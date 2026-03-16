@@ -9,11 +9,13 @@ import Scan from "./pages/Scan";
 import Memos from "./pages/Memos";
 import Outreach from "./pages/Outreach";
 import Settings from "./pages/Settings";
+import DealDetail from "./pages/DealDetail";
 
 function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/deal/:id"} component={DealDetail} />
       <Route path={"/scan"} component={Scan} />
       <Route path={"/memos"} component={Memos} />
       <Route path={"/outreach"} component={Outreach} />

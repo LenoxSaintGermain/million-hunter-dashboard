@@ -202,7 +202,7 @@ export default function Home() {
               </TableHeader>
               <TableBody>
                 {opportunities.map((opp) => (
-                  <TableRow key={opp.id} className="group cursor-pointer hover:bg-muted/50 transition-colors">
+                  <TableRow key={opp.id} className="group cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => window.location.href = `/deal/${opp.id}`}>
                     <TableCell className="font-medium">
                       <div className="flex flex-col">
                         <span className="text-foreground group-hover:text-primary transition-colors">
