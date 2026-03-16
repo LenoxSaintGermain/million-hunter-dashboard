@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 import DashboardLayout from "@/components/DashboardLayout";
 import SignalDetail from "@/components/SignalDetail";
+import DynamicCapitalStack from "@/components/DynamicCapitalStack";
 import { cn } from "@/lib/utils";
 
 // Mock data for a single deal (would be fetched by ID)
@@ -155,6 +156,12 @@ export default function DealDetail() {
         <div className="space-y-4">
           <h2 className="text-xl font-semibold tracking-tight">Third Signal Analysis</h2>
           <SignalDetail signals={dealData.signals} />
+        </div>
+
+        {/* Dynamic Capital Stack Wizard */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold tracking-tight">Capital Stack Wizard</h2>
+          <DynamicCapitalStack purchasePrice={dealData.asking_price} cashFlow={dealData.cash_flow} />
         </div>
 
         {/* Description & Broker Info */}
