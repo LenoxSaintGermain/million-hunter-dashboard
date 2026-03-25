@@ -1,155 +1,200 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { 
-  LayoutDashboard, 
-  Search, 
-  FileText, 
-  Send, 
-  Settings, 
-  Menu, 
-  X,
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { getLoginUrl } from "@/const";
+import {
+  LayoutDashboard,
+  Search,
+  FileText,
+  Mail,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  Zap,
   Bell,
-  User
+  User,
+  TrendingUp,
+  Menu,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+const navItems = [
+  { href: "/", icon: LayoutDashboard, label: "Command Center", badge: null },
+  { href: "/scan", icon: Search, label: "Market Scan", badge: "Live" },
+  { href: "/memos", icon: FileText, label: "Investment Memos", badge: null },
+  { href: "/outreach", icon: Mail, label: "Outreach Pipeline", badge: null },
+];
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [location] = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, isAuthenticated } = useAuth();
 
-  const navItems = [
-    { icon: LayoutDashboard, label: "Command Center", path: "/" },
-    { icon: Search, label: "Market Scan", path: "/scan" },
-    { icon: FileText, label: "Investment Memos", path: "/memos" },
-    { icon: Send, label: "Outreach", path: "/outreach" },
-    { icon: Settings, label: "Settings", path: "/settings" },
-  ];
+  const SidebarContent = () => (
+    <>
+      {/* Logo */}
+      <div className={cn("flex items-center h-16 px-4 border-b border-border gap-3 shrink-0", collapsed && "justify-center px-0")}>
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/20 shrink-0">
+          <Zap className="w-4 h-4 text-primary" />
+        </div>
+        {!collapsed && (
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-bold text-foreground tracking-tight truncate">Signal Hunter</span>
+            <span className="text-[10px] text-muted-foreground tracking-widest uppercase">Acquisition OS</span>
+          </div>
+        )}
+        <button className="ml-auto lg:hidden text-muted-foreground" onClick={() => setMobileOpen(false)}>
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+        {navItems.map((item) => {
+          const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+          return (
+            <Tooltip key={item.href} delayDuration={0}>
+              <TooltipTrigger asChild>
+                <Link href={item.href} onClick={() => setMobileOpen(false)}>
+                  <div className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-150 text-sm font-medium",
+                    isActive
+                      ? "bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                    collapsed && "justify-center px-0"
+                  )}>
+                    <item.icon className={cn("shrink-0", collapsed ? "w-5 h-5" : "w-4 h-4")} />
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1 truncate">{item.label}</span>
+                        {item.badge && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-primary/20 text-primary border-0">
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </Link>
+              </TooltipTrigger>
+              {collapsed && <TooltipContent side="right">{item.label}</TooltipContent>}
+            </Tooltip>
+          );
+        })}
+      </nav>
+
+      {/* Bottom */}
+      <div className="border-t border-border p-2 space-y-1 shrink-0">
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <Link href="/settings" onClick={() => setMobileOpen(false)}>
+              <div className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent",
+                collapsed && "justify-center px-0"
+              )}>
+                <Settings className={cn("shrink-0", collapsed ? "w-5 h-5" : "w-4 h-4")} />
+                {!collapsed && <span>Settings</span>}
+              </div>
+            </Link>
+          </TooltipTrigger>
+          {collapsed && <TooltipContent side="right">Settings</TooltipContent>}
+        </Tooltip>
+
+        <div className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg", collapsed && "justify-center px-0")}>
+          <Avatar className="w-7 h-7 shrink-0">
+            <AvatarFallback className="bg-primary/20 text-primary text-xs font-bold">
+              {user?.name?.charAt(0) ?? "L"}
+            </AvatarFallback>
+          </Avatar>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-foreground truncate">{user?.name ?? "Lenox"}</p>
+              <p className="text-[10px] text-muted-foreground truncate">Acquisition OS</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
 
   return (
-    <div className="min-h-screen bg-background font-sans text-foreground flex overflow-hidden">
-      {/* Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden backdrop-blur-sm"
-          onClick={() => setSidebarOpen(false)}
-        />
+    <div className="flex h-screen bg-background overflow-hidden">
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setMobileOpen(false)} />
       )}
 
-      {/* Sidebar */}
-      <aside 
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-sidebar-border transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-auto flex flex-col",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        {/* Logo Area */}
-        <div className="h-16 flex items-center px-6 border-b border-sidebar-border">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold">
-              <img 
-                src="https://d2xsxph8kpxj0f.cloudfront.net/87291783/GeCPeFFiEBRZFpk6xckkAz/logo-icon-mqktVHbBtdAgQ9x9itu4WL.webp" 
-                alt="Logo" 
-                className="w-6 h-6 object-contain"
-              />
-            </div>
-            <span className="font-semibold text-lg tracking-tight">Million Hunter</span>
-          </div>
-          <button 
-            className="ml-auto lg:hidden text-muted-foreground"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const isActive = location === item.path;
-            return (
-              <Link key={item.path} href={item.path}>
-                <div 
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer group",
-                    isActive 
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground" 
-                      : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-                  )}
-                >
-                  <item.icon 
-                    size={18} 
-                    className={cn(
-                      "transition-colors",
-                      isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                    )} 
-                  />
-                  {item.label}
-                </div>
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* User Profile */}
-        <div className="p-4 border-t border-sidebar-border">
-          <div className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-sidebar-accent/50 transition-colors cursor-pointer">
-            <Avatar className="h-9 w-9 border border-border">
-              <AvatarImage src="" />
-              <AvatarFallback className="bg-primary/10 text-primary font-medium">LX</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">Lenox</p>
-              <p className="text-xs text-muted-foreground truncate">Strategist</p>
-            </div>
-          </div>
-        </div>
+      {/* Mobile sidebar */}
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-50 w-60 bg-card border-r border-border flex flex-col transition-transform duration-200 lg:hidden",
+        mobileOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <SidebarContent />
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Header */}
-        <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-4 lg:px-8">
-          <div className="flex items-center gap-4">
-            <button 
-              className="lg:hidden p-2 -ml-2 text-muted-foreground hover:text-foreground"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu size={20} />
-            </button>
-            <h1 className="text-lg font-semibold hidden sm:block">
-              {navItems.find(i => i.path === location)?.label || "Dashboard"}
-            </h1>
-          </div>
+      {/* Desktop sidebar */}
+      <aside className={cn(
+        "hidden lg:flex flex-col border-r border-border transition-all duration-300 ease-in-out shrink-0 bg-card relative",
+        collapsed ? "w-16" : "w-60"
+      )}>
+        <SidebarContent />
+        {/* Collapse toggle */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="absolute -right-3 top-20 w-6 h-6 flex items-center justify-center bg-card border border-border rounded-full text-muted-foreground hover:text-foreground transition-colors z-10"
+        >
+          {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+        </button>
+      </aside>
 
-          <div className="flex items-center gap-4">
-            <div className="relative hidden md:block">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <input 
-                type="text" 
-                placeholder="Search opportunities..." 
-                className="h-9 w-64 rounded-md border border-input bg-background pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-ring"
-              />
+      {/* Main content */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar */}
+        <header className="h-16 border-b border-border flex items-center justify-between px-4 lg:px-6 bg-card/50 shrink-0">
+          <div className="flex items-center gap-3">
+            <button className="lg:hidden p-1.5 text-muted-foreground hover:text-foreground" onClick={() => setMobileOpen(true)}>
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="hidden sm:flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-muted-foreground">
+                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              </span>
             </div>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+              <Bell className="w-4 h-4" />
             </Button>
+            {!isAuthenticated ? (
+              <Button size="sm" className="h-8 text-xs" onClick={() => window.location.href = getLoginUrl()}>
+                Sign In
+              </Button>
+            ) : (
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                <User className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
-          <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+        {/* Page content */}
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
             {children}
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

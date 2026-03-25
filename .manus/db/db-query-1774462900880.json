@@ -1,0 +1,9 @@
+{
+  "query": "\nALTER TABLE outreach \n  ADD COLUMN channel ENUM('email','phone','linkedin','sms') NOT NULL DEFAULT 'email',\n  ADD COLUMN subject TEXT,\n  ADD COLUMN body TEXT;\n\nALTER TABLE outreach \n  MODIFY COLUMN status ENUM('pending','sent','opened','replied','meeting_scheduled','no_response','not_interested','closed') NOT NULL DEFAULT 'pending';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute \nALTER TABLE outreach \n  ADD COLUMN channel ENUM('email','phone','linkedin','sms') NOT NULL DEFAULT 'email',\n  ADD COLUMN subject TEXT,\n  ADD COLUMN body TEXT;\n\nALTER TABLE outreach \n  MODIFY COLUMN status ENUM('pending','sent','opened','replied','meeting_scheduled','no_response','not_interested','closed') NOT NULL DEFAULT 'pending';\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 855
+}

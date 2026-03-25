@@ -1,321 +1,279 @@
-import { useState, useEffect } from "react";
-import { 
-  TrendingUp, 
-  DollarSign, 
-  Users, 
-  Activity, 
-  ArrowUpRight, 
-  ArrowDownRight,
-  Filter,
-  MoreHorizontal
-} from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { Progress } from "@/components/ui/progress";
-import DashboardLayout from "@/components/DashboardLayout";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { Link } from "wouter";
+import {
+  TrendingUp, DollarSign, Activity, ArrowUpRight,
+  Zap, Brain, RefreshCw, ChevronRight,
+  Building2, MapPin, Clock, AlertCircle,
+} from "lucide-react";
 
-// Mock data for initial render (will be replaced by real data fetch)
-const opportunities = [
-  {
-    id: "SBA-GA-001",
-    name: "Metro Commercial Cleaning - Atlanta",
-    revenue: 1850000,
-    cashFlow: 720000,
-    asking: 2100000,
-    score: 0.907,
-    status: "High Priority",
-    trend: "up",
-    location: "Atlanta, GA"
-  },
-  {
-    id: "SBA-GA-002",
-    name: "Peach State Commercial Cleaning Georgia",
-    revenue: 3500000,
-    cashFlow: 1100000,
-    asking: 4000000,
-    score: 0.786,
-    status: "Qualified",
-    trend: "stable",
-    location: "Atlanta, GA"
-  },
-  {
-    id: "SBA-NC-003",
-    name: "Logistics & Delivery Service Charlotte",
-    revenue: 6500000,
-    cashFlow: 1900000,
-    asking: 7600000,
-    score: 0.759,
-    status: "Qualified",
-    trend: "up",
-    location: "Charlotte, NC"
-  },
-  {
-    id: "SBA-TX-004",
-    name: "TX Government Logistics & Delivery",
-    revenue: 6200000,
-    cashFlow: 1800000,
-    asking: 6500000,
-    score: 0.705,
-    status: "Qualified",
-    trend: "down",
-    location: "Dallas, TX"
-  },
-  {
-    id: "SBA-GA-005",
-    name: "Route-Based Pest Control Service Atlanta",
-    revenue: 1500000,
-    cashFlow: 650000,
-    asking: 2270000,
-    score: 0.670,
-    status: "Review",
-    trend: "stable",
-    location: "Atlanta, GA"
-  }
-];
+function KpiCard({ label, value, sub, icon: Icon, trend }: {
+  label: string; value: string; sub?: string; icon: React.ElementType; trend?: "up" | "down" | "neutral";
+}) {
+  return (
+    <Card className="bg-card border-border hover:border-primary/30 transition-colors">
+      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+        <CardTitle className="text-xs font-medium text-muted-foreground">{label}</CardTitle>
+        <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Icon className="w-3.5 h-3.5 text-primary" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold text-foreground">{value}</div>
+        {sub && (
+          <p className={cn("text-xs mt-1 flex items-center gap-1",
+            trend === "up" ? "text-emerald-500" : trend === "down" ? "text-destructive" : "text-muted-foreground"
+          )}>
+            {trend === "up" && <ArrowUpRight className="w-3 h-3" />}
+            {sub}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ScoreBadge({ score }: { score: number | null | undefined }) {
+  if (score == null) return <span className="text-xs text-muted-foreground font-mono">—</span>;
+  const color = score >= 0.8 ? "text-emerald-500" : score >= 0.65 ? "text-amber-500" : "text-muted-foreground";
+  return <span className={cn("text-sm font-bold font-mono", color)}>{score.toFixed(3)}</span>;
+}
 
 export default function Home() {
+  const { data, isLoading, refetch } = trpc.dashboard.stats.useQuery();
+  const triggerScan = trpc.scan.trigger.useMutation({
+    onSuccess: (d) => { toast.success(d.message); refetch(); },
+    onError: (e) => toast.error(`Scan failed: ${e.message}`),
+  });
+
+  const fmt = (n: number | null | undefined) => {
+    if (n == null) return "—";
+    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}k`;
+    return `$${n}`;
+  };
+
+  const activityIcon: Record<string, React.ElementType> = {
+    deal_added: Building2,
+    deal_scored: Zap,
+    signal_analyzed: Brain,
+    red_flag_detected: AlertCircle,
+    memo_generated: Activity,
+    outreach_sent: ArrowUpRight,
+    scan_completed: RefreshCw,
+    stage_changed: ChevronRight,
+  };
+
+  const activityColor: Record<string, string> = {
+    deal_added: "bg-blue-500/20 text-blue-400",
+    deal_scored: "bg-amber-500/20 text-amber-400",
+    signal_analyzed: "bg-purple-500/20 text-purple-400",
+    red_flag_detected: "bg-destructive/20 text-destructive",
+    memo_generated: "bg-primary/20 text-primary",
+    outreach_sent: "bg-emerald-500/20 text-emerald-400",
+    scan_completed: "bg-blue-500/20 text-blue-400",
+    stage_changed: "bg-muted/60 text-muted-foreground",
+  };
+
+  const stats = data?.dealStats;
+  const outStats = data?.outreachStats;
+
   return (
     <DashboardLayout>
-      {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/90 to-primary text-primary-foreground p-8 shadow-lg">
-        <div className="absolute inset-0 opacity-20 bg-[url('https://d2xsxph8kpxj0f.cloudfront.net/87291783/GeCPeFFiEBRZFpk6xckkAz/hero-background-QfT7XBwYK438J3BgUvLss9.webp')] bg-cover bg-center mix-blend-overlay" />
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      {/* Hero */}
+      <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card p-6">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl pointer-events-none" />
+        <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight mb-2">Good Morning, Lenox</h2>
-            <p className="text-primary-foreground/80 max-w-xl">
-              Market scan complete. 55 new listings analyzed across 11 platforms. 
-              4 high-potential opportunities identified for immediate review.
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs text-emerald-500 font-medium">System Operational</span>
+            </div>
+            <h1 className="text-2xl font-bold text-foreground mb-1">Signal Hunter Command Center</h1>
+            <p className="text-sm text-muted-foreground max-w-xl">
+              {data?.latestScan
+                ? `Last scan: ${new Date(data.latestScan.createdAt).toLocaleString()} · ${data.latestScan.sources?.length ?? 0} platforms`
+                : "No scan data yet. Trigger a market scan to begin."}
             </p>
           </div>
-          <div className="flex gap-3">
-            <Button variant="secondary" className="shadow-sm">
-              <Activity className="mr-2 h-4 w-4" />
-              View Report
+          <div className="flex gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 text-xs border-border"
+              onClick={() => triggerScan.mutate({})}
+              disabled={triggerScan.isPending}
+            >
+              <RefreshCw className={cn("w-3.5 h-3.5 mr-1.5", triggerScan.isPending && "animate-spin")} />
+              {triggerScan.isPending ? "Scanning..." : "Run Market Scan"}
             </Button>
-            <Button className="bg-white text-primary hover:bg-white/90 shadow-sm">
-              <TrendingUp className="mr-2 h-4 w-4" />
-              Start Outreach
-            </Button>
+            <Link href="/scan">
+              <Button size="sm" className="h-9 text-xs">
+                <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
+                View Pipeline
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Pipeline Value
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">$12.4M</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center">
-              <ArrowUpRight className="h-3 w-3 text-emerald-500 mr-1" />
-              <span className="text-emerald-500 font-medium">+15%</span> from last week
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Opportunities
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center">
-              <span className="text-emerald-500 font-medium">4 new</span> today
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Outreach Sent
-            </CardTitle>
-            <SendIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">28</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center">
-              <ArrowUpRight className="h-3 w-3 text-emerald-500 mr-1" />
-              <span className="text-emerald-500 font-medium">+8</span> this week
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Avg. Deal Score
-            </CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">0.74</div>
-            <div className="w-full bg-secondary h-1.5 mt-3 rounded-full overflow-hidden">
-              <div className="bg-primary h-full rounded-full" style={{ width: '74%' }} />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="Total Pipeline Value"
+            value={fmt(stats?.totalAskingPrice)}
+            sub={`${stats?.totalDeals ?? 0} active deals`}
+            icon={DollarSign}
+            trend="up"
+          />
+          <KpiCard
+            label="Avg. Cash Flow"
+            value={fmt(stats?.avgCashFlow)}
+            sub="across qualified deals"
+            icon={TrendingUp}
+            trend="up"
+          />
+          <KpiCard
+            label="High Priority"
+            value={String(stats?.highPriority ?? 0)}
+            sub="deals ready for outreach"
+            icon={Zap}
+            trend={stats?.highPriority ? "up" : "neutral"}
+          />
+          <KpiCard
+            label="Outreach Active"
+            value={String(outStats?.total ?? 0)}
+            sub={`${outStats?.responded ?? 0} responded`}
+            icon={Activity}
+            trend={outStats?.responded ? "up" : "neutral"}
+          />
+        </div>
+      )}
 
-      {/* Main Content Area */}
-      <div className="grid gap-6 md:grid-cols-7">
-        {/* Opportunities Table */}
-        <Card className="md:col-span-5">
-          <CardHeader className="flex flex-row items-center justify-between">
+      {/* Main grid */}
+      <div className="grid gap-6 lg:grid-cols-7">
+        {/* Top Opportunities */}
+        <Card className="lg:col-span-5 bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div>
-              <CardTitle>Top Opportunities</CardTitle>
-              <CardDescription>
-                Ranked by AI scoring algorithm based on financials, strategic fit, and deal structure.
-              </CardDescription>
+              <CardTitle className="text-sm font-semibold">Top Opportunities</CardTitle>
+              <CardDescription className="text-xs">Ranked by AI scoring algorithm</CardDescription>
             </div>
-            <Button variant="outline" size="sm" className="h-8">
-              <Filter className="mr-2 h-3 w-3" />
-              Filter
-            </Button>
+            <Link href="/scan">
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground">
+                View all <ChevronRight className="w-3 h-3 ml-1" />
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[300px]">Business Name</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Cash Flow</TableHead>
-                  <TableHead>Asking</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {opportunities.map((opp) => (
-                  <TableRow key={opp.id} className="group cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => window.location.href = `/deal/${opp.id}`}>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                        <span className="text-foreground group-hover:text-primary transition-colors">
-                          {opp.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">{opp.location}</span>
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+              </div>
+            ) : !stats?.topDeals?.length ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Building2 className="w-10 h-10 text-muted-foreground/20 mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">No deals yet</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">Run a market scan to populate the pipeline</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {stats.topDeals.map((deal) => (
+                  <Link key={deal.id} href={`/deal/${deal.id}`}>
+                    <div className="group flex items-center gap-4 px-3 py-2.5 rounded-lg hover:bg-muted/40 transition-colors cursor-pointer">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <Building2 className="w-4 h-4 text-primary" />
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className={cn(
-                          "font-bold",
-                          opp.score >= 0.8 ? "text-emerald-600" : 
-                          opp.score >= 0.7 ? "text-amber-600" : "text-muted-foreground"
-                        )}>
-                          {opp.score.toFixed(3)}
-                        </span>
-                        {opp.trend === 'up' && <ArrowUpRight className="h-3 w-3 text-emerald-500" />}
-                        {opp.trend === 'down' && <ArrowDownRight className="h-3 w-3 text-rose-500" />}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                          {deal.name}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {deal.location && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <MapPin className="w-2.5 h-2.5" />{deal.location}
+                            </span>
+                          )}
+                          {deal.industry && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">{deal.industry}</Badge>
+                          )}
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell>${(opp.cashFlow / 1000).toFixed(0)}k</TableCell>
-                    <TableCell>${(opp.asking / 1000000).toFixed(2)}M</TableCell>
-                    <TableCell>
-                      <Badge variant={
-                        opp.status === "High Priority" ? "default" : 
-                        opp.status === "Qualified" ? "secondary" : "outline"
-                      }>
-                        {opp.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                      <div className="flex items-center gap-4 shrink-0 text-right">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Cash Flow</p>
+                          <p className="text-xs font-semibold text-emerald-500">{fmt(deal.cashFlow)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Score</p>
+                          <ScoreBadge score={deal.score} />
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                      </div>
+                    </div>
+                  </Link>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Side Panel - Recent Activity */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Live Feed</CardTitle>
-            <CardDescription>Real-time system updates</CardDescription>
+        {/* Live Feed */}
+        <Card className="lg:col-span-2 bg-card border-border">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">Live Feed</CardTitle>
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <CardDescription className="text-xs">Real-time system events</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-6">
-              {[
-                { time: "10m ago", text: "New listing found in Atlanta (HVAC)", type: "scan" },
-                { time: "25m ago", text: "Outreach email sent to Broker: Georgia Business Brokers", type: "email" },
-                { time: "1h ago", text: "Investment Memo generated for SBA-GA-001", type: "doc" },
-                { time: "2h ago", text: "Market scan completed: 55 listings processed", type: "system" },
-              ].map((item, i) => (
-                <div key={i} className="flex gap-3 items-start">
-                  <div className={cn(
-                    "w-2 h-2 mt-2 rounded-full shrink-0",
-                    item.type === 'scan' ? "bg-blue-500" :
-                    item.type === 'email' ? "bg-purple-500" :
-                    item.type === 'doc' ? "bg-amber-500" : "bg-emerald-500"
-                  )} />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium leading-none">{item.text}</p>
-                    <p className="text-xs text-muted-foreground">{item.time}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <div className="mt-8 pt-6 border-t border-border">
-              <h4 className="text-sm font-medium mb-4">System Status</h4>
-              <div className="space-y-3">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Scraper Engine</span>
-                  <span className="text-emerald-500 font-medium">Operational</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Scoring Model</span>
-                  <span className="text-emerald-500 font-medium">v2.1 Active</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">API Quota</span>
-                  <span className="text-primary font-medium">85% Remaining</span>
-                </div>
-                <Progress value={15} className="h-1" />
+            {isLoading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12" />)}
               </div>
-            </div>
+            ) : !data?.recentActivity?.length ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Activity className="w-8 h-8 text-muted-foreground/20 mb-2" />
+                <p className="text-xs text-muted-foreground">No activity yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {data.recentActivity.map((event) => {
+                  const Icon = activityIcon[event.type] ?? Activity;
+                  const colorClass = activityColor[event.type] ?? "bg-muted/60 text-muted-foreground";
+                  const elapsed = Math.round((Date.now() - new Date(event.createdAt).getTime()) / 60000);
+                  return (
+                    <div key={event.id} className="flex gap-2.5 items-start">
+                      <div className={cn("w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5", colorClass)}>
+                        <Icon className="w-3 h-3" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground leading-snug">{event.title}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" />
+                          {elapsed < 1 ? "just now" : elapsed < 60 ? `${elapsed}m ago` : `${Math.round(elapsed / 60)}h ago`}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
     </DashboardLayout>
   );
-}
-
-function SendIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m22 2-7 20-4-9-9-4Z" />
-      <path d="M22 2 11 13" />
-    </svg>
-  )
 }
