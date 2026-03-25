@@ -1,0 +1,19 @@
+{
+  "query": "DELETE FROM deals WHERE name LIKE 'Test Deal%' OR name LIKE 'Debug Test%'; DELETE FROM scan_jobs WHERE status IN ('pending', 'running') AND completedAt IS NULL; SELECT COUNT(*) as deals FROM deals; SELECT COUNT(*) as scan_jobs FROM scan_jobs;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute DELETE FROM deals WHERE name LIKE 'Test Deal%' OR name LIKE 'Debug Test%'; DELETE FROM scan_jobs WHERE status IN ('pending', 'running') AND completedAt IS NULL; SELECT COUNT(*) as deals FROM deals; SELECT COUNT(*) as scan_jobs FROM scan_jobs;",
+  "rows": [
+    {
+      "deals": "0"
+    },
+    {
+      "deals": "scan_jobs"
+    },
+    {
+      "deals": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "deals\n0\nscan_jobs\n0\n",
+  "stderr": "",
+  "execution_time_ms": 84
+}

@@ -79,3 +79,8 @@
 - [x] Integrate ScanProgress into Home and Settings pages
 - [x] Add clear error states and retry button
 - [x] Save checkpoint after scan feedback is live
+
+## Bug: Scan Results Not Persisting (Mar 25)
+- [x] Debug why createDeal fails silently in runScanPipeline
+- [x] Fix deal persistence so scanned deals appear in Command Center (root cause: mysql2/drizzle returns [ResultSetHeader, null] array, not .insertId directly — fixed to use [0].insertId)
+- [x] Verify KPI cards update after scan completes

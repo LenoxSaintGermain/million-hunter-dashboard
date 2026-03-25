@@ -1,0 +1,31 @@
+{
+  "query": "SELECT COUNT(*) as total FROM deals; SELECT * FROM deals LIMIT 5; SELECT * FROM scan_jobs ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT COUNT(*) as total FROM deals; SELECT * FROM deals LIMIT 5; SELECT * FROM scan_jobs ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "total": "0"
+    },
+    {
+      "total": "id\tstatus\tsources\tlistingsFound\tlistingsQualified\terrorMessage\tstartedAt\tcompletedAt\tcreatedAt\tcurrentPhase\tphaseDetail\tprogressPct\tdealsScored"
+    },
+    {
+      "total": "9\trunning\t[\"bizbuysell\"]\t0\t0\tNULL\t2026-03-25 19:37:26\tNULL\t2026-03-25 19:37:26\tScanning marketplaces\tNULL\t10\t0"
+    },
+    {
+      "total": "8\tpending\t[\"bizbuysell\", \"dealstream\"]\t0\t0\tNULL\t2026-03-25 19:37:26\tNULL\t2026-03-25 19:37:26\tInitializing scan engine\tConnecting to 2 marketplaces\t2\t0"
+    },
+    {
+      "total": "7\trunning\t[\"bizbuysell\"]\t0\t0\tNULL\t2026-03-25 19:37:17\tNULL\t2026-03-25 19:37:17\tScanning marketplaces\tNULL\t10\t0"
+    },
+    {
+      "total": "6\tpending\t[\"bizbuysell\", \"dealstream\"]\t0\t0\tNULL\t2026-03-25 19:37:17\tNULL\t2026-03-25 19:37:17\tInitializing scan engine\tConnecting to 2 marketplaces\t2\t0"
+    },
+    {
+      "total": "5\tpending\t[\"bizbuysell\", \"dealstream\", \"flippa\", \"quietlight\", \"empireflippers\", \"axial\", \"bizquest\", \"sunbeltnetwork\", \"acquire\", \"businessbroker\", \"loopnet\"]\t0\t0\tNULL\t2026-03-25 19:29:10\tNULL\t2026-03-25 19:29:10\tNULL\tNULL\t0\t0"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\n0\nid\tstatus\tsources\tlistingsFound\tlistingsQualified\terrorMessage\tstartedAt\tcompletedAt\tcreatedAt\tcurrentPhase\tphaseDetail\tprogressPct\tdealsScored\n9\trunning\t[\"bizbuysell\"]\t0\t0\tNULL\t2026-03-25 19:37:26\tNULL\t2026-03-25 19:37:26\tScanning marketplaces\tNULL\t10\t0\n8\tpending\t[\"bizbuysell\", \"dealstream\"]\t0\t0\tNULL\t2026-03-25 19:37:26\tNULL\t2026-03-25 19:37:26\tInitializing scan engine\tConnecting to 2 marketplaces\t2\t0\n7\trunning\t[\"bizbuysell\"]\t0\t0\tNULL\t2026-03-25 19:37:17\tNULL\t2026-03-25 19:37:17\tScanning marketplaces\tNULL\t10\t0\n6\tpending\t[\"bizbuysell\", \"dealstream\"]\t0\t0\tNULL\t2026-03-25 19:37:17\tNULL\t2026-03-25 19:37:17\tInitializing scan engine\tConnecting to 2 marketplaces\t2\t0\n5\tpending\t[\"bizbuysell\", \"dealstream\", \"flippa\", \"quietlight\", \"empireflippers\", \"axial\", \"bizquest\", \"sunbeltnetwork\", \"acquire\", \"businessbroker\", \"loopnet\"]\t0\t0\tNULL\t2026-03-25 19:29:10\tNULL\t2026-03-25 19:29:10\tNULL\tNULL\t0\t0\n",
+  "stderr": "",
+  "execution_time_ms": 85
+}

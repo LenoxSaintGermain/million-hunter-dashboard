@@ -283,7 +283,7 @@ export const appRouter = router({
           phaseDetail: `Connecting to ${sources.length} marketplace${sources.length > 1 ? "s" : ""}`,
           progressPct: 2,
         });
-        const jobId = (insertResult as any).insertId as number;
+        const jobId = (insertResult as any)[0].insertId as number;
 
         // Run the full pipeline asynchronously — don't await, return immediately
         runScanPipeline(jobId, sources, minCashFlow, maxMultiple).catch((err) => {
@@ -414,7 +414,7 @@ async function runScanPipeline(
       dealId = existing.id;
     } else {
       const res = await createDeal({ ...listing, stage: "new" }) as any;
-      dealId = res.insertId;
+      dealId = res[0].insertId;
     }
 
     // Score the deal
