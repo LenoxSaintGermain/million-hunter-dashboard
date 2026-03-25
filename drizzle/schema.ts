@@ -182,3 +182,14 @@ export const scanJobs = mysqlTable("scan_jobs", {
 
 export type ScanJob = typeof scanJobs.$inferSelect;
 export type InsertScanJob = typeof scanJobs.$inferInsert;
+// ─── AI Model Config (per-module model selection) ─────────────────────────────
+export const modelConfig = mysqlTable("model_config", {
+  id: int("id").autoincrement().primaryKey(),
+  module: varchar("module", { length: 64 }).notNull().unique(),
+  modelId: varchar("modelId", { length: 128 }).notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ModelConfig = typeof modelConfig.$inferSelect;
+export type InsertModelConfig = typeof modelConfig.$inferInsert;

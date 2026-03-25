@@ -530,12 +530,12 @@ function OutreachTab({ dealId }: { dealId: number }) {
                   <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium", statusColor[c.status] ?? "bg-muted text-muted-foreground")}>
                     {c.status.replace(/_/g, " ")}
                   </span>
-                  {c.status === "not_contacted" && (
+                  {c.status === "pending" && (
                     <Button
                       size="sm"
                       variant="outline"
                       className="h-7 text-[11px] border-border"
-                      onClick={() => updateStatus.mutate({ id: c.id, status: "email_sent" })}
+                      onClick={() => updateStatus.mutate({ id: c.id, status: "sent" })}
                     >
                       Mark Sent
                     </Button>

@@ -47,6 +47,7 @@ function ScoreBadge({ score }: { score: number | null | undefined }) {
 
 export default function Home() {
   const { data, isLoading, refetch } = trpc.dashboard.stats.useQuery();
+  const { data: topDealsData } = trpc.deals.list.useQuery({ limit: 5 });
   const triggerScan = trpc.scan.trigger.useMutation({
     onSuccess: (d) => { toast.success(d.message); refetch(); },
     onError: (e) => toast.error(`Scan failed: ${e.message}`),
@@ -98,7 +99,7 @@ export default function Home() {
             <h1 className="text-2xl font-bold text-foreground mb-1">Signal Hunter Command Center</h1>
             <p className="text-sm text-muted-foreground max-w-xl">
               {data?.latestScan
-                ? `Last scan: ${new Date(data.latestScan.createdAt).toLocaleString()} · ${data.latestScan.sources?.length ?? 0} platforms`
+                ? `Last scan: ${new Date(data.latestScan.createdAt).toLocaleString()} · ${(data.latestScan.sources as string[] | null)?.length ?? 0} platforms`
                 : "No scan data yet. Trigger a market scan to begin."}
             </p>
           </div>
@@ -132,14 +133,14 @@ export default function Home() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             label="Total Pipeline Value"
-            value={fmt(stats?.totalAskingPrice)}
-            sub={`${stats?.totalDeals ?? 0} active deals`}
+            value={fmt(stats?.totalPipelineValue)}
+            sub={`${stats?.total ?? 0} active deals`}
             icon={DollarSign}
             trend="up"
           />
           <KpiCard
-            label="Avg. Cash Flow"
-            value={fmt(stats?.avgCashFlow)}
+            label="Avg. Deal Score"
+            value={stats?.avgScore != null ? stats.avgScore.toFixed(3) : '—'}
             sub="across qualified deals"
             icon={TrendingUp}
             trend="up"
@@ -153,7 +154,7 @@ export default function Home() {
           />
           <KpiCard
             label="Outreach Active"
-            value={String(outStats?.total ?? 0)}
+            value={String(outStats?.totalSent ?? 0)}
             sub={`${outStats?.responded ?? 0} responded`}
             icon={Activity}
             trend={outStats?.responded ? "up" : "neutral"}
@@ -181,7 +182,7 @@ export default function Home() {
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
               </div>
-            ) : !stats?.topDeals?.length ? (
+            ) : !topDealsData?.length ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Building2 className="w-10 h-10 text-muted-foreground/20 mb-3" />
                 <p className="text-sm font-medium text-muted-foreground">No deals yet</p>
@@ -189,7 +190,7 @@ export default function Home() {
               </div>
             ) : (
               <div className="space-y-1">
-                {stats.topDeals.map((deal) => (
+                {(topDealsData ?? []).map((deal) => (
                   <Link key={deal.id} href={`/deal/${deal.id}`}>
                     <div className="group flex items-center gap-4 px-3 py-2.5 rounded-lg hover:bg-muted/40 transition-colors cursor-pointer">
                       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">

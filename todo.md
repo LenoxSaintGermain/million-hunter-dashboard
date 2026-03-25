@@ -52,3 +52,21 @@
 - [ ] Add Dockerfile for Cloud Run deployment
 - [ ] Add cloudbuild.yaml for CI/CD pipeline
 - [ ] Document GCP deployment steps in README
+
+## Model Upgrade (Mar 25)
+- [x] Replace Anthropic with OpenAI gpt-5.4 for Owner Psychology module
+- [x] Replace deprecated gemini-2.0-flash with gemini-2.5-flash in Digital Audit
+- [x] Update all Gemini model IDs to latest stable (gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite)
+- [x] Inject OPENAI_API_KEY secret
+- [x] Update api-keys.test.ts to validate OpenAI key
+- [x] Install openai npm package
+- [x] Save production checkpoint after model upgrades
+
+## Dynamic Model Selector (Mar 25)
+- [x] Build model registry in shared/models.ts with all Gemini + GPT-5.4 models (including experimental)
+- [x] Add model_config table to database schema for per-module model persistence
+- [x] Add tRPC procedures: models.catalog, models.config, models.update, models.resetDefaults
+- [x] Update gemini.ts to read model IDs dynamically from config (no hardcoded models)
+- [x] Build AI Model Selector UI in Settings.tsx with per-module dropdowns
+- [x] Replace Anthropic with OpenAI gpt-5.4 in Owner Psychology (primary, no fallback needed)
+- [x] Save production checkpoint after model selector is live

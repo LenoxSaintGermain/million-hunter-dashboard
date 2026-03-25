@@ -220,3 +220,46 @@ export async function updateScanJob(id: number, data: Partial<Pick<InsertScanJob
   if (!db) throw new Error("Database not available");
   await db.update(scanJobs).set(data).where(eq(scanJobs.id, id));
 }
+
+
+// ─── Model Config ─────────────────────────────────────────────────────────────
+import { modelConfig, type InsertModelConfig } from "../drizzle/schema";
+import { DEFAULT_MODULE_MODELS, type AnalysisModule } from "../shared/models";
+
+export async function getModelConfig(): Promise<Record<string, string>> {
+  const db = await getDb();
+  if (!db) return { ...DEFAULT_MODULE_MODELS };
+  try {
+    const rows = await db.select().from(modelConfig);
+    const config: Record<string, string> = { ...DEFAULT_MODULE_MODELS };
+    for (const row of rows) {
+      if (row.enabled) config[row.module] = row.modelId;
+    }
+    return config;
+  } catch {
+    return { ...DEFAULT_MODULE_MODELS };
+  }
+}
+
+export async function getModuleModel(module: AnalysisModule): Promise<string> {
+  const config = await getModelConfig();
+  return config[module] ?? DEFAULT_MODULE_MODELS[module];
+}
+
+export async function upsertModelConfig(module: AnalysisModule, modelId: string, enabled = true) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(modelConfig)
+    .values({ module, modelId, enabled })
+    .onDuplicateKeyUpdate({ set: { modelId, enabled } });
+}
+
+export async function getAllModelConfigs() {
+  const db = await getDb();
+  if (!db) return [];
+  try {
+    return await db.select().from(modelConfig);
+  } catch {
+    return [];
+  }
+}

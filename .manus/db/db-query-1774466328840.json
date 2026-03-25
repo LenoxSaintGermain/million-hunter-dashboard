@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `model_config` (\n  `id` int NOT NULL AUTO_INCREMENT,\n  `module` varchar(64) NOT NULL,\n  `modelId` varchar(128) NOT NULL,\n  `enabled` tinyint(1) NOT NULL DEFAULT 1,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  PRIMARY KEY (`id`),\n  UNIQUE KEY `model_config_module_unique` (`module`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute CREATE TABLE IF NOT EXISTS `model_config` (\n  `id` int NOT NULL AUTO_INCREMENT,\n  `module` varchar(64) NOT NULL,\n  `modelId` varchar(128) NOT NULL,\n  `enabled` tinyint(1) NOT NULL DEFAULT 1,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  PRIMARY KEY (`id`),\n  UNIQUE KEY `model_config_module_unique` (`module`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 111
+}

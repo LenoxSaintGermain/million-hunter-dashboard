@@ -1,0 +1,8 @@
+{
+  "query": "SHOW TABLES LIKE 'model_config'; DESCRIBE model_config;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SHOW TABLES LIKE 'model_config'; DESCRIBE model_config;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1146 (42S02) at line 1: Table 'gecpeffiebrzfpk6xckkaz.model_config' doesn't exist"
+  ]
+}

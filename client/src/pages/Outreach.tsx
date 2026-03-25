@@ -251,7 +251,7 @@ export default function Outreach() {
                         {Object.entries(STATUS_CONFIG).map(([status, cfg]) => (
                           <button
                             key={status}
-                            onClick={() => updateStatus.mutate({ id: contact.id, status })}
+                            onClick={() => updateStatus.mutate({ id: contact.id, status: status as "pending"|"sent"|"opened"|"replied"|"meeting_scheduled"|"no_response"|"not_interested"|"closed" })}
                             className={cn(
                               "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium transition-opacity",
                               contact.status === status ? cfg.color : "bg-muted/30 text-muted-foreground hover:bg-muted/60"

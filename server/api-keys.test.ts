@@ -1,29 +1,35 @@
 import { describe, it, expect } from "vitest";
 import { GoogleGenAI } from "@google/genai";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
 describe("API Key Validation", () => {
-  it("GEMINI_API_KEY is set and valid", async () => {
+  it("GEMINI_API_KEY is set and valid (gemini-2.5-flash)", async () => {
     const key = process.env.GEMINI_API_KEY;
     expect(key, "GEMINI_API_KEY must be set").toBeTruthy();
 
     const ai = new GoogleGenAI({ apiKey: key! });
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: "Say 'ok' in one word.",
     });
     const text = response.text?.toLowerCase() ?? "";
     expect(text.length).toBeGreaterThan(0);
   }, 30000);
 
-  it("ANTHROPIC_API_KEY is set (credits check skipped — insufficient balance)", () => {
-    const key = process.env.ANTHROPIC_API_KEY;
-    expect(key, "ANTHROPIC_API_KEY must be set").toBeTruthy();
+  it("OPENAI_API_KEY is set and valid (gpt-5.4)", async () => {
+    const key = process.env.OPENAI_API_KEY;
+    expect(key, "OPENAI_API_KEY must be set").toBeTruthy();
     expect(key!.length).toBeGreaterThan(10);
-    // Note: Anthropic account has insufficient credits. Key is valid but API calls will fail.
-    // Add credits at https://console.anthropic.com/settings/billing to enable Owner Psychology module.
-    // System falls back to Gemini 2.5 Pro for behavioral analysis until credits are restored.
-  });
+
+    const client = new OpenAI({ apiKey: key! });
+    const response = await client.chat.completions.create({
+      model: "gpt-5.4",
+      messages: [{ role: "user", content: "Say 'ok' in one word." }],
+      max_completion_tokens: 5,
+    });
+    const text = response.choices[0]?.message?.content?.toLowerCase() ?? "";
+    expect(text.length).toBeGreaterThan(0);
+  }, 30000);
 
   it("SONAR_API_KEY is set", () => {
     const key = process.env.SONAR_API_KEY;

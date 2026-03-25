@@ -10,7 +10,9 @@ import {
   getOutreach, getOutreachByDealId, createOutreach, updateOutreachStatus, getOutreachStats,
   getActivityLog, logActivity,
   getLatestScanJob, createScanJob,
+  getModelConfig, getAllModelConfigs, upsertModelConfig,
 } from "./db";
+import { MODEL_CATALOG, DEFAULT_MODULE_MODELS, type AnalysisModule } from "../shared/models";
 import {
   analyzeOwnerPsychology, runDigitalAudit, runRedTeamAnalysis,
   buildCapitalStack, generateInvestmentMemo, scoreDeal,
@@ -261,6 +263,53 @@ export const appRouter = router({
         return { success: true, message: "Scan job queued. Results will appear in the dashboard." };
       }),
   }),
-});
 
+  models: router({
+    // List all available models from the catalog
+    catalog: publicProcedure.query(async () => MODEL_CATALOG),
+
+    // Get current per-module config (merged with defaults)
+    config: publicProcedure.query(async () => {
+      const saved = await getAllModelConfigs();
+      const defaults = DEFAULT_MODULE_MODELS;
+      const result: Record<string, { modelId: string; enabled: boolean }> = {};
+      for (const [module, defaultModel] of Object.entries(defaults)) {
+        const saved_entry = saved.find((r) => r.module === module);
+        result[module] = {
+          modelId: saved_entry?.modelId ?? defaultModel,
+          enabled: saved_entry?.enabled ?? true,
+        };
+      }
+      return result;
+    }),
+
+    // Update a single module's model selection
+    update: protectedProcedure
+      .input(z.object({
+        module: z.string(),
+        modelId: z.string(),
+        enabled: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await upsertModelConfig(
+          input.module as AnalysisModule,
+          input.modelId,
+          input.enabled ?? true
+        );
+        await logActivity({
+          type: "system",
+          title: `AI model updated: ${input.module} → ${input.modelId}`,
+        });
+        return { success: true };
+      }),
+
+    // Reset all modules to defaults
+    resetDefaults: protectedProcedure.mutation(async () => {
+      for (const [module, modelId] of Object.entries(DEFAULT_MODULE_MODELS)) {
+        await upsertModelConfig(module as AnalysisModule, modelId, true);
+      }
+      return { success: true };
+    }),
+  }),
+});
 export type AppRouter = typeof appRouter;
