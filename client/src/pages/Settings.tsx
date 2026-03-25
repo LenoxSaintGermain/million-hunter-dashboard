@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import ScanProgress from "@/components/ScanProgress";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -104,8 +105,13 @@ export default function Settings() {
     onError: (e) => toast.error(`Reset failed: ${e.message}`),
   });
 
+  const [activeScanJobId, setActiveScanJobId] = useState<number | null>(null);
+
   const triggerScan = trpc.scan.trigger.useMutation({
-    onSuccess: (data) => toast.success(data.message),
+    onSuccess: (data) => {
+      toast.success(data.message);
+      if (data.jobId) setActiveScanJobId(data.jobId);
+    },
     onError: (e) => toast.error(`Scan failed: ${e.message}`),
   });
 
@@ -130,12 +136,28 @@ export default function Settings() {
           size="sm"
           className="h-9 text-xs"
           onClick={() => triggerScan.mutate({ sources: Array.from(enabledSources), minCashFlow: minCashFlow[0], maxMultiple: maxMultiple[0] })}
-          disabled={triggerScan.isPending}
+          disabled={triggerScan.isPending || activeScanJobId !== null}
         >
           <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${triggerScan.isPending ? "animate-spin" : ""}`} />
-          {triggerScan.isPending ? "Triggering..." : "Trigger Scan Now"}
+          {triggerScan.isPending ? "Starting..." : activeScanJobId ? "Scan Running..." : "Trigger Scan Now"}
         </Button>
       </div>
+
+      {/* Scan Progress Panel */}
+      {activeScanJobId !== null && (
+        <ScanProgress
+          jobId={activeScanJobId}
+          onComplete={() => {
+            setActiveScanJobId(null);
+            utils.dashboard.stats.invalidate();
+            utils.deals.list.invalidate();
+          }}
+          onRetry={() => {
+            setActiveScanJobId(null);
+            triggerScan.mutate({ sources: Array.from(enabledSources), minCashFlow: minCashFlow[0], maxMultiple: maxMultiple[0] });
+          }}
+        />
+      )}
 
       {/* Tab Navigation */}
       <div className="flex gap-1 border-b border-border/50 pb-0">

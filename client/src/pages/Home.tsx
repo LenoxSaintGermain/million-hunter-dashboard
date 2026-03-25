@@ -1,5 +1,7 @@
 import { trpc } from "@/lib/trpc";
+import { useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
+import ScanProgress from "@/components/ScanProgress";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,10 +48,15 @@ function ScoreBadge({ score }: { score: number | null | undefined }) {
 }
 
 export default function Home() {
+  const [activeScanJobId, setActiveScanJobId] = useState<number | null>(null);
+  const utils = trpc.useUtils();
   const { data, isLoading, refetch } = trpc.dashboard.stats.useQuery();
   const { data: topDealsData } = trpc.deals.list.useQuery({ limit: 5 });
   const triggerScan = trpc.scan.trigger.useMutation({
-    onSuccess: (d) => { toast.success(d.message); refetch(); },
+    onSuccess: (d) => {
+      toast.success(d.message);
+      if (d.jobId) setActiveScanJobId(d.jobId);
+    },
     onError: (e) => toast.error(`Scan failed: ${e.message}`),
   });
 
@@ -109,10 +116,10 @@ export default function Home() {
               size="sm"
               className="h-9 text-xs border-border"
               onClick={() => triggerScan.mutate({})}
-              disabled={triggerScan.isPending}
+              disabled={triggerScan.isPending || activeScanJobId !== null}
             >
               <RefreshCw className={cn("w-3.5 h-3.5 mr-1.5", triggerScan.isPending && "animate-spin")} />
-              {triggerScan.isPending ? "Scanning..." : "Run Market Scan"}
+              {triggerScan.isPending ? "Starting..." : activeScanJobId ? "Scan Running..." : "Run Market Scan"}
             </Button>
             <Link href="/scan">
               <Button size="sm" className="h-9 text-xs">
@@ -123,6 +130,23 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Scan Progress Panel */}
+      {activeScanJobId !== null && (
+        <ScanProgress
+          jobId={activeScanJobId}
+          onComplete={() => {
+            setActiveScanJobId(null);
+            refetch();
+            utils.deals.list.invalidate();
+            utils.dashboard.stats.invalidate();
+          }}
+          onRetry={() => {
+            setActiveScanJobId(null);
+            triggerScan.mutate({});
+          }}
+        />
+      )}
 
       {/* KPI Cards */}
       {isLoading ? (

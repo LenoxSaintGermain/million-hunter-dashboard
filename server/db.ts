@@ -215,7 +215,7 @@ export async function createScanJob(data: InsertScanJob) {
   return db.insert(scanJobs).values(data);
 }
 
-export async function updateScanJob(id: number, data: Partial<Pick<InsertScanJob, "status" | "listingsFound" | "listingsQualified" | "errorMessage" | "completedAt">>) {
+export async function updateScanJob(id: number, data: Partial<Pick<InsertScanJob, "status" | "listingsFound" | "listingsQualified" | "currentPhase" | "phaseDetail" | "progressPct" | "dealsScored" | "errorMessage" | "completedAt">>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(scanJobs).set(data).where(eq(scanJobs.id, id));

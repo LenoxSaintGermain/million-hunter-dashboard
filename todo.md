@@ -70,3 +70,12 @@
 - [x] Build AI Model Selector UI in Settings.tsx with per-module dropdowns
 - [x] Replace Anthropic with OpenAI gpt-5.4 in Owner Psychology (primary, no fallback needed)
 - [x] Save production checkpoint after model selector is live
+
+## Scan Feedback & Real-Time Progress (Mar 25)
+- [x] Audit scan pipeline backend — understand phases, timing, and what data is returned
+- [x] Add phase tracking to scan job (currentPhase, phaseDetail, progress %) in DB
+- [x] Add tRPC procedure: scan.getStatus — poll current scan job with live phase info
+- [x] Build ScanProgress component — step indicators, live polling, results summary
+- [x] Integrate ScanProgress into Home and Settings pages
+- [x] Add clear error states and retry button
+- [x] Save checkpoint after scan feedback is live
