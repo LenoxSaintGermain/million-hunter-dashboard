@@ -320,3 +320,102 @@ export async function updateCommercialAssetStatus(id: number, status: typeof com
   if (!db) throw new Error("Database not available");
   await db.update(commercialAssets).set({ status, updatedAt: Date.now() }).where(eq(commercialAssets.id, id));
 }
+
+export async function updateCommercialAssetAiScore(id: number, score: number, summary?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(commercialAssets)
+    .set({ aiScore: score, aiAnalysis: summary ?? null, status: "reviewing", updatedAt: Date.now() })
+    .where(eq(commercialAssets.id, id));
+}
+
+// ─── Macro Signals ────────────────────────────────────────────────────────────
+import { macroSignals, type InsertMacroSignal } from "../drizzle/schema";
+
+export async function getMacroSignals(limit = 20) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(macroSignals)
+    .orderBy(desc(macroSignals.createdAt))
+    .limit(limit);
+}
+
+export async function insertMacroSignal(data: Omit<InsertMacroSignal, "id">) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(macroSignals).values({ ...data, createdAt: Date.now() });
+}
+
+export async function seedMacroSignals() {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db.select().from(macroSignals).limit(1);
+  if (existing.length > 0) return { seeded: false, message: "Already seeded" };
+
+  const now = Date.now();
+  const seeds: Omit<InsertMacroSignal, "id">[] = [
+    {
+      signalType: "institutional",
+      title: "Blackstone Acquires 3 Atlanta Industrial Parks",
+      summary: "Blackstone Real Estate closed on $420M in Atlanta industrial assets near I-285 corridor, signaling continued institutional appetite for Southeast logistics.",
+      roryPitch: "When the world's largest real estate fund bets $420M on Atlanta warehouses, the question isn't whether the market is hot — it's whether you're positioned before the next wave.",
+      impactedAssetClasses: ["industrial", "warehouse", "flex"],
+      recommendedAction: "Prioritize industrial assets within 5mi of I-285/I-20 interchange. Seller motivation may spike as smaller owners exit ahead of institutional compression.",
+      confidenceScore: 0.91,
+      sourceUrl: "https://www.wsj.com/real-estate",
+      expiresAt: now + 30 * 24 * 60 * 60 * 1000,
+      createdAt: now - 2 * 60 * 60 * 1000,
+    },
+    {
+      signalType: "government",
+      title: "Atlanta BeltLine TAD Extension Approved — $180M Committed",
+      summary: "Atlanta City Council approved a $180M TAD bond issuance extending the BeltLine Tax Allocation District to include Westside and Southside corridors through 2035.",
+      roryPitch: "Government money rarely moves fast, but when it does, it creates a decade-long tailwind. The BeltLine TAD extension is a 10-year free ride for anyone who positions now.",
+      impactedAssetClasses: ["retail", "mixed_use", "office"],
+      recommendedAction: "Scan for distressed retail and mixed-use within 0.5mi of new TAD boundary. Seller expectations may not yet reflect the infrastructure premium.",
+      confidenceScore: 0.95,
+      sourceUrl: "https://www.atlantaga.gov/beltline",
+      expiresAt: now + 90 * 24 * 60 * 60 * 1000,
+      createdAt: now - 5 * 60 * 60 * 1000,
+    },
+    {
+      signalType: "event",
+      title: "Super Bowl LXI Awarded to Atlanta — 2027",
+      summary: "The NFL awarded Super Bowl LXI to Atlanta, expected to generate $400M+ in economic activity and drive 18-month pre-event hospitality and retail demand surge.",
+      roryPitch: "Super Bowls don't just fill hotels — they compress cap rates. Every hospitality and retail asset within 3 miles of Mercedes-Benz Stadium just got a 2-year demand guarantee.",
+      impactedAssetClasses: ["retail", "mixed_use", "office"],
+      recommendedAction: "Target hospitality-adjacent retail and flex space near downtown Atlanta. Acquisition window is 12 months before event premiums are fully priced in.",
+      confidenceScore: 0.88,
+      sourceUrl: "https://www.nfl.com/super-bowl",
+      expiresAt: now + 180 * 24 * 60 * 60 * 1000,
+      createdAt: now - 12 * 60 * 60 * 1000,
+    },
+    {
+      signalType: "macro_momentum",
+      title: "Fed Signals Rate Pause — CRE Financing Window Opens",
+      summary: "Federal Reserve minutes indicate a likely pause in rate hikes through Q3 2026, reducing DSCR pressure on commercial real estate acquisitions and improving SBA 7(a) deal economics.",
+      roryPitch: "Rate pauses are the market's exhale. Every month the Fed holds, the SBA deal math gets better. This is the window — not the warning.",
+      impactedAssetClasses: ["industrial", "retail", "warehouse", "office"],
+      recommendedAction: "Accelerate LOI submissions on qualified deals. Lock 10-year SBA rates before any policy reversal. Current DSCR thresholds favor deals with 1.25x+ coverage.",
+      confidenceScore: 0.79,
+      sourceUrl: "https://www.federalreserve.gov",
+      expiresAt: now + 60 * 24 * 60 * 60 * 1000,
+      createdAt: now - 24 * 60 * 60 * 1000,
+    },
+    {
+      signalType: "seasonal",
+      title: "Q2 Seller Motivation Peak — Listing Volume Up 23%",
+      summary: "BizBuySell and LoopNet data show Q2 historically produces 23% more motivated seller listings as owners target summer closing timelines before fiscal year-end.",
+      roryPitch: "Sellers who list in April want to close by July. That urgency is your leverage — not a coincidence.",
+      impactedAssetClasses: ["retail", "industrial", "mixed_use", "warehouse"],
+      recommendedAction: "Increase scan frequency to daily. Prioritize listings posted within last 14 days. Seller motivation peaks in weeks 6-10 after initial listing.",
+      confidenceScore: 0.82,
+      sourceUrl: null,
+      expiresAt: now + 45 * 24 * 60 * 60 * 1000,
+      createdAt: now - 36 * 60 * 60 * 1000,
+    },
+  ];
+
+  await db.insert(macroSignals).values(seeds);
+  return { seeded: true, count: seeds.length };
+}

@@ -1036,6 +1036,74 @@ Generate a JSON dossier:
         await updateCommercialAssetStatus(input.id, input.status);
         return { success: true };
       }),
+
+    scoreAsset: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ input }) => {
+        const { getCommercialAssetById, updateCommercialAssetAiScore } = await import("./db");
+        const asset = await getCommercialAssetById(input.id);
+        if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+
+        const { invokeLLM } = await import("./_core/llm");
+        const prompt = `You are a commercial real estate investment analyst. Score this property on a 0.000–1.000 scale for acquisition potential.
+
+Property: ${asset.name}
+Address: ${asset.address}, ${asset.city}, ${asset.state}
+Type: ${asset.propertyType}
+Asking Price: ${asset.askingPrice ? '$' + asset.askingPrice.toLocaleString() : 'Unknown'}
+Cap Rate: ${asset.capRate ? (asset.capRate * 100).toFixed(1) + '%' : 'Unknown'}
+NOI: ${asset.noi ? '$' + asset.noi.toLocaleString() : 'Unknown'}
+SqFt: ${asset.squareFootage ?? 'Unknown'}
+Zoning: ${asset.zoning ?? 'Unknown'}
+Lease Type: ${asset.leaseType ?? 'Unknown'}
+Opportunity Zone: ${asset.opportunityZone ? 'YES — tax advantage' : 'No'}
+TAD District: ${asset.tadDistrict ?? 'None'}
+
+Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], "risks": ["..."] }`;
+
+        const res = await invokeLLM({
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_schema", json_schema: { name: "asset_score", strict: true, schema: { type: "object", properties: { score: { type: "number" }, summary: { type: "string" }, strengths: { type: "array", items: { type: "string" } }, risks: { type: "array", items: { type: "string" } } }, required: ["score", "summary", "strengths", "risks"], additionalProperties: false } } },
+        });
+
+        const parsed = JSON.parse(res.choices[0].message.content as string);
+        const score = Math.min(1, Math.max(0, parsed.score ?? 0.5));
+        await updateCommercialAssetAiScore(input.id, score, parsed.summary);
+        return { score, summary: parsed.summary, strengths: parsed.strengths, risks: parsed.risks };
+      }),
+  }),
+
+  sentinel: router({
+    list: protectedProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(50).default(20) }).optional())
+      .query(async ({ input }) => {
+        const { getMacroSignals } = await import("./db");
+        return getMacroSignals(input?.limit ?? 20);
+      }),
+
+    seed: protectedProcedure
+      .mutation(async () => {
+        const { seedMacroSignals } = await import("./db");
+        return seedMacroSignals();
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        signalType: z.enum(["institutional", "government", "seasonal", "event", "macro_momentum"]),
+        title: z.string().min(1).max(255),
+        summary: z.string().min(1),
+        roryPitch: z.string().optional(),
+        impactedAssetClasses: z.array(z.string()).optional(),
+        recommendedAction: z.string().optional(),
+        confidenceScore: z.number().min(0).max(1).optional(),
+        sourceUrl: z.string().url().optional(),
+        expiresAt: z.number().int().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { insertMacroSignal } = await import("./db");
+        await insertMacroSignal({ ...input, createdAt: Date.now() });
+        return { success: true };
+      }),
   }),
 });
 export type AppRouter = typeof appRouter;

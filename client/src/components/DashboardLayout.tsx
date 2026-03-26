@@ -21,6 +21,7 @@ import {
   BarChart3,
   Radar,
   Sparkles,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -33,6 +34,7 @@ const navSections = [
     items: [
       { href: "/", icon: LayoutDashboard, label: "Command Center", badge: null },
       { href: "/scan", icon: Search, label: "Market Scan", badge: "Live" },
+      { href: "/scout", icon: Building2, label: "Asset Scout", badge: "New" },
       { href: "/memos", icon: FileText, label: "Investment Memos", badge: null },
       { href: "/outreach", icon: Mail, label: "Outreach Pipeline", badge: null },
     ],

@@ -198,3 +198,18 @@
 - [x] Consensus divergence alert: ⚠️ banner in War Room Consensus tab when divergenceFlag=true
 - [x] Consensus divergence alert: 3-model side-by-side rationale view on divergence
 - [x] Run tests and save Sprint 5 checkpoint
+
+## Sprint 6 — Scout UI + Macro Signals Sentinel
+
+- [x] Fix Settings.tsx duplicate useState import (Vite console error)
+- [x] Scout UI: create /scout page with filterable commercial assets grid
+- [x] Scout UI: OZ/TAD filter chips + property type filter
+- [x] Scout UI: cap rate sort + status filter
+- [x] Scout UI: Add Asset dialog (manual entry form)
+- [x] Scout UI: Run AI Score button per asset card
+- [x] Scout UI: register /scout route in App.tsx + sidebar nav
+- [x] Macro Signals: add sentinel tRPC procedures (sentinel.list, sentinel.seed)
+- [x] Macro Signals: seed macro_signals with realistic Atlanta/national signals
+- [x] Macro Signals: surface Sentinel live feed panel in Command Center
+- [x] Macro Signals: urgency score color coding + signal type icons
+- [x] Run tests and save Sprint 6 checkpoint
