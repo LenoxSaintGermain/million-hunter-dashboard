@@ -298,3 +298,50 @@ export const investorDossiers = mysqlTable("investor_dossiers", {
 
 export type InvestorDossier = typeof investorDossiers.$inferSelect;
 export type InsertInvestorDossier = typeof investorDossiers.$inferInsert;
+
+// ─── Deal Trajectory (ADK agent step log — Hermes trajectory memory) ──────────
+export const dealTrajectory = mysqlTable("deal_trajectory", {
+  id: int("id").autoincrement().primaryKey(),
+  dealId: int("dealId").notNull(),
+  agentName: varchar("agentName", { length: 128 }).notNull(),
+  model: varchar("model", { length: 128 }).notNull(),
+  inputSummary: text("inputSummary"),
+  outputSummary: text("outputSummary"),
+  durationMs: int("durationMs"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type DealTrajectory = typeof dealTrajectory.$inferSelect;
+export type InsertDealTrajectory = typeof dealTrajectory.$inferInsert;
+
+// ─── Consensus Scores (ADK ParallelAgent — MiroFish divergence scoring) ───────
+export const consensusScores = mysqlTable("consensus_scores", {
+  id: int("id").autoincrement().primaryKey(),
+  dealId: int("dealId").notNull(),
+  model1Name: varchar("model1Name", { length: 128 }),
+  model1Score: float("model1Score"),
+  model1Rationale: text("model1Rationale"),
+  model2Name: varchar("model2Name", { length: 128 }),
+  model2Score: float("model2Score"),
+  model2Rationale: text("model2Rationale"),
+  model3Name: varchar("model3Name", { length: 128 }),
+  model3Score: float("model3Score"),
+  model3Rationale: text("model3Rationale"),
+  consensusScore: float("consensusScore"),
+  divergenceScore: float("divergenceScore"),
+  divergenceFlag: boolean("divergenceFlag").default(false),
+  summary: text("summary"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ConsensusScore = typeof consensusScores.$inferSelect;
+export type InsertConsensusScore = typeof consensusScores.$inferInsert;
+
+// ─── Seller Simulations (MiroFish persona agent) ──────────────────────────────
+export const sellerSimulations = mysqlTable("seller_simulations", {
+  id: int("id").autoincrement().primaryKey(),
+  dealId: int("dealId").notNull(),
+  personaJson: json("personaJson").$type<Record<string, unknown>>(),
+  scenariosJson: json("scenariosJson").$type<Array<Record<string, unknown>>>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SellerSimulation = typeof sellerSimulations.$inferSelect;
+export type InsertSellerSimulation = typeof sellerSimulations.$inferInsert;

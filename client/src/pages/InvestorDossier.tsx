@@ -229,7 +229,7 @@ export default function InvestorDossier() {
       return;
     }
     setStep("generating");
-    generateMutation.mutate(form);
+    generateMutation.mutate({ ...form, title: `${form.dealName} — ${form.investorProfile} Dossier` });
   };
 
   const selectedProfile = INVESTOR_PROFILES.find((p) => p.id === form.investorProfile) ?? INVESTOR_PROFILES[1];

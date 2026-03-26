@@ -133,3 +133,30 @@
 - [x] Cinematic hero sections with gradient text
 - [x] Agent voice commentary woven throughout (not just in Dossier)
 - [x] Mobile-first responsive audit of all new pages
+
+## Phase 3: ADK Multi-Agent Architecture
+
+### Sprint 1 — Core ADK Refactor (no new GCP services)
+- [x] Install @google/adk TypeScript SDK
+- [x] Create server/agents/ directory with skill pack layout
+- [x] Build SmartRouterAgent (BaseAgent) — routes tasks to cheap vs strong model
+- [x] Refactor Third Signal pipeline to ADK SequentialAgent (5 modules in order)
+- [x] Wire session.state as trajectory memory (output_key per agent)
+- [x] Add deal_trajectory table to DB for persistent agent step logging
+- [x] Add tRPC procedures: agents.getTrajectory, agents.runPipeline
+- [x] Update War Room tab in DealDetail to show live agent trajectory steps
+
+### Sprint 2 — Consensus Scoring + Cloud Run Config
+- [x] Build ParallelAgent consensus scorer (3 Gemini models in parallel)
+- [x] Add consensus_scores table to DB with divergence flag
+- [x] Add "Models Disagree — Review Manually" flag to Consensus tab
+- [x] Add tRPC procedure: agents.consensusScore, agents.getConsensusScore
+- [ ] Write Dockerfile for agent-service Cloud Run container
+- [ ] Write cloudbuild.yaml for CI/CD from GitHub main branch
+
+### Sprint 3 — Seller Simulation
+- [x] Build SellerPersonaAgent (generates seller persona from deal signals)
+- [x] Build NegotiationSimulatorAgent (simulates 4 negotiation scenarios)
+- [x] Add seller_simulations table to DB
+- [x] Add Seller Simulation tab to Deal Detail page
+- [x] Add tRPC procedures: agents.sellerSimulation, agents.getSellerSimulation

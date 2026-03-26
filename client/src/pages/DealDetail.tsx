@@ -13,6 +13,7 @@ import {
   ArrowLeft, Zap, Brain, Globe, Shield, DollarSign,
   FileText, Mail, AlertTriangle, TrendingUp,
   Building2, MapPin, Users, Calendar, ExternalLink,
+  GitBranch, BarChart3, UserSearch, CheckCircle2, XCircle, Loader2,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -68,6 +69,28 @@ export default function DealDetail() {
   const scoreDeal = trpc.deals.score.useMutation({
     onSuccess: (d) => { toast.success(`Scored: ${d.score.toFixed(3)}`); refetch(); },
   });
+
+  // ADK agent mutations
+  const runPipeline = trpc.agents.runPipeline.useMutation({
+    onSuccess: () => { toast.success("ADK pipeline complete — trajectory logged"); refetch(); },
+    onError: (e) => toast.error(`Pipeline failed: ${e.message}`),
+  });
+  const consensusScore = trpc.agents.consensusScore.useMutation({
+    onSuccess: (r) => {
+      if (r.divergenceFlag) toast.warning(`⚠️ Models diverge (${(r.divergenceScore * 100).toFixed(0)}%) — manual review recommended`);
+      else toast.success(`Consensus: ${r.consensusScore.toFixed(3)} — models agree`);
+      refetch();
+    },
+    onError: (e) => toast.error(`Consensus scoring failed: ${e.message}`),
+  });
+  const sellerSim = trpc.agents.sellerSimulation.useMutation({
+    onSuccess: (r) => { toast.success(`Seller profile: ${r.persona.motivation} motivation, urgency ${r.persona.urgencyLevel}/10`); refetch(); },
+    onError: (e) => toast.error(`Seller simulation failed: ${e.message}`),
+  });
+
+  const { data: trajectoryData } = trpc.agents.getTrajectory.useQuery({ dealId }, { enabled: !!dealId });
+  const { data: consensusData } = trpc.agents.getConsensusScore.useQuery({ dealId }, { enabled: !!dealId });
+  const { data: sellerData } = trpc.agents.getSellerSimulation.useQuery({ dealId }, { enabled: !!dealId });
 
   const fmt = (n: number | null | undefined, prefix = "$") => {
     if (n == null) return "—";
@@ -196,11 +219,20 @@ export default function DealDetail() {
 
       {/* Tabs */}
       <Tabs defaultValue="signals">
-        <TabsList className="bg-card border border-border h-9">
+        <TabsList className="bg-card border border-border h-9 flex-wrap gap-0.5">
           <TabsTrigger value="signals" className="text-xs h-7">Third Signal</TabsTrigger>
           <TabsTrigger value="memo" className="text-xs h-7">Investment Memo</TabsTrigger>
           <TabsTrigger value="capital" className="text-xs h-7">Capital Stack</TabsTrigger>
           <TabsTrigger value="outreach" className="text-xs h-7">Outreach</TabsTrigger>
+          <TabsTrigger value="consensus" className="text-xs h-7">
+            <BarChart3 className="w-3 h-3 mr-1" />Consensus
+          </TabsTrigger>
+          <TabsTrigger value="seller" className="text-xs h-7">
+            <UserSearch className="w-3 h-3 mr-1" />Seller Sim
+          </TabsTrigger>
+          <TabsTrigger value="trajectory" className="text-xs h-7">
+            <GitBranch className="w-3 h-3 mr-1" />Trajectory
+          </TabsTrigger>
         </TabsList>
 
         {/* Third Signal Tab */}
@@ -464,6 +496,211 @@ export default function DealDetail() {
         {/* Outreach Tab */}
         <TabsContent value="outreach" className="mt-4">
           <OutreachTab dealId={dealId} />
+        </TabsContent>
+
+        {/* Consensus Score Tab (MiroFish) */}
+        <TabsContent value="consensus" className="mt-4">
+          <Card className="bg-card border-border">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-primary" />
+                  Multi-Model Consensus Scoring
+                </CardTitle>
+                <CardDescription className="text-xs mt-1">
+                  3 Gemini models score in parallel. High divergence = genuine uncertainty = manual review.
+                </CardDescription>
+              </div>
+              <Button
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => consensusScore.mutate({ dealId })}
+                disabled={consensusScore.isPending}
+              >
+                {consensusScore.isPending ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <BarChart3 className="w-3 h-3 mr-1.5" />}
+                Run Consensus
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {!consensusData ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <BarChart3 className="w-10 h-10 text-muted-foreground/20 mb-3" />
+                  <p className="text-sm text-muted-foreground">No consensus score yet</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Run 3-model parallel scoring to detect genuine uncertainty</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Consensus header */}
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Consensus Score</p>
+                      <p className="text-3xl font-bold text-foreground">{(consensusData.consensusScore ?? 0).toFixed(3)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Divergence</p>
+                      <div className="flex items-center gap-1.5 justify-end mt-1">
+                        {consensusData.divergenceFlag ? (
+                          <><XCircle className="w-4 h-4 text-amber-400" /><span className="text-sm font-semibold text-amber-400">{((consensusData.divergenceScore ?? 0) * 100).toFixed(0)}% — Review</span></>
+                        ) : (
+                          <><CheckCircle2 className="w-4 h-4 text-emerald-400" /><span className="text-sm font-semibold text-emerald-400">Models Agree</span></>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Per-model scores */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { name: consensusData.model1Name, score: consensusData.model1Score, rationale: consensusData.model1Rationale },
+                      { name: consensusData.model2Name, score: consensusData.model2Score, rationale: consensusData.model2Rationale },
+                      { name: consensusData.model3Name, score: consensusData.model3Score, rationale: consensusData.model3Rationale },
+                    ].map((m, i) => m.name && (
+                      <div key={i} className="p-3 rounded-lg bg-muted/20 border border-border/50">
+                        <p className="text-xs font-mono text-muted-foreground truncate">{m.name?.split("-").slice(-2).join("-")}</p>
+                        <p className="text-xl font-bold mt-1">{(m.score ?? 0).toFixed(3)}</p>
+                        {m.rationale && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{m.rationale}</p>}
+                      </div>
+                    ))}
+                  </div>
+                  {consensusData.summary && (
+                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                      <p className="text-xs font-medium text-primary mb-1">Synthesis</p>
+                      <p className="text-xs text-muted-foreground">{consensusData.summary}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Seller Simulation Tab (MiroFish) */}
+        <TabsContent value="seller" className="mt-4">
+          <Card className="bg-card border-border">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <UserSearch className="w-4 h-4 text-primary" />
+                  Seller Persona Simulation
+                </CardTitle>
+                <CardDescription className="text-xs mt-1">
+                  AI-generated seller profile + negotiation scenarios. Rehearse the LOI before you send it.
+                </CardDescription>
+              </div>
+              <Button
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => sellerSim.mutate({ dealId })}
+                disabled={sellerSim.isPending}
+              >
+                {sellerSim.isPending ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <UserSearch className="w-3 h-3 mr-1.5" />}
+                Simulate Seller
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {!sellerData ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <UserSearch className="w-10 h-10 text-muted-foreground/20 mb-3" />
+                  <p className="text-sm text-muted-foreground">No seller simulation yet</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Generate a seller persona to rehearse negotiation scenarios before making contact</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Persona card */}
+                  {(sellerData.personaJson as any) ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        { label: "Motivation", value: (sellerData.personaJson as any).motivation, cls: "capitalize" },
+                        { label: "Urgency", value: `${(sellerData.personaJson as any).urgencyLevel}/10`, cls: "" },
+                        { label: "Price Flexibility", value: (sellerData.personaJson as any).priceFlexibility, cls: "capitalize" },
+                        { label: "Legacy Concern", value: (sellerData.personaJson as any).legacyConcern ? "Yes" : "No", cls: "" },
+                      ].map((item) => (
+                        <div key={item.label} className="p-3 rounded-lg bg-muted/20 border border-border/50">
+                          <p className="text-xs text-muted-foreground">{item.label}</p>
+                          <p className={`text-sm font-semibold mt-0.5 ${item.cls}`}>{item.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {/* Scenarios */}
+                  {sellerData.scenariosJson && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Negotiation Scenarios</p>
+                      {(sellerData.scenariosJson as any[]).map((s: any, i: number) => (
+                        <div key={i} className="p-3 rounded-lg border border-border/50 bg-muted/10">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-xs font-semibold">{s.scenario}</p>
+                            <Badge variant="outline" className="text-xs h-5">{s.probability}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{s.sellerResponse}</p>
+                          {s.counterStrategy && (
+                            <p className="text-xs text-primary mt-1">→ {s.counterStrategy}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Trajectory Tab (Hermes) */}
+        <TabsContent value="trajectory" className="mt-4">
+          <Card className="bg-card border-border">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <GitBranch className="w-4 h-4 text-primary" />
+                  Agent Trajectory
+                </CardTitle>
+                <CardDescription className="text-xs mt-1">
+                  Full step-by-step log of every agent that touched this deal. Each agent reads what prior agents found.
+                </CardDescription>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs border-border"
+                onClick={() => runPipeline.mutate({ dealId })}
+                disabled={runPipeline.isPending}
+              >
+                {runPipeline.isPending ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Zap className="w-3 h-3 mr-1.5" />}
+                Run ADK Pipeline
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {!trajectoryData?.length ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <GitBranch className="w-10 h-10 text-muted-foreground/20 mb-3" />
+                  <p className="text-sm text-muted-foreground">No trajectory yet</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Run the ADK pipeline to log every agent step with model, timing, and context</p>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
+                  <div className="space-y-4 pl-10">
+                    {trajectoryData.map((step, i) => (
+                      <div key={step.id} className="relative">
+                        <div className="absolute -left-6 w-3 h-3 rounded-full bg-primary border-2 border-background" />
+                        <div className="p-3 rounded-lg bg-muted/20 border border-border/50">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-xs font-semibold text-foreground">{step.agentName}</p>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono text-muted-foreground">{step.model?.split("-").slice(-2).join("-")}</span>
+                              {step.durationMs && <span className="text-xs text-muted-foreground">{step.durationMs}ms</span>}
+                            </div>
+                          </div>
+                          {step.inputSummary && <p className="text-xs text-muted-foreground/70 mb-1"><span className="text-muted-foreground font-medium">In:</span> {step.inputSummary}</p>}
+                          {step.outputSummary && <p className="text-xs text-muted-foreground"><span className="text-muted-foreground font-medium">Out:</span> {step.outputSummary}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </DashboardLayout>

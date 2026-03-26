@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { eq, desc } from "drizzle-orm";
+import { getDb } from "./db";
+import { consensusScores, sellerSimulations, dealTrajectory } from "../drizzle/schema";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -777,6 +780,116 @@ Generate a JSON dossier:
           return { id: dossierId, ...dossierData };
         }
         return dossierData;
+      }),
+  }),
+
+  // ─── ADK Agent Procedures ────────────────────────────────────────────────────
+  agents: router({
+    // Consensus scoring: 3 models in parallel, divergence flag (MiroFish)
+    consensusScore: protectedProcedure
+      .input(z.object({ dealId: z.number() }))
+      .mutation(async ({ input }) => {
+        const dealRow = await getDealById(input.dealId);
+        if (!dealRow) throw new Error("Deal not found");
+        const { runConsensusScoring } = await import("./agents/index");
+        const result = await runConsensusScoring(dealRow);
+        // Persist to consensus_scores table
+        const dbConn = await getDb();
+        if (dbConn) {
+          await dbConn.insert(consensusScores).values({
+            dealId: input.dealId,
+            model1Name: result.scores[0]?.model,
+            model1Score: result.scores[0]?.score,
+            model1Rationale: result.scores[0]?.rationale,
+            model2Name: result.scores[1]?.model,
+            model2Score: result.scores[1]?.score,
+            model2Rationale: result.scores[1]?.rationale,
+            model3Name: result.scores[2]?.model,
+            model3Score: result.scores[2]?.score,
+            model3Rationale: result.scores[2]?.rationale,
+            consensusScore: result.consensusScore,
+            divergenceScore: result.divergenceScore,
+            divergenceFlag: result.divergenceFlag,
+            summary: result.summary,
+          });
+        }
+        await logActivity({ type: "signal_analyzed", title: `Consensus scoring: ${dealRow.name} — ${result.divergenceFlag ? "⚠️ DIVERGENCE FLAG" : "Models agree"}` });
+        return result;
+      }),
+
+    // Seller simulation: persona + negotiation scenarios (MiroFish)
+    sellerSimulation: protectedProcedure
+      .input(z.object({ dealId: z.number() }))
+      .mutation(async ({ input }) => {
+        const dealRow2 = await getDealById(input.dealId);
+        if (!dealRow2) throw new Error("Deal not found");
+        const { runSellerSimulation } = await import("./agents/index");
+        const result = await runSellerSimulation(dealRow2);
+        const dbConn2 = await getDb();
+        if (dbConn2) {
+          await dbConn2.insert(sellerSimulations).values({
+            dealId: input.dealId,
+            personaJson: result.persona as any,
+            scenariosJson: result.scenarios as any,
+          });
+        }
+        await logActivity({ type: "signal_analyzed", title: `Seller simulation: ${dealRow2.name} — ${result.persona.motivation} seller, urgency ${result.persona.urgencyLevel}/10` });
+        return result;
+      }),
+
+    // Get seller simulation for a deal
+    getSellerSimulation: publicProcedure
+      .input(z.object({ dealId: z.number() }))
+      .query(async ({ input }) => {
+        const dbConn3 = await getDb();
+        if (!dbConn3) return null;
+        const rows = await dbConn3.select().from(sellerSimulations)
+          .where(eq(sellerSimulations.dealId, input.dealId))
+          .orderBy(desc(sellerSimulations.createdAt))
+          .limit(1);
+        return rows[0] ?? null;
+      }),
+
+    // Get consensus scores for a deal
+    getConsensusScore: publicProcedure
+      .input(z.object({ dealId: z.number() }))
+      .query(async ({ input }) => {
+        const dbConn4 = await getDb();
+        if (!dbConn4) return null;
+        const rows = await dbConn4.select().from(consensusScores)
+          .where(eq(consensusScores.dealId, input.dealId))
+          .orderBy(desc(consensusScores.createdAt))
+          .limit(1);
+        return rows[0] ?? null;
+      }),
+
+    // Get trajectory steps for a deal
+    getTrajectory: publicProcedure
+      .input(z.object({ dealId: z.number() }))
+      .query(async ({ input }) => {
+        const dbConn5 = await getDb();
+        if (!dbConn5) return [];
+        return dbConn5.select().from(dealTrajectory)
+          .where(eq(dealTrajectory.dealId, input.dealId))
+          .orderBy(dealTrajectory.createdAt);
+      }),
+
+    // Run full Third Signal pipeline with trajectory logging
+    runPipeline: protectedProcedure
+      .input(z.object({ dealId: z.number() }))
+      .mutation(async ({ input }) => {
+        const dealRow3 = await getDealById(input.dealId);
+        if (!dealRow3) throw new Error("Deal not found");
+        const { runThirdSignalPipeline } = await import("./agents/index");
+        const result = await runThirdSignalPipeline(dealRow3);
+        await logActivity({ type: "signal_analyzed", title: `ADK pipeline complete: ${dealRow3.name} — ${result.trajectorySteps.length} agent steps` });
+        return {
+          ownerPsychology: result.ownerPsychology,
+          digitalAudit: result.digitalAudit,
+          redTeam: result.redTeam,
+          capitalStack: result.capitalStack,
+          trajectorySteps: result.trajectorySteps,
+        };
       }),
   }),
 });
