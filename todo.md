@@ -213,3 +213,17 @@
 - [x] Macro Signals: surface Sentinel live feed panel in Command Center
 - [x] Macro Signals: urgency score color coding + signal type icons
 - [x] Run tests and save Sprint 6 checkpoint
+
+## Sprint 7 — Cinematic Onboarding Lobby
+
+- [x] Inventory NotebookLM videos from user's Drive folder
+- [x] Upload videos to CDN (manus-upload-file --webdev)
+- [x] Add onboarding_completed field to users table + db:push migration
+- [x] Add user.markOnboardingComplete tRPC mutation
+- [x] Build /lobby page: cinematic full-screen video player with chapter nav
+- [x] Lobby: elegant chapter cards (Porsche/Bentley walkthrough aesthetic)
+- [x] Lobby: progress indicator + chapter titles
+- [x] Lobby: Skip / Watch Later option (graceful exit)
+- [x] Lobby: Enter Dashboard CTA after final chapter
+- [x] Wire first-login gate in App.tsx routing
+- [x] Run tests and save Sprint 7 checkpoint

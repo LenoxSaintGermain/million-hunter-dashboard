@@ -35,6 +35,33 @@ export const appRouter = router({
     }),
   }),
 
+  user: router({
+    // Returns onboarding status for the current user
+    onboardingStatus: protectedProcedure.query(async ({ ctx }) => {
+      const db = await (await import("./db")).getDb();
+      if (!db) return { completed: false };
+      const { users } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const [row] = await db.select({ onboardingCompleted: users.onboardingCompleted })
+        .from(users)
+        .where(eq(users.openId, ctx.user.openId))
+        .limit(1);
+      return { completed: row?.onboardingCompleted ?? false };
+    }),
+
+    // Marks onboarding as complete for the current user
+    markOnboardingComplete: protectedProcedure.mutation(async ({ ctx }) => {
+      const db = await (await import("./db")).getDb();
+      if (!db) return { success: false };
+      const { users } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.update(users)
+        .set({ onboardingCompleted: true })
+        .where(eq(users.openId, ctx.user.openId));
+      return { success: true };
+    }),
+  }),
+
   dashboard: router({
     stats: publicProcedure.query(async () => {
       const [dealStats, outreachStats, recentActivity, latestScan] = await Promise.all([

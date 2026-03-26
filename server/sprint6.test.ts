@@ -11,11 +11,12 @@ import { eq } from "drizzle-orm";
 // ─── Scout ────────────────────────────────────────────────────────────────────
 describe("Scout — commercial assets", () => {
   let assetId: number;
+  const testName = `Sprint6 Test Retail Strip ${Date.now()}`;
 
   it("inserts a commercial asset and returns an id", async () => {
     const { createCommercialAsset } = await import("./db");
     const result = await createCommercialAsset({
-      name: "Sprint6 Test Retail Strip",
+      name: testName,
       address: "456 Test Ave",
       city: "Atlanta",
       state: "GA",
@@ -32,7 +33,7 @@ describe("Scout — commercial assets", () => {
     const { getCommercialAssetById } = await import("./db");
     const asset = await getCommercialAssetById(assetId);
     expect(asset).toBeDefined();
-    expect(asset!.name).toBe("Sprint6 Test Retail Strip");
+    expect(asset!.name).toBe(testName);
     expect(asset!.opportunityZone).toBe(true);
     expect(asset!.tadDistrict).toBe("Westside TAD");
   });
