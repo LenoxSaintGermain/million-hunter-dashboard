@@ -157,6 +157,18 @@ export default function DealDetail() {
               <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/15 text-primary">
                 {deal.stage.replace(/_/g, " ")}
               </span>
+              {deal.opportunityZone && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  Opportunity Zone
+                </span>
+              )}
+              {deal.tadDistrict && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  {deal.tadDistrict}
+                </span>
+              )}
             </div>
             <h1 className="text-2xl font-bold text-foreground mb-1">{deal.name}</h1>
             <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
@@ -539,6 +551,37 @@ export default function DealDetail() {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {/* ⚠️ Divergence Alert Banner — shown prominently when models disagree */}
+                  {consensusData.divergenceFlag && (
+                    <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-500/30 bg-amber-500/8">
+                      <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                        <XCircle className="w-4 h-4 text-amber-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-amber-400">Models Disagree — Manual Review Required</p>
+                        <p className="text-xs text-amber-400/70 mt-0.5">
+                          Divergence score: <span className="font-bold">{((consensusData.divergenceScore ?? 0) * 100).toFixed(0)}%</span>. When AI models disagree this significantly, it signals genuine ambiguity in the deal fundamentals. Do not advance to LOI without a direct conversation with the broker.
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">
+                            ⚠️ High Uncertainty
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
+                            Do Not Advance Without Review
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ✅ Agreement Banner — shown when models align */}
+                  {!consensusData.divergenceFlag && (
+                    <div className="flex items-center gap-3 p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <p className="text-xs text-emerald-400 font-medium">All 3 models in agreement — consensus score is reliable</p>
+                    </div>
+                  )}
+
                   {/* Consensus header */}
                   <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border">
                     <div>
@@ -556,17 +599,43 @@ export default function DealDetail() {
                       </div>
                     </div>
                   </div>
-                  {/* Per-model scores */}
-                  <div className="grid grid-cols-3 gap-3">
+
+                  {/* Per-model scores — expanded with full rationale on divergence */}
+                  <div className={cn(
+                    "gap-3",
+                    consensusData.divergenceFlag ? "flex flex-col" : "grid grid-cols-3"
+                  )}>
                     {[
                       { name: consensusData.model1Name, score: consensusData.model1Score, rationale: consensusData.model1Rationale },
                       { name: consensusData.model2Name, score: consensusData.model2Score, rationale: consensusData.model2Rationale },
                       { name: consensusData.model3Name, score: consensusData.model3Score, rationale: consensusData.model3Rationale },
                     ].map((m, i) => m.name && (
-                      <div key={i} className="p-3 rounded-lg bg-muted/20 border border-border/50">
-                        <p className="text-xs font-mono text-muted-foreground truncate">{m.name?.split("-").slice(-2).join("-")}</p>
-                        <p className="text-xl font-bold mt-1">{(m.score ?? 0).toFixed(3)}</p>
-                        {m.rationale && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{m.rationale}</p>}
+                      <div key={i} className={cn(
+                        "p-3 rounded-lg border border-border/50",
+                        consensusData.divergenceFlag ? "bg-muted/20 flex items-start gap-4" : "bg-muted/20"
+                      )}>
+                        {consensusData.divergenceFlag ? (
+                          <>
+                            <div className="shrink-0 text-center w-16">
+                              <p className="text-xs font-mono text-muted-foreground">{m.name?.split("-").slice(-2).join("-")}</p>
+                              <p className="text-2xl font-bold mt-1">{(m.score ?? 0).toFixed(3)}</p>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Rationale</p>
+                              {m.rationale ? (
+                                <p className="text-xs text-foreground/80 leading-relaxed">{m.rationale}</p>
+                              ) : (
+                                <p className="text-xs text-muted-foreground/50 italic">No rationale provided</p>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-xs font-mono text-muted-foreground truncate">{m.name?.split("-").slice(-2).join("-")}</p>
+                            <p className="text-xl font-bold mt-1">{(m.score ?? 0).toFixed(3)}</p>
+                            {m.rationale && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{m.rationale}</p>}
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>

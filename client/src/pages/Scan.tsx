@@ -147,12 +147,24 @@ export default function Scan() {
                         {deal.name}
                       </CardTitle>
                     </Link>
-                    {deal.location && (
-                      <div className="flex items-center gap-0.5 mt-1">
-                        <MapPin className="w-2.5 h-2.5 text-muted-foreground" />
-                        <span className="text-[11px] text-muted-foreground">{deal.location}</span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      {deal.location && (
+                        <div className="flex items-center gap-0.5">
+                          <MapPin className="w-2.5 h-2.5 text-muted-foreground" />
+                          <span className="text-[11px] text-muted-foreground">{deal.location}</span>
+                        </div>
+                      )}
+                      {deal.opportunityZone && (
+                        <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                          OZ
+                        </span>
+                      )}
+                      {deal.tadDistrict && (
+                        <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                          TAD
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium shrink-0", stageColor[deal.stage] ?? "bg-muted text-muted-foreground")}>
                     {deal.stage.replace(/_/g, " ")}

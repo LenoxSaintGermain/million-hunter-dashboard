@@ -224,7 +224,7 @@ export default function Home() {
                         <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
                           {deal.name}
                         </p>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           {deal.location && (
                             <span className="flex items-center gap-1 text-xs text-muted-foreground">
                               <MapPin className="w-2.5 h-2.5" />{deal.location}
@@ -232,6 +232,16 @@ export default function Home() {
                           )}
                           {deal.industry && (
                             <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">{deal.industry}</Badge>
+                          )}
+                          {deal.opportunityZone && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                              OZ
+                            </span>
+                          )}
+                          {deal.tadDistrict && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                              TAD
+                            </span>
                           )}
                         </div>
                       </div>

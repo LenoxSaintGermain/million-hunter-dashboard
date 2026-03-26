@@ -985,6 +985,58 @@ Generate a JSON dossier:
         };
       }),
   }),
+
+  // ─── Scout (Commercial Assets) ────────────────────────────────────────────
+  scout: router({
+    list: protectedProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(100).default(50), offset: z.number().int().min(0).default(0) }).optional())
+      .query(async ({ input }) => {
+        const { getCommercialAssets } = await import("./db");
+        return getCommercialAssets({ limit: input?.limit ?? 50, offset: input?.offset ?? 0 });
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .query(async ({ input }) => {
+        const { getCommercialAssetById } = await import("./db");
+        const asset = await getCommercialAssetById(input.id);
+        if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+        return asset;
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        address: z.string().min(1),
+        city: z.string().min(1),
+        state: z.string().min(1),
+        zip: z.string().optional(),
+        propertyType: z.enum(["office", "industrial", "retail", "mixed_use", "land", "warehouse", "flex"]).default("retail"),
+        squareFootage: z.number().int().optional(),
+        askingPrice: z.number().optional(),
+        capRate: z.number().optional(),
+        noi: z.number().optional(),
+        leaseType: z.enum(["nnn", "gross", "modified_gross", "vacant"]).optional(),
+        zoning: z.string().optional(),
+        opportunityZone: z.boolean().default(false),
+        ozTractId: z.string().optional(),
+        tadDistrict: z.string().optional(),
+        sourceUrl: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { createCommercialAsset } = await import("./db");
+        const res = await createCommercialAsset({ ...input, source: "manual" }) as any;
+        return { id: res[0].insertId, message: "Asset created" };
+      }),
+
+    updateStatus: protectedProcedure
+      .input(z.object({ id: z.number().int(), status: z.enum(["new", "reviewing", "qualified", "rejected", "acquired"]) }))
+      .mutation(async ({ input }) => {
+        const { updateCommercialAssetStatus } = await import("./db");
+        await updateCommercialAssetStatus(input.id, input.status);
+        return { success: true };
+      }),
+  }),
 });
 export type AppRouter = typeof appRouter;
 

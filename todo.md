@@ -187,3 +187,14 @@
 - [x] Add consensus_* module entries to AI Engine Settings tab
 - [ ] Add commercial_assets table schema (foundation for Sprint 5 Scout)
 - [x] Run tests and save Sprint 4 checkpoint
+
+## Sprint 5 — Signal Surface + Scout Foundation
+
+- [x] OZ/TAD badges: add 🟢 OZ and 🏙 TAD badges to Command Center deal table rows
+- [x] OZ/TAD badges: add OZ/TAD badges to Deal Detail header section
+- [x] Commercial Assets Scout: add commercial_assets table to DB schema
+- [x] Commercial Assets Scout: run db:push migration
+- [x] Commercial Assets Scout: add tRPC stubs (scout.list, scout.create)
+- [x] Consensus divergence alert: ⚠️ banner in War Room Consensus tab when divergenceFlag=true
+- [x] Consensus divergence alert: 3-model side-by-side rationale view on divergence
+- [x] Run tests and save Sprint 5 checkpoint

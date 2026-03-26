@@ -287,3 +287,36 @@ export async function getAllModelConfigs() {
     return [];
   }
 }
+
+// ─── Commercial Assets (Scout) ────────────────────────────────────────────────
+import { commercialAssets, type InsertCommercialAsset } from "../drizzle/schema";
+
+export async function getCommercialAssets(opts?: { limit?: number; offset?: number; status?: string }) {
+  const db = await getDb();
+  if (!db) return [];
+  const query = db.select().from(commercialAssets)
+    .orderBy(desc(commercialAssets.createdAt))
+    .limit(opts?.limit ?? 50)
+    .offset(opts?.offset ?? 0);
+  return query;
+}
+
+export async function getCommercialAssetById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(commercialAssets).where(eq(commercialAssets.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createCommercialAsset(data: InsertCommercialAsset) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const now = Date.now();
+  return db.insert(commercialAssets).values({ ...data, createdAt: now, updatedAt: now });
+}
+
+export async function updateCommercialAssetStatus(id: number, status: typeof commercialAssets.$inferSelect["status"]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(commercialAssets).set({ status, updatedAt: Date.now() }).where(eq(commercialAssets.id, id));
+}
