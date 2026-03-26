@@ -160,3 +160,17 @@
 - [x] Add seller_simulations table to DB
 - [x] Add Seller Simulation tab to Deal Detail page
 - [x] Add tRPC procedures: agents.sellerSimulation, agents.getSellerSimulation
+
+## AI Generation Persistence (cache-first, no re-runs)
+- [x] Audit all AI-generating tRPC procedures for cache-first logic
+- [x] Fix signals.analyze — serve from DB if exists, only re-run if forced
+- [x] Fix memos.generate — serve from DB if exists, only re-run if forced
+- [x] Fix agents.runPipeline — serve trajectory from DB if exists
+- [x] Fix agents.consensusScore — serve from DB if exists
+- [x] Fix agents.sellerSimulation — serve from DB if exists
+- [x] Fix freedomMap.generate — serve from DB if exists
+- [x] Fix strategyBlender.generate — serve from DB if exists
+- [x] Fix opportunityRadar.scan — serve from DB if exists
+- [x] Fix investorDossier.generate — serve from DB if exists
+- [x] Add "Re-analyze" force-refresh button to Third Signal tab in War Room
+- [x] Save checkpoint after persistence fixes

@@ -77,14 +77,14 @@ export default function DealDetail() {
   });
   const consensusScore = trpc.agents.consensusScore.useMutation({
     onSuccess: (r) => {
-      if (r.divergenceFlag) toast.warning(`⚠️ Models diverge (${(r.divergenceScore * 100).toFixed(0)}%) — manual review recommended`);
-      else toast.success(`Consensus: ${r.consensusScore.toFixed(3)} — models agree`);
+      if (r.divergenceFlag) toast.warning(`⚠️ Models diverge (${((r.divergenceScore ?? 0) * 100).toFixed(0)}%) — manual review recommended`);
+      else toast.success(`Consensus: ${(r.consensusScore ?? 0).toFixed(3)} — models agree`);
       refetch();
     },
     onError: (e) => toast.error(`Consensus scoring failed: ${e.message}`),
   });
   const sellerSim = trpc.agents.sellerSimulation.useMutation({
-    onSuccess: (r) => { toast.success(`Seller profile: ${r.persona.motivation} motivation, urgency ${r.persona.urgencyLevel}/10`); refetch(); },
+    onSuccess: (r) => { toast.success(`Seller profile: ${r.persona?.motivation ?? 'unknown'} motivation, urgency ${r.persona?.urgencyLevel ?? '?'}/10`); refetch(); },
     onError: (e) => toast.error(`Seller simulation failed: ${e.message}`),
   });
 
@@ -250,7 +250,15 @@ export default function DealDetail() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Analysis cached — re-run to refresh with latest data</p>
+                <Button size="sm" variant="outline" className="h-7 text-xs border-border" onClick={() => analyzeSignals.mutate({ dealId, force: true })} disabled={analyzeSignals.isPending}>
+                  <Brain className="w-3 h-3 mr-1.5" />
+                  {analyzeSignals.isPending ? "Re-analyzing..." : "Re-analyze"}
+                </Button>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
               {/* Owner Psychology */}
               <SignalCard icon={Brain} title="Owner Psychology" color="bg-purple-500/20 text-purple-400">
                 <div className="space-y-3">
@@ -389,6 +397,7 @@ export default function DealDetail() {
                   </div>
                 </div>
               </SignalCard>
+            </div>
             </div>
           )}
         </TabsContent>

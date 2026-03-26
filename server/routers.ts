@@ -115,10 +115,20 @@ export const appRouter = router({
       .input(z.object({
         dealId: z.number(),
         modules: z.array(z.enum(["psychology","digital","redteam","capital"])).optional(),
+        force: z.boolean().optional(), // force=true bypasses cache and re-generates
       }))
       .mutation(async ({ input }) => {
         const deal = await getDealById(input.dealId);
         if (!deal) throw new Error("Deal not found");
+
+        // Cache-first: if signal exists and force is not set, return cached result
+        if (!input.force) {
+          const cached = await getSignalByDealId(input.dealId);
+          if (cached) {
+            return { success: true, cached: true, psychology: null, digital: null, redteam: null, capital: null };
+          }
+        }
+
         const modules = input.modules ?? ["psychology","digital","redteam","capital"];
         const [psychology, digital, redteam, capital] = await Promise.all([
           modules.includes("psychology") ? analyzeOwnerPsychology(deal) : Promise.resolve(null),
@@ -178,10 +188,19 @@ export const appRouter = router({
       .query(async ({ input }) => getMemoByDealId(input.dealId)),
 
     generate: protectedProcedure
-      .input(z.object({ dealId: z.number() }))
+      .input(z.object({ dealId: z.number(), force: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         const deal = await getDealById(input.dealId);
         if (!deal) throw new Error("Deal not found");
+
+        // Cache-first: return existing memo unless force=true
+        if (!input.force) {
+          const existingMemo = await getMemoByDealId(input.dealId);
+          if (existingMemo) {
+            return { success: true, cached: true, memo: existingMemo };
+          }
+        }
+
         const signal = await getSignalByDealId(input.dealId);
         const memo = await generateInvestmentMemo(deal, {
           ownerProfile: signal?.ownerProfileSummary ?? undefined,
@@ -787,10 +806,22 @@ Generate a JSON dossier:
   agents: router({
     // Consensus scoring: 3 models in parallel, divergence flag (MiroFish)
     consensusScore: protectedProcedure
-      .input(z.object({ dealId: z.number() }))
+      .input(z.object({ dealId: z.number(), force: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         const dealRow = await getDealById(input.dealId);
         if (!dealRow) throw new Error("Deal not found");
+
+        // Cache-first: return existing consensus score unless force=true
+        if (!input.force) {
+          const dbCheck = await getDb();
+          if (dbCheck) {
+            const existing = await dbCheck.select().from(consensusScores)
+              .where(eq(consensusScores.dealId, input.dealId))
+              .orderBy(desc(consensusScores.createdAt)).limit(1);
+            if (existing[0]) return { cached: true, ...existing[0] };
+          }
+        }
+
         const { runConsensusScoring } = await import("./agents/index");
         const result = await runConsensusScoring(dealRow);
         // Persist to consensus_scores table
@@ -819,10 +850,22 @@ Generate a JSON dossier:
 
     // Seller simulation: persona + negotiation scenarios (MiroFish)
     sellerSimulation: protectedProcedure
-      .input(z.object({ dealId: z.number() }))
+      .input(z.object({ dealId: z.number(), force: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         const dealRow2 = await getDealById(input.dealId);
         if (!dealRow2) throw new Error("Deal not found");
+
+        // Cache-first: return existing simulation unless force=true
+        if (!input.force) {
+          const dbCheck2 = await getDb();
+          if (dbCheck2) {
+            const existing2 = await dbCheck2.select().from(sellerSimulations)
+              .where(eq(sellerSimulations.dealId, input.dealId))
+              .orderBy(desc(sellerSimulations.createdAt)).limit(1);
+            if (existing2[0]) return { cached: true, persona: existing2[0].personaJson, scenarios: existing2[0].scenariosJson };
+          }
+        }
+
         const { runSellerSimulation } = await import("./agents/index");
         const result = await runSellerSimulation(dealRow2);
         const dbConn2 = await getDb();
@@ -876,10 +919,24 @@ Generate a JSON dossier:
 
     // Run full Third Signal pipeline with trajectory logging
     runPipeline: protectedProcedure
-      .input(z.object({ dealId: z.number() }))
+      .input(z.object({ dealId: z.number(), force: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         const dealRow3 = await getDealById(input.dealId);
         if (!dealRow3) throw new Error("Deal not found");
+
+        // Cache-first: if trajectory steps exist, return them without re-running
+        if (!input.force) {
+          const dbCheck3 = await getDb();
+          if (dbCheck3) {
+            const existingSteps = await dbCheck3.select().from(dealTrajectory)
+              .where(eq(dealTrajectory.dealId, input.dealId))
+              .orderBy(dealTrajectory.createdAt);
+            if (existingSteps.length > 0) {
+              return { cached: true, trajectorySteps: existingSteps, ownerPsychology: null, digitalAudit: null, redTeam: null, capitalStack: null };
+            }
+          }
+        }
+
         const { runThirdSignalPipeline } = await import("./agents/index");
         const result = await runThirdSignalPipeline(dealRow3);
         await logActivity({ type: "signal_analyzed", title: `ADK pipeline complete: ${dealRow3.name} — ${result.trajectorySteps.length} agent steps` });
