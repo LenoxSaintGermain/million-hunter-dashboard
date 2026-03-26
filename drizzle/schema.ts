@@ -58,6 +58,14 @@ export const deals = mysqlTable("deals", {
   score: float("score"),
   redFlagCount: int("redFlagCount").default(0),
   isArchived: boolean("isArchived").default(false),
+  // OZ / TAD enrichment fields
+  opportunityZone: boolean("opportunity_zone").default(false),
+  ozTractId: varchar("oz_tract_id", { length: 32 }),
+  tadDistrict: varchar("tad_district", { length: 128 }),
+  ozPotentialGain: bigint("oz_potential_gain", { mode: "number" }),
+  eventProximityMiles: float("event_proximity_miles"),
+  eventRevenueLow: bigint("event_revenue_low", { mode: "number" }),
+  eventRevenueHigh: bigint("event_revenue_high", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -345,3 +353,54 @@ export const sellerSimulations = mysqlTable("seller_simulations", {
 });
 export type SellerSimulation = typeof sellerSimulations.$inferSelect;
 export type InsertSellerSimulation = typeof sellerSimulations.$inferInsert;
+
+// ─── Commercial Assets (Sprint 5 Scout agent) ─────────────────────────────────
+export const commercialAssets = mysqlTable("commercial_assets", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  address: varchar("address", { length: 500 }).notNull(),
+  city: varchar("city", { length: 100 }).notNull(),
+  state: varchar("state", { length: 50 }).notNull(),
+  zip: varchar("zip", { length: 20 }),
+  propertyType: mysqlEnum("property_type", ["office", "industrial", "retail", "mixed_use", "land", "warehouse", "flex"]).notNull().default("retail"),
+  squareFootage: int("square_footage"),
+  askingPrice: bigint("asking_price", { mode: "number" }),
+  capRate: float("cap_rate"),
+  noi: bigint("noi", { mode: "number" }),
+  leaseType: mysqlEnum("lease_type", ["nnn", "gross", "modified_gross", "vacant"]),
+  zoning: varchar("zoning", { length: 100 }),
+  opportunityZone: boolean("opportunity_zone").notNull().default(false),
+  ozTractId: varchar("oz_tract_id", { length: 20 }),
+  tadDistrict: varchar("tad_district", { length: 100 }),
+  distanceToVenue: float("distance_to_venue"),
+  eventRevenueLow: int("event_revenue_low"),
+  eventRevenueHigh: int("event_revenue_high"),
+  source: varchar("source", { length: 100 }).notNull().default("manual"),
+  sourceUrl: text("source_url"),
+  aiScore: float("ai_score"),
+  aiAnalysis: text("ai_analysis"),
+  status: mysqlEnum("status", ["new", "reviewing", "qualified", "rejected", "acquired"]).notNull().default("new"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+
+export type CommercialAsset = typeof commercialAssets.$inferSelect;
+export type InsertCommercialAsset = typeof commercialAssets.$inferInsert;
+
+// ─── Macro Signals (Sprint 6 Sentinel agent) ──────────────────────────────────
+export const macroSignals = mysqlTable("macro_signals", {
+  id: int("id").autoincrement().primaryKey(),
+  signalType: mysqlEnum("signal_type", ["institutional", "government", "seasonal", "event", "macro_momentum"]).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  summary: text("summary").notNull(),
+  roryPitch: text("rory_pitch"),
+  impactedAssetClasses: json("impacted_asset_classes").$type<string[]>(),
+  recommendedAction: text("recommended_action"),
+  confidenceScore: float("confidence_score"),
+  sourceUrl: text("source_url"),
+  expiresAt: bigint("expires_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+
+export type MacroSignal = typeof macroSignals.$inferSelect;
+export type InsertMacroSignal = typeof macroSignals.$inferInsert;

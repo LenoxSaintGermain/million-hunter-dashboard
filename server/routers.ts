@@ -14,12 +14,14 @@ import {
   getActivityLog, logActivity,
   getLatestScanJob, createScanJob, updateScanJob,
   getModelConfig, getAllModelConfigs, upsertModelConfig,
+  getDealIdByNameSource,
 } from "./db";
 import { MODEL_CATALOG, DEFAULT_MODULE_MODELS, type AnalysisModule } from "../shared/models";
 import {
   analyzeOwnerPsychology, runDigitalAudit, runRedTeamAnalysis,
   buildCapitalStack, generateInvestmentMemo, scoreDeal,
 } from "./gemini";
+import { enrichDealWithOZTAD } from "./ozTadEnrichment";
 
 export const appRouter = router({
   system: systemRouter,
@@ -367,8 +369,42 @@ export const appRouter = router({
       for (const [module, modelId] of Object.entries(DEFAULT_MODULE_MODELS)) {
         await upsertModelConfig(module as AnalysisModule, modelId, true);
       }
+      // Reset consensus models to defaults
+      await upsertModelConfig("consensus_model_1" as AnalysisModule, "gemini-2.5-pro", true);
+      await upsertModelConfig("consensus_model_2" as AnalysisModule, "gemini-2.5-flash", true);
+      await upsertModelConfig("consensus_model_3" as AnalysisModule, "gemini-2.5-flash-lite", true);
       return { success: true };
     }),
+
+    // Get/set the 3 models used for consensus scoring
+    consensusConfig: publicProcedure.query(async () => {
+      const saved = await getAllModelConfigs();
+      const defaults = {
+        consensus_model_1: "gemini-2.5-pro",
+        consensus_model_2: "gemini-2.5-flash",
+        consensus_model_3: "gemini-2.5-flash-lite",
+      };
+      const result: Record<string, string> = {};
+      for (const [key, defaultModel] of Object.entries(defaults)) {
+        const entry = saved.find((r) => r.module === key);
+        result[key] = entry?.modelId ?? defaultModel;
+      }
+      return result;
+    }),
+
+    updateConsensus: protectedProcedure
+      .input(z.object({
+        model1: z.string(),
+        model2: z.string(),
+        model3: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        await upsertModelConfig("consensus_model_1" as AnalysisModule, input.model1, true);
+        await upsertModelConfig("consensus_model_2" as AnalysisModule, input.model2, true);
+        await upsertModelConfig("consensus_model_3" as AnalysisModule, input.model3, true);
+        await logActivity({ type: "system", title: `Consensus models updated: ${input.model1} · ${input.model2} · ${input.model3}` });
+        return { success: true };
+      }),
   }),
 
   // ─── Freedom Map ─────────────────────────────────────────────────────────────
@@ -1002,20 +1038,16 @@ async function runScanPipeline(
   await phase("AI scoring", `Scoring ${qualified.length} deals with Gemini 2.5 Flash`, 45);
   let scored = 0;
   for (const listing of qualified) {
-    // Create or find the deal record
-    const existing = await (async () => {
-      try {
-        const allDeals = await import("./db").then((m) => m.getDeals({ limit: 200 }));
-        return allDeals.find((d) => d.name === listing.name);
-      } catch { return undefined; }
-    })();
-
+    // Upsert deal — ON DUPLICATE KEY UPDATE handles re-scan deduplication
+    // getDealIdByNameSource checks if the deal already exists first
     let dealId: number;
-    if (existing) {
-      dealId = existing.id;
+    const existingId = await getDealIdByNameSource(listing.name, listing.source ?? null);
+    if (existingId) {
+      dealId = existingId;
     } else {
       const res = await createDeal({ ...listing, stage: "new" }) as any;
-      dealId = res[0].insertId;
+      // ON DUPLICATE KEY UPDATE returns insertId=0 for updates — re-fetch if needed
+      dealId = res[0].insertId || (await getDealIdByNameSource(listing.name, listing.source ?? null)) || 0;
     }
 
     // Score the deal
@@ -1026,6 +1058,52 @@ async function runScanPipeline(
         await updateDealScore(dealId, score, redFlagCount);
         const stage = score >= 0.8 ? "high_priority" : score >= 0.65 ? "qualified" : "new";
         await updateDealStage(dealId, stage);
+
+        // OZ/TAD enrichment — runs async after scoring
+        enrichDealWithOZTAD(deal.location, deal.askingPrice, deal.cashFlow)
+          .then(async (enrichment) => {
+            if (enrichment.opportunityZone || enrichment.tadDistrict || enrichment.eventProximityMiles) {
+              const db = getDb();
+              await db.execute(
+                `UPDATE deals SET
+                  opportunity_zone = ?,
+                  oz_tract_id = ?,
+                  tad_district = ?,
+                  oz_potential_gain = ?,
+                  event_proximity_miles = ?,
+                  event_revenue_low = ?,
+                  event_revenue_high = ?
+                WHERE id = ?`,
+                [
+                  enrichment.opportunityZone ? 1 : 0,
+                  enrichment.ozTractId,
+                  enrichment.tadDistrict,
+                  enrichment.ozPotentialGain,
+                  enrichment.eventProximityMiles,
+                  enrichment.eventRevenueLow,
+                  enrichment.eventRevenueHigh,
+                  dealId,
+                ]
+              );
+              if (enrichment.opportunityZone) {
+                await logActivity({
+                  dealId,
+                  type: "deal_scored",
+                  title: `OZ Detected: ${deal.name}`,
+                  detail: `Tract ${enrichment.ozTractId} · Est. tax-free gain $${((enrichment.ozPotentialGain ?? 0) / 1000).toFixed(0)}k`,
+                });
+              }
+              if (enrichment.tadDistrict) {
+                await logActivity({
+                  dealId,
+                  type: "deal_scored",
+                  title: `TAD District: ${enrichment.tadDistrict}`,
+                  detail: `${deal.name} is within the ${enrichment.tadDistrict}`,
+                });
+              }
+            }
+          })
+          .catch((e) => console.warn(`[OZ/TAD] Enrichment failed for ${listing.name}:`, e));
       }
     } catch (e) {
       console.warn(`[Scan] Scoring failed for ${listing.name}:`, e);

@@ -174,3 +174,16 @@
 - [x] Fix investorDossier.generate — serve from DB if exists
 - [x] Add "Re-analyze" force-refresh button to Third Signal tab in War Room
 - [x] Save checkpoint after persistence fixes
+
+## Sprint 4 — Data Foundation
+
+- [x] Deal deduplication: add UNIQUE constraint on deals(name, source)
+- [x] Update runScanPipeline to use INSERT ... ON DUPLICATE KEY UPDATE
+- [x] Add OZ/TAD fields to deals table: opportunityZone, ozTractId, tadDistrict, ozPotentialGain
+- [x] Wire HUD Opportunity Zone API into scan pipeline enrichment phase
+- [x] Wire Atlanta TAD boundary lookup into scan pipeline enrichment phase
+- [ ] Add OZ/TAD badges to deal cards in Command Center and Deal Detail (Sprint 5)
+- [x] Move consensus scoring models from hardcoded to model_config table
+- [x] Add consensus_* module entries to AI Engine Settings tab
+- [ ] Add commercial_assets table schema (foundation for Sprint 5 Scout)
+- [x] Run tests and save Sprint 4 checkpoint

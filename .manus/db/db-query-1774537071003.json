@@ -1,0 +1,9 @@
+{
+  "query": "\n-- Step 1: Remove any existing duplicate rows, keeping the most recent\nDELETE d1 FROM deals d1\nINNER JOIN deals d2 \nWHERE d1.id < d2.id \n  AND d1.name = d2.name \n  AND d1.source = d2.source;\n\n-- Step 2: Add the unique constraint\nALTER TABLE deals ADD UNIQUE KEY uq_deals_name_source (name, source);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute \n-- Step 1: Remove any existing duplicate rows, keeping the most recent\nDELETE d1 FROM deals d1\nINNER JOIN deals d2 \nWHERE d1.id < d2.id \n  AND d1.name = d2.name \n  AND d1.source = d2.source;\n\n-- Step 2: Add the unique constraint\nALTER TABLE deals ADD UNIQUE KEY uq_deals_name_source (name, source);\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 531
+}

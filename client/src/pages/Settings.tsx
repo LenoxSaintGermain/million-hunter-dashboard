@@ -17,7 +17,103 @@ import {
   Database, Brain, Bell, Settings2, RefreshCw, Cpu, RotateCcw,
   Zap, Globe, FlaskConical, CheckCircle2,
 } from "lucide-react";
-import { MODULE_LABELS, MODULE_DESCRIPTIONS, type AnalysisModule } from "@shared/models";
+import { MODULE_LABELS, MODULE_DESCRIPTIONS, MODEL_CATALOG, type AnalysisModule } from "@shared/models";
+
+// ─── Consensus Model Config Sub-Component ─────────────────────────────────────
+function ConsensusModelConfig() {
+  const utils = trpc.useUtils();
+  const { data: consensusData, isLoading } = trpc.models.consensusConfig.useQuery();
+  const [m1, setM1] = useState("");
+  const [m2, setM2] = useState("");
+  const [m3, setM3] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  // Sync local state when data loads
+  const dataRef = useState(() => ({ loaded: false }))[0];
+  if (consensusData && !dataRef.loaded) {
+    dataRef.loaded = true;
+    setM1(consensusData.consensus_model_1 ?? "gemini-2.5-pro");
+    setM2(consensusData.consensus_model_2 ?? "gemini-2.5-flash");
+    setM3(consensusData.consensus_model_3 ?? "gemini-2.5-flash-lite");
+  }
+
+  const updateConsensus = trpc.models.updateConsensus.useMutation({
+    onSuccess: () => {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      utils.models.consensusConfig.invalidate();
+      toast.success("Consensus models saved");
+    },
+    onError: (e) => toast.error(`Failed: ${e.message}`),
+  });
+
+  const GEMINI_MODELS = MODEL_CATALOG.filter((m) => m.provider === "google");
+
+  const ModelSelect = ({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) => (
+    <div className="space-y-1.5">
+      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="h-8 text-xs border-border bg-muted/20">
+          <SelectValue placeholder="Select model..." />
+        </SelectTrigger>
+        <SelectContent>
+          {GEMINI_MODELS.map((model) => (
+            <SelectItem key={model.id} value={model.id} className="text-xs">
+              <div className="flex items-center gap-2">
+                <span>{model.label}</span>
+                <span className="text-[9px] px-1 py-0.5 rounded-sm bg-blue-500/20 text-blue-400 font-medium">{model.tier}</span>
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  return (
+    <Card className="bg-card border-border border-primary/30">
+      <CardContent className="pt-4 pb-4">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="text-xs font-semibold text-foreground flex items-center gap-2">
+              <Cpu className="w-3.5 h-3.5 text-primary" />
+              Consensus Scoring Models
+            </h3>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              3 models run in parallel — divergence &gt;15% triggers ⚠ Review flag
+            </p>
+          </div>
+          <Button
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => updateConsensus.mutate({ model1: m1, model2: m2, model3: m3 })}
+            disabled={updateConsensus.isPending || isLoading}
+          >
+            {saved ? <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-400" /> : null}
+            {updateConsensus.isPending ? "Saving..." : saved ? "Saved" : "Save"}
+          </Button>
+        </div>
+        {isLoading ? (
+          <div className="grid grid-cols-3 gap-3">
+            {[1,2,3].map(i => <Skeleton key={i} className="h-16" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            <ModelSelect value={m1} onChange={setM1} label="Model 1 (Strong)" />
+            <ModelSelect value={m2} onChange={setM2} label="Model 2 (Fast)" />
+            <ModelSelect value={m3} onChange={setM3} label="Model 3 (Lite)" />
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border/50">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <p className="text-[10px] text-muted-foreground">
+            Active: <span className="text-foreground font-mono">{m1}</span> · <span className="text-foreground font-mono">{m2}</span> · <span className="text-foreground font-mono">{m3}</span>
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 const SOURCES = [
   { id: "bizbuysell", label: "BizBuySell", tier: "Primary" },
@@ -352,6 +448,9 @@ export default function Settings() {
               })}
             </div>
           )}
+
+          {/* Consensus Scoring Models */}
+          <ConsensusModelConfig />
 
           {/* Model catalog summary */}
           <Card className="bg-card border-border">

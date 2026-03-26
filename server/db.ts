@@ -86,7 +86,31 @@ export async function getDealById(id: number) {
 export async function createDeal(data: InsertDeal) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return db.insert(deals).values(data);
+  // ON DUPLICATE KEY UPDATE: if (name, source) already exists, update financials + stage
+  // This prevents re-scans from creating duplicate deal rows
+  return db.insert(deals).values(data).onDuplicateKeyUpdate({
+    set: {
+      revenue: data.revenue,
+      cashFlow: data.cashFlow,
+      askingPrice: data.askingPrice,
+      multiple: data.multiple,
+      employees: data.employees,
+      description: data.description,
+      updatedAt: new Date(),
+    },
+  });
+}
+
+// Returns the deal ID for an existing deal by name+source, or null if not found
+export async function getDealIdByNameSource(name: string, source?: string | null): Promise<number | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const { and, isNull } = await import("drizzle-orm");
+  const conditions = source
+    ? [eq(deals.name, name), eq(deals.source, source)]
+    : [eq(deals.name, name), isNull(deals.source)];
+  const result = await db.select({ id: deals.id }).from(deals).where(and(...conditions)).limit(1);
+  return result[0]?.id ?? null;
 }
 
 export async function updateDealStage(id: number, stage: typeof deals.$inferSelect["stage"]) {

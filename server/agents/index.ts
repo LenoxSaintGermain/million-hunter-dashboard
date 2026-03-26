@@ -200,6 +200,19 @@ export async function runThirdSignalPipeline(deal: Deal): Promise<{
  * Computes consensus score and divergence metric.
  * High divergence (>0.15) flags the deal for manual review.
  */
+export async function getConsensusModelIds(): Promise<[string, string, string]> {
+  try {
+    const { getAllModelConfigs } = await import("../db");
+    const saved = await getAllModelConfigs();
+    const m1 = saved.find((r) => r.module === "consensus_model_1")?.modelId ?? MODEL_STRONG;
+    const m2 = saved.find((r) => r.module === "consensus_model_2")?.modelId ?? MODEL_FAST;
+    const m3 = saved.find((r) => r.module === "consensus_model_3")?.modelId ?? MODEL_LITE;
+    return [m1, m2, m3];
+  } catch {
+    return [MODEL_STRONG, MODEL_FAST, MODEL_LITE];
+  }
+}
+
 export async function runConsensusScoring(deal: Deal): Promise<ConsensusResult> {
   const dealContext = `
 Business: ${deal.name}
@@ -222,32 +235,24 @@ Return JSON with:
 
 Return ONLY valid JSON.`;
 
+  // Load configured model IDs (dynamic — reads from DB, falls back to defaults)
+  const [modelId1, modelId2, modelId3] = await getConsensusModelIds();
+
+  const callGemini = (modelId: string, label: string) =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: scoringPrompt(label) }] }],
+        generationConfig: { responseMimeType: "application/json" },
+      }),
+    }).then(r => r.json());
+
   // Run all 3 models in parallel (MiroFish fan-out pattern)
-  const [proResult, flashResult, expResult] = await Promise.allSettled([
-    fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=" + process.env.GEMINI_API_KEY, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: scoringPrompt("Gemini 2.5 Pro") }] }],
-        generationConfig: { responseMimeType: "application/json" },
-      }),
-    }).then(r => r.json()),
-    fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + process.env.GEMINI_API_KEY, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: scoringPrompt("Gemini 2.5 Flash") }] }],
-        generationConfig: { responseMimeType: "application/json" },
-      }),
-    }).then(r => r.json()),
-    fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-06-17:generateContent?key=" + process.env.GEMINI_API_KEY, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: scoringPrompt("Gemini 2.5 Flash Lite") }] }],
-        generationConfig: { responseMimeType: "application/json" },
-      }),
-    }).then(r => r.json()),
+  const [result1, result2, result3] = await Promise.allSettled([
+    callGemini(modelId1, modelId1),
+    callGemini(modelId2, modelId2),
+    callGemini(modelId3, modelId3),
   ]);
 
   // Parse results from each model
@@ -269,9 +274,9 @@ Return ONLY valid JSON.`;
   };
 
   const scores = [
-    parseScore(proResult, "gemini-2.5-pro"),
-    parseScore(flashResult, "gemini-2.5-flash"),
-    parseScore(expResult, "gemini-2.5-flash-lite"),
+    parseScore(result1, modelId1),
+    parseScore(result2, modelId2),
+    parseScore(result3, modelId3),
   ];
 
   // Compute consensus and divergence (MiroFish synthesizer pattern)
