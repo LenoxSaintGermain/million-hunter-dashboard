@@ -17,17 +17,35 @@ import {
   TrendingUp,
   Menu,
   X,
+  Target,
+  BarChart3,
+  Radar,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-const navItems = [
-  { href: "/", icon: LayoutDashboard, label: "Command Center", badge: null },
-  { href: "/scan", icon: Search, label: "Market Scan", badge: "Live" },
-  { href: "/memos", icon: FileText, label: "Investment Memos", badge: null },
-  { href: "/outreach", icon: Mail, label: "Outreach Pipeline", badge: null },
+const navSections = [
+  {
+    label: "Operations",
+    items: [
+      { href: "/", icon: LayoutDashboard, label: "Command Center", badge: null },
+      { href: "/scan", icon: Search, label: "Market Scan", badge: "Live" },
+      { href: "/memos", icon: FileText, label: "Investment Memos", badge: null },
+      { href: "/outreach", icon: Mail, label: "Outreach Pipeline", badge: null },
+    ],
+  },
+  {
+    label: "Capital Stack",
+    items: [
+      { href: "/freedom-map", icon: Target, label: "Freedom Map", badge: "New" },
+      { href: "/strategy-blender", icon: BarChart3, label: "Strategy Blender", badge: null },
+      { href: "/opportunity-radar", icon: Radar, label: "Opportunity Radar", badge: null },
+      { href: "/investor-dossier", icon: Sparkles, label: "Investor Dossier", badge: null },
+    ],
+  },
 ];
 
 interface DashboardLayoutProps {
@@ -59,38 +77,54 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
-          const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
-          return (
-            <Tooltip key={item.href} delayDuration={0}>
-              <TooltipTrigger asChild>
-                <Link href={item.href} onClick={() => setMobileOpen(false)}>
-                  <div className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-150 text-sm font-medium",
-                    isActive
-                      ? "bg-primary/15 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent",
-                    collapsed && "justify-center px-0"
-                  )}>
-                    <item.icon className={cn("shrink-0", collapsed ? "w-5 h-5" : "w-4 h-4")} />
-                    {!collapsed && (
-                      <>
-                        <span className="flex-1 truncate">{item.label}</span>
-                        {item.badge && (
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-primary/20 text-primary border-0">
-                            {item.badge}
-                          </Badge>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </Link>
-              </TooltipTrigger>
-              {collapsed && <TooltipContent side="right">{item.label}</TooltipContent>}
-            </Tooltip>
-          );
-        })}
+      <nav className="flex-1 py-3 px-2 overflow-y-auto space-y-4">
+        {navSections.map((section) => (
+          <div key={section.label}>
+            {!collapsed && (
+              <div className="px-3 mb-1">
+                <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground/50">{section.label}</span>
+              </div>
+            )}
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+                return (
+                  <Tooltip key={item.href} delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <Link href={item.href} onClick={() => setMobileOpen(false)}>
+                        <div className={cn(
+                          "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-150 text-sm font-medium",
+                          isActive
+                            ? "bg-primary/15 text-primary"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                          collapsed && "justify-center px-0"
+                        )}>
+                          <item.icon className={cn("shrink-0", collapsed ? "w-5 h-5" : "w-4 h-4")} />
+                          {!collapsed && (
+                            <>
+                              <span className="flex-1 truncate">{item.label}</span>
+                              {item.badge && (
+                                <Badge variant="secondary" className={cn(
+                                  "text-[10px] px-1.5 py-0 h-4 border-0",
+                                  item.badge === "New"
+                                    ? "bg-cyan-500/20 text-cyan-400"
+                                    : "bg-primary/20 text-primary"
+                                )}>
+                                  {item.badge}
+                                </Badge>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </Link>
+                    </TooltipTrigger>
+                    {collapsed && <TooltipContent side="right">{item.label}</TooltipContent>}
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Bottom */}

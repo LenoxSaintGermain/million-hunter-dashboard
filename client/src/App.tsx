@@ -10,6 +10,10 @@ import DealDetail from "./pages/DealDetail";
 import Memos from "./pages/Memos";
 import Outreach from "./pages/Outreach";
 import Settings from "./pages/Settings";
+import FreedomMap from "./pages/FreedomMap";
+import StrategyBlender from "./pages/StrategyBlender";
+import OpportunityRadar from "./pages/OpportunityRadar";
+import InvestorDossier from "./pages/InvestorDossier";
 
 function Router() {
   return (
@@ -20,6 +24,10 @@ function Router() {
       <Route path="/memos" component={Memos} />
       <Route path="/outreach" component={Outreach} />
       <Route path="/settings" component={Settings} />
+      <Route path="/freedom-map" component={FreedomMap} />
+      <Route path="/strategy-blender" component={StrategyBlender} />
+      <Route path="/opportunity-radar" component={OpportunityRadar} />
+      <Route path="/investor-dossier" component={InvestorDossier} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

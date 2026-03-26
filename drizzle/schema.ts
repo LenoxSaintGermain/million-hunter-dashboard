@@ -197,3 +197,104 @@ export const modelConfig = mysqlTable("model_config", {
 
 export type ModelConfig = typeof modelConfig.$inferSelect;
 export type InsertModelConfig = typeof modelConfig.$inferInsert;
+
+// ─── Freedom Goals (goal-first deal engineering) ──────────────────────────────
+export const freedomGoals = mysqlTable("freedom_goals", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: varchar("userId", { length: 64 }),
+  name: varchar("name", { length: 128 }).notNull().default("My Freedom Plan"),
+  targetMonthlyIncome: bigint("targetMonthlyIncome", { mode: "number" }).notNull(),
+  currentIncome: bigint("currentIncome", { mode: "number" }),
+  investmentCapital: bigint("investmentCapital", { mode: "number" }),
+  timelineYears: int("timelineYears").notNull().default(3),
+  riskTolerance: mysqlEnum("riskTolerance", ["conservative", "moderate", "aggressive"]).default("moderate").notNull(),
+  location: varchar("location", { length: 256 }),
+  situation: mysqlEnum("situation", ["single", "married", "family"]).default("single").notNull(),
+  age: int("age"),
+  aiRationale: text("aiRationale"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FreedomGoal = typeof freedomGoals.$inferSelect;
+export type InsertFreedomGoal = typeof freedomGoals.$inferInsert;
+
+// ─── Strategy Blueprints (custom deal mix recipes) ────────────────────────────
+export const strategyBlueprints = mysqlTable("strategy_blueprints", {
+  id: int("id").autoincrement().primaryKey(),
+  goalId: int("goalId"),
+  userId: varchar("userId", { length: 64 }),
+  name: varchar("name", { length: 256 }).notNull(),
+  recipe: json("recipe").notNull(), // Array of deal components
+  capitalStack: json("capitalStack"), // Sources & uses breakdown
+  projectedMonthlyIncome: bigint("projectedMonthlyIncome", { mode: "number" }),
+  projectedTotalInvestment: bigint("projectedTotalInvestment", { mode: "number" }),
+  dscr: float("dscr"),
+  scenario: mysqlEnum("scenario", ["conservative", "base", "aggressive"]).default("base").notNull(),
+  aiRationale: text("aiRationale"),
+  isFavorite: boolean("isFavorite").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type StrategyBlueprint = typeof strategyBlueprints.$inferSelect;
+export type InsertStrategyBlueprint = typeof strategyBlueprints.$inferInsert;
+
+// ─── Opportunity Radar (creative plays & market signals) ──────────────────────
+export const opportunityRadar = mysqlTable("opportunity_radar", {
+  id: int("id").autoincrement().primaryKey(),
+  signalType: mysqlEnum("signalType", [
+    "permit_filed",
+    "tad_boundary",
+    "zoning_change",
+    "world_event",
+    "land_play",
+    "gas_station_hold",
+    "parking_arbitrage",
+    "lot_prep",
+    "microloan",
+    "other",
+  ]).notNull(),
+  title: varchar("title", { length: 256 }).notNull(),
+  location: varchar("location", { length: 256 }),
+  description: text("description"),
+  urgencyScore: float("urgencyScore"),
+  estimatedROI: float("estimatedROI"),
+  estimatedHoldYears: float("estimatedHoldYears"),
+  capitalRequired: bigint("capitalRequired", { mode: "number" }),
+  aiAnalysis: text("aiAnalysis"),
+  sourceUrl: text("sourceUrl"),
+  expiresAt: timestamp("expiresAt"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type OpportunityRadar = typeof opportunityRadar.$inferSelect;
+export type InsertOpportunityRadar = typeof opportunityRadar.$inferInsert;
+
+// ─── Investor Dossiers (bespoke pitch decks) ──────────────────────────────────
+export const investorDossiers = mysqlTable("investor_dossiers", {
+  id: int("id").autoincrement().primaryKey(),
+  dealId: int("dealId"),
+  blueprintId: int("blueprintId"),
+  userId: varchar("userId", { length: 64 }),
+  title: varchar("title", { length: 256 }).notNull(),
+  investorPersona: mysqlEnum("investorPersona", ["passive", "active", "institutional", "family_office", "syndicate"]).default("passive").notNull(),
+  thesis: text("thesis"),
+  analystCommentary: text("analystCommentary"),
+  skepticCommentary: text("skepticCommentary"),
+  visionaryCommentary: text("visionaryCommentary"),
+  financialProjections: json("financialProjections"),
+  riskAssessment: json("riskAssessment"),
+  capitalStack: json("capitalStack"),
+  keyHighlights: json("keyHighlights"),
+  recommendation: mysqlEnum("recommendation", ["STRONG_BUY", "BUY", "CONSIDER", "PASS"]).default("CONSIDER").notNull(),
+  pdfUrl: text("pdfUrl"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type InvestorDossier = typeof investorDossiers.$inferSelect;
+export type InsertInvestorDossier = typeof investorDossiers.$inferInsert;

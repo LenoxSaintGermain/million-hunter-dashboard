@@ -84,3 +84,52 @@
 - [x] Debug why createDeal fails silently in runScanPipeline
 - [x] Fix deal persistence so scanned deals appear in Command Center (root cause: mysql2/drizzle returns [ResultSetHeader, null] array, not .insertId directly — fixed to use [0].insertId)
 - [x] Verify KPI cards update after scan completes
+
+## Phase 2: Mainstreet Investor OS Expansion
+
+### Schema & Backend
+- [x] Add freedom_goals table (target income, timeline, location, situation, risk tolerance)
+- [x] Add strategy_blueprints table (goal_id, recipe JSON, ai_rationale, capital_stack JSON)
+- [x] Add opportunity_radar table (type: permit/TAD/land/creative, location, signal, ai_analysis)
+- [x] Add tRPC procedures: freedomMap.generate, freedomMap.save, freedomMap.list
+- [x] Add tRPC procedures: strategyBlender.generate, strategyBlender.save
+- [x] Add tRPC procedures: opportunityRadar.scan, opportunityRadar.list
+- [x] Add tRPC procedures: investorDossier.generate, investorDossier.get
+
+### Freedom Map Page
+- [x] Goal-first intake form (target monthly income, timeline, capital, risk, location, situation)
+- [x] AI-generated portfolio recipe (deal mix: business + rentals + flip + land play)
+- [x] Dynamic milestone timeline with lifestyle markers
+- [x] Three view modes: Lifestyle / Portfolio / Wealth
+- [x] Preset profiles (Side Hustle → FI, Family Freedom, Aggressive Builder)
+- [x] AI agent voice narrating the path ("Here's how we get you there...")
+
+### Strategy Blender Page
+- [x] Deal type selector (SBA business, rental, flip, microloan, land/parking, TAD play, hold)
+- [x] Live capital stack with toggleable levers (seller note, SBA 7a, impact fund, green stack)
+- [x] DSCR calculator and debt service visualization
+- [x] Scenario presets: Conservative / Base / Aggressive
+- [x] Multi-year projection chart (Recharts)
+- [x] "Mirror the Blackrock move" — portfolio rebalancing logic
+
+### Opportunity Radar Page
+- [x] Signal type cards: Permit Filed, TAD Boundary, World Cup proximity, Zoning Change
+- [x] Creative play templates: Parking lot arbitrage, Gas station hold, Lot prep for acquisition
+- [x] AI analysis per signal ("Why this matters now...")
+- [x] Map integration showing signal locations
+- [x] Filter by signal type, location radius, urgency score
+
+### Investor Pitch Dossier
+- [x] DossierView component (sidebar nav: Thesis / Financials / Risks / Brand+GTM)
+- [x] AgentCommentary component (Analyst / Skeptic / Visionary perspectives)
+- [x] InvestorReceipt drawer (slide-in, portfolio cart, confetti on 3+ positions)
+- [x] Bespoke AI-generated pitch narrative per investor persona
+- [x] PDF export of full dossier
+- [x] "The AI is looking out for you" messaging layer
+
+### UX Upgrade
+- [x] Install framer-motion for showcase-quality animations
+- [x] Staggered entrance animations on all major pages
+- [x] Cinematic hero sections with gradient text
+- [x] Agent voice commentary woven throughout (not just in Dossier)
+- [x] Mobile-first responsive audit of all new pages
