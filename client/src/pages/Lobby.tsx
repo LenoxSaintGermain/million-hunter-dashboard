@@ -97,6 +97,7 @@ export default function Lobby() {
   const [completed, setCompleted] = useState<Set<number>>(new Set());
   const [showChapterSelect, setShowChapterSelect] = useState(false);
   const [entered, setEntered] = useState(false); // fade-in gate
+  const [exiting, setExiting] = useState(false); // prevents guard re-trigger during nav
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -171,13 +172,28 @@ export default function Lobby() {
   };
 
   const handleEnterDashboard = async () => {
-    await markOnboarding.mutateAsync();
-    navigate("/");
+    if (exiting) return;
+    setExiting(true);
+    try {
+      await markOnboarding.mutateAsync();
+    } catch {
+      // mutation may fail if user is not authenticated — still allow exit
+    }
+    // Mark session so OnboardingGuard skips the check on the next page load
+    sessionStorage.setItem("onboarding_checked", "done");
+    window.location.href = "/";
   };
 
   const handleSkip = async () => {
-    await markOnboarding.mutateAsync();
-    navigate("/");
+    if (exiting) return;
+    setExiting(true);
+    try {
+      await markOnboarding.mutateAsync();
+    } catch {
+      // allow skip even if mutation fails
+    }
+    sessionStorage.setItem("onboarding_checked", "done");
+    window.location.href = "/";
   };
 
   return (

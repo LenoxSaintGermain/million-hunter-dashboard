@@ -227,3 +227,9 @@
 - [x] Lobby: Enter Dashboard CTA after final chapter
 - [x] Wire first-login gate in App.tsx routing
 - [x] Run tests and save Sprint 7 checkpoint
+
+## Sprint 7 Bug Fixes
+
+- [x] Fix Lobby: Skip intro button not navigating to dashboard
+- [x] Fix Lobby: Enter Dashboard button not navigating to dashboard
+- [x] Ensure markOnboardingComplete mutation fires before navigation
