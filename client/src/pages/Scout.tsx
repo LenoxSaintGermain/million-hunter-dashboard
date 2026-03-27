@@ -286,18 +286,18 @@ function AssetCard({ asset, onStatusChange }: { asset: any; onStatusChange: () =
         </div>
 
         {/* AI Score display */}
-        {asset.aiScore != null && (
+        {asset.aiScore != null && (() => { const score = parseFloat(String(asset.aiScore)); return (
           <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/15">
             <BarChart3 className="w-3 h-3 text-primary shrink-0" />
             <div className="flex-1 min-w-0">
               <span className="text-xs text-muted-foreground">AI Score: </span>
-              <span className={cn("text-sm font-bold", asset.aiScore >= 0.75 ? "text-emerald-400" : asset.aiScore >= 0.6 ? "text-amber-400" : "text-muted-foreground")}>
-                {asset.aiScore.toFixed(3)}
+              <span className={cn("text-sm font-bold", score >= 0.75 ? "text-emerald-400" : score >= 0.6 ? "text-amber-400" : "text-muted-foreground")}>
+                {score.toFixed(3)}
               </span>
             </div>
             <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
           </div>
-        )}
+        ); })()}
 
         {/* Actions */}
         <div className="flex gap-2 pt-1">
@@ -329,7 +329,7 @@ function AssetCard({ asset, onStatusChange }: { asset: any; onStatusChange: () =
         </div>
 
         {/* Convert to Deal — shown for qualified assets */}
-        {(asset.status === "qualified" || (asset.aiScore != null && asset.aiScore >= 0.70)) && (
+        {(asset.status === "qualified" || (asset.aiScore != null && parseFloat(String(asset.aiScore)) >= 0.70)) && (
           <Button
             size="sm"
             className="w-full h-7 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white border-0 mt-1"
