@@ -248,3 +248,15 @@
 - [x] Sentinel: Refresh Signals button calling LLM via Perplexity Sonar
 - [x] Sentinel: AI-generated signals with real-time Atlanta market grounding
 - [x] Run tests and save Sprint 8 checkpoint
+
+## Sprint 9 — Data Integrity + Pipeline Automation
+
+- [x] DECIMAL audit: parseFloat guard for capRate in DealDetail, Home, Scan pages
+- [x] DECIMAL audit: parseFloat guard for confidenceScore in War Room Consensus tab
+- [x] DECIMAL audit: parseFloat guard for score fields in DealDetail Third Signal tab
+- [x] DECIMAL audit: parseFloat guard for all numeric fields in Command Center KPI cards
+- [x] Scout: auto-trigger scoreAsset immediately after AddAssetDialog success
+- [x] Scout: show "Scoring..." state on newly created card while auto-score runs
+- [x] Scout→Deal Bridge: auto-trigger agents.runPipeline after convertToDeal succeeds
+- [x] Scout→Deal Bridge: War Room opens with pipeline already in progress
+- [x] Run tests and save Sprint 9 checkpoint

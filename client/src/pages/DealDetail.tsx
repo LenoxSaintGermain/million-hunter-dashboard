@@ -67,7 +67,7 @@ export default function DealDetail() {
     onError: (e) => toast.error(`Memo generation failed: ${e.message}`),
   });
   const scoreDeal = trpc.deals.score.useMutation({
-    onSuccess: (d) => { toast.success(`Scored: ${d.score.toFixed(3)}`); refetch(); },
+    onSuccess: (d) => { toast.success(`Scored: ${parseFloat(String(d.score)).toFixed(3)}`); refetch(); },
   });
 
   // ADK agent mutations
@@ -77,8 +77,8 @@ export default function DealDetail() {
   });
   const consensusScore = trpc.agents.consensusScore.useMutation({
     onSuccess: (r) => {
-      if (r.divergenceFlag) toast.warning(`⚠️ Models diverge (${((r.divergenceScore ?? 0) * 100).toFixed(0)}%) — manual review recommended`);
-      else toast.success(`Consensus: ${(r.consensusScore ?? 0).toFixed(3)} — models agree`);
+      if (r.divergenceFlag) toast.warning(`⚠️ Models diverge (${(parseFloat(String(r.divergenceScore ?? 0)) * 100).toFixed(0)}%) — manual review recommended`);
+      else toast.success(`Consensus: ${parseFloat(String(r.consensusScore ?? 0)).toFixed(3)} — models agree`);
       refetch();
     },
     onError: (e) => toast.error(`Consensus scoring failed: ${e.message}`),
@@ -92,14 +92,18 @@ export default function DealDetail() {
   const { data: consensusData } = trpc.agents.getConsensusScore.useQuery({ dealId }, { enabled: !!dealId });
   const { data: sellerData } = trpc.agents.getSellerSimulation.useQuery({ dealId }, { enabled: !!dealId });
 
-  const fmt = (n: number | null | undefined, prefix = "$") => {
-    if (n == null) return "—";
-    if (n >= 1_000_000) return `${prefix}${(n / 1_000_000).toFixed(2)}M`;
-    if (n >= 1_000) return `${prefix}${(n / 1_000).toFixed(0)}k`;
-    return `${prefix}${n}`;
+  // MySQL returns DECIMAL columns as strings — coerce to float everywhere
+  const toNum = (v: any): number | null => v == null ? null : parseFloat(String(v));
+
+  const fmt = (n: any, prefix = "$") => {
+    const v = toNum(n);
+    if (v == null || isNaN(v)) return "—";
+    if (v >= 1_000_000) return `${prefix}${(v / 1_000_000).toFixed(2)}M`;
+    if (v >= 1_000) return `${prefix}${(v / 1_000).toFixed(0)}k`;
+    return `${prefix}${v}`;
   };
 
-  const pct = (n: number | null | undefined) => n == null ? "—" : `${Math.round(n * 100)}%`;
+  const pct = (n: any) => { const v = toNum(n); return v == null ? "—" : `${Math.round(v * 100)}%`; };
 
   if (isLoading) {
     return (
@@ -133,7 +137,7 @@ export default function DealDetail() {
   }
 
   const { deal, signal, memo } = data;
-  const score = deal.score;
+  const score = toNum(deal.score);
   const scoreColor = score == null ? "text-muted-foreground" : score >= 0.8 ? "text-emerald-500" : score >= 0.65 ? "text-amber-500" : "text-destructive";
 
   return (
@@ -226,7 +230,7 @@ export default function DealDetail() {
           sub={deal.revenue && deal.cashFlow ? `${Math.round((deal.cashFlow / deal.revenue) * 100)}% margin` : undefined}
         />
         <StatCard label="Asking Price" value={fmt(deal.askingPrice)} />
-        <StatCard label="Multiple" value={deal.multiple ? `${deal.multiple.toFixed(2)}x` : "—"} sub="EBITDA multiple" />
+        <StatCard label="Multiple" value={toNum(deal.multiple) != null ? `${toNum(deal.multiple)!.toFixed(2)}x` : "—"} sub="EBITDA multiple" />
       </div>
 
       {/* Tabs */}
@@ -388,8 +392,8 @@ export default function DealDetail() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">DSCR</span>
                     <span className={cn("text-xs font-mono font-bold",
-                      (signal.dscr ?? 0) >= 1.25 ? "text-emerald-500" : "text-destructive"
-                    )}>{signal.dscr?.toFixed(2) ?? "—"}</span>
+                      (toNum(signal.dscr) ?? 0) >= 1.25 ? "text-emerald-500" : "text-destructive"
+                    )}>{toNum(signal.dscr)?.toFixed(2) ?? "—"}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Cash-on-Cash</span>
@@ -493,8 +497,8 @@ export default function DealDetail() {
                     <div className="bg-muted/30 rounded-xl p-4 border border-border/50">
                       <p className="text-xs text-muted-foreground mb-1">DSCR</p>
                       <p className={cn("text-2xl font-bold font-mono",
-                        (signal.dscr ?? 0) >= 1.25 ? "text-emerald-500" : "text-destructive"
-                      )}>{signal.dscr?.toFixed(2) ?? "—"}</p>
+                        (toNum(signal.dscr) ?? 0) >= 1.25 ? "text-emerald-500" : "text-destructive"
+                      )}>{toNum(signal.dscr)?.toFixed(2) ?? "—"}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">Min 1.25 for SBA approval</p>
                     </div>
                     <div className="bg-muted/30 rounded-xl p-4 border border-border/50">
@@ -560,7 +564,7 @@ export default function DealDetail() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-amber-400">Models Disagree — Manual Review Required</p>
                         <p className="text-xs text-amber-400/70 mt-0.5">
-                          Divergence score: <span className="font-bold">{((consensusData.divergenceScore ?? 0) * 100).toFixed(0)}%</span>. When AI models disagree this significantly, it signals genuine ambiguity in the deal fundamentals. Do not advance to LOI without a direct conversation with the broker.
+                          Divergence score: <span className="font-bold">{((toNum(consensusData.divergenceScore) ?? 0) * 100).toFixed(0)}%</span>. When AI models disagree this significantly, it signals genuine ambiguity in the deal fundamentals. Do not advance to LOI without a direct conversation with the broker.
                         </p>
                         <div className="flex items-center gap-2 mt-2">
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">
@@ -586,13 +590,13 @@ export default function DealDetail() {
                   <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border">
                     <div>
                       <p className="text-xs text-muted-foreground">Consensus Score</p>
-                      <p className="text-3xl font-bold text-foreground">{(consensusData.consensusScore ?? 0).toFixed(3)}</p>
+                      <p className="text-3xl font-bold text-foreground">{(toNum(consensusData.consensusScore) ?? 0).toFixed(3)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">Divergence</p>
                       <div className="flex items-center gap-1.5 justify-end mt-1">
                         {consensusData.divergenceFlag ? (
-                          <><XCircle className="w-4 h-4 text-amber-400" /><span className="text-sm font-semibold text-amber-400">{((consensusData.divergenceScore ?? 0) * 100).toFixed(0)}% — Review</span></>
+                          <><XCircle className="w-4 h-4 text-amber-400" /><span className="text-sm font-semibold text-amber-400">{((toNum(consensusData.divergenceScore) ?? 0) * 100).toFixed(0)}% — Review</span></>
                         ) : (
                           <><CheckCircle2 className="w-4 h-4 text-emerald-400" /><span className="text-sm font-semibold text-emerald-400">Models Agree</span></>
                         )}
@@ -618,7 +622,7 @@ export default function DealDetail() {
                           <>
                             <div className="shrink-0 text-center w-16">
                               <p className="text-xs font-mono text-muted-foreground">{m.name?.split("-").slice(-2).join("-")}</p>
-                              <p className="text-2xl font-bold mt-1">{(m.score ?? 0).toFixed(3)}</p>
+                              <p className="text-2xl font-bold mt-1">{(toNum(m.score) ?? 0).toFixed(3)}</p>
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium text-muted-foreground mb-1">Rationale</p>
@@ -632,7 +636,7 @@ export default function DealDetail() {
                         ) : (
                           <>
                             <p className="text-xs font-mono text-muted-foreground truncate">{m.name?.split("-").slice(-2).join("-")}</p>
-                            <p className="text-xl font-bold mt-1">{(m.score ?? 0).toFixed(3)}</p>
+                            <p className="text-xl font-bold mt-1">{(toNum(m.score) ?? 0).toFixed(3)}</p>
                             {m.rationale && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{m.rationale}</p>}
                           </>
                         )}

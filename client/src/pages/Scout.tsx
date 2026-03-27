@@ -58,7 +58,7 @@ function fmt(n: number | null | undefined): string {
 }
 
 // ─── Add Asset Dialog ─────────────────────────────────────────────────────────
-function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
+function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: number) => void }) {
   const [form, setForm] = useState({
     name: "", address: "", city: "Atlanta", state: "GA", zip: "",
     propertyType: "retail" as PropertyType,
@@ -68,9 +68,9 @@ function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
   });
 
   const create = trpc.scout.create.useMutation({
-    onSuccess: () => {
-      toast.success("Asset added to Scout pipeline");
-      onCreated();
+    onSuccess: (newAsset) => {
+      toast.success("Asset added — AI scoring in progress...");
+      onCreated(newAsset.id);
       onClose();
       setForm({ name: "", address: "", city: "Atlanta", state: "GA", zip: "", propertyType: "retail", squareFootage: "", askingPrice: "", capRate: "", noi: "", leaseType: "", zoning: "", opportunityZone: false, tadDistrict: "", sourceUrl: "" });
     },
@@ -207,11 +207,17 @@ function AssetCard({ asset, onStatusChange }: { asset: any; onStatusChange: () =
     onError: (e) => toast.error(`Update failed: ${e.message}`),
   });
 
+  const runPipeline = trpc.agents.runPipeline.useMutation({
+    onSuccess: () => { /* pipeline running in background */ },
+    onError: () => { /* non-blocking — deal still navigates */ },
+  });
+
   const convertToDeal = trpc.scout.convertToDeal.useMutation({
     onSuccess: (r) => {
-      toast.success(`Deal created: ${r.message}`);
-      // Navigate to the deal detail page in War Room
+      toast.success(`Deal created — Third Signal analysis starting...`);
       if (r.dealId) {
+        // Fire-and-forget: auto-trigger the full ADK pipeline so War Room opens with analysis in progress
+        runPipeline.mutate({ dealId: r.dealId });
         navigate(`/deal/${r.dealId}`);
       }
     },
@@ -357,6 +363,16 @@ export default function Scout() {
   const [sortBy, setSortBy] = useState<"capRate" | "askingPrice" | "aiScore" | "createdAt">("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [addOpen, setAddOpen] = useState(false);
+  const [autoScoringId, setAutoScoringId] = useState<number | null>(null);
+
+  const autoScore = trpc.scout.scoreAsset.useMutation({
+    onSuccess: (r) => {
+      toast.success(`Auto-scored: ${parseFloat(String(r.score)).toFixed(3)} — ${r.summary?.slice(0, 60)}...`);
+      setAutoScoringId(null);
+      refetch();
+    },
+    onError: () => { setAutoScoringId(null); refetch(); },
+  });
 
   const { data: assets, isLoading, refetch } = trpc.scout.list.useQuery({ limit: 100 });
 
@@ -575,7 +591,16 @@ export default function Scout() {
         </div>
       )}
 
-      <AddAssetDialog open={addOpen} onClose={() => setAddOpen(false)} onCreated={() => refetch()} />
+      <AddAssetDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onCreated={(id) => {
+          setAutoScoringId(id);
+          refetch();
+          // Auto-trigger AI scoring on the newly created asset
+          autoScore.mutate({ id });
+        }}
+      />
     </DashboardLayout>
   );
 }

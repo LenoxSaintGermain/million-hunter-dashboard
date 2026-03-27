@@ -43,10 +43,11 @@ function KpiCard({ label, value, sub, icon: Icon, trend }: {
   );
 }
 
-function ScoreBadge({ score }: { score: number | null | undefined }) {
-  if (score == null) return <span className="text-xs text-muted-foreground font-mono">—</span>;
-  const color = score >= 0.8 ? "text-emerald-500" : score >= 0.65 ? "text-amber-500" : "text-muted-foreground";
-  return <span className={cn("text-sm font-bold font-mono", color)}>{score.toFixed(3)}</span>;
+function ScoreBadge({ score }: { score: any }) {
+  const v = score == null ? null : parseFloat(String(score));
+  if (v == null || isNaN(v)) return <span className="text-xs text-muted-foreground font-mono">—</span>;
+  const color = v >= 0.8 ? "text-emerald-500" : v >= 0.65 ? "text-amber-500" : "text-muted-foreground";
+  return <span className={cn("text-sm font-bold font-mono", color)}>{v.toFixed(3)}</span>;
 }
 
 // ─── Signal type config ──────────────────────────────────────────────────────
@@ -58,9 +59,10 @@ const SIGNAL_CONFIG: Record<string, { icon: React.ElementType; color: string; la
   macro_momentum:{ icon: Waves, color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20", label: "Macro" },
 };
 
-function ConfidenceBar({ score }: { score: number | null | undefined }) {
-  if (score == null) return null;
-  const pct = Math.round(score * 100);
+function ConfidenceBar({ score }: { score: any }) {
+  const v = score == null ? null : parseFloat(String(score));
+  if (v == null || isNaN(v)) return null;
+  const pct = Math.round(v * 100);
   const color = pct >= 85 ? "bg-emerald-500" : pct >= 70 ? "bg-amber-500" : "bg-muted-foreground";
   return (
     <div className="flex items-center gap-2">
@@ -151,12 +153,12 @@ function SentinelPanel() {
           </div>
         ) : (
           [...signals]
-            .sort((a, b) => (b.confidenceScore ?? 0) - (a.confidenceScore ?? 0))
+            .sort((a, b) => (parseFloat(String(b.confidenceScore ?? 0)) || 0) - (parseFloat(String(a.confidenceScore ?? 0)) || 0))
             .map((sig) => {
             const cfg = SIGNAL_CONFIG[sig.signalType] ?? SIGNAL_CONFIG.macro_momentum;
             const Icon = cfg.icon;
             const isOpen = expanded === sig.id;
-            const isHighUrgency = (sig.confidenceScore ?? 0) >= 0.88;
+            const isHighUrgency = (parseFloat(String(sig.confidenceScore ?? 0)) || 0) >= 0.88;
             return (
               <div
                 key={sig.id}
@@ -356,7 +358,7 @@ export default function Home() {
           />
           <KpiCard
             label="Avg. Deal Score"
-            value={stats?.avgScore != null ? stats.avgScore.toFixed(3) : '—'}
+            value={stats?.avgScore != null ? parseFloat(String(stats.avgScore)).toFixed(3) : '—'}
             sub="across qualified deals"
             icon={TrendingUp}
             trend="up"

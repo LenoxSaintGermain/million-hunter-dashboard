@@ -17,18 +17,19 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
-function ScoreBar({ score }: { score: number | null | undefined }) {
-  if (score == null) return <span className="text-muted-foreground text-xs">Not scored</span>;
-  const pct = Math.round(score * 100);
-  const color = score >= 0.8 ? "bg-emerald-500" : score >= 0.65 ? "bg-amber-500" : "bg-destructive";
+function ScoreBar({ score }: { score: any }) {
+  const v = score == null ? null : parseFloat(String(score));
+  if (v == null || isNaN(v)) return <span className="text-muted-foreground text-xs">Not scored</span>;
+  const pct = Math.round(v * 100);
+  const color = v >= 0.8 ? "bg-emerald-500" : v >= 0.65 ? "bg-amber-500" : "bg-destructive";
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
         <div className={cn("h-full rounded-full", color)} style={{ width: `${pct}%` }} />
       </div>
       <span className={cn("text-xs font-mono font-bold w-10 text-right",
-        score >= 0.8 ? "text-emerald-500" : score >= 0.65 ? "text-amber-500" : "text-destructive"
-      )}>{score.toFixed(3)}</span>
+        v >= 0.8 ? "text-emerald-500" : v >= 0.65 ? "text-amber-500" : "text-destructive"
+      )}>{v.toFixed(3)}</span>
     </div>
   );
 }
@@ -55,7 +56,7 @@ export default function Scan() {
     onSuccess: () => { toast.success("Scan triggered"); refetch(); },
   });
   const scoreDeal = trpc.deals.score.useMutation({
-    onSuccess: (d) => { toast.success(`Scored: ${d.score.toFixed(3)}`); refetch(); },
+    onSuccess: (d) => { toast.success(`Scored: ${parseFloat(String(d.score)).toFixed(3)}`); refetch(); },
   });
   const createDeal = trpc.deals.create.useMutation({
     onSuccess: () => {
