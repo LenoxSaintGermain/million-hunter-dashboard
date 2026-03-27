@@ -233,3 +233,18 @@
 - [x] Fix Lobby: Skip intro button not navigating to dashboard
 - [x] Fix Lobby: Enter Dashboard button not navigating to dashboard
 - [x] Ensure markOnboardingComplete mutation fires before navigation
+
+## Sprint 8 — Lobby Polish + Scout Bridge + Sentinel Intelligence
+
+- [x] Settings: Re-watch Onboarding button (resets onboarding_completed in DB + sessionStorage)
+- [x] Add user.resetOnboarding tRPC mutation
+- [x] Lobby: buffering/loading spinner overlay while video stalls
+- [x] Lobby: onWaiting/onCanPlay video events to show/hide spinner
+- [x] Scout: Convert to Deal button on asset cards
+- [x] Scout: pre-populate deal from asset financials (name, asking price, cap rate, OZ/TAD)
+- [x] Scout: route to /deal/:id after conversion
+- [x] Sentinel: sort signals by confidence score descending
+- [x] Sentinel: ⚡ High Urgency badge for signals >= 0.88 confidence
+- [x] Sentinel: Refresh Signals button calling LLM via Perplexity Sonar
+- [x] Sentinel: AI-generated signals with real-time Atlanta market grounding
+- [x] Run tests and save Sprint 8 checkpoint

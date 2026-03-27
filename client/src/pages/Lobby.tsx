@@ -98,6 +98,7 @@ export default function Lobby() {
   const [showChapterSelect, setShowChapterSelect] = useState(false);
   const [entered, setEntered] = useState(false); // fade-in gate
   const [exiting, setExiting] = useState(false); // prevents guard re-trigger during nav
+  const [buffering, setBuffering] = useState(false); // video stall/waiting state
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -139,6 +140,9 @@ export default function Lobby() {
     setCompleted((prev) => new Set([...prev, chapter.id]));
     setShowControls(true);
   };
+  const handleWaiting = () => setBuffering(true);
+  const handleCanPlay = () => setBuffering(false);
+  const handlePlaying = () => setBuffering(false);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -218,7 +222,20 @@ export default function Lobby() {
         onEnded={handleEnded}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
+        onWaiting={handleWaiting}
+        onCanPlay={handleCanPlay}
+        onPlaying={handlePlaying}
       />
+
+      {/* ── Buffering spinner ── */}
+      {buffering && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-full border-2 border-white/10 border-t-white/70 animate-spin" />
+            <p className="text-[11px] text-white/40 font-medium tracking-widest uppercase">Loading</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Gradient overlays ── */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-black/60 pointer-events-none" />

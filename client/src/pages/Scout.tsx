@@ -11,10 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 import {
   Building2, MapPin, DollarSign, TrendingUp, Zap, Plus, Search,
   Filter, SlidersHorizontal, RefreshCw, ChevronDown, ChevronUp,
-  Loader2, BarChart3, CheckCircle2,
+  Loader2, BarChart3, CheckCircle2, ArrowRight,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -190,8 +191,9 @@ function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
   );
 }
 
-// ─── Asset Card ───────────────────────────────────────────────────────────────
+// ─── Asset Card ──────────────────────────────────────────────────────────────────────────────────
 function AssetCard({ asset, onStatusChange }: { asset: any; onStatusChange: () => void }) {
+  const [, navigate] = useLocation();
   const scoreAsset = trpc.scout.scoreAsset.useMutation({
     onSuccess: (r) => {
       toast.success(`AI Score: ${r.score.toFixed(3)} — ${r.summary?.slice(0, 80)}...`);
@@ -203,6 +205,17 @@ function AssetCard({ asset, onStatusChange }: { asset: any; onStatusChange: () =
   const updateStatus = trpc.scout.updateStatus.useMutation({
     onSuccess: () => { toast.success("Status updated"); onStatusChange(); },
     onError: (e) => toast.error(`Update failed: ${e.message}`),
+  });
+
+  const convertToDeal = trpc.scout.convertToDeal.useMutation({
+    onSuccess: (r) => {
+      toast.success(`Deal created: ${r.message}`);
+      // Navigate to the deal detail page in War Room
+      if (r.dealId) {
+        navigate(`/deal/${r.dealId}`);
+      }
+    },
+    onError: (e) => toast.error(`Conversion failed: ${e.message}`),
   });
 
   const pt = asset.propertyType as PropertyType;
@@ -314,6 +327,21 @@ function AssetCard({ asset, onStatusChange }: { asset: any; onStatusChange: () =
             </SelectContent>
           </Select>
         </div>
+
+        {/* Convert to Deal — shown for qualified assets */}
+        {(asset.status === "qualified" || (asset.aiScore != null && asset.aiScore >= 0.70)) && (
+          <Button
+            size="sm"
+            className="w-full h-7 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white border-0 mt-1"
+            onClick={() => convertToDeal.mutate({ id: asset.id })}
+            disabled={convertToDeal.isPending}
+          >
+            {convertToDeal.isPending
+              ? <Loader2 className="w-2.5 h-2.5 mr-1.5 animate-spin" />
+              : <TrendingUp className="w-2.5 h-2.5 mr-1.5" />}
+            {convertToDeal.isPending ? "Converting..." : "Convert to Deal → War Room"}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

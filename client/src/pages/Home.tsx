@@ -14,7 +14,7 @@ import {
   Zap, Brain, RefreshCw, ChevronRight,
   Building2, MapPin, Clock, AlertCircle,
   Landmark, CalendarDays, BarChart2, Megaphone, Waves,
-  ExternalLink,
+  ExternalLink, Loader2,
 } from "lucide-react";
 
 function KpiCard({ label, value, sub, icon: Icon, trend }: {
@@ -84,6 +84,14 @@ function SentinelPanel() {
     },
   });
 
+  const aiRefresh = trpc.sentinel.aiRefresh.useMutation({
+    onSuccess: (r) => {
+      toast.success(`${r.message}`);
+      refetch();
+    },
+    onError: (e) => toast.error(`Refresh failed: ${e.message}`),
+  });
+
   // Auto-seed on first load if empty
   const [autoSeeded, setAutoSeeded] = useState(false);
   useEffect(() => {
@@ -107,6 +115,18 @@ function SentinelPanel() {
             <CardTitle className="text-sm font-semibold">Macro Signals Sentinel</CardTitle>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground gap-1"
+              onClick={() => aiRefresh.mutate()}
+              disabled={aiRefresh.isPending}
+            >
+              {aiRefresh.isPending
+                ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                : <RefreshCw className="w-2.5 h-2.5" />}
+              {aiRefresh.isPending ? "Scanning..." : "Refresh"}
+            </Button>
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[10px] text-emerald-500 font-medium">Live</span>
           </div>
@@ -130,16 +150,19 @@ function SentinelPanel() {
             <p className="text-xs text-muted-foreground">No signals yet</p>
           </div>
         ) : (
-          signals.map((sig) => {
+          [...signals]
+            .sort((a, b) => (b.confidenceScore ?? 0) - (a.confidenceScore ?? 0))
+            .map((sig) => {
             const cfg = SIGNAL_CONFIG[sig.signalType] ?? SIGNAL_CONFIG.macro_momentum;
             const Icon = cfg.icon;
             const isOpen = expanded === sig.id;
+            const isHighUrgency = (sig.confidenceScore ?? 0) >= 0.88;
             return (
               <div
                 key={sig.id}
                 className={cn(
                   "rounded-lg border transition-all duration-200 cursor-pointer",
-                  isOpen ? "border-primary/30 bg-primary/5" : "border-border bg-muted/10 hover:border-primary/20 hover:bg-muted/20"
+                  isHighUrgency ? "border-rose-500/30 bg-rose-500/5" : isOpen ? "border-primary/30 bg-primary/5" : "border-border bg-muted/10 hover:border-primary/20 hover:bg-muted/20"
                 )}
                 onClick={() => setExpanded(isOpen ? null : sig.id)}
               >
@@ -150,7 +173,14 @@ function SentinelPanel() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-1">
-                        <p className="text-xs font-semibold text-foreground leading-snug line-clamp-2">{sig.title}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-foreground leading-snug line-clamp-2">{sig.title}</p>
+                          {isHighUrgency && (
+                            <span className="inline-flex items-center gap-0.5 mt-0.5 px-1.5 py-0 h-4 rounded text-[9px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/25">
+                              ⚡ High Urgency
+                            </span>
+                          )}
+                        </div>
                         <span className={cn("inline-flex shrink-0 items-center px-1.5 py-0.5 rounded text-[9px] font-semibold border ml-1", cfg.color)}>
                           {cfg.label}
                         </span>

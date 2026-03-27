@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import ScanProgress from "@/components/ScanProgress";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -160,11 +161,46 @@ const MODULE_ICON: Record<string, React.ReactNode> = {
   marketScan: <Database className="w-3.5 h-3.5 text-muted-foreground" />,
 };
 
+// ─── Re-Watch Onboarding Button ─────────────────────────────────────────────────────────
+function ReWatchButton() {
+  const [, navigate] = useLocation();
+  const [done, setDone] = useState(false);
+  const reset = trpc.user.resetOnboarding.useMutation({
+    onSuccess: () => {
+      setDone(true);
+      // Clear the session flag so the guard redirects on next navigation
+      sessionStorage.removeItem("onboarding_checked");
+      toast.success("Onboarding reset — redirecting to lobby");
+      setTimeout(() => {
+        window.location.href = "/lobby";
+      }, 800);
+    },
+    onError: (e) => toast.error(`Failed: ${e.message}`),
+  });
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="h-8 text-xs shrink-0 border-violet-500/30 text-violet-400 hover:bg-violet-500/10 hover:text-violet-300"
+      onClick={() => reset.mutate()}
+      disabled={reset.isPending || done}
+    >
+      {reset.isPending ? (
+        <RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />
+      ) : (
+        <RotateCcw className="w-3 h-3 mr-1.5" />
+      )}
+      {done ? "Redirecting..." : "Re-watch Briefing"}
+    </Button>
+  );
+}
+
 const TABS = [
   { id: "sources", label: "Data Sources", icon: Database },
   { id: "engine", label: "AI Engine", icon: Brain },
   { id: "filters", label: "Filters", icon: Settings2 },
   { id: "notifications", label: "Alerts", icon: Bell },
+  { id: "general", label: "General", icon: Settings2 },
 ];
 
 export default function Settings() {
@@ -552,6 +588,34 @@ export default function Settings() {
                   <Switch checked={item.value} onCheckedChange={item.set} />
                 </div>
               ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Tab: General */}
+      {activeTab === "general" && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Onboarding */}
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Globe className="w-4 h-4 text-violet-400" /> Onboarding
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Re-watch the Signal Hunter briefing videos at any time
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-foreground">Investor Briefing</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 max-w-xs">
+                    Two chapters: Zero-Tax Arbitrage and the Mainstreet Investor OS. Share with co-investors or replay before a pitch.
+                  </p>
+                </div>
+                <ReWatchButton />
+              </div>
             </CardContent>
           </Card>
         </div>

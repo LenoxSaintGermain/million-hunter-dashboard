@@ -60,6 +60,18 @@ export const appRouter = router({
         .where(eq(users.openId, ctx.user.openId));
       return { success: true };
     }),
+
+    // Resets onboarding so the user sees the lobby again on next visit
+    resetOnboarding: protectedProcedure.mutation(async ({ ctx }) => {
+      const db = await (await import("./db")).getDb();
+      if (!db) return { success: false };
+      const { users } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.update(users)
+        .set({ onboardingCompleted: false })
+        .where(eq(users.openId, ctx.user.openId));
+      return { success: true };
+    }),
   }),
 
   dashboard: router({
@@ -1098,6 +1110,40 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         await updateCommercialAssetAiScore(input.id, score, parsed.summary);
         return { score, summary: parsed.summary, strengths: parsed.strengths, risks: parsed.risks };
       }),
+
+    // Convert a qualified Scout asset into a Deal record and route to War Room
+    convertToDeal: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ input }) => {
+        const { getCommercialAssetById, createDeal } = await import("./db");
+        const asset = await getCommercialAssetById(input.id);
+        if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+
+        // Build a deal record pre-populated from the asset's financials
+        const dealName = asset.name;
+        const askingPrice = asset.askingPrice ?? 0;
+        // Estimate annual revenue from NOI + 30% overhead, or just use NOI * 1.3
+        const estimatedRevenue = asset.noi ? Math.round(asset.noi * 1.3) : askingPrice * 0.12;
+        const estimatedCashFlow = asset.noi ?? Math.round(askingPrice * 0.08);
+
+        const res = await createDeal({
+          name: dealName,
+          source: "scout",
+          sourceUrl: asset.sourceUrl ?? "",
+          location: `${asset.city}, ${asset.state}`,
+          industry: asset.propertyType,
+          revenue: estimatedRevenue,
+          cashFlow: estimatedCashFlow,
+          askingPrice,
+          stage: "new",
+          opportunityZone: asset.opportunityZone ?? false,
+          ozTractId: asset.ozTractId ?? null,
+          tadDistrict: asset.tadDistrict ?? null,
+        }) as any;
+
+        const dealId = res[0]?.insertId;
+        return { dealId, message: `Deal created from asset: ${dealName}` };
+      }),
   }),
 
   sentinel: router({
@@ -1130,6 +1176,72 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         const { insertMacroSignal } = await import("./db");
         await insertMacroSignal({ ...input, createdAt: Date.now() });
         return { success: true };
+      }),
+
+    // AI Refresh: use Perplexity Sonar to generate 3 real-time web-grounded macro signals
+    aiRefresh: protectedProcedure
+      .mutation(async () => {
+        const { insertMacroSignal } = await import("./db");
+        const sonarKey = process.env.SONAR_API_KEY;
+        if (!sonarKey) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Sonar API key not configured" });
+
+        // Query Perplexity Sonar for current Atlanta market signals
+        const sonarRes = await fetch("https://api.perplexity.ai/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${sonarKey}` },
+          body: JSON.stringify({
+            model: "sonar-pro",
+            messages: [
+              {
+                role: "system",
+                content: "You are a macro intelligence analyst for a Main Street business acquisition fund focused on Atlanta, GA. Generate exactly 3 actionable market signals relevant to acquiring cash-flowing SMBs (HVAC, cleaning, logistics, pest control, plumbing). Each signal must be grounded in real, current news or data. Return valid JSON only."
+              },
+              {
+                role: "user",
+                content: `Today is ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}. Generate 3 macro signals for a business acquisition fund. Return JSON array with exactly 3 objects, each with: signalType (one of: institutional, government, seasonal, event, macro_momentum), title (max 80 chars), summary (2-3 sentences), roryPitch (1 sentence Rory Sutherland-style insight), impactedAssetClasses (array of strings), recommendedAction (1 sentence), confidenceScore (0.0-1.0). Format: [{...}, {...}, {...}]`
+              }
+            ],
+            max_tokens: 1500,
+          }),
+        });
+
+        if (!sonarRes.ok) {
+          const errText = await sonarRes.text();
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Sonar API error: ${errText.slice(0, 200)}` });
+        }
+
+        const sonarData = await sonarRes.json() as any;
+        const content = sonarData.choices?.[0]?.message?.content ?? "[]";
+
+        // Parse the JSON array from the response (handle markdown code blocks)
+        let signals: any[];
+        try {
+          const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+          signals = JSON.parse(cleaned);
+          if (!Array.isArray(signals)) throw new Error("Not an array");
+        } catch {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to parse Sonar response as JSON array" });
+        }
+
+        // Validate and insert each signal
+        const validTypes = ["institutional", "government", "seasonal", "event", "macro_momentum"] as const;
+        let inserted = 0;
+        for (const sig of signals.slice(0, 3)) {
+          const signalType = validTypes.includes(sig.signalType) ? sig.signalType : "macro_momentum";
+          await insertMacroSignal({
+            signalType,
+            title: String(sig.title ?? "").slice(0, 255),
+            summary: String(sig.summary ?? ""),
+            roryPitch: sig.roryPitch ? String(sig.roryPitch) : undefined,
+            impactedAssetClasses: Array.isArray(sig.impactedAssetClasses) ? sig.impactedAssetClasses : [],
+            recommendedAction: sig.recommendedAction ? String(sig.recommendedAction) : undefined,
+            confidenceScore: typeof sig.confidenceScore === "number" ? Math.min(1, Math.max(0, sig.confidenceScore)) : 0.75,
+            createdAt: Date.now(),
+          });
+          inserted++;
+        }
+
+        return { inserted, message: `${inserted} new signals generated from live market data` };
       }),
   }),
 });
