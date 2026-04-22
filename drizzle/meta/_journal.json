@@ -15,6 +15,13 @@
       "when": 1774461788091,
       "tag": "0001_large_angel",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1776870391633,
+      "tag": "0002_high_wraith",
+      "breakpoints": true
     }
   ]
 }

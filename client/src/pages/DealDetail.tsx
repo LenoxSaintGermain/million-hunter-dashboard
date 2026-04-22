@@ -13,7 +13,7 @@ import {
   ArrowLeft, Zap, Brain, Globe, Shield, DollarSign,
   FileText, Mail, AlertTriangle, TrendingUp,
   Building2, MapPin, Users, Calendar, ExternalLink,
-  GitBranch, BarChart3, UserSearch, CheckCircle2, XCircle, Loader2,
+  GitBranch, BarChart3, UserSearch, CheckCircle2, XCircle, Loader2, Share2,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -68,6 +68,19 @@ export default function DealDetail() {
   });
   const scoreDeal = trpc.deals.score.useMutation({
     onSuccess: (d) => { toast.success(`Scored: ${parseFloat(String(d.score)).toFixed(3)}`); refetch(); },
+  });
+
+  // Deal Share
+  const createShareToken = trpc.dealShare.createToken.useMutation({
+    onSuccess: (data) => {
+      const shareUrl = `${window.location.origin}/deal-share/${data.token}`;
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        toast.success("Investor link copied!", { description: "30-day access link ready to share" });
+      }).catch(() => {
+        toast.info("Share link generated", { description: shareUrl });
+      });
+    },
+    onError: (e) => toast.error(`Failed to create share link: ${e.message}`),
   });
 
   // ADK agent mutations
@@ -215,6 +228,16 @@ export default function DealDetail() {
               >
                 <Brain className="w-3 h-3 mr-1.5" />
                 {analyzeSignals.isPending ? "Analyzing..." : "Run Signals"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs border-border text-primary border-primary/30 hover:bg-primary/10"
+                onClick={() => createShareToken.mutate({ dealId })}
+                disabled={createShareToken.isPending}
+              >
+                <Share2 className="w-3 h-3 mr-1.5" />
+                {createShareToken.isPending ? "Generating..." : "Share"}
               </Button>
             </div>
           </div>

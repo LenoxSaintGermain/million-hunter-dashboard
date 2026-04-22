@@ -1137,17 +1137,15 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
     convertToDeal: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ input }) => {
-        const { getCommercialAssetById, createDeal } = await import("./db");
+        const { getCommercialAssetById, createDeal, upsertSignal } = await import("./db");
         const asset = await getCommercialAssetById(input.id);
         if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
-
         // Build a deal record pre-populated from the asset's financials
         const dealName = asset.name;
         const askingPrice = asset.askingPrice ?? 0;
         // Estimate annual revenue from NOI + 30% overhead, or just use NOI * 1.3
         const estimatedRevenue = asset.noi ? Math.round(asset.noi * 1.3) : askingPrice * 0.12;
         const estimatedCashFlow = asset.noi ?? Math.round(askingPrice * 0.08);
-
         const res = await createDeal({
           name: dealName,
           source: "scout",
@@ -1162,9 +1160,43 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
           ozTractId: asset.ozTractId ?? null,
           tadDistrict: asset.tadDistrict ?? null,
         }) as any;
-
         const dealId = res[0]?.insertId;
-        return { dealId, message: `Deal created from asset: ${dealName}` };
+        // ─── Scout → War Room Pre-fill ────────────────────────────────────────────────────
+        // Seed the Third Signal tab with context from the Scout asset so the
+        // analyst doesn't have to re-enter cap rate, OZ/TAD status, and address.
+        if (dealId) {
+          try {
+            // Derive SBA eligibility seed: commercial RE deals under $5M asking are typically SBA 504 eligible
+            const sbaEligibleSeed = askingPrice > 0 && askingPrice <= 5_000_000;
+            // Rough DSCR estimate from NOI / estimated annual debt service (6% on 90% LTV, 25yr)
+            let dscrSeed: number | undefined;
+            if (asset.noi && askingPrice > 0) {
+              const loanAmount = askingPrice * 0.9;
+              const annualDebtService = loanAmount * (0.06 / (1 - Math.pow(1 + 0.06 / 12, -300))) * 12;
+              dscrSeed = parseFloat((asset.noi / annualDebtService).toFixed(2));
+            }
+            // Build a context summary for the capital stack tab
+            const contextParts: string[] = [];
+            if (asset.capRate) contextParts.push(`Cap rate: ${(asset.capRate * 100).toFixed(2)}%`);
+            if (asset.opportunityZone) contextParts.push("Located in Opportunity Zone");
+            if (asset.tadDistrict) contextParts.push(`TAD District: ${asset.tadDistrict}`);
+            if (asset.ozTractId) contextParts.push(`OZ Tract: ${asset.ozTractId}`);
+            contextParts.push(`Property type: ${asset.propertyType}`);
+            contextParts.push(`Location: ${asset.city}, ${asset.state}`);
+            const capitalStackSummary = `[Scout Pre-fill] ${contextParts.join(" · ")}. Run capital stack analysis to generate full SBA/seller note/equity breakdown.`;
+            await upsertSignal({
+              dealId,
+              sbaEligible: sbaEligibleSeed,
+              ...(dscrSeed !== undefined && { dscr: dscrSeed }),
+              capitalStackSummary,
+              modelVersions: { source: "scout-prefill", version: "1.0" },
+            });
+          } catch (prefillErr) {
+            // Pre-fill is best-effort — don't fail the conversion if it errors
+            console.warn("[Scout] Pre-fill signal seed failed:", prefillErr);
+          }
+        }
+        return { dealId, message: `Deal created from asset: ${dealName}`, prefilled: !!dealId };
       }),
   }),
 
@@ -1264,6 +1296,60 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         }
 
         return { inserted, message: `${inserted} new signals generated from live market data` };
+      }),
+    // Archive a single signal manually
+    archive: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const { archiveSignalById } = await import("./db");
+        await archiveSignalById(input.id);
+        return { success: true };
+      }),
+    // Get only active (non-archived, non-expired) signals
+    listActive: publicProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(50).default(20) }).optional())
+      .query(async ({ input }) => {
+        const { getMacroSignalsActive } = await import("./db");
+        return getMacroSignalsActive(input?.limit ?? 20);
+      }),
+    // Run auto-archive sweep (marks expired signals archived)
+    autoArchive: protectedProcedure
+      .mutation(async () => {
+        const { archiveExpiredSignals } = await import("./db");
+        const count = await archiveExpiredSignals();
+        return { archived: count, message: `${count} expired signal(s) archived` };
+      }),
+  }),
+
+  // ─── Deal Share Tokens ─────────────────────────────────────────────────────
+  dealShare: router({
+    // Create a share token for a deal (30-day TTL by default)
+    createToken: protectedProcedure
+      .input(z.object({ dealId: z.number(), ttlDays: z.number().int().min(1).max(365).default(30) }))
+      .mutation(async ({ input }) => {
+        const { createDealShareToken } = await import("./db");
+        const token = await createDealShareToken(input.dealId, input.ttlDays);
+        return { token };
+      }),
+    // Public: get deal data by share token (increments view count)
+    getByToken: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const { getDealShareToken, incrementShareTokenViewCount } = await import("./db");
+        const shareRow = await getDealShareToken(input.token);
+        if (!shareRow) throw new TRPCError({ code: "NOT_FOUND", message: "Share link not found" });
+        if (shareRow.expiresAt && shareRow.expiresAt < Date.now()) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "This share link has expired" });
+        }
+        // Increment view count asynchronously (don't block response)
+        incrementShareTokenViewCount(input.token).catch(() => {});
+        const deal = await getDealById(shareRow.dealId);
+        if (!deal) throw new TRPCError({ code: "NOT_FOUND", message: "Deal not found" });
+        const [signal, memo] = await Promise.all([
+          getSignalByDealId(shareRow.dealId),
+          getMemoByDealId(shareRow.dealId),
+        ]);
+        return { deal, signal, memo, viewCount: shareRow.viewCount, expiresAt: shareRow.expiresAt };
       }),
   }),
 });

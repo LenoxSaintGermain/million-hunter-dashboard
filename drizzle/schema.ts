@@ -400,8 +400,22 @@ export const macroSignals = mysqlTable("macro_signals", {
   confidenceScore: float("confidence_score"),
   sourceUrl: text("source_url"),
   expiresAt: bigint("expires_at", { mode: "number" }),
+  archived: boolean("archived").default(false).notNull(),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
 });
 
 export type MacroSignal = typeof macroSignals.$inferSelect;
 export type InsertMacroSignal = typeof macroSignals.$inferInsert;
+
+// ─── Deal Share Tokens (public investor one-pager links) ──────────────────────
+export const dealShareTokens = mysqlTable("deal_share_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  dealId: int("deal_id").notNull(),
+  expiresAt: bigint("expires_at", { mode: "number" }),
+  viewCount: int("view_count").default(0).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+
+export type DealShareToken = typeof dealShareTokens.$inferSelect;
+export type InsertDealShareToken = typeof dealShareTokens.$inferInsert;

@@ -277,3 +277,19 @@
 - [x] Command Center: Pipeline Velocity sparkline (Recharts AreaChart, 8-week rolling window)
 - [x] deals.velocity tRPC procedure (raw SQL GROUP BY ISO week)
 - [x] Run tests (55/55 passing) and save Sprint 10 checkpoint
+
+## Sprint 11 — Auto-Archive + Deal Share + Scout Pre-fill + GCP Deploy
+- [x] Sentinel: auto-archive backend — cron job marks signals archived=true when expiresAt passes
+- [x] Sentinel: archived field added to macro_signals schema + db:push
+- [x] Sentinel: sentinel.archive tRPC mutation (manual archive) + auto-archive on server startup
+- [x] Sentinel: sentinel.listActive procedure — returns only non-archived, non-expired signals
+- [x] War Room: public Deal Share page at /deal-share/:token (cinematic investor one-pager)
+- [x] War Room: deal_share_tokens table (token, dealId, expiresAt, viewCount)
+- [x] War Room: dealShare.createToken tRPC mutation + dealShare.getByToken public procedure
+- [x] War Room: Share button in Deal Detail header generates token + copies URL to clipboard
+- [x] Scout: pre-fill War Room seed context on Scout→Deal conversion (capRate, OZ/TAD, SBA eligibility, DSCR estimate)
+- [x] Scout: capitalStackSummary pre-seeded with [Scout Pre-fill] context tag
+- [x] GCP: Dockerfile for Cloud Run (Node 22 Alpine, multi-stage build)
+- [x] GCP: cloudbuild.yaml for CI/CD with Artifact Registry + Cloud Run deploy
+- [x] GCP: .dockerignore file
+- [x] Sprint 11 vitest suite — 8 tests (63/63 total passing)

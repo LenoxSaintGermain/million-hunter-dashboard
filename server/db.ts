@@ -1,4 +1,4 @@
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, lt, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -418,4 +418,66 @@ export async function seedMacroSignals() {
 
   await db.insert(macroSignals).values(seeds);
   return { seeded: true, count: seeds.length };
+}
+
+// ─── Sentinel Auto-Archive ────────────────────────────────────────────────────
+import { dealShareTokens, type InsertDealShareToken } from "../drizzle/schema";
+
+export async function archiveExpiredSignals(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const now = Date.now();
+  const result = await db.update(macroSignals)
+    .set({ archived: true })
+    .where(and(
+      isNotNull(macroSignals.expiresAt),
+      lt(macroSignals.expiresAt, now),
+      eq(macroSignals.archived, false),
+    ));
+  const affected = (result as any)[0]?.affectedRows ?? 0;
+  return affected;
+}
+
+export async function archiveSignalById(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(macroSignals).set({ archived: true }).where(eq(macroSignals.id, id));
+}
+
+export async function getMacroSignalsActive(limit = 20) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(macroSignals)
+    .where(eq(macroSignals.archived, false))
+    .orderBy(desc(macroSignals.confidenceScore))
+    .limit(limit);
+}
+
+// ─── Deal Share Tokens ────────────────────────────────────────────────────────
+export async function createDealShareToken(dealId: number, ttlDays = 30): Promise<string> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { randomBytes } = await import("crypto");
+  const token = randomBytes(24).toString("hex"); // 48-char hex token
+  const now = Date.now();
+  const expiresAt = now + ttlDays * 24 * 60 * 60 * 1000;
+  await db.insert(dealShareTokens).values({ token, dealId, expiresAt, viewCount: 0, createdAt: now });
+  return token;
+}
+
+export async function getDealShareToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(dealShareTokens).where(eq(dealShareTokens.token, token)).limit(1);
+  return result[0];
+}
+
+export async function incrementShareTokenViewCount(token: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const row = await getDealShareToken(token);
+  if (!row) return;
+  await db.update(dealShareTokens)
+    .set({ viewCount: row.viewCount + 1 })
+    .where(eq(dealShareTokens.token, token));
 }

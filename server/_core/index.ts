@@ -63,3 +63,25 @@ async function startServer() {
 }
 
 startServer().catch(console.error);
+
+// ─── Sentinel Auto-Archive Cron ──────────────────────────────────────────────
+// Runs every hour to mark expired macro signals as archived.
+// Also runs once on startup to catch any signals that expired while offline.
+function startSentinelArchiveCron() {
+  const runArchive = async () => {
+    try {
+      const { archiveExpiredSignals } = await import("../db");
+      const count = await archiveExpiredSignals();
+      if (count > 0) {
+        console.log(`[Sentinel] Auto-archived ${count} expired signal(s)`);
+      }
+    } catch (err) {
+      console.warn("[Sentinel] Auto-archive failed:", err);
+    }
+  };
+  // Run immediately on startup
+  runArchive();
+  // Then every hour
+  setInterval(runArchive, 60 * 60 * 1000);
+}
+startSentinelArchiveCron();

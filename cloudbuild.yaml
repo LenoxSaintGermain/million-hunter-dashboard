@@ -1,0 +1,97 @@
+# ─── Cloud Build Pipeline for Project Million Hunter ─────────────────────────
+# Builds a Docker image, pushes to Artifact Registry, and deploys to Cloud Run.
+#
+# Required substitutions (set in Cloud Build trigger or gcloud CLI):
+#   _REGION       — GCP region, e.g. us-central1
+#   _SERVICE_NAME — Cloud Run service name, e.g. million-hunter
+#   _AR_REPO      — Artifact Registry repo, e.g. million-hunter-repo
+#
+# Required Secret Manager secrets (referenced via secretEnv):
+#   DATABASE_URL, JWT_SECRET, VITE_APP_ID, OAUTH_SERVER_URL,
+#   VITE_OAUTH_PORTAL_URL, OWNER_OPEN_ID, OWNER_NAME,
+#   BUILT_IN_FORGE_API_URL, BUILT_IN_FORGE_API_KEY,
+#   VITE_FRONTEND_FORGE_API_KEY, VITE_FRONTEND_FORGE_API_URL,
+#   ANTHROPIC_API_KEY, GEMINI_API_KEY, SONAR_API_KEY
+#
+# Usage (manual trigger):
+#   gcloud builds submit \
+#     --config cloudbuild.yaml \
+#     --substitutions _REGION=us-central1,_SERVICE_NAME=million-hunter,_AR_REPO=million-hunter-repo
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE_NAME: million-hunter
+  _AR_REPO: million-hunter-repo
+  _IMAGE: ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE_NAME}
+
+steps:
+  # ── Step 1: Build Docker image ──────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: build
+    args:
+      - build
+      - --tag
+      - ${_IMAGE}:${SHORT_SHA}
+      - --tag
+      - ${_IMAGE}:latest
+      - --cache-from
+      - ${_IMAGE}:latest
+      - .
+
+  # ── Step 2: Push to Artifact Registry ───────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: push
+    waitFor: [build]
+    args:
+      - push
+      - --all-tags
+      - ${_IMAGE}
+
+  # ── Step 3: Deploy to Cloud Run ─────────────────────────────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy
+    waitFor: [push]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME}
+      - --image=${_IMAGE}:${SHORT_SHA}
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --min-instances=0
+      - --max-instances=10
+      - --memory=512Mi
+      - --cpu=1
+      - --timeout=60
+      # Inject secrets from Secret Manager as env vars
+      - --set-secrets=DATABASE_URL=DATABASE_URL:latest
+      - --set-secrets=JWT_SECRET=JWT_SECRET:latest
+      - --set-secrets=VITE_APP_ID=VITE_APP_ID:latest
+      - --set-secrets=OAUTH_SERVER_URL=OAUTH_SERVER_URL:latest
+      - --set-secrets=VITE_OAUTH_PORTAL_URL=VITE_OAUTH_PORTAL_URL:latest
+      - --set-secrets=OWNER_OPEN_ID=OWNER_OPEN_ID:latest
+      - --set-secrets=OWNER_NAME=OWNER_NAME:latest
+      - --set-secrets=BUILT_IN_FORGE_API_URL=BUILT_IN_FORGE_API_URL:latest
+      - --set-secrets=BUILT_IN_FORGE_API_KEY=BUILT_IN_FORGE_API_KEY:latest
+      - --set-secrets=VITE_FRONTEND_FORGE_API_KEY=VITE_FRONTEND_FORGE_API_KEY:latest
+      - --set-secrets=VITE_FRONTEND_FORGE_API_URL=VITE_FRONTEND_FORGE_API_URL:latest
+      - --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest
+      - --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest
+      - --set-secrets=SONAR_API_KEY=SONAR_API_KEY:latest
+
+# Store the image in Artifact Registry
+images:
+  - ${_IMAGE}:${SHORT_SHA}
+  - ${_IMAGE}:latest
+
+# Build timeout (10 minutes is usually sufficient)
+timeout: 600s
+
+options:
+  # Use a faster machine for builds
+  machineType: E2_HIGHCPU_8
+  # Log to Cloud Logging
+  logging: CLOUD_LOGGING_ONLY

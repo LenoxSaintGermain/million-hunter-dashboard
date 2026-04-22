@@ -15,6 +15,7 @@ import StrategyBlender from "./pages/StrategyBlender";
 import OpportunityRadar from "./pages/OpportunityRadar";
 import InvestorDossier from "./pages/InvestorDossier";
 import Scout from "./pages/Scout";
+import DealShare from "./pages/DealShare";
 import Lobby from "./pages/Lobby";
 import { trpc } from "@/lib/trpc";
 import { useEffect } from "react";
@@ -78,6 +79,8 @@ function Router() {
         <Route path="/opportunity-radar" component={OpportunityRadar} />
         <Route path="/investor-dossier" component={InvestorDossier} />
         <Route path="/scout" component={Scout} />
+        {/* Public deal share — no auth required */}
+        <Route path="/deal-share/:token" component={DealShare} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
