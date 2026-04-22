@@ -137,7 +137,7 @@ export default function Lobby() {
   };
   const handleEnded = () => {
     setPlaying(false);
-    setCompleted((prev) => new Set([...prev, chapter.id]));
+    setCompleted((prev) => new Set(Array.from(prev).concat(chapter.id)));
     setShowControls(true);
   };
   const handleWaiting = () => setBuffering(true);

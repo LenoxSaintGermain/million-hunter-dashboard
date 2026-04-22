@@ -16,6 +16,64 @@ import {
   Landmark, CalendarDays, BarChart2, Megaphone, Waves,
   ExternalLink, Loader2,
 } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+
+function VelocitySparkline() {
+  const { data, isLoading } = trpc.deals.velocity.useQuery();
+  const hasData = data && data.length > 0;
+  const total = data?.reduce((s, d) => s + d.count, 0) ?? 0;
+  const trend = data && data.length >= 2 ? data[data.length - 1].count - data[data.length - 2].count : 0;
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="pb-2 space-y-0">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-xs font-medium text-muted-foreground">Pipeline Velocity</CardTitle>
+          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+            <TrendingUp className="w-3.5 h-3.5 text-primary" />
+          </div>
+        </div>
+        <div className="flex items-baseline gap-2 mt-1">
+          <span className="text-2xl font-bold text-foreground">{isLoading ? "—" : total}</span>
+          <span className="text-xs text-muted-foreground">deals / 8 wks</span>
+          {!isLoading && trend !== 0 && (
+            <span className={cn("text-xs font-semibold flex items-center gap-0.5", trend > 0 ? "text-emerald-500" : "text-rose-500")}>
+              <ArrowUpRight className={cn("w-3 h-3", trend < 0 && "rotate-180")} />
+              {trend > 0 ? "+" : ""}{trend} wk
+            </span>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0 pb-3">
+        {isLoading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : !hasData ? (
+          <div className="h-16 flex items-center justify-center">
+            <p className="text-[10px] text-muted-foreground/50">No data yet — run a scan</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={56}>
+            <AreaChart data={data} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
+              <defs>
+                <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="week" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "6px", fontSize: "11px", padding: "4px 8px" }}
+                labelStyle={{ color: "hsl(var(--muted-foreground))" }}
+                itemStyle={{ color: "hsl(var(--foreground))" }}
+              />
+              <Area type="monotone" dataKey="count" name="Deals" stroke="hsl(var(--primary))" strokeWidth={1.5} fill="url(#velocityGrad)" dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function KpiCard({ label, value, sub, icon: Icon, trend }: {
   label: string; value: string; sub?: string; icon: React.ElementType; trend?: "up" | "down" | "neutral";
@@ -107,6 +165,15 @@ function SentinelPanel() {
     const m = Math.round((Date.now() - ts) / 60000);
     return m < 1 ? "just now" : m < 60 ? `${m}m ago` : `${Math.round(m / 60)}h ago`;
   };
+  const expiryLabel = (expiresAt: number | null | undefined) => {
+    if (!expiresAt) return null;
+    const msLeft = expiresAt - Date.now();
+    if (msLeft <= 0) return { label: "Expired", urgent: false, archived: true };
+    const hLeft = Math.round(msLeft / 3600000);
+    const dLeft = Math.round(msLeft / 86400000);
+    if (hLeft < 24) return { label: `Expires in ${hLeft}h`, urgent: hLeft < 6, archived: false };
+    return { label: `Expires in ${dLeft}d`, urgent: false, archived: false };
+  };
 
   return (
     <Card className="lg:col-span-2 bg-card border-border flex flex-col">
@@ -153,6 +220,7 @@ function SentinelPanel() {
           </div>
         ) : (
           [...signals]
+            .filter((sig) => !sig.expiresAt || sig.expiresAt > Date.now())
             .sort((a, b) => (parseFloat(String(b.confidenceScore ?? 0)) || 0) - (parseFloat(String(a.confidenceScore ?? 0)) || 0))
             .map((sig) => {
             const cfg = SIGNAL_CONFIG[sig.signalType] ?? SIGNAL_CONFIG.macro_momentum;
@@ -188,7 +256,7 @@ function SentinelPanel() {
                         </span>
                       </div>
                       <ConfidenceBar score={sig.confidenceScore} />
-                      <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                      <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1 flex-wrap">
                         <Clock className="w-2.5 h-2.5" />
                         {elapsed(sig.createdAt)}
                         {sig.impactedAssetClasses && sig.impactedAssetClasses.length > 0 && (
@@ -197,6 +265,16 @@ function SentinelPanel() {
                             <span>{sig.impactedAssetClasses.slice(0, 2).join(", ")}</span>
                           </>
                         )}
+                        {(() => {
+                          const exp = expiryLabel(sig.expiresAt);
+                          if (!exp) return null;
+                          return (
+                            <>
+                              <span className="text-muted-foreground/40">·</span>
+                              <span className={exp.urgent ? "text-amber-400 font-semibold" : "text-muted-foreground/60"}>{exp.label}</span>
+                            </>
+                          );
+                        })()}
                       </p>
                     </div>
                   </div>
@@ -380,6 +458,8 @@ export default function Home() {
         </div>
       )}
 
+      {/* Pipeline Velocity Sparkline */}
+      <VelocitySparkline />
       {/* Main grid */}
       <div className="grid gap-6 lg:grid-cols-7">
         {/* Top Opportunities */}

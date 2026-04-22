@@ -192,7 +192,7 @@ function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
 }
 
 // ─── Asset Card ──────────────────────────────────────────────────────────────────────────────────
-function AssetCard({ asset, onStatusChange }: { asset: any; onStatusChange: () => void }) {
+function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: any; onStatusChange: () => void; isAutoScoring?: boolean }) {
   const [, navigate] = useLocation();
   const scoreAsset = trpc.scout.scoreAsset.useMutation({
     onSuccess: (r) => {
@@ -228,7 +228,17 @@ function AssetCard({ asset, onStatusChange }: { asset: any; onStatusChange: () =
   const st = asset.status as AssetStatus;
 
   return (
-    <Card className="bg-card border-border hover:border-primary/30 transition-all duration-200 group">
+    <Card className={cn("relative overflow-hidden bg-card border-border hover:border-primary/30 transition-all duration-200 group", isAutoScoring && "border-primary/50 ring-1 ring-primary/20")}>
+      {/* Auto-scoring shimmer overlay */}
+      {isAutoScoring && (
+        <div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2 rounded-lg">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+            <div className="w-3 h-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+            <span className="text-xs font-medium text-primary">AI Scoring...</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Third Signal analysis in progress</p>
+        </div>
+      )}
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -586,7 +596,7 @@ export default function Scout() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((asset) => (
-            <AssetCard key={asset.id} asset={asset} onStatusChange={() => refetch()} />
+            <AssetCard key={asset.id} asset={asset} onStatusChange={() => refetch()} isAutoScoring={asset.id === autoScoringId} />
           ))}
         </div>
       )}

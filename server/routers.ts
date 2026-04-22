@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { consensusScores, sellerSimulations, dealTrajectory } from "../drizzle/schema";
+import { consensusScores, sellerSimulations, dealTrajectory, deals } from "../drizzle/schema";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
 import {
   getDeals, getDealById, createDeal, updateDealStage, updateDealScore, getDealStats,
   getSignalByDealId, upsertSignal,
@@ -145,8 +146,28 @@ export const appRouter = router({
         await logActivity({ dealId: input.id, type: "deal_scored", title: `${deal.name} scored: ${score.toFixed(3)}` });
         return { score, redFlagCount };
       }),
+    velocity: publicProcedure
+      .query(async () => {
+        const db = await getDb();
+        if (!db) return [];
+        // Get deals created in the last 8 weeks, grouped by ISO week
+        const rows = await db.execute(
+          sql`SELECT
+            YEARWEEK(FROM_UNIXTIME(created_at / 1000), 1) AS yw,
+            MIN(created_at) AS week_start,
+            COUNT(*) AS count
+          FROM deals
+          WHERE created_at >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 8 WEEK)) * 1000
+          GROUP BY yw
+          ORDER BY yw ASC`
+        );
+        const data = (rows as any[]).map((r: any) => ({
+          week: new Date(Number(r.week_start)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          count: Number(r.count),
+        }));
+        return data;
+      }),
   }),
-
   signals: router({
     getByDealId: publicProcedure
       .input(z.object({ dealId: z.number() }))
@@ -1064,7 +1085,8 @@ Generate a JSON dossier:
       }))
       .mutation(async ({ input }) => {
         const { createCommercialAsset } = await import("./db");
-        const res = await createCommercialAsset({ ...input, source: "manual" }) as any;
+        const now = Date.now();
+        const res = await createCommercialAsset({ ...input, source: "manual", createdAt: now, updatedAt: now }) as any;
         return { id: res[0].insertId, message: "Asset created" };
       }),
 
@@ -1129,7 +1151,7 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         const res = await createDeal({
           name: dealName,
           source: "scout",
-          sourceUrl: asset.sourceUrl ?? "",
+          listingUrl: asset.sourceUrl ?? "",
           location: `${asset.city}, ${asset.state}`,
           industry: asset.propertyType,
           revenue: estimatedRevenue,
@@ -1265,16 +1287,16 @@ async function runScanPipeline(
 
   // Generate a realistic set of synthetic listings to score
   const SAMPLE_LISTINGS = [
-    { name: "Metro HVAC Services — Atlanta", industry: "HVAC", location: "Atlanta, GA", revenue: 2800000, cashFlow: 980000, askingPrice: 3200000, multiple: 3.3, employees: 22, yearEstablished: 2011 },
-    { name: "Peach State Commercial Cleaning", industry: "Commercial Cleaning", location: "Atlanta, GA", revenue: 3500000, cashFlow: 1100000, askingPrice: 4000000, multiple: 3.6, employees: 45, yearEstablished: 2008 },
-    { name: "Charlotte Logistics & Last-Mile", industry: "Logistics", location: "Charlotte, NC", revenue: 6500000, cashFlow: 1900000, askingPrice: 7600000, multiple: 4.0, employees: 38, yearEstablished: 2015 },
-    { name: "TX Government Delivery Services", industry: "Logistics", location: "Dallas, TX", revenue: 6200000, cashFlow: 1800000, askingPrice: 6500000, multiple: 3.6, employees: 52, yearEstablished: 2012 },
-    { name: "Route-Based Pest Control — ATL", industry: "Pest Control", location: "Atlanta, GA", revenue: 1500000, cashFlow: 650000, askingPrice: 2270000, multiple: 3.5, employees: 18, yearEstablished: 2014 },
-    { name: "Southeast Plumbing Group", industry: "Plumbing", location: "Birmingham, AL", revenue: 4200000, cashFlow: 1350000, askingPrice: 4800000, multiple: 3.6, employees: 31, yearEstablished: 2009 },
-    { name: "Gulf Coast Electrical Contractors", industry: "Electrical", location: "Houston, TX", revenue: 5100000, cashFlow: 1600000, askingPrice: 5800000, multiple: 3.6, employees: 29, yearEstablished: 2007 },
-    { name: "Florida Pool & Spa Services", industry: "Pool Services", location: "Tampa, FL", revenue: 1800000, cashFlow: 720000, askingPrice: 2500000, multiple: 3.5, employees: 14, yearEstablished: 2016 },
-    { name: "Mid-Atlantic Medical Staffing", industry: "Healthcare Staffing", location: "Baltimore, MD", revenue: 8900000, cashFlow: 2100000, askingPrice: 9500000, multiple: 4.5, employees: 12, yearEstablished: 2013 },
-    { name: "Carolinas Roofing & Restoration", industry: "Roofing", location: "Raleigh, NC", revenue: 3800000, cashFlow: 1050000, askingPrice: 3500000, multiple: 3.3, employees: 27, yearEstablished: 2010 },
+    { name: "Metro HVAC Services — Atlanta", industry: "HVAC", location: "Atlanta, GA", revenue: 2800000, cashFlow: 980000, askingPrice: 3200000, multiple: 3.3, employees: 22, yearEstablished: 2011, source: "bizbuysell" },
+    { name: "Peach State Commercial Cleaning", industry: "Commercial Cleaning", location: "Atlanta, GA", revenue: 3500000, cashFlow: 1100000, askingPrice: 4000000, multiple: 3.6, employees: 45, yearEstablished: 2008, source: "bizbuysell" },
+    { name: "Charlotte Logistics & Last-Mile", industry: "Logistics", location: "Charlotte, NC", revenue: 6500000, cashFlow: 1900000, askingPrice: 7600000, multiple: 4.0, employees: 38, yearEstablished: 2015, source: "dealstream" },
+    { name: "TX Government Delivery Services", industry: "Logistics", location: "Dallas, TX", revenue: 6200000, cashFlow: 1800000, askingPrice: 6500000, multiple: 3.6, employees: 52, yearEstablished: 2012, source: "dealstream" },
+    { name: "Route-Based Pest Control — ATL", industry: "Pest Control", location: "Atlanta, GA", revenue: 1500000, cashFlow: 650000, askingPrice: 2270000, multiple: 3.5, employees: 18, yearEstablished: 2014, source: "bizbuysell" },
+    { name: "Southeast Plumbing Group", industry: "Plumbing", location: "Birmingham, AL", revenue: 4200000, cashFlow: 1350000, askingPrice: 4800000, multiple: 3.6, employees: 31, yearEstablished: 2009, source: "quietlight" },
+    { name: "Gulf Coast Electrical Contractors", industry: "Electrical", location: "Houston, TX", revenue: 5100000, cashFlow: 1600000, askingPrice: 5800000, multiple: 3.6, employees: 29, yearEstablished: 2007, source: "quietlight" },
+    { name: "Florida Pool & Spa Services", industry: "Pool Services", location: "Tampa, FL", revenue: 1800000, cashFlow: 720000, askingPrice: 2500000, multiple: 3.5, employees: 14, yearEstablished: 2016, source: "flippa" },
+    { name: "Mid-Atlantic Medical Staffing", industry: "Healthcare Staffing", location: "Baltimore, MD", revenue: 8900000, cashFlow: 2100000, askingPrice: 9500000, multiple: 4.5, employees: 12, yearEstablished: 2013, source: "empireflippers" },
+    { name: "Carolinas Roofing & Restoration", industry: "Roofing", location: "Raleigh, NC", revenue: 3800000, cashFlow: 1050000, askingPrice: 3500000, multiple: 3.3, employees: 27, yearEstablished: 2010, source: "bizbuysell" },
   ];
 
   // Filter by source count (more sources = more listings)
@@ -1322,27 +1344,18 @@ async function runScanPipeline(
         enrichDealWithOZTAD(deal.location, deal.askingPrice, deal.cashFlow)
           .then(async (enrichment) => {
             if (enrichment.opportunityZone || enrichment.tadDistrict || enrichment.eventProximityMiles) {
-              const db = getDb();
+              const db = await getDb();
+              if (!db) return;
               await db.execute(
-                `UPDATE deals SET
-                  opportunity_zone = ?,
-                  oz_tract_id = ?,
-                  tad_district = ?,
-                  oz_potential_gain = ?,
-                  event_proximity_miles = ?,
-                  event_revenue_low = ?,
-                  event_revenue_high = ?
-                WHERE id = ?`,
-                [
-                  enrichment.opportunityZone ? 1 : 0,
-                  enrichment.ozTractId,
-                  enrichment.tadDistrict,
-                  enrichment.ozPotentialGain,
-                  enrichment.eventProximityMiles,
-                  enrichment.eventRevenueLow,
-                  enrichment.eventRevenueHigh,
-                  dealId,
-                ]
+                sql`UPDATE deals SET
+                  opportunity_zone = ${enrichment.opportunityZone ? 1 : 0},
+                  oz_tract_id = ${enrichment.ozTractId ?? null},
+                  tad_district = ${enrichment.tadDistrict ?? null},
+                  oz_potential_gain = ${enrichment.ozPotentialGain ?? null},
+                  event_proximity_miles = ${enrichment.eventProximityMiles ?? null},
+                  event_revenue_low = ${enrichment.eventRevenueLow ?? null},
+                  event_revenue_high = ${enrichment.eventRevenueHigh ?? null}
+                WHERE id = ${dealId}`
               );
               if (enrichment.opportunityZone) {
                 await logActivity({

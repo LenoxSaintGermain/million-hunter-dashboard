@@ -260,3 +260,20 @@
 - [x] Scout→Deal Bridge: auto-trigger agents.runPipeline after convertToDeal succeeds
 - [x] Scout→Deal Bridge: War Room opens with pipeline already in progress
 - [x] Run tests and save Sprint 9 checkpoint
+## Sprint 10 — Signal Intelligence + UX Polish + Pipeline Visibility
+- [x] Sentinel: expiresAt countdown badge on signal cards (time-remaining display)
+- [x] Sentinel: archived signal filtering (hide expired signals from live feed)
+- [x] Scout: isAutoScoring shimmer overlay on AssetCard while AI score is in flight
+- [x] Scout: "AI Scoring..." pulsing spinner overlay with semi-transparent backdrop
+- [x] Command Center: Pipeline Velocity sparkline (Recharts AreaChart, 8-week rolling window)
+- [x] deals.velocity tRPC procedure (raw SQL GROUP BY ISO week)
+- [x] Run tests (55/55 passing) and save Sprint 10 checkpoint
+
+## Sprint 10 — Signal Intelligence + UX Polish + Pipeline Visibility
+- [x] Sentinel: expiresAt countdown badge on signal cards (time-remaining display)
+- [x] Sentinel: archived signal filtering (hide expired signals from live feed)
+- [x] Scout: isAutoScoring shimmer overlay on AssetCard while AI score is in flight
+- [x] Scout: AI Scoring pulsing spinner overlay with semi-transparent backdrop
+- [x] Command Center: Pipeline Velocity sparkline (Recharts AreaChart, 8-week rolling window)
+- [x] deals.velocity tRPC procedure (raw SQL GROUP BY ISO week)
+- [x] Run tests (55/55 passing) and save Sprint 10 checkpoint
