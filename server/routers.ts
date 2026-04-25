@@ -154,11 +154,11 @@ export const appRouter = router({
         // Get deals created in the last 8 weeks, grouped by ISO week
         const rows = await db.execute(
           sql`SELECT
-            YEARWEEK(FROM_UNIXTIME(createdAt / 1000), 1) AS yw,
+            YEARWEEK(createdAt, 1) AS yw,
             MIN(createdAt) AS week_start,
             COUNT(*) AS cnt
           FROM deals
-          WHERE createdAt >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 8 WEEK)) * 1000
+          WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 8 WEEK)
           GROUP BY yw
           ORDER BY yw ASC`
         );
@@ -169,6 +169,8 @@ export const appRouter = router({
             weekStartMs = r.week_start.getTime();
           } else if (typeof r.week_start === 'bigint') {
             weekStartMs = Number(r.week_start);
+          } else if (typeof r.week_start === 'string') {
+            weekStartMs = new Date(r.week_start).getTime();
           } else {
             weekStartMs = Number(r.week_start);
           }
