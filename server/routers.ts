@@ -153,17 +153,17 @@ export const appRouter = router({
         // Get deals created in the last 8 weeks, grouped by ISO week
         const rows = await db.execute(
           sql`SELECT
-            YEARWEEK(FROM_UNIXTIME(created_at / 1000), 1) AS yw,
-            MIN(created_at) AS week_start,
-            COUNT(*) AS count
+            YEARWEEK(FROM_UNIXTIME(createdAt / 1000), 1) AS yw,
+            MIN(createdAt) AS week_start,
+            COUNT(*) AS cnt
           FROM deals
-          WHERE created_at >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 8 WEEK)) * 1000
+          WHERE createdAt >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 8 WEEK)) * 1000
           GROUP BY yw
           ORDER BY yw ASC`
         );
         const data = (rows as any[]).map((r: any) => ({
           week: new Date(Number(r.week_start)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          count: Number(r.count),
+          count: Number(r.cnt),
         }));
         return data;
       }),
