@@ -242,7 +242,7 @@ export const appRouter = router({
             cashOnCashReturn: capital.cashOnCashReturn,
             capitalStackSummary: capital.summary,
           }),
-          modelVersions: { psychology: "claude-3-5-sonnet", digital: "sonar-pro", redteam: "gemini-2.5-pro", capital: "gemini-2.5-flash" },
+          modelVersions: { psychology: "claude-opus-4.7", digital: "claude-opus-4.7", redteam: "gemini-3.1-pro-preview", capital: "gemini-3-flash-preview" },
         };
         await upsertSignal(signalData);
         await logActivity({
@@ -1249,56 +1249,33 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         return { success: true };
       }),
 
-    // AI Refresh: use Perplexity Sonar to generate 3 real-time web-grounded macro signals
+    // AI Refresh: use Claude-Opus-4.7 via Poe to generate 3 real-time macro signals
     aiRefresh: protectedProcedure
       .mutation(async () => {
         const { insertMacroSignal } = await import("./db");
-        const sonarKey = process.env.SONAR_API_KEY;
-        if (!sonarKey) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Sonar API key not configured" });
-
-        // Query Perplexity Sonar for current Atlanta market signals
-        const sonarRes = await fetch("https://api.perplexity.ai/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${sonarKey}` },
-          body: JSON.stringify({
-            model: "sonar-pro",
-            messages: [
-              {
-                role: "system",
-                content: "You are a macro intelligence analyst for a Main Street business acquisition fund focused on Atlanta, GA. Generate exactly 3 actionable market signals relevant to acquiring cash-flowing SMBs (HVAC, cleaning, logistics, pest control, plumbing). Each signal must be grounded in real, current news or data. Return valid JSON only."
-              },
-              {
-                role: "user",
-                content: `Today is ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}. Generate 3 macro signals for a business acquisition fund. Return JSON array with exactly 3 objects, each with: signalType (one of: institutional, government, seasonal, event, macro_momentum), title (max 80 chars), summary (2-3 sentences), roryPitch (1 sentence Rory Sutherland-style insight), impactedAssetClasses (array of strings), recommendedAction (1 sentence), confidenceScore (0.0-1.0). Format: [{...}, {...}, {...}]`
-              }
-            ],
-            max_tokens: 1500,
-          }),
+        const { poeJSON, POE_MODELS } = await import("./poe");
+        const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const signals = await poeJSON<Array<{
+          signalType: string;
+          title: string;
+          summary: string;
+          roryPitch?: string;
+          impactedAssetClasses: string[];
+          recommendedAction?: string;
+          confidenceScore: number;
+        }>>({
+          model: POE_MODELS.CLAUDE_OPUS,
+          systemPrompt: "You are a macro intelligence analyst for a Main Street business acquisition fund focused on Atlanta, GA. Generate exactly 3 actionable market signals relevant to acquiring cash-flowing SMBs (HVAC, cleaning, logistics, pest control, plumbing). Return valid JSON only.",
+          userPrompt: `Today is ${today}. Generate 3 macro signals for a business acquisition fund. Return a JSON array with exactly 3 objects, each with: signalType (one of: institutional, government, seasonal, event, macro_momentum), title (max 80 chars), summary (2-3 sentences), roryPitch (1 sentence Rory Sutherland-style insight), impactedAssetClasses (array of strings), recommendedAction (1 sentence), confidenceScore (0.0-1.0). Format: [{...}, {...}, {...}]`,
+          maxTokens: 1500,
         });
-
-        if (!sonarRes.ok) {
-          const errText = await sonarRes.text();
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Sonar API error: ${errText.slice(0, 200)}` });
+        if (!Array.isArray(signals)) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to parse signals as JSON array" });
         }
-
-        const sonarData = await sonarRes.json() as any;
-        const content = sonarData.choices?.[0]?.message?.content ?? "[]";
-
-        // Parse the JSON array from the response (handle markdown code blocks)
-        let signals: any[];
-        try {
-          const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-          signals = JSON.parse(cleaned);
-          if (!Array.isArray(signals)) throw new Error("Not an array");
-        } catch {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to parse Sonar response as JSON array" });
-        }
-
-        // Validate and insert each signal
         const validTypes = ["institutional", "government", "seasonal", "event", "macro_momentum"] as const;
         let inserted = 0;
         for (const sig of signals.slice(0, 3)) {
-          const signalType = validTypes.includes(sig.signalType) ? sig.signalType : "macro_momentum";
+          const signalType = validTypes.includes(sig.signalType as any) ? sig.signalType as typeof validTypes[number] : "macro_momentum";
           await insertMacroSignal({
             signalType,
             title: String(sig.title ?? "").slice(0, 255),
@@ -1311,8 +1288,7 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
           });
           inserted++;
         }
-
-        return { inserted, message: `${inserted} new signals generated from live market data` };
+        return { inserted, message: `${inserted} new signals generated via Claude-Opus-4.7` };
       }),
     // Archive a single signal manually
     archive: protectedProcedure

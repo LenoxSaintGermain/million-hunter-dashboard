@@ -11,7 +11,7 @@
  *     Claude-Opus-4.7           → Owner Psychology profiling (nuanced language analysis)
  *
  *   Perplexity Sonar Pro (direct) — live web research:
- *     sonar-pro                 → Digital Footprint Audit
+ *     Claude-Opus-4.7 (Poe)     → Digital Footprint Audit
  */
 
 import { GoogleGenAI } from "@google/genai";
@@ -122,50 +122,37 @@ Analyze and return a JSON object with:
   }
 }
 
-// ─── Digital Footprint Audit (Perplexity Sonar Pro — direct) ─────────────────
+// ─── Digital Footprint Audit (Claude-Opus-4.7 via Poe) ───────────────────────
 export async function runDigitalAudit(deal: Deal): Promise<DigitalAuditResult> {
-  const sonarApiKey = process.env.SONAR_API_KEY;
-  if (!sonarApiKey) {
-    return { techDebtScore: 0.5, growthTrend: "stable", seoAuthorityScore: 30, reviewSentimentScore: 0, auditSummary: "Perplexity API key not configured." };
-  }
-
+  const { poeJSON, POE_MODELS } = await import("./poe");
   const prompt = `Research the digital footprint of this business and return a JSON analysis:
-
 Business Name: ${deal.name}
 Location: ${deal.location ?? "Unknown"}
 Industry: ${deal.industry ?? "Unknown"}
-
-Search for: online reviews, website quality, social media presence, Google Business profile, tech stack indicators, and growth signals.
-
+Analyze: online reviews, website quality, social media presence, Google Business profile, tech stack indicators, and growth signals.
 Return JSON with:
 - techDebtScore: number 0-1 (1 = very outdated tech/systems)
 - growthTrend: "growing" | "stable" | "declining"
 - seoAuthorityScore: number 0-100
 - reviewSentimentScore: number -1 to 1 (based on review sentiment)
 - auditSummary: string (3-4 sentence summary of digital health and key opportunities/risks)
-
 Return ONLY valid JSON.`;
-
   try {
-    const response = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${sonarApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "sonar-pro",
-        messages: [
-          { role: "system", content: "You are a digital due diligence analyst. Return only valid JSON." },
-          { role: "user", content: prompt },
-        ],
-        return_citations: true,
-      }),
+    const parsed = await poeJSON<{
+      techDebtScore: number;
+      growthTrend: string;
+      seoAuthorityScore: number;
+      reviewSentimentScore: number;
+      auditSummary: string;
+    }>({
+      model: POE_MODELS.CLAUDE_OPUS,
+      systemPrompt: "You are a digital due diligence analyst specializing in Main Street business acquisitions. Return only valid JSON.",
+      userPrompt: prompt,
+      maxTokens: 1000,
     });
-    const data = await response.json() as { choices: Array<{ message: { content: string } }> };
-    const text = data.choices?.[0]?.message?.content ?? "{}";
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
     return {
       techDebtScore: Math.min(1, Math.max(0, parsed.techDebtScore ?? 0.5)),
-      growthTrend: parsed.growthTrend ?? "stable",
+      growthTrend: (parsed.growthTrend as "growing" | "stable" | "declining") ?? "stable",
       seoAuthorityScore: Math.min(100, Math.max(0, parsed.seoAuthorityScore ?? 30)),
       reviewSentimentScore: Math.min(1, Math.max(-1, parsed.reviewSentimentScore ?? 0)),
       auditSummary: parsed.auditSummary ?? "Digital audit completed.",

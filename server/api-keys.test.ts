@@ -15,9 +15,9 @@ describe("API Key Validation", () => {
     expect(key!.length).toBeGreaterThan(10);
   });
 
-  it("SONAR_API_KEY is set", () => {
-    const key = process.env.SONAR_API_KEY;
-    expect(key, "SONAR_API_KEY must be set").toBeTruthy();
+  it("Poe_api_key is set", () => {
+    const key = process.env.Poe_api_key;
+    expect(key, "Poe_api_key must be set").toBeTruthy();
     expect(key!.length).toBeGreaterThan(10);
   });
 
