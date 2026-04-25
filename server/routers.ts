@@ -162,7 +162,9 @@ export const appRouter = router({
           GROUP BY yw
           ORDER BY yw ASC`
         );
-        const data = (rows as any[]).map((r: any) => {
+        // db.execute returns [rows, fields] tuple — extract the rows array
+        const rowsArr = Array.isArray((rows as any)[0]) ? (rows as any)[0] : (rows as any);
+        const data = (rowsArr as any[]).map((r: any) => {
           // week_start may be a MySQL Date object or a BigInt/number — handle all cases
           let weekStartMs: number;
           if (r.week_start instanceof Date) {
