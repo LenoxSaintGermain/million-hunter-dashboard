@@ -109,7 +109,7 @@ export async function poeJSON<T = Record<string, unknown>>(
 ): Promise<T> {
   const schemaHint = params.schema
     ? `\n\nRespond ONLY with valid JSON matching this schema:\n${params.schema}`
-    : "\n\nRespond ONLY with valid JSON. No markdown, no explanation, just the JSON object.";
+    : "\n\nRespond ONLY with valid JSON. No markdown, no explanation, no prose. Return the raw JSON value (object or array) only.";
 
   const raw = await poeChat({
     ...params,
@@ -117,9 +117,33 @@ export async function poeJSON<T = Record<string, unknown>>(
     temperature: params.temperature ?? 0.1,
   });
 
-  // Extract JSON from markdown code blocks if present
-  const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) || raw.match(/(\{[\s\S]*\})/);
-  const jsonStr = jsonMatch ? jsonMatch[1].trim() : raw.trim();
+  // Extract JSON from markdown code blocks if present.
+  // Handles both objects {...} and arrays [...]
+  const codeBlockMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  let jsonStr: string;
+  if (codeBlockMatch) {
+    jsonStr = codeBlockMatch[1].trim();
+  } else {
+    // Find the outermost JSON structure — array takes priority over object
+    const arrayMatch = raw.match(/(\[[\s\S]*\])/);
+    const objectMatch = raw.match(/(\{[\s\S]*\})/);
+    const firstArray = arrayMatch ? raw.indexOf(arrayMatch[0]) : Infinity;
+    const firstObject = objectMatch ? raw.indexOf(objectMatch[0]) : Infinity;
+    if (arrayMatch && firstArray <= firstObject) {
+      jsonStr = arrayMatch[1].trim();
+    } else if (objectMatch) {
+      // If Claude wraps the array in an object like {"signals": [...]}, extract the array
+      const parsed = JSON.parse(objectMatch[1]);
+      const values = Object.values(parsed);
+      const innerArray = values.find(v => Array.isArray(v));
+      if (innerArray) {
+        return innerArray as T;
+      }
+      jsonStr = objectMatch[1].trim();
+    } else {
+      jsonStr = raw.trim();
+    }
+  }
 
   try {
     return JSON.parse(jsonStr) as T;
