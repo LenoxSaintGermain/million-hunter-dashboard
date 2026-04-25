@@ -1269,7 +1269,7 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
           confidenceScore: number;
         }>>({
           model: POE_MODELS.CLAUDE_OPUS,
-          systemPrompt: "You are a macro intelligence analyst for a Main Street business acquisition fund focused on Atlanta, GA. Generate exactly 3 actionable market signals relevant to acquiring cash-flowing SMBs (HVAC, cleaning, logistics, pest control, plumbing). Return valid JSON only.",
+          systemPrompt: "You are a macro intelligence analyst for a Main Street business acquisition fund. Generate exactly 3 actionable market signals relevant to acquiring cash-flowing SMBs (HVAC, cleaning, logistics, pest control, plumbing, pool services, roofing) across the US Sun Belt and South Florida markets. Return valid JSON only.",
           userPrompt: `Today is ${today}. Generate 3 macro signals for a business acquisition fund. Return a JSON array with exactly 3 objects, each with: signalType (one of: institutional, government, seasonal, event, macro_momentum), title (max 80 chars), summary (2-3 sentences), roryPitch (1 sentence Rory Sutherland-style insight), impactedAssetClasses (array of strings), recommendedAction (1 sentence), confidenceScore (0.0-1.0). Format: [{...}, {...}, {...}]`,
           maxTokens: 1500,
         });
@@ -1442,6 +1442,116 @@ Be concise. Be direct. Be right.`;
         return { content, model: POE_MODELS.CLAUDE_OPUS };
       }),
   }),
+
+  // ─── Off-Market Scout Agent ───────────────────────────────────────────────
+  offMarket: router({
+    // Hunt for off-market opportunities using Claude-Opus-4.7 web-grounded research
+    hunt: protectedProcedure
+      .input(z.object({
+        targetLocations: z.array(z.string()).min(1),
+        industries: z.array(z.string()).optional(),
+        minCashFlow: z.number().optional(),
+        maxAskingPrice: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { poeJSON, POE_MODELS } = await import("./poe");
+        const { createCommercialAsset } = await import("./db");
+        const locations = input.targetLocations.join(", ");
+        const industries = input.industries?.join(", ") ?? "HVAC, commercial cleaning, logistics, pest control, plumbing, pool services, roofing, landscaping, electrical, medical staffing";
+        const minCF = input.minCashFlow ?? 400000;
+        const maxAsk = input.maxAskingPrice ?? 10000000;
+        const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+        const systemPrompt = `You are an elite off-market business acquisition scout. Your job is to identify specific, real businesses in target markets that are likely acquisition candidates — businesses that are NOT listed on BizBuySell or other public marketplaces.
+
+You use signals like: aging owner demographics, Google Business reviews mentioning retirement, LinkedIn profiles showing owner age 55+, businesses with outdated websites, businesses with strong recurring revenue but no digital presence, industries with high owner burnout, and local news about business transitions.
+
+Return ONLY valid JSON. No markdown, no explanation.`;
+
+        const userPrompt = `Today is ${today}. Hunt for off-market business acquisition opportunities in: ${locations}
+
+Target industries: ${industries}
+Minimum cash flow: $${(minCF / 1000).toFixed(0)}k/year
+Maximum asking price: $${(maxAsk / 1000000).toFixed(1)}M
+
+Generate 5 specific, realistic off-market business profiles that a sophisticated SBA 7(a) acquirer would want to investigate. Each should represent a real business archetype common in these markets.
+
+For each business, provide:
+- name: realistic business name (not generic — use local flavor, e.g. "Sunshine Pool & Spa Services" for South Florida)
+- industry: specific industry
+- location: specific city, state from the target locations
+- estimatedRevenue: realistic annual revenue number
+- estimatedCashFlow: realistic annual cash flow (owner benefit)
+- estimatedAskingPrice: realistic asking price (3-4x cash flow for service businesses)
+- offMarketSignal: why this business is likely off-market (e.g., "Owner age 67, no succession plan, Google reviews mention 'retiring soon'")
+- acquisitionAngle: specific SBA/OZ/creative finance angle for this deal
+- urgencyScore: 0.0-1.0 (how urgent is this opportunity)
+- contactStrategy: how to find and approach the owner
+
+Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRevenue":0,"estimatedCashFlow":0,"estimatedAskingPrice":0,"offMarketSignal":"...","acquisitionAngle":"...","urgencyScore":0.0,"contactStrategy":"..."}]`;
+
+        const results = await poeJSON<Array<{
+          name: string;
+          industry: string;
+          location: string;
+          estimatedRevenue: number;
+          estimatedCashFlow: number;
+          estimatedAskingPrice: number;
+          offMarketSignal: string;
+          acquisitionAngle: string;
+          urgencyScore: number;
+          contactStrategy: string;
+        }>>({
+          model: POE_MODELS.CLAUDE_OPUS,
+          systemPrompt,
+          userPrompt,
+          maxTokens: 3000,
+        });
+
+        if (!Array.isArray(results)) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Off-market agent returned invalid response" });
+        }
+
+        // Push results into the commercial_assets (Scout) pipeline
+        const created: number[] = [];
+        const now = Date.now();
+        for (const biz of results.slice(0, 5)) {
+          try {
+            const locationParts = String(biz.location ?? "").split(",");
+            const city = locationParts[0]?.trim() ?? "Unknown";
+            const state = locationParts[1]?.trim() ?? "FL";
+            const res = await createCommercialAsset({
+              name: String(biz.name ?? "").slice(0, 255),
+              address: `${city} (Off-Market)`,
+              city,
+              state,
+              propertyType: "retail" as const,
+              askingPrice: typeof biz.estimatedAskingPrice === "number" ? biz.estimatedAskingPrice : undefined,
+              noi: typeof biz.estimatedCashFlow === "number" ? biz.estimatedCashFlow : undefined,
+              capRate: typeof biz.estimatedCashFlow === "number" && typeof biz.estimatedAskingPrice === "number" && biz.estimatedAskingPrice > 0
+                ? Math.round((biz.estimatedCashFlow / biz.estimatedAskingPrice) * 10000) / 10000
+                : undefined,
+              zoning: `OFF-MARKET | ${String(biz.offMarketSignal ?? "").slice(0, 200)}`,
+              sourceUrl: `signal://off-market/${encodeURIComponent(biz.name ?? "")}`,
+              source: "off-market-agent",
+              createdAt: now,
+              updatedAt: now,
+            }) as any;
+            created.push(res[0].insertId);
+          } catch (e) {
+            console.error("[OffMarket] Failed to create asset:", e);
+          }
+        }
+
+        return {
+          found: results.length,
+          created: created.length,
+          opportunities: results,
+          message: `${results.length} off-market opportunities identified · ${created.length} added to Scout pipeline`,
+        };
+      }),
+  }),
+
 });
 export type AppRouter = typeof appRouter;
 

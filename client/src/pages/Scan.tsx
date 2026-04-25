@@ -23,9 +23,10 @@ import ScanProgress from "@/components/ScanProgress";
 
 // ── Preset location groups ─────────────────────────────────────────────────
 const LOCATION_PRESETS = [
-  { label: "Atlanta Metro", cities: ["Atlanta, GA", "Marietta, GA", "Alpharetta, GA", "Decatur, GA"] },
-  { label: "Southeast", cities: ["Atlanta, GA", "Charlotte, NC", "Nashville, TN", "Birmingham, AL"] },
-  { label: "Sun Belt", cities: ["Atlanta, GA", "Dallas, TX", "Houston, TX", "Tampa, FL", "Charlotte, NC"] },
+  { label: "Miami / FLL", cities: ["Miami, FL", "Fort Lauderdale, FL", "Boca Raton, FL", "Pompano Beach, FL"] },
+  { label: "South Florida", cities: ["Miami, FL", "Fort Lauderdale, FL", "West Palm Beach, FL", "Naples, FL", "Fort Myers, FL"] },
+  { label: "Florida", cities: ["Miami, FL", "Fort Lauderdale, FL", "Tampa, FL", "Orlando, FL", "Jacksonville, FL"] },
+  { label: "Sun Belt", cities: ["Miami, FL", "Dallas, TX", "Houston, TX", "Atlanta, GA", "Charlotte, NC"] },
   { label: "National", cities: [] }, // empty = no location filter
 ];
 
@@ -73,14 +74,21 @@ export default function Scan() {
   const [form, setForm] = useState({ name: "", industry: "", location: "", askingPrice: "", revenue: "", cashFlow: "" });
 
   // ── Scan config state ──────────────────────────────────────────────────
-  const [targetLocations, setTargetLocations] = useState<string[]>(["Atlanta, GA"]);
+  const [targetLocations, setTargetLocations] = useState<string[]>(["Miami, FL", "Fort Lauderdale, FL"]);
   const [locationInput, setLocationInput] = useState("");
   const [selectedSources, setSelectedSources] = useState<string[]>(["bizbuysell", "dealstream", "quietlight"]);
   const [minCashFlow, setMinCashFlow] = useState(500000);
   const [maxMultiple, setMaxMultiple] = useState(5);
-  const [activePreset, setActivePreset] = useState("Atlanta Metro");
+  const [activePreset, setActivePreset] = useState("Miami / FLL");
   const [activeScanJobId, setActiveScanJobId] = useState<number | null>(null);
   const locationInputRef = useRef<HTMLInputElement>(null);
+  // Off-Market Scout state
+  const [showOffMarket, setShowOffMarket] = useState(false);
+  const [offMarketResults, setOffMarketResults] = useState<Array<{
+    name: string; industry: string; location: string;
+    estimatedRevenue: number; estimatedCashFlow: number; estimatedAskingPrice: number;
+    offMarketSignal: string; acquisitionAngle: string; urgencyScore: number; contactStrategy: string;
+  }>>([]);
 
   const { data: deals, isLoading, refetch } = trpc.deals.list.useQuery({ limit: 100 });
   const triggerScan = trpc.scan.trigger.useMutation({
@@ -94,6 +102,14 @@ export default function Scan() {
   });
   const scoreDeal = trpc.deals.score.useMutation({
     onSuccess: (d) => { toast.success(`Scored: ${parseFloat(String(d.score)).toFixed(3)}`); refetch(); },
+  });
+  const huntOffMarket = trpc.offMarket.hunt.useMutation({
+    onSuccess: (r) => {
+      toast.success(r.message);
+      setOffMarketResults(r.opportunities ?? []);
+      setShowOffMarket(true);
+    },
+    onError: (e) => toast.error(`Off-Market Scout failed: ${e.message}`),
   });
   const createDeal = trpc.deals.create.useMutation({
     onSuccess: () => {
@@ -354,6 +370,84 @@ export default function Scan() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Off-Market Scout ──────────────────────────────────────────────── */}
+      <Card className="border-dashed border-amber-500/40 bg-amber-500/5">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <CardTitle className="text-sm font-semibold text-amber-400">Off-Market Scout</CardTitle>
+              <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400">AI Agent</Badge>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1.5 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+              onClick={() => huntOffMarket.mutate({ targetLocations, industries: [], minCashFlow })}
+              disabled={huntOffMarket.isPending}
+            >
+              {huntOffMarket.isPending ? (
+                <><Loader2 className="w-3 h-3 animate-spin" />Hunting...</>
+              ) : (
+                <><Search className="w-3 h-3" />Hunt Off-Market</>
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            AI agent proactively researches unlisted businesses matching your criteria — owner-operated, aging owners, distressed signals, and acquisition-ready targets.
+          </p>
+        </CardHeader>
+        {showOffMarket && offMarketResults.length > 0 && (
+          <CardContent className="pt-0">
+            <div className="space-y-3">
+              {offMarketResults.map((opp, i) => (
+                <div key={i} className="rounded-lg border border-amber-500/20 bg-background p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">{opp.name}</p>
+                      <p className="text-xs text-muted-foreground">{opp.industry} · {opp.location}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <div className={`w-1.5 h-1.5 rounded-full ${opp.urgencyScore >= 8 ? 'bg-red-400' : opp.urgencyScore >= 6 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                      <span className="text-xs font-mono text-muted-foreground">Urgency {opp.urgencyScore}/10</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div><span className="text-muted-foreground">Est. Revenue</span><br /><span className="font-medium">${(opp.estimatedRevenue / 1e6).toFixed(1)}M</span></div>
+                    <div><span className="text-muted-foreground">Est. Cash Flow</span><br /><span className="font-medium">${(opp.estimatedCashFlow / 1e3).toFixed(0)}k</span></div>
+                    <div><span className="text-muted-foreground">Est. Asking</span><br /><span className="font-medium">${(opp.estimatedAskingPrice / 1e6).toFixed(1)}M</span></div>
+                  </div>
+                  <div className="text-xs space-y-1">
+                    <p><span className="text-amber-400 font-medium">Signal:</span> {opp.offMarketSignal}</p>
+                    <p><span className="text-blue-400 font-medium">Angle:</span> {opp.acquisitionAngle}</p>
+                    <p><span className="text-emerald-400 font-medium">Contact:</span> {opp.contactStrategy}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-xs w-full"
+                    onClick={() => {
+                      createDeal.mutate({
+                        name: opp.name,
+                        industry: opp.industry,
+                        location: opp.location,
+                        askingPrice: opp.estimatedAskingPrice,
+                        revenue: opp.estimatedRevenue,
+                        cashFlow: opp.estimatedCashFlow,
+                        source: "off-market-scout",
+                        description: `Signal: ${opp.offMarketSignal}\nAngle: ${opp.acquisitionAngle}\nContact: ${opp.contactStrategy}`,
+                      });
+                    }}
+                  >
+                    Add to Pipeline
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
       {/* ── Scan Progress ─────────────────────────────────────────────────── */}
       {activeScanJobId && (

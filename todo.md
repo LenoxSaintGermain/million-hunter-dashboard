@@ -307,7 +307,7 @@
 - [ ] Fix agents/index.ts: MODEL_LITE constant to correct preview ID
 - [ ] Fix gemini.ts header comment to reflect accurate model assignments
 - [ ] Update investmentMemo to use gpt-5.5 via OpenAI SDK
-- [ ] Run tests and save checkpoint
+- [x] Run tests and save checkpoint
 
 ## Model Routing Audit — Gemini Direct + Poe for Claude/GPT
 - [ ] gemini.ts: update Gemini model IDs to gemini-3.1-pro-preview / gemini-3-flash-preview (direct Google API)
@@ -316,7 +316,7 @@
 - [ ] agents/index.ts: consensus scorer calls Google API directly with Gemini 3.1 models
 - [ ] routers.ts: update modelVersions metadata labels
 - [ ] DB model_config: update consensus model IDs to Gemini 3.1 strings
-- [ ] Run tests and save checkpoint
+- [x] Run tests and save checkpoint
 
 ## Hotfix — Pipeline Velocity NaN Bug
 - [x] Server: velocity query handles MySQL Date objects (week_start instanceof Date check)
@@ -348,3 +348,13 @@
 - [x] Fix scout.list 401 — add enabled: isAuthenticated guard in Scout.tsx
 - [x] Add useAuth import to Home.tsx and Scout.tsx
 - [x] Re-run Playwright audit — 0 console errors, 0 API errors, 0 failed requests (11/11 pages clean)
+
+## Sprint 13 — Clean Data + Location Agnostic + Off-Market Scout Agent
+
+- [x] Purge Sprint 11 test deals (Sprint11 Scout Prefill Test, Sprint11 Share Test Deal) from DB
+- [x] Make Market Scan location-agnostic: remove Atlanta hardcodes, set Miami/FLL as default presets
+- [x] Update scan.trigger to accept any targetLocations (no Atlanta fallback hardcode)
+- [x] Build Off-Market Scout AI agent: Claude-Opus-4.7 via Poe, web-grounded, hunts unlisted businesses
+- [x] Add off-market scan UI panel on Market Scan page (separate from on-market scan)
+- [x] Off-market results feed into Asset Scout pipeline (same createCommercialAsset flow)
+- [x] Run tests and save checkpoint
