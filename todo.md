@@ -293,3 +293,27 @@
 - [x] GCP: cloudbuild.yaml for CI/CD with Artifact Registry + Cloud Run deploy
 - [x] GCP: .dockerignore file
 - [x] Sprint 11 vitest suite — 8 tests (63/63 total passing)
+
+## GPT-5.5 Model Audit & Fix
+- [ ] Run GPT-5.5 code review on all AI feature code
+- [ ] Fix DB model_config: replace all phantom/deprecated model IDs with live models
+- [ ] Fix investmentMemo DB row: gpt-5.4 → gpt-5.5
+- [ ] Fix capitalStack DB row: gemini-3.1-pro-exp → gemini-2.5-flash
+- [ ] Fix dealScoring DB row: gemini-3.0-flash-exp → gemini-2.5-flash
+- [ ] Fix marketScan DB row: gemini-3.0-flash-exp → gemini-2.5-flash
+- [ ] Fix ownerPsychology DB row: gemini-3.1-pro-exp → gemini-2.5-pro
+- [ ] Fix digitalAudit DB row: sonar-deep-research → sonar-pro
+- [ ] Fix consensus_model_3 DB row: gemini-2.5-flash-lite → gemini-2.5-flash-lite-preview-06-17
+- [ ] Fix agents/index.ts: MODEL_LITE constant to correct preview ID
+- [ ] Fix gemini.ts header comment to reflect accurate model assignments
+- [ ] Update investmentMemo to use gpt-5.5 via OpenAI SDK
+- [ ] Run tests and save checkpoint
+
+## Model Routing Audit — Gemini Direct + Poe for Claude/GPT
+- [ ] gemini.ts: update Gemini model IDs to gemini-3.1-pro-preview / gemini-3-flash-preview (direct Google API)
+- [ ] gemini.ts: replace Anthropic SDK (claude-3-5-sonnet) with Poe client (Claude-Opus-4.7) for Owner Psychology
+- [ ] agents/index.ts: update MODEL_STRONG/FAST/LITE constants to Gemini 3.1 IDs
+- [ ] agents/index.ts: consensus scorer calls Google API directly with Gemini 3.1 models
+- [ ] routers.ts: update modelVersions metadata labels
+- [ ] DB model_config: update consensus model IDs to Gemini 3.1 strings
+- [ ] Run tests and save checkpoint

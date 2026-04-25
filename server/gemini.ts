@@ -1,21 +1,29 @@
 /**
- * Gemini AI Service Layer — Signal Hunter
+ * AI Service Layer — Signal Hunter
  *
- * Model assignments (cost-optimized):
- *   gemini-2.5-flash        → Fast structured extraction, scoring, capital stack math
- *   gemini-2.5-pro          → Deep reasoning: Red Team, investment memo synthesis
- *   gemini-2.0-flash        → Digital audit / live web research (grounding)
+ * Model routing:
+ *   Google Gemini (direct API) — all Gemini tasks:
+ *     gemini-3.1-pro-preview    → Deep reasoning: Red Team, investment memo synthesis
+ *     gemini-3-flash-preview    → Fast structured extraction, capital stack math
+ *     gemini-3.1-flash-lite-preview → High-volume scoring, market scan
  *
- * Perplexity Sonar Pro      → Digital Footprint Audit (live web search)
- * Anthropic Claude 3.5      → Owner Psychology profiling (nuanced language analysis)
+ *   Poe API (OpenAI-compatible gateway) — non-Gemini models:
+ *     Claude-Opus-4.7           → Owner Psychology profiling (nuanced language analysis)
+ *
+ *   Perplexity Sonar Pro (direct) — live web research:
+ *     sonar-pro                 → Digital Footprint Audit
  */
 
 import { GoogleGenAI } from "@google/genai";
-import Anthropic from "@anthropic-ai/sdk";
+import { poeJSON, POE_MODELS } from "./poe";
 import type { Deal } from "../drizzle/schema";
 
 const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+
+// ─── Gemini model IDs ─────────────────────────────────────────────────────────
+const GEMINI_PRO    = "gemini-3.1-pro-preview";
+const GEMINI_FLASH  = "gemini-3-flash-preview";
+const GEMINI_LITE   = "gemini-3.1-flash-lite-preview";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface OwnerPsychologyResult {
@@ -58,7 +66,7 @@ export interface InvestmentMemoResult {
   aiOptimizationOpportunities: string[];
 }
 
-// ─── Owner Psychology (Claude 3.5 Sonnet) ────────────────────────────────────
+// ─── Owner Psychology (Claude Opus 4.7 via Poe) ───────────────────────────────
 export async function analyzeOwnerPsychology(deal: Deal): Promise<OwnerPsychologyResult> {
   const prompt = `You are an expert M&A psychologist and negotiation strategist. Analyze this business listing and infer the seller's psychological profile and motivation.
 
@@ -76,36 +84,32 @@ Analyze and return a JSON object with:
 - distressScore: number 0-1 (1 = highly distressed/motivated seller)
 - retirementSignal: boolean (true if retirement is likely motivation)
 - negotiationStyle: "collaborative" | "adversarial" | "desperate"
-- profileSummary: string (2-3 sentence analysis of seller psychology and recommended approach)
+- profileSummary: string (2-3 sentence analysis of seller psychology and recommended approach)`;
 
-Return ONLY valid JSON, no markdown.`;
-
-  // Try Anthropic first; fall back to Gemini 2.5 Pro if credits are insufficient
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 512,
-      messages: [{ role: "user", content: prompt }],
+    const parsed = await poeJSON<OwnerPsychologyResult>({
+      model: POE_MODELS.CLAUDE_OPUS,
+      systemPrompt: "You are an expert M&A psychologist. Return only valid JSON with no markdown.",
+      userPrompt: prompt,
+      maxTokens: 512,
+      temperature: 0.3,
     });
-    const text = response.content[0].type === "text" ? response.content[0].text : "{}";
-    const parsed = JSON.parse(text);
     return {
       distressScore: Math.min(1, Math.max(0, parsed.distressScore ?? 0.5)),
       retirementSignal: parsed.retirementSignal ?? false,
       negotiationStyle: parsed.negotiationStyle ?? "collaborative",
       profileSummary: parsed.profileSummary ?? "Insufficient data for psychological profiling.",
     };
-  } catch (anthropicErr: any) {
-    // Fall back to Gemini 2.5 Pro if Anthropic is unavailable (e.g. insufficient credits)
-    console.warn("[OwnerPsychology] Anthropic unavailable, falling back to Gemini:", anthropicErr?.message);
-    const fallbackResponse = await genai.models.generateContent({
-      model: "gemini-2.5-pro",
-      contents: prompt,
-      config: { responseMimeType: "application/json" },
-    });
-    const fallbackText = fallbackResponse.text ?? "{}";
+  } catch (poeErr: any) {
+    // Fall back to Gemini 3.1 Pro if Poe is unavailable
+    console.warn("[OwnerPsychology] Poe unavailable, falling back to Gemini:", poeErr?.message);
     try {
-      const parsed = JSON.parse(fallbackText);
+      const fallbackResponse = await genai.models.generateContent({
+        model: GEMINI_PRO,
+        contents: prompt,
+        config: { responseMimeType: "application/json" },
+      });
+      const parsed = JSON.parse(fallbackResponse.text ?? "{}");
       return {
         distressScore: Math.min(1, Math.max(0, parsed.distressScore ?? 0.5)),
         retirementSignal: parsed.retirementSignal ?? false,
@@ -118,7 +122,7 @@ Return ONLY valid JSON, no markdown.`;
   }
 }
 
-// ─── Digital Footprint Audit (Perplexity Sonar Pro) ──────────────────────────
+// ─── Digital Footprint Audit (Perplexity Sonar Pro — direct) ─────────────────
 export async function runDigitalAudit(deal: Deal): Promise<DigitalAuditResult> {
   const sonarApiKey = process.env.SONAR_API_KEY;
   if (!sonarApiKey) {
@@ -171,9 +175,8 @@ Return ONLY valid JSON.`;
   }
 }
 
-// ─── Red Team Analysis (Gemini 2.5 Pro) ──────────────────────────────────────
+// ─── Red Team Analysis (Gemini 3.1 Pro — direct) ─────────────────────────────
 export async function runRedTeamAnalysis(deal: Deal): Promise<RedTeamResult> {
-  const model = genai.models;
   const prompt = `You are a ruthless Devil's Advocate for a private equity firm. Your ONLY job is to find reasons NOT to buy this business. Be specific, data-driven, and brutal.
 
 Business: ${deal.name}
@@ -197,8 +200,8 @@ Return JSON with:
 Return ONLY valid JSON.`;
 
   try {
-    const response = await model.generateContent({
-      model: "gemini-2.5-pro",
+    const response = await genai.models.generateContent({
+      model: GEMINI_PRO,
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: { responseMimeType: "application/json" },
     });
@@ -214,7 +217,7 @@ Return ONLY valid JSON.`;
   }
 }
 
-// ─── Capital Stack Wizard (Gemini 2.5 Flash) ─────────────────────────────────
+// ─── Capital Stack Wizard (Gemini 3 Flash — direct) ──────────────────────────
 export async function buildCapitalStack(deal: Deal): Promise<CapitalStackResult> {
   const askingPrice = deal.askingPrice ?? 0;
   const cashFlow = deal.cashFlow ?? 0;
@@ -249,7 +252,7 @@ Return ONLY valid JSON.`;
 
   try {
     const response = await genai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: GEMINI_FLASH,
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: { responseMimeType: "application/json" },
     });
@@ -281,7 +284,7 @@ Return ONLY valid JSON.`;
   }
 }
 
-// ─── Investment Memo (Gemini 2.5 Pro) ────────────────────────────────────────
+// ─── Investment Memo (Gemini 3.1 Pro — direct) ───────────────────────────────
 export async function generateInvestmentMemo(
   deal: Deal,
   signals?: {
@@ -316,25 +319,19 @@ Write a professional investment memo in Markdown format with these sections:
 6. Capital Structure & Returns
 7. Recommendation
 
-Also return structured fields:
-- executiveSummary: string
-- investmentThesis: string
-- riskFactors: string[] (top 4-5 risks)
-- aiOptimizationOpportunities: string[] (top 4-5 AI opportunities)
-
 Return JSON with:
 - title: string (memo title)
 - content: string (full markdown memo)
 - executiveSummary: string
 - investmentThesis: string
-- riskFactors: string[]
-- aiOptimizationOpportunities: string[]
+- riskFactors: string[] (top 4-5 risks)
+- aiOptimizationOpportunities: string[] (top 4-5 AI opportunities)
 
 Return ONLY valid JSON.`;
 
   try {
     const response = await genai.models.generateContent({
-      model: "gemini-2.5-pro",
+      model: GEMINI_PRO,
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: { responseMimeType: "application/json" },
     });
@@ -360,7 +357,7 @@ Return ONLY valid JSON.`;
   }
 }
 
-// ─── Composite Scorer (Gemini 2.5 Flash) ─────────────────────────────────────
+// ─── Composite Scorer (rule-based, no LLM call) ───────────────────────────────
 export async function scoreDeal(deal: Deal): Promise<{ score: number; redFlagCount: number }> {
   const cashFlow = deal.cashFlow ?? 0;
   const revenue = deal.revenue ?? 0;

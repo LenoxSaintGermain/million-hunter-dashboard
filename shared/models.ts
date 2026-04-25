@@ -6,8 +6,8 @@
  * Google is generous with rate limits on experimental tiers.
  */
 
-export type ModelProvider = "google" | "openai" | "perplexity";
-export type ModelTier = "experimental" | "stable" | "fast" | "lite";
+export type ModelProvider = "google" | "poe" | "perplexity";
+export type ModelTier = "preview" | "stable" | "fast" | "lite";
 
 export interface ModelDefinition {
   id: string;
@@ -39,38 +39,39 @@ export interface ModuleModelConfig {
 // ─── Model Catalog ────────────────────────────────────────────────────────────
 
 export const MODEL_CATALOG: ModelDefinition[] = [
-  // ── Google Gemini — Experimental ──────────────────────────────────────────
+  // ── Google Gemini 3.1 (Preview — direct API) ───────────────────────────────
   {
-    id: "gemini-3.1-pro-exp",
-    label: "Gemini 3.1 Pro (Experimental)",
+    id: "gemini-3.1-pro-preview",
+    label: "Gemini 3.1 Pro (Preview)",
     provider: "google",
-    tier: "experimental",
+    tier: "preview",
     contextWindow: 2000000,
     outputLimit: 65536,
     supportsJson: true,
     supportsGrounding: true,
-    notes: "Latest frontier model. Generous rate limits on experimental tier.",
+    notes: "Frontier reasoning model. Best for Red Team, Investment Memo, deep analysis.",
   },
   {
-    id: "gemini-3.0-pro-exp",
-    label: "Gemini 3.0 Pro (Experimental)",
+    id: "gemini-3-flash-preview",
+    label: "Gemini 3 Flash (Preview)",
     provider: "google",
-    tier: "experimental",
-    contextWindow: 2000000,
-    outputLimit: 65536,
-    supportsJson: true,
-    supportsGrounding: true,
-  },
-  {
-    id: "gemini-3.0-flash-exp",
-    label: "Gemini 3.0 Flash (Experimental)",
-    provider: "google",
-    tier: "experimental",
+    tier: "preview",
     contextWindow: 1000000,
     outputLimit: 32768,
     supportsJson: true,
     supportsGrounding: true,
-    notes: "Fast experimental model with grounding.",
+    notes: "Fast frontier model. Best for Capital Stack, Consensus scoring.",
+  },
+  {
+    id: "gemini-3.1-flash-lite-preview",
+    label: "Gemini 3.1 Flash-Lite (Preview)",
+    provider: "google",
+    tier: "lite",
+    contextWindow: 1000000,
+    outputLimit: 16384,
+    supportsJson: true,
+    supportsGrounding: false,
+    notes: "Fastest/cheapest Gemini 3.x. Best for Deal Scoring, Market Scan.",
   },
   // ── Google Gemini — Stable ────────────────────────────────────────────────
   {
@@ -138,53 +139,66 @@ export const MODEL_CATALOG: ModelDefinition[] = [
     supportsGrounding: false,
     notes: "Legacy. Use 2.5 Pro instead.",
   },
-  // ── OpenAI ────────────────────────────────────────────────────────────────
+  // ── Claude via Poe API ────────────────────────────────────────────────────────────────────
   {
-    id: "gpt-5.4",
-    label: "GPT-5.4",
-    provider: "openai",
+    id: "Claude-Opus-4.7",
+    label: "Claude Opus 4.7 (via Poe)",
+    provider: "poe",
+    tier: "preview",
+    contextWindow: 200000,
+    outputLimit: 32000,
+    supportsJson: true,
+    supportsGrounding: false,
+    notes: "Anthropic's most capable model. Best for Owner Psychology profiling.",
+  },
+  {
+    id: "Claude-Sonnet-4.6",
+    label: "Claude Sonnet 4.6 (via Poe)",
+    provider: "poe",
+    tier: "stable",
+    contextWindow: 200000,
+    outputLimit: 16000,
+    supportsJson: true,
+    supportsGrounding: false,
+    notes: "Speed + intelligence balance. Good alternative for Owner Psychology.",
+  },
+  {
+    id: "Claude-Haiku-4.5",
+    label: "Claude Haiku 4.5 (via Poe)",
+    provider: "poe",
+    tier: "lite",
+    contextWindow: 200000,
+    outputLimit: 8000,
+    supportsJson: true,
+    supportsGrounding: false,
+    notes: "Fastest Claude. Use for high-volume tasks via Poe.",
+  },
+  // ── GPT via Poe API ───────────────────────────────────────────────────────────────────────
+  {
+    id: "GPT-5.5",
+    label: "GPT-5.5 (via Poe)",
+    provider: "poe",
+    tier: "preview",
+    contextWindow: 128000,
+    outputLimit: 32768,
+    supportsJson: true,
+    supportsGrounding: false,
+    notes: "OpenAI's latest flagship. Released April 23, 2026.",
+  },
+  {
+    id: "GPT-4.1",
+    label: "GPT-4.1 (via Poe)",
+    provider: "poe",
     tier: "stable",
     contextWindow: 128000,
     outputLimit: 16384,
     supportsJson: true,
     supportsGrounding: false,
-    notes: "OpenAI flagship. Best for nuanced language/behavioral analysis.",
+    notes: "Stable GPT flagship. Reliable fallback.",
   },
+  // Perplexity (direct API)
   {
-    id: "gpt-5.4-mini",
-    label: "GPT-5.4 Mini",
-    provider: "openai",
-    tier: "fast",
-    contextWindow: 128000,
-    outputLimit: 16384,
-    supportsJson: true,
-    supportsGrounding: false,
-    notes: "Faster/cheaper GPT-5.4 variant.",
-  },
-  {
-    id: "gpt-4o",
-    label: "GPT-4o",
-    provider: "openai",
-    tier: "stable",
-    contextWindow: 128000,
-    outputLimit: 16384,
-    supportsJson: true,
-    supportsGrounding: false,
-  },
-  {
-    id: "gpt-4o-mini",
-    label: "GPT-4o Mini",
-    provider: "openai",
-    tier: "fast",
-    contextWindow: 128000,
-    outputLimit: 16384,
-    supportsJson: true,
-    supportsGrounding: false,
-  },
-  // ── Perplexity ────────────────────────────────────────────────────────────
-  {
-    id: "sonar-pro",
-    label: "Perplexity Sonar Pro",
+    id: "sonar-pro",label: "Perplexity Sonar Pro",
     provider: "perplexity",
     tier: "stable",
     contextWindow: 127072,
@@ -208,7 +222,7 @@ export const MODEL_CATALOG: ModelDefinition[] = [
     id: "sonar-deep-research",
     label: "Perplexity Sonar Deep Research",
     provider: "perplexity",
-    tier: "experimental",
+    tier: "preview",
     contextWindow: 127072,
     outputLimit: 8000,
     supportsJson: false,
@@ -220,13 +234,13 @@ export const MODEL_CATALOG: ModelDefinition[] = [
 // ─── Default Module → Model Assignments ──────────────────────────────────────
 
 export const DEFAULT_MODULE_MODELS: Record<AnalysisModule, string> = {
-  ownerPsychology: "gpt-5.4",
+  ownerPsychology: "Claude-Opus-4.7",
   digitalAudit: "sonar-pro",
-  redTeam: "gemini-3.1-pro-exp",
-  capitalStack: "gemini-2.5-flash",
-  investmentMemo: "gemini-3.1-pro-exp",
-  dealScoring: "gemini-2.5-flash",
-  marketScan: "gemini-2.5-flash-lite",
+  redTeam: "gemini-3.1-pro-preview",
+  capitalStack: "gemini-3-flash-preview",
+  investmentMemo: "gemini-3.1-pro-preview",
+  dealScoring: "gemini-3.1-flash-lite-preview",
+  marketScan: "gemini-3.1-flash-lite-preview",
 };
 
 export const MODULE_LABELS: Record<AnalysisModule, string> = {

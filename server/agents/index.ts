@@ -33,9 +33,10 @@ import { getDb } from "../db";
 import { dealTrajectory } from "../../drizzle/schema";
 
 // ─── Model Tiers ─────────────────────────────────────────────────────────────
-const MODEL_STRONG = "gemini-2.5-pro";
-const MODEL_FAST = "gemini-2.5-flash";
-const MODEL_LITE = "gemini-2.5-flash-lite-preview-06-17";
+// Gemini 3.1 — called directly via Google Generative AI API
+const MODEL_STRONG = "gemini-3.1-pro-preview";
+const MODEL_FAST = "gemini-3-flash-preview";
+const MODEL_LITE = "gemini-3.1-flash-lite-preview";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface AgentRunResult {
