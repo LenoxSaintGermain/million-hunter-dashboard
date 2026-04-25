@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
 import ScanProgress from "@/components/ScanProgress";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -138,7 +139,8 @@ function ConfidenceBar({ score }: { score: any }) {
 
 function SentinelPanel() {
   const [expanded, setExpanded] = useState<number | null>(null);
-  const { data: signals, isLoading, refetch } = trpc.sentinel.list.useQuery({ limit: 10 });
+  const { isAuthenticated } = useAuth();
+  const { data: signals, isLoading, refetch } = trpc.sentinel.list.useQuery({ limit: 10 }, { enabled: isAuthenticated });
   const seed = trpc.sentinel.seed.useMutation({
     onSuccess: (r) => {
       if (r.seeded) {

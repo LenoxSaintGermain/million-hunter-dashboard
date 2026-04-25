@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -384,7 +385,8 @@ export default function Scout() {
     onError: () => { setAutoScoringId(null); refetch(); },
   });
 
-  const { data: assets, isLoading, refetch } = trpc.scout.list.useQuery({ limit: 100 });
+  const { isAuthenticated } = useAuth();
+  const { data: assets, isLoading, refetch } = trpc.scout.list.useQuery({ limit: 100 }, { enabled: isAuthenticated });
 
   const filtered = useMemo(() => {
     if (!assets) return [];

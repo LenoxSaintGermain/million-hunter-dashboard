@@ -339,3 +339,12 @@
 - [x] Co-Pilot: GlobalCoPilot in App.tsx — visible on all authenticated pages, hidden on lobby/deal-share
 - [x] Co-Pilot: DealDetail.tsx — CoPilot receives dealId + dealName for deal-specific analysis
 - [x] Tests: 63/63 passing
+
+## Playwright Audit — API Error Fixes (Apr 25)
+- [x] Purge remaining test deals (Sprint11 Scout Prefill Test, Sprint6 Test Retail Strip, etc.)
+- [x] Purge 23 test commercial assets from DB
+- [x] Remove duplicate real deals (330xxx IDs) — keep canonical IDs 5-13 + 30001
+- [x] Fix sentinel.list 401 — add enabled: isAuthenticated guard in Home.tsx SentinelPanel
+- [x] Fix scout.list 401 — add enabled: isAuthenticated guard in Scout.tsx
+- [x] Add useAuth import to Home.tsx and Scout.tsx
+- [x] Re-run Playwright audit — 0 console errors, 0 API errors, 0 failed requests (11/11 pages clean)
