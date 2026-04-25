@@ -19,6 +19,8 @@ import DealShare from "./pages/DealShare";
 import Lobby from "./pages/Lobby";
 import { trpc } from "@/lib/trpc";
 import { useEffect } from "react";
+import CoPilot from "@/components/CoPilot";
+import { useAuth } from "./_core/hooks/useAuth";
 
 // ─── Onboarding Guard ─────────────────────────────────────────────────────────
 // Checks if the authenticated user has completed onboarding.
@@ -59,6 +61,15 @@ function OnboardingGuard() {
   return null;
 }
 
+// Renders the Co-Pilot only for authenticated users (not on lobby/deal-share)
+function GlobalCoPilot() {
+  const { isAuthenticated } = useAuth();
+  const [location] = useLocation();
+  const isPublicPage = location.startsWith("/lobby") || location.startsWith("/deal-share");
+  if (!isAuthenticated || isPublicPage) return null;
+  return <CoPilot />;
+}
+
 function Router() {
   return (
     <>
@@ -84,6 +95,7 @@ function Router() {
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
+      <GlobalCoPilot />
     </>
   );
 }

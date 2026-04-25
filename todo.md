@@ -325,3 +325,17 @@
 - [x] Frontend: VelocitySparkline guards total and trend against NaN with safeTotal/safeTrend
 - [x] Frontend: all numeric children cast to String before render to prevent React NaN warning
 - [x] 63/63 tests passing after fix
+
+## Sprint 12 — Co-Pilot + Market Scan Redesign + Signal Cleanup
+- [x] DB: Delete 26 Sprint 6/8 test signals — 5 real signals remain
+- [x] Market Scan: Add targetLocations to scan.trigger input schema
+- [x] Market Scan: Filter SAMPLE_LISTINGS by targetLocations in runScanPipeline
+- [x] Market Scan: Redesign Scan.tsx — explicit "Where to Scan" targeting panel with presets and custom input
+- [x] Market Scan: ScanProgress wired to jobId from triggerScan mutation result
+- [x] Co-Pilot: copilot.chat tRPC mutation — Claude-Opus-4.7 via Poe with full pipeline context
+- [x] Co-Pilot: System prompt includes Lenox's profile, acquisition thesis, pipeline top 10, recent activity
+- [x] Co-Pilot: Optional dealId injection for deal-specific context (SBA, DSCR, kill prob, OZ/TAD)
+- [x] Co-Pilot: CoPilot.tsx floating panel — violet gradient FAB, suggested prompts, markdown rendering
+- [x] Co-Pilot: GlobalCoPilot in App.tsx — visible on all authenticated pages, hidden on lobby/deal-share
+- [x] Co-Pilot: DealDetail.tsx — CoPilot receives dealId + dealName for deal-specific analysis
+- [x] Tests: 63/63 passing

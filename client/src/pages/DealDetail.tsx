@@ -1,6 +1,7 @@
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
+import CoPilot from "@/components/CoPilot";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -807,11 +808,12 @@ export default function DealDetail() {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
+       </Tabs>
+      {/* Co-Pilot with deal-specific context injected */}
+      <CoPilot dealId={dealId} dealName={deal.name} />
     </DashboardLayout>
   );
 }
-
 function OutreachTab({ dealId }: { dealId: number }) {
   const { data: contacts, isLoading, refetch } = trpc.outreach.getByDealId.useQuery({ dealId });
   const createContact = trpc.outreach.create.useMutation({

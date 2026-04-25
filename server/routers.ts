@@ -23,6 +23,7 @@ import {
   buildCapitalStack, generateInvestmentMemo, scoreDeal,
 } from "./gemini";
 import { enrichDealWithOZTAD } from "./ozTadEnrichment";
+import { poeChat, POE_MODELS } from "./poe";
 
 export const appRouter = router({
   system: systemRouter,
@@ -366,11 +367,13 @@ export const appRouter = router({
         sources: z.array(z.string()).optional(),
         minCashFlow: z.number().optional(),
         maxMultiple: z.number().optional(),
+        targetLocations: z.array(z.string()).optional(),
       }).optional())
       .mutation(async ({ input }) => {
         const sources = input?.sources ?? ["bizbuysell","dealstream","flippa","quietlight","empireflippers"];
         const minCashFlow = input?.minCashFlow ?? 500000;
         const maxMultiple = input?.maxMultiple ?? 6;
+        const targetLocations = input?.targetLocations ?? [];
 
         // Create the scan job record immediately so the UI can poll it
         const insertResult = await createScanJob({
@@ -384,7 +387,7 @@ export const appRouter = router({
         const jobId = (insertResult as any)[0].insertId as number;
 
         // Run the full pipeline asynchronously — don't await, return immediately
-        runScanPipeline(jobId, sources, minCashFlow, maxMultiple).catch((err) => {
+        runScanPipeline(jobId, sources, minCashFlow, maxMultiple, targetLocations).catch((err) => {
           console.error("[Scan] Pipeline failed:", err);
           updateScanJob(jobId, {
             status: "failed",
@@ -1366,6 +1369,99 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         return { deal, signal, memo, viewCount: shareRow.viewCount, expiresAt: shareRow.expiresAt };
       }),
   }),
+
+  // ─── AI Co-Pilot ───────────────────────────────────────────────────────────
+  copilot: router({
+    chat: protectedProcedure
+      .input(z.object({
+        messages: z.array(z.object({
+          role: z.enum(["user", "assistant"]),
+          content: z.string(),
+        })),
+        // Optional context injection — pass dealId to give the agent deal-specific context
+        dealId: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        // Fetch live context to ground the agent
+        const [allDeals, recentActivity] = await Promise.all([
+          getDeals({ limit: 20 }),
+          getActivityLog(10),
+        ]);
+
+        // Optional: fetch specific deal context if dealId provided
+        let dealContext = "";
+        if (input.dealId) {
+          const deal = await getDealById(input.dealId);
+          if (deal) {
+            const [signal, memo] = await Promise.all([
+              getSignalByDealId(input.dealId),
+              getMemoByDealId(input.dealId),
+            ]);
+            dealContext= `\n\n## Active Deal Context\n**${deal.name}** (${deal.location ?? "Unknown location"})\n- Stage: ${deal.stage}\n- Revenue: $${(deal.revenue ?? 0).toLocaleString()}\n- Cash Flow: $${(deal.cashFlow ?? 0).toLocaleString()}\n- Asking: $${(deal.askingPrice ?? 0).toLocaleString()}\n- AI Score: ${deal.score ?? "Not scored"}\n- OZ: ${deal.opportunityZone ? "Yes" : "No"} | TAD: ${deal.tadDistrict ? "Yes" : "No"}\n${signal ? `- Signal: SBA ${signal.sbaEligible ? "Eligible" : "Not eligible"} | DSCR: ${signal.dscr ?? "\u2014"} | Kill prob: ${signal.killProbability ?? "\u2014"}` : ""}\n${memo ? `- Investment Memo: Exists` : ""}`;        }
+        }
+
+        // Pipeline summary for context
+        const pipelineSummary = allDeals.slice(0, 10).map(d =>
+          `- ${d.name} | ${d.location ?? "—"} | Score: ${d.score ?? "—"} | Stage: ${d.stage} | CF: $${((d.cashFlow ?? 0) / 1000).toFixed(0)}k`
+        ).join("\n");
+
+        const recentActivitySummary = recentActivity.slice(0, 5).map(a =>
+          `- ${a.title}`
+        ).join("\n");
+
+        const systemPrompt = `You are Lenox's AI Co-Pilot — a highly intelligent, decisive strategic advisor embedded in Signal Hunter, his M&A acquisition command center.
+
+Your persona: Think Donna Paulsen meets Olivia Pope. Highly competent, always two steps ahead, zero fluff. You challenge weak ideas, stress-test assumptions, and surface leverage points Lenox hasn't considered. You are NOT a yes-man.
+
+## Lenox's Profile
+- GenAI Product Strategist & AI Solutions Architect | Venture Operator
+- Building a portfolio of ventures: Orbital (context-native creation), AfterHours (creator platform), Saint & Summer (children's IP)
+- Planning 1-2 year relocation to Mexico with family
+- Acquisition thesis: SBA 7(a) + Opportunity Zone arbitrage, targeting $500k+ cash flow businesses in Southeast/Sun Belt
+- Target: $1M+ annual income from acquisitions within 18 months
+- Bias toward speed and shipping. "Good enough today > perfect plan next week."
+
+## Current Pipeline (Top 10)
+${pipelineSummary}
+
+## Recent Activity
+${recentActivitySummary}${dealContext}
+
+## Your Operating Doctrine
+1. **Challenge everything** — stress-test ideas, flag weak assumptions early, provide contrarian insights
+2. **High-signal output** — use tables and bullets to surface tradeoffs, risks, and leverage points
+3. **Agentic bias** — if a task can be automated or turned into an SOP, propose it
+4. **Context-aware** — filter all advice through Lenox's multi-venture reality and acquisition thesis
+5. **Execution-focused** — optimize for speed and compound-value work
+
+When analyzing deals, always consider: SBA eligibility, OZ/TAD status, DSCR, seller motivation, industry defensibility, and the "Third Signal" arbitrage angle.
+
+Be concise. Be direct. Be right.`;
+
+        // Build messages array for Poe — convert our format to OpenAI format
+        const poeMsgs = [
+          { role: "system" as const, content: systemPrompt },
+          ...input.messages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+        ];
+
+        const client = new (await import("openai")).default({
+          apiKey: process.env.Poe_api_key,
+          baseURL: "https://api.poe.com/v1",
+        });
+
+        const response = await client.chat.completions.create({
+          model: POE_MODELS.CLAUDE_OPUS,
+          messages: poeMsgs,
+          max_tokens: 2048,
+          temperature: 0.4,
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (!content) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Co-Pilot returned empty response" });
+
+        return { content, model: POE_MODELS.CLAUDE_OPUS };
+      }),
+  }),
 });
 export type AppRouter = typeof appRouter;
 
@@ -1377,6 +1473,7 @@ async function runScanPipeline(
   sources: string[],
   minCashFlow: number,
   maxMultiple: number,
+  targetLocations: string[] = [],
 ) {
   const phase = async (label: string, detail: string, pct: number) =>
     updateScanJob(jobId, { currentPhase: label, phaseDetail: detail, progressPct: pct });
@@ -1399,9 +1496,18 @@ async function runScanPipeline(
     { name: "Carolinas Roofing & Restoration", industry: "Roofing", location: "Raleigh, NC", revenue: 3800000, cashFlow: 1050000, askingPrice: 3500000, multiple: 3.3, employees: 27, yearEstablished: 2010, source: "bizbuysell" },
   ];
 
-  // Filter by source count (more sources = more listings)
-  const listingCount = Math.min(SAMPLE_LISTINGS.length, 4 + sources.length);
-  const listings = SAMPLE_LISTINGS.slice(0, listingCount);
+  // Filter by location if specified, otherwise use all listings
+  let locationFiltered = SAMPLE_LISTINGS;
+  if (targetLocations.length > 0) {
+    const lowerTargets = targetLocations.map(l => l.toLowerCase());
+    locationFiltered = SAMPLE_LISTINGS.filter(l =>
+      lowerTargets.some(t => l.location.toLowerCase().includes(t) || t.includes(l.location.toLowerCase().split(',')[0].trim().toLowerCase()))
+    );
+    // If no matches, fall back to all listings (don't return empty)
+    if (locationFiltered.length === 0) locationFiltered = SAMPLE_LISTINGS;
+  }
+  const listingCount = Math.min(locationFiltered.length, 4 + sources.length);
+  const listings = locationFiltered.slice(0, listingCount);
 
   await phase("Extracting deal data", `Parsing ${listings.length} qualified listings`, 25);
   await updateScanJob(jobId, { listingsFound: listings.length });
