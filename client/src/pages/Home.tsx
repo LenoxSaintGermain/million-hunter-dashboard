@@ -21,8 +21,12 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "rec
 function VelocitySparkline() {
   const { data, isLoading } = trpc.deals.velocity.useQuery();
   const hasData = data && data.length > 0;
-  const total = data?.reduce((s, d) => s + d.count, 0) ?? 0;
-  const trend = data && data.length >= 2 ? data[data.length - 1].count - data[data.length - 2].count : 0;
+  const total = data?.reduce((s, d) => s + (Number(d.count) || 0), 0) ?? 0;
+  const safeTotal = isNaN(total) ? 0 : total;
+  const trend = data && data.length >= 2
+    ? (Number(data[data.length - 1].count) || 0) - (Number(data[data.length - 2].count) || 0)
+    : 0;
+  const safeTrend = isNaN(trend) ? 0 : trend;
   return (
     <Card className="bg-card border-border">
       <CardHeader className="pb-2 space-y-0">
@@ -33,12 +37,12 @@ function VelocitySparkline() {
           </div>
         </div>
         <div className="flex items-baseline gap-2 mt-1">
-          <span className="text-2xl font-bold text-foreground">{isLoading ? "—" : total}</span>
+          <span className="text-2xl font-bold text-foreground">{isLoading ? "—" : String(safeTotal)}</span>
           <span className="text-xs text-muted-foreground">deals / 8 wks</span>
-          {!isLoading && trend !== 0 && (
-            <span className={cn("text-xs font-semibold flex items-center gap-0.5", trend > 0 ? "text-emerald-500" : "text-rose-500")}>
-              <ArrowUpRight className={cn("w-3 h-3", trend < 0 && "rotate-180")} />
-              {trend > 0 ? "+" : ""}{trend} wk
+          {!isLoading && safeTrend !== 0 && (
+            <span className={cn("text-xs font-semibold flex items-center gap-0.5", safeTrend > 0 ? "text-emerald-500" : "text-rose-500")}>
+              <ArrowUpRight className={cn("w-3 h-3", safeTrend < 0 && "rotate-180")} />
+              {safeTrend > 0 ? "+" : ""}{String(safeTrend)} wk
             </span>
           )}
         </div>

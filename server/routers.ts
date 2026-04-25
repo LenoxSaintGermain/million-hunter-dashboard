@@ -161,10 +161,24 @@ export const appRouter = router({
           GROUP BY yw
           ORDER BY yw ASC`
         );
-        const data = (rows as any[]).map((r: any) => ({
-          week: new Date(Number(r.week_start)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          count: Number(r.cnt),
-        }));
+        const data = (rows as any[]).map((r: any) => {
+          // week_start may be a MySQL Date object or a BigInt/number — handle all cases
+          let weekStartMs: number;
+          if (r.week_start instanceof Date) {
+            weekStartMs = r.week_start.getTime();
+          } else if (typeof r.week_start === 'bigint') {
+            weekStartMs = Number(r.week_start);
+          } else {
+            weekStartMs = Number(r.week_start);
+          }
+          const weekLabel = !isNaN(weekStartMs) && weekStartMs > 0
+            ? new Date(weekStartMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            : `Wk ${String(r.yw).slice(-2)}`; // fallback: "Wk 17"
+          return {
+            week: weekLabel,
+            count: Number(r.cnt) || 0,
+          };
+        });
         return data;
       }),
   }),

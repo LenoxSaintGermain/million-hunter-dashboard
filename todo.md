@@ -317,3 +317,11 @@
 - [ ] routers.ts: update modelVersions metadata labels
 - [ ] DB model_config: update consensus model IDs to Gemini 3.1 strings
 - [ ] Run tests and save checkpoint
+
+## Hotfix — Pipeline Velocity NaN Bug
+- [x] Server: velocity query handles MySQL Date objects (week_start instanceof Date check)
+- [x] Server: velocity query handles BigInt week_start values
+- [x] Server: fallback week label uses YEARWEEK value when date parse fails
+- [x] Frontend: VelocitySparkline guards total and trend against NaN with safeTotal/safeTrend
+- [x] Frontend: all numeric children cast to String before render to prevent React NaN warning
+- [x] 63/63 tests passing after fix
