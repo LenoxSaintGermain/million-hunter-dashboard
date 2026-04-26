@@ -502,84 +502,98 @@ export default function Scan() {
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((deal) => (
-              <Card key={deal.id} className="bg-card border-border hover:border-primary/40 transition-all duration-200 group">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <Link href={`/deal/${deal.id}`}>
-                        <CardTitle className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors cursor-pointer line-clamp-2">
-                          {deal.name}
-                        </CardTitle>
-                      </Link>
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        {deal.location && (
-                          <div className="flex items-center gap-0.5">
-                            <MapPin className="w-2.5 h-2.5 text-muted-foreground" />
-                            <span className="text-[11px] text-muted-foreground">{deal.location}</span>
-                          </div>
-                        )}
-                        {deal.opportunityZone && (
-                          <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">OZ</span>
-                        )}
-                        {deal.tadDistrict && (
-                          <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">TAD</span>
-                        )}
-                      </div>
-                    </div>
-                    <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium shrink-0", stageColor[deal.stage] ?? "bg-muted text-muted-foreground")}>
-                      {deal.stage.replace(/_/g, " ")}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    {[
-                      { label: "Revenue", value: fmt(deal.revenue) },
-                      { label: "Cash Flow", value: fmt(deal.cashFlow) },
-                      { label: "Asking", value: fmt(deal.askingPrice) },
-                    ].map((f) => (
-                      <div key={f.label} className="bg-muted/30 rounded-lg p-2">
-                        <p className="text-[10px] text-muted-foreground">{f.label}</p>
-                        <p className="text-xs font-semibold text-foreground mt-0.5">{f.value}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">AI Score</span>
-                      {deal.redFlagCount != null && deal.redFlagCount > 0 && (
-                        <span className="flex items-center gap-0.5 text-[10px] text-destructive">
-                          <AlertTriangle className="w-2.5 h-2.5" />
-                          {deal.redFlagCount} flags
+            {filtered.map((deal) => {
+              const sc = deal.score == null ? null : parseFloat(String(deal.score));
+              const scColor = sc == null ? "oklch(0.40 0.01 260)" : sc >= 0.8 ? "oklch(0.70 0.18 160)" : sc >= 0.65 ? "oklch(0.75 0.20 80)" : "oklch(0.60 0.22 25)";
+              return (
+              <div key={deal.id} className="card-hover-lift" style={{
+                background: "oklch(0.14 0.01 260)",
+                border: "1px solid oklch(0.22 0.01 260)",
+                borderRadius: 12,
+                padding: "16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Link href={`/deal/${deal.id}`}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "oklch(0.95 0.01 260)", cursor: "pointer", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.4 }}>
+                        {deal.name}
+                      </p>
+                    </Link>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                      {deal.location && (
+                        <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "oklch(0.55 0.01 260)" }}>
+                          <MapPin style={{ width: 10, height: 10 }} />{deal.location}
                         </span>
                       )}
+                      {deal.opportunityZone && (
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "0 6px", height: 16, borderRadius: 9999, background: "oklch(0.70 0.18 160 / 0.15)", color: "oklch(0.70 0.18 160)", border: "1px solid oklch(0.70 0.18 160 / 0.20)", display: "inline-flex", alignItems: "center" }}>OZ</span>
+                      )}
+                      {deal.tadDistrict && (
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "0 6px", height: 16, borderRadius: 9999, background: "oklch(0.65 0.22 250 / 0.15)", color: "oklch(0.65 0.22 250)", border: "1px solid oklch(0.65 0.22 250 / 0.20)", display: "inline-flex", alignItems: "center" }}>TAD</span>
+                      )}
                     </div>
-                    <ScoreBar score={deal.score} />
                   </div>
-
-                  <div className="flex gap-2 pt-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 h-7 text-[11px] border-border"
-                      onClick={() => scoreDeal.mutate({ id: deal.id })}
-                      disabled={scoreDeal.isPending}
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6, flexShrink: 0, background: "oklch(0.18 0.01 260)", color: "oklch(0.55 0.01 260)", border: "1px solid oklch(0.22 0.01 260)" }}>
+                    {deal.stage.replace(/_/g, " ")}
+                  </span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                  {[
+                    { label: "Revenue", value: fmt(deal.revenue) },
+                    { label: "Cash Flow", value: fmt(deal.cashFlow) },
+                    { label: "Asking", value: fmt(deal.askingPrice) },
+                  ].map((f) => (
+                    <div key={f.label} style={{ background: "oklch(0.18 0.01 260)", borderRadius: 8, padding: "8px", textAlign: "center" }}>
+                      <p style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "oklch(0.40 0.01 260)", marginBottom: 3 }}>{f.label}</p>
+                      <p style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: "oklch(0.85 0.01 260)" }}>{f.value}</p>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: "oklch(0.40 0.01 260)" }}>AI Score</span>
+                    {deal.redFlagCount != null && deal.redFlagCount > 0 && (
+                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "oklch(0.60 0.22 25)" }}>
+                        <AlertTriangle style={{ width: 10, height: 10 }} />
+                        {deal.redFlagCount} flags
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ flex: 1, height: 4, borderRadius: 2, background: "oklch(0.18 0.01 260)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${Math.round((sc ?? 0) * 100)}%`, background: scColor, borderRadius: 2, transition: "width 0.85s cubic-bezier(0.16,1,0.3,1)" }} />
+                    </div>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: scColor, flexShrink: 0 }}>
+                      {sc != null ? sc.toFixed(3) : "—"}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
+                  <button
+                    className="btn-press"
+                    style={{ flex: 1, height: 30, fontSize: 11, fontWeight: 500, borderRadius: 7, background: "transparent", border: "1px solid oklch(0.22 0.01 260)", color: "oklch(0.55 0.01 260)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
+                    onClick={() => scoreDeal.mutate({ id: deal.id })}
+                    disabled={scoreDeal.isPending}
+                  >
+                    <Zap style={{ width: 10, height: 10 }} />
+                    Score
+                  </button>
+                  <Link href={`/deal/${deal.id}`} style={{ flex: 1 }}>
+                    <button
+                      className="btn-press"
+                      style={{ width: "100%", height: 30, fontSize: 11, fontWeight: 500, borderRadius: 7, background: "oklch(0.65 0.22 250)", border: "none", color: "oklch(0.98 0.005 260)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
                     >
-                      <Zap className="w-2.5 h-2.5 mr-1" />
-                      Score
-                    </Button>
-                    <Link href={`/deal/${deal.id}`} className="flex-1">
-                      <Button variant="outline" size="sm" className="w-full h-7 text-[11px] border-border">
-                        <ArrowUpRight className="w-2.5 h-2.5 mr-1" />
-                        War Room
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                      <ArrowUpRight style={{ width: 10, height: 10 }} />
+                      War Room
+                    </button>
+                  </Link>
+                </div>
+              </div>
+            );
+            })}
           </div>
         )}
       </div>

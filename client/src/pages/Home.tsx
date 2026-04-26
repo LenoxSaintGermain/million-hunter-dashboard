@@ -3,10 +3,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
 import ScanProgress from "@/components/ScanProgress";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -19,6 +17,106 @@ import {
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
+// ─── Design System Helpers ───────────────────────────────────────────────────
+const C = {
+  p:   "oklch(0.65 0.22 250)",
+  em:  "oklch(0.70 0.18 160)",
+  am:  "oklch(0.75 0.20 80)",
+  re:  "oklch(0.60 0.22 25)",
+  cy:  "oklch(0.75 0.15 200)",
+  vi:  "oklch(0.65 0.22 290)",
+  ro:  "oklch(0.65 0.20 15)",
+  fg1: "oklch(0.95 0.01 260)",
+  fg2: "oklch(0.85 0.01 260)",
+  fg3: "oklch(0.55 0.01 260)",
+  fg4: "oklch(0.40 0.01 260)",
+  s1:  "oklch(0.14 0.01 260)",
+  s2:  "oklch(0.18 0.01 260)",
+  bd:  "oklch(0.22 0.01 260)",
+};
+
+const scoreColor = (v: number) => v >= 0.8 ? C.em : v >= 0.65 ? C.am : C.re;
+const fmt = (n: number | null | undefined) => {
+  if (n == null) return "—";
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}k`;
+  return `$${n}`;
+};
+
+// ─── ScoreBadge ──────────────────────────────────────────────────────────────
+function ScoreBadge({ score }: { score: any }) {
+  const v = score == null ? null : parseFloat(String(score));
+  if (v == null || isNaN(v)) return (
+    <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: C.fg4 }}>—</span>
+  );
+  return (
+    <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, color: scoreColor(v) }}>
+      {v.toFixed(3)}
+    </span>
+  );
+}
+
+// ─── ConfidenceBar ───────────────────────────────────────────────────────────
+function ConfidenceBar({ score }: { score: any }) {
+  const v = score == null ? null : parseFloat(String(score));
+  if (v == null || isNaN(v)) return null;
+  const pct = Math.round(v * 100);
+  const color = pct >= 85 ? C.em : pct >= 70 ? C.am : C.fg3;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+      <div style={{ flex: 1, height: 3, borderRadius: 2, background: C.s2, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2, transition: "width 0.85s cubic-bezier(0.16,1,0.3,1)" }} />
+      </div>
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: C.fg3, flexShrink: 0 }}>{pct}%</span>
+    </div>
+  );
+}
+
+// ─── KPI Card ────────────────────────────────────────────────────────────────
+function KpiCard({ label, value, sub, icon: Icon, trend, accentColor }: {
+  label: string; value: string; sub?: string; icon: React.ElementType;
+  trend?: "up" | "down" | "neutral"; accentColor?: string;
+}) {
+  const accent = accentColor ?? C.p;
+  return (
+    <div
+      className="card-hover-lift"
+      style={{
+        background: C.s1,
+        border: `1px solid ${C.bd}`,
+        borderRadius: 12,
+        padding: "16px",
+        cursor: "default",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: C.fg4 }}>
+          {label}
+        </span>
+        <div style={{
+          width: 28, height: 28, borderRadius: 8,
+          background: `${accent}1a`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <Icon style={{ width: 14, height: 14, color: accent }} />
+        </div>
+      </div>
+      <div style={{ fontFamily: "var(--font-sans)", fontSize: 24, fontWeight: 700, color: C.fg1, lineHeight: 1.2 }}>
+        {value}
+      </div>
+      {sub && (
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+          {trend === "up" && <ArrowUpRight style={{ width: 12, height: 12, color: C.em }} />}
+          <span style={{ fontSize: 11, color: trend === "up" ? C.em : trend === "down" ? C.re : C.fg3 }}>
+            {sub}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Pipeline Velocity Sparkline ─────────────────────────────────────────────
 function VelocitySparkline() {
   const { data, isLoading } = trpc.deals.velocity.useQuery();
   const hasData = data && data.length > 0;
@@ -28,137 +126,82 @@ function VelocitySparkline() {
     ? (Number(data[data.length - 1].count) || 0) - (Number(data[data.length - 2].count) || 0)
     : 0;
   const safeTrend = isNaN(trend) ? 0 : trend;
+
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-2 space-y-0">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-xs font-medium text-muted-foreground">Pipeline Velocity</CardTitle>
-          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-            <TrendingUp className="w-3.5 h-3.5 text-primary" />
-          </div>
-        </div>
-        <div className="flex items-baseline gap-2 mt-1">
-          <span className="text-2xl font-bold text-foreground">{isLoading ? "—" : String(safeTotal)}</span>
-          <span className="text-xs text-muted-foreground">deals / 8 wks</span>
-          {!isLoading && safeTrend !== 0 && (
-            <span className={cn("text-xs font-semibold flex items-center gap-0.5", safeTrend > 0 ? "text-emerald-500" : "text-rose-500")}>
-              <ArrowUpRight className={cn("w-3 h-3", safeTrend < 0 && "rotate-180")} />
-              {safeTrend > 0 ? "+" : ""}{String(safeTrend)} wk
+    <div style={{ background: C.s1, border: `1px solid ${C.bd}`, borderRadius: 12, padding: "16px 20px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div>
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: C.fg4 }}>
+            Pipeline Velocity
+          </span>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4 }}>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 700, color: C.fg1 }}>
+              {isLoading ? "—" : String(safeTotal)}
             </span>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0 pb-3">
-        {isLoading ? (
-          <Skeleton className="h-16 w-full" />
-        ) : !hasData ? (
-          <div className="h-16 flex items-center justify-center">
-            <p className="text-[10px] text-muted-foreground/50">No data yet — run a scan</p>
+            <span style={{ fontSize: 11, color: C.fg3 }}>deals / 8 wks</span>
+            {!isLoading && safeTrend !== 0 && (
+              <span style={{ fontSize: 11, fontWeight: 600, color: safeTrend > 0 ? C.em : C.re, display: "flex", alignItems: "center", gap: 2 }}>
+                <ArrowUpRight style={{ width: 12, height: 12, transform: safeTrend < 0 ? "rotate(180deg)" : undefined }} />
+                {safeTrend > 0 ? "+" : ""}{String(safeTrend)} wk
+              </span>
+            )}
           </div>
-        ) : (
-          <ResponsiveContainer width="100%" height={56}>
-            <AreaChart data={data} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
-              <defs>
-                <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="week" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "6px", fontSize: "11px", padding: "4px 8px" }}
-                labelStyle={{ color: "hsl(var(--muted-foreground))" }}
-                itemStyle={{ color: "hsl(var(--foreground))" }}
-              />
-              <Area type="monotone" dataKey="count" name="Deals" stroke="hsl(var(--primary))" strokeWidth={1.5} fill="url(#velocityGrad)" dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function KpiCard({ label, value, sub, icon: Icon, trend }: {
-  label: string; value: string; sub?: string; icon: React.ElementType; trend?: "up" | "down" | "neutral";
-}) {
-  return (
-    <Card className="bg-card border-border hover:border-primary/30 transition-colors">
-      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-        <CardTitle className="text-xs font-medium text-muted-foreground">{label}</CardTitle>
-        <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Icon className="w-3.5 h-3.5 text-primary" />
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold text-foreground">{value}</div>
-        {sub && (
-          <p className={cn("text-xs mt-1 flex items-center gap-1",
-            trend === "up" ? "text-emerald-500" : trend === "down" ? "text-destructive" : "text-muted-foreground"
-          )}>
-            {trend === "up" && <ArrowUpRight className="w-3 h-3" />}
-            {sub}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ScoreBadge({ score }: { score: any }) {
-  const v = score == null ? null : parseFloat(String(score));
-  if (v == null || isNaN(v)) return <span className="text-xs text-muted-foreground font-mono">—</span>;
-  const color = v >= 0.8 ? "text-emerald-500" : v >= 0.65 ? "text-amber-500" : "text-muted-foreground";
-  return <span className={cn("text-sm font-bold font-mono", color)}>{v.toFixed(3)}</span>;
-}
-
-// ─── Signal type config ──────────────────────────────────────────────────────
-const SIGNAL_CONFIG: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-  institutional: { icon: Landmark, color: "bg-violet-500/15 text-violet-400 border-violet-500/20", label: "Institutional" },
-  government:    { icon: Megaphone, color: "bg-blue-500/15 text-blue-400 border-blue-500/20", label: "Government" },
-  seasonal:      { icon: CalendarDays, color: "bg-amber-500/15 text-amber-400 border-amber-500/20", label: "Seasonal" },
-  event:         { icon: Zap, color: "bg-pink-500/15 text-pink-400 border-pink-500/20", label: "Event" },
-  macro_momentum:{ icon: Waves, color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20", label: "Macro" },
-};
-
-function ConfidenceBar({ score }: { score: any }) {
-  const v = score == null ? null : parseFloat(String(score));
-  if (v == null || isNaN(v)) return null;
-  const pct = Math.round(v * 100);
-  const color = pct >= 85 ? "bg-emerald-500" : pct >= 70 ? "bg-amber-500" : "bg-muted-foreground";
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-1 rounded-full bg-muted/40 overflow-hidden">
-        <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${pct}%` }} />
+        <div style={{ width: 28, height: 28, borderRadius: 8, background: `${C.p}1a`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <TrendingUp style={{ width: 14, height: 14, color: C.p }} />
+        </div>
       </div>
-      <span className="text-[10px] text-muted-foreground font-mono shrink-0">{pct}%</span>
+      {isLoading ? (
+        <Skeleton className="h-14 w-full" />
+      ) : !hasData ? (
+        <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <p style={{ fontSize: 10, color: `${C.fg4}` }}>No data yet — run a scan</p>
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={56}>
+          <AreaChart data={data} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
+            <defs>
+              <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={C.p} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={C.p} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <XAxis dataKey="week" tick={{ fontSize: 9, fill: C.fg3 }} tickLine={false} axisLine={false} />
+            <YAxis tick={{ fontSize: 9, fill: C.fg3 }} tickLine={false} axisLine={false} allowDecimals={false} />
+            <Tooltip
+              contentStyle={{ background: C.s1, border: `1px solid ${C.bd}`, borderRadius: 6, fontSize: 11, padding: "4px 8px" }}
+              labelStyle={{ color: C.fg3 }}
+              itemStyle={{ color: C.fg1 }}
+            />
+            <Area type="monotone" dataKey="count" name="Deals" stroke={C.p} strokeWidth={1.5} fill="url(#velocityGrad)" dot={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 }
 
+// ─── Signal type config ──────────────────────────────────────────────────────
+const SIGNAL_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string; border: string; label: string }> = {
+  institutional: { icon: Landmark,    color: C.vi, bg: `${C.vi}15`, border: `${C.vi}25`, label: "Institutional" },
+  government:    { icon: Megaphone,   color: C.p,  bg: `${C.p}15`,  border: `${C.p}25`,  label: "Government" },
+  seasonal:      { icon: CalendarDays,color: C.am, bg: `${C.am}15`, border: `${C.am}25`, label: "Seasonal" },
+  event:         { icon: Zap,         color: C.ro, bg: `${C.ro}15`, border: `${C.ro}25`, label: "Event" },
+  macro_momentum:{ icon: Waves,       color: C.em, bg: `${C.em}15`, border: `${C.em}25`, label: "Macro" },
+};
+
+// ─── Sentinel Panel ──────────────────────────────────────────────────────────
 function SentinelPanel() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const { isAuthenticated } = useAuth();
   const { data: signals, isLoading, refetch } = trpc.sentinel.list.useQuery({ limit: 10 }, { enabled: isAuthenticated });
   const seed = trpc.sentinel.seed.useMutation({
-    onSuccess: (r) => {
-      if (r.seeded) {
-        toast.success(`Sentinel seeded with ${r.count} signals`);
-        refetch();
-      }
-    },
+    onSuccess: (r) => { if (r.seeded) { toast.success(`Sentinel seeded with ${r.count} signals`); refetch(); } },
   });
-
   const aiRefresh = trpc.sentinel.aiRefresh.useMutation({
-    onSuccess: (r) => {
-      toast.success(`${r.message}`);
-      refetch();
-    },
+    onSuccess: (r) => { toast.success(`${r.message}`); refetch(); },
     onError: (e) => toast.error(`Refresh failed: ${e.message}`),
   });
-
-  // Auto-seed on first load if empty
   const [autoSeeded, setAutoSeeded] = useState(false);
   useEffect(() => {
     if (!isLoading && signals?.length === 0 && !autoSeeded && !seed.isPending) {
@@ -174,157 +217,168 @@ function SentinelPanel() {
   const expiryLabel = (expiresAt: number | null | undefined) => {
     if (!expiresAt) return null;
     const msLeft = expiresAt - Date.now();
-    if (msLeft <= 0) return { label: "Expired", urgent: false, archived: true };
+    if (msLeft <= 0) return { label: "Expired", urgent: false };
     const hLeft = Math.round(msLeft / 3600000);
     const dLeft = Math.round(msLeft / 86400000);
-    if (hLeft < 24) return { label: `Expires in ${hLeft}h`, urgent: hLeft < 6, archived: false };
-    return { label: `Expires in ${dLeft}d`, urgent: false, archived: false };
+    if (hLeft < 24) return { label: `Expires in ${hLeft}h`, urgent: hLeft < 6 };
+    return { label: `Expires in ${dLeft}d`, urgent: false };
   };
 
   return (
-    <Card className="lg:col-span-2 bg-card border-border flex flex-col">
-      <CardHeader className="pb-3 shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BarChart2 className="w-3.5 h-3.5 text-primary" />
-            <CardTitle className="text-sm font-semibold">Macro Signals Sentinel</CardTitle>
+    <div style={{ background: C.s1, border: `1px solid ${C.bd}`, borderRadius: 12, display: "flex", flexDirection: "column", gridColumn: "span 2" }}>
+      {/* Header */}
+      <div style={{ padding: "16px 20px 12px", borderBottom: `1px solid ${C.bd}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+            <BarChart2 style={{ width: 14, height: 14, color: C.p }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.fg1 }}>Macro Signals Sentinel</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground gap-1"
-              onClick={() => aiRefresh.mutate()}
-              disabled={aiRefresh.isPending}
-            >
-              {aiRefresh.isPending
-                ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                : <RefreshCw className="w-2.5 h-2.5" />}
-              {aiRefresh.isPending ? "Scanning..." : "Refresh"}
-            </Button>
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] text-emerald-500 font-medium">Live</span>
+          <p style={{ fontSize: 11, color: C.fg3 }}>Institutional moves, permits, events &amp; macro tailwinds</p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={() => aiRefresh.mutate()}
+            disabled={aiRefresh.isPending}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              fontSize: 10, fontWeight: 500, height: 24, padding: "0 8px", borderRadius: 6,
+              background: "transparent", border: `1px solid ${C.bd}`, color: C.fg3, cursor: "pointer",
+            }}
+          >
+            {aiRefresh.isPending
+              ? <Loader2 style={{ width: 10, height: 10 }} className="animate-spin" />
+              : <RefreshCw style={{ width: 10, height: 10 }} />}
+            {aiRefresh.isPending ? "Scanning..." : "Refresh"}
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span className="live-dot" />
+            <span style={{ fontSize: 10, color: C.em, fontWeight: 500 }}>Live</span>
           </div>
         </div>
-        <CardDescription className="text-xs">Institutional moves, permits, events &amp; macro tailwinds</CardDescription>
-      </CardHeader>
-      <CardContent className="flex-1 overflow-y-auto max-h-[480px] space-y-2 pr-1">
+      </div>
+
+      {/* Signal list */}
+      <div style={{ flex: 1, overflowY: "auto", maxHeight: 480, padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
         {isLoading || seed.isPending ? (
-          <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="p-3 rounded-lg border border-border bg-muted/10 space-y-2">
-                <Skeleton className="h-3 w-3/4" />
-                <Skeleton className="h-2 w-full" />
-                <Skeleton className="h-1.5 w-1/2" />
-              </div>
-            ))}
-          </div>
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} style={{ padding: 12, borderRadius: 8, border: `1px solid ${C.bd}`, background: `${C.s2}20` }}>
+              <Skeleton className="h-3 w-3/4 mb-2" />
+              <Skeleton className="h-2 w-full mb-1" />
+              <Skeleton className="h-1.5 w-1/2" />
+            </div>
+          ))
         ) : !signals?.length ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Waves className="w-8 h-8 text-muted-foreground/20 mb-2" />
-            <p className="text-xs text-muted-foreground">No signals yet</p>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 0", textAlign: "center" }}>
+            <Waves style={{ width: 32, height: 32, color: `${C.fg4}`, marginBottom: 8 }} />
+            <p style={{ fontSize: 12, color: C.fg3 }}>No signals yet</p>
           </div>
         ) : (
           [...signals]
             .filter((sig) => !sig.expiresAt || sig.expiresAt > Date.now())
             .sort((a, b) => (parseFloat(String(b.confidenceScore ?? 0)) || 0) - (parseFloat(String(a.confidenceScore ?? 0)) || 0))
             .map((sig) => {
-            const cfg = SIGNAL_CONFIG[sig.signalType] ?? SIGNAL_CONFIG.macro_momentum;
-            const Icon = cfg.icon;
-            const isOpen = expanded === sig.id;
-            const isHighUrgency = (parseFloat(String(sig.confidenceScore ?? 0)) || 0) >= 0.88;
-            return (
-              <div
-                key={sig.id}
-                className={cn(
-                  "rounded-lg border transition-all duration-200 cursor-pointer",
-                  isHighUrgency ? "border-rose-500/30 bg-rose-500/5" : isOpen ? "border-primary/30 bg-primary/5" : "border-border bg-muted/10 hover:border-primary/20 hover:bg-muted/20"
-                )}
-                onClick={() => setExpanded(isOpen ? null : sig.id)}
-              >
-                <div className="p-3">
-                  <div className="flex items-start gap-2.5">
-                    <div className={cn("w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5 border", cfg.color)}>
-                      <Icon className="w-3 h-3" />
+              const cfg = SIGNAL_CONFIG[sig.signalType] ?? SIGNAL_CONFIG.macro_momentum;
+              const Icon = cfg.icon;
+              const isOpen = expanded === sig.id;
+              const isHighUrgency = (parseFloat(String(sig.confidenceScore ?? 0)) || 0) >= 0.88;
+              return (
+                <div
+                  key={sig.id}
+                  className="signal-hover"
+                  onClick={() => setExpanded(isOpen ? null : sig.id)}
+                  style={{
+                    borderRadius: 8,
+                    border: `1px solid ${isHighUrgency ? `${C.re}30` : isOpen ? `${C.p}30` : C.bd}`,
+                    background: isHighUrgency ? `${C.re}08` : isOpen ? `${C.p}08` : `${C.s2}20`,
+                    cursor: "pointer",
+                    padding: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{
+                      width: 24, height: 24, borderRadius: 6, flexShrink: 0, marginTop: 2,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      background: cfg.bg, border: `1px solid ${cfg.border}`,
+                    }}>
+                      <Icon style={{ width: 12, height: 12, color: cfg.color }} />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-1">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-foreground leading-snug line-clamp-2">{sig.title}</p>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 4 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 12, fontWeight: 600, color: C.fg1, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                            {sig.title}
+                          </p>
                           {isHighUrgency && (
-                            <span className="inline-flex items-center gap-0.5 mt-0.5 px-1.5 py-0 h-4 rounded text-[9px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/25">
-                              ⚡ High Urgency
-                            </span>
+                            <span style={{
+                              display: "inline-flex", alignItems: "center", gap: 2, marginTop: 2,
+                              padding: "0 6px", height: 16, borderRadius: 4,
+                              fontSize: 9, fontWeight: 700,
+                              background: `${C.re}15`, color: C.re, border: `1px solid ${C.re}25`,
+                            }}>⚡ High Urgency</span>
                           )}
                         </div>
-                        <span className={cn("inline-flex shrink-0 items-center px-1.5 py-0.5 rounded text-[9px] font-semibold border ml-1", cfg.color)}>
+                        <span style={{
+                          display: "inline-flex", flexShrink: 0, alignItems: "center",
+                          padding: "0 6px", height: 16, borderRadius: 4, marginLeft: 4,
+                          fontSize: 9, fontWeight: 700,
+                          background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
+                        }}>
                           {cfg.label}
                         </span>
                       </div>
                       <ConfidenceBar score={sig.confidenceScore} />
-                      <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1 flex-wrap">
-                        <Clock className="w-2.5 h-2.5" />
+                      <p style={{ fontSize: 10, color: C.fg3, marginTop: 4, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                        <Clock style={{ width: 10, height: 10 }} />
                         {elapsed(sig.createdAt)}
                         {sig.impactedAssetClasses && sig.impactedAssetClasses.length > 0 && (
-                          <>
-                            <span className="text-muted-foreground/40">·</span>
-                            <span>{sig.impactedAssetClasses.slice(0, 2).join(", ")}</span>
-                          </>
+                          <><span style={{ color: `${C.fg4}` }}>·</span><span>{sig.impactedAssetClasses.slice(0, 2).join(", ")}</span></>
                         )}
                         {(() => {
                           const exp = expiryLabel(sig.expiresAt);
                           if (!exp) return null;
                           return (
-                            <>
-                              <span className="text-muted-foreground/40">·</span>
-                              <span className={exp.urgent ? "text-amber-400 font-semibold" : "text-muted-foreground/60"}>{exp.label}</span>
-                            </>
+                            <><span style={{ color: C.fg4 }}>·</span><span style={{ color: exp.urgent ? C.am : C.fg3, fontWeight: exp.urgent ? 600 : 400 }}>{exp.label}</span></>
                           );
                         })()}
                       </p>
                     </div>
                   </div>
 
-                  {/* Expanded detail */}
                   {isOpen && (
-                    <div className="mt-3 space-y-2 border-t border-border pt-3">
-                      <p className="text-xs text-muted-foreground leading-relaxed">{sig.summary}</p>
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.bd}`, display: "flex", flexDirection: "column", gap: 8 }}>
+                      <p style={{ fontSize: 12, color: C.fg2, lineHeight: 1.6 }}>{sig.summary}</p>
                       {sig.roryPitch && (
-                        <div className="p-2 rounded-lg bg-primary/8 border border-primary/15">
-                          <p className="text-[10px] text-primary/70 font-medium mb-1 uppercase tracking-wide">Signal Insight</p>
-                          <p className="text-xs text-foreground italic leading-relaxed">"{sig.roryPitch}"</p>
+                        <div style={{ padding: 10, borderRadius: 6, background: `${C.p}08`, border: `1px solid ${C.p}15` }}>
+                          <p style={{ fontSize: 9, color: `${C.p}b0`, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Signal Insight</p>
+                          <p style={{ fontSize: 12, color: C.fg1, fontStyle: "italic", lineHeight: 1.6 }}>"{sig.roryPitch}"</p>
                         </div>
                       )}
                       {sig.recommendedAction && (
-                        <div className="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
-                          <p className="text-[10px] text-emerald-400 font-medium mb-1 uppercase tracking-wide">Recommended Action</p>
-                          <p className="text-xs text-foreground leading-relaxed">{sig.recommendedAction}</p>
+                        <div style={{ padding: 10, borderRadius: 6, background: `${C.em}08`, border: `1px solid ${C.em}15` }}>
+                          <p style={{ fontSize: 9, color: C.em, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Recommended Action</p>
+                          <p style={{ fontSize: 12, color: C.fg1, lineHeight: 1.6 }}>{sig.recommendedAction}</p>
                         </div>
                       )}
                       {sig.sourceUrl && (
-                        <a
-                          href={sig.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <ExternalLink className="w-2.5 h-2.5" />
+                        <a href={sig.sourceUrl} target="_blank" rel="noopener noreferrer"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, color: C.p, textDecoration: "none" }}
+                          onClick={(e) => e.stopPropagation()}>
+                          <ExternalLink style={{ width: 10, height: 10 }} />
                           Source
                         </a>
                       )}
                     </div>
                   )}
                 </div>
-              </div>
-            );
-          })
+              );
+            })
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
+// ─── Home ────────────────────────────────────────────────────────────────────
 export default function Home() {
   const [activeScanJobId, setActiveScanJobId] = useState<number | null>(null);
   const utils = trpc.useUtils();
@@ -338,78 +392,77 @@ export default function Home() {
     onError: (e) => toast.error(`Scan failed: ${e.message}`),
   });
 
-  const fmt = (n: number | null | undefined) => {
-    if (n == null) return "—";
-    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}k`;
-    return `$${n}`;
-  };
-
-  const activityIcon: Record<string, React.ElementType> = {
-    deal_added: Building2,
-    deal_scored: Zap,
-    signal_analyzed: Brain,
-    red_flag_detected: AlertCircle,
-    memo_generated: Activity,
-    outreach_sent: ArrowUpRight,
-    scan_completed: RefreshCw,
-    stage_changed: ChevronRight,
-  };
-
-  const activityColor: Record<string, string> = {
-    deal_added: "bg-blue-500/20 text-blue-400",
-    deal_scored: "bg-amber-500/20 text-amber-400",
-    signal_analyzed: "bg-purple-500/20 text-purple-400",
-    red_flag_detected: "bg-destructive/20 text-destructive",
-    memo_generated: "bg-primary/20 text-primary",
-    outreach_sent: "bg-emerald-500/20 text-emerald-400",
-    scan_completed: "bg-blue-500/20 text-blue-400",
-    stage_changed: "bg-muted/60 text-muted-foreground",
-  };
-
   const stats = data?.dealStats;
   const outStats = data?.outreachStats;
 
+  const activityIcon: Record<string, React.ElementType> = {
+    deal_added: Building2, deal_scored: Zap, signal_analyzed: Brain,
+    red_flag_detected: AlertCircle, memo_generated: Activity,
+    outreach_sent: ArrowUpRight, scan_completed: RefreshCw, stage_changed: ChevronRight,
+  };
+  const activityColor: Record<string, string> = {
+    deal_added: C.p, deal_scored: C.am, signal_analyzed: C.vi,
+    red_flag_detected: C.re, memo_generated: C.p, outreach_sent: C.em,
+    scan_completed: C.p, stage_changed: C.fg3,
+  };
+
   return (
     <DashboardLayout>
-      {/* Hero */}
-      <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card p-6">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl pointer-events-none" />
-        <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs text-emerald-500 font-medium">System Operational</span>
+
+      {/* ── Hero Panel ── */}
+      <div className="sh-hero-panel" style={{ padding: "24px 28px" }}>
+        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span className="live-dot" />
+                <span style={{ fontSize: 11, color: C.em, fontWeight: 500 }}>System Operational</span>
+              </div>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: C.fg1, letterSpacing: "-0.01em", marginBottom: 6 }}>
+                Signal Hunter Command Center
+              </h1>
+              <p style={{ fontSize: 13, color: C.fg3, maxWidth: 520 }}>
+                {data?.latestScan
+                  ? `Last scan: ${new Date(data.latestScan.createdAt).toLocaleString()} · ${(data.latestScan.sources as string[] | null)?.length ?? 0} platforms`
+                  : "No scan data yet. Trigger a market scan to begin."}
+              </p>
             </div>
-            <h1 className="text-2xl font-bold text-foreground mb-1">Signal Hunter Command Center</h1>
-            <p className="text-sm text-muted-foreground max-w-xl">
-              {data?.latestScan
-                ? `Last scan: ${new Date(data.latestScan.createdAt).toLocaleString()} · ${(data.latestScan.sources as string[] | null)?.length ?? 0} platforms`
-                : "No scan data yet. Trigger a market scan to begin."}
-            </p>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 text-xs border-border"
-              onClick={() => triggerScan.mutate({})}
-              disabled={triggerScan.isPending || activeScanJobId !== null}
-            >
-              <RefreshCw className={cn("w-3.5 h-3.5 mr-1.5", triggerScan.isPending && "animate-spin")} />
-              {triggerScan.isPending ? "Starting..." : activeScanJobId ? "Scan Running..." : "Run Market Scan"}
-            </Button>
-            <Link href="/scan">
-              <Button size="sm" className="h-9 text-xs">
-                <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
-                View Pipeline
-              </Button>
-            </Link>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+              <button
+                className="btn-press"
+                onClick={() => triggerScan.mutate({})}
+                disabled={triggerScan.isPending || activeScanJobId !== null}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  height: 36, padding: "0 14px", borderRadius: 8,
+                  fontSize: 12, fontWeight: 500, cursor: "pointer",
+                  background: "transparent", border: `1px solid ${C.bd}`, color: C.fg2,
+                  opacity: (triggerScan.isPending || activeScanJobId !== null) ? 0.6 : 1,
+                }}
+              >
+                <RefreshCw style={{ width: 14, height: 14 }} className={cn(triggerScan.isPending && "animate-spin")} />
+                {triggerScan.isPending ? "Starting..." : activeScanJobId ? "Scan Running..." : "Run Market Scan"}
+              </button>
+              <Link href="/scan">
+                <button
+                  className="btn-press"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    height: 36, padding: "0 14px", borderRadius: 8,
+                    fontSize: 12, fontWeight: 500, cursor: "pointer",
+                    background: C.p, border: "none", color: "oklch(0.98 0.005 260)",
+                  }}
+                >
+                  <TrendingUp style={{ width: 14, height: 14 }} />
+                  View Pipeline
+                </button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Scan Progress Panel */}
+      {/* ── Scan Progress ── */}
       {activeScanJobId !== null && (
         <ScanProgress
           jobId={activeScanJobId}
@@ -419,130 +472,120 @@ export default function Home() {
             utils.deals.list.invalidate();
             utils.dashboard.stats.invalidate();
           }}
-          onRetry={() => {
-            setActiveScanJobId(null);
-            triggerScan.mutate({});
-          }}
+          onRetry={() => { setActiveScanJobId(null); triggerScan.mutate({}); }}
         />
       )}
 
-      {/* KPI Cards */}
+      {/* ── KPI Cards ── */}
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
-            label="Total Pipeline Value"
-            value={fmt(stats?.totalPipelineValue)}
-            sub={`${stats?.total ?? 0} active deals`}
-            icon={DollarSign}
-            trend="up"
-          />
-          <KpiCard
-            label="Avg. Deal Score"
-            value={stats?.avgScore != null ? parseFloat(String(stats.avgScore)).toFixed(3) : '—'}
-            sub="across qualified deals"
-            icon={TrendingUp}
-            trend="up"
-          />
-          <KpiCard
-            label="High Priority"
-            value={String(stats?.highPriority ?? 0)}
-            sub="deals ready for outreach"
-            icon={Zap}
-            trend={stats?.highPriority ? "up" : "neutral"}
-          />
-          <KpiCard
-            label="Outreach Active"
-            value={String(outStats?.totalSent ?? 0)}
-            sub={`${outStats?.responded ?? 0} responded`}
-            icon={Activity}
-            trend={outStats?.responded ? "up" : "neutral"}
-          />
+          <KpiCard label="Total Pipeline Value" value={fmt(stats?.totalPipelineValue)}
+            sub={`${stats?.total ?? 0} active deals`} icon={DollarSign} trend="up" />
+          <KpiCard label="Avg. Deal Score"
+            value={stats?.avgScore != null ? parseFloat(String(stats.avgScore)).toFixed(3) : "—"}
+            sub="across qualified deals" icon={TrendingUp} trend="up" accentColor={C.am} />
+          <KpiCard label="High Priority" value={String(stats?.highPriority ?? 0)}
+            sub="deals ready for outreach" icon={Zap}
+            trend={stats?.highPriority ? "up" : "neutral"} accentColor={C.em} />
+          <KpiCard label="Outreach Active" value={String(outStats?.totalSent ?? 0)}
+            sub={`${outStats?.responded ?? 0} responded`} icon={Activity}
+            trend={outStats?.responded ? "up" : "neutral"} accentColor={C.cy} />
         </div>
       )}
 
-      {/* Pipeline Velocity Sparkline */}
+      {/* ── Pipeline Velocity ── */}
       <VelocitySparkline />
-      {/* Main grid */}
+
+      {/* ── Main Grid ── */}
       <div className="grid gap-6 lg:grid-cols-7">
+
         {/* Top Opportunities */}
-        <Card className="lg:col-span-5 bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <div style={{ background: C.s1, border: `1px solid ${C.bd}`, borderRadius: 12, gridColumn: "span 5" }}>
+          <div style={{ padding: "16px 20px 12px", borderBottom: `1px solid ${C.bd}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <CardTitle className="text-sm font-semibold">Top Opportunities</CardTitle>
-              <CardDescription className="text-xs">Ranked by AI scoring algorithm</CardDescription>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.fg1 }}>Top Opportunities</span>
+              <p style={{ fontSize: 11, color: C.fg3, marginTop: 2 }}>Ranked by AI scoring algorithm</p>
             </div>
             <Link href="/scan">
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground">
-                View all <ChevronRight className="w-3 h-3 ml-1" />
-              </Button>
+              <button style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: C.fg3, background: "transparent", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6 }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = C.fg1)}
+                onMouseLeave={(e) => (e.currentTarget.style.color = C.fg3)}>
+                View all <ChevronRight style={{ width: 12, height: 12 }} />
+              </button>
             </Link>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div style={{ padding: "8px 12px" }}>
             {isLoading ? (
-              <div className="space-y-3">
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 8 }}>
                 {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
               </div>
             ) : !topDealsData?.length ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Building2 className="w-10 h-10 text-muted-foreground/20 mb-3" />
-                <p className="text-sm font-medium text-muted-foreground">No deals yet</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">Run a market scan to populate the pipeline</p>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 0", textAlign: "center" }}>
+                <Building2 style={{ width: 40, height: 40, color: C.fg4, marginBottom: 12 }} />
+                <p style={{ fontSize: 13, fontWeight: 500, color: C.fg3 }}>No deals yet</p>
+                <p style={{ fontSize: 11, color: C.fg4, marginTop: 4 }}>Run a market scan to populate the pipeline</p>
               </div>
             ) : (
-              <div className="space-y-1">
-                {(topDealsData ?? []).map((deal) => (
-                  <Link key={deal.id} href={`/deal/${deal.id}`}>
-                    <div className="group flex items-center gap-4 px-3 py-2.5 rounded-lg hover:bg-muted/40 transition-colors cursor-pointer">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <Building2 className="w-4 h-4 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
-                          {deal.name}
-                        </p>
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          {deal.location && (
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <MapPin className="w-2.5 h-2.5" />{deal.location}
-                            </span>
-                          )}
-                          {deal.industry && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">{deal.industry}</Badge>
-                          )}
-                          {deal.opportunityZone && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
-                              OZ
-                            </span>
-                          )}
-                          {deal.tadDistrict && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">
-                              TAD
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4 shrink-0 text-right">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Cash Flow</p>
-                          <p className="text-xs font-semibold text-emerald-500">{fmt(deal.cashFlow)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Score</p>
-                          <ScoreBadge score={deal.score} />
-                        </div>
-                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+              topDealsData.map((deal) => (
+                <Link key={deal.id} href={`/deal/${deal.id}`}>
+                  <div
+                    className="row-hover"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 16,
+                      padding: "10px 12px", borderRadius: 8, cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: `${C.p}1a`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <Building2 style={{ width: 16, height: 16, color: C.p }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: C.fg1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {deal.name}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2, flexWrap: "wrap" }}>
+                        {deal.location && (
+                          <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: C.fg3 }}>
+                            <MapPin style={{ width: 10, height: 10 }} />{deal.location}
+                          </span>
+                        )}
+                        {deal.industry && (
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: "0 6px", height: 16, borderRadius: 4, background: `${C.s2}`, color: C.fg3, border: `1px solid ${C.bd}`, display: "inline-flex", alignItems: "center" }}>
+                            {deal.industry}
+                          </span>
+                        )}
+                        {deal.opportunityZone && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: "0 6px", height: 16, borderRadius: 9999, background: `${C.em}15`, color: C.em, border: `1px solid ${C.em}20`, display: "inline-flex", alignItems: "center" }}>
+                            OZ
+                          </span>
+                        )}
+                        {deal.tadDistrict && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: "0 6px", height: 16, borderRadius: 9999, background: `${C.p}15`, color: C.p, border: `1px solid ${C.p}20`, display: "inline-flex", alignItems: "center" }}>
+                            TAD
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </Link>
-                ))}
-              </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 24, flexShrink: 0, textAlign: "right" }}>
+                      <div>
+                        <p style={{ fontSize: 10, color: C.fg4, textTransform: "uppercase", letterSpacing: "0.1em" }}>Cash Flow</p>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: C.em, fontFamily: "var(--font-mono)" }}>{fmt(deal.cashFlow)}</p>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: 10, color: C.fg4, textTransform: "uppercase", letterSpacing: "0.1em" }}>Score</p>
+                        <ScoreBadge score={deal.score} />
+                      </div>
+                      <ChevronRight style={{ width: 14, height: 14, color: C.fg4 }} />
+                    </div>
+                  </div>
+                </Link>
+              ))
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Macro Signals Sentinel */}
         <SentinelPanel />

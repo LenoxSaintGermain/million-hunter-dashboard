@@ -20,12 +20,18 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function StatCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
+  const ac = accent ?? "oklch(0.65 0.22 250)";
   return (
-    <div className="bg-muted/30 rounded-xl p-4 border border-border/50">
-      <p className="text-xs text-muted-foreground mb-1">{label}</p>
-      <p className="text-xl font-bold text-foreground">{value}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+    <div style={{
+      background: "oklch(0.14 0.01 260)",
+      border: "1px solid oklch(0.22 0.01 260)",
+      borderRadius: 10,
+      padding: "14px 16px",
+    }}>
+      <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: "oklch(0.40 0.01 260)", marginBottom: 6 }}>{label}</p>
+      <p style={{ fontFamily: "var(--font-mono)", fontSize: 20, fontWeight: 700, color: ac }}>{value}</p>
+      {sub && <p style={{ fontSize: 11, color: "oklch(0.55 0.01 260)", marginTop: 2 }}>{sub}</p>}
     </div>
   );
 }
@@ -154,7 +160,7 @@ export default function DealDetail() {
 
   const { deal, signal, memo } = data;
   const score = toNum(deal.score);
-  const scoreColor = score == null ? "text-muted-foreground" : score >= 0.8 ? "text-emerald-500" : score >= 0.65 ? "text-amber-500" : "text-destructive";
+  const scoreColorVal = score == null ? "oklch(0.40 0.01 260)" : score >= 0.8 ? "oklch(0.70 0.18 160)" : score >= 0.65 ? "oklch(0.75 0.20 80)" : "oklch(0.60 0.22 25)";
 
   return (
     <DashboardLayout>
@@ -167,8 +173,8 @@ export default function DealDetail() {
       </Link>
 
       {/* Deal header */}
-      <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-primary/8 via-card to-card p-6">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
+      <div className="sh-hero-panel" style={{ padding: "24px 28px" }}>
+        <div className="absolute top-0 right-0 w-48 h-48 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" style={{ background: "oklch(0.65 0.22 250 / 0.05)" }} />
         <div className="relative flex flex-col lg:flex-row lg:items-start justify-between gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -212,10 +218,10 @@ export default function DealDetail() {
           {/* Score + Actions */}
           <div className="flex items-center gap-3 shrink-0">
             <div className="text-center">
-              <div className={cn("text-4xl font-bold font-mono", scoreColor)}>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 40, fontWeight: 700, color: scoreColorVal, lineHeight: 1 }}>
                 {score != null ? score.toFixed(3) : "—"}
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">AI Score</p>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: "oklch(0.40 0.01 260)", marginTop: 4 }}>AI Score</p>
             </div>
             <div className="flex flex-col gap-2">
               <Button size="sm" className="h-8 text-xs" onClick={() => scoreDeal.mutate({ id: dealId })} disabled={scoreDeal.isPending}>
@@ -249,14 +255,15 @@ export default function DealDetail() {
 
       {/* Financial KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Annual Revenue" value={fmt(deal.revenue)} />
+        <StatCard label="Annual Revenue" value={fmt(deal.revenue)} accent="oklch(0.65 0.22 250)" />
         <StatCard
           label="Cash Flow / SDE"
           value={fmt(deal.cashFlow)}
           sub={deal.revenue && deal.cashFlow ? `${Math.round((deal.cashFlow / deal.revenue) * 100)}% margin` : undefined}
+          accent="oklch(0.70 0.18 160)"
         />
-        <StatCard label="Asking Price" value={fmt(deal.askingPrice)} />
-        <StatCard label="Multiple" value={toNum(deal.multiple) != null ? `${toNum(deal.multiple)!.toFixed(2)}x` : "—"} sub="EBITDA multiple" />
+        <StatCard label="Asking Price" value={fmt(deal.askingPrice)} accent="oklch(0.75 0.20 80)" />
+        <StatCard label="Multiple" value={toNum(deal.multiple) != null ? `${toNum(deal.multiple)!.toFixed(2)}x` : "—"} sub="EBITDA multiple" accent="oklch(0.75 0.15 200)" />
       </div>
 
       {/* Tabs */}
