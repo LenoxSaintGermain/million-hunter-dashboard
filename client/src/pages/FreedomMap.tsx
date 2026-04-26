@@ -132,7 +132,7 @@ export default function FreedomMap() {
                 </div>
 
                 {/* Target Income */}
-                <Card className="bg-card/50 border-white/8">
+                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-semibold text-white">Target Monthly Income</label>
@@ -152,7 +152,7 @@ export default function FreedomMap() {
 
                 {/* Capital & Timeline */}
                 <div className="grid grid-cols-2 gap-4">
-                  <Card className="bg-card/50 border-white/8">
+                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5 space-y-3">
                       <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Investment Capital</label>
                       <div className="flex items-center gap-2">
@@ -166,7 +166,7 @@ export default function FreedomMap() {
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className="bg-card/50 border-white/8">
+                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5 space-y-3">
                       <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Timeline (Years)</label>
                       <div className="flex items-center gap-2">
@@ -226,7 +226,7 @@ export default function FreedomMap() {
                 </div>
 
                 {/* Location */}
-                <Card className="bg-card/50 border-white/8">
+                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-2">
                     <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Target Market</label>
                     <div className="flex items-center gap-2">
@@ -254,7 +254,7 @@ export default function FreedomMap() {
 
               {/* Side Panel */}
               <div className="space-y-4">
-                <Card className="bg-card/50 border-white/8">
+                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-6 space-y-4">
                     <div className="flex items-center gap-2 text-sm font-semibold text-white">
                       <Zap className="w-4 h-4 text-yellow-400" />
@@ -368,7 +368,7 @@ export default function FreedomMap() {
                   { label: "Total Investment", value: formatCurrency(result.totalInvestmentRequired), icon: DollarSign, color: "text-blue-400" },
                   { label: "Deal Components", value: `${result.recipe?.length ?? 0} assets`, icon: Building2, color: "text-purple-400" },
                 ].map((stat) => (
-                  <Card key={stat.label} className="bg-card/50 border-white/8">
+                  <Card key={stat.label} className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-4 text-center">
                       <stat.icon className={cn("w-5 h-5 mx-auto mb-2", stat.color)} />
                       <div className={cn("text-xl font-bold", stat.color)}>{stat.value}</div>
@@ -470,7 +470,7 @@ export default function FreedomMap() {
                           <div className="absolute -left-10 top-1 w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 flex items-center justify-center">
                             <Star className="w-3.5 h-3.5 text-cyan-400" />
                           </div>
-                          <Card className="bg-card/50 border-white/8">
+                          <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between gap-4">
                                 <div>
@@ -499,7 +499,7 @@ export default function FreedomMap() {
                   animate={{ opacity: 1 }}
                   className="space-y-4"
                 >
-                  <Card className="bg-card/50 border-white/8">
+                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-6 space-y-4">
                       <div className="text-sm font-semibold text-white">AI Rationale</div>
                       <p className="text-gray-400 leading-relaxed">{result.rationale}</p>

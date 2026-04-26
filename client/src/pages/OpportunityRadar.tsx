@@ -126,7 +126,7 @@ export default function OpportunityRadar() {
 
         {/* Scan Controls */}
         <div className="flex gap-3">
-          <div className="flex-1 flex items-center gap-2 bg-card/50 border border-white/8 rounded-xl px-4">
+          <div className="flex-1 flex items-center gap-2 bg-card/50 border border-white/8 rounded-xl px-4" style={{ background: "var(--sh-surface-1)" }}>
             <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
             <Input
               value={location}
@@ -395,7 +395,7 @@ export default function OpportunityRadar() {
                 const cfg = SIGNAL_CONFIG[play.type];
                 const Icon = cfg.icon;
                 return (
-                  <Card key={play.title} className="bg-card/50 border-white/8 opacity-60">
+                  <Card key={play.title} className="bg-card/50 border-white/8 opacity-60" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-4 space-y-2">
                       <div className="flex items-center gap-2">
                         <Icon className={cn("w-4 h-4", cfg.color)} />

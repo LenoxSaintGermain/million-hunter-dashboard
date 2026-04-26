@@ -68,9 +68,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           collapsed && "justify-center px-0"
         )}
       >
-        <div className="icon-hover flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
-          style={{ background: "var(--sh-primary-20)" }}>
-          <Zap className="w-4 h-4" style={{ color: "var(--sh-primary)" }} />
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg shrink-0 overflow-hidden">
+          <img
+            src="/manus-storage/sh-icon-final_9231defd.png"
+            alt="Signal Hunter"
+            className="w-8 h-8 object-cover rounded-lg"
+          />
         </div>
         {!collapsed && (
           <div className="fade-in flex flex-col min-w-0 overflow-hidden">

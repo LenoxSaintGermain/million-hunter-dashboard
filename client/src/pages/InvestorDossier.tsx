@@ -284,7 +284,7 @@ export default function InvestorDossier() {
             >
               <div className="lg:col-span-2 space-y-5">
                 {/* Deal Info */}
-                <Card className="bg-card/50 border-white/8">
+                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-4">
                     <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Deal Details</div>
                     <div className="grid gap-3">
@@ -325,7 +325,7 @@ export default function InvestorDossier() {
                 </Card>
 
                 {/* Financials */}
-                <Card className="bg-card/50 border-white/8">
+                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-4">
                     <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Financials</div>
                     <div className="grid grid-cols-2 gap-3">
@@ -353,7 +353,7 @@ export default function InvestorDossier() {
                 </Card>
 
                 {/* Key Highlights */}
-                <Card className="bg-card/50 border-white/8">
+                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-3">
                     <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Key Highlights (optional)</div>
                     <textarea
@@ -532,7 +532,7 @@ export default function InvestorDossier() {
               <div className="grid gap-4 lg:grid-cols-2">
                 {/* Investment Thesis */}
                 {result.investmentThesis && (
-                  <Card className="bg-card/50 border-white/8">
+                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5">
                       <DossierSection title="Investment Thesis" icon={TrendingUp} color="text-emerald-400">
                         <p className="text-sm text-gray-300 leading-relaxed">{result.investmentThesis}</p>
@@ -543,7 +543,7 @@ export default function InvestorDossier() {
 
                 {/* Capital Stack */}
                 {result.capitalStack && (
-                  <Card className="bg-card/50 border-white/8">
+                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5">
                       <DossierSection title="Recommended Capital Stack" icon={BarChart3} color="text-blue-400">
                         <div className="space-y-2">
@@ -585,7 +585,7 @@ export default function InvestorDossier() {
 
                 {/* Investor Pitch */}
                 {result.investorPitch && (
-                  <Card className="bg-card/50 border-white/8">
+                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5">
                       <DossierSection title={`Message for ${selectedProfile.label}`} icon={Users} color="text-purple-400">
                         <p className="text-sm text-gray-300 leading-relaxed">{result.investorPitch}</p>
@@ -596,7 +596,7 @@ export default function InvestorDossier() {
 
                 {/* Risk & Mitigations */}
                 {(result.riskFactors?.length > 0 || result.mitigations?.length > 0) && (
-                  <Card className="bg-card/50 border-white/8">
+                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5 space-y-4">
                       {result.riskFactors?.length > 0 && (
                         <DossierSection title="Risk Factors" icon={AlertCircle} color="text-amber-400">
@@ -660,7 +660,7 @@ export default function InvestorDossier() {
             <p className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Recent Dossiers</p>
             <div className="grid gap-3 md:grid-cols-3">
               {savedDossiers.slice(0, 3).map((d: any) => (
-                <Card key={d.id} className="bg-card/50 border-white/8 hover:border-white/15 transition-all cursor-pointer">
+                <Card key={d.id} className="bg-card/50 border-white/8 hover:border-white/15 transition-all cursor-pointer" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-4 space-y-2">
                     <div className="text-sm font-semibold text-white truncate">{d.dealName}</div>
                     <div className="flex items-center justify-between">

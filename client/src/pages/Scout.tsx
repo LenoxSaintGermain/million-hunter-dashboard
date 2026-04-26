@@ -61,7 +61,7 @@ function fmt(n: number | null | undefined): string {
 // ─── Add Asset Dialog ─────────────────────────────────────────────────────────
 function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: number) => void }) {
   const [form, setForm] = useState({
-    name: "", address: "", city: "Atlanta", state: "GA", zip: "",
+    name: "", address: "", city: "Miami", state: "FL", zip: "",
     propertyType: "retail" as PropertyType,
     squareFootage: "", askingPrice: "", capRate: "", noi: "",
     leaseType: "" as "nnn" | "gross" | "modified_gross" | "vacant" | "",
@@ -73,7 +73,7 @@ function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
       toast.success("Asset added — AI scoring in progress...");
       onCreated(newAsset.id);
       onClose();
-      setForm({ name: "", address: "", city: "Atlanta", state: "GA", zip: "", propertyType: "retail", squareFootage: "", askingPrice: "", capRate: "", noi: "", leaseType: "", zoning: "", opportunityZone: false, tadDistrict: "", sourceUrl: "" });
+      setForm({ name: "", address: "", city: "Miami", state: "FL", zip: "", propertyType: "retail", squareFootage: "", askingPrice: "", capRate: "", noi: "", leaseType: "", zoning: "", opportunityZone: false, tadDistrict: "", sourceUrl: "" });
     },
     onError: (e) => toast.error(`Failed: ${e.message}`),
   });
@@ -101,9 +101,9 @@ function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
 
   const fields = [
     { key: "name", label: "Property Name *", placeholder: "e.g. Westside Retail Strip" },
-    { key: "address", label: "Street Address *", placeholder: "e.g. 123 Peachtree St NW" },
-    { key: "city", label: "City", placeholder: "Atlanta" },
-    { key: "state", label: "State", placeholder: "GA" },
+    { key: "address", label: "Street Address *", placeholder: "e.g. 123 Brickell Ave" },
+    { key: "city", label: "City", placeholder: "Miami" },
+    { key: "state", label: "State", placeholder: "FL" },
     { key: "zip", label: "ZIP Code", placeholder: "30303" },
     { key: "squareFootage", label: "Square Footage", placeholder: "5000" },
     { key: "askingPrice", label: "Asking Price ($)", placeholder: "1200000" },
@@ -229,7 +229,7 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
   const st = asset.status as AssetStatus;
 
   return (
-    <Card className={cn("relative overflow-hidden bg-card border-border hover:border-primary/30 transition-all duration-200 group", isAutoScoring && "border-primary/50 ring-1 ring-primary/20")}>
+    <div className={cn("relative overflow-hidden rounded-xl border transition-all duration-200 group", isAutoScoring ? "border-primary/50 ring-1 ring-primary/20" : "border-[var(--sh-border)] hover:border-[var(--sh-primary)]/30")} style={{ background: "var(--sh-surface-1)" }}>
       {/* Auto-scoring shimmer overlay */}
       {isAutoScoring && (
         <div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2 rounded-lg">
@@ -240,12 +240,12 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
           <p className="text-[10px] text-muted-foreground">Third Signal analysis in progress</p>
         </div>
       )}
-      <CardHeader className="pb-2">
+      <div className="p-4 pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
+            <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
               {asset.name}
-            </CardTitle>
+            </p>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               <div className="flex items-center gap-0.5">
                 <MapPin className="w-2.5 h-2.5 text-muted-foreground" />
@@ -268,9 +268,8 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
             </span>
           </div>
         </div>
-      </CardHeader>
-
-      <CardContent className="space-y-3">
+      </div>
+      <div className="px-4 pb-4 space-y-3">
         {/* Financials grid */}
         <div className="grid grid-cols-3 gap-2 text-center">
           {[
@@ -278,7 +277,7 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
             { label: "Cap Rate", value: asset.capRate ? `${(asset.capRate * 100).toFixed(1)}%` : "—" },
             { label: "NOI", value: fmt(asset.noi) },
           ].map((f) => (
-            <div key={f.label} className="bg-muted/30 rounded-lg p-2">
+            <div key={f.label} className="rounded-lg p-2" style={{ background: "var(--sh-surface-2)" }}>
               <p className="text-[10px] text-muted-foreground">{f.label}</p>
               <p className="text-xs font-semibold text-foreground mt-0.5">{f.value}</p>
             </div>
@@ -359,11 +358,10 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
             {convertToDeal.isPending ? "Converting..." : "Convert to Deal → War Room"}
           </Button>
         )}
-      </CardContent>
-    </Card>
+       </div>
+    </div>
   );
 }
-
 // ─── Main Scout Page ──────────────────────────────────────────────────────────
 export default function Scout() {
   const [search, setSearch] = useState("");

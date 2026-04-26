@@ -311,7 +311,7 @@ export default function StrategyBlender() {
           {/* Right: Analysis Panel */}
           <div className="lg:col-span-2 space-y-4">
             {/* Live Totals */}
-            <Card className="bg-card/50 border-white/8">
+            <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
               <CardContent className="p-5 space-y-3">
                 <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Live Stack Summary</div>
                 <div className="space-y-2">
@@ -346,7 +346,7 @@ export default function StrategyBlender() {
             {/* Capital Levers */}
             {analysis?.levers && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                <Card className="bg-card/50 border-white/8">
+                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Capital Levers</div>
@@ -391,7 +391,7 @@ export default function StrategyBlender() {
             {/* Capital Stack Breakdown */}
             {analysis?.capitalStack && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                <Card className="bg-card/50 border-white/8">
+                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-3">
                     <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Capital Stack</div>
                     {Object.entries(analysis.capitalStack)
@@ -443,7 +443,7 @@ export default function StrategyBlender() {
         {/* 5-Year Projection Chart */}
         {analysis?.projections && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <Card className="bg-card/50 border-white/8">
+            <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-emerald-400" />

@@ -54,7 +54,7 @@ function ConsensusModelConfig() {
     <div className="space-y-1.5">
       <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-8 text-xs border-border bg-muted/20">
+        <SelectTrigger className="h-8 text-xs border-[var(--sh-border)] bg-muted/20">
           <SelectValue placeholder="Select model..." />
         </SelectTrigger>
         <SelectContent>
@@ -72,7 +72,7 @@ function ConsensusModelConfig() {
   );
 
   return (
-    <Card className="bg-card border-border border-primary/30">
+    <Card className="bg-card border-[var(--sh-border)] border-primary/30" style={{ background: "var(--sh-surface-1)" }}>
       <CardContent className="pt-4 pb-4">
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -105,7 +105,7 @@ function ConsensusModelConfig() {
             <ModelSelect value={m3} onChange={setM3} label="Model 3 (Lite)" />
           </div>
         )}
-        <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border/50">
+        <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-[var(--sh-border)]/50">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
           <p className="text-[10px] text-muted-foreground">
             Active: <span className="text-foreground font-mono">{m1}</span> · <span className="text-foreground font-mono">{m2}</span> · <span className="text-foreground font-mono">{m3}</span>
@@ -292,7 +292,7 @@ export default function Settings() {
       )}
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 border-b border-border/50 pb-0">
+      <div className="flex gap-1 border-b border-[var(--sh-border)]/50 pb-0">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -315,7 +315,7 @@ export default function Settings() {
       {/* Tab: Data Sources */}
       {activeTab === "sources" && (
         <div className="grid gap-4">
-          <Card className="bg-card border-border">
+          <Card className="bg-card border-[var(--sh-border)]" style={{ background: "var(--sh-surface-1)" }}>
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <Database className="w-4 h-4 text-primary" />
@@ -332,7 +332,7 @@ export default function Settings() {
                     className={`flex items-center justify-between p-2.5 rounded-lg border text-left transition-all ${
                       enabledSources.has(source.id)
                         ? "border-primary/50 bg-primary/10"
-                        : "border-border bg-muted/20 opacity-50"
+                        : "border-[var(--sh-border)] bg-muted/20 opacity-50"
                     }`}
                   >
                     <div>
@@ -370,7 +370,7 @@ export default function Settings() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs border-border shrink-0"
+                  className="h-8 text-xs border-[var(--sh-border)] shrink-0"
                   onClick={() => resetDefaults.mutate()}
                   disabled={resetDefaults.isPending}
                 >
@@ -396,7 +396,7 @@ export default function Settings() {
                 const isEnabled = configData?.[module]?.enabled ?? true;
 
                 return (
-                  <Card key={module} className={`bg-card border-border transition-opacity ${!isEnabled ? "opacity-50" : ""}`}>
+                  <Card key={module} className={`bg-card border-[var(--sh-border)] transition-opacity ${!isEnabled ? "opacity-50" : ""}`}>
                     <CardContent className="pt-4 pb-4">
                       <div className="flex items-start gap-3">
                         <div className="w-8 h-8 rounded-lg bg-muted/40 flex items-center justify-center shrink-0 mt-0.5">
@@ -422,7 +422,7 @@ export default function Settings() {
                             }}
                             disabled={!isEnabled}
                           >
-                            <SelectTrigger className="h-8 text-xs border-border bg-muted/20">
+                            <SelectTrigger className="h-8 text-xs border-[var(--sh-border)] bg-muted/20">
                               <SelectValue placeholder="Select model..." />
                             </SelectTrigger>
                             <SelectContent className="max-h-72">
@@ -489,7 +489,7 @@ export default function Settings() {
           <ConsensusModelConfig />
 
           {/* Model catalog summary */}
-          <Card className="bg-card border-border">
+          <Card className="bg-card border-[var(--sh-border)]" style={{ background: "var(--sh-surface-1)" }}>
             <CardHeader className="pb-2">
               <CardTitle className="text-xs font-semibold text-muted-foreground">Available Models ({catalogData?.length ?? 0})</CardTitle>
             </CardHeader>
@@ -513,7 +513,7 @@ export default function Settings() {
       {/* Tab: Filters */}
       {activeTab === "filters" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="bg-card border-border">
+          <Card className="bg-card border-[var(--sh-border)]" style={{ background: "var(--sh-surface-1)" }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Settings2 className="w-4 h-4 text-amber-400" /> Scoring Filters
@@ -540,7 +540,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-border">
+          <Card className="bg-card border-[var(--sh-border)]" style={{ background: "var(--sh-surface-1)" }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Brain className="w-4 h-4 text-purple-400" /> AI Automation
@@ -568,7 +568,7 @@ export default function Settings() {
       {/* Tab: Notifications */}
       {activeTab === "notifications" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="bg-card border-border">
+          <Card className="bg-card border-[var(--sh-border)]" style={{ background: "var(--sh-surface-1)" }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Bell className="w-4 h-4 text-blue-400" /> Notifications
@@ -597,7 +597,7 @@ export default function Settings() {
       {activeTab === "general" && (
         <div className="grid gap-4 lg:grid-cols-2">
           {/* Onboarding */}
-          <Card className="bg-card border-border">
+          <Card className="bg-card border-[var(--sh-border)]" style={{ background: "var(--sh-surface-1)" }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Globe className="w-4 h-4 text-violet-400" /> Onboarding
