@@ -369,7 +369,7 @@ export const commercialAssets = mysqlTable("commercial_assets", {
   capRate: float("cap_rate"),
   noi: bigint("noi", { mode: "number" }),
   leaseType: mysqlEnum("lease_type", ["nnn", "gross", "modified_gross", "vacant"]),
-  zoning: varchar("zoning", { length: 100 }),
+  zoning: text("zoning"),
   opportunityZone: boolean("opportunity_zone").notNull().default(false),
   ozTractId: varchar("oz_tract_id", { length: 20 }),
   tadDistrict: varchar("tad_district", { length: 100 }),
@@ -419,3 +419,58 @@ export const dealShareTokens = mysqlTable("deal_share_tokens", {
 
 export type DealShareToken = typeof dealShareTokens.$inferSelect;
 export type InsertDealShareToken = typeof dealShareTokens.$inferInsert;
+
+// ─── Agent Artifact / Finding / Remediation types ────────────────────────────
+export type AgentArtifact = {
+  type: "cold_outreach_email" | "loi_draft" | "investment_thesis" | "due_diligence_checklist" | "seller_profile" | "negotiation_playbook" | "financing_model" | "risk_matrix";
+  title: string;
+  content: string;
+  format: "markdown" | "html" | "json";
+  generatedAt: number;
+};
+
+export type RedTeamFinding = {
+  category: "financial" | "operational" | "legal" | "market" | "execution" | "personal_fit";
+  severity: "critical" | "high" | "medium" | "low";
+  finding: string;
+  evidence: string;
+  recommendation: string;
+  confidenceScore: number;
+};
+
+export type RemediationAction = {
+  findingCategory: string;
+  action: string;
+  artifact?: AgentArtifact;
+  status: "pending" | "complete";
+};
+
+// ─── Agent Runs (Hermes-pattern: Plan→Execute→Reflect→Remediate) ──────────────
+// Stores every agent invocation with full input context, tool calls, and output artifacts.
+// Mirrors Hermes' trajectory.py — enables cross-run recall and skill improvement.
+export const agentRuns = mysqlTable("agent_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  dealId: int("deal_id").notNull(),
+  agentType: mysqlEnum("agent_type", ["deal_architect", "red_team", "remediation"]).notNull(),
+  status: mysqlEnum("status", ["pending", "running", "complete", "failed"]).notNull().default("pending"),
+  // Input context snapshot (deal data, user goals, prior run outputs)
+  inputContext: json("input_context").$type<Record<string, unknown>>(),
+  // Structured output artifacts (array of artifact objects)
+  artifacts: json("artifacts").$type<AgentArtifact[]>(),
+  // Red team findings (gaps, risks, confidence scores)
+  findings: json("findings").$type<RedTeamFinding[]>(),
+  // Remediation actions taken
+  remediations: json("remediations").$type<RemediationAction[]>(),
+  // Raw LLM response for debugging / trajectory replay
+  rawResponse: text("raw_response"),
+  // Confidence score 0-1 (self-assessed by agent)
+  confidenceScore: float("confidence_score"),
+  // Token usage for cost tracking
+  tokensUsed: int("tokens_used"),
+  // Parent run ID for chained agents (architect → red_team → remediation)
+  parentRunId: int("parent_run_id"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  completedAt: bigint("completed_at", { mode: "number" }),
+});
+export type AgentRun = typeof agentRuns.$inferSelect;
+export type InsertAgentRun = typeof agentRuns.$inferInsert;

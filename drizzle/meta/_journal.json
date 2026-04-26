@@ -22,6 +22,20 @@
       "when": 1776870391633,
       "tag": "0002_high_wraith",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1777173905054,
+      "tag": "0003_warm_moira_mactaggert",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1777174491494,
+      "tag": "0004_nasty_leo",
+      "breakpoints": true
     }
   ]
 }

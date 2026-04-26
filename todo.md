@@ -358,3 +358,16 @@
 - [x] Add off-market scan UI panel on Market Scan page (separate from on-market scan)
 - [x] Off-market results feed into Asset Scout pipeline (same createCommercialAsset flow)
 - [x] Run tests and save checkpoint
+
+## Sprint 13 — Three-Agent Loop (Hermes-pattern)
+
+- [x] Purge Sprint 11 test deals from DB (Sprint11 Scout Prefill Test, Sprint11 Share Test Deal)
+- [x] Fix Market Scan location defaults to Miami/FLL (remove Atlanta hardcodes)
+- [x] Build Off-Market Scout agent (Claude-powered, web-grounded research)
+- [x] Three-agent DB schema: agent_runs table with artifacts/findings/remediations JSON columns
+- [x] Deal Architect tRPC procedure (generates 6 artifacts: cold email, LOI, thesis, DD checklist, seller profile, negotiation playbook)
+- [x] Red Team tRPC procedure (adversarial stress-test: findings by severity/category, deal-killers, red flags)
+- [x] Remediation Agent tRPC procedure (fills gaps, generates missing artifacts, go/no-go recommendation)
+- [x] Agent Loop Panel UI in DealDetail — 3-step pipeline cards, artifact accordion, findings accordion, remediation plan with go/no-go badge
+- [x] Fix zoning column truncation (expanded to TEXT)
+- [x] 63/63 tests passing

@@ -1,0 +1,1 @@
+ALTER TABLE `commercial_assets` MODIFY COLUMN `zoning` text;

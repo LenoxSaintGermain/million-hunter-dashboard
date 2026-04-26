@@ -1065,6 +1065,169 @@ Generate a JSON dossier:
           trajectorySteps: result.trajectorySteps,
         };
       }),
+
+    // ─── Deal Architect: generate all artifacts to move on a deal ────────────
+    runDealArchitect: protectedProcedure
+      .input(z.object({ dealId: z.number() }))
+      .mutation(async ({ input }) => {
+        const deal = await getDealById(input.dealId);
+        if (!deal) throw new TRPCError({ code: "NOT_FOUND", message: "Deal not found" });
+        const { invokeLLM } = await import("./_core/llm");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const [result] = await db.execute<any>(
+          sql`INSERT INTO agent_runs (deal_id, agent_type, status, input_context, created_at)
+              VALUES (${input.dealId}, 'deal_architect', 'running', ${JSON.stringify({ dealId: deal.id, name: deal.name })}, ${Date.now()})`
+        );
+        const runId = (result as any).insertId;
+        try {
+          const systemPrompt = `You are the Deal Architect — an elite M&A advisor. Generate ALL artifacts a buyer needs to move decisively on a business acquisition.
+Generate these 6 artifacts:
+1. cold_outreach_email: Compelling personalized cold email to seller/broker
+2. loi_draft: Letter of Intent outline with key terms
+3. investment_thesis: 3-paragraph thesis (why this biz, value creation, exit optionality)
+4. due_diligence_checklist: Top 15 DD items specific to this business type
+5. seller_profile: Psychological profile of likely seller (motivations, fears, negotiation style)
+6. negotiation_playbook: 5 key negotiation moves with specific language
+
+Return JSON: { "artifacts": [{ "type": "...", "title": "...", "content": "...", "format": "markdown", "generatedAt": 0 }], "confidenceScore": 0.0 }`;
+          const userPrompt = `Deal: ${deal.name} | ${deal.industry || "Unknown"} | ${deal.location || "Unknown"}
+Revenue: $${((deal.revenue || 0) / 1e6).toFixed(2)}M | CF: $${((deal.cashFlow || 0) / 1e3).toFixed(0)}k | Ask: $${((deal.askingPrice || 0) / 1e6).toFixed(2)}M | ${deal.cashFlow ? ((deal.askingPrice || 0) / deal.cashFlow).toFixed(1) : "N/A"}x
+AI Score: ${deal.score ? parseFloat(String(deal.score)).toFixed(3) : "unscored"} | Source: ${deal.source || "unknown"}
+Description: ${deal.description || "No description provided"}
+Generate all 6 artifacts. Be specific, actionable, and tailored to THIS deal.`;
+          const response = await invokeLLM({
+            messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+            response_format: { type: "json_schema", json_schema: { name: "deal_architect_output", strict: true, schema: { type: "object", properties: { artifacts: { type: "array", items: { type: "object", properties: { type: { type: "string" }, title: { type: "string" }, content: { type: "string" }, format: { type: "string" }, generatedAt: { type: "number" } }, required: ["type", "title", "content", "format", "generatedAt"], additionalProperties: false } }, confidenceScore: { type: "number" } }, required: ["artifacts", "confidenceScore"], additionalProperties: false } } },
+          });
+          const raw = response.choices[0].message.content;
+          const parsed = JSON.parse(raw as string);
+          const artifacts = parsed.artifacts.map((a: any) => ({ ...a, generatedAt: Date.now() }));
+          await db.execute(sql`UPDATE agent_runs SET status = 'complete', artifacts = ${JSON.stringify(artifacts)}, confidence_score = ${parsed.confidenceScore ?? 0.8}, raw_response = ${raw}, completed_at = ${Date.now()} WHERE id = ${runId}`);
+          await logActivity({ type: "deal_scored", title: `Deal Architect: ${artifacts.length} artifacts for ${deal.name}`, dealId: input.dealId });
+          return { runId, artifacts, confidenceScore: parsed.confidenceScore ?? 0.8 };
+        } catch (e: any) {
+          await db.execute(sql`UPDATE agent_runs SET status = 'failed', raw_response = ${e.message}, completed_at = ${Date.now()} WHERE id = ${runId}`);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Deal Architect failed: ${e.message}` });
+        }
+      }),
+
+    // ─── Red Team: adversarial stress-tester ─────────────────────────────────
+    runRedTeam: protectedProcedure
+      .input(z.object({ dealId: z.number(), architectRunId: z.number().optional() }))
+      .mutation(async ({ input }) => {
+        const deal = await getDealById(input.dealId);
+        if (!deal) throw new TRPCError({ code: "NOT_FOUND", message: "Deal not found" });
+        const { invokeLLM } = await import("./_core/llm");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        let architectArtifacts: any[] = [];
+        if (input.architectRunId) {
+          const [rows] = await db.execute<any[]>(sql`SELECT artifacts FROM agent_runs WHERE id = ${input.architectRunId}`);
+          const runRows = Array.isArray(rows) ? rows : [];
+          if (runRows.length > 0 && runRows[0].artifacts) {
+            architectArtifacts = typeof runRows[0].artifacts === 'string' ? JSON.parse(runRows[0].artifacts) : runRows[0].artifacts;
+          }
+        }
+        const [result] = await db.execute<any>(
+          sql`INSERT INTO agent_runs (deal_id, agent_type, status, input_context, parent_run_id, created_at)
+              VALUES (${input.dealId}, 'red_team', 'running', ${JSON.stringify({ dealId: deal.id, architectRunId: input.architectRunId })}, ${input.architectRunId ?? null}, ${Date.now()})`
+        );
+        const runId = (result as any).insertId;
+        try {
+          const systemPrompt = `You are the Red Team Agent — a ruthless adversarial analyst stress-testing acquisition decisions.
+Find every reason this deal could fail. Think like: short-seller, skeptical LP, former employee, deal lawyer.
+For each finding: category (financial|operational|legal|market|execution|personal_fit), severity (critical|high|medium|low), finding, evidence, recommendation, confidenceScore (0-1).
+Return JSON: { "findings": [...], "overallRiskScore": 0.0, "dealKillers": ["..."], "redFlags": ["..."] }`;
+          const userPrompt = `Deal: ${deal.name} | ${deal.industry} | ${deal.location}
+Revenue: $${((deal.revenue || 0) / 1e6).toFixed(2)}M | CF: $${((deal.cashFlow || 0) / 1e3).toFixed(0)}k | Ask: $${((deal.askingPrice || 0) / 1e6).toFixed(2)}M | ${deal.cashFlow ? ((deal.askingPrice || 0) / deal.cashFlow).toFixed(1) : "N/A"}x
+Description: ${deal.description || "No description"}
+${architectArtifacts.length > 0 ? `Architect artifacts to stress-test: ${architectArtifacts.map((a: any) => `[${a.type}] ${a.title}`).join(', ')}` : ''}
+Find every gap, risk, and blind spot.`;
+          const response = await invokeLLM({
+            messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+            response_format: { type: "json_schema", json_schema: { name: "red_team_output", strict: true, schema: { type: "object", properties: { findings: { type: "array", items: { type: "object", properties: { category: { type: "string" }, severity: { type: "string" }, finding: { type: "string" }, evidence: { type: "string" }, recommendation: { type: "string" }, confidenceScore: { type: "number" } }, required: ["category", "severity", "finding", "evidence", "recommendation", "confidenceScore"], additionalProperties: false } }, overallRiskScore: { type: "number" }, dealKillers: { type: "array", items: { type: "string" } }, redFlags: { type: "array", items: { type: "string" } } }, required: ["findings", "overallRiskScore", "dealKillers", "redFlags"], additionalProperties: false } } },
+          });
+          const raw = response.choices[0].message.content;
+          const parsed = JSON.parse(raw as string);
+          await db.execute(sql`UPDATE agent_runs SET status = 'complete', findings = ${JSON.stringify(parsed.findings)}, confidence_score = ${parsed.overallRiskScore ?? 0.5}, raw_response = ${raw}, completed_at = ${Date.now()} WHERE id = ${runId}`);
+          await logActivity({ type: "red_flag_detected", title: `Red Team: ${parsed.findings.length} risks on ${deal.name} (${parsed.dealKillers.length} deal-killers)`, dealId: input.dealId });
+          return { runId, findings: parsed.findings, overallRiskScore: parsed.overallRiskScore, dealKillers: parsed.dealKillers, redFlags: parsed.redFlags };
+        } catch (e: any) {
+          await db.execute(sql`UPDATE agent_runs SET status = 'failed', raw_response = ${e.message}, completed_at = ${Date.now()} WHERE id = ${runId}`);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Red Team failed: ${e.message}` });
+        }
+      }),
+
+    // ─── Remediation Agent: fills gaps, generates missing artifacts, go/no-go ─
+    runRemediation: protectedProcedure
+      .input(z.object({ dealId: z.number(), redTeamRunId: z.number() }))
+      .mutation(async ({ input }) => {
+        const deal = await getDealById(input.dealId);
+        if (!deal) throw new TRPCError({ code: "NOT_FOUND", message: "Deal not found" });
+        const { invokeLLM } = await import("./_core/llm");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const [rows] = await db.execute<any[]>(sql`SELECT findings FROM agent_runs WHERE id = ${input.redTeamRunId}`);
+        const runRows = Array.isArray(rows) ? rows : [];
+        if (!runRows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Red team run not found" });
+        const findings: any[] = runRows[0].findings ? (typeof runRows[0].findings === 'string' ? JSON.parse(runRows[0].findings) : runRows[0].findings) : [];
+        const criticalAndHigh = findings.filter((f: any) => f.severity === 'critical' || f.severity === 'high');
+        const [result] = await db.execute<any>(
+          sql`INSERT INTO agent_runs (deal_id, agent_type, status, input_context, parent_run_id, created_at)
+              VALUES (${input.dealId}, 'remediation', 'running', ${JSON.stringify({ dealId: deal.id, redTeamRunId: input.redTeamRunId, findingsCount: findings.length })}, ${input.redTeamRunId}, ${Date.now()})`
+        );
+        const runId = (result as any).insertId;
+        try {
+          const systemPrompt = `You are the Remediation Agent — a decisive deal strategist turning red team findings into action.
+For each critical/high finding: produce a specific executable action AND a draft artifact where relevant.
+Artifact types: cold_outreach_email | loi_draft | investment_thesis | due_diligence_checklist | seller_profile | negotiation_playbook | financing_model | risk_matrix
+Return JSON: { "remediations": [{ "findingCategory": "...", "action": "...", "artifact": { "type": "...", "title": "...", "content": "...", "format": "markdown", "generatedAt": 0 } | null, "status": "complete" }], "executiveSummary": "...", "goNoGoRecommendation": "go" | "conditional_go" | "no_go", "confidenceScore": 0.0 }`;
+          const userPrompt = `Deal: ${deal.name} (${deal.industry}, ${deal.location})
+Revenue: $${((deal.revenue || 0) / 1e6).toFixed(2)}M | CF: $${((deal.cashFlow || 0) / 1e3).toFixed(0)}k | Ask: $${((deal.askingPrice || 0) / 1e6).toFixed(2)}M
+Critical/High findings (${criticalAndHigh.length}):
+${criticalAndHigh.map((f: any, i: number) => `${i+1}. [${f.severity.toUpperCase()}] ${f.category}: ${f.finding}\n   Rec: ${f.recommendation}`).join('\n\n')}
+Produce concrete remediation plan. Give go/no-go recommendation.`;
+          const response = await invokeLLM({
+            messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+            response_format: { type: "json_schema", json_schema: { name: "remediation_output", strict: true, schema: { type: "object", properties: { remediations: { type: "array", items: { type: "object", properties: { findingCategory: { type: "string" }, action: { type: "string" }, artifact: { anyOf: [{ type: "object", properties: { type: { type: "string" }, title: { type: "string" }, content: { type: "string" }, format: { type: "string" }, generatedAt: { type: "number" } }, required: ["type", "title", "content", "format", "generatedAt"], additionalProperties: false }, { type: "null" }] }, status: { type: "string" } }, required: ["findingCategory", "action", "artifact", "status"], additionalProperties: false } }, executiveSummary: { type: "string" }, goNoGoRecommendation: { type: "string" }, confidenceScore: { type: "number" } }, required: ["remediations", "executiveSummary", "goNoGoRecommendation", "confidenceScore"], additionalProperties: false } } },
+          });
+          const raw = response.choices[0].message.content;
+          const parsed = JSON.parse(raw as string);
+          await db.execute(sql`UPDATE agent_runs SET status = 'complete', remediations = ${JSON.stringify(parsed.remediations)}, confidence_score = ${parsed.confidenceScore ?? 0.75}, raw_response = ${raw}, completed_at = ${Date.now()} WHERE id = ${runId}`);
+          await logActivity({ type: "signal_analyzed", title: `Remediation: ${parsed.goNoGoRecommendation.toUpperCase()} on ${deal.name} — ${parsed.remediations.length} actions`, dealId: input.dealId });
+          return { runId, remediations: parsed.remediations, executiveSummary: parsed.executiveSummary, goNoGoRecommendation: parsed.goNoGoRecommendation, confidenceScore: parsed.confidenceScore };
+        } catch (e: any) {
+          await db.execute(sql`UPDATE agent_runs SET status = 'failed', raw_response = ${e.message}, completed_at = ${Date.now()} WHERE id = ${runId}`);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Remediation failed: ${e.message}` });
+        }
+      }),
+
+    // ─── Get Agent Runs for a deal ────────────────────────────────────────────
+    getRuns: protectedProcedure
+      .input(z.object({ dealId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const [rows] = await db.execute<any[]>(
+          sql`SELECT * FROM agent_runs WHERE deal_id = ${input.dealId} ORDER BY created_at DESC LIMIT 20`
+        );
+        const runs = Array.isArray(rows) ? rows : [];
+        return runs.map((r: any) => ({
+          id: r.id,
+          dealId: r.deal_id,
+          agentType: r.agent_type,
+          status: r.status,
+          confidenceScore: r.confidence_score,
+          tokensUsed: r.tokens_used,
+          parentRunId: r.parent_run_id,
+          createdAt: r.created_at,
+          completedAt: r.completed_at,
+          artifacts: r.artifacts ? (typeof r.artifacts === 'string' ? JSON.parse(r.artifacts) : r.artifacts) : [],
+          findings: r.findings ? (typeof r.findings === 'string' ? JSON.parse(r.findings) : r.findings) : [],
+          remediations: r.remediations ? (typeof r.remediations === 'string' ? JSON.parse(r.remediations) : r.remediations) : [],
+        }));
+      }),
   }),
 
   // ─── Scout (Commercial Assets) ────────────────────────────────────────────

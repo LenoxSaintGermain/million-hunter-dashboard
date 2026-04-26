@@ -1,3 +1,4 @@
+import React from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -15,6 +16,7 @@ import {
   FileText, Mail, AlertTriangle, TrendingUp,
   Building2, MapPin, Users, Calendar, ExternalLink,
   GitBranch, BarChart3, UserSearch, CheckCircle2, XCircle, Loader2, Share2,
+  Bot, Swords, Wrench, ChevronDown, ChevronRight, Copy, Download,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -269,6 +271,9 @@ export default function DealDetail() {
           </TabsTrigger>
           <TabsTrigger value="seller" className="text-xs h-7">
             <UserSearch className="w-3 h-3 mr-1" />Seller Sim
+          </TabsTrigger>
+          <TabsTrigger value="agents" className="text-xs h-7">
+            <Bot className="h-3 w-3 mr-1" />Agent Loop
           </TabsTrigger>
           <TabsTrigger value="trajectory" className="text-xs h-7">
             <GitBranch className="w-3 h-3 mr-1" />Trajectory
@@ -808,12 +813,333 @@ export default function DealDetail() {
             </CardContent>
           </Card>
         </TabsContent>
+        <TabsContent value="agents" className="mt-4">
+          <AgentLoopPanel dealId={dealId} dealName={deal.name} />
+        </TabsContent>
        </Tabs>
       {/* Co-Pilot with deal-specific context injected */}
       <CoPilot dealId={dealId} dealName={deal.name} />
     </DashboardLayout>
   );
 }
+// ─── Agent Loop Panel (Hermes-pattern: Architect → Red Team → Remediation) ────
+function AgentLoopPanel({ dealId, dealName }: { dealId: number; dealName: string }) {
+  const [activeRunId, setActiveRunId] = React.useState<number | null>(null);
+  const [redTeamRunId, setRedTeamRunId] = React.useState<number | null>(null);
+  const [expandedArtifact, setExpandedArtifact] = React.useState<string | null>(null);
+  const [expandedFinding, setExpandedFinding] = React.useState<number | null>(null);
+  const utils = trpc.useUtils();
+
+  const { data: runs, isLoading: runsLoading, refetch: refetchRuns } = trpc.agents.getRuns.useQuery({ dealId });
+
+  const architectMutation = trpc.agents.runDealArchitect.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Deal Architect complete — ${data.artifacts.length} artifacts generated`);
+      setActiveRunId(data.runId);
+      refetchRuns();
+    },
+    onError: (e) => toast.error(`Deal Architect failed: ${e.message}`),
+  });
+
+  const redTeamMutation = trpc.agents.runRedTeam.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Red Team found ${data.findings.length} risks (${data.dealKillers.length} deal-killers)`);
+      setRedTeamRunId(data.runId);
+      refetchRuns();
+    },
+    onError: (e) => toast.error(`Red Team failed: ${e.message}`),
+  });
+
+  const remediationMutation = trpc.agents.runRemediation.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Remediation: ${data.goNoGoRecommendation.toUpperCase()} — ${data.remediations.length} actions`);
+      refetchRuns();
+    },
+    onError: (e) => toast.error(`Remediation failed: ${e.message}`),
+  });
+
+  const architectRun = runs?.find(r => r.agentType === 'deal_architect' && r.status === 'complete');
+  const redTeamRun = runs?.find(r => r.agentType === 'red_team' && r.status === 'complete');
+  const remediationRun = runs?.find(r => r.agentType === 'remediation' && r.status === 'complete');
+
+  const isAnyRunning = architectMutation.isPending || redTeamMutation.isPending || remediationMutation.isPending;
+
+  const severityColor: Record<string, string> = {
+    critical: "text-red-400 bg-red-500/10 border-red-500/20",
+    high: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+    medium: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+    low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+  };
+
+  const goNoGoColor: Record<string, string> = {
+    go: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
+    conditional_go: "text-amber-400 bg-amber-500/10 border-amber-500/30",
+    no_go: "text-red-400 bg-red-500/10 border-red-500/30",
+  };
+
+  const artifactIcon: Record<string, React.ReactNode> = {
+    cold_outreach_email: <Mail className="h-3.5 w-3.5" />,
+    loi_draft: <FileText className="h-3.5 w-3.5" />,
+    investment_thesis: <TrendingUp className="h-3.5 w-3.5" />,
+    due_diligence_checklist: <CheckCircle2 className="h-3.5 w-3.5" />,
+    seller_profile: <UserSearch className="h-3.5 w-3.5" />,
+    negotiation_playbook: <Shield className="h-3.5 w-3.5" />,
+    financing_model: <DollarSign className="h-3.5 w-3.5" />,
+    risk_matrix: <AlertTriangle className="h-3.5 w-3.5" />,
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Pipeline header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <Bot className="h-4 w-4 text-primary" />
+            Agent Loop
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Hermes-pattern: Architect → Red Team → Remediation
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => architectMutation.mutate({ dealId })}
+            disabled={isAnyRunning}
+            className="h-8 text-xs"
+          >
+            {architectMutation.isPending ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <Bot className="h-3 w-3 mr-1.5" />}
+            Run Full Loop
+          </Button>
+        </div>
+      </div>
+
+      {/* Three-agent pipeline steps */}
+      <div className="grid grid-cols-3 gap-3">
+        {/* Step 1: Deal Architect */}
+        <div className={cn("rounded-xl border p-4 space-y-3 transition-colors", architectRun ? "border-primary/30 bg-primary/5" : "border-border/50 bg-muted/20")}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold", architectRun ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>1</div>
+              <span className="text-sm font-medium">Deal Architect</span>
+            </div>
+            {architectRun && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+            {architectMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+          </div>
+          <p className="text-xs text-muted-foreground">Generates 6 deal artifacts: cold outreach, LOI, thesis, DD checklist, seller profile, negotiation playbook.</p>
+          {architectRun ? (
+            <div className="text-xs text-emerald-400 font-medium">{(architectRun.artifacts as any[])?.length ?? 0} artifacts ready</div>
+          ) : (
+            <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={() => architectMutation.mutate({ dealId })} disabled={isAnyRunning}>
+              {architectMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Bot className="h-3 w-3 mr-1" />}
+              Generate Artifacts
+            </Button>
+          )}
+        </div>
+
+        {/* Step 2: Red Team */}
+        <div className={cn("rounded-xl border p-4 space-y-3 transition-colors", redTeamRun ? "border-red-500/30 bg-red-500/5" : "border-border/50 bg-muted/20")}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold", redTeamRun ? "bg-red-500 text-white" : "bg-muted text-muted-foreground")}>2</div>
+              <span className="text-sm font-medium">Red Team</span>
+            </div>
+            {redTeamRun && <Swords className="h-4 w-4 text-red-400" />}
+            {redTeamMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-red-400" />}
+          </div>
+          <p className="text-xs text-muted-foreground">Adversarial stress-test. Finds deal-killers, red flags, and gaps across 6 risk categories.</p>
+          {redTeamRun ? (
+            <div className="text-xs text-red-400 font-medium">
+              {(redTeamRun.findings as any[])?.filter((f: any) => f.severity === 'critical').length ?? 0} critical · {(redTeamRun.findings as any[])?.length ?? 0} total risks
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" className="w-full h-7 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={() => redTeamMutation.mutate({ dealId, architectRunId: architectRun?.id })} disabled={isAnyRunning}>
+              {redTeamMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Swords className="h-3 w-3 mr-1" />}
+              Stress-Test Deal
+            </Button>
+          )}
+        </div>
+
+        {/* Step 3: Remediation */}
+        <div className={cn("rounded-xl border p-4 space-y-3 transition-colors", remediationRun ? "border-amber-500/30 bg-amber-500/5" : "border-border/50 bg-muted/20")}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold", remediationRun ? "bg-amber-500 text-black" : "bg-muted text-muted-foreground")}>3</div>
+              <span className="text-sm font-medium">Remediation</span>
+            </div>
+            {remediationRun && <Wrench className="h-4 w-4 text-amber-400" />}
+            {remediationMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-amber-400" />}
+          </div>
+          <p className="text-xs text-muted-foreground">Fills gaps, generates missing artifacts, and delivers a Go/No-Go recommendation.</p>
+          {remediationRun ? (
+            <div className={cn("text-xs font-bold px-2 py-1 rounded border inline-block", goNoGoColor[(remediationRun.remediations as any)?.goNoGoRecommendation] ?? goNoGoColor.conditional_go)}>
+              {String((remediationRun as any).goNoGoRecommendation ?? "PENDING").replace(/_/g, " ").toUpperCase()}
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" className="w-full h-7 text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10" onClick={() => { if (redTeamRun) remediationMutation.mutate({ dealId, redTeamRunId: redTeamRun.id }); else toast.error("Run Red Team first"); }} disabled={isAnyRunning || !redTeamRun}>
+              {remediationMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Wrench className="h-3 w-3 mr-1" />}
+              Remediate Gaps
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Artifacts from Deal Architect */}
+      {architectRun && (architectRun.artifacts as any[])?.length > 0 && (
+        <Card className="border-primary/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Bot className="h-4 w-4 text-primary" />
+              Deal Architect Artifacts
+              <Badge variant="secondary" className="text-xs ml-auto">{(architectRun.artifacts as any[]).length} files</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {(architectRun.artifacts as any[]).map((artifact: any, i: number) => (
+              <div key={i} className="border border-border/50 rounded-lg overflow-hidden">
+                <button
+                  className="w-full flex items-center justify-between p-3 hover:bg-muted/30 transition-colors text-left"
+                  onClick={() => setExpandedArtifact(expandedArtifact === artifact.type ? null : artifact.type)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">{artifactIcon[artifact.type] ?? <FileText className="h-3.5 w-3.5" />}</span>
+                    <span className="text-sm font-medium">{artifact.title}</span>
+                    <Badge variant="outline" className="text-xs">{artifact.type.replace(/_/g, " ")}</Badge>
+                  </div>
+                  {expandedArtifact === artifact.type ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </button>
+                {expandedArtifact === artifact.type && (
+                  <div className="border-t border-border/50 p-4 bg-muted/10">
+                    <div className="flex justify-end mb-2">
+                      <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => { navigator.clipboard.writeText(artifact.content); toast.success("Copied to clipboard"); }}>
+                        <Copy className="h-3 w-3 mr-1" />Copy
+                      </Button>
+                    </div>
+                    <Streamdown className="text-sm prose prose-invert max-w-none">{artifact.content}</Streamdown>
+                  </div>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Red Team Findings */}
+      {redTeamRun && (redTeamRun.findings as any[])?.length > 0 && (
+        <Card className="border-red-500/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Swords className="h-4 w-4 text-red-400" />
+              Red Team Findings
+              <Badge variant="destructive" className="text-xs ml-auto">
+                {(redTeamRun.findings as any[]).filter((f: any) => f.severity === 'critical').length} critical
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {(redTeamRun.findings as any[]).map((finding: any, i: number) => (
+              <div key={i} className={cn("border rounded-lg overflow-hidden", severityColor[finding.severity] ?? "border-border/50")}>
+                <button
+                  className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors text-left"
+                  onClick={() => setExpandedFinding(expandedFinding === i ? null : i)}
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge className={cn("text-xs border", severityColor[finding.severity])}>{finding.severity}</Badge>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wide">{finding.category}</span>
+                    <span className="text-sm font-medium text-foreground">{finding.finding}</span>
+                  </div>
+                  {expandedFinding === i ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                </button>
+                {expandedFinding === i && (
+                  <div className="border-t border-current/20 p-4 space-y-2 bg-black/20">
+                    <div><span className="text-xs font-semibold text-muted-foreground uppercase">Evidence</span><p className="text-sm mt-1">{finding.evidence}</p></div>
+                    <div><span className="text-xs font-semibold text-muted-foreground uppercase">Recommendation</span><p className="text-sm mt-1">{finding.recommendation}</p></div>
+                    <div className="text-xs text-muted-foreground">Confidence: {(finding.confidenceScore * 100).toFixed(0)}%</div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Remediation Plan */}
+      {remediationRun && (
+        <Card className="border-amber-500/20">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Wrench className="h-4 w-4 text-amber-400" />
+                Remediation Plan
+              </CardTitle>
+              {(remediationRun as any).goNoGoRecommendation && (
+                <div className={cn("text-sm font-bold px-3 py-1 rounded-full border", goNoGoColor[(remediationRun as any).goNoGoRecommendation] ?? goNoGoColor.conditional_go)}>
+                  {String((remediationRun as any).goNoGoRecommendation).replace(/_/g, " ").toUpperCase()}
+                </div>
+              )}
+            </div>
+            {(remediationRun as any).executiveSummary && (
+              <p className="text-xs text-muted-foreground mt-2">{(remediationRun as any).executiveSummary}</p>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(remediationRun.remediations as any[])?.map((rem: any, i: number) => (
+              <div key={i} className="border border-border/50 rounded-lg p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">{rem.findingCategory}</Badge>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 ml-auto" />
+                </div>
+                <p className="text-sm">{rem.action}</p>
+                {rem.artifact && (
+                  <div className="mt-2 border border-amber-500/20 rounded-lg overflow-hidden">
+                    <button
+                      className="w-full flex items-center justify-between p-2.5 hover:bg-amber-500/5 transition-colors text-left"
+                      onClick={() => setExpandedArtifact(expandedArtifact === `rem-${i}` ? null : `rem-${i}`)}
+                    >
+                      <div className="flex items-center gap-2">
+                        {artifactIcon[rem.artifact.type] ?? <FileText className="h-3.5 w-3.5" />}
+                        <span className="text-xs font-medium">{rem.artifact.title}</span>
+                      </div>
+                      {expandedArtifact === `rem-${i}` ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    </button>
+                    {expandedArtifact === `rem-${i}` && (
+                      <div className="border-t border-amber-500/20 p-3 bg-black/20">
+                        <Streamdown className="text-sm prose prose-invert max-w-none">{rem.artifact.content}</Streamdown>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Empty state */}
+      {!architectRun && !redTeamRun && !remediationRun && !isAnyRunning && (
+        <div className="text-center py-12 text-muted-foreground">
+          <Bot className="h-10 w-10 mx-auto mb-3 opacity-30" />
+          <p className="text-sm font-medium">No agent runs yet</p>
+          <p className="text-xs mt-1">Start with Deal Architect to generate all acquisition artifacts</p>
+        </div>
+      )}
+
+      {/* Running state */}
+      {isAnyRunning && (
+        <div className="flex items-center justify-center gap-3 py-8 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <span className="text-sm">
+            {architectMutation.isPending && "Deal Architect generating artifacts..."}
+            {redTeamMutation.isPending && "Red Team stress-testing the deal..."}
+            {remediationMutation.isPending && "Remediation Agent filling gaps..."}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OutreachTab({ dealId }: { dealId: number }) {
   const { data: contacts, isLoading, refetch } = trpc.outreach.getByDealId.useQuery({ dealId });
   const createContact = trpc.outreach.create.useMutation({
