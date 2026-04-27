@@ -13,7 +13,7 @@ import {
   Zap, Brain, RefreshCw, ChevronRight,
   Building2, MapPin, Clock, AlertCircle,
   Landmark, CalendarDays, BarChart2, Megaphone, Waves,
-  ExternalLink, Loader2, Users,
+  ExternalLink, Loader2, Users, Trash2,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -290,6 +290,10 @@ function SentinelPanel() {
     onSuccess: (r) => { toast.success(`${r.message}`); refetch(); },
     onError: (e) => toast.error(`Refresh failed: ${e.message}`),
   });
+  const deleteSignal = trpc.sentinel.delete.useMutation({
+    onSuccess: () => { toast.success("Signal deleted"); refetch(); },
+    onError: (e) => toast.error(`Delete failed: ${e.message}`),
+  });
   const [autoSeeded, setAutoSeeded] = useState(false);
   useEffect(() => {
     if (!isLoading && signals?.length === 0 && !autoSeeded && !seed.isPending) {
@@ -405,14 +409,30 @@ function SentinelPanel() {
                             }}>⚡ High Urgency</span>
                           )}
                         </div>
-                        <span style={{
-                          display: "inline-flex", flexShrink: 0, alignItems: "center",
-                          padding: "0 6px", height: 16, borderRadius: 4, marginLeft: 4,
-                          fontSize: 9, fontWeight: 700,
-                          background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
-                        }}>
-                          {cfg.label}
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                          <span style={{
+                            display: "inline-flex", alignItems: "center",
+                            padding: "0 6px", height: 16, borderRadius: 4,
+                            fontSize: 9, fontWeight: 700,
+                            background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
+                          }}>
+                            {cfg.label}
+                          </span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); if (confirm("Delete this signal?")) deleteSignal.mutate({ id: sig.id }); }}
+                            title="Delete signal"
+                            style={{
+                              display: "inline-flex", alignItems: "center", justifyContent: "center",
+                              width: 20, height: 20, borderRadius: 4, border: `1px solid ${C.bd}`,
+                              background: "transparent", color: C.fg4, cursor: "pointer",
+                              transition: "all 0.15s",
+                            }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = `${C.re}15`; (e.currentTarget as HTMLButtonElement).style.color = C.re; (e.currentTarget as HTMLButtonElement).style.borderColor = `${C.re}30`; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = C.fg4; (e.currentTarget as HTMLButtonElement).style.borderColor = C.bd; }}
+                          >
+                            <Trash2 style={{ width: 10, height: 10 }} />
+                          </button>
+                        </div>
                       </div>
                       <ConfidenceBar score={sig.confidenceScore} />
                       <p style={{ fontSize: 10, color: C.fg3, marginTop: 4, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
@@ -472,6 +492,11 @@ export default function Home() {
   const utils = trpc.useUtils();
   const { data, isLoading, refetch } = trpc.dashboard.stats.useQuery();
   const { data: topDealsData } = trpc.deals.list.useQuery({ limit: 5 });
+  const deleteDeal = trpc.deals.delete.useMutation({
+    onSuccess: () => { toast.success("Deal removed"); utils.deals.list.invalidate(); utils.dashboard.stats.invalidate(); },
+    onError: (e) => toast.error(`Delete failed: ${e.message}`),
+  });
+
   const triggerScan = trpc.scan.trigger.useMutation({
     onSuccess: (d) => {
       toast.success(d.message);
@@ -670,6 +695,19 @@ export default function Home() {
                         <ScoreBadge score={deal.score} />
                       </div>
                       <ChevronRight style={{ width: 14, height: 14, color: C.fg4 }} />
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (confirm(`Delete "${deal.name}"? This cannot be undone.`)) deleteDeal.mutate({ id: deal.id }); }}
+                        title="Delete deal"
+                        style={{
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          width: 24, height: 24, borderRadius: 6, border: `1px solid ${C.bd}`,
+                          background: "transparent", color: C.fg4, cursor: "pointer", flexShrink: 0,
+                        }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = `${C.re}15`; (e.currentTarget as HTMLButtonElement).style.color = C.re; (e.currentTarget as HTMLButtonElement).style.borderColor = `${C.re}30`; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = C.fg4; (e.currentTarget as HTMLButtonElement).style.borderColor = C.bd; }}
+                      >
+                        <Trash2 style={{ width: 12, height: 12 }} />
+                      </button>
                     </div>
                   </div>
                 </Link>

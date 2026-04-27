@@ -147,6 +147,17 @@ export const appRouter = router({
         await logActivity({ dealId: input.id, type: "deal_scored", title: `${deal.name} scored: ${score.toFixed(3)}` });
         return { score, redFlagCount };
       }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { deals: dealsTable } = await import("../drizzle/schema");
+        await db.delete(dealsTable).where(eq(dealsTable.id, input.id));
+        await logActivity({ type: "deal_added", title: `Deal #${input.id} deleted by operator` });
+        return { success: true };
+      }),
+
     velocity: publicProcedure
       .query(async () => {
         const db = await getDb();
@@ -1471,6 +1482,16 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
       .query(async ({ input }) => {
         const { getMacroSignalsActive } = await import("./db");
         return getMacroSignalsActive(input?.limit ?? 20);
+      }),
+    // Hard-delete a single macro signal
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { macroSignals } = await import("../drizzle/schema");
+        await db.delete(macroSignals).where(eq(macroSignals.id, input.id));
+        return { success: true };
       }),
     // Run auto-archive sweep (marks expired signals archived)
     autoArchive: protectedProcedure

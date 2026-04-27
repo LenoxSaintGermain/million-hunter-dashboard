@@ -409,6 +409,16 @@
 - [ ] Animated onboarding archetype reveal screen
 - [ ] DNA strand bars with live animation on every investor screen
 
+## Sprint 18 — Delete Capability + Test Data Purge
+
+- [x] Purge 7 Sprint6 test signals from DB (macro_signals table)
+- [x] Purge 2 Sprint11 test deals from DB (Sprint11 Share Test Deal, Sprint11 Scout Prefill Test)
+- [x] Add deals.delete tRPC procedure (hard-delete by id, operator-protected)
+- [x] Add sentinel.delete tRPC procedure (hard-delete macro signal by id, operator-protected)
+- [x] Wire trash icon delete button into each deal row in Command Center (with confirm dialog)
+- [x] Wire trash icon delete button into each signal card in Sentinel panel (with confirm dialog)
+- [x] 81/81 tests passing, zero TypeScript errors
+
 ## Sprint 17 — DNA Match Scores on Deal Cards
 
 - [x] Create client/src/lib/dnaMatch.ts — pure scoring engine (sector 30pts, size 25pts, risk 25pts, IRR 20pts)
