@@ -1,10 +1,9 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
 import ScanProgress from "@/components/ScanProgress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -13,11 +12,12 @@ import {
   Zap, Brain, RefreshCw, ChevronRight,
   Building2, MapPin, Clock, AlertCircle,
   Landmark, CalendarDays, BarChart2, Megaphone, Waves,
-  ExternalLink, Loader2, Users, Trash2,
+  ExternalLink, Loader2, Users, Trash2, ArrowRight,
+  Target, Radio, ScanLine, Shield,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
-// ─── Design System Helpers ───────────────────────────────────────────────────
+// ─── Design Tokens (preserved) ───────────────────────────────────────────────
 const C = {
   p:   "oklch(0.65 0.22 250)",
   em:  "oklch(0.70 0.18 160)",
@@ -43,17 +43,22 @@ const fmt = (n: number | null | undefined) => {
   return `$${n}`;
 };
 
-// ─── ScoreBadge ──────────────────────────────────────────────────────────────
-function ScoreBadge({ score }: { score: any }) {
-  const v = score == null ? null : parseFloat(String(score));
-  if (v == null || isNaN(v)) return (
-    <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: C.fg4 }}>—</span>
-  );
-  return (
-    <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, color: scoreColor(v) }}>
-      {v.toFixed(3)}
-    </span>
-  );
+// ─── Fade-in animation hook ───────────────────────────────────────────────────
+function useFadeIn(delay = 0) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.opacity = "0";
+    el.style.transform = "translateY(10px)";
+    el.style.transition = `opacity 0.55s ease ${delay}ms, transform 0.55s ease ${delay}ms`;
+    const t = setTimeout(() => {
+      el.style.opacity = "1";
+      el.style.transform = "translateY(0)";
+    }, 30);
+    return () => clearTimeout(t);
+  }, [delay]);
+  return ref;
 }
 
 // ─── ConfidenceBar ───────────────────────────────────────────────────────────
@@ -64,119 +69,10 @@ function ConfidenceBar({ score }: { score: any }) {
   const color = pct >= 85 ? C.em : pct >= 70 ? C.am : C.fg3;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-      <div style={{ flex: 1, height: 3, borderRadius: 2, background: C.s2, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2, transition: "width 0.85s cubic-bezier(0.16,1,0.3,1)" }} />
+      <div style={{ flex: 1, height: 2, borderRadius: 1, background: `${C.bd}`, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 1, transition: "width 0.85s cubic-bezier(0.16,1,0.3,1)" }} />
       </div>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: C.fg3, flexShrink: 0 }}>{pct}%</span>
-    </div>
-  );
-}
-
-// ─── KPI Card ────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, sub, icon: Icon, trend, accentColor }: {
-  label: string; value: string; sub?: string; icon: React.ElementType;
-  trend?: "up" | "down" | "neutral"; accentColor?: string;
-}) {
-  const accent = accentColor ?? C.p;
-  return (
-    <div
-      className="card-hover-lift"
-      style={{
-        background: C.s1,
-        border: `1px solid ${C.bd}`,
-        borderRadius: 12,
-        padding: "16px",
-        cursor: "default",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: C.fg4 }}>
-          {label}
-        </span>
-        <div style={{
-          width: 28, height: 28, borderRadius: 8,
-          background: `${accent}1a`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <Icon style={{ width: 14, height: 14, color: accent }} />
-        </div>
-      </div>
-      <div style={{ fontFamily: "var(--font-sans)", fontSize: 24, fontWeight: 700, color: C.fg1, lineHeight: 1.2 }}>
-        {value}
-      </div>
-      {sub && (
-        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
-          {trend === "up" && <ArrowUpRight style={{ width: 12, height: 12, color: C.em }} />}
-          <span style={{ fontSize: 11, color: trend === "up" ? C.em : trend === "down" ? C.re : C.fg3 }}>
-            {sub}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Pipeline Velocity Sparkline ─────────────────────────────────────────────
-function VelocitySparkline() {
-  const { data, isLoading } = trpc.deals.velocity.useQuery();
-  const hasData = data && data.length > 0;
-  const total = data?.reduce((s, d) => s + (Number(d.count) || 0), 0) ?? 0;
-  const safeTotal = isNaN(total) ? 0 : total;
-  const trend = data && data.length >= 2
-    ? (Number(data[data.length - 1].count) || 0) - (Number(data[data.length - 2].count) || 0)
-    : 0;
-  const safeTrend = isNaN(trend) ? 0 : trend;
-
-  return (
-    <div style={{ background: C.s1, border: `1px solid ${C.bd}`, borderRadius: 12, padding: "16px 20px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <div>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: C.fg4 }}>
-            Pipeline Velocity
-          </span>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4 }}>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 700, color: C.fg1 }}>
-              {isLoading ? "—" : String(safeTotal)}
-            </span>
-            <span style={{ fontSize: 11, color: C.fg3 }}>deals / 8 wks</span>
-            {!isLoading && safeTrend !== 0 && (
-              <span style={{ fontSize: 11, fontWeight: 600, color: safeTrend > 0 ? C.em : C.re, display: "flex", alignItems: "center", gap: 2 }}>
-                <ArrowUpRight style={{ width: 12, height: 12, transform: safeTrend < 0 ? "rotate(180deg)" : undefined }} />
-                {safeTrend > 0 ? "+" : ""}{String(safeTrend)} wk
-              </span>
-            )}
-          </div>
-        </div>
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: `${C.p}1a`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <TrendingUp style={{ width: 14, height: 14, color: C.p }} />
-        </div>
-      </div>
-      {isLoading ? (
-        <Skeleton className="h-14 w-full" />
-      ) : !hasData ? (
-        <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <p style={{ fontSize: 10, color: `${C.fg4}` }}>No data yet — run a scan</p>
-        </div>
-      ) : (
-        <ResponsiveContainer width="100%" height={56}>
-          <AreaChart data={data} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
-            <defs>
-              <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={C.p} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={C.p} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <XAxis dataKey="week" tick={{ fontSize: 9, fill: C.fg3 }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fontSize: 9, fill: C.fg3 }} tickLine={false} axisLine={false} allowDecimals={false} />
-            <Tooltip
-              contentStyle={{ background: C.s1, border: `1px solid ${C.bd}`, borderRadius: 6, fontSize: 11, padding: "4px 8px" }}
-              labelStyle={{ color: C.fg3 }}
-              itemStyle={{ color: C.fg1 }}
-            />
-            <Area type="monotone" dataKey="count" name="Deals" stroke={C.p} strokeWidth={1.5} fill="url(#velocityGrad)" dot={false} />
-          </AreaChart>
-        </ResponsiveContainer>
-      )}
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: C.fg4, flexShrink: 0 }}>{pct}%</span>
     </div>
   );
 }
@@ -190,9 +86,9 @@ const SIGNAL_CONFIG: Record<string, { icon: React.ElementType; color: string; bg
   macro_momentum:{ icon: Waves,       color: C.em, bg: `${C.em}15`, border: `${C.em}25`, label: "Macro" },
 };
 
-// ─── Investor Interests Panel (operator-only) ───────────────────────────────
+// ─── Investor Interests Panel ─────────────────────────────────────────────────
 const INTEREST_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  expressed:         { bg: `oklch(0.75 0.20 80 / 0.15)`, color: `oklch(0.75 0.20 80)` },
+  expressed:         { bg: `oklch(0.75 0.20 80 / 0.15)`,  color: `oklch(0.75 0.20 80)` },
   operator_reviewing:{ bg: `oklch(0.75 0.15 200 / 0.15)`, color: `oklch(0.72 0.15 200)` },
   memo_shared:       { bg: `oklch(0.65 0.22 250 / 0.15)`, color: `oklch(0.65 0.22 250)` },
   committed:         { bg: `oklch(0.70 0.18 160 / 0.15)`, color: `oklch(0.70 0.18 160)` },
@@ -208,6 +104,7 @@ const INTEREST_STATUS_LABELS: Record<string, string> = {
 
 function InvestorInterestsPanel() {
   const utils = trpc.useUtils();
+  const ref = useFadeIn(300);
   const { data: interests, isLoading } = trpc.investor.getAllInterests.useQuery(undefined, { retry: false });
   const updateStatus = trpc.investor.updateInterestStatus.useMutation({
     onSuccess: () => utils.investor.getAllInterests.invalidate(),
@@ -216,54 +113,52 @@ function InvestorInterestsPanel() {
   if (isLoading || !interests || interests.length === 0) return null;
 
   return (
-    <div style={{
-      background: C.s1, border: `1px solid ${C.bd}`, borderRadius: 12,
-      padding: 20, gridColumn: "span 7",
+    <div ref={ref} style={{
+      borderTop: `1px solid ${C.bd}`,
+      paddingTop: 20,
     }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+      {/* Section label */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 8, background: `${C.p}1a`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Users style={{ width: 14, height: 14, color: C.p }} />
-          </div>
-          <span style={{ fontSize: 13, fontWeight: 600, color: C.fg1 }}>Investor Interests</span>
+          <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: C.fg4 }}>Capital Interest</span>
+          <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: `${C.p}20`, color: C.p, fontWeight: 700 }}>
+            {(interests as any[]).length} active
+          </span>
         </div>
-        <span style={{ fontSize: 11, color: C.fg4, fontFamily: "var(--font-mono)" }}>
-          {(interests as any[]).length} total
-        </span>
+        <Users style={{ width: 12, height: 12, color: C.fg4 }} />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {(interests as any[]).map((interest: any) => {
           const sc = INTEREST_STATUS_COLORS[interest.status] ?? INTEREST_STATUS_COLORS.expressed;
           return (
             <div key={interest.id} style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              gap: 12, padding: "10px 12px", borderRadius: 8,
-              background: C.s2, border: `1px solid ${C.bd}`,
+              gap: 12, padding: "8px 12px", borderRadius: 6,
+              background: `${C.s2}60`, borderLeft: `2px solid ${sc.color}40`,
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: C.fg1 }}>
-                  Deal #{interest.dealId}
-                  {interest.dealName && ` · ${interest.dealName}`}
+                <p style={{ fontSize: 11, fontWeight: 600, color: C.fg1 }}>
+                  {interest.dealName ?? `Deal #${interest.dealId}`}
                 </p>
                 {interest.allocationAmount && (
-                  <p style={{ fontSize: 11, color: C.em, fontFamily: "var(--font-mono)", marginTop: 2 }}>
+                  <p style={{ fontSize: 10, color: C.em, fontFamily: "var(--font-mono)", marginTop: 1 }}>
                     ${Number(interest.allocationAmount).toLocaleString()} allocation
                   </p>
                 )}
                 {interest.investorNote && (
-                  <p style={{ fontSize: 11, color: C.fg3, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <p style={{ fontSize: 10, color: C.fg3, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {interest.investorNote}
                   </p>
                 )}
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 9999, background: sc.bg, color: sc.color }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 9999, background: sc.bg, color: sc.color }}>
                   {INTEREST_STATUS_LABELS[interest.status] ?? interest.status}
                 </span>
                 <select
                   value={interest.status}
                   onChange={(e) => updateStatus.mutate({ interestId: interest.id, status: e.target.value as any })}
-                  style={{ fontSize: 11, background: C.s2, color: C.fg3, border: `1px solid ${C.bd}`, borderRadius: 6, padding: "2px 6px" }}
+                  style={{ fontSize: 10, background: C.s2, color: C.fg3, border: `1px solid ${C.bd}`, borderRadius: 4, padding: "2px 4px" }}
                 >
                   {Object.entries(INTEREST_STATUS_LABELS).map(([v, l]) => (
                     <option key={v} value={v}>{l}</option>
@@ -278,20 +173,21 @@ function InvestorInterestsPanel() {
   );
 }
 
-// ─── Sentinel Panel ──────────────────────────────────────────────────────────
-function SentinelPanel() {
+// ─── Macro Signal Stream (live ticker-style) ──────────────────────────────────
+function SignalStream() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const { isAuthenticated } = useAuth();
-  const { data: signals, isLoading, refetch } = trpc.sentinel.list.useQuery({ limit: 10 }, { enabled: isAuthenticated });
+  const ref = useFadeIn(200);
+  const { data: signals, isLoading, refetch } = trpc.sentinel.list.useQuery({ limit: 12 }, { enabled: isAuthenticated });
   const seed = trpc.sentinel.seed.useMutation({
     onSuccess: (r) => { if (r.seeded) { toast.success(`Sentinel seeded with ${r.count} signals`); refetch(); } },
   });
   const aiRefresh = trpc.sentinel.aiRefresh.useMutation({
-    onSuccess: (r) => { toast.success(`${r.message}`); refetch(); },
+    onSuccess: (r) => { toast.success(r.message); refetch(); },
     onError: (e) => toast.error(`Refresh failed: ${e.message}`),
   });
   const deleteSignal = trpc.sentinel.delete.useMutation({
-    onSuccess: () => { toast.success("Signal deleted"); refetch(); },
+    onSuccess: () => { toast.success("Signal removed"); refetch(); },
     onError: (e) => toast.error(`Delete failed: ${e.message}`),
   });
   const [autoSeeded, setAutoSeeded] = useState(false);
@@ -306,26 +202,37 @@ function SentinelPanel() {
     const m = Math.round((Date.now() - ts) / 60000);
     return m < 1 ? "just now" : m < 60 ? `${m}m ago` : `${Math.round(m / 60)}h ago`;
   };
-  const expiryLabel = (expiresAt: number | null | undefined) => {
-    if (!expiresAt) return null;
-    const msLeft = expiresAt - Date.now();
-    if (msLeft <= 0) return { label: "Expired", urgent: false };
-    const hLeft = Math.round(msLeft / 3600000);
-    const dLeft = Math.round(msLeft / 86400000);
-    if (hLeft < 24) return { label: `Expires in ${hLeft}h`, urgent: hLeft < 6 };
-    return { label: `Expires in ${dLeft}d`, urgent: false };
-  };
+
+  const activeSignals = signals
+    ? [...signals]
+        .filter((s) => !s.expiresAt || s.expiresAt > Date.now())
+        .sort((a, b) => (parseFloat(String(b.confidenceScore ?? 0)) || 0) - (parseFloat(String(a.confidenceScore ?? 0)) || 0))
+    : [];
 
   return (
-    <div style={{ background: C.s1, border: `1px solid ${C.bd}`, borderRadius: 12, display: "flex", flexDirection: "column", gridColumn: "span 2" }}>
-      {/* Header */}
-      <div style={{ padding: "16px 20px 12px", borderBottom: `1px solid ${C.bd}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-            <BarChart2 style={{ width: 14, height: 14, color: C.p }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: C.fg1 }}>Macro Signals Sentinel</span>
+    <div ref={ref} style={{
+      background: C.s1,
+      border: `1px solid ${C.bd}`,
+      borderRadius: 12,
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+    }}>
+      {/* Stream header */}
+      <div style={{
+        padding: "14px 18px 10px",
+        borderBottom: `1px solid ${C.bd}`,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: `${C.s2}40`,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Radio style={{ width: 13, height: 13, color: C.em }} />
+          <div>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: C.fg2 }}>
+              Signal Stream
+            </span>
+            <p style={{ fontSize: 10, color: C.fg4, marginTop: 1 }}>Macro · Institutional · Seasonal</p>
           </div>
-          <p style={{ fontSize: 11, color: C.fg3 }}>Institutional moves, permits, events &amp; macro tailwinds</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
@@ -333,170 +240,445 @@ function SentinelPanel() {
             disabled={aiRefresh.isPending}
             style={{
               display: "inline-flex", alignItems: "center", gap: 4,
-              fontSize: 10, fontWeight: 500, height: 24, padding: "0 8px", borderRadius: 6,
-              background: "transparent", border: `1px solid ${C.bd}`, color: C.fg3, cursor: "pointer",
+              fontSize: 9, fontWeight: 600, height: 22, padding: "0 8px", borderRadius: 4,
+              background: "transparent", border: `1px solid ${C.bd}`, color: C.fg4, cursor: "pointer",
+              textTransform: "uppercase", letterSpacing: "0.08em",
             }}
           >
             {aiRefresh.isPending
-              ? <Loader2 style={{ width: 10, height: 10 }} className="animate-spin" />
-              : <RefreshCw style={{ width: 10, height: 10 }} />}
-            {aiRefresh.isPending ? "Scanning..." : "Refresh"}
+              ? <Loader2 style={{ width: 9, height: 9 }} className="animate-spin" />
+              : <RefreshCw style={{ width: 9, height: 9 }} />}
+            {aiRefresh.isPending ? "Scanning" : "Refresh"}
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span className="live-dot" />
-            <span style={{ fontSize: 10, color: C.em, fontWeight: 500 }}>Live</span>
+            <span style={{ fontSize: 9, color: C.em, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Live</span>
           </div>
         </div>
       </div>
 
-      {/* Signal list */}
-      <div style={{ flex: 1, overflowY: "auto", maxHeight: 480, padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* Signal feed */}
+      <div style={{ flex: 1, overflowY: "auto", maxHeight: 520 }}>
         {isLoading || seed.isPending ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{ padding: 12, borderRadius: 8, border: `1px solid ${C.bd}`, background: `${C.s2}20` }}>
-              <Skeleton className="h-3 w-3/4 mb-2" />
-              <Skeleton className="h-2 w-full mb-1" />
-              <Skeleton className="h-1.5 w-1/2" />
-            </div>
-          ))
-        ) : !signals?.length ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 0", textAlign: "center" }}>
-            <Waves style={{ width: 32, height: 32, color: `${C.fg4}`, marginBottom: 8 }} />
-            <p style={{ fontSize: 12, color: C.fg3 }}>No signals yet</p>
+          <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 1 }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{ padding: "10px 0", borderBottom: `1px solid ${C.bd}20` }}>
+                <Skeleton className="h-2.5 w-4/5 mb-1.5" />
+                <Skeleton className="h-1.5 w-2/3" />
+              </div>
+            ))}
+          </div>
+        ) : !activeSignals.length ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 0", textAlign: "center" }}>
+            <Waves style={{ width: 28, height: 28, color: C.fg4, marginBottom: 8 }} />
+            <p style={{ fontSize: 11, color: C.fg4 }}>No active signals</p>
           </div>
         ) : (
-          [...signals]
-            .filter((sig) => !sig.expiresAt || sig.expiresAt > Date.now())
-            .sort((a, b) => (parseFloat(String(b.confidenceScore ?? 0)) || 0) - (parseFloat(String(a.confidenceScore ?? 0)) || 0))
-            .map((sig) => {
-              const cfg = SIGNAL_CONFIG[sig.signalType] ?? SIGNAL_CONFIG.macro_momentum;
-              const Icon = cfg.icon;
-              const isOpen = expanded === sig.id;
-              const isHighUrgency = (parseFloat(String(sig.confidenceScore ?? 0)) || 0) >= 0.88;
-              return (
-                <div
-                  key={sig.id}
-                  className="signal-hover"
-                  onClick={() => setExpanded(isOpen ? null : sig.id)}
-                  style={{
-                    borderRadius: 8,
-                    border: `1px solid ${isHighUrgency ? `${C.re}30` : isOpen ? `${C.p}30` : C.bd}`,
-                    background: isHighUrgency ? `${C.re}08` : isOpen ? `${C.p}08` : `${C.s2}20`,
-                    cursor: "pointer",
-                    padding: 12,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                    <div style={{
-                      width: 24, height: 24, borderRadius: 6, flexShrink: 0, marginTop: 2,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      background: cfg.bg, border: `1px solid ${cfg.border}`,
-                    }}>
-                      <Icon style={{ width: 12, height: 12, color: cfg.color }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 4 }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: 12, fontWeight: 600, color: C.fg1, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                            {sig.title}
-                          </p>
-                          {isHighUrgency && (
-                            <span style={{
-                              display: "inline-flex", alignItems: "center", gap: 2, marginTop: 2,
-                              padding: "0 6px", height: 16, borderRadius: 4,
-                              fontSize: 9, fontWeight: 700,
-                              background: `${C.re}15`, color: C.re, border: `1px solid ${C.re}25`,
-                            }}>⚡ High Urgency</span>
-                          )}
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                          <span style={{
-                            display: "inline-flex", alignItems: "center",
-                            padding: "0 6px", height: 16, borderRadius: 4,
-                            fontSize: 9, fontWeight: 700,
-                            background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
-                          }}>
-                            {cfg.label}
-                          </span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); if (confirm("Delete this signal?")) deleteSignal.mutate({ id: sig.id }); }}
-                            title="Delete signal"
-                            style={{
-                              display: "inline-flex", alignItems: "center", justifyContent: "center",
-                              width: 20, height: 20, borderRadius: 4, border: `1px solid ${C.bd}`,
-                              background: "transparent", color: C.fg4, cursor: "pointer",
-                              transition: "all 0.15s",
-                            }}
-                            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = `${C.re}15`; (e.currentTarget as HTMLButtonElement).style.color = C.re; (e.currentTarget as HTMLButtonElement).style.borderColor = `${C.re}30`; }}
-                            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = C.fg4; (e.currentTarget as HTMLButtonElement).style.borderColor = C.bd; }}
-                          >
-                            <Trash2 style={{ width: 10, height: 10 }} />
-                          </button>
-                        </div>
-                      </div>
-                      <ConfidenceBar score={sig.confidenceScore} />
-                      <p style={{ fontSize: 10, color: C.fg3, marginTop: 4, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-                        <Clock style={{ width: 10, height: 10 }} />
-                        {elapsed(sig.createdAt)}
-                        {sig.impactedAssetClasses && sig.impactedAssetClasses.length > 0 && (
-                          <><span style={{ color: `${C.fg4}` }}>·</span><span>{sig.impactedAssetClasses.slice(0, 2).join(", ")}</span></>
-                        )}
-                        {(() => {
-                          const exp = expiryLabel(sig.expiresAt);
-                          if (!exp) return null;
-                          return (
-                            <><span style={{ color: C.fg4 }}>·</span><span style={{ color: exp.urgent ? C.am : C.fg3, fontWeight: exp.urgent ? 600 : 400 }}>{exp.label}</span></>
-                          );
-                        })()}
-                      </p>
-                    </div>
+          activeSignals.map((sig, idx) => {
+            const cfg = SIGNAL_CONFIG[sig.signalType] ?? SIGNAL_CONFIG.macro_momentum;
+            const Icon = cfg.icon;
+            const isOpen = expanded === sig.id;
+            const isHighUrgency = (parseFloat(String(sig.confidenceScore ?? 0)) || 0) >= 0.88;
+            const isFirst = idx === 0;
+
+            return (
+              <div
+                key={sig.id}
+                onClick={() => setExpanded(isOpen ? null : sig.id)}
+                className={cn("signal-entry", isHighUrgency && "urgency-border")}
+                style={{
+                  padding: "11px 18px",
+                  borderBottom: `1px solid ${C.bd}30`,
+                  borderLeft: `2px solid ${isHighUrgency ? C.re : isFirst ? C.p : "transparent"}`,
+                  background: isOpen ? `${C.p}06` : isHighUrgency ? `${C.re}05` : "transparent",
+                  cursor: "pointer",
+                  transition: "background 0.2s ease",
+                  animationDelay: `${idx * 50}ms`,
+                }}
+                onMouseEnter={(e) => { if (!isOpen) (e.currentTarget as HTMLDivElement).style.background = `${C.s2}60`; }}
+                onMouseLeave={(e) => { if (!isOpen) (e.currentTarget as HTMLDivElement).style.background = isHighUrgency ? `${C.re}05` : "transparent"; }}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  {/* Type icon */}
+                  <div style={{
+                    width: 20, height: 20, borderRadius: 4, flexShrink: 0, marginTop: 1,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: cfg.bg,
+                  }}>
+                    <Icon style={{ width: 10, height: 10, color: cfg.color }} />
                   </div>
 
-                  {isOpen && (
-                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.bd}`, display: "flex", flexDirection: "column", gap: 8 }}>
-                      <p style={{ fontSize: 12, color: C.fg2, lineHeight: 1.6 }}>{sig.summary}</p>
-                      {sig.roryPitch && (
-                        <div style={{ padding: 10, borderRadius: 6, background: `${C.p}08`, border: `1px solid ${C.p}15` }}>
-                          <p style={{ fontSize: 9, color: `${C.p}b0`, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Signal Insight</p>
-                          <p style={{ fontSize: 12, color: C.fg1, fontStyle: "italic", lineHeight: 1.6 }}>"{sig.roryPitch}"</p>
-                        </div>
-                      )}
-                      {sig.recommendedAction && (
-                        <div style={{ padding: 10, borderRadius: 6, background: `${C.em}08`, border: `1px solid ${C.em}15` }}>
-                          <p style={{ fontSize: 9, color: C.em, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Recommended Action</p>
-                          <p style={{ fontSize: 12, color: C.fg1, lineHeight: 1.6 }}>{sig.recommendedAction}</p>
-                        </div>
-                      )}
-                      {sig.sourceUrl && (
-                        <a href={sig.sourceUrl} target="_blank" rel="noopener noreferrer"
-                          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, color: C.p, textDecoration: "none" }}
-                          onClick={(e) => e.stopPropagation()}>
-                          <ExternalLink style={{ width: 10, height: 10 }} />
-                          Source
-                        </a>
-                      )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* Title row */}
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
+                      <p style={{
+                        fontSize: 11, fontWeight: 600, color: C.fg1, lineHeight: 1.4,
+                        display: "-webkit-box", WebkitLineClamp: isOpen ? undefined : 2,
+                        WebkitBoxOrient: "vertical", overflow: isOpen ? "visible" : "hidden",
+                        flex: 1,
+                      }}>
+                        {isHighUrgency && (
+                          <span style={{ color: C.re, marginRight: 4, fontSize: 10 }}>⚡</span>
+                        )}
+                        {sig.title}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
+                        <span style={{
+                          fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3,
+                          background: cfg.bg, color: cfg.color, textTransform: "uppercase", letterSpacing: "0.08em",
+                        }}>
+                          {cfg.label}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); if (confirm("Remove this signal?")) deleteSignal.mutate({ id: sig.id }); }}
+                          title="Remove"
+                          style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            width: 18, height: 18, borderRadius: 3, border: "none",
+                            background: "transparent", color: C.fg4, cursor: "pointer",
+                          }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.re; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.fg4; }}
+                        >
+                          <Trash2 style={{ width: 9, height: 9 }} />
+                        </button>
+                      </div>
                     </div>
-                  )}
+
+                    {/* Confidence bar */}
+                    <ConfidenceBar score={sig.confidenceScore} />
+
+                    {/* Meta */}
+                    <p style={{ fontSize: 9, color: C.fg4, marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                      <Clock style={{ width: 8, height: 8 }} />
+                      {elapsed(sig.createdAt)}
+                      {sig.impactedAssetClasses && sig.impactedAssetClasses.length > 0 && (
+                        <><span style={{ color: C.bd }}>·</span><span>{sig.impactedAssetClasses.slice(0, 2).join(", ")}</span></>
+                      )}
+                    </p>
+
+                    {/* Expanded detail */}
+                    {isOpen && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.bd}30` }}>
+                        <p style={{ fontSize: 11, color: C.fg2, lineHeight: 1.65 }}>{sig.summary}</p>
+                        {sig.roryPitch && (
+                          <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 5, background: `${C.p}08`, borderLeft: `2px solid ${C.p}40` }}>
+                            <p style={{ fontSize: 9, color: `${C.p}b0`, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>Signal Insight</p>
+                            <p style={{ fontSize: 11, color: C.fg1, fontStyle: "italic", lineHeight: 1.6 }}>"{sig.roryPitch}"</p>
+                          </div>
+                        )}
+                        {sig.recommendedAction && (
+                          <div style={{ marginTop: 6, padding: "8px 10px", borderRadius: 5, background: `${C.em}08`, borderLeft: `2px solid ${C.em}40` }}>
+                            <p style={{ fontSize: 9, color: C.em, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>Recommended Action</p>
+                            <p style={{ fontSize: 11, color: C.fg1, lineHeight: 1.6 }}>{sig.recommendedAction}</p>
+                          </div>
+                        )}
+                        {sig.sourceUrl && (
+                          <a href={sig.sourceUrl} target="_blank" rel="noopener noreferrer"
+                            style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, color: C.p, textDecoration: "none", marginTop: 6 }}
+                            onClick={(e) => e.stopPropagation()}>
+                            <ExternalLink style={{ width: 9, height: 9 }} />
+                            Source
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              );
-            })
+              </div>
+            );
+          })
         )}
       </div>
     </div>
   );
 }
 
-// ─── Home ────────────────────────────────────────────────────────────────────
+// ─── Velocity Sparkline (compact) ────────────────────────────────────────────
+function VelocityMini() {
+  const { data, isLoading } = trpc.deals.velocity.useQuery();
+  const total = data?.reduce((s, d) => s + (Number(d.count) || 0), 0) ?? 0;
+  const trend = data && data.length >= 2
+    ? (Number(data[data.length - 1].count) || 0) - (Number(data[data.length - 2].count) || 0)
+    : 0;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div>
+        <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: C.fg4 }}>Velocity</span>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 2 }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 18, fontWeight: 700, color: C.fg1 }}>
+            {isLoading ? "—" : String(isNaN(total) ? 0 : total)}
+          </span>
+          <span style={{ fontSize: 10, color: C.fg4 }}>/ 8 wks</span>
+          {!isLoading && trend !== 0 && (
+            <span style={{ fontSize: 10, fontWeight: 600, color: trend > 0 ? C.em : C.re }}>
+              {trend > 0 ? "↑" : "↓"}{Math.abs(trend)}
+            </span>
+          )}
+        </div>
+      </div>
+      {!isLoading && data && data.length > 0 && (
+        <div style={{ flex: 1, height: 36 }}>
+          <ResponsiveContainer width="100%" height={36}>
+            <AreaChart data={data} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="vg2" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={C.p} stopOpacity={0.25} />
+                  <stop offset="95%" stopColor={C.p} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Tooltip
+                contentStyle={{ background: C.s1, border: `1px solid ${C.bd}`, borderRadius: 4, fontSize: 10, padding: "2px 6px" }}
+                labelStyle={{ color: C.fg3 }} itemStyle={{ color: C.fg1 }}
+              />
+              <Area type="monotone" dataKey="count" name="Deals" stroke={C.p} strokeWidth={1.5} fill="url(#vg2)" dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Intelligence Feed (ranked deal list) ─────────────────────────────────────
+function IntelligenceFeed({ deals, isLoading, onDelete }: {
+  deals: any[] | undefined;
+  isLoading: boolean;
+  onDelete: (id: number, name: string) => void;
+}) {
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
+
+  if (isLoading) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} style={{ padding: "14px 20px", borderBottom: `1px solid ${C.bd}30` }}>
+            <Skeleton className="h-3 w-3/5 mb-2" />
+            <Skeleton className="h-2 w-2/5" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!deals?.length) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "56px 0", textAlign: "center" }}>
+        <ScanLine style={{ width: 36, height: 36, color: C.fg4, marginBottom: 12 }} />
+        <p style={{ fontSize: 12, fontWeight: 500, color: C.fg3 }}>No intelligence yet</p>
+        <p style={{ fontSize: 11, color: C.fg4, marginTop: 4 }}>Trigger a market scan to populate the feed</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {deals.map((deal, idx) => {
+        const score = deal.score != null ? parseFloat(String(deal.score)) : null;
+        const isHovered = hoveredId === deal.id;
+        const rank = idx + 1;
+        const isTop = rank <= 2;
+
+        return (
+          <div
+            key={deal.id}
+            style={{ position: "relative" }}
+            onMouseEnter={() => setHoveredId(deal.id)}
+            onMouseLeave={() => setHoveredId(null)}
+          >
+            <Link href={`/deal/${deal.id}`}>
+              <div
+                className="feed-entry"
+                style={{
+                  display: "flex", alignItems: "center", gap: 16,
+                  padding: "14px 20px",
+                  borderBottom: `1px solid ${C.bd}30`,
+                  borderLeft: `2px solid ${isTop ? C.p : "transparent"}`,
+                  background: isHovered ? `${C.s2}60` : "transparent",
+                  cursor: "pointer",
+                  transition: "background 0.15s ease",
+                  animationDelay: `${idx * 60}ms`,
+                }}>
+                {/* Rank */}
+                <span style={{
+                  fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700,
+                  color: isTop ? C.p : C.fg4,
+                  width: 20, flexShrink: 0, textAlign: "center",
+                }}>
+                  {String(rank).padStart(2, "0")}
+                </span>
+
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: C.fg1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {deal.name}
+                    </p>
+                    {deal.opportunityZone && (
+                      <span style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: `${C.em}15`, color: C.em, flexShrink: 0 }}>OZ</span>
+                    )}
+                    {deal.tadDistrict && (
+                      <span style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: `${C.p}15`, color: C.p, flexShrink: 0 }}>TAD</span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {deal.location && (
+                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.fg4 }}>
+                        <MapPin style={{ width: 9, height: 9 }} />{deal.location}
+                      </span>
+                    )}
+                    {deal.industry && (
+                      <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 6px", borderRadius: 3, background: C.s2, color: C.fg3 }}>
+                        {deal.industry}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Metrics */}
+                <div style={{ display: "flex", alignItems: "center", gap: 20, flexShrink: 0 }}>
+                  <div style={{ textAlign: "right" }}>
+                    <p style={{ fontSize: 9, color: C.fg4, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 2 }}>Cash Flow</p>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: C.em, fontFamily: "var(--font-mono)" }}>{fmt(deal.cashFlow)}</p>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <p style={{ fontSize: 9, color: C.fg4, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 2 }}>Score</p>
+                    <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, color: score != null ? scoreColor(score) : C.fg4 }}>
+                      {score != null && !isNaN(score) ? score.toFixed(3) : "—"}
+                    </p>
+                  </div>
+                  <ArrowRight style={{ width: 13, height: 13, color: isHovered ? C.fg2 : C.fg4, transition: "color 0.15s, transform 0.15s", transform: isHovered ? "translateX(2px)" : "none" }} />
+                </div>
+              </div>
+            </Link>
+
+            {/* Delete — only visible on hover */}
+            {isHovered && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(deal.id, deal.name); }}
+                title="Remove deal"
+                style={{
+                  position: "absolute", right: 52, top: "50%", transform: "translateY(-50%)",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  width: 22, height: 22, borderRadius: 4, border: `1px solid ${C.bd}`,
+                  background: C.s1, color: C.fg4, cursor: "pointer", zIndex: 2,
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.re; (e.currentTarget as HTMLButtonElement).style.borderColor = `${C.re}40`; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.fg4; (e.currentTarget as HTMLButtonElement).style.borderColor = C.bd; }}
+              >
+                <Trash2 style={{ width: 10, height: 10 }} />
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Stat Strip ───────────────────────────────────────────────────────────────
+function StatStrip({ stats, outStats, isLoading }: { stats: any; outStats: any; isLoading: boolean }) {
+  const ref = useFadeIn(100);
+  const items = [
+    { label: "Pipeline Value", value: fmt(stats?.totalPipelineValue), color: C.p, icon: DollarSign },
+    { label: "Active Deals", value: String(stats?.total ?? 0), color: C.fg2, icon: Building2 },
+    { label: "Avg Score", value: stats?.avgScore != null ? parseFloat(String(stats.avgScore)).toFixed(3) : "—", color: C.am, icon: Target, mono: true },
+    { label: "High Priority", value: String(stats?.highPriority ?? 0), color: C.em, icon: Zap },
+    { label: "Outreach Sent", value: String(outStats?.totalSent ?? 0), color: C.cy, icon: Activity },
+    { label: "Responded", value: String(outStats?.responded ?? 0), color: C.em, icon: ArrowUpRight },
+  ];
+
+  return (
+    <div ref={ref} style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(6, 1fr)",
+      borderBottom: `1px solid ${C.bd}`,
+    }}>
+      {items.map((item, i) => {
+        const Icon = item.icon;
+        return (
+          <div key={i} style={{
+            padding: "14px 20px",
+            borderRight: i < items.length - 1 ? `1px solid ${C.bd}` : "none",
+            display: "flex", flexDirection: "column", gap: 4,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.18em", color: C.fg4 }}>
+                {item.label}
+              </span>
+              <Icon style={{ width: 11, height: 11, color: `${item.color}80` }} />
+            </div>
+            {isLoading ? (
+              <Skeleton className="h-5 w-16" />
+            ) : (
+              <span style={{
+                fontFamily: item.mono ? "var(--font-mono)" : "var(--font-sans)",
+                fontSize: 20, fontWeight: 700, color: item.color, lineHeight: 1,
+              }}>
+                {item.value}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Activity Log (compact) ───────────────────────────────────────────────────
+function ActivityLog({ activities }: { activities: any[] | undefined }) {
+  if (!activities?.length) return null;
+  const activityColor: Record<string, string> = {
+    deal_added: C.p, deal_scored: C.am, signal_analyzed: C.vi,
+    red_flag_detected: C.re, memo_generated: C.p, outreach_sent: C.em,
+    scan_completed: C.em, stage_changed: C.fg3,
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      {activities.slice(0, 8).map((act: any, i: number) => (
+        <div key={i} style={{
+          display: "flex", alignItems: "flex-start", gap: 10,
+          padding: "8px 18px",
+          borderBottom: `1px solid ${C.bd}20`,
+        }}>
+          <div style={{
+            width: 6, height: 6, borderRadius: "50%", flexShrink: 0, marginTop: 4,
+            background: activityColor[act.type] ?? C.fg4,
+          }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 11, color: C.fg2, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {act.title}
+            </p>
+            {act.detail && (
+              <p style={{ fontSize: 10, color: C.fg4, marginTop: 1 }}>{act.detail}</p>
+            )}
+          </div>
+          <span style={{ fontSize: 9, color: C.fg4, flexShrink: 0, fontFamily: "var(--font-mono)" }}>
+            {(() => {
+              const m = Math.round((Date.now() - act.createdAt) / 60000);
+              return m < 1 ? "now" : m < 60 ? `${m}m` : `${Math.round(m / 60)}h`;
+            })()}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Command Center (main page) ───────────────────────────────────────────────
 export default function Home() {
   const [activeScanJobId, setActiveScanJobId] = useState<number | null>(null);
   const utils = trpc.useUtils();
   const { data, isLoading, refetch } = trpc.dashboard.stats.useQuery();
-  const { data: topDealsData } = trpc.deals.list.useQuery({ limit: 5 });
+  const { data: topDealsData } = trpc.deals.list.useQuery({ limit: 8 });
+  const heroRef = useFadeIn(0);
+  const feedRef = useFadeIn(150);
+
   const deleteDeal = trpc.deals.delete.useMutation({
     onSuccess: () => { toast.success("Deal removed"); utils.deals.list.invalidate(); utils.dashboard.stats.invalidate(); },
     onError: (e) => toast.error(`Delete failed: ${e.message}`),
   });
-
   const triggerScan = trpc.scan.trigger.useMutation({
     onSuccess: (d) => {
       toast.success(d.message);
@@ -508,216 +690,193 @@ export default function Home() {
   const stats = data?.dealStats;
   const outStats = data?.outreachStats;
 
-  const activityIcon: Record<string, React.ElementType> = {
-    deal_added: Building2, deal_scored: Zap, signal_analyzed: Brain,
-    red_flag_detected: AlertCircle, memo_generated: Activity,
-    outreach_sent: ArrowUpRight, scan_completed: RefreshCw, stage_changed: ChevronRight,
-  };
-  const activityColor: Record<string, string> = {
-    deal_added: C.p, deal_scored: C.am, signal_analyzed: C.vi,
-    red_flag_detected: C.re, memo_generated: C.p, outreach_sent: C.em,
-    scan_completed: C.p, stage_changed: C.fg3,
-  };
+  // Derive system state annotation
+  const systemAnnotation = (() => {
+    if (!stats) return null;
+    if ((stats.highPriority ?? 0) > 0) return { text: `${stats.highPriority} deal${stats.highPriority > 1 ? "s" : ""} ready for outreach — initiate contact`, color: C.em };
+    if ((stats.total ?? 0) === 0) return { text: "Pipeline empty — run a market scan to begin intelligence gathering", color: C.am };
+    if ((outStats?.responded ?? 0) > 0) return { text: `${outStats?.responded} broker response${(outStats?.responded ?? 0) > 1 ? "s" : ""} pending review`, color: C.p };
+    return { text: "System nominal — no immediate action required", color: C.fg3 };
+  })();
 
   return (
     <DashboardLayout>
+      {/* ── BRIEFING HEADER ─────────────────────────────────────────────────── */}
+      <div ref={heroRef} className="sh-hero-panel" style={{ padding: 0, overflow: "hidden" }}>
+        {/* Operator briefing bar */}
+        <div style={{
+          padding: "18px 28px 16px",
+          borderBottom: `1px solid ${C.bd}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20,
+        }}>
+          <div style={{ flex: 1 }}>
+            {/* Dateline */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <span className="live-dot" />
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: C.em }}>
+                System Operational
+              </span>
+              <span style={{ color: C.bd }}>·</span>
+              <span style={{ fontSize: 9, color: C.fg4, fontFamily: "var(--font-mono)" }}>
+                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).toUpperCase()}
+              </span>
+            </div>
 
-      {/* ── Hero Panel ── */}
-      <div className="sh-hero-panel" style={{ padding: "24px 28px" }}>
-        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <span className="live-dot" />
-                <span style={{ fontSize: 11, color: C.em, fontWeight: 500 }}>System Operational</span>
-              </div>
-              <h1 style={{ fontSize: 24, fontWeight: 700, color: C.fg1, letterSpacing: "-0.01em", marginBottom: 6 }}>
-                Signal Hunter Command Center
-              </h1>
-              <p style={{ fontSize: 13, color: C.fg3, maxWidth: 520 }}>
-                {data?.latestScan
-                  ? `Last scan: ${new Date(data.latestScan.createdAt).toLocaleString()} · ${(data.latestScan.sources as string[] | null)?.length ?? 0} platforms`
-                  : "No scan data yet. Trigger a market scan to begin."}
+            {/* Headline */}
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: C.fg1, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 8 }}>
+              Signal Hunter Command Center
+            </h1>
+
+            {/* System annotation — proactive insight */}
+            {systemAnnotation && (
+              <p style={{ fontSize: 12, color: systemAnnotation.color, display: "flex", alignItems: "center", gap: 6 }}>
+                <Shield style={{ width: 11, height: 11, flexShrink: 0 }} />
+                {systemAnnotation.text}
               </p>
-            </div>
-            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-              <button
-                className="btn-press"
-                onClick={() => triggerScan.mutate({})}
-                disabled={triggerScan.isPending || activeScanJobId !== null}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  height: 36, padding: "0 14px", borderRadius: 8,
-                  fontSize: 12, fontWeight: 500, cursor: "pointer",
-                  background: "transparent", border: `1px solid ${C.bd}`, color: C.fg2,
-                  opacity: (triggerScan.isPending || activeScanJobId !== null) ? 0.6 : 1,
-                }}
-              >
-                <RefreshCw style={{ width: 14, height: 14 }} className={cn(triggerScan.isPending && "animate-spin")} />
-                {triggerScan.isPending ? "Starting..." : activeScanJobId ? "Scan Running..." : "Run Market Scan"}
-              </button>
-              <Link href="/scan">
-                <button
-                  className="btn-press"
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: 6,
-                    height: 36, padding: "0 14px", borderRadius: 8,
-                    fontSize: 12, fontWeight: 500, cursor: "pointer",
-                    background: C.p, border: "none", color: "oklch(0.98 0.005 260)",
-                  }}
-                >
-                  <TrendingUp style={{ width: 14, height: 14 }} />
-                  View Pipeline
-                </button>
-              </Link>
-            </div>
+            )}
+
+            {/* Last scan */}
+            {data?.latestScan && (
+              <p style={{ fontSize: 10, color: C.fg4, marginTop: 6, fontFamily: "var(--font-mono)" }}>
+                Last scan: {new Date(data.latestScan.createdAt).toLocaleString()} · {(data.latestScan.sources as string[] | null)?.length ?? 0} platforms
+              </p>
+            )}
           </div>
-        </div>
-      </div>
 
-      {/* ── Scan Progress ── */}
-      {activeScanJobId !== null && (
-        <ScanProgress
-          jobId={activeScanJobId}
-          onComplete={() => {
-            setActiveScanJobId(null);
-            refetch();
-            utils.deals.list.invalidate();
-            utils.dashboard.stats.invalidate();
-          }}
-          onRetry={() => { setActiveScanJobId(null); triggerScan.mutate({}); }}
-        />
-      )}
-
-      {/* ── KPI Cards ── */}
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <KpiCard label="Total Pipeline Value" value={fmt(stats?.totalPipelineValue)}
-            sub={`${stats?.total ?? 0} active deals`} icon={DollarSign} trend="up" />
-          <KpiCard label="Avg. Deal Score"
-            value={stats?.avgScore != null ? parseFloat(String(stats.avgScore)).toFixed(3) : "—"}
-            sub="across qualified deals" icon={TrendingUp} trend="up" accentColor={C.am} />
-          <KpiCard label="High Priority" value={String(stats?.highPriority ?? 0)}
-            sub="deals ready for outreach" icon={Zap}
-            trend={stats?.highPriority ? "up" : "neutral"} accentColor={C.em} />
-          <KpiCard label="Outreach Active" value={String(outStats?.totalSent ?? 0)}
-            sub={`${outStats?.responded ?? 0} responded`} icon={Activity}
-            trend={outStats?.responded ? "up" : "neutral"} accentColor={C.cy} />
-        </div>
-      )}
-
-      {/* ── Pipeline Velocity ── */}
-      <VelocitySparkline />
-
-      {/* ── Investor Interests (operator-only) ── */}
-      <InvestorInterestsPanel />
-
-      {/* ── Main Grid ── */}
-      <div className="grid gap-6 lg:grid-cols-7">
-
-        {/* Top Opportunities */}
-        <div style={{ background: C.s1, border: `1px solid ${C.bd}`, borderRadius: 12, gridColumn: "span 5" }}>
-          <div style={{ padding: "16px 20px 12px", borderBottom: `1px solid ${C.bd}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.fg1 }}>Top Opportunities</span>
-              <p style={{ fontSize: 11, color: C.fg3, marginTop: 2 }}>Ranked by AI scoring algorithm</p>
-            </div>
+          {/* Primary actions */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, alignItems: "flex-end" }}>
+            <button
+              className={cn("btn-press", !triggerScan.isPending && !activeScanJobId && "scan-btn-idle")}
+              onClick={() => triggerScan.mutate({})}
+              disabled={triggerScan.isPending || activeScanJobId !== null}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                height: 40, padding: "0 20px", borderRadius: 8,
+                fontSize: 12, fontWeight: 600, cursor: "pointer",
+                background: triggerScan.isPending || activeScanJobId !== null ? `${C.p}60` : C.p,
+                border: "none", color: "oklch(0.98 0.005 260)",
+                letterSpacing: "0.02em",
+                transition: "box-shadow 0.2s ease",
+              }}
+            >
+              {triggerScan.isPending || activeScanJobId !== null
+                ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Scanning Market</>
+                : <><ScanLine style={{ width: 14, height: 14 }} /> Run Market Scan</>
+              }
+            </button>
             <Link href="/scan">
-              <button style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: C.fg3, background: "transparent", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = C.fg1)}
-                onMouseLeave={(e) => (e.currentTarget.style.color = C.fg3)}>
-                View all <ChevronRight style={{ width: 12, height: 12 }} />
+              <button style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                height: 30, padding: "0 12px", borderRadius: 6,
+                fontSize: 11, fontWeight: 500, cursor: "pointer",
+                background: "transparent", border: `1px solid ${C.bd}`, color: C.fg3,
+              }}>
+                <TrendingUp style={{ width: 12, height: 12 }} />
+                View Pipeline
               </button>
             </Link>
           </div>
-          <div style={{ padding: "8px 12px" }}>
-            {isLoading ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 8 }}>
-                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
-              </div>
-            ) : !topDealsData?.length ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 0", textAlign: "center" }}>
-                <Building2 style={{ width: 40, height: 40, color: C.fg4, marginBottom: 12 }} />
-                <p style={{ fontSize: 13, fontWeight: 500, color: C.fg3 }}>No deals yet</p>
-                <p style={{ fontSize: 11, color: C.fg4, marginTop: 4 }}>Run a market scan to populate the pipeline</p>
-              </div>
-            ) : (
-              topDealsData.map((deal) => (
-                <Link key={deal.id} href={`/deal/${deal.id}`}>
-                  <div
-                    className="row-hover"
-                    style={{
-                      display: "flex", alignItems: "center", gap: 16,
-                      padding: "10px 12px", borderRadius: 8, cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: `${C.p}1a`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Building2 style={{ width: 16, height: 16, color: C.p }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13, fontWeight: 500, color: C.fg1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {deal.name}
-                      </p>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2, flexWrap: "wrap" }}>
-                        {deal.location && (
-                          <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: C.fg3 }}>
-                            <MapPin style={{ width: 10, height: 10 }} />{deal.location}
-                          </span>
-                        )}
-                        {deal.industry && (
-                          <span style={{ fontSize: 10, fontWeight: 600, padding: "0 6px", height: 16, borderRadius: 4, background: `${C.s2}`, color: C.fg3, border: `1px solid ${C.bd}`, display: "inline-flex", alignItems: "center" }}>
-                            {deal.industry}
-                          </span>
-                        )}
-                        {deal.opportunityZone && (
-                          <span style={{ fontSize: 10, fontWeight: 700, padding: "0 6px", height: 16, borderRadius: 9999, background: `${C.em}15`, color: C.em, border: `1px solid ${C.em}20`, display: "inline-flex", alignItems: "center" }}>
-                            OZ
-                          </span>
-                        )}
-                        {deal.tadDistrict && (
-                          <span style={{ fontSize: 10, fontWeight: 700, padding: "0 6px", height: 16, borderRadius: 9999, background: `${C.p}15`, color: C.p, border: `1px solid ${C.p}20`, display: "inline-flex", alignItems: "center" }}>
-                            TAD
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 24, flexShrink: 0, textAlign: "right" }}>
-                      <div>
-                        <p style={{ fontSize: 10, color: C.fg4, textTransform: "uppercase", letterSpacing: "0.1em" }}>Cash Flow</p>
-                        <p style={{ fontSize: 12, fontWeight: 600, color: C.em, fontFamily: "var(--font-mono)" }}>{fmt(deal.cashFlow)}</p>
-                      </div>
-                      <div>
-                        <p style={{ fontSize: 10, color: C.fg4, textTransform: "uppercase", letterSpacing: "0.1em" }}>Score</p>
-                        <ScoreBadge score={deal.score} />
-                      </div>
-                      <ChevronRight style={{ width: 14, height: 14, color: C.fg4 }} />
-                      <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (confirm(`Delete "${deal.name}"? This cannot be undone.`)) deleteDeal.mutate({ id: deal.id }); }}
-                        title="Delete deal"
-                        style={{
-                          display: "inline-flex", alignItems: "center", justifyContent: "center",
-                          width: 24, height: 24, borderRadius: 6, border: `1px solid ${C.bd}`,
-                          background: "transparent", color: C.fg4, cursor: "pointer", flexShrink: 0,
-                        }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = `${C.re}15`; (e.currentTarget as HTMLButtonElement).style.color = C.re; (e.currentTarget as HTMLButtonElement).style.borderColor = `${C.re}30`; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = C.fg4; (e.currentTarget as HTMLButtonElement).style.borderColor = C.bd; }}
-                      >
-                        <Trash2 style={{ width: 12, height: 12 }} />
-                      </button>
-                    </div>
-                  </div>
-                </Link>
-              ))
-            )}
-          </div>
         </div>
 
-        {/* Macro Signals Sentinel */}
-        <SentinelPanel />
+        {/* Scan progress */}
+        {activeScanJobId !== null && (
+          <ScanProgress
+            jobId={activeScanJobId}
+            onComplete={() => {
+              setActiveScanJobId(null);
+              refetch();
+              utils.deals.list.invalidate();
+              utils.dashboard.stats.invalidate();
+            }}
+            onRetry={() => { setActiveScanJobId(null); triggerScan.mutate({}); }}
+          />
+        )}
+
+        {/* Stat strip */}
+        <StatStrip stats={stats} outStats={outStats} isLoading={isLoading} />
+      </div>
+
+      {/* ── MAIN EDITORIAL GRID ──────────────────────────────────────────────── */}
+      <div className="editorial-grid" style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 0, minHeight: 0 }}>
+
+        {/* LEFT: Intelligence Feed + Activity */}
+        <div ref={feedRef} style={{ borderRight: `1px solid ${C.bd}`, display: "flex", flexDirection: "column" }}>
+
+          {/* Feed header */}
+          <div style={{
+            padding: "14px 20px 10px",
+            borderBottom: `1px solid ${C.bd}`,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            background: `${C.s2}30`,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Brain style={{ width: 13, height: 13, color: C.p }} />
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: C.fg2 }}>
+                  Intelligence Feed
+                </span>
+                <p style={{ fontSize: 9, color: C.fg4, marginTop: 1 }}>Ranked by AI acquisition score</p>
+              </div>
+            </div>
+            <Link href="/scan">
+              <button style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                fontSize: 9, fontWeight: 600, height: 22, padding: "0 8px", borderRadius: 4,
+                background: "transparent", border: `1px solid ${C.bd}`, color: C.fg4, cursor: "pointer",
+                textTransform: "uppercase", letterSpacing: "0.08em",
+              }}>
+                All Deals <ChevronRight style={{ width: 9, height: 9 }} />
+              </button>
+            </Link>
+          </div>
+
+          {/* Deal feed */}
+          <IntelligenceFeed
+            deals={topDealsData}
+            isLoading={isLoading}
+            onDelete={(id, name) => {
+              if (confirm(`Remove "${name}" from the pipeline? This cannot be undone.`)) {
+                deleteDeal.mutate({ id });
+              }
+            }}
+          />
+
+          {/* Velocity strip */}
+          {!isLoading && (
+            <div style={{
+              padding: "14px 20px",
+              borderTop: `1px solid ${C.bd}`,
+              background: `${C.s2}20`,
+            }}>
+              <VelocityMini />
+            </div>
+          )}
+
+          {/* Investor interests */}
+          {!isLoading && (
+            <div style={{ padding: "0 20px 20px" }}>
+              <InvestorInterestsPanel />
+            </div>
+          )}
+
+          {/* Activity log */}
+          {data?.recentActivity && data.recentActivity.length > 0 && (
+            <div style={{ borderTop: `1px solid ${C.bd}` }}>
+              <div style={{ padding: "12px 18px 8px", display: "flex", alignItems: "center", gap: 8 }}>
+                <Activity style={{ width: 11, height: 11, color: C.fg4 }} />
+                <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.18em", color: C.fg4 }}>
+                  System Log
+                </span>
+              </div>
+              <ActivityLog activities={data.recentActivity} />
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: Signal Stream */}
+        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <SignalStream />
+        </div>
       </div>
     </DashboardLayout>
   );

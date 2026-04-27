@@ -430,3 +430,22 @@
 - [x] Strong-match cards get subtle green glow border treatment
 - [x] 18 new vitest tests in server/dna-match.test.ts — 81/81 total passing
 - [x] Zero TypeScript errors
+
+## Sprint 19 — Cinematic Command Center Redesign
+
+- [x] Rewrite Home.tsx: Bloomberg/Palantir editorial layout (briefing header, stat strip, intelligence feed, signal stream)
+- [x] Replace 4-card KPI grid with 6-stat horizontal strip (no card borders, dense information)
+- [x] Replace "Top Opportunities" card with ranked Intelligence Feed (rank numbers, stagger entry animation)
+- [x] Replace Sentinel card with Signal Stream (ticker-style, left-border urgency indicators)
+- [x] Asymmetric 2-column editorial grid (feed left, signal stream right 340px)
+- [x] Proactive system annotation in briefing header (context-aware: high priority / empty / response pending)
+- [x] Bloomberg-style dateline in header (uppercase mono font)
+- [x] Run Market Scan elevated to primary CTA with persistent glow pulse animation (scan-btn-idle)
+- [x] Progressive section reveals via useFadeIn hook (staggered delays per section)
+- [x] Feed rows: stagger entry animation (feedEntry, 60ms delay per row)
+- [x] Signal entries: stagger entry animation (signalEntry, 50ms delay per item)
+- [x] High-urgency signals: pulsing left-border animation (urgencyBorder)
+- [x] Velocity sparkline moved to compact inline strip below feed
+- [x] Activity log moved to editorial System Log section below feed
+- [x] All delete buttons preserved and functional
+- [x] Zero TypeScript errors, 81/81 tests passing
