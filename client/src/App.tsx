@@ -24,6 +24,7 @@ import MyPosition from "./pages/investor/MyPosition";
 import InvestorOnboarding from "./pages/investor/InvestorOnboarding";
 import InvestorScan from "./pages/investor/InvestorScan";
 import InvestorScout from "./pages/investor/InvestorScout";
+import InvestorDNAProfile from "./pages/investor/InvestorDNAProfile";
 import { trpc } from "@/lib/trpc";
 import { useEffect } from "react";
 import CoPilot from "@/components/CoPilot";
@@ -117,7 +118,7 @@ function Router() {
         <Route path="/investor/position" component={MyPosition} />
         <Route path="/investor/scan" component={InvestorScan} />
         <Route path="/investor/scout" component={InvestorScout} />
-        <Route path="/investor/dna" component={InvestorOnboarding} />
+        <Route path="/investor/dna" component={InvestorDNAProfile} />
 
         {/* ── Operator routes ── */}
         <Route path="/" component={Home} />
