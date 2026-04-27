@@ -17,6 +17,10 @@ import InvestorDossier from "./pages/InvestorDossier";
 import Scout from "./pages/Scout";
 import DealShare from "./pages/DealShare";
 import Lobby from "./pages/Lobby";
+import InvestorDealRoom from "./pages/investor/DealRoom";
+import InvestorDealDetail from "./pages/investor/InvestorDealDetail";
+import MemoVault from "./pages/investor/MemoVault";
+import MyPosition from "./pages/investor/MyPosition";
 import { trpc } from "@/lib/trpc";
 import { useEffect } from "react";
 import CoPilot from "@/components/CoPilot";
@@ -36,8 +40,8 @@ function OnboardingGuard() {
     sessionStorage.getItem("onboarding_checked") === "done";
 
   const { data: onboarding } = trpc.user.onboardingStatus.useQuery(undefined, {
-    // Only fetch when: authenticated, not on lobby/404, and not already cleared this session
-    enabled: !!authData && location !== "/lobby" && location !== "/404" && !alreadyChecked,
+    // Only fetch when: authenticated, not on lobby/404, not investor portal, and not already cleared this session
+    enabled: !!authData && location !== "/lobby" && location !== "/404" && !alreadyChecked && !location.startsWith("/investor"),
     staleTime: Infinity, // Only check once per session
   });
 
@@ -61,12 +65,15 @@ function OnboardingGuard() {
   return null;
 }
 
-// Renders the Co-Pilot only for authenticated users (not on lobby/deal-share)
+// Renders the Co-Pilot only for operator/admin users (not investors, not on lobby/deal-share)
 function GlobalCoPilot() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [location] = useLocation();
   const isPublicPage = location.startsWith("/lobby") || location.startsWith("/deal-share");
-  if (!isAuthenticated || isPublicPage) return null;
+  const isInvestorPage = location.startsWith("/investor");
+  if (!isAuthenticated || isPublicPage || isInvestorPage) return null;
+  // Hide Co-Pilot for investor role — they get a clean read-only experience
+  if ((user as any)?.role === "investor") return null;
   return <CoPilot />;
 }
 
@@ -78,7 +85,13 @@ function Router() {
         {/* Lobby — cinematic first-login onboarding */}
         <Route path="/lobby" component={Lobby} />
 
-        {/* Main app routes */}
+        {/* ── Investor Portal — curated read-only view for capital allocators ── */}
+        <Route path="/investor" component={InvestorDealRoom} />
+        <Route path="/investor/deal/:id" component={InvestorDealDetail} />
+        <Route path="/investor/memos" component={MemoVault} />
+        <Route path="/investor/position" component={MyPosition} />
+
+        {/* ── Operator routes ── */}
         <Route path="/" component={Home} />
         <Route path="/scan" component={Scan} />
         <Route path="/deal/:id" component={DealDetail} />
@@ -90,6 +103,7 @@ function Router() {
         <Route path="/opportunity-radar" component={OpportunityRadar} />
         <Route path="/investor-dossier" component={InvestorDossier} />
         <Route path="/scout" component={Scout} />
+
         {/* Public deal share — no auth required */}
         <Route path="/deal-share/:token" component={DealShare} />
         <Route path="/404" component={NotFound} />

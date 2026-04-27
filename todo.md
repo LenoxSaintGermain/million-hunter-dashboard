@@ -371,3 +371,17 @@
 - [x] Agent Loop Panel UI in DealDetail — 3-step pipeline cards, artifact accordion, findings accordion, remediation plan with go/no-go badge
 - [x] Fix zoning column truncation (expanded to TEXT)
 - [x] 63/63 tests passing
+
+## Sprint 14 — Mobile Polish + Investor Portal
+
+- [ ] Mobile nav: DS-styled bottom sheet drawer with backdrop blur
+- [ ] Mobile nav: smooth slide-up animation with spring easing
+- [ ] Mobile nav: active state indicators matching desktop sidebar
+- [ ] Mobile nav: tap-outside and swipe-down gesture dismiss
+- [ ] Investor Portal: add 'investor' role to user enum in schema
+- [ ] Investor Portal: role-based routing (investor role → portal, operator → dashboard)
+- [ ] Investor Portal: InvestorLayout — clean read-only nav (no scan/scout/outreach tools)
+- [ ] Investor Portal: Deal Room page — curated deal cards with thesis summaries
+- [ ] Investor Portal: Memo Viewer — DS-styled read-only memo with two-column layout
+- [ ] Investor Portal: Portfolio Snapshot — committed capital, target returns, deal stages
+- [ ] Investor Portal: role-gate tRPC procedures (investors cannot trigger scans/AI runs)
