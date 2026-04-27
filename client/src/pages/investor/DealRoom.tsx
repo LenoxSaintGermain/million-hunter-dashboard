@@ -11,9 +11,12 @@ import {
   Activity,
   Search,
   CheckCircle2,
+  Dna,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { computeDnaMatchScore, type DnaProfile, type DnaMatchResult } from "@/lib/dnaMatch";
 
 // ─── Stage config ─────────────────────────────────────────────────────────────
 const STAGE_LABELS: Record<string, string> = {
@@ -37,6 +40,31 @@ const STAGE_COLORS: Record<string, { bg: string; color: string }> = {
   new: { bg: "oklch(0.55 0.01 260 / 0.1)", color: "var(--sh-fg-3)" },
 };
 
+// ─── Match tier colors (OKLCH DS tokens) ─────────────────────────────────────
+const TIER_STYLES = {
+  strong: {
+    bg: "oklch(0.55 0.18 145 / 0.15)",
+    color: "oklch(0.72 0.18 145)",
+    border: "oklch(0.72 0.18 145 / 0.3)",
+    glow: "oklch(0.72 0.18 145 / 0.12)",
+    label: "Strong Match",
+  },
+  good: {
+    bg: "oklch(0.55 0.18 60 / 0.15)",
+    color: "oklch(0.75 0.18 60)",
+    border: "oklch(0.75 0.18 60 / 0.3)",
+    glow: "oklch(0.75 0.18 60 / 0.1)",
+    label: "Good Match",
+  },
+  partial: {
+    bg: "oklch(0.55 0.01 260 / 0.12)",
+    color: "var(--sh-fg-3)",
+    border: "var(--sh-border)",
+    glow: "transparent",
+    label: "Partial Match",
+  },
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt(n: number | null | undefined, prefix = "$") {
   if (!n) return "—";
@@ -56,6 +84,109 @@ function ScoreMeter({ score }: { score: number | null | undefined }) {
         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
       </div>
       <span className="sh-mono text-[11px] font-bold" style={{ color }}>{score.toFixed(3)}</span>
+    </div>
+  );
+}
+
+// ─── DNA Match Badge ──────────────────────────────────────────────────────────
+function DNAMatchBadge({ match }: { match: DnaMatchResult }) {
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const style = TIER_STYLES[match.tier];
+
+  const breakdown = [
+    { label: "Sector", pts: match.sectorPts, max: 30 },
+    { label: "Deal Size", pts: match.sizePts, max: 25 },
+    { label: "Risk Fit", pts: match.riskPts, max: 25 },
+    { label: "IRR Proxy", pts: match.irrPts, max: 20 },
+  ];
+
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowBreakdown((v) => !v);
+        }}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all duration-200 hover:scale-105"
+        style={{
+          background: style.bg,
+          color: style.color,
+          border: `1px solid ${style.border}`,
+          boxShadow: `0 0 8px ${style.glow}`,
+        }}
+        title="Click to see score breakdown"
+      >
+        <Dna className="w-3 h-3 shrink-0" />
+        <span className="sh-mono">{match.total}</span>
+        <span className="hidden sm:inline opacity-80">· {style.label}</span>
+        <Info className="w-2.5 h-2.5 opacity-50" />
+      </button>
+
+      {/* Breakdown popover */}
+      {showBreakdown && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowBreakdown(false); }}
+          />
+          <div
+            className="absolute right-0 top-full mt-2 z-50 w-56 rounded-xl p-3 shadow-2xl"
+            style={{
+              background: "var(--sh-surface-1)",
+              border: `1px solid ${style.border}`,
+              boxShadow: `0 8px 32px oklch(0 0 0 / 0.4), 0 0 0 1px ${style.border}`,
+            }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-1.5">
+                <Dna className="w-3.5 h-3.5" style={{ color: style.color }} />
+                <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: style.color }}>
+                  DNA Match
+                </span>
+              </div>
+              <span className="sh-mono text-[20px] font-black leading-none" style={{ color: style.color }}>
+                {match.total}
+              </span>
+            </div>
+
+            {/* Sub-score bars */}
+            <div className="space-y-2">
+              {breakdown.map(({ label, pts, max }) => {
+                const pct = Math.round((pts / max) * 100);
+                const barColor = pct >= 80 ? "oklch(0.72 0.18 145)" : pct >= 50 ? "oklch(0.75 0.18 60)" : "var(--sh-fg-4)";
+                return (
+                  <div key={label}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[10px] font-medium" style={{ color: "var(--sh-fg-3)" }}>{label}</span>
+                      <span className="sh-mono text-[10px]" style={{ color: "var(--sh-fg-2)" }}>
+                        {pts}<span style={{ color: "var(--sh-fg-4)" }}>/{max}</span>
+                      </span>
+                    </div>
+                    <div className="h-1 rounded-full overflow-hidden" style={{ background: "var(--sh-surface-3)" }}>
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%`, background: barColor }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer label */}
+            <div
+              className="mt-3 pt-2.5 text-center text-[10px] font-semibold uppercase tracking-wider"
+              style={{ borderTop: "1px solid var(--sh-border)", color: style.color }}
+            >
+              {style.label}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -133,18 +264,40 @@ function InterestModal({ deal, onClose }: { deal: any; onClose: () => void }) {
 }
 
 // ─── Deal Card ────────────────────────────────────────────────────────────────
-function DealCard({ deal, isTop, onInterest, hasInterest }: {
-  deal: any; isTop: boolean; onInterest: (d: any) => void; hasInterest: boolean;
+function DealCard({ deal, isTop, onInterest, hasInterest, dnaProfile }: {
+  deal: any;
+  isTop: boolean;
+  onInterest: (d: any) => void;
+  hasInterest: boolean;
+  dnaProfile: DnaProfile | null;
 }) {
   const stageStyle = STAGE_COLORS[deal.stage] ?? STAGE_COLORS.new;
+
+  // Compute match score if DNA profile is available
+  const match = dnaProfile
+    ? computeDnaMatchScore(
+        { industry: deal.industry, askingPrice: deal.askingPrice, cashFlow: deal.cashFlow, score: deal.score },
+        dnaProfile
+      )
+    : null;
+
+  const tierStyle = match ? TIER_STYLES[match.tier] : null;
 
   return (
     <div
       className="relative group rounded-2xl border cursor-pointer transition-all duration-200 hover:border-[var(--sh-primary-20)]"
       style={{
         background: "var(--sh-surface-1)",
-        borderColor: isTop ? "var(--sh-primary-20)" : "var(--sh-border)",
-        boxShadow: isTop ? "0 0 0 1px var(--sh-primary-10)" : undefined,
+        borderColor: isTop
+          ? "var(--sh-primary-20)"
+          : match?.tier === "strong"
+          ? tierStyle!.border
+          : "var(--sh-border)",
+        boxShadow: isTop
+          ? "0 0 0 1px var(--sh-primary-10)"
+          : match?.tier === "strong"
+          ? `0 0 16px ${tierStyle!.glow}`
+          : undefined,
       }}
     >
       {isTop && (
@@ -161,6 +314,7 @@ function DealCard({ deal, isTop, onInterest, hasInterest }: {
 
       <Link href={`/investor/deal/${deal.id}`}>
         <div className="p-5">
+          {/* Title row + DNA badge */}
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -189,10 +343,16 @@ function DealCard({ deal, isTop, onInterest, hasInterest }: {
                 </div>
               )}
             </div>
-            <ChevronRight className="w-4 h-4 shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ color: "var(--sh-primary)" }} />
+
+            {/* DNA Match Badge — top-right of card header */}
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              {match && <DNAMatchBadge match={match} />}
+              <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ color: "var(--sh-primary)" }} />
+            </div>
           </div>
 
+          {/* Financials grid */}
           <div className="grid grid-cols-3 gap-px rounded-xl overflow-hidden mb-4" style={{ background: "var(--sh-border)" }}>
             {[
               { label: "Revenue", value: fmt(deal.revenue) },
@@ -233,12 +393,25 @@ export default function DealRoom() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("active");
   const [interestDeal, setInterestDeal] = useState<any>(null);
+  const [sortMode, setSortMode] = useState<"signal" | "match">("signal");
 
   const { data: deals, isLoading } = trpc.deals.list.useQuery({ limit: 50 });
   const { data: dna } = trpc.investor.getDnaStatus.useQuery();
   const { data: myInterests = [] } = trpc.investor.getMyInterests.useQuery();
 
   const interestedIds = new Set((myInterests as any[]).map((i) => i.dealId));
+
+  // Build a typed DnaProfile only when quiz is completed
+  const dnaProfile: DnaProfile | null =
+    dna?.quizCompleted
+      ? {
+          riskTolerance: dna.riskTolerance,
+          timeHorizon: dna.timeHorizon,
+          liquidityNeed: dna.liquidityNeed,
+          esgConviction: dna.esgConviction,
+          sectorAffinity: dna.sectorAffinity as string[],
+        }
+      : null;
 
   const filtered = (deals ?? []).filter((d) => {
     const matchSearch =
@@ -253,7 +426,37 @@ export default function DealRoom() {
     return matchSearch && matchStage && !d.isArchived;
   });
 
-  const sorted = [...filtered].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  // Sort by AI signal score or DNA match score
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortMode === "match" && dnaProfile) {
+      const scoreA = computeDnaMatchScore(
+        { industry: a.industry, askingPrice: a.askingPrice, cashFlow: a.cashFlow, score: a.score },
+        dnaProfile
+      ).total;
+      const scoreB = computeDnaMatchScore(
+        { industry: b.industry, askingPrice: b.askingPrice, cashFlow: b.cashFlow, score: b.score },
+        dnaProfile
+      ).total;
+      return scoreB - scoreA;
+    }
+    return (b.score ?? 0) - (a.score ?? 0);
+  });
+
+  // Avg DNA match for summary bar
+  const avgMatch =
+    dnaProfile && sorted.length
+      ? Math.round(
+          sorted.reduce(
+            (s, d) =>
+              s +
+              computeDnaMatchScore(
+                { industry: d.industry, askingPrice: d.askingPrice, cashFlow: d.cashFlow, score: d.score },
+                dnaProfile
+              ).total,
+            0
+          ) / sorted.length
+        )
+      : null;
 
   return (
     <InvestorLayout>
@@ -266,8 +469,27 @@ export default function DealRoom() {
           <div className="flex items-center gap-3">
             <span className="sh-label">YOUR DNA</span>
             <span className="text-sm font-semibold" style={{ color: "var(--sh-primary)" }}>
-              {dna.archetypeLabel} · {dna.archetypeCode}
+              {dna.archetypeLabel ?? dna.archetypeCode}
             </span>
+            {avgMatch !== null && (
+              <>
+                <span style={{ color: "var(--sh-fg-4)" }}>·</span>
+                <span className="sh-label">AVG MATCH</span>
+                <span
+                  className="sh-mono text-sm font-bold"
+                  style={{
+                    color:
+                      avgMatch >= 80
+                        ? "oklch(0.72 0.18 145)"
+                        : avgMatch >= 60
+                        ? "oklch(0.75 0.18 60)"
+                        : "var(--sh-fg-3)",
+                  }}
+                >
+                  {avgMatch}
+                </span>
+              </>
+            )}
           </div>
           <span className="sh-small" style={{ color: "var(--sh-fg-3)" }}>
             {(myInterests as any[]).length} interest{(myInterests as any[]).length !== 1 ? "s" : ""} expressed
@@ -283,7 +505,7 @@ export default function DealRoom() {
         </p>
       </div>
 
-      {/* Filters */}
+      {/* Filters + Sort */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1" style={{ maxWidth: 400 }}>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--sh-fg-4)" }} />
@@ -296,20 +518,47 @@ export default function DealRoom() {
             style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-1)" }}
           />
         </div>
-        <div className="flex items-center gap-1.5 p-1 rounded-lg" style={{ background: "var(--sh-surface-2)" }}>
-          {[{ value: "active", label: "Active Deals" }, { value: "all", label: "All Deals" }].map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setStageFilter(opt.value)}
-              className="px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all"
-              style={{
-                background: stageFilter === opt.value ? "var(--sh-primary)" : "transparent",
-                color: stageFilter === opt.value ? "oklch(0.98 0 0)" : "var(--sh-fg-3)",
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Stage filter */}
+          <div className="flex items-center gap-1.5 p-1 rounded-lg" style={{ background: "var(--sh-surface-2)" }}>
+            {[{ value: "active", label: "Active" }, { value: "all", label: "All" }].map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setStageFilter(opt.value)}
+                className="px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all"
+                style={{
+                  background: stageFilter === opt.value ? "var(--sh-primary)" : "transparent",
+                  color: stageFilter === opt.value ? "oklch(0.98 0 0)" : "var(--sh-fg-3)",
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort toggle — only show if DNA is complete */}
+          {dnaProfile && (
+            <div className="flex items-center gap-1.5 p-1 rounded-lg" style={{ background: "var(--sh-surface-2)" }}>
+              {[
+                { value: "signal", label: "Signal" },
+                { value: "match", label: "DNA Match" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setSortMode(opt.value as "signal" | "match")}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all"
+                  style={{
+                    background: sortMode === opt.value ? "oklch(0.55 0.18 145 / 0.2)" : "transparent",
+                    color: sortMode === opt.value ? "oklch(0.72 0.18 145)" : "var(--sh-fg-3)",
+                  }}
+                >
+                  {opt.value === "match" && <Dna className="w-3 h-3" />}
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -318,7 +567,7 @@ export default function DealRoom() {
         {[
           { label: "Deals", value: sorted.length, icon: Activity },
           {
-            label: "Avg Score",
+            label: "Avg Signal",
             value: sorted.length ? (sorted.reduce((s, d) => s + (d.score ?? 0), 0) / sorted.length).toFixed(3) : "—",
             icon: Star,
           },
@@ -355,6 +604,7 @@ export default function DealRoom() {
               isTop={idx === 0 && (deal.score ?? 0) >= 0.75}
               onInterest={setInterestDeal}
               hasInterest={interestedIds.has(deal.id)}
+              dnaProfile={dnaProfile}
             />
           ))}
         </div>

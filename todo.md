@@ -408,3 +408,15 @@
 - [ ] Wire DNA Card into Deal Room header, Deal Detail right rail, My Position
 - [ ] Animated onboarding archetype reveal screen
 - [ ] DNA strand bars with live animation on every investor screen
+
+## Sprint 17 — DNA Match Scores on Deal Cards
+
+- [x] Create client/src/lib/dnaMatch.ts — pure scoring engine (sector 30pts, size 25pts, risk 25pts, IRR 20pts)
+- [x] DNAMatchBadge component with click-to-expand breakdown popover (sub-score bars per dimension)
+- [x] Wire dnaProfile from getDnaStatus into every DealCard in DealRoom.tsx
+- [x] Sort toggle: "Signal" (AI score) vs "DNA Match" (computed compatibility) 
+- [x] Avg DNA match score shown in archetype banner
+- [x] Tier color coding: strong (green ≥80), good (amber ≥60), partial (muted <60)
+- [x] Strong-match cards get subtle green glow border treatment
+- [x] 18 new vitest tests in server/dna-match.test.ts — 81/81 total passing
+- [x] Zero TypeScript errors
