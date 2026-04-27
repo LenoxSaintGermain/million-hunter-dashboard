@@ -13,7 +13,7 @@ import {
   Zap, Brain, RefreshCw, ChevronRight,
   Building2, MapPin, Clock, AlertCircle,
   Landmark, CalendarDays, BarChart2, Megaphone, Waves,
-  ExternalLink, Loader2,
+  ExternalLink, Loader2, Users,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -189,6 +189,94 @@ const SIGNAL_CONFIG: Record<string, { icon: React.ElementType; color: string; bg
   event:         { icon: Zap,         color: C.ro, bg: `${C.ro}15`, border: `${C.ro}25`, label: "Event" },
   macro_momentum:{ icon: Waves,       color: C.em, bg: `${C.em}15`, border: `${C.em}25`, label: "Macro" },
 };
+
+// ─── Investor Interests Panel (operator-only) ───────────────────────────────
+const INTEREST_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  expressed:         { bg: `oklch(0.75 0.20 80 / 0.15)`, color: `oklch(0.75 0.20 80)` },
+  operator_reviewing:{ bg: `oklch(0.75 0.15 200 / 0.15)`, color: `oklch(0.72 0.15 200)` },
+  memo_shared:       { bg: `oklch(0.65 0.22 250 / 0.15)`, color: `oklch(0.65 0.22 250)` },
+  committed:         { bg: `oklch(0.70 0.18 160 / 0.15)`, color: `oklch(0.70 0.18 160)` },
+  passed:            { bg: `oklch(0.40 0.01 260 / 0.1)`,  color: `oklch(0.40 0.01 260)` },
+};
+const INTEREST_STATUS_LABELS: Record<string, string> = {
+  expressed: "Expressed",
+  operator_reviewing: "Reviewing",
+  memo_shared: "Memo Shared",
+  committed: "Committed",
+  passed: "Passed",
+};
+
+function InvestorInterestsPanel() {
+  const utils = trpc.useUtils();
+  const { data: interests, isLoading } = trpc.investor.getAllInterests.useQuery(undefined, { retry: false });
+  const updateStatus = trpc.investor.updateInterestStatus.useMutation({
+    onSuccess: () => utils.investor.getAllInterests.invalidate(),
+  });
+
+  if (isLoading || !interests || interests.length === 0) return null;
+
+  return (
+    <div style={{
+      background: C.s1, border: `1px solid ${C.bd}`, borderRadius: 12,
+      padding: 20, gridColumn: "span 7",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: `${C.p}1a`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Users style={{ width: 14, height: 14, color: C.p }} />
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 600, color: C.fg1 }}>Investor Interests</span>
+        </div>
+        <span style={{ fontSize: 11, color: C.fg4, fontFamily: "var(--font-mono)" }}>
+          {(interests as any[]).length} total
+        </span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {(interests as any[]).map((interest: any) => {
+          const sc = INTEREST_STATUS_COLORS[interest.status] ?? INTEREST_STATUS_COLORS.expressed;
+          return (
+            <div key={interest.id} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              gap: 12, padding: "10px 12px", borderRadius: 8,
+              background: C.s2, border: `1px solid ${C.bd}`,
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: C.fg1 }}>
+                  Deal #{interest.dealId}
+                  {interest.dealName && ` · ${interest.dealName}`}
+                </p>
+                {interest.allocationAmount && (
+                  <p style={{ fontSize: 11, color: C.em, fontFamily: "var(--font-mono)", marginTop: 2 }}>
+                    ${Number(interest.allocationAmount).toLocaleString()} allocation
+                  </p>
+                )}
+                {interest.investorNote && (
+                  <p style={{ fontSize: 11, color: C.fg3, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {interest.investorNote}
+                  </p>
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 9999, background: sc.bg, color: sc.color }}>
+                  {INTEREST_STATUS_LABELS[interest.status] ?? interest.status}
+                </span>
+                <select
+                  value={interest.status}
+                  onChange={(e) => updateStatus.mutate({ interestId: interest.id, status: e.target.value as any })}
+                  style={{ fontSize: 11, background: C.s2, color: C.fg3, border: `1px solid ${C.bd}`, borderRadius: 6, padding: "2px 6px" }}
+                >
+                  {Object.entries(INTEREST_STATUS_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ─── Sentinel Panel ──────────────────────────────────────────────────────────
 function SentinelPanel() {
@@ -499,6 +587,9 @@ export default function Home() {
 
       {/* ── Pipeline Velocity ── */}
       <VelocitySparkline />
+
+      {/* ── Investor Interests (operator-only) ── */}
+      <InvestorInterestsPanel />
 
       {/* ── Main Grid ── */}
       <div className="grid gap-6 lg:grid-cols-7">

@@ -1715,6 +1715,182 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
       }),
   }),
 
+
+
+  investor: router({
+    // Get investor DNA status (quiz completed? archetype?)
+    getDnaStatus: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return { quizCompleted: false, archetypeCode: null, archetypeLabel: null };
+      const { investorDna } = await import("../drizzle/schema");
+      const result = await db.select().from(investorDna).where(eq(investorDna.userId, ctx.user.id)).limit(1);
+      if (!result[0]) return { quizCompleted: false, archetypeCode: null, archetypeLabel: null };
+      return {
+        quizCompleted: result[0].quizCompleted,
+        archetypeCode: result[0].archetypeCode,
+        archetypeLabel: result[0].archetypeLabel,
+        timeHorizon: result[0].timeHorizon,
+        riskTolerance: result[0].riskTolerance,
+        liquidityNeed: result[0].liquidityNeed,
+        esgConviction: result[0].esgConviction,
+        sectorAffinity: result[0].sectorAffinity ?? [],
+      };
+    }),
+
+    // Save investor DNA from onboarding quiz
+    saveDna: protectedProcedure.input(z.object({
+      timeHorizon: z.number().min(0).max(1),
+      riskTolerance: z.number().min(0).max(1),
+      liquidityNeed: z.number().min(0).max(1),
+      esgConviction: z.number().min(0).max(1),
+      sectorAffinity: z.array(z.string()),
+    })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const { investorDna } = await import("../drizzle/schema");
+
+      // Compute archetype from strand scores
+      let archetypeCode = "ANCHOR-1";
+      let archetypeLabel = "Steady Anchor";
+      if (input.riskTolerance > 0.7 && input.timeHorizon > 0.6) {
+        archetypeCode = "ALPHA-7";
+        archetypeLabel = "Alpha Hunter";
+      } else if (input.esgConviction > 0.7) {
+        archetypeCode = "IMPACT-4";
+        archetypeLabel = "Impact Operator";
+      } else if (input.liquidityNeed < 0.3 && input.timeHorizon > 0.7) {
+        archetypeCode = "COMPOUNDER-9";
+        archetypeLabel = "Long Compounder";
+      } else if (input.riskTolerance > 0.5 && input.timeHorizon < 0.4) {
+        archetypeCode = "SPRINT-3";
+        archetypeLabel = "Sprint Trader";
+      }
+
+      const existing = await db.select({ id: investorDna.id }).from(investorDna).where(eq(investorDna.userId, ctx.user.id)).limit(1);
+      if (existing[0]) {
+        await db.update(investorDna).set({
+          timeHorizon: input.timeHorizon,
+          riskTolerance: input.riskTolerance,
+          liquidityNeed: input.liquidityNeed,
+          esgConviction: input.esgConviction,
+          sectorAffinity: input.sectorAffinity,
+          archetypeCode,
+          archetypeLabel,
+          quizCompleted: true,
+        }).where(eq(investorDna.userId, ctx.user.id));
+      } else {
+        await db.insert(investorDna).values({
+          userId: ctx.user.id,
+          timeHorizon: input.timeHorizon,
+          riskTolerance: input.riskTolerance,
+          liquidityNeed: input.liquidityNeed,
+          esgConviction: input.esgConviction,
+          sectorAffinity: input.sectorAffinity,
+          archetypeCode,
+          archetypeLabel,
+          quizCompleted: true,
+        });
+      }
+      return { archetypeCode, archetypeLabel };
+    }),
+
+    // Get curated deals for investor
+    getDeals: protectedProcedure.query(async () => {
+      return getDeals({ limit: 50 });
+    }),
+
+    // Express interest in a deal
+    expressInterest: protectedProcedure.input(z.object({
+      dealId: z.number(),
+      allocationAmount: z.number().optional(),
+      investorNote: z.string().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const { investorInterest } = await import("../drizzle/schema");
+      const { and } = await import("drizzle-orm");
+
+      const existing = await db.select({ id: investorInterest.id }).from(investorInterest)
+        .where(and(eq(investorInterest.userId, ctx.user.id), eq(investorInterest.dealId, input.dealId))).limit(1);
+
+      if (existing[0]) {
+        await db.update(investorInterest).set({
+          allocationAmount: input.allocationAmount ?? null,
+          investorNote: input.investorNote ?? null,
+          status: "expressed",
+        }).where(eq(investorInterest.id, existing[0].id));
+      } else {
+        await db.insert(investorInterest).values({
+          userId: ctx.user.id,
+          dealId: input.dealId,
+          allocationAmount: input.allocationAmount ?? null,
+          investorNote: input.investorNote ?? null,
+          status: "expressed",
+        });
+      }
+
+      try {
+        const { notifyOwner } = await import("./_core/notification");
+        await notifyOwner({
+          title: "New Investor Interest",
+          content: `Investor (user #${ctx.user.id}) expressed interest in deal #${input.dealId}${input.allocationAmount ? ` — $${input.allocationAmount.toLocaleString()} allocation` : ""}${input.investorNote ? `\n\nNote: ${input.investorNote}` : ""}`,
+        });
+      } catch {}
+
+      return { success: true };
+    }),
+
+    // Get investor's expressed interests
+    getMyInterests: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const { investorInterest } = await import("../drizzle/schema");
+      return db.select().from(investorInterest).where(eq(investorInterest.userId, ctx.user.id))
+        .orderBy(desc(investorInterest.createdAt));
+    }),
+
+    // Operator: get all investor interests
+    getAllInterests: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return [];
+      const { investorInterest } = await import("../drizzle/schema");
+      const rows = await db
+        .select({
+          id: investorInterest.id,
+          userId: investorInterest.userId,
+          dealId: investorInterest.dealId,
+          dealName: deals.name,
+          allocationAmount: investorInterest.allocationAmount,
+          investorNote: investorInterest.investorNote,
+          status: investorInterest.status,
+          operatorNote: investorInterest.operatorNote,
+          createdAt: investorInterest.createdAt,
+        })
+        .from(investorInterest)
+        .leftJoin(deals, eq(deals.id, investorInterest.dealId))
+        .orderBy(desc(investorInterest.createdAt))
+        .limit(100);
+      return rows;
+    }),
+
+    // Operator: update interest status
+    updateInterestStatus: protectedProcedure.input(z.object({
+      interestId: z.number(),
+      status: z.enum(["expressed", "operator_reviewing", "memo_shared", "committed", "passed"]),
+      operatorNote: z.string().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const { investorInterest } = await import("../drizzle/schema");
+      await db.update(investorInterest).set({
+        status: input.status,
+        operatorNote: input.operatorNote ?? null,
+      }).where(eq(investorInterest.id, input.interestId));
+      return { success: true };
+    }),
+  }),
 });
 export type AppRouter = typeof appRouter;
 

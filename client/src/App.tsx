@@ -21,46 +21,69 @@ import InvestorDealRoom from "./pages/investor/DealRoom";
 import InvestorDealDetail from "./pages/investor/InvestorDealDetail";
 import MemoVault from "./pages/investor/MemoVault";
 import MyPosition from "./pages/investor/MyPosition";
+import InvestorOnboarding from "./pages/investor/InvestorOnboarding";
 import { trpc } from "@/lib/trpc";
 import { useEffect } from "react";
 import CoPilot from "@/components/CoPilot";
 import { useAuth } from "./_core/hooks/useAuth";
 
 // ─── Onboarding Guard ─────────────────────────────────────────────────────────
-// Checks if the authenticated user has completed onboarding.
-// If not, redirects them to /lobby once. Runs silently in the background.
-// Uses sessionStorage to avoid re-checking after the user has exited the lobby
-// (since the mutation + hard reload ensures DB is updated before this runs again).
+// Handles two flows:
+// 1. Operator: checks onboarding_completed → redirects to /lobby if not done
+// 2. Investor: checks investor DNA quiz → redirects to /investor/onboarding if not done
+// 3. Role-based redirect: investor role users land on /investor, not /
 function OnboardingGuard() {
   const [location, navigate] = useLocation();
   const { data: authData } = trpc.auth.me.useQuery();
+  const userRole = (authData as any)?.role as string | undefined;
 
-  // Skip the check entirely if the user just exited the lobby this session
   const alreadyChecked = typeof window !== "undefined" &&
     sessionStorage.getItem("onboarding_checked") === "done";
 
+  const isPublicPage = location === "/lobby" || location === "/404" || location.startsWith("/deal-share");
+  const isInvestorArea = location.startsWith("/investor");
+
+  // Operator onboarding check
   const { data: onboarding } = trpc.user.onboardingStatus.useQuery(undefined, {
-    // Only fetch when: authenticated, not on lobby/404, not investor portal, and not already cleared this session
-    enabled: !!authData && location !== "/lobby" && location !== "/404" && !alreadyChecked && !location.startsWith("/investor"),
-    staleTime: Infinity, // Only check once per session
+    enabled: !!authData && !isPublicPage && !alreadyChecked && !isInvestorArea && userRole !== "investor",
+    staleTime: Infinity,
+  });
+
+  // Investor DNA check
+  const { data: dnaStatus } = trpc.investor.getDnaStatus.useQuery(undefined, {
+    enabled: !!authData && userRole === "investor" && !isPublicPage,
+    staleTime: Infinity,
   });
 
   useEffect(() => {
+    if (!authData) return;
+
+    // Role-based redirect: investor landing on operator root → send to investor portal
+    if (userRole === "investor" && (location === "/" || location === "")) {
+      navigate("/investor");
+      return;
+    }
+
+    // Investor DNA onboarding: if quiz not complete, redirect to onboarding
+    if (userRole === "investor" && dnaStatus !== undefined && !dnaStatus.quizCompleted && location !== "/investor/onboarding") {
+      navigate("/investor/onboarding");
+      return;
+    }
+
+    // Operator onboarding check
     if (alreadyChecked) return;
-    // If authenticated, onboarding loaded, not completed, and not already on lobby → redirect
     if (
-      authData &&
+      userRole !== "investor" &&
       onboarding !== undefined &&
       onboarding.completed === false &&
       location !== "/lobby"
     ) {
       navigate("/lobby");
     }
-    // If completed, mark session so we never check again
-    if (authData && onboarding?.completed === true) {
+    if (userRole !== "investor" && onboarding?.completed === true) {
       sessionStorage.setItem("onboarding_checked", "done");
     }
-  }, [authData, onboarding, location, navigate, alreadyChecked]);
+  }, [authData, onboarding, dnaStatus, userRole, location, navigate, alreadyChecked]);
 
   return null;
 }
@@ -72,7 +95,6 @@ function GlobalCoPilot() {
   const isPublicPage = location.startsWith("/lobby") || location.startsWith("/deal-share");
   const isInvestorPage = location.startsWith("/investor");
   if (!isAuthenticated || isPublicPage || isInvestorPage) return null;
-  // Hide Co-Pilot for investor role — they get a clean read-only experience
   if ((user as any)?.role === "investor") return null;
   return <CoPilot />;
 }
@@ -85,7 +107,8 @@ function Router() {
         {/* Lobby — cinematic first-login onboarding */}
         <Route path="/lobby" component={Lobby} />
 
-        {/* ── Investor Portal — curated read-only view for capital allocators ── */}
+        {/* ── Investor Portal — curated experience for capital allocators ── */}
+        <Route path="/investor/onboarding" component={InvestorOnboarding} />
         <Route path="/investor" component={InvestorDealRoom} />
         <Route path="/investor/deal/:id" component={InvestorDealDetail} />
         <Route path="/investor/memos" component={MemoVault} />

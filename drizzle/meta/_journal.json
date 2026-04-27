@@ -43,6 +43,13 @@
       "when": 1777261640757,
       "tag": "0005_dusty_mister_fear",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1777263936326,
+      "tag": "0006_acoustic_tigra",
+      "breakpoints": true
     }
   ]
 }

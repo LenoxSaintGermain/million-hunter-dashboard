@@ -385,3 +385,17 @@
 - [ ] Investor Portal: Memo Viewer — DS-styled read-only memo with two-column layout
 - [ ] Investor Portal: Portfolio Snapshot — committed capital, target returns, deal stages
 - [ ] Investor Portal: role-gate tRPC procedures (investors cannot trigger scans/AI runs)
+
+## Sprint 15 — Investor Experience Upgrade (Tripoli-inspired)
+
+- [ ] Auto-assign investor role on new user registration (except operator gmail)
+- [ ] Role-based post-login redirect (investor → /investor, operator → /)
+- [ ] Investor DNA schema: add investor_dna table to DB
+- [ ] Investor DNA onboarding quiz (5-step: horizon, risk, liquidity, ESG, sectors)
+- [ ] DNA Card component (strand bars, archetype code, animated reveal)
+- [ ] Deal Room upgrade: hero shelf, DNA-matched deal shelves, ticker tape, stat grid
+- [ ] InvestorDealDetail: stat grid, DNA match radar, recent commits tape
+- [ ] Investor Scan access with operator approval flow for AI scoring
+- [ ] Investor Scout access with operator approval flow
+- [ ] Allocation Builder: portfolio impact simulator, DNA shift preview
+- [ ] Operator notification when investor submits scan/scout findings

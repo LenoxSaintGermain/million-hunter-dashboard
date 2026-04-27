@@ -474,3 +474,54 @@ export const agentRuns = mysqlTable("agent_runs", {
 });
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type InsertAgentRun = typeof agentRuns.$inferInsert;
+
+// ─── Investor DNA (Tripoli-pattern: onboarding quiz → archetype profile) ─────
+// Stores each investor's risk/return/sector preferences as strand scores.
+// Used to compute deal match scores and curate the Deal Room shelves.
+export const investorDna = mysqlTable("investor_dna", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull().unique(),
+  // Strand scores 0-1 (answers from onboarding quiz)
+  timeHorizon: float("time_horizon").notNull().default(0.5),      // 0=short, 1=long
+  riskTolerance: float("risk_tolerance").notNull().default(0.5),  // 0=stable, 1=aggressive
+  liquidityNeed: float("liquidity_need").notNull().default(0.5),  // 0=locked, 1=liquid
+  esgConviction: float("esg_conviction").notNull().default(0.5),  // 0=returns, 1=mission
+  // Sector affinity as JSON array of selected sectors
+  sectorAffinity: json("sector_affinity").$type<string[]>().default([]),
+  // Computed archetype code (e.g. "ALPHA-7", "ANCHOR-3")
+  archetypeCode: varchar("archetype_code", { length: 32 }),
+  archetypeLabel: varchar("archetype_label", { length: 128 }),
+  // Whether onboarding quiz is complete
+  quizCompleted: boolean("quiz_completed").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type InvestorDna = typeof investorDna.$inferSelect;
+export type InsertInvestorDna = typeof investorDna.$inferInsert;
+
+// ─── Investor Interest (deal interest expression → operator approval flow) ────
+// Investor flags a deal as "interested" → operator runs AI scoring → operator shares memo.
+// This keeps the operator in control of token spend.
+export const investorInterest = mysqlTable("investor_interest", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  dealId: int("deal_id").notNull(),
+  // Investor's intended allocation amount
+  allocationAmount: bigint("allocation_amount", { mode: "number" }),
+  // Status: expressed → operator_reviewing → memo_shared → committed → passed
+  status: mysqlEnum("status", [
+    "expressed",
+    "operator_reviewing",
+    "memo_shared",
+    "committed",
+    "passed",
+  ]).default("expressed").notNull(),
+  // Investor notes / questions for the operator
+  investorNote: text("investor_note"),
+  // Operator response / memo share note
+  operatorNote: text("operator_note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type InvestorInterest = typeof investorInterest.$inferSelect;
+export type InsertInvestorInterest = typeof investorInterest.$inferInsert;
