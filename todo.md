@@ -399,3 +399,12 @@
 - [ ] Investor Scout access with operator approval flow
 - [ ] Allocation Builder: portfolio impact simulator, DNA shift preview
 - [ ] Operator notification when investor submits scan/scout findings
+
+## Sprint 16 — Tripoli Investor DNA Experience
+
+- [ ] Inject Lenox's DNA profile into DB (Alpha Hunter archetype, operator preview)
+- [ ] Add Market Scan + Asset Scout to investor nav with operator-approval flow
+- [ ] Build animated DNA Card component (baseball card × Spotify Wrapped × 23andMe)
+- [ ] Wire DNA Card into Deal Room header, Deal Detail right rail, My Position
+- [ ] Animated onboarding archetype reveal screen
+- [ ] DNA strand bars with live animation on every investor screen

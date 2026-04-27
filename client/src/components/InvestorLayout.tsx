@@ -13,14 +13,21 @@ import {
   LogOut,
   TrendingUp,
   ChevronRight,
+  Search,
+  Building2,
+  Dna,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import DNACard from "@/components/investor/DNACard";
 
 const investorNav = [
   { href: "/investor", icon: LayoutDashboard, label: "Deal Room", description: "Curated acquisition opportunities" },
+  { href: "/investor/scan", icon: Search, label: "Market Scan", description: "Find deals in your target markets" },
+  { href: "/investor/scout", icon: Building2, label: "Asset Scout", description: "Commercial real estate signals" },
   { href: "/investor/memos", icon: FileText, label: "Memo Vault", description: "Investment analysis & theses" },
   { href: "/investor/position", icon: Briefcase, label: "My Position", description: "Portfolio & committed capital" },
+  { href: "/investor/dna", icon: Dna, label: "My DNA", description: "Your investor profile & archetype" },
 ];
 
 interface InvestorLayoutProps {
@@ -291,6 +298,10 @@ export default function InvestorLayout({ children }: InvestorLayoutProps) {
           </div>
         </nav>
 
+        {/* DNA compact pill */}
+        <div className="px-3 pb-2 shrink-0">
+          <DNACard compact className="w-full" />
+        </div>
         {/* Bottom user row */}
         <div className="border-t border-border p-3 shrink-0">
           <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl" style={{ background: "var(--sh-surface-2)" }}>

@@ -22,6 +22,8 @@ import InvestorDealDetail from "./pages/investor/InvestorDealDetail";
 import MemoVault from "./pages/investor/MemoVault";
 import MyPosition from "./pages/investor/MyPosition";
 import InvestorOnboarding from "./pages/investor/InvestorOnboarding";
+import InvestorScan from "./pages/investor/InvestorScan";
+import InvestorScout from "./pages/investor/InvestorScout";
 import { trpc } from "@/lib/trpc";
 import { useEffect } from "react";
 import CoPilot from "@/components/CoPilot";
@@ -113,6 +115,9 @@ function Router() {
         <Route path="/investor/deal/:id" component={InvestorDealDetail} />
         <Route path="/investor/memos" component={MemoVault} />
         <Route path="/investor/position" component={MyPosition} />
+        <Route path="/investor/scan" component={InvestorScan} />
+        <Route path="/investor/scout" component={InvestorScout} />
+        <Route path="/investor/dna" component={InvestorOnboarding} />
 
         {/* ── Operator routes ── */}
         <Route path="/" component={Home} />
