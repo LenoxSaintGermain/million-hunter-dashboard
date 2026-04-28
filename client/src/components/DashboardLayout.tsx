@@ -145,10 +145,10 @@ function LogoBlock({ collapsed, onClose }: { collapsed?: boolean; onClose?: () =
       </div>
       {!collapsed && (
         <div className="fade-in flex flex-col min-w-0 overflow-hidden">
-          <span className="text-[13px] font-bold tracking-[-0.01em] truncate" style={{ color: "var(--sh-fg-1)" }}>
+          <span style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 400, letterSpacing: "-0.02em", color: "var(--sh-fg-1)", lineHeight: 1.1 }}>
             Signal Hunter
           </span>
-          <span className="text-[9px] font-bold uppercase tracking-[0.15em]" style={{ color: "var(--sh-fg-4)" }}>
+          <span className="eyebrow" style={{ marginTop: 1 }}>
             Acquisition OS
           </span>
         </div>
@@ -181,7 +181,7 @@ function SidebarNav({
           <div key={section.label} className="mb-4">
             {!collapsed && (
               <div className="px-3 mb-1">
-                <span className="sh-label">{section.label}</span>
+                <span className="eyebrow">{section.label}</span>
               </div>
             )}
             <div className="space-y-0.5">

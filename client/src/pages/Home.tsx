@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
+import { motion, useInView } from "framer-motion";
+import { useRef } from "react";
 import { trpc } from "@/lib/trpc";
-import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
 import ScanProgress from "@/components/ScanProgress";
@@ -15,13 +17,16 @@ import {
   ExternalLink, Loader2, Users, Trash2, ArrowRight,
   Target, Radio, ScanLine, Shield,
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
-// ─── Design Tokens (preserved) ───────────────────────────────────────────────
+// ─── Motion constants (Tripoli ease) ─────────────────────────────────────────
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+// ─── Design Tokens ───────────────────────────────────────────────────────────
 const C = {
   p:   "oklch(0.65 0.22 250)",
   em:  "oklch(0.70 0.18 160)",
   am:  "oklch(0.75 0.20 80)",
+  ba:  "oklch(0.66 0.14 55)",    // burnt amber — Tripoli accent
   re:  "oklch(0.60 0.22 25)",
   cy:  "oklch(0.75 0.15 200)",
   vi:  "oklch(0.65 0.22 290)",
@@ -43,22 +48,46 @@ const fmt = (n: number | null | undefined) => {
   return `$${n}`;
 };
 
-// ─── Fade-in animation hook ───────────────────────────────────────────────────
-function useFadeIn(delay = 0) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.opacity = "0";
-    el.style.transform = "translateY(10px)";
-    el.style.transition = `opacity 0.55s ease ${delay}ms, transform 0.55s ease ${delay}ms`;
-    const t = setTimeout(() => {
-      el.style.opacity = "1";
-      el.style.transform = "translateY(0)";
-    }, 30);
-    return () => clearTimeout(t);
-  }, [delay]);
-  return ref;
+// ─── Animated SVG Sparkline (Tripoli NavSparkline pattern) ───────────────────
+function NavSparkline({ trace, height = 48, color = C.p }: { trace: number[]; height?: number; color?: string }) {
+  if (!trace || trace.length < 2) return null;
+  const w = 240;
+  const h = height;
+  const min = Math.min(...trace);
+  const max = Math.max(...trace);
+  const range = max - min || 1;
+  const stepX = w / (trace.length - 1);
+  const points = trace.map((v, i) => {
+    const x = i * stepX;
+    const y = h - ((v - min) / range) * (h - 6) - 3;
+    return [x, y] as const;
+  });
+  const linePath = points.map(([x, y], i) => (i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`)).join(" ");
+  const areaPath = `${linePath} L ${w} ${h} L 0 ${h} Z`;
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: "100%", height }} aria-hidden>
+      <motion.path
+        d={areaPath}
+        fill={color}
+        opacity={0.07}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.07 }}
+        transition={{ duration: 0.8, ease: EASE }}
+      />
+      <motion.path
+        d={linePath}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.25}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        initial={{ pathLength: 0, opacity: 0 }}
+        animate={{ pathLength: 1, opacity: 1 }}
+        transition={{ duration: 1.4, ease: EASE }}
+      />
+    </svg>
+  );
 }
 
 // ─── ConfidenceBar ───────────────────────────────────────────────────────────
@@ -69,8 +98,13 @@ function ConfidenceBar({ score }: { score: any }) {
   const color = pct >= 85 ? C.em : pct >= 70 ? C.am : C.fg3;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-      <div style={{ flex: 1, height: 2, borderRadius: 1, background: `${C.bd}`, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 1, transition: "width 0.85s cubic-bezier(0.16,1,0.3,1)" }} />
+      <div style={{ flex: 1, height: 2, borderRadius: 1, background: C.bd, overflow: "hidden" }}>
+        <motion.div
+          style={{ height: "100%", borderRadius: 1, background: color }}
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.9, ease: EASE, delay: 0.2 }}
+        />
       </div>
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: C.fg4, flexShrink: 0 }}>{pct}%</span>
     </div>
@@ -104,7 +138,6 @@ const INTEREST_STATUS_LABELS: Record<string, string> = {
 
 function InvestorInterestsPanel() {
   const utils = trpc.useUtils();
-  const ref = useFadeIn(300);
   const { data: interests, isLoading } = trpc.investor.getAllInterests.useQuery(undefined, { retry: false });
   const updateStatus = trpc.investor.updateInterestStatus.useMutation({
     onSuccess: () => utils.investor.getAllInterests.invalidate(),
@@ -113,14 +146,15 @@ function InvestorInterestsPanel() {
   if (isLoading || !interests || interests.length === 0) return null;
 
   return (
-    <div ref={ref} style={{
-      borderTop: `1px solid ${C.bd}`,
-      paddingTop: 20,
-    }}>
-      {/* Section label */}
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: EASE, delay: 0.35 }}
+      style={{ borderTop: `1px solid ${C.bd}`, paddingTop: 20 }}
+    >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: C.fg4 }}>Capital Interest</span>
+          <span className="eyebrow">Capital Interest</span>
           <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: `${C.p}20`, color: C.p, fontWeight: 700 }}>
             {(interests as any[]).length} active
           </span>
@@ -169,15 +203,14 @@ function InvestorInterestsPanel() {
           );
         })}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-// ─── Macro Signal Stream (live ticker-style) ──────────────────────────────────
+// ─── Signal Stream ────────────────────────────────────────────────────────────
 function SignalStream() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const { isAuthenticated } = useAuth();
-  const ref = useFadeIn(200);
   const { data: signals, isLoading, refetch } = trpc.sentinel.list.useQuery({ limit: 12 }, { enabled: isAuthenticated });
   const seed = trpc.sentinel.seed.useMutation({
     onSuccess: (r) => { if (r.seeded) { toast.success(`Sentinel seeded with ${r.count} signals`); refetch(); } },
@@ -210,14 +243,20 @@ function SignalStream() {
     : [];
 
   return (
-    <div ref={ref} style={{
-      background: C.s1,
-      border: `1px solid ${C.bd}`,
-      borderRadius: 12,
-      display: "flex",
-      flexDirection: "column",
-      overflow: "hidden",
-    }}>
+    <motion.div
+      initial={{ opacity: 0, x: 16, filter: "blur(4px)" }}
+      animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+      transition={{ duration: 0.8, ease: EASE, delay: 0.25 }}
+      style={{
+        background: C.s1,
+        border: `1px solid ${C.bd}`,
+        borderRadius: 12,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        height: "100%",
+      }}
+    >
       {/* Stream header */}
       <div style={{
         padding: "14px 18px 10px",
@@ -231,7 +270,7 @@ function SignalStream() {
             <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: C.fg2 }}>
               Signal Stream
             </span>
-            <p style={{ fontSize: 10, color: C.fg4, marginTop: 1 }}>Macro · Institutional · Seasonal</p>
+            <p className="eyebrow" style={{ marginTop: 2 }}>Macro · Institutional · Seasonal</p>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -282,24 +321,25 @@ function SignalStream() {
             const isFirst = idx === 0;
 
             return (
-              <div
+              <motion.div
                 key={sig.id}
+                initial={{ opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, ease: EASE, delay: 0.05 + idx * 0.05 }}
                 onClick={() => setExpanded(isOpen ? null : sig.id)}
-                className={cn("signal-entry", isHighUrgency && "urgency-border")}
+                className={cn(isHighUrgency && "urgency-border")}
                 style={{
                   padding: "11px 18px",
                   borderBottom: `1px solid ${C.bd}30`,
-                  borderLeft: `2px solid ${isHighUrgency ? C.re : isFirst ? C.p : "transparent"}`,
+                  borderLeft: `2px solid ${isHighUrgency ? C.re : isFirst ? C.ba : "transparent"}`,
                   background: isOpen ? `${C.p}06` : isHighUrgency ? `${C.re}05` : "transparent",
                   cursor: "pointer",
                   transition: "background 0.2s ease",
-                  animationDelay: `${idx * 50}ms`,
                 }}
                 onMouseEnter={(e) => { if (!isOpen) (e.currentTarget as HTMLDivElement).style.background = `${C.s2}60`; }}
                 onMouseLeave={(e) => { if (!isOpen) (e.currentTarget as HTMLDivElement).style.background = isHighUrgency ? `${C.re}05` : "transparent"; }}
               >
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                  {/* Type icon */}
                   <div style={{
                     width: 20, height: 20, borderRadius: 4, flexShrink: 0, marginTop: 1,
                     display: "flex", alignItems: "center", justifyContent: "center",
@@ -309,7 +349,6 @@ function SignalStream() {
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {/* Title row */}
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
                       <p style={{
                         fontSize: 11, fontWeight: 600, color: C.fg1, lineHeight: 1.4,
@@ -317,9 +356,7 @@ function SignalStream() {
                         WebkitBoxOrient: "vertical", overflow: isOpen ? "visible" : "hidden",
                         flex: 1,
                       }}>
-                        {isHighUrgency && (
-                          <span style={{ color: C.re, marginRight: 4, fontSize: 10 }}>⚡</span>
-                        )}
+                        {isHighUrgency && <span style={{ color: C.re, marginRight: 4, fontSize: 10 }}>⚡</span>}
                         {sig.title}
                       </p>
                       <div style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
@@ -345,10 +382,8 @@ function SignalStream() {
                       </div>
                     </div>
 
-                    {/* Confidence bar */}
                     <ConfidenceBar score={sig.confidenceScore} />
 
-                    {/* Meta */}
                     <p style={{ fontSize: 9, color: C.fg4, marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
                       <Clock style={{ width: 8, height: 8 }} />
                       {elapsed(sig.createdAt)}
@@ -357,13 +392,17 @@ function SignalStream() {
                       )}
                     </p>
 
-                    {/* Expanded detail */}
                     {isOpen && (
-                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.bd}30` }}>
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        transition={{ duration: 0.35, ease: EASE }}
+                        style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.bd}30`, overflow: "hidden" }}
+                      >
                         <p style={{ fontSize: 11, color: C.fg2, lineHeight: 1.65 }}>{sig.summary}</p>
                         {sig.roryPitch && (
-                          <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 5, background: `${C.p}08`, borderLeft: `2px solid ${C.p}40` }}>
-                            <p style={{ fontSize: 9, color: `${C.p}b0`, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>Signal Insight</p>
+                          <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 5, background: `${C.ba}08`, borderLeft: `2px solid ${C.ba}40` }}>
+                            <p style={{ fontSize: 9, color: `${C.ba}`, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>Signal Insight</p>
                             <p style={{ fontSize: 11, color: C.fg1, fontStyle: "italic", lineHeight: 1.6 }}>"{sig.roryPitch}"</p>
                           </div>
                         )}
@@ -375,39 +414,40 @@ function SignalStream() {
                         )}
                         {sig.sourceUrl && (
                           <a href={sig.sourceUrl} target="_blank" rel="noopener noreferrer"
-                            style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, color: C.p, textDecoration: "none", marginTop: 6 }}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, color: C.ba, textDecoration: "none", marginTop: 6 }}
                             onClick={(e) => e.stopPropagation()}>
                             <ExternalLink style={{ width: 9, height: 9 }} />
                             Source
                           </a>
                         )}
-                      </div>
+                      </motion.div>
                     )}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-// ─── Velocity Sparkline (compact) ────────────────────────────────────────────
+// ─── Velocity Sparkline (animated SVG) ───────────────────────────────────────
 function VelocityMini() {
   const { data, isLoading } = trpc.deals.velocity.useQuery();
   const total = data?.reduce((s, d) => s + (Number(d.count) || 0), 0) ?? 0;
   const trend = data && data.length >= 2
     ? (Number(data[data.length - 1].count) || 0) - (Number(data[data.length - 2].count) || 0)
     : 0;
+  const trace = data?.map((d) => Number(d.count) || 0) ?? [];
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
       <div>
-        <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: C.fg4 }}>Velocity</span>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 2 }}>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 18, fontWeight: 700, color: C.fg1 }}>
+        <span className="eyebrow">Velocity</span>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 4 }}>
+          <span style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 400, color: C.fg1, letterSpacing: "-0.02em" }}>
             {isLoading ? "—" : String(isNaN(total) ? 0 : total)}
           </span>
           <span style={{ fontSize: 10, color: C.fg4 }}>/ 8 wks</span>
@@ -418,30 +458,16 @@ function VelocityMini() {
           )}
         </div>
       </div>
-      {!isLoading && data && data.length > 0 && (
+      {!isLoading && trace.length > 1 && (
         <div style={{ flex: 1, height: 36 }}>
-          <ResponsiveContainer width="100%" height={36}>
-            <AreaChart data={data} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="vg2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={C.p} stopOpacity={0.25} />
-                  <stop offset="95%" stopColor={C.p} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Tooltip
-                contentStyle={{ background: C.s1, border: `1px solid ${C.bd}`, borderRadius: 4, fontSize: 10, padding: "2px 6px" }}
-                labelStyle={{ color: C.fg3 }} itemStyle={{ color: C.fg1 }}
-              />
-              <Area type="monotone" dataKey="count" name="Deals" stroke={C.p} strokeWidth={1.5} fill="url(#vg2)" dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <NavSparkline trace={trace} height={36} color={C.p} />
         </div>
       )}
     </div>
   );
 }
 
-// ─── Intelligence Feed (ranked deal list) ─────────────────────────────────────
+// ─── Intelligence Feed ────────────────────────────────────────────────────────
 function IntelligenceFeed({ deals, isLoading, onDelete }: {
   deals: any[] | undefined;
   isLoading: boolean;
@@ -481,48 +507,53 @@ function IntelligenceFeed({ deals, isLoading, onDelete }: {
         const isTop = rank <= 2;
 
         return (
-          <div
+          <motion.div
             key={deal.id}
+            initial={{ opacity: 0, x: -8, filter: "blur(2px)" }}
+            animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.5, ease: EASE, delay: 0.1 + idx * 0.06 }}
             style={{ position: "relative" }}
             onMouseEnter={() => setHoveredId(deal.id)}
             onMouseLeave={() => setHoveredId(null)}
           >
             <Link href={`/deal/${deal.id}`}>
               <div
-                className="feed-entry"
                 style={{
                   display: "flex", alignItems: "center", gap: 16,
                   padding: "14px 20px",
                   borderBottom: `1px solid ${C.bd}30`,
-                  borderLeft: `2px solid ${isTop ? C.p : "transparent"}`,
+                  borderLeft: `2px solid ${isTop ? C.ba : "transparent"}`,
                   background: isHovered ? `${C.s2}60` : "transparent",
                   cursor: "pointer",
                   transition: "background 0.15s ease",
-                  animationDelay: `${idx * 60}ms`,
-                }}>
-                {/* Rank */}
+                }}
+              >
+                {/* Rank — Fraunces display number */}
                 <span style={{
-                  fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700,
-                  color: isTop ? C.p : C.fg4,
-                  width: 20, flexShrink: 0, textAlign: "center",
+                  fontFamily: "var(--font-display)",
+                  fontSize: 18, fontWeight: 400,
+                  color: isTop ? C.ba : C.fg4,
+                  width: 24, flexShrink: 0, textAlign: "center",
+                  letterSpacing: "-0.02em",
                 }}>
                   {String(rank).padStart(2, "0")}
                 </span>
 
                 {/* Content */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                    <p style={{ fontSize: 12, fontWeight: 600, color: C.fg1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {deal.name}
-                    </p>
-                    {deal.opportunityZone && (
-                      <span style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: `${C.em}15`, color: C.em, flexShrink: 0 }}>OZ</span>
-                    )}
-                    {deal.tadDistrict && (
-                      <span style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: `${C.p}15`, color: C.p, flexShrink: 0 }}>TAD</span>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {/* Business name — Fraunces */}
+                  <p style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 15, fontWeight: 400,
+                    color: C.fg1,
+                    letterSpacing: "-0.015em",
+                    lineHeight: 1.2,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    marginBottom: 4,
+                  }}>
+                    {deal.name}
+                  </p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     {deal.location && (
                       <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.fg4 }}>
                         <MapPin style={{ width: 9, height: 9 }} />{deal.location}
@@ -533,27 +564,38 @@ function IntelligenceFeed({ deals, isLoading, onDelete }: {
                         {deal.industry}
                       </span>
                     )}
+                    {deal.opportunityZone && (
+                      <span style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: `${C.em}15`, color: C.em }}>OZ</span>
+                    )}
+                    {deal.tadDistrict && (
+                      <span style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: `${C.p}15`, color: C.p }}>TAD</span>
+                    )}
                   </div>
                 </div>
 
                 {/* Metrics */}
                 <div style={{ display: "flex", alignItems: "center", gap: 20, flexShrink: 0 }}>
                   <div style={{ textAlign: "right" }}>
-                    <p style={{ fontSize: 9, color: C.fg4, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 2 }}>Cash Flow</p>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: C.em, fontFamily: "var(--font-mono)" }}>{fmt(deal.cashFlow)}</p>
+                    <p className="eyebrow" style={{ marginBottom: 2 }}>Cash Flow</p>
+                    <p style={{ fontFamily: "var(--font-display)", fontSize: 14, fontWeight: 400, color: C.em, letterSpacing: "-0.01em" }}>{fmt(deal.cashFlow)}</p>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <p style={{ fontSize: 9, color: C.fg4, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 2 }}>Score</p>
+                    <p className="eyebrow" style={{ marginBottom: 2 }}>Score</p>
                     <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, color: score != null ? scoreColor(score) : C.fg4 }}>
                       {score != null && !isNaN(score) ? score.toFixed(3) : "—"}
                     </p>
                   </div>
-                  <ArrowRight style={{ width: 13, height: 13, color: isHovered ? C.fg2 : C.fg4, transition: "color 0.15s, transform 0.15s", transform: isHovered ? "translateX(2px)" : "none" }} />
+                  <ArrowRight style={{
+                    width: 13, height: 13,
+                    color: isHovered ? C.fg2 : C.fg4,
+                    transition: "color 0.15s, transform 0.15s",
+                    transform: isHovered ? "translateX(2px)" : "none",
+                  }} />
                 </div>
               </div>
             </Link>
 
-            {/* Delete — only visible on hover */}
+            {/* Delete — visible on hover */}
             {isHovered && (
               <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(deal.id, deal.name); }}
@@ -570,27 +612,26 @@ function IntelligenceFeed({ deals, isLoading, onDelete }: {
                 <Trash2 style={{ width: 10, height: 10 }} />
               </button>
             )}
-          </div>
+          </motion.div>
         );
       })}
     </div>
   );
 }
 
-// ─── Stat Strip ───────────────────────────────────────────────────────────────
+// ─── Stat Strip (Tripoli pattern: no card borders, hairline separators) ───────
 function StatStrip({ stats, outStats, isLoading }: { stats: any; outStats: any; isLoading: boolean }) {
-  const ref = useFadeIn(100);
   const items = [
-    { label: "Pipeline Value", value: fmt(stats?.totalPipelineValue), color: C.p, icon: DollarSign },
-    { label: "Active Deals", value: String(stats?.total ?? 0), color: C.fg2, icon: Building2 },
-    { label: "Avg Score", value: stats?.avgScore != null ? parseFloat(String(stats.avgScore)).toFixed(3) : "—", color: C.am, icon: Target, mono: true },
-    { label: "High Priority", value: String(stats?.highPriority ?? 0), color: C.em, icon: Zap },
-    { label: "Outreach Sent", value: String(outStats?.totalSent ?? 0), color: C.cy, icon: Activity },
-    { label: "Responded", value: String(outStats?.responded ?? 0), color: C.em, icon: ArrowUpRight },
+    { label: "Pipeline Value", value: fmt(stats?.totalPipelineValue), color: C.ba, icon: DollarSign },
+    { label: "Active Deals",   value: String(stats?.total ?? 0),      color: C.fg2, icon: Building2 },
+    { label: "Avg Score",      value: stats?.avgScore != null ? parseFloat(String(stats.avgScore)).toFixed(3) : "—", color: C.am, icon: Target, mono: true },
+    { label: "High Priority",  value: String(stats?.highPriority ?? 0), color: C.em, icon: Zap },
+    { label: "Outreach Sent",  value: String(outStats?.totalSent ?? 0), color: C.cy, icon: Activity },
+    { label: "Responded",      value: String(outStats?.responded ?? 0), color: C.em, icon: ArrowUpRight },
   ];
 
   return (
-    <div ref={ref} style={{
+    <div style={{
       display: "grid",
       gridTemplateColumns: "repeat(6, 1fr)",
       borderBottom: `1px solid ${C.bd}`,
@@ -598,35 +639,40 @@ function StatStrip({ stats, outStats, isLoading }: { stats: any; outStats: any; 
       {items.map((item, i) => {
         const Icon = item.icon;
         return (
-          <div key={i} style={{
-            padding: "14px 20px",
-            borderRight: i < items.length - 1 ? `1px solid ${C.bd}` : "none",
-            display: "flex", flexDirection: "column", gap: 4,
-          }}>
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: EASE, delay: 0.15 + i * 0.05 }}
+            style={{
+              padding: "16px 20px",
+              borderRight: i < items.length - 1 ? `1px solid ${C.bd}` : "none",
+              display: "flex", flexDirection: "column", gap: 6,
+            }}
+          >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.18em", color: C.fg4 }}>
-                {item.label}
-              </span>
+              <span className="eyebrow">{item.label}</span>
               <Icon style={{ width: 11, height: 11, color: `${item.color}80` }} />
             </div>
             {isLoading ? (
-              <Skeleton className="h-5 w-16" />
+              <Skeleton className="h-6 w-16" />
             ) : (
               <span style={{
-                fontFamily: item.mono ? "var(--font-mono)" : "var(--font-sans)",
-                fontSize: 20, fontWeight: 700, color: item.color, lineHeight: 1,
+                fontFamily: item.mono ? "var(--font-mono)" : "var(--font-display)",
+                fontSize: 24, fontWeight: 400, color: item.color, lineHeight: 1,
+                letterSpacing: item.mono ? "0" : "-0.025em",
               }}>
                 {item.value}
               </span>
             )}
-          </div>
+          </motion.div>
         );
       })}
     </div>
   );
 }
 
-// ─── Activity Log (compact) ───────────────────────────────────────────────────
+// ─── Activity Log ─────────────────────────────────────────────────────────────
 function ActivityLog({ activities }: { activities: any[] | undefined }) {
   if (!activities?.length) return null;
   const activityColor: Record<string, string> = {
@@ -672,8 +718,6 @@ export default function Home() {
   const utils = trpc.useUtils();
   const { data, isLoading, refetch } = trpc.dashboard.stats.useQuery();
   const { data: topDealsData } = trpc.deals.list.useQuery({ limit: 8 });
-  const heroRef = useFadeIn(0);
-  const feedRef = useFadeIn(150);
 
   const deleteDeal = trpc.deals.delete.useMutation({
     onSuccess: () => { toast.success("Deal removed"); utils.deals.list.invalidate(); utils.dashboard.stats.invalidate(); },
@@ -690,7 +734,6 @@ export default function Home() {
   const stats = data?.dealStats;
   const outStats = data?.outreachStats;
 
-  // Derive system state annotation
   const systemAnnotation = (() => {
     if (!stats) return null;
     if ((stats.highPriority ?? 0) > 0) return { text: `${stats.highPriority} deal${stats.highPriority > 1 ? "s" : ""} ready for outreach — initiate contact`, color: C.em };
@@ -702,32 +745,47 @@ export default function Home() {
   return (
     <DashboardLayout>
       {/* ── BRIEFING HEADER ─────────────────────────────────────────────────── */}
-      <div ref={heroRef} className="sh-hero-panel" style={{ padding: 0, overflow: "hidden" }}>
+      <motion.div
+        initial={{ opacity: 0, y: 16, filter: "blur(6px)" }}
+        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+        transition={{ duration: 0.9, ease: EASE }}
+        className="sh-hero-panel"
+        style={{ padding: 0, overflow: "hidden" }}
+      >
         {/* Operator briefing bar */}
         <div style={{
-          padding: "18px 28px 16px",
+          padding: "20px 28px 18px",
           borderBottom: `1px solid ${C.bd}`,
           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20,
         }}>
           <div style={{ flex: 1 }}>
             {/* Dateline */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
               <span className="live-dot" />
               <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: C.em }}>
                 System Operational
               </span>
               <span style={{ color: C.bd }}>·</span>
-              <span style={{ fontSize: 9, color: C.fg4, fontFamily: "var(--font-mono)" }}>
+              <span className="dateline">
                 {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).toUpperCase()}
               </span>
             </div>
 
-            {/* Headline */}
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: C.fg1, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 8 }}>
+            {/* Headline — Fraunces display */}
+            <h1 style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "clamp(1.6rem, 3vw, 2.4rem)",
+              fontWeight: 400,
+              color: C.fg1,
+              letterSpacing: "-0.025em",
+              lineHeight: 1.0,
+              marginBottom: 10,
+              textWrap: "balance",
+            }}>
               Signal Hunter Command Center
             </h1>
 
-            {/* System annotation — proactive insight */}
+            {/* System annotation */}
             {systemAnnotation && (
               <p style={{ fontSize: 12, color: systemAnnotation.color, display: "flex", alignItems: "center", gap: 6 }}>
                 <Shield style={{ width: 11, height: 11, flexShrink: 0 }} />
@@ -745,34 +803,35 @@ export default function Home() {
 
           {/* Primary actions */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, alignItems: "flex-end" }}>
-            <button
-              className={cn("btn-press", !triggerScan.isPending && !activeScanJobId && "scan-btn-idle")}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className={cn(!triggerScan.isPending && !activeScanJobId && "scan-btn-idle")}
               onClick={() => triggerScan.mutate({})}
               disabled={triggerScan.isPending || activeScanJobId !== null}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 8,
-                height: 40, padding: "0 20px", borderRadius: 8,
+                height: 42, padding: "0 22px", borderRadius: 9999,
                 fontSize: 12, fontWeight: 600, cursor: "pointer",
                 background: triggerScan.isPending || activeScanJobId !== null ? `${C.p}60` : C.p,
                 border: "none", color: "oklch(0.98 0.005 260)",
                 letterSpacing: "0.02em",
-                transition: "box-shadow 0.2s ease",
               }}
             >
               {triggerScan.isPending || activeScanJobId !== null
                 ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Scanning Market</>
                 : <><ScanLine style={{ width: 14, height: 14 }} /> Run Market Scan</>
               }
-            </button>
+            </motion.button>
             <Link href="/scan">
               <button style={{
                 display: "inline-flex", alignItems: "center", gap: 6,
-                height: 30, padding: "0 12px", borderRadius: 6,
+                height: 30, padding: "0 14px", borderRadius: 9999,
                 fontSize: 11, fontWeight: 500, cursor: "pointer",
                 background: "transparent", border: `1px solid ${C.bd}`, color: C.fg3,
               }}>
                 <TrendingUp style={{ width: 12, height: 12 }} />
-                View Pipeline
+                View Pipeline →
               </button>
             </Link>
           </div>
@@ -794,13 +853,18 @@ export default function Home() {
 
         {/* Stat strip */}
         <StatStrip stats={stats} outStats={outStats} isLoading={isLoading} />
-      </div>
+      </motion.div>
 
       {/* ── MAIN EDITORIAL GRID ──────────────────────────────────────────────── */}
-      <div className="editorial-grid" style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 0, minHeight: 0 }}>
-
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: EASE, delay: 0.3 }}
+        className="editorial-grid"
+        style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 0, minHeight: 0 }}
+      >
         {/* LEFT: Intelligence Feed + Activity */}
-        <div ref={feedRef} style={{ borderRight: `1px solid ${C.bd}`, display: "flex", flexDirection: "column" }}>
+        <div style={{ borderRight: `1px solid ${C.bd}`, display: "flex", flexDirection: "column" }}>
 
           {/* Feed header */}
           <div style={{
@@ -810,12 +874,12 @@ export default function Home() {
             background: `${C.s2}30`,
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Brain style={{ width: 13, height: 13, color: C.p }} />
+              <Brain style={{ width: 13, height: 13, color: C.ba }} />
               <div>
                 <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: C.fg2 }}>
                   Intelligence Feed
                 </span>
-                <p style={{ fontSize: 9, color: C.fg4, marginTop: 1 }}>Ranked by AI acquisition score</p>
+                <p className="eyebrow" style={{ marginTop: 2 }}>Ranked by AI acquisition score</p>
               </div>
             </div>
             <Link href="/scan">
@@ -864,9 +928,7 @@ export default function Home() {
             <div style={{ borderTop: `1px solid ${C.bd}` }}>
               <div style={{ padding: "12px 18px 8px", display: "flex", alignItems: "center", gap: 8 }}>
                 <Activity style={{ width: 11, height: 11, color: C.fg4 }} />
-                <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.18em", color: C.fg4 }}>
-                  System Log
-                </span>
+                <span className="eyebrow">System Log</span>
               </div>
               <ActivityLog activities={data.recentActivity} />
             </div>
@@ -877,7 +939,7 @@ export default function Home() {
         <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <SignalStream />
         </div>
-      </div>
+      </motion.div>
     </DashboardLayout>
   );
 }

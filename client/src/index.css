@@ -4,10 +4,11 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ─── Google Fonts ─────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @theme inline {
   /* ── Fonts ── */
+  --font-display: 'Fraunces', 'Iowan Old Style', 'Apple Garamond', Georgia, serif;
   --font-sans: 'Space Grotesk', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
@@ -86,11 +87,21 @@
   --sh-emerald-15:      oklch(0.70 0.18 160 / 0.15);
   --sh-emerald-20:      oklch(0.70 0.18 160 / 0.20);
 
-  /* Amber — Warning / Mid Score */
+  /* Amber — Warning / Mid Score / Tripoli accent */
   --sh-amber:           oklch(0.75 0.20 80);
   --sh-amber-8:         oklch(0.75 0.20 80 / 0.08);
   --sh-amber-15:        oklch(0.75 0.20 80 / 0.15);
   --sh-amber-20:        oklch(0.75 0.20 80 / 0.20);
+
+  /* Burnt Amber — Tripoli editorial accent (warmer, more ink-like) */
+  --sh-burnt-amber:     oklch(0.66 0.14 55);
+  --sh-burnt-amber-10:  oklch(0.66 0.14 55 / 0.10);
+  --sh-burnt-amber-20:  oklch(0.66 0.14 55 / 0.20);
+  --sh-burnt-amber-fg:  oklch(0.99 0.005 85);
+
+  /* Hairline rule — Tripoli editorial separator */
+  --sh-rule:            oklch(0.22 0.01 260);
+  --sh-rule-warm:       oklch(0.24 0.015 260 / 0.6);
 
   /* Rose / Red — Urgent / Destructive / Low Score */
   --sh-destructive:     oklch(0.60 0.22 25);
@@ -117,6 +128,7 @@
   --sh-glow-blue:       0 0 20px oklch(0.65 0.22 250 / 0.30);
   --sh-glow-green:      0 0 20px oklch(0.70 0.18 160 / 0.30);
   --sh-glow-red:        0 0 20px oklch(0.60 0.22 25  / 0.30);
+  --sh-glow-amber:      0 0 20px oklch(0.66 0.14 55  / 0.35);
 
   /* Layout */
   --sidebar-width:      15rem;    /* 240px */
@@ -132,11 +144,49 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "ss01", "cv11";
+    text-rendering: optimizeLegibility;
   }
 
   /* Mono numbers — applied to all financial figures and scores */
   .font-mono {
     font-family: var(--font-mono) !important;
+  }
+
+  /* Display / editorial headings — Fraunces */
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  /* Eyebrow label — Tripoli pattern */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--sh-fg-3);
+  }
+
+  /* Hairline rule utility */
+  .hairline {
+    border-color: var(--sh-rule);
+  }
+
+  /* Tabular numbers */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Hide scrollbars on horizontal shelves */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
 

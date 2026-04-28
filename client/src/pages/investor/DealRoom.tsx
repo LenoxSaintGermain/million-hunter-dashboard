@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import InvestorLayout from "@/components/InvestorLayout";
 import { Link } from "wouter";
@@ -17,6 +18,9 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { computeDnaMatchScore, type DnaProfile, type DnaMatchResult } from "@/lib/dnaMatch";
+
+// ─── Motion constants ────────────────────────────────────────────────────────
+const EASE = [0.16, 1, 0.3, 1] as const;
 
 // ─── Stage config ─────────────────────────────────────────────────────────────
 const STAGE_LABELS: Record<string, string> = {
@@ -263,17 +267,38 @@ function InterestModal({ deal, onClose }: { deal: any; onClose: () => void }) {
   );
 }
 
-// ─── Deal Card ────────────────────────────────────────────────────────────────
-function DealCard({ deal, isTop, onInterest, hasInterest, dnaProfile }: {
+// ─── Mini Sparkline (animated SVG) ───────────────────────────────────────────
+function MiniSparkline({ trace, color }: { trace: number[]; color: string }) {
+  if (!trace || trace.length < 2) return null;
+  const w = 80; const h = 28;
+  const min = Math.min(...trace); const max = Math.max(...trace);
+  const range = max - min || 1;
+  const stepX = w / (trace.length - 1);
+  const pts = trace.map((v, i) => [i * stepX, h - ((v - min) / range) * (h - 4) - 2] as const);
+  const d = pts.map(([x, y], i) => (i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`)).join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: 80, height: 28 }} aria-hidden>
+      <motion.path d={d} fill="none" stroke={color} strokeWidth={1.5}
+        strokeLinecap="round" strokeLinejoin="round"
+        initial={{ pathLength: 0, opacity: 0 }}
+        animate={{ pathLength: 1, opacity: 1 }}
+        transition={{ duration: 1.2, ease: EASE }}
+      />
+    </svg>
+  );
+}
+
+// ─── Deal Card (Tripoli editorial format) ─────────────────────────────────────
+function DealCard({ deal, isTop, onInterest, hasInterest, dnaProfile, idx }: {
   deal: any;
   isTop: boolean;
   onInterest: (d: any) => void;
   hasInterest: boolean;
   dnaProfile: DnaProfile | null;
+  idx: number;
 }) {
   const stageStyle = STAGE_COLORS[deal.stage] ?? STAGE_COLORS.new;
 
-  // Compute match score if DNA profile is available
   const match = dnaProfile
     ? computeDnaMatchScore(
         { industry: deal.industry, askingPrice: deal.askingPrice, cashFlow: deal.cashFlow, score: deal.score },
@@ -283,29 +308,39 @@ function DealCard({ deal, isTop, onInterest, hasInterest, dnaProfile }: {
 
   const tierStyle = match ? TIER_STYLES[match.tier] : null;
 
+  // Synthetic sparkline from score + cashflow ratio (visual only)
+  const sparkTrace = deal.score != null
+    ? [0.4, 0.5, deal.score * 0.7, deal.score * 0.85, deal.score, deal.score * 0.95, deal.score]
+    : null;
+  const sparkColor = match?.tier === "strong" ? "oklch(0.72 0.18 145)" : "oklch(0.66 0.14 55)";
+
   return (
-    <div
-      className="relative group rounded-2xl border cursor-pointer transition-all duration-200 hover:border-[var(--sh-primary-20)]"
+    <motion.div
+      initial={{ opacity: 0, y: 12, filter: "blur(3px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      transition={{ duration: 0.55, ease: EASE, delay: 0.08 + idx * 0.07 }}
+      className="relative group cursor-pointer"
       style={{
         background: "var(--sh-surface-1)",
-        borderColor: isTop
-          ? "var(--sh-primary-20)"
-          : match?.tier === "strong"
-          ? tierStyle!.border
-          : "var(--sh-border)",
+        border: `1px solid ${isTop ? "oklch(0.66 0.14 55 / 0.35)" : match?.tier === "strong" ? tierStyle!.border : "var(--sh-border)"}`,
+        borderRadius: 16,
         boxShadow: isTop
-          ? "0 0 0 1px var(--sh-primary-10)"
+          ? "0 0 20px oklch(0.66 0.14 55 / 0.12)"
           : match?.tier === "strong"
           ? `0 0 16px ${tierStyle!.glow}`
           : undefined,
+        overflow: "hidden",
       }}
     >
+      {/* Top-signal ribbon */}
       {isTop && (
-        <div className="absolute -top-px left-4 px-2.5 py-0.5 rounded-b-lg text-[10px] font-bold uppercase tracking-wider"
-          style={{ background: "var(--sh-primary)", color: "oklch(0.98 0 0)" }}>
-          Top Signal
-        </div>
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 2,
+          background: "linear-gradient(90deg, oklch(0.66 0.14 55), oklch(0.75 0.20 80))",
+        }} />
       )}
+
+      {/* Interested checkmark */}
       {hasInterest && (
         <div className="absolute top-3 right-3">
           <CheckCircle2 className="w-4 h-4" style={{ color: "var(--sh-primary)" }} />
@@ -313,78 +348,95 @@ function DealCard({ deal, isTop, onInterest, hasInterest, dnaProfile }: {
       )}
 
       <Link href={`/investor/deal/${deal.id}`}>
-        <div className="p-5">
-          {/* Title row + DNA badge */}
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="inline-flex items-center text-[10px] font-bold px-2 h-[18px] rounded-[5px]"
-                  style={{ background: stageStyle.bg, color: stageStyle.color }}>
-                  {STAGE_LABELS[deal.stage] ?? deal.stage}
-                </span>
-                {deal.industry && (
-                  <span className="text-[10px] font-medium px-2 h-[18px] inline-flex items-center rounded-[5px]"
-                    style={{ background: "var(--sh-surface-3)", color: "var(--sh-fg-3)" }}>
-                    {deal.industry}
-                  </span>
-                )}
-                {deal.opportunityZone && (
-                  <span className="text-[10px] font-bold px-2 h-[18px] inline-flex items-center rounded-[5px]"
-                    style={{ background: "var(--sh-cyan-15)", color: "var(--sh-cyan)" }}>
-                    OZ
-                  </span>
-                )}
-              </div>
-              <h3 className="text-[15px] font-bold leading-snug" style={{ color: "var(--sh-fg-1)" }}>{deal.name}</h3>
-              {deal.location && (
-                <div className="flex items-center gap-1 mt-1">
-                  <MapPin className="w-3 h-3 shrink-0" style={{ color: "var(--sh-fg-4)" }} />
-                  <span className="text-[12px]" style={{ color: "var(--sh-fg-3)" }}>{deal.location}</span>
+        <div style={{ padding: "18px 20px 14px" }}>
+          {/* Eyebrow row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <span className="eyebrow">{STAGE_LABELS[deal.stage] ?? deal.stage}</span>
+            {deal.industry && (
+              <span style={{
+                fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.1em",
+                padding: "1px 6px", borderRadius: 3,
+                background: "var(--sh-surface-3)", color: "var(--sh-fg-3)",
+              }}>{deal.industry}</span>
+            )}
+            {deal.opportunityZone && (
+              <span style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: "var(--sh-cyan-15)", color: "var(--sh-cyan)" }}>OZ</span>
+            )}
+          </div>
+
+          {/* Title — Fraunces display */}
+          <h3 style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 18, fontWeight: 400,
+            color: "var(--sh-fg-1)",
+            letterSpacing: "-0.02em",
+            lineHeight: 1.15,
+            marginBottom: 6,
+            textWrap: "balance",
+          }}>{deal.name}</h3>
+
+          {/* Location line */}
+          {deal.location && (
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 14 }}>
+              <MapPin style={{ width: 10, height: 10, color: "var(--sh-fg-4)", flexShrink: 0 }} />
+              <span style={{ fontSize: 11, color: "var(--sh-fg-3)" }}>{deal.location}</span>
+            </div>
+          )}
+
+          {/* 3-stat footer (Tripoli pattern) + sparkline */}
+          <div style={{
+            display: "flex", alignItems: "flex-end", justifyContent: "space-between",
+            borderTop: "1px solid var(--sh-border)", paddingTop: 12, gap: 12,
+          }}>
+            <div style={{ display: "flex", gap: 20 }}>
+              {[
+                { label: "Revenue",   value: fmt(deal.revenue) },
+                { label: "Cash Flow", value: fmt(deal.cashFlow) },
+                { label: "Asking",    value: fmt(deal.askingPrice) },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <p className="eyebrow" style={{ marginBottom: 3 }}>{label}</p>
+                  <p style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 400, color: "var(--sh-fg-1)", letterSpacing: "-0.01em" }}>{value}</p>
                 </div>
-              )}
+              ))}
             </div>
-
-            {/* DNA Match Badge — top-right of card header */}
-            <div className="flex flex-col items-end gap-1 shrink-0">
-              {match && <DNAMatchBadge match={match} />}
-              <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{ color: "var(--sh-primary)" }} />
-            </div>
+            {sparkTrace && <MiniSparkline trace={sparkTrace} color={sparkColor} />}
           </div>
 
-          {/* Financials grid */}
-          <div className="grid grid-cols-3 gap-px rounded-xl overflow-hidden mb-4" style={{ background: "var(--sh-border)" }}>
-            {[
-              { label: "Revenue", value: fmt(deal.revenue) },
-              { label: "Cash Flow", value: fmt(deal.cashFlow) },
-              { label: "Asking", value: fmt(deal.askingPrice) },
-            ].map(({ label, value }) => (
-              <div key={label} className="flex flex-col items-center py-3 gap-0.5" style={{ background: "var(--sh-surface-2)" }}>
-                <span className="sh-mono text-[13px] font-bold" style={{ color: "var(--sh-fg-1)" }}>{value}</span>
-                <span className="sh-label">{label}</span>
-              </div>
-            ))}
+          {/* Score meter */}
+          <div style={{ marginTop: 12 }}>
+            <ScoreMeter score={deal.score} />
           </div>
-
-          <ScoreMeter score={deal.score} />
         </div>
       </Link>
 
-      {/* Express Interest CTA */}
-      <div className="px-5 pb-4">
+      {/* Footer: DNA badge + CTA */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "10px 20px 14px", gap: 10,
+        borderTop: "1px solid var(--sh-border)",
+        background: "var(--sh-surface-2)",
+      }}>
+        {match ? (
+          <DNAMatchBadge match={match} />
+        ) : (
+          <span style={{ fontSize: 10, color: "var(--sh-fg-4)" }}>Complete DNA quiz for match score</span>
+        )}
         <button
           onClick={(e) => { e.preventDefault(); onInterest(deal); }}
-          className="w-full py-2 rounded-lg text-[12px] font-semibold transition-colors"
           style={{
-            background: hasInterest ? "var(--sh-surface-2)" : "var(--sh-primary-15)",
-            color: hasInterest ? "var(--sh-fg-3)" : "var(--sh-primary)",
-            border: `1px solid ${hasInterest ? "var(--sh-border)" : "var(--sh-primary-20)"}`,
+            display: "inline-flex", alignItems: "center", gap: 6,
+            height: 32, padding: "0 14px", borderRadius: 9999,
+            fontSize: 12, fontWeight: 600, cursor: "pointer",
+            background: hasInterest ? "var(--sh-surface-3)" : "oklch(0.66 0.14 55 / 0.15)",
+            color: hasInterest ? "var(--sh-fg-3)" : "oklch(0.66 0.14 55)",
+            border: `1px solid ${hasInterest ? "var(--sh-border)" : "oklch(0.66 0.14 55 / 0.3)"}`,
           }}
         >
           {hasInterest ? "✓ Interest Expressed" : "Express Interest →"}
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -498,12 +550,24 @@ export default function DealRoom() {
       )}
 
       {/* Page header */}
-      <div>
-        <h1 className="sh-h2" style={{ color: "var(--sh-fg-1)" }}>Deal Room</h1>
-        <p className="sh-body mt-1" style={{ color: "var(--sh-fg-3)" }}>
+      <motion.div
+        initial={{ opacity: 0, y: 12, filter: "blur(4px)" }}
+        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+        transition={{ duration: 0.7, ease: EASE }}
+      >
+        <h1 style={{
+          fontFamily: "var(--font-display)",
+          fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)",
+          fontWeight: 400,
+          letterSpacing: "-0.025em",
+          lineHeight: 1.0,
+          color: "var(--sh-fg-1)",
+          marginBottom: 6,
+        }}>Deal Room</h1>
+        <p style={{ fontSize: 13, color: "var(--sh-fg-3)", fontFamily: "var(--font-sans)" }}>
           Curated acquisition opportunities — ranked by AI signal score
         </p>
-      </div>
+      </motion.div>
 
       {/* Filters + Sort */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -605,6 +669,7 @@ export default function DealRoom() {
               onInterest={setInterestDeal}
               hasInterest={interestedIds.has(deal.id)}
               dnaProfile={dnaProfile}
+              idx={idx}
             />
           ))}
         </div>

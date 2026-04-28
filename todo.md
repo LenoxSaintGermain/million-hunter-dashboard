@@ -449,3 +449,16 @@
 - [x] Activity log moved to editorial System Log section below feed
 - [x] All delete buttons preserved and functional
 - [x] Zero TypeScript errors, 81/81 tests passing
+
+## Sprints 20–22 — Tripoli Editorial Design Elevation
+
+- [x] Audited Tripoli Investor Hub repo: extracted Fraunces font, blur-in motion, hairline rules, 3-stat footer, warm amber accent
+- [x] Installed Fraunces variable serif font via Google Fonts CDN
+- [x] Added --font-display CSS token and .eyebrow utility class to index.css
+- [x] Applied Fraunces to all display headings in Command Center (Home.tsx)
+- [x] Installed framer-motion, added blur-in reveals to Command Center hero, stat strip, intelligence feed, signal stream
+- [x] Built animated SVG MiniSparkline component (path draw animation via framer-motion)
+- [x] Rewrote DealRoom DealCard to Tripoli editorial format: Fraunces title, 3-stat footer, sparkline, amber top-signal ribbon
+- [x] Moved DNA match badge to card footer row alongside Express Interest CTA
+- [x] Applied Fraunces wordmark + eyebrow labels to DashboardLayout sidebar
+- [x] 81/81 tests passing, zero TypeScript errors
