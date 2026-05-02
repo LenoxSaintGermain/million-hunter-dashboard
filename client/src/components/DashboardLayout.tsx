@@ -33,6 +33,7 @@ const navSections = [
     items: [
       { href: "/", icon: LayoutDashboard, label: "Command Center", badge: null },
       { href: "/scan", icon: Search, label: "Market Scan", badge: { label: "Live", color: "primary" } },
+      { href: "/thesis", icon: Sparkles, label: "Thesis Engine", badge: { label: "New", color: "amber" } },
       { href: "/scout", icon: Building2, label: "Asset Scout", badge: { label: "New", color: "cyan" } },
       { href: "/memos", icon: FileText, label: "Investment Memos", badge: null },
       { href: "/outreach", icon: Mail, label: "Outreach Pipeline", badge: null },
@@ -109,9 +110,9 @@ function NavItem({
                   <span
                     className="inline-flex items-center text-[10px] font-bold px-1.5 h-[18px] rounded-[5px]"
                     style={{
-                      color: item.badge.color === "cyan" ? "var(--sh-cyan)" : "var(--sh-primary)",
-                      background: item.badge.color === "cyan" ? "var(--sh-cyan-15)" : "var(--sh-primary-15)",
-                      border: `1px solid ${item.badge.color === "cyan" ? "var(--sh-cyan-20)" : "var(--sh-primary-20)"}`,
+                      color: item.badge.color === "cyan" ? "var(--sh-cyan)" : item.badge.color === "amber" ? "rgb(251 191 36)" : "var(--sh-primary)",
+                      background: item.badge.color === "cyan" ? "var(--sh-cyan-15)" : item.badge.color === "amber" ? "rgba(251,191,36,0.1)" : "var(--sh-primary-15)",
+                      border: `1px solid ${item.badge.color === "cyan" ? "var(--sh-cyan-20)" : item.badge.color === "amber" ? "rgba(251,191,36,0.25)" : "var(--sh-primary-20)"}`,
                     }}
                   >
                     {item.badge.label}
@@ -406,9 +407,9 @@ function MobileBottomSheet({
                           <span
                             className="inline-flex items-center text-[10px] font-bold px-1.5 h-[18px] rounded-[5px]"
                             style={{
-                              color: item.badge.color === "cyan" ? "var(--sh-cyan)" : "var(--sh-primary)",
-                              background: item.badge.color === "cyan" ? "var(--sh-cyan-15)" : "var(--sh-primary-15)",
-                              border: `1px solid ${item.badge.color === "cyan" ? "var(--sh-cyan-20)" : "var(--sh-primary-20)"}`,
+                              color: item.badge.color === "cyan" ? "var(--sh-cyan)" : item.badge.color === "amber" ? "rgb(251 191 36)" : "var(--sh-primary)",
+                              background: item.badge.color === "cyan" ? "var(--sh-cyan-15)" : item.badge.color === "amber" ? "rgba(251,191,36,0.1)" : "var(--sh-primary-15)",
+                              border: `1px solid ${item.badge.color === "cyan" ? "var(--sh-cyan-20)" : item.badge.color === "amber" ? "rgba(251,191,36,0.25)" : "var(--sh-primary-20)"}`,
                             }}
                           >
                             {item.badge.label}

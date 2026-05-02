@@ -525,3 +525,46 @@ export const investorInterest = mysqlTable("investor_interest", {
 });
 export type InvestorInterest = typeof investorInterest.$inferSelect;
 export type InsertInvestorInterest = typeof investorInterest.$inferInsert;
+
+// ─── Thesis Compilations (STRATEGIST agent — Spec TSL-SCI-PROD-001-A1) ────────
+// Stores each thesis compile: raw text → decomposed filters + weights + evidence.
+// Saved theses become reusable assets; approved theses can trigger a scan pipeline.
+export const thesisCompilations = mysqlTable("thesis_compilations", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  // Raw thesis text entered by the user
+  thesisText: text("thesis_text").notNull(),
+  // Template used (if any)
+  templateUsed: varchar("template_used", { length: 64 }),
+  // Strategist-compiled structured output (JSON)
+  compiledFilters: json("compiled_filters").$type<{
+    revenueMin?: number; revenueMax?: number;
+    geographies?: string[];
+    businessAgeMin?: number;
+    headcountMin?: number; headcountMax?: number;
+    exclusions?: string[];
+  }>().default({}),
+  scoringWeights: json("scoring_weights").$type<Array<{
+    dimension: string; weight: number; isCustom: boolean;
+  }>>().default([]),
+  evidenceRequirements: json("evidence_requirements").$type<string[]>().default([]),
+  autoDisqualifiers: json("auto_disqualifiers").$type<string[]>().default([]),
+  confidenceNotes: json("confidence_notes").$type<string[]>().default([]),
+  // Strategist's universe estimate
+  estimatedTargetsMin: int("estimated_targets_min"),
+  estimatedTargetsMax: int("estimated_targets_max"),
+  estimatedCostMin: int("estimated_cost_min"),
+  estimatedCostMax: int("estimated_cost_max"),
+  // Status: compiling | review | approved | running | completed | archived
+  status: mysqlEnum("status", [
+    "compiling", "review", "approved", "running", "completed", "archived",
+  ]).default("compiling").notNull(),
+  // Linked scan job if the thesis was approved and run
+  scanJobId: int("scan_job_id"),
+  // User-editable name for saved thesis
+  name: varchar("name", { length: 256 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type ThesisCompilation = typeof thesisCompilations.$inferSelect;
+export type InsertThesisCompilation = typeof thesisCompilations.$inferInsert;

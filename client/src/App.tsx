@@ -15,6 +15,7 @@ import StrategyBlender from "./pages/StrategyBlender";
 import OpportunityRadar from "./pages/OpportunityRadar";
 import InvestorDossier from "./pages/InvestorDossier";
 import Scout from "./pages/Scout";
+import ThesisEngine from "./pages/ThesisEngine";
 import DealShare from "./pages/DealShare";
 import Lobby from "./pages/Lobby";
 import InvestorDealRoom from "./pages/investor/DealRoom";
@@ -123,6 +124,7 @@ function Router() {
         {/* ── Operator routes ── */}
         <Route path="/" component={Home} />
         <Route path="/scan" component={Scan} />
+        <Route path="/thesis" component={ThesisEngine} />
         <Route path="/deal/:id" component={DealDetail} />
         <Route path="/memos" component={Memos} />
         <Route path="/outreach" component={Outreach} />

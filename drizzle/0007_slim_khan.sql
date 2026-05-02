@@ -1,0 +1,21 @@
+CREATE TABLE `thesis_compilations` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`user_id` int NOT NULL,
+	`thesis_text` text NOT NULL,
+	`template_used` varchar(64),
+	`compiled_filters` json DEFAULT ('{}'),
+	`scoring_weights` json DEFAULT ('[]'),
+	`evidence_requirements` json DEFAULT ('[]'),
+	`auto_disqualifiers` json DEFAULT ('[]'),
+	`confidence_notes` json DEFAULT ('[]'),
+	`estimated_targets_min` int,
+	`estimated_targets_max` int,
+	`estimated_cost_min` int,
+	`estimated_cost_max` int,
+	`status` enum('compiling','review','approved','running','completed','archived') NOT NULL DEFAULT 'compiling',
+	`scan_job_id` int,
+	`name` varchar(256),
+	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `thesis_compilations_id` PRIMARY KEY(`id`)
+);

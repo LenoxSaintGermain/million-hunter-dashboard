@@ -462,3 +462,21 @@
 - [x] Moved DNA match badge to card footer row alongside Express Interest CTA
 - [x] Applied Fraunces wordmark + eyebrow labels to DashboardLayout sidebar
 - [x] 81/81 tests passing, zero TypeScript errors
+
+## Sprint 23 — Thesis Engine (Spec TSL-SCI-PROD-001-A1)
+
+- [x] Create thesis_compilations table in DB (direct SQL migration — TiDB compatible)
+- [x] Build thesisRouter.ts: thesis.compile (STRATEGIST agent via Claude JSON schema), thesis.list, thesis.delete
+- [x] Wire thesisRouter into appRouter as thesis namespace
+- [x] STRATEGIST system prompt: 5 base dimensions, 5 custom dimension examples, 3 worked examples, geography reference, NAICS categories
+- [x] Build ThesisEngine.tsx: editorial two-panel layout with Fraunces headings + Framer Motion blur-in
+- [x] Template gallery: Hirsch Durability, Silver Tsunami, Recurring Revenue, Sector Roll-up, Generational Transition
+- [x] STRATEGIST output review: compiled filters, scoring weight bars (amber=custom), evidence, disqualifiers, confidence notes
+- [x] Universe estimate panel: estimated targets + estimated cost
+- [x] Approve & Run Pipeline button + Reset button
+- [x] Saved theses list with load/delete per user
+- [x] Tier gate banner: Custom Dimension Authoring (Operator tier)
+- [x] Add /thesis route to App.tsx
+- [x] Add Thesis Engine nav item to DashboardLayout (amber badge, Sparkles icon)
+- [x] Amber badge color support in NavItem (desktop + mobile)
+- [x] 81/81 tests passing, zero TypeScript errors

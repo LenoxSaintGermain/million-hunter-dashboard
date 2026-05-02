@@ -24,6 +24,7 @@ import {
 } from "./gemini";
 import { enrichDealWithOZTAD } from "./ozTadEnrichment";
 import { poeChat, POE_MODELS } from "./poe";
+import { thesisRouter } from "./thesisRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -1911,7 +1912,10 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
       }).where(eq(investorInterest.id, input.interestId));
       return { success: true };
     }),
-  }),
+    }),
+
+  // ─── Thesis Engine (STRATEGIST agent — Spec TSL-SCI-PROD-001-A1) ─────────────
+  thesis: thesisRouter,
 });
 export type AppRouter = typeof appRouter;
 
