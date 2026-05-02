@@ -480,3 +480,12 @@
 - [x] Add Thesis Engine nav item to DashboardLayout (amber badge, Sparkles icon)
 - [x] Amber badge color support in NavItem (desktop + mobile)
 - [x] 81/81 tests passing, zero TypeScript errors
+
+## Sprint 24 — Thesis→Scan Wiring, Feed Dedup, High Priority Auto-Tag
+
+- [x] Wire Thesis Engine "Approve & Run" to scan.trigger with compiled filters (geographies→targetLocations, revenueMin→minCashFlow proxy, multipleMax)
+- [x] Add thesis scan confirmation dialog showing compiled parameters before triggering
+- [x] Navigate to Command Center after scan is triggered from Thesis Engine
+- [x] Deduplicate Intelligence Feed by name (case-insensitive) — keep highest-score entry per unique name
+- [x] High Priority auto-tag: lowered threshold to score >= 0.75, backfilled 10 existing deals to high_priority
+- [x] Verify High Priority stat shows correct count after scan (10 deals now show in stat strip)

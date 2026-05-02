@@ -7,6 +7,7 @@
  *   Right — STRATEGIST output review (editable structured form + Approve & Run)
  */
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -108,6 +109,35 @@ export default function ThesisEngine() {
   const deleteMutation = trpc.thesis.delete.useMutation({
     onSuccess: () => { toast.success("Thesis deleted"); refetchList(); },
   });
+  const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
+  const triggerScan = trpc.scan.trigger.useMutation({
+    onSuccess: (d) => {
+      toast.success("Pipeline running", {
+        description: `Scan job #${d.jobId} started with thesis parameters. Redirecting to Command Center…`,
+        duration: 4000,
+      });
+      utils.dashboard.stats.invalidate();
+      utils.deals.list.invalidate();
+      setTimeout(() => navigate("/"), 1800);
+    },
+    onError: (e) => toast.error(`Scan failed: ${e.message}`),
+  });
+  function handleApproveAndRun() {
+    if (!compilationResult) return;
+    const f = compilationResult.compiledFilters ?? {};
+    const targetLocations: string[] = f.geographies ?? [];
+    const minCashFlow = f.cashFlowMin ?? (f.revenueMin ? Math.round(f.revenueMin * 0.35) : 500000);
+    const maxMultiple = f.multipleMax ?? 5;
+    const geoLabel = targetLocations.length > 0
+      ? targetLocations.slice(0, 3).join(", ") + (targetLocations.length > 3 ? ` +${targetLocations.length - 3}` : "")
+      : "National";
+    toast.info("Thesis approved — launching scan", {
+      description: `Geography: ${geoLabel} · Min cash flow: $${(minCashFlow / 1000).toFixed(0)}k · Max multiple: ${maxMultiple}x`,
+      duration: 3000,
+    });
+    triggerScan.mutate({ targetLocations, minCashFlow, maxMultiple });
+  }
 
   function handleTemplate(t: typeof TEMPLATES[0]) {
     setActiveTemplate(t.id);
@@ -494,14 +524,14 @@ export default function ThesisEngine() {
                   <div className="flex gap-3 pt-2">
                     <Button
                       className="flex-1 bg-amber-500 hover:bg-amber-400 text-black font-medium"
-                      onClick={() => {
-                        toast.success("Thesis approved — pipeline queued", {
-                          description: "Market Scan will run with these parameters. Check the scan progress in Command Center.",
-                        });
-                      }}
+                      onClick={handleApproveAndRun}
+                      disabled={triggerScan.isPending}
                     >
-                      <TrendingUp className="h-4 w-4 mr-2" />
-                      Approve & Run Pipeline
+                      {triggerScan.isPending ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Launching Scan…</>
+                      ) : (
+                        <><TrendingUp className="h-4 w-4 mr-2" />Approve & Run Pipeline</>
+                      )}
                     </Button>
                     <Button
                       variant="outline"

@@ -1997,7 +1997,7 @@ async function runScanPipeline(
       if (deal) {
         const { score, redFlagCount } = await scoreDeal(deal);
         await updateDealScore(dealId, score, redFlagCount);
-        const stage = score >= 0.8 ? "high_priority" : score >= 0.65 ? "qualified" : "new";
+        const stage = score >= 0.75 ? "high_priority" : score >= 0.60 ? "qualified" : "new";
         await updateDealStage(dealId, stage);
 
         // OZ/TAD enrichment — runs async after scoring

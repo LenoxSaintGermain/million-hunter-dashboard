@@ -82,9 +82,20 @@ export async function getUserByOpenId(openId: string) {
 export async function getDeals(opts?: { limit?: number; offset?: number }) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(deals).where(eq(deals.isArchived, false))
+  // Fetch a larger window so dedup doesn't starve the result set
+  const raw = await db.select().from(deals).where(eq(deals.isArchived, false))
     .orderBy(desc(deals.score), desc(deals.createdAt))
-    .limit(opts?.limit ?? 50).offset(opts?.offset ?? 0);
+    .limit((opts?.limit ?? 50) * 4).offset(opts?.offset ?? 0);
+  // Deduplicate by name (case-insensitive) — keep highest-score entry per unique name
+  const seen = new Map<string, typeof raw[0]>();
+  for (const deal of raw) {
+    const key = deal.name.trim().toLowerCase();
+    const existing = seen.get(key);
+    if (!existing || (deal.score ?? 0) > (existing.score ?? 0)) {
+      seen.set(key, deal);
+    }
+  }
+  return Array.from(seen.values()).slice(0, opts?.limit ?? 50);
 }
 
 export async function getDealById(id: number) {

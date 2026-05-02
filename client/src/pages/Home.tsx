@@ -894,9 +894,20 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* Deal feed */}
+          {/* Deal feed — deduplicated by name (keep highest-score entry per unique name) */}
           <IntelligenceFeed
-            deals={topDealsData}
+            deals={(() => {
+              if (!topDealsData) return topDealsData;
+              const seen = new Map<string, any>();
+              for (const deal of topDealsData) {
+                const key = deal.name.trim().toLowerCase();
+                const existing = seen.get(key);
+                if (!existing || (deal.score ?? 0) > (existing.score ?? 0)) {
+                  seen.set(key, deal);
+                }
+              }
+              return Array.from(seen.values());
+            })()}
             isLoading={isLoading}
             onDelete={(id, name) => {
               if (confirm(`Remove "${name}" from the pipeline? This cannot be undone.`)) {
