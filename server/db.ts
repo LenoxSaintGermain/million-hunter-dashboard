@@ -320,7 +320,7 @@ export async function getCommercialAssets(opts?: { limit?: number; offset?: numb
     .orderBy(desc(commercialAssets.createdAt))
     .limit(opts?.limit ?? 50)
     .offset(opts?.offset ?? 0);
-  return query;
+  return await query;
 }
 
 export async function getCommercialAssetById(id: number) {
