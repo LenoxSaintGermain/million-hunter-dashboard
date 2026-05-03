@@ -45,7 +45,7 @@ Food Distribution, Auto Services, Security Services, Staffing, IT Services
 
 OUTPUT RULES:
 - All scoring weights must sum to exactly 100
-- Revenue values in USD integers (e.g. 20000000 for $20M)
+- Revenue values in USD integers (e.g. 20000000 for $20M) — NEVER use decimals or scientific notation for numbers
 - Geographies as US state abbreviations (e.g. ["FL","GA","TX"])
 - confidenceNotes must flag any ambiguous interpretation
 - estimatedTargets and estimatedCost are rough ranges, not guarantees
@@ -84,18 +84,21 @@ suggestedName: "Recurring Revenue Specialist"
 Return ONLY valid JSON matching the schema. No markdown, no explanation outside the JSON.`;
 
 // ── JSON Schema for structured output ────────────────────────────────────────
+// NOTE: All numeric fields use "string" type to avoid Gemini's structured-output
+// bug where integer schema fields render as 32k-character decimal strings.
+// The compile procedure parses them back to numbers after receiving the response.
 const COMPILATION_SCHEMA = {
   type: "object" as const,
   properties: {
     compiledFilters: {
       type: "object" as const,
       properties: {
-        revenueMin: { type: "number" as const },
-        revenueMax: { type: "number" as const },
+        revenueMin: { type: "string" as const, description: "USD integer as string e.g. '2000000'" },
+        revenueMax: { type: "string" as const, description: "USD integer as string e.g. '5000000'" },
         geographies: { type: "array" as const, items: { type: "string" as const } },
-        businessAgeMin: { type: "number" as const },
-        headcountMin: { type: "number" as const },
-        headcountMax: { type: "number" as const },
+        businessAgeMin: { type: "string" as const, description: "Years as integer string e.g. '10'" },
+        headcountMin: { type: "string" as const, description: "Integer string e.g. '10'" },
+        headcountMax: { type: "string" as const, description: "Integer string e.g. '100'" },
         exclusions: { type: "array" as const, items: { type: "string" as const } },
       },
       required: [] as string[],
@@ -107,7 +110,7 @@ const COMPILATION_SCHEMA = {
         type: "object" as const,
         properties: {
           dimension: { type: "string" as const },
-          weight: { type: "number" as const },
+          weight: { type: "string" as const, description: "Integer 1-100 as string, all weights sum to 100" },
           isCustom: { type: "boolean" as const },
         },
         required: ["dimension", "weight", "isCustom"],
@@ -117,10 +120,10 @@ const COMPILATION_SCHEMA = {
     evidenceRequirements: { type: "array" as const, items: { type: "string" as const } },
     autoDisqualifiers: { type: "array" as const, items: { type: "string" as const } },
     confidenceNotes: { type: "array" as const, items: { type: "string" as const } },
-    estimatedTargetsMin: { type: "number" as const },
-    estimatedTargetsMax: { type: "number" as const },
-    estimatedCostMin: { type: "number" as const },
-    estimatedCostMax: { type: "number" as const },
+    estimatedTargetsMin: { type: "string" as const, description: "Integer as string" },
+    estimatedTargetsMax: { type: "string" as const, description: "Integer as string" },
+    estimatedCostMin: { type: "string" as const, description: "Integer as string" },
+    estimatedCostMax: { type: "string" as const, description: "Integer as string" },
     suggestedName: { type: "string" as const },
   },
   required: [
@@ -155,25 +158,74 @@ export const thesisRouter = router({
       ) as any;
       const compilationId = insertResult.insertId as number;
 
-      // Call STRATEGIST via built-in LLM helper
-      const { invokeLLM } = await import("./_core/llm");
+      // Call STRATEGIST via Forge API (Gemini 2.5 Flash)
+      // Schema uses string types for all numeric fields to avoid Gemini's
+      // structured-output bug where integer fields render as 32k-char decimals.
+      // We coerce strings back to numbers after parsing.
+      const { ENV } = await import("./_core/env");
+      const forgeUrl = ENV.forgeApiUrl
+        ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
+        : "https://forge.manus.ai/v1/chat/completions";
+
       let compiled: any;
       try {
-        const response = await invokeLLM({
-          messages: [
-            { role: "system", content: STRATEGIST_SYSTEM_PROMPT },
-            { role: "user", content: `Compile this investment thesis:\n\n${input.thesisText}` },
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "thesis_compilation",
-              strict: true,
-              schema: COMPILATION_SCHEMA,
-            },
+        const forgeRes = await fetch(forgeUrl, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${ENV.forgeApiKey}`,
           },
+          body: JSON.stringify({
+            model: "gemini-2.5-flash",
+            messages: [
+              { role: "system", content: STRATEGIST_SYSTEM_PROMPT },
+              { role: "user", content: `Compile this investment thesis into a JSON object with these exact keys: compiledFilters (object with revenueMin, revenueMax, geographies, businessAgeMin, headcountMin, headcountMax, exclusions), scoringWeights (array of {dimension, weight, isCustom}), evidenceRequirements (array), autoDisqualifiers (array), confidenceNotes (array), estimatedTargetsMin, estimatedTargetsMax, estimatedCostMin, estimatedCostMax, suggestedName.\n\nIMPORTANT: All numeric values MUST be plain integers with NO decimal points (e.g. 2000000 not 2000000.0).\n\nThesis: ${input.thesisText}` },
+            ],
+            response_format: { type: "json_object" },
+            max_tokens: 2048,
+          }),
+          signal: AbortSignal.timeout(55000),
         });
-        compiled = JSON.parse(response.choices[0].message.content as string);
+        if (!forgeRes.ok) {
+          const errText = await forgeRes.text();
+          throw new Error(`Forge API error ${forgeRes.status}: ${errText.slice(0, 200)}`);
+        }
+        const forgeJson = await forgeRes.json() as any;
+        const rawContent = forgeJson.choices?.[0]?.message?.content;
+        if (!rawContent) {
+          throw new Error(`Empty response from STRATEGIST — finish_reason: ${forgeJson.choices?.[0]?.finish_reason}`);
+        }
+        // Strip markdown code fences if present
+        const stripped = rawContent.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+        let raw: any;
+        try {
+          raw = JSON.parse(stripped);
+        } catch {
+          const match = stripped.match(/\{[\s\S]*\}/);
+          if (!match) throw new Error("STRATEGIST returned non-JSON content");
+          raw = JSON.parse(match[0]);
+        }
+        // Coerce string numeric fields back to numbers (workaround for Gemini integer schema bug)
+        const toInt = (v: any) => v !== undefined && v !== null && v !== "" ? parseInt(String(v), 10) || 0 : undefined;
+        compiled = {
+          ...raw,
+          compiledFilters: {
+            ...raw.compiledFilters,
+            revenueMin: toInt(raw.compiledFilters?.revenueMin),
+            revenueMax: toInt(raw.compiledFilters?.revenueMax),
+            businessAgeMin: toInt(raw.compiledFilters?.businessAgeMin),
+            headcountMin: toInt(raw.compiledFilters?.headcountMin),
+            headcountMax: toInt(raw.compiledFilters?.headcountMax),
+          },
+          scoringWeights: (raw.scoringWeights ?? []).map((w: any) => ({
+            ...w,
+            weight: parseInt(String(w.weight), 10) || 0,
+          })),
+          estimatedTargetsMin: toInt(raw.estimatedTargetsMin) ?? 0,
+          estimatedTargetsMax: toInt(raw.estimatedTargetsMax) ?? 0,
+          estimatedCostMin: toInt(raw.estimatedCostMin) ?? 0,
+          estimatedCostMax: toInt(raw.estimatedCostMax) ?? 0,
+        };
       } catch (e) {
         // Mark as review so the user can retry
         await db.execute(
