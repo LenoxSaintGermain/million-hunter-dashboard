@@ -270,6 +270,15 @@ export const thesisRouter = router({
     const rows = await db.execute(
       sql`SELECT * FROM thesis_compilations WHERE user_id = ${ctx.user.id} ORDER BY created_at DESC LIMIT 20`
     ) as any;
+    // TiDB returns JSON columns as already-parsed objects (not strings).
+    // Guard: if value is already an object/array, use it directly; only JSON.parse strings.
+    const parseCol = (v: any, fallback: any) => {
+      if (v === null || v === undefined) return fallback;
+      if (typeof v === 'string') {
+        try { return JSON.parse(v); } catch { return fallback; }
+      }
+      return v; // already parsed by TiDB driver
+    };
     return (rows[0] as any[]).map((r: any) => ({
       id: r.id,
       userId: r.user_id,
@@ -277,11 +286,11 @@ export const thesisRouter = router({
       templateUsed: r.template_used,
       name: r.name,
       status: r.status,
-      compiledFilters: r.compiled_filters ? JSON.parse(r.compiled_filters) : {},
-      scoringWeights: r.scoring_weights ? JSON.parse(r.scoring_weights) : [],
-      evidenceRequirements: r.evidence_requirements ? JSON.parse(r.evidence_requirements) : [],
-      autoDisqualifiers: r.auto_disqualifiers ? JSON.parse(r.auto_disqualifiers) : [],
-      confidenceNotes: r.confidence_notes ? JSON.parse(r.confidence_notes) : [],
+      compiledFilters: parseCol(r.compiled_filters, {}),
+      scoringWeights: parseCol(r.scoring_weights, []),
+      evidenceRequirements: parseCol(r.evidence_requirements, []),
+      autoDisqualifiers: parseCol(r.auto_disqualifiers, []),
+      confidenceNotes: parseCol(r.confidence_notes, []),
       estimatedTargetsMin: r.estimated_targets_min,
       estimatedTargetsMax: r.estimated_targets_max,
       estimatedCostMin: r.estimated_cost_min,
