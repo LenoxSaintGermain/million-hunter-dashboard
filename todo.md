@@ -489,3 +489,20 @@
 - [x] Deduplicate Intelligence Feed by name (case-insensitive) — keep highest-score entry per unique name
 - [x] High Priority auto-tag: lowered threshold to score >= 0.75, backfilled 10 existing deals to high_priority
 - [x] Verify High Priority stat shows correct count after scan (10 deals now show in stat strip)
+
+## Sprint 25 — TIDE Capital Flow Intelligence (Phase 1: Political Capital Deployment)
+
+- [x] Add capital_flows table to DB schema (entity, amount, geography, category, flow_date, source, confidence)
+- [x] Add convergence_events table to DB schema (flows[], signal_type, geography, thesis_seed, confidence)
+- [x] Add tide_predictions table to DB schema (claim, geography, category, confidence, outcome)
+- [x] Run direct SQL migration for all 3 tables (TiDB compatible)
+- [x] Build tideRouter.ts: tide.scan (TIDE-SCOUT + TIDE-CLASSIFIER + TIDE-LINKER agents)
+- [x] TIDE-SCOUT: fetch USAspending.gov awards, Federal Register notices, FEC disbursements
+- [x] TIDE-CLASSIFIER: Gemini classifies each flow by category + geography + confidence
+- [x] TIDE-LINKER: Gemini identifies convergence events (2+ flows in same geography within 90 days)
+- [x] tide.listFlows, tide.listConvergence, tide.listPredictions, tide.scan procedures
+- [x] tide.archiveConvergence, tide.convertToThesis, tide.logPrediction, tide.updateOutcome procedures
+- [x] Build TIDE.tsx dashboard page: flow feed with category filter, convergence events panel, prediction track record
+- [x] Add TIDE Intelligence nav item to DashboardLayout sidebar (amber New badge)
+- [x] Add /tide route to App.tsx
+- [x] 81/81 tests passing, zero TypeScript errors

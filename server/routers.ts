@@ -25,6 +25,7 @@ import {
 import { enrichDealWithOZTAD } from "./ozTadEnrichment";
 import { poeChat, POE_MODELS } from "./poe";
 import { thesisRouter } from "./thesisRouter";
+import { tideRouter } from "./tideRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -1916,6 +1917,7 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
 
   // ─── Thesis Engine (STRATEGIST agent — Spec TSL-SCI-PROD-001-A1) ─────────────
   thesis: thesisRouter,
+  tide: tideRouter,
 });
 export type AppRouter = typeof appRouter;
 

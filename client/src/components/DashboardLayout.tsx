@@ -21,6 +21,7 @@ import {
   Radar,
   Sparkles,
   Building2,
+  Activity,
   LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ const navSections = [
       { href: "/strategy-blender", icon: BarChart3, label: "Strategy Blender", badge: null },
       { href: "/opportunity-radar", icon: Radar, label: "Opportunity Radar", badge: null },
       { href: "/investor-dossier", icon: Sparkles, label: "Investor Dossier", badge: null },
+      { href: "/tide", icon: Activity, label: "TIDE Intelligence", badge: { label: "New", color: "amber" } },
     ],
   },
 ];

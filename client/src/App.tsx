@@ -16,6 +16,7 @@ import OpportunityRadar from "./pages/OpportunityRadar";
 import InvestorDossier from "./pages/InvestorDossier";
 import Scout from "./pages/Scout";
 import ThesisEngine from "./pages/ThesisEngine";
+import TIDEPage from "./pages/TIDE";
 import DealShare from "./pages/DealShare";
 import Lobby from "./pages/Lobby";
 import InvestorDealRoom from "./pages/investor/DealRoom";
@@ -134,6 +135,7 @@ function Router() {
         <Route path="/opportunity-radar" component={OpportunityRadar} />
         <Route path="/investor-dossier" component={InvestorDossier} />
         <Route path="/scout" component={Scout} />
+        <Route path="/tide" component={TIDEPage} />
 
         {/* Public deal share — no auth required */}
         <Route path="/deal-share/:token" component={DealShare} />
