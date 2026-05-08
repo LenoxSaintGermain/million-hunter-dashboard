@@ -84,7 +84,7 @@ const CATEGORY_COLORS: Record<FlowCategory, { text: string; bg: string; border: 
   agriculture:    { text: "var(--sage)",      bg: "oklch(0.55 0.06 155 / 0.08)", border: "oklch(0.55 0.06 155 / 0.25)" },
   technology:     { text: "var(--sh-cyan)",   bg: "oklch(0.45 0.08 220 / 0.08)", border: "oklch(0.45 0.08 220 / 0.25)" },
   finance:        { text: "var(--amber)",     bg: "oklch(0.66 0.14 55 / 0.08)",  border: "oklch(0.66 0.14 55 / 0.25)" },
-  other:          { text: "var(--sh-fg-3)",   bg: "oklch(0.18 0.018 250 / 0.04)", border: "var(--rule)" },
+  other:          { text: "var(--sh-fg-3)",   bg: "var(--sh-primary-8)", border: "var(--rule)" },
 };
 
 const SIGNAL_LABELS: Record<SignalType, string> = {
@@ -125,7 +125,19 @@ function FlowCard({ flow }: { flow: CapitalFlow }) {
   const [expanded, setExpanded] = useState(false);
   const colors = CATEGORY_COLORS[flow.category] || CATEGORY_COLORS.other;
   const sourceInfo = SOURCE_LABELS[flow.source] || { label: flow.source, description: "" };
-  const amountStr = flow.amount ? fmtMoney(flow.amount / 100) : null;
+  const rawAmount = flow.amount ? flow.amount / 100 : null;
+  const amountStr = rawAmount ? fmtMoney(rawAmount) : null;
+  const isSignificantAmount = rawAmount != null && rawAmount >= 1_000_000;
+  // Format date — cap future dates at today
+  const flowDateDisplay = (() => {
+    if (!flow.flow_date) return "—";
+    try {
+      const d = new Date(flow.flow_date);
+      const now = new Date();
+      const display = d > now ? now : d;
+      return display.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch { return flow.flow_date; }
+  })();
 
   return (
     <motion.div
@@ -152,7 +164,13 @@ function FlowCard({ flow }: { flow: CapitalFlow }) {
               {sourceInfo.label}
             </span>
             {amountStr && (
-              <span className="font-mono text-[10px] tabular-nums" style={{ color: "var(--amber)", fontWeight: 500 }}>
+              <span 
+                className="font-mono text-[10px] tabular-nums"
+                style={{ 
+                  color: isSignificantAmount ? "var(--amber)" : "var(--sh-fg-3)", 
+                  fontWeight: isSignificantAmount ? 600 : 400 
+                }}
+              >
                 {amountStr}
               </span>
             )}
@@ -171,7 +189,7 @@ function FlowCard({ flow }: { flow: CapitalFlow }) {
         </div>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           <span className="font-mono text-[10px] tabular-nums" style={{ color: "var(--sh-fg-4)" }}>
-            {flow.flow_date}
+            {flowDateDisplay}
           </span>
           <button
             onClick={() => setExpanded(!expanded)}
@@ -416,8 +434,13 @@ export default function TIDEPage() {
   const predictions: Prediction[] = (predictionsQuery.data as any[]) || [];
 
   const filteredFlows = useMemo(() => {
-    if (filterCategory === "all") return flows;
-    return flows.filter((f) => f.category === filterCategory);
+    // Filter out very small Political Capital amounts (FEC filings under $500 are noise)
+    const meaningful = flows.filter((f) => {
+      if (f.source === "fec" && f.amount && f.amount / 100 < 500) return false;
+      return true;
+    });
+    if (filterCategory === "all") return meaningful;
+    return meaningful.filter((f) => f.category === filterCategory);
   }, [flows, filterCategory]);
 
   const totalCapital = flows.reduce((s, f) => s + (f.amount || 0), 0);

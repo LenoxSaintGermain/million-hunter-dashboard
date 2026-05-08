@@ -390,13 +390,15 @@ export const tideRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) return [];
-      // Build dynamic query
-      let baseQuery = `SELECT * FROM capital_flows WHERE 1=1`;
+      // Build dynamic query — deduplicate by entity+source+flow_date
       const clauses: string[] = [];
       if (input.geography) clauses.push(`geography LIKE '%${input.geography.replace(/'/g, "''")}%'`);
-      if (input.category) clauses.push(`category = '${input.category.replace(/'/g, "''")}'`);
-      const whereClause = clauses.length > 0 ? " AND " + clauses.join(" AND ") : "";
-      const fullQuery = `${baseQuery}${whereClause} ORDER BY flow_date DESC, confidence DESC LIMIT ${input.limit}`;
+      if (input.category) clauses.push(`category = '${input.category.replace(/'/g, "''")}' `);
+      const whereClause = clauses.length > 0 ? " WHERE " + clauses.join(" AND ") : "";
+      // Use MAX(id) per unique (entity, source, flow_date) to eliminate duplicates from multiple scans
+      const fullQuery = `SELECT * FROM capital_flows WHERE id IN (
+        SELECT MAX(id) FROM capital_flows${whereClause} GROUP BY entity, source, flow_date
+      ) ORDER BY flow_date DESC, confidence DESC LIMIT ${input.limit}`;
       const rows = await db.execute(sql.raw(fullQuery)) as any;
       return (rows[0] as any[]) || [];
     }),

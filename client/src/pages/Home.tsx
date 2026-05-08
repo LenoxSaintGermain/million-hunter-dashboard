@@ -32,9 +32,9 @@ const C = {
   vi:  "var(--sh-violet)",
   ro:  "var(--clay)",
   fg1: "var(--ink)",
-  fg2: "oklch(0.35 0.018 250)",
-  fg3: "oklch(0.48 0.018 250)",
-  fg4: "oklch(0.60 0.012 250)",
+  fg2: "var(--sh-fg-2)",
+  fg3: "var(--sh-fg-3)",
+  fg4: "var(--sh-fg-4)",
   s1:  "var(--paper)",
   s2:  "var(--bone)",
   bd:  "var(--rule)",
@@ -812,8 +812,8 @@ export default function Home() {
                 display: "inline-flex", alignItems: "center", gap: 8,
                 height: 42, padding: "0 22px", borderRadius: 9999,
                 fontSize: 12, fontWeight: 600, cursor: "pointer",
-                background: triggerScan.isPending || activeScanJobId !== null ? "oklch(0.18 0.018 250 / 0.5)" : "var(--ink)",
-                border: "none", color: "var(--paper)",
+                background: triggerScan.isPending || activeScanJobId !== null ? "var(--sh-primary-20)" : "var(--amber)",
+                border: "none", color: triggerScan.isPending || activeScanJobId !== null ? "var(--sh-fg-3)" : "var(--amber-foreground)",
                 letterSpacing: "0.02em",
               }}
             >

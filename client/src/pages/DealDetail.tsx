@@ -221,7 +221,7 @@ export default function DealDetail() {
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 40, fontWeight: 700, color: scoreColorVal, lineHeight: 1 }}>
                 {score != null ? score.toFixed(3) : "—"}
               </div>
-              <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--sh-fg-3)", marginTop: 4 }}>AI Score</p>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.2em", color: "var(--sh-fg-3)", marginTop: 4 }}>AI Score</p>
             </div>
             <div className="flex flex-col gap-2">
               <Button size="sm" className="h-8 text-xs" onClick={() => scoreDeal.mutate({ id: dealId })} disabled={scoreDeal.isPending}>
