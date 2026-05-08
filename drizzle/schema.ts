@@ -18,7 +18,7 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin", "investor"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "admin", "investor", "insurance"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -568,3 +568,36 @@ export const thesisCompilations = mysqlTable("thesis_compilations", {
 });
 export type ThesisCompilation = typeof thesisCompilations.$inferSelect;
 export type InsertThesisCompilation = typeof thesisCompilations.$inferInsert;
+
+// ─── Insurance Prospects (NY Life / commercial insurance prospecting) ─────────
+// Each deal in the pipeline can be scored as a commercial insurance prospect.
+// Surfaces premium potential, policy fit, and a pre-call brief for insurance agents.
+export const insuranceProspects = mysqlTable("insurance_prospects", {
+  id: int("id").autoincrement().primaryKey(),
+  dealId: int("deal_id").notNull().unique(),
+  // Composite prospect score 0–1 (weighted: premium potential + policy complexity + risk profile)
+  prospectScore: float("prospect_score"),
+  // Estimated annual premium range in cents
+  estimatedPremiumLow: bigint("estimated_premium_low", { mode: "number" }),
+  estimatedPremiumHigh: bigint("estimated_premium_high", { mode: "number" }),
+  // Risk profile: low | moderate | elevated | high
+  riskProfile: mysqlEnum("risk_profile", ["low", "moderate", "elevated", "high"]).default("moderate").notNull(),
+  // Policy fit map — which policies are relevant and why
+  policyFit: json("policy_fit").$type<Array<{
+    policy: string;          // e.g. "Key Man Life", "Business Interruption", "Commercial Property"
+    relevance: "high" | "medium" | "low";
+    estimatedPremium?: number; // annual, in cents
+    rationale: string;
+  }>>().default([]),
+  // AI-generated pre-call brief (the conversation starter)
+  briefText: text("brief_text"),
+  // Prospect status in the insurance pipeline
+  status: mysqlEnum("status", ["new", "briefed", "contacted", "quoted", "closed", "passed"]).default("new").notNull(),
+  // Which user generated this prospect record
+  generatedByUserId: int("generated_by_user_id"),
+  scoredAt: timestamp("scored_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type InsuranceProspect = typeof insuranceProspects.$inferSelect;
+export type InsertInsuranceProspect = typeof insuranceProspects.$inferInsert;
+

@@ -517,3 +517,28 @@
 - [x] Fix Scan.tsx deal card dark oklch → bone/paper/rule tokens
 - [x] Fix Memos.tsx amber background to use Editorial Finance amber token
 - [x] 81/81 tests passing, zero TypeScript errors
+
+## Sprint 27 — Insurance Prospector + Multi-User Admin
+
+### Insurance Prospector
+- [ ] Add `insurance_prospects` table to schema (dealId, premiumPotential, riskProfile, policyFit JSON, prospectScore, briefText, status)
+- [x] Add `insurance` role to users enum in schema
+- [x] Run db:push migration for new tables and role
+- [x] Add insuranceProspector router: scoreProspect, generateBrief, listProspects, updateStatus
+- [x] Build InsuranceProspector.tsx page: prospect list, policy fit badges, brief generator
+- [x] Add /insurance-prospector route to App.tsx
+- [x] Add Insurance Prospector nav item (visible to admin + insurance roles)
+
+### Multi-User Admin
+- [x] Add getAllUsers, updateUserRole, deactivateUser procedures (admin-only)
+- [x] Build AdminPanel.tsx: user list table, role selector, deactivate toggle
+- [x] Add /admin route to App.tsx (admin-only guard)
+- [x] Add Admin Panel nav item (admin role only)
+- [x] Role-gate nav: insurance role sees Insurance Prospector, not acquisition modules
+- [ ] Add role badge to user avatar in sidebar (Admin / Investor / Insurance)
+
+### Backlog / Polish
+- [ ] Fix mobile nav active state amber indicator not rendering in sheet
+- [ ] Extract fmtMoney/fmtPct into client/src/lib/format.ts and import site-wide
+- [ ] Seed Sentinel Signals with 8 real macro signals (archive test entries)
+- [x] 81+ tests passing, zero TypeScript errors

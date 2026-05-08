@@ -1,0 +1,15 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `insurance_prospects` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`deal_id` int NOT NULL,\n\t`prospect_score` float,\n\t`estimated_premium_low` bigint,\n\t`estimated_premium_high` bigint,\n\t`risk_profile` enum('low','moderate','elevated','high') NOT NULL DEFAULT 'moderate',\n\t`policy_fit` json DEFAULT ('[]'),\n\t`brief_text` text,\n\t`status` enum('new','briefed','contacted','quoted','closed','passed') NOT NULL DEFAULT 'new',\n\t`generated_by_user_id` int,\n\t`scored_at` timestamp NOT NULL DEFAULT (now()),\n\t`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `insurance_prospects_id` PRIMARY KEY(`id`),\n\tCONSTRAINT `insurance_prospects_deal_id_unique` UNIQUE(`deal_id`)\n);\nALTER TABLE `users` MODIFY COLUMN `role` enum('user','admin','investor','insurance') NOT NULL DEFAULT 'user';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute CREATE TABLE IF NOT EXISTS `insurance_prospects` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`deal_id` int NOT NULL,\n\t`prospect_score` float,\n\t`estimated_premium_low` bigint,\n\t`estimated_premium_high` bigint,\n\t`risk_profile` enum('low','moderate','elevated','high') NOT NULL DEFAULT 'moderate',\n\t`policy_fit` json DEFAULT ('[]'),\n\t`brief_text` text,\n\t`status` enum('new','briefed','contacted','quoted','closed','passed') NOT NULL DEFAULT 'new',\n\t`generated_by_user_id` int,\n\t`scored_at` timestamp NOT NULL DEFAULT (now()),\n\t`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `insurance_prospects_id` PRIMARY KEY(`id`),\n\tCONSTRAINT `insurance_prospects_deal_id_unique` UNIQUE(`deal_id`)\n);\nALTER TABLE `users` MODIFY COLUMN `role` enum('user','admin','investor','insurance') NOT NULL DEFAULT 'user';",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 8 column 33 near \"'[]'),",
+    "\t`brief_text` text,",
+    "\t`status` enum('new','briefed','contacted','quoted','closed','passed') NOT NULL DEFAULT 'new',",
+    "\t`generated_by_user_id` int,",
+    "\t`scored_at` timestamp NOT NULL DEFAULT (now()),",
+    "\t`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,",
+    "\tCONSTRAINT `insurance_prospects_id` PRIMARY KEY(`id`),",
+    "\tCONSTRAINT `insurance_prospects_"
+  ]
+}

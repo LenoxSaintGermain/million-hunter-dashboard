@@ -23,6 +23,8 @@ import {
   Activity,
   LogOut,
   Zap,
+  Shield,
+  Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -49,6 +51,18 @@ const navSections = [
       { href: "/opportunity-radar", icon: Radar, label: "Opportunity Radar", badge: null },
       { href: "/investor-dossier", icon: Sparkles, label: "Investor Dossier", badge: null },
       { href: "/tide", icon: Activity, label: "TIDE Intelligence", badge: { label: "New", color: "amber" } },
+    ],
+  },
+  {
+    label: "Partners",
+    items: [
+      { href: "/insurance-prospector", icon: Shield, label: "Insurance Prospector", badge: { label: "New", color: "amber" }, roles: ["admin", "insurance"] as string[] },
+    ],
+  },
+  {
+    label: "Platform",
+    items: [
+      { href: "/admin", icon: Settings2, label: "Admin Panel", badge: null, roles: ["admin"] as string[] },
     ],
   },
 ];
@@ -215,17 +229,26 @@ function SidebarNav({
   collapsed,
   location,
   user,
+  userRole,
   onNavigate,
 }: {
   collapsed: boolean;
   location: string;
   user: { name?: string | null } | null;
+  userRole?: string | null;
   onNavigate: () => void;
 }) {
   return (
     <>
       <nav className="flex-1 py-3 px-2 overflow-y-auto">
-        {navSections.map((section, si) => (
+        {navSections.map((section, si) => {
+          const visibleItems = section.items.filter((item) => {
+            const roles = (item as any).roles as string[] | undefined;
+            if (!roles) return true;
+            return roles.includes(userRole ?? "user");
+          });
+          if (visibleItems.length === 0) return null;
+          return (
           <div key={section.label} className={cn("mb-1", si > 0 && "mt-3 pt-3 border-t")} style={{ borderColor: "var(--rule)" }}>
             {!collapsed && (
               <div className="px-3 mb-1.5">
@@ -244,7 +267,7 @@ function SidebarNav({
               </div>
             )}
             <div className="space-y-0.5">
-              {section.items.map((item) => {
+              {visibleItems.map((item) => {
                 const isActive =
                   location === item.href ||
                   (item.href !== "/" && location.startsWith(item.href));
@@ -260,7 +283,8 @@ function SidebarNav({
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Bottom */}
@@ -339,12 +363,14 @@ function MobileBottomSheet({
   onClose,
   location,
   user,
+  userRole,
   logout,
 }: {
   open: boolean;
   onClose: () => void;
   location: string;
   user: { name?: string | null } | null;
+  userRole?: string | null;
   logout: () => void;
 }) {
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -431,7 +457,14 @@ function MobileBottomSheet({
         </div>
 
         <div className="flex-1 overflow-y-auto py-3 px-3">
-          {navSections.map((section, si) => (
+          {navSections.map((section, si) => {
+            const visibleItems = section.items.filter((item) => {
+              const roles = (item as any).roles as string[] | undefined;
+              if (!roles) return true;
+              return roles.includes(userRole ?? "user");
+            });
+            if (visibleItems.length === 0) return null;
+            return (
             <div key={section.label} className={cn("mb-1", si > 0 && "mt-4 pt-4 border-t")} style={{ borderColor: "var(--rule)" }}>
               <div className="px-3 mb-2">
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--sh-fg-4)" }}>
@@ -439,7 +472,7 @@ function MobileBottomSheet({
                 </span>
               </div>
               <div className="space-y-0.5">
-                {section.items.map((item) => {
+                {visibleItems.map((item) => {
                   const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
                   return (
                     <Link key={item.href} href={item.href} onClick={onClose}>
@@ -476,7 +509,8 @@ function MobileBottomSheet({
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
 
           <div className="mt-4 pt-4 border-t" style={{ borderColor: "var(--rule)" }}>
             <Link href="/settings" onClick={onClose}>
@@ -522,6 +556,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [location] = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
+  const userRole = (user as any)?.role as string | undefined;
 
   useEffect(() => {
     setMobileOpen(false);
@@ -534,6 +569,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         onClose={() => setMobileOpen(false)}
         location={location}
         user={user}
+        userRole={userRole}
         logout={logout ?? (() => {})}
       />
 
@@ -550,6 +586,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           collapsed={collapsed}
           location={location}
           user={user}
+          userRole={userRole}
           onNavigate={() => {}}
         />
         <button

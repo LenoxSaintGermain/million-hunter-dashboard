@@ -17,6 +17,8 @@ import InvestorDossier from "./pages/InvestorDossier";
 import Scout from "./pages/Scout";
 import ThesisEngine from "./pages/ThesisEngine";
 import TIDEPage from "./pages/TIDE";
+import InsuranceProspector from "./pages/InsuranceProspector";
+import AdminPanel from "./pages/AdminPanel";
 import DealShare from "./pages/DealShare";
 import Lobby from "./pages/Lobby";
 import InvestorDealRoom from "./pages/investor/DealRoom";
@@ -136,6 +138,8 @@ function Router() {
         <Route path="/investor-dossier" component={InvestorDossier} />
         <Route path="/scout" component={Scout} />
         <Route path="/tide" component={TIDEPage} />
+        <Route path="/insurance-prospector" component={InsuranceProspector} />
+        <Route path="/admin" component={AdminPanel} />
 
         {/* Public deal share — no auth required */}
         <Route path="/deal-share/:token" component={DealShare} />

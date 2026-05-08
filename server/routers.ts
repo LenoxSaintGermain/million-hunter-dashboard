@@ -26,6 +26,7 @@ import { enrichDealWithOZTAD } from "./ozTadEnrichment";
 import { poeChat, POE_MODELS } from "./poe";
 import { thesisRouter } from "./thesisRouter";
 import { tideRouter } from "./tideRouter";
+import { insuranceRouter } from "./insuranceRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -1915,6 +1916,46 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
     }),
     }),
 
+  // ─── Insurance Prospector ────────────────────────────────────────────────────
+  insurance: insuranceRouter,
+  // ─── Admin — User Management ─────────────────────────────────────────────────
+  admin: router({
+    /** List all users (admin only) */
+    listUsers: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return [];
+      const rows = await db.execute(
+        sql`SELECT id, open_id, name, email, login_method, role, created_at, updated_at, last_signed_in, onboarding_completed FROM users ORDER BY created_at DESC LIMIT 200`
+      ) as unknown as { rows: Record<string, unknown>[] };
+      return rows.rows ?? [];
+    }),
+    /** Update a user's role (admin only) */
+    updateRole: protectedProcedure
+      .input(z.object({
+        userId: z.number(),
+        role: z.enum(["user", "admin", "investor", "insurance"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.execute(sql`UPDATE users SET role = ${input.role}, updated_at = NOW() WHERE id = ${input.userId}`);
+        return { success: true };
+      }),
+    /** Get platform stats (admin only) */
+    platformStats: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return null;
+      const [users, deals_count, prospects] = await Promise.all([
+        db.execute(sql`SELECT role, COUNT(*) as count FROM users GROUP BY role`) as Promise<unknown>,
+        db.execute(sql`SELECT stage, COUNT(*) as count FROM deals WHERE is_archived = 0 GROUP BY stage`) as Promise<unknown>,
+        db.execute(sql`SELECT status, COUNT(*) as count FROM insurance_prospects GROUP BY status`) as Promise<unknown>,
+      ]);
+      return { users: (users as { rows: unknown[] }).rows, deals: (deals_count as { rows: unknown[] }).rows, prospects: (prospects as { rows: unknown[] }).rows };
+    }),
+  }),
   // ─── Thesis Engine (STRATEGIST agent — Spec TSL-SCI-PROD-001-A1) ─────────────
   thesis: thesisRouter,
   tide: tideRouter,
