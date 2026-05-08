@@ -2,33 +2,28 @@
  * TIDE — Temporal Intelligence for Deployment Events
  * Phase 1: Political Capital Deployment
  *
- * Three-panel editorial layout:
- *  Left  → Geography scan input + Capital Flow Feed
- *  Right → Convergence Events + Prediction Track Record
+ * Editorial Finance design system — warm bone/paper, Fraunces display,
+ * contextual "why this matters" explanations, no raw FEC dump links.
  */
-
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   Zap, TrendingUp, MapPin, AlertTriangle, CheckCircle2,
   Clock, ArrowRight, BarChart2, Loader2, Target, BookOpen,
-  Archive, RefreshCw, ChevronDown, ChevronUp, ExternalLink,
+  Archive, RefreshCw, ChevronDown, ChevronUp, Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 type FlowCategory =
   | "infrastructure" | "defense" | "healthcare" | "housing"
   | "energy" | "education" | "agriculture" | "technology"
   | "finance" | "other";
-
 type SignalType =
   | "infrastructure_surge" | "defense_pivot" | "housing_push"
   | "energy_transition" | "healthcare_expansion" | "government_expansion" | "other";
@@ -45,7 +40,6 @@ interface CapitalFlow {
   source_url: string;
   confidence: number;
 }
-
 interface ConvergenceEvent {
   id: number;
   geography: string;
@@ -56,7 +50,6 @@ interface ConvergenceEvent {
   status: "active" | "archived" | "converted_to_thesis";
   created_at: string;
 }
-
 interface Prediction {
   id: number;
   claim: string;
@@ -67,19 +60,31 @@ interface Prediction {
   predicted_at: string;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Number formatting ────────────────────────────────────────────────────────
+function fmtMoney(n: number | null | undefined): string {
+  if (n == null) return "—";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
+  if (abs >= 1_000_000)     return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000)         return `$${(n / 1_000).toFixed(0)}K`;
+  return `$${n}`;
+}
+function fmtPct(n: number): string {
+  return `${Math.round(n * 100)}%`;
+}
 
-const CATEGORY_COLORS: Record<FlowCategory, string> = {
-  infrastructure: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-  defense:        "text-red-400 bg-red-400/10 border-red-400/20",
-  healthcare:     "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-  housing:        "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  energy:         "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
-  education:      "text-purple-400 bg-purple-400/10 border-purple-400/20",
-  agriculture:    "text-lime-400 bg-lime-400/10 border-lime-400/20",
-  technology:     "text-cyan-400 bg-cyan-400/10 border-cyan-400/20",
-  finance:        "text-orange-400 bg-orange-400/10 border-orange-400/20",
-  other:          "text-zinc-400 bg-zinc-400/10 border-zinc-400/20",
+// ─── Constants ────────────────────────────────────────────────────────────────
+const CATEGORY_COLORS: Record<FlowCategory, { text: string; bg: string; border: string }> = {
+  infrastructure: { text: "var(--amber)",     bg: "oklch(0.66 0.14 55 / 0.08)",  border: "oklch(0.66 0.14 55 / 0.25)" },
+  defense:        { text: "var(--clay)",      bg: "oklch(0.55 0.14 28 / 0.08)",  border: "oklch(0.55 0.14 28 / 0.25)" },
+  healthcare:     { text: "var(--sage)",      bg: "oklch(0.55 0.06 155 / 0.08)", border: "oklch(0.55 0.06 155 / 0.25)" },
+  housing:        { text: "var(--sh-cyan)",   bg: "oklch(0.45 0.08 220 / 0.08)", border: "oklch(0.45 0.08 220 / 0.25)" },
+  energy:         { text: "var(--amber)",     bg: "oklch(0.66 0.14 55 / 0.08)",  border: "oklch(0.66 0.14 55 / 0.25)" },
+  education:      { text: "var(--sh-violet)", bg: "oklch(0.45 0.10 290 / 0.08)", border: "oklch(0.45 0.10 290 / 0.25)" },
+  agriculture:    { text: "var(--sage)",      bg: "oklch(0.55 0.06 155 / 0.08)", border: "oklch(0.55 0.06 155 / 0.25)" },
+  technology:     { text: "var(--sh-cyan)",   bg: "oklch(0.45 0.08 220 / 0.08)", border: "oklch(0.45 0.08 220 / 0.25)" },
+  finance:        { text: "var(--amber)",     bg: "oklch(0.66 0.14 55 / 0.08)",  border: "oklch(0.66 0.14 55 / 0.25)" },
+  other:          { text: "var(--sh-fg-3)",   bg: "oklch(0.18 0.018 250 / 0.04)", border: "var(--rule)" },
 };
 
 const SIGNAL_LABELS: Record<SignalType, string> = {
@@ -92,10 +97,20 @@ const SIGNAL_LABELS: Record<SignalType, string> = {
   other:                  "Capital Convergence",
 };
 
-const SOURCE_LABELS = {
-  usaspending:      "USASpending",
-  federal_register: "Fed Register",
-  fec:              "FEC",
+const SOURCE_LABELS: Record<string, { label: string; description: string }> = {
+  usaspending:      { label: "Federal Contract",  description: "A federal contract award tracked via USASpending.gov — direct government spending in this geography." },
+  federal_register: { label: "Regulatory Signal", description: "A Federal Register notice — regulatory activity that often precedes capital deployment or policy-driven demand." },
+  fec:              { label: "Political Capital",  description: "A PAC or campaign finance filing — political money flowing into this market, often a leading indicator of policy priorities." },
+};
+
+const SIGNAL_WHY_IT_MATTERS: Record<SignalType, string> = {
+  infrastructure_surge:   "Multiple federal infrastructure contracts are converging on this geography. This typically precedes 18–36 months of elevated construction, logistics, and services demand.",
+  defense_pivot:          "Defense spending is concentrating here. Defense contractors, staffing firms, and adjacent services businesses tend to see sustained revenue growth in these corridors.",
+  housing_push:           "Federal housing programs and subsidies are flowing into this market. Demand for property management, maintenance, and related services typically follows.",
+  energy_transition:      "Energy infrastructure investment is accelerating here. Electrical contractors, equipment suppliers, and workforce training providers are positioned to benefit.",
+  healthcare_expansion:   "Healthcare facility funding and regulatory approvals are clustering in this area. Medical staffing, supply chain, and ancillary services see compounding demand.",
+  government_expansion:   "Government agency expansion is underway. Administrative services, IT, facilities management, and professional services contracts typically follow.",
+  other:                  "Multiple capital signals are converging in this geography. The pattern suggests elevated economic activity across several sectors.",
 };
 
 const SUGGESTED_GEOS = [
@@ -103,50 +118,71 @@ const SUGGESTED_GEOS = [
   "Nashville, TN", "Phoenix, AZ", "Denver, CO", "Washington, DC",
 ];
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+const EASE = [0.16, 1, 0.3, 1] as const;
 
+// ─── FlowCard ─────────────────────────────────────────────────────────────────
 function FlowCard({ flow }: { flow: CapitalFlow }) {
   const [expanded, setExpanded] = useState(false);
-  const colorClass = CATEGORY_COLORS[flow.category] || CATEGORY_COLORS.other;
-  const amountStr = flow.amount
-    ? `$${(flow.amount / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-    : null;
+  const colors = CATEGORY_COLORS[flow.category] || CATEGORY_COLORS.other;
+  const sourceInfo = SOURCE_LABELS[flow.source] || { label: flow.source, description: "" };
+  const amountStr = flow.amount ? fmtMoney(flow.amount / 100) : null;
 
   return (
     <motion.div
       layout
       initial={{ opacity: 0, filter: "blur(4px)" }}
       animate={{ opacity: 1, filter: "blur(0px)" }}
-      className="border-b border-white/5 py-3 last:border-0"
+      transition={{ duration: 0.4, ease: EASE }}
+      style={{ borderBottom: "1px solid var(--rule)", paddingTop: 14, paddingBottom: 14 }}
+      className="last:border-0"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <span className={cn("text-[10px] font-mono px-1.5 py-0.5 rounded border uppercase tracking-wider", colorClass)}>
+          <div className="flex items-center gap-2 flex-wrap mb-2">
+            <span
+              className="font-mono text-[10px] px-2 py-0.5 rounded-full border uppercase tracking-wider"
+              style={{ color: colors.text, background: colors.bg, borderColor: colors.border }}
+            >
               {flow.category}
             </span>
-            <span className="text-[10px] text-zinc-500 font-mono">
-              {SOURCE_LABELS[flow.source]}
+            <span
+              className="font-mono text-[10px] px-2 py-0.5 rounded-full border"
+              style={{ color: "var(--sh-fg-4)", background: "var(--bone)", borderColor: "var(--rule)" }}
+            >
+              {sourceInfo.label}
             </span>
             {amountStr && (
-              <span className="text-[10px] font-mono text-amber-400/80">{amountStr}</span>
+              <span className="font-mono text-[10px] tabular-nums" style={{ color: "var(--amber)", fontWeight: 500 }}>
+                {amountStr}
+              </span>
             )}
           </div>
-          <p className="text-sm text-zinc-200 font-medium leading-snug line-clamp-2">
+          <p
+            className="text-sm leading-snug"
+            style={{ color: "var(--ink)", fontFamily: "var(--font-display)", fontWeight: 400, letterSpacing: "-0.01em" }}
+          >
             {flow.entity}
           </p>
-          <p className="text-xs text-zinc-500 mt-0.5 line-clamp-1">{flow.raw_title}</p>
+          {sourceInfo.description && (
+            <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--sh-fg-3)" }}>
+              {sourceInfo.description}
+            </p>
+          )}
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className="text-[10px] text-zinc-600 font-mono">{flow.flow_date}</span>
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <span className="font-mono text-[10px] tabular-nums" style={{ color: "var(--sh-fg-4)" }}>
+            {flow.flow_date}
+          </span>
           <button
             onClick={() => setExpanded(!expanded)}
-            className="text-zinc-600 hover:text-zinc-400 transition-colors"
+            style={{ color: "var(--sh-fg-4)" }}
+            className="hover:opacity-70 transition-opacity"
           >
             {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
         </div>
       </div>
+
       <AnimatePresence>
         {expanded && (
           <motion.div
@@ -155,24 +191,17 @@ function FlowCard({ flow }: { flow: CapitalFlow }) {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="pt-2 flex items-center gap-3">
-              <div className="flex items-center gap-1 text-xs text-zinc-500">
+            <div className="mt-3 pt-3 flex items-center gap-4 flex-wrap" style={{ borderTop: "1px solid var(--rule)" }}>
+              <div className="flex items-center gap-1 text-xs" style={{ color: "var(--sh-fg-3)" }}>
                 <MapPin className="h-3 w-3" />
                 {flow.geography}
               </div>
-              <div className="text-xs text-zinc-500">
-                Confidence: {Math.round(flow.confidence * 100)}%
+              <div className="text-xs font-mono tabular-nums" style={{ color: "var(--sh-fg-4)" }}>
+                Confidence: {fmtPct(flow.confidence)}
               </div>
-              {flow.source_url && (
-                <a
-                  href={flow.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-amber-400/70 hover:text-amber-400 flex items-center gap-1 transition-colors"
-                >
-                  Source <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
+              <div className="text-xs italic" style={{ color: "var(--sh-fg-4)" }}>
+                "{flow.raw_title}"
+              </div>
             </div>
           </motion.div>
         )}
@@ -181,6 +210,7 @@ function FlowCard({ flow }: { flow: CapitalFlow }) {
   );
 }
 
+// ─── ConvergenceCard ──────────────────────────────────────────────────────────
 function ConvergenceCard({
   event,
   onArchive,
@@ -191,54 +221,70 @@ function ConvergenceCard({
   onConvert: (id: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const capitalStr = event.total_capital
-    ? `$${(event.total_capital / 100 / 1_000_000).toFixed(1)}M`
-    : null;
+  const capitalStr = event.total_capital ? fmtMoney(event.total_capital / 100) : null;
+  const isHighConf = event.confidence >= 0.8;
+  const whyItMatters = SIGNAL_WHY_IT_MATTERS[event.signal_type as SignalType] || SIGNAL_WHY_IT_MATTERS.other;
 
   return (
     <motion.div
       layout
       initial={{ opacity: 0, filter: "blur(4px)" }}
       animate={{ opacity: 1, filter: "blur(0px)" }}
-      className={cn(
-        "rounded-lg border p-4 mb-3",
-        event.confidence >= 0.8
-          ? "border-amber-400/30 bg-amber-400/5"
-          : "border-white/8 bg-white/3"
-      )}
+      transition={{ duration: 0.4, ease: EASE }}
+      className="rounded-lg border p-4 mb-3 last:mb-0"
+      style={{
+        borderColor: isHighConf ? "oklch(0.66 0.14 55 / 0.35)" : "var(--rule)",
+        background: isHighConf ? "oklch(0.66 0.14 55 / 0.04)" : "var(--bone)",
+      }}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
+      <div className="flex items-start justify-between gap-2 mb-3">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Zap className={cn("h-3.5 w-3.5", event.confidence >= 0.8 ? "text-amber-400" : "text-zinc-400")} />
-            <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Zap className="h-3.5 w-3.5" style={{ color: isHighConf ? "var(--amber)" : "var(--sh-fg-3)" }} />
+            <span className="eyebrow" style={{ color: isHighConf ? "var(--amber)" : "var(--sh-fg-3)" }}>
               {SIGNAL_LABELS[event.signal_type as SignalType] || "Convergence"}
             </span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-zinc-200">{event.geography}</span>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em" }}>
+              {event.geography}
+            </span>
             {capitalStr && (
-              <span className="text-xs text-amber-400/80 font-mono">{capitalStr} total</span>
+              <span className="font-mono text-xs tabular-nums" style={{ color: "var(--amber)" }}>
+                {capitalStr} tracked
+              </span>
             )}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className={cn(
-            "text-xs font-mono px-1.5 py-0.5 rounded",
-            event.confidence >= 0.8 ? "text-amber-400 bg-amber-400/10" : "text-zinc-400 bg-zinc-400/10"
-          )}>
-            {Math.round(event.confidence * 100)}%
-          </span>
+        <span
+          className="font-mono text-xs tabular-nums px-2 py-0.5 rounded-full"
+          style={{
+            color: isHighConf ? "var(--amber)" : "var(--sh-fg-3)",
+            background: isHighConf ? "oklch(0.66 0.14 55 / 0.10)" : "var(--bone)",
+            border: "1px solid var(--rule)",
+          }}
+        >
+          {fmtPct(event.confidence)}
+        </span>
+      </div>
+
+      <div className="mb-3 p-3 rounded-md" style={{ background: "var(--paper)", border: "1px solid var(--rule)" }}>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Info className="h-3 w-3" style={{ color: "var(--amber)" }} />
+          <span className="eyebrow" style={{ color: "var(--amber)" }}>Why this matters</span>
         </div>
+        <p className="text-xs leading-relaxed" style={{ color: "var(--sh-fg-2)" }}>
+          {whyItMatters}
+        </p>
       </div>
 
       <button
         onClick={() => setExpanded(!expanded)}
-        className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1 mb-2"
+        className="flex items-center gap-1 mb-2 text-xs transition-opacity hover:opacity-70"
+        style={{ color: "var(--sh-fg-3)" }}
       >
         Thesis seed {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </button>
-
       <AnimatePresence>
         {expanded && (
           <motion.div
@@ -247,7 +293,10 @@ function ConvergenceCard({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <p className="text-xs text-zinc-400 leading-relaxed mb-3 border-l-2 border-amber-400/30 pl-3">
+            <p
+              className="text-xs leading-relaxed mb-3 pl-3 italic"
+              style={{ color: "var(--sh-fg-2)", borderLeft: "2px solid oklch(0.66 0.14 55 / 0.35)" }}
+            >
               {event.thesis_seed}
             </p>
           </motion.div>
@@ -258,7 +307,8 @@ function ConvergenceCard({
         <Button
           size="sm"
           variant="outline"
-          className="h-6 text-[10px] px-2 border-amber-400/30 text-amber-400 hover:bg-amber-400/10"
+          className="h-6 text-[10px] px-2"
+          style={{ borderColor: "oklch(0.66 0.14 55 / 0.35)", color: "var(--amber)" }}
           onClick={() => onConvert(event.id)}
         >
           <BookOpen className="h-3 w-3 mr-1" />
@@ -267,7 +317,8 @@ function ConvergenceCard({
         <Button
           size="sm"
           variant="ghost"
-          className="h-6 text-[10px] px-2 text-zinc-500 hover:text-zinc-300"
+          className="h-6 text-[10px] px-2"
+          style={{ color: "var(--sh-fg-4)" }}
           onClick={() => onArchive(event.id)}
         >
           <Archive className="h-3 w-3 mr-1" />
@@ -278,41 +329,40 @@ function ConvergenceCard({
   );
 }
 
+// ─── PredictionRow ────────────────────────────────────────────────────────────
 function PredictionRow({ prediction, onUpdate }: {
   prediction: Prediction;
   onUpdate: (id: number, outcome: "confirmed" | "disconfirmed") => void;
 }) {
   const outcomeIcon = {
-    confirmed: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />,
-    disconfirmed: <AlertTriangle className="h-3.5 w-3.5 text-red-400" />,
-    pending: <Clock className="h-3.5 w-3.5 text-zinc-500" />,
+    confirmed:    <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "var(--sage)" }} />,
+    disconfirmed: <AlertTriangle className="h-3.5 w-3.5" style={{ color: "var(--clay)" }} />,
+    pending:      <Clock className="h-3.5 w-3.5" style={{ color: "var(--sh-fg-4)" }} />,
   }[prediction.outcome];
 
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-white/5 last:border-0">
+    <div className="flex items-start gap-3 py-2.5 last:border-0" style={{ borderBottom: "1px solid var(--rule)" }}>
       <div className="mt-0.5">{outcomeIcon}</div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-zinc-300 leading-snug">{prediction.claim}</p>
+        <p className="text-xs leading-snug" style={{ color: "var(--ink)" }}>{prediction.claim}</p>
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-[10px] text-zinc-600 font-mono">{prediction.geography}</span>
-          <span className="text-[10px] text-zinc-600">·</span>
-          <span className="text-[10px] text-zinc-600 font-mono">{Math.round(prediction.confidence * 100)}% conf</span>
+          <span className="font-mono text-[10px]" style={{ color: "var(--sh-fg-4)" }}>{prediction.geography}</span>
+          <span style={{ color: "var(--rule)" }}>·</span>
+          <span className="font-mono text-[10px] tabular-nums" style={{ color: "var(--sh-fg-4)" }}>{fmtPct(prediction.confidence)} conf</span>
         </div>
       </div>
       {prediction.outcome === "pending" && (
         <div className="flex gap-1 shrink-0">
           <button
             onClick={() => onUpdate(prediction.id, "confirmed")}
-            className="text-[10px] px-1.5 py-0.5 rounded border border-emerald-400/30 text-emerald-400 hover:bg-emerald-400/10 transition-colors"
-          >
-            ✓
-          </button>
+            className="text-[10px] px-1.5 py-0.5 rounded border transition-colors"
+            style={{ borderColor: "oklch(0.55 0.06 155 / 0.35)", color: "var(--sage)" }}
+          >✓</button>
           <button
             onClick={() => onUpdate(prediction.id, "disconfirmed")}
-            className="text-[10px] px-1.5 py-0.5 rounded border border-red-400/30 text-red-400 hover:bg-red-400/10 transition-colors"
-          >
-            ✗
-          </button>
+            className="text-[10px] px-1.5 py-0.5 rounded border transition-colors"
+            style={{ borderColor: "oklch(0.55 0.14 28 / 0.35)", color: "var(--clay)" }}
+          >✗</button>
         </div>
       )}
     </div>
@@ -320,7 +370,6 @@ function PredictionRow({ prediction, onUpdate }: {
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-
 export default function TIDEPage() {
   const { toast } = useToast();
   const [geography, setGeography] = useState("Atlanta, GA");
@@ -328,18 +377,13 @@ export default function TIDEPage() {
   const [showPredictions, setShowPredictions] = useState(false);
   const [newPrediction, setNewPrediction] = useState("");
 
-  // tRPC queries
   const flowsQuery = trpc.tide.listFlows.useQuery({ limit: 50 });
   const convergenceQuery = trpc.tide.listConvergence.useQuery({ status: "active", limit: 20 });
   const predictionsQuery = trpc.tide.listPredictions.useQuery({ limit: 30 });
 
-  // tRPC mutations
   const scanMutation = trpc.tide.scan.useMutation({
     onSuccess: (data) => {
-      toast({
-        title: "TIDE Scan Complete",
-        description: data.message,
-      });
+      toast({ title: "TIDE Scan Complete", description: data.message });
       flowsQuery.refetch();
       convergenceQuery.refetch();
     },
@@ -347,21 +391,15 @@ export default function TIDEPage() {
       toast({ title: "TIDE Scan Failed", description: err.message, variant: "destructive" });
     },
   });
-
   const archiveMutation = trpc.tide.archiveConvergence.useMutation({
     onSuccess: () => convergenceQuery.refetch(),
   });
-
   const convertMutation = trpc.tide.convertToThesis.useMutation({
     onSuccess: (data) => {
-      toast({
-        title: "Thesis Seed Ready",
-        description: `"${data.thesisSeed.slice(0, 80)}..." — navigate to Thesis Engine to compile.`,
-      });
+      toast({ title: "Thesis Seed Ready", description: `"${data.thesisSeed.slice(0, 80)}..." — navigate to Thesis Engine to compile.` });
       convergenceQuery.refetch();
     },
   });
-
   const logPredictionMutation = trpc.tide.logPrediction.useMutation({
     onSuccess: () => {
       setNewPrediction("");
@@ -369,12 +407,10 @@ export default function TIDEPage() {
       toast({ title: "Prediction logged", description: "Track record updated." });
     },
   });
-
   const updateOutcomeMutation = trpc.tide.updateOutcome.useMutation({
     onSuccess: () => predictionsQuery.refetch(),
   });
 
-  // Filtered flows
   const flows: CapitalFlow[] = (flowsQuery.data as any[]) || [];
   const convergenceEvents: ConvergenceEvent[] = (convergenceQuery.data as any[]) || [];
   const predictions: Prediction[] = (predictionsQuery.data as any[]) || [];
@@ -384,7 +420,6 @@ export default function TIDEPage() {
     return flows.filter((f) => f.category === filterCategory);
   }, [flows, filterCategory]);
 
-  // Stats
   const totalCapital = flows.reduce((s, f) => s + (f.amount || 0), 0);
   const confirmedPredictions = predictions.filter((p) => p.outcome === "confirmed").length;
   const totalPredictions = predictions.filter((p) => p.outcome !== "pending").length;
@@ -401,40 +436,53 @@ export default function TIDEPage() {
       <motion.div
         initial={{ opacity: 0, filter: "blur(6px)" }}
         animate={{ opacity: 1, filter: "blur(0px)" }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.7, ease: EASE }}
         className="mb-6"
       >
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-mono text-amber-400/70 uppercase tracking-widest">
-                TIDE · Temporal Intelligence for Deployment Events
-              </span>
-            </div>
-            <h1 className="font-display text-3xl font-bold text-zinc-100 tracking-tight">
+            <span className="eyebrow" style={{ color: "var(--amber)" }}>
+              TIDE · Temporal Intelligence for Deployment Events
+            </span>
+            <h1
+              className="mt-2"
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "clamp(1.5rem, 3vw, 2.2rem)",
+                fontWeight: 400,
+                color: "var(--ink)",
+                letterSpacing: "-0.025em",
+                lineHeight: 1.05,
+              }}
+            >
               Capital Flow Intelligence
             </h1>
-            <p className="text-sm text-zinc-500 mt-1 max-w-xl">
-              Phase 1: Political Capital Deployment. Monitor federal contracts, regulatory signals, and PAC flows to detect convergence events before the market prices them in.
+            <p className="text-sm mt-2 max-w-xl" style={{ color: "var(--sh-fg-3)", lineHeight: 1.6 }}>
+              Monitor federal contracts, regulatory signals, and political capital flows to detect
+              convergence events before the market prices them in. Each signal is contextualized
+              so you understand what it means for acquisition targets in that geography.
             </p>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            {accuracy !== null && (
-              <div className="text-right">
-                <div className="text-2xl font-display font-bold text-amber-400">{accuracy}%</div>
-                <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Prediction Accuracy</div>
+          <div className="flex items-stretch gap-0 rounded-lg overflow-hidden" style={{ border: "1px solid var(--rule)" }}>
+            {[
+              { label: "Capital Tracked", value: totalCapital > 0 ? fmtMoney(totalCapital / 100) : "—" },
+              { label: "Active Events",   value: String(convergenceEvents.length) },
+              ...(accuracy !== null ? [{ label: "Prediction Accuracy", value: `${accuracy}%` }] : []),
+            ].map((stat, i, arr) => (
+              <div
+                key={stat.label}
+                className="px-5 py-3 text-right"
+                style={{ background: "var(--paper)", borderRight: i < arr.length - 1 ? "1px solid var(--rule)" : "none" }}
+              >
+                <div
+                  className="tabular-nums"
+                  style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1 }}
+                >
+                  {stat.value}
+                </div>
+                <div className="eyebrow mt-1">{stat.label}</div>
               </div>
-            )}
-            <div className="text-right">
-              <div className="text-2xl font-display font-bold text-zinc-200">{convergenceEvents.length}</div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Active Events</div>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-display font-bold text-zinc-200">
-                {totalCapital > 0 ? `$${(totalCapital / 100 / 1_000_000).toFixed(0)}M` : "—"}
-              </div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Capital Tracked</div>
-            </div>
+            ))}
           </div>
         </div>
       </motion.div>
@@ -443,8 +491,9 @@ export default function TIDEPage() {
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15, duration: 0.4 }}
-        className="mb-6 p-4 rounded-xl border border-white/8 bg-white/3"
+        transition={{ delay: 0.15, duration: 0.5, ease: EASE }}
+        className="mb-6 p-4 rounded-lg"
+        style={{ background: "var(--paper)", border: "1px solid var(--rule)" }}
       >
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex-1 min-w-[200px]">
@@ -452,33 +501,38 @@ export default function TIDEPage() {
               value={geography}
               onChange={(e) => setGeography(e.target.value)}
               placeholder="Geography (e.g. Atlanta, GA)"
-              className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 font-mono text-sm"
+              className="font-mono text-sm"
+              style={{ background: "var(--bone)", borderColor: "var(--rule)", color: "var(--ink)" }}
             />
           </div>
           <Button
             onClick={() => scanMutation.mutate({ geography })}
             disabled={scanMutation.isPending || !geography.trim()}
-            className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
+            style={{
+              background: scanMutation.isPending ? "oklch(0.18 0.018 250 / 0.5)" : "var(--ink)",
+              color: "var(--paper)",
+              border: "none",
+              fontWeight: 600,
+            }}
           >
-            {scanMutation.isPending ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Scanning…</>
-            ) : (
-              <><Zap className="h-4 w-4 mr-2" /> Run TIDE Scan</>
-            )}
+            {scanMutation.isPending
+              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Scanning…</>
+              : <><Zap className="h-4 w-4 mr-2" /> Run TIDE Scan</>
+            }
           </Button>
         </div>
         <div className="flex items-center gap-2 mt-3 flex-wrap">
-          <span className="text-[10px] text-zinc-600 uppercase tracking-wider">Quick:</span>
+          <span className="eyebrow">Quick:</span>
           {SUGGESTED_GEOS.map((geo) => (
             <button
               key={geo}
               onClick={() => setGeography(geo)}
-              className={cn(
-                "text-[10px] px-2 py-0.5 rounded border transition-colors font-mono",
-                geography === geo
-                  ? "border-amber-400/40 text-amber-400 bg-amber-400/10"
-                  : "border-white/10 text-zinc-500 hover:text-zinc-300 hover:border-white/20"
-              )}
+              className="text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap font-mono transition-colors"
+              style={{
+                borderColor: geography === geo ? "oklch(0.66 0.14 55 / 0.40)" : "var(--rule)",
+                color: geography === geo ? "var(--amber)" : "var(--sh-fg-4)",
+                background: geography === geo ? "oklch(0.66 0.14 55 / 0.06)" : "transparent",
+              }}
             >
               {geo}
             </button>
@@ -492,52 +546,49 @@ export default function TIDEPage() {
         <motion.div
           initial={{ opacity: 0, filter: "blur(4px)" }}
           animate={{ opacity: 1, filter: "blur(0px)" }}
-          transition={{ delay: 0.2, duration: 0.5 }}
+          transition={{ delay: 0.2, duration: 0.5, ease: EASE }}
           className="lg:col-span-3"
         >
-          <div className="rounded-xl border border-white/8 bg-white/3 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
+          <div className="rounded-lg overflow-hidden" style={{ background: "var(--paper)", border: "1px solid var(--rule)" }}>
+            <div
+              className="flex items-center justify-between px-4 py-3"
+              style={{ borderBottom: "1px solid var(--rule)", background: "var(--bone)" }}
+            >
               <div className="flex items-center gap-2">
-                <BarChart2 className="h-4 w-4 text-amber-400" />
-                <span className="text-sm font-medium text-zinc-200">Capital Flow Feed</span>
-                <span className="text-xs text-zinc-500 font-mono">({filteredFlows.length})</span>
+                <BarChart2 className="h-4 w-4" style={{ color: "var(--amber)" }} />
+                <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>Capital Flow Feed</span>
+                <span className="font-mono text-xs" style={{ color: "var(--sh-fg-4)" }}>({filteredFlows.length})</span>
               </div>
-              <button
-                onClick={() => flowsQuery.refetch()}
-                className="text-zinc-500 hover:text-zinc-300 transition-colors"
-              >
+              <button onClick={() => flowsQuery.refetch()} style={{ color: "var(--sh-fg-4)" }} className="hover:opacity-70 transition-opacity">
                 <RefreshCw className={cn("h-3.5 w-3.5", flowsQuery.isFetching && "animate-spin")} />
               </button>
             </div>
-
-            {/* Category filter */}
-            <div className="flex items-center gap-1.5 px-4 py-2 border-b border-white/5 overflow-x-auto">
+            <div className="flex items-center gap-1.5 px-4 py-2 overflow-x-auto" style={{ borderBottom: "1px solid var(--rule)" }}>
               {categories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFilterCategory(cat)}
-                  className={cn(
-                    "text-[10px] px-2 py-0.5 rounded border whitespace-nowrap font-mono uppercase tracking-wider transition-colors",
-                    filterCategory === cat
-                      ? "border-amber-400/40 text-amber-400 bg-amber-400/10"
-                      : "border-white/8 text-zinc-500 hover:text-zinc-300 hover:border-white/15"
-                  )}
+                  className="text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap font-mono uppercase tracking-wider transition-colors"
+                  style={{
+                    borderColor: filterCategory === cat ? "oklch(0.66 0.14 55 / 0.40)" : "var(--rule)",
+                    color: filterCategory === cat ? "var(--amber)" : "var(--sh-fg-4)",
+                    background: filterCategory === cat ? "oklch(0.66 0.14 55 / 0.06)" : "transparent",
+                  }}
                 >
                   {cat}
                 </button>
               ))}
             </div>
-
             <div className="px-4 max-h-[520px] overflow-y-auto">
               {flowsQuery.isLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+                  <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--sh-fg-4)" }} />
                 </div>
               ) : filteredFlows.length === 0 ? (
                 <div className="py-12 text-center">
-                  <TrendingUp className="h-8 w-8 text-zinc-700 mx-auto mb-3" />
-                  <p className="text-sm text-zinc-500">No flows detected yet.</p>
-                  <p className="text-xs text-zinc-600 mt-1">Run a TIDE scan to populate the feed.</p>
+                  <TrendingUp className="h-8 w-8 mx-auto mb-3" style={{ color: "var(--rule)" }} />
+                  <p className="text-sm" style={{ color: "var(--sh-fg-3)" }}>No flows detected yet.</p>
+                  <p className="text-xs mt-1" style={{ color: "var(--sh-fg-4)" }}>Run a TIDE scan to populate the feed.</p>
                 </div>
               ) : (
                 filteredFlows.map((flow) => <FlowCard key={flow.id} flow={flow} />)
@@ -550,32 +601,37 @@ export default function TIDEPage() {
         <motion.div
           initial={{ opacity: 0, filter: "blur(4px)" }}
           animate={{ opacity: 1, filter: "blur(0px)" }}
-          transition={{ delay: 0.3, duration: 0.5 }}
+          transition={{ delay: 0.3, duration: 0.5, ease: EASE }}
           className="lg:col-span-2 space-y-4"
         >
-          {/* Convergence Events */}
-          <div className="rounded-xl border border-white/8 bg-white/3 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
+          <div className="rounded-lg overflow-hidden" style={{ background: "var(--paper)", border: "1px solid var(--rule)" }}>
+            <div
+              className="flex items-center justify-between px-4 py-3"
+              style={{ borderBottom: "1px solid var(--rule)", background: "var(--bone)" }}
+            >
               <div className="flex items-center gap-2">
-                <Target className="h-4 w-4 text-amber-400" />
-                <span className="text-sm font-medium text-zinc-200">Convergence Events</span>
+                <Target className="h-4 w-4" style={{ color: "var(--amber)" }} />
+                <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>Convergence Events</span>
                 {convergenceEvents.length > 0 && (
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-400">
+                  <span
+                    className="font-mono text-[10px] px-1.5 py-0.5 rounded-full"
+                    style={{ color: "var(--amber)", background: "oklch(0.66 0.14 55 / 0.10)", border: "1px solid oklch(0.66 0.14 55 / 0.25)" }}
+                  >
                     {convergenceEvents.length}
                   </span>
                 )}
               </div>
             </div>
-            <div className="p-4 max-h-[400px] overflow-y-auto">
+            <div className="p-4 max-h-[500px] overflow-y-auto">
               {convergenceQuery.isLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+                  <Loader2 className="h-4 w-4 animate-spin" style={{ color: "var(--sh-fg-4)" }} />
                 </div>
               ) : convergenceEvents.length === 0 ? (
                 <div className="py-8 text-center">
-                  <Zap className="h-6 w-6 text-zinc-700 mx-auto mb-2" />
-                  <p className="text-xs text-zinc-500">No convergence events yet.</p>
-                  <p className="text-xs text-zinc-600 mt-1">Run a TIDE scan to detect patterns.</p>
+                  <Zap className="h-6 w-6 mx-auto mb-2" style={{ color: "var(--rule)" }} />
+                  <p className="text-xs" style={{ color: "var(--sh-fg-3)" }}>No convergence events yet.</p>
+                  <p className="text-xs mt-1" style={{ color: "var(--sh-fg-4)" }}>Run a TIDE scan to detect patterns.</p>
                 </div>
               ) : (
                 convergenceEvents.map((event) => (
@@ -590,24 +646,29 @@ export default function TIDEPage() {
             </div>
           </div>
 
-          {/* Prediction Track Record */}
-          <div className="rounded-xl border border-white/8 bg-white/3 overflow-hidden">
+          <div className="rounded-lg overflow-hidden" style={{ background: "var(--paper)", border: "1px solid var(--rule)" }}>
             <button
               onClick={() => setShowPredictions(!showPredictions)}
-              className="w-full flex items-center justify-between px-4 py-3 border-b border-white/8 hover:bg-white/3 transition-colors"
+              className="w-full flex items-center justify-between px-4 py-3 transition-colors"
+              style={{ borderBottom: "1px solid var(--rule)", background: "var(--bone)" }}
             >
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                <span className="text-sm font-medium text-zinc-200">Prediction Track Record</span>
+                <CheckCircle2 className="h-4 w-4" style={{ color: "var(--sage)" }} />
+                <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>Prediction Track Record</span>
                 {accuracy !== null && (
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-400/10 text-emerald-400">
+                  <span
+                    className="font-mono text-[10px] px-1.5 py-0.5 rounded-full"
+                    style={{ color: "var(--sage)", background: "oklch(0.55 0.06 155 / 0.10)", border: "1px solid oklch(0.55 0.06 155 / 0.25)" }}
+                  >
                     {accuracy}% accuracy
                   </span>
                 )}
               </div>
-              {showPredictions ? <ChevronUp className="h-4 w-4 text-zinc-500" /> : <ChevronDown className="h-4 w-4 text-zinc-500" />}
+              {showPredictions
+                ? <ChevronUp className="h-4 w-4" style={{ color: "var(--sh-fg-4)" }} />
+                : <ChevronDown className="h-4 w-4" style={{ color: "var(--sh-fg-4)" }} />
+              }
             </button>
-
             <AnimatePresence>
               {showPredictions && (
                 <motion.div
@@ -616,38 +677,29 @@ export default function TIDEPage() {
                   exit={{ height: 0, opacity: 0 }}
                   className="overflow-hidden"
                 >
-                  {/* Log new prediction */}
-                  <div className="px-4 pt-3 pb-2 border-b border-white/5">
+                  <div className="px-4 pt-3 pb-2" style={{ borderBottom: "1px solid var(--rule)" }}>
                     <div className="flex gap-2">
                       <Input
                         value={newPrediction}
                         onChange={(e) => setNewPrediction(e.target.value)}
                         placeholder="Log a prediction…"
-                        className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 text-xs h-8"
+                        className="text-xs h-8"
+                        style={{ background: "var(--bone)", borderColor: "var(--rule)", color: "var(--ink)" }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && newPrediction.trim()) {
-                            logPredictionMutation.mutate({
-                              claim: newPrediction.trim(),
-                              geography,
-                              category: "other",
-                              confidence: 0.7,
-                            });
+                            logPredictionMutation.mutate({ claim: newPrediction.trim(), geography, category: "other", confidence: 0.7 });
                           }
                         }}
                       />
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 text-xs border-white/10 text-zinc-400 hover:text-zinc-200"
+                        className="h-8 text-xs"
+                        style={{ borderColor: "var(--rule)", color: "var(--sh-fg-3)" }}
                         disabled={!newPrediction.trim() || logPredictionMutation.isPending}
                         onClick={() => {
                           if (newPrediction.trim()) {
-                            logPredictionMutation.mutate({
-                              claim: newPrediction.trim(),
-                              geography,
-                              category: "other",
-                              confidence: 0.7,
-                            });
+                            logPredictionMutation.mutate({ claim: newPrediction.trim(), geography, category: "other", confidence: 0.7 });
                           }
                         }}
                       >
@@ -655,11 +707,10 @@ export default function TIDEPage() {
                       </Button>
                     </div>
                   </div>
-
                   <div className="px-4 max-h-[300px] overflow-y-auto">
                     {predictions.length === 0 ? (
                       <div className="py-6 text-center">
-                        <p className="text-xs text-zinc-600">No predictions logged yet.</p>
+                        <p className="text-xs" style={{ color: "var(--sh-fg-4)" }}>No predictions logged yet.</p>
                       </div>
                     ) : (
                       predictions.map((p) => (

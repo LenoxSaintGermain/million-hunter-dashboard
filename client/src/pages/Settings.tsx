@@ -90,7 +90,7 @@ function ConsensusModelConfig() {
             onClick={() => updateConsensus.mutate({ model1: m1, model2: m2, model3: m3 })}
             disabled={updateConsensus.isPending || isLoading}
           >
-            {saved ? <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-400" /> : null}
+            {saved ? <CheckCircle2 className="w-3 h-3 mr-1 text-[var(--sage)]" /> : null}
             {updateConsensus.isPending ? "Saving..." : saved ? "Saved" : "Save"}
           </Button>
         </div>
@@ -133,14 +133,14 @@ const SOURCES = [
 const TIER_COLOR: Record<string, string> = {
   Primary: "bg-blue-500/20 text-blue-400",
   Premium: "bg-purple-500/20 text-purple-400",
-  Enterprise: "bg-amber-500/20 text-amber-400",
-  Commercial: "bg-emerald-500/20 text-emerald-400",
+  Enterprise: "bg-amber-500/20 text-[var(--amber)]",
+  Commercial: "bg-emerald-500/20 text-[var(--sage)]",
   SaaS: "bg-pink-500/20 text-pink-400",
 };
 
 const PROVIDER_COLOR: Record<string, string> = {
   google: "bg-blue-500/20 text-blue-400",
-  openai: "bg-emerald-500/20 text-emerald-400",
+  openai: "bg-emerald-500/20 text-[var(--sage)]",
   perplexity: "bg-purple-500/20 text-purple-400",
 };
 
@@ -154,9 +154,9 @@ const TIER_ICON: Record<string, React.ReactNode> = {
 const MODULE_ICON: Record<string, React.ReactNode> = {
   ownerPsychology: <Brain className="w-3.5 h-3.5 text-purple-400" />,
   digitalAudit: <Globe className="w-3.5 h-3.5 text-blue-400" />,
-  redTeam: <Zap className="w-3.5 h-3.5 text-red-400" />,
-  capitalStack: <Settings2 className="w-3.5 h-3.5 text-amber-400" />,
-  investmentMemo: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
+  redTeam: <Zap className="w-3.5 h-3.5 text-[var(--clay)]" />,
+  capitalStack: <Settings2 className="w-3.5 h-3.5 text-[var(--amber)]" />,
+  investmentMemo: <CheckCircle2 className="w-3.5 h-3.5 text-[var(--sage)]" />,
   dealScoring: <Cpu className="w-3.5 h-3.5 text-primary" />,
   marketScan: <Database className="w-3.5 h-3.5 text-muted-foreground" />,
 };
@@ -465,7 +465,7 @@ export default function Settings() {
                                 {(currentModel.outputLimit / 1000).toFixed(0)}k out
                               </span>
                               {currentModel.supportsGrounding && (
-                                <span className="text-[9px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded-sm">
+                                <span className="text-[9px] bg-emerald-500/10 text-[var(--sage)] px-1.5 py-0.5 rounded-sm">
                                   grounded
                                 </span>
                               )}
@@ -516,7 +516,7 @@ export default function Settings() {
           <Card className="bg-card border-[var(--sh-border)]" style={{ background: "var(--sh-surface-1)" }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Settings2 className="w-4 h-4 text-amber-400" /> Scoring Filters
+                <Settings2 className="w-4 h-4 text-[var(--amber)]" /> Scoring Filters
               </CardTitle>
               <CardDescription className="text-xs">Minimum thresholds for deal qualification</CardDescription>
             </CardHeader>

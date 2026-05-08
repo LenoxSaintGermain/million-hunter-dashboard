@@ -30,9 +30,9 @@ function MetricPill({ label, value, accent = false }: { label: string; value: st
       "flex flex-col items-center justify-center rounded-2xl p-5 border",
       accent
         ? "bg-gradient-to-br from-emerald-950/60 to-emerald-900/30 border-emerald-500/30 shadow-[0_0_24px_-4px_rgba(16,185,129,0.2)]"
-        : "bg-white/[0.03] border-white/10"
+        : "bg-white/[0.03] border-[var(--rule)]"
     )}>
-      <span className={cn("text-3xl font-bold font-mono tracking-tight", accent ? "text-emerald-400" : "text-white")}>
+      <span className={cn("text-3xl font-bold font-mono tracking-tight", accent ? "text-[var(--sage)]" : "text-white")}>
         {value}
       </span>
       <span className="text-xs text-white/50 mt-1 text-center">{label}</span>
@@ -42,9 +42,9 @@ function MetricPill({ label, value, accent = false }: { label: string; value: st
 
 function Section({ title, icon: Icon, children, className }: { title: string; icon: React.ElementType; children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("rounded-2xl border border-white/10 bg-white/[0.03] p-6", className)}>
+    <div className={cn("rounded-2xl border border-[var(--rule)] bg-white/[0.03] p-6", className)}>
       <div className="flex items-center gap-2.5 mb-5">
-        <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-xl bg-[var(--bone)] flex items-center justify-center">
           <Icon className="w-4 h-4 text-white/70" />
         </div>
         <h3 className="text-sm font-semibold text-white/80 uppercase tracking-widest">{title}</h3>
@@ -102,7 +102,7 @@ export default function DealShare() {
     return (
       <div className="min-h-screen bg-[#080A0F] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center animate-pulse">
+          <div className="w-12 h-12 rounded-2xl bg-[var(--bone)] border border-[var(--rule)] flex items-center justify-center animate-pulse">
             <Building2 className="w-6 h-6 text-white/30" />
           </div>
           <p className="text-sm text-white/40">Loading deal briefing…</p>
@@ -118,7 +118,7 @@ export default function DealShare() {
       <div className="min-h-screen bg-[#080A0F] flex items-center justify-center px-4">
         <div className="max-w-md text-center space-y-4">
           <div className="w-16 h-16 rounded-2xl bg-red-950/40 border border-red-500/20 flex items-center justify-center mx-auto">
-            <AlertTriangle className="w-8 h-8 text-red-400" />
+            <AlertTriangle className="w-8 h-8 text-[var(--clay)]" />
           </div>
           <h1 className="text-xl font-bold text-white">Access Denied</h1>
           <p className="text-sm text-white/50">{msg}</p>
@@ -174,14 +174,14 @@ export default function DealShare() {
         </div>
 
         {/* ── Hero ───────────────────────────────────────────────────────────── */}
-        <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.05] via-white/[0.02] to-transparent p-8 sm:p-10 relative overflow-hidden">
+        <div className="rounded-3xl border border-[var(--rule)] bg-gradient-to-br from-white/[0.05] via-white/[0.02] to-transparent p-8 sm:p-10 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
           <div className="relative">
             {/* Badges */}
             <div className="flex flex-wrap gap-2 mb-4">
-              {deal.industry && <Badge variant="secondary" className="text-xs bg-white/10 text-white/70 border-0">{deal.industry}</Badge>}
+              {deal.industry && <Badge variant="secondary" className="text-xs bg-[var(--bone)] text-white/70 border-0">{deal.industry}</Badge>}
               {deal.opportunityZone && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-[var(--sage)] border border-emerald-500/25">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   Opportunity Zone
                 </span>
@@ -244,7 +244,7 @@ export default function DealShare() {
               )}
               {capital.sellerNote && (
                 <div className="rounded-xl bg-amber-950/30 border border-amber-500/20 p-4">
-                  <p className="text-xs text-amber-400/70 mb-1">Seller Note</p>
+                  <p className="text-xs text-[var(--amber)]/70 mb-1">Seller Note</p>
                   <p className="text-2xl font-bold text-amber-300">{fmt(capital.sellerNote)}</p>
                 </div>
               )}
@@ -255,11 +255,11 @@ export default function DealShare() {
                 </div>
               )}
             </div>
-            <div className="flex flex-wrap gap-6 pt-4 border-t border-white/5">
+            <div className="flex flex-wrap gap-6 pt-4 border-t border-[var(--rule)]">
               {capital.dscr != null && (
                 <div>
                   <p className="text-xs text-white/40 mb-0.5">DSCR</p>
-                  <p className={cn("text-lg font-bold", (capital.dscr ?? 0) >= 1.25 ? "text-emerald-400" : "text-amber-400")}>
+                  <p className={cn("text-lg font-bold", (capital.dscr ?? 0) >= 1.25 ? "text-[var(--sage)]" : "text-[var(--amber)]")}>
                     {capital.dscr.toFixed(2)}x
                   </p>
                 </div>
@@ -267,7 +267,7 @@ export default function DealShare() {
               {capital.cashOnCash != null && (
                 <div>
                   <p className="text-xs text-white/40 mb-0.5">Cash-on-Cash Return</p>
-                  <p className="text-lg font-bold text-emerald-400">{pct(capital.cashOnCash)}</p>
+                  <p className="text-lg font-bold text-[var(--sage)]">{pct(capital.cashOnCash)}</p>
                 </div>
               )}
               {signal?.capitalStackSummary && (
@@ -294,9 +294,9 @@ export default function DealShare() {
                     Capital gains invested through a Qualified Opportunity Fund (QOF) may defer and reduce federal tax liability. 
                     10-year holds can eliminate capital gains on appreciation entirely — a structural advantage unavailable in non-OZ deals.
                   </p>
-                  {deal.ozTractId && <p className="text-xs text-emerald-400/60 mt-2">Tract: {deal.ozTractId}</p>}
+                  {deal.ozTractId && <p className="text-xs text-[var(--sage)]/60 mt-2">Tract: {deal.ozTractId}</p>}
                   {deal.ozPotentialGain && (
-                    <p className="text-sm font-bold text-emerald-400 mt-2">Est. OZ Gain: {fmt(deal.ozPotentialGain)}</p>
+                    <p className="text-sm font-bold text-[var(--sage)] mt-2">Est. OZ Gain: {fmt(deal.ozPotentialGain)}</p>
                   )}
                 </div>
               )}
@@ -315,7 +315,7 @@ export default function DealShare() {
               )}
             </div>
             {(deal.eventRevenueLow || deal.eventRevenueHigh) && (
-              <div className="mt-4 rounded-xl bg-white/[0.03] border border-white/10 p-4 flex items-center gap-4">
+              <div className="mt-4 rounded-xl bg-white/[0.03] border border-[var(--rule)] p-4 flex items-center gap-4">
                 <BarChart3 className="w-5 h-5 text-primary/60 shrink-0" />
                 <div>
                   <p className="text-xs text-white/40 mb-0.5">Event Revenue Proximity</p>
@@ -336,9 +336,9 @@ export default function DealShare() {
           <Section title="Third Signal Intelligence" icon={Brain}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
               {signal.ownerDistressScore != null && (
-                <div className="rounded-xl bg-white/[0.03] border border-white/10 p-4">
+                <div className="rounded-xl bg-white/[0.03] border border-[var(--rule)] p-4">
                   <p className="text-xs text-white/40 mb-1">Owner Distress Score</p>
-                  <p className={cn("text-2xl font-bold", toNum(signal.ownerDistressScore)! >= 0.6 ? "text-emerald-400" : "text-amber-400")}>
+                  <p className={cn("text-2xl font-bold", toNum(signal.ownerDistressScore)! >= 0.6 ? "text-[var(--sage)]" : "text-[var(--amber)]")}>
                     {pct(signal.ownerDistressScore)}
                   </p>
                   {signal.ownerNegotiationStyle && (
@@ -347,9 +347,9 @@ export default function DealShare() {
                 </div>
               )}
               {signal.reviewSentimentScore != null && (
-                <div className="rounded-xl bg-white/[0.03] border border-white/10 p-4">
+                <div className="rounded-xl bg-white/[0.03] border border-[var(--rule)] p-4">
                   <p className="text-xs text-white/40 mb-1">Review Sentiment</p>
-                  <p className={cn("text-2xl font-bold", toNum(signal.reviewSentimentScore)! >= 0.6 ? "text-emerald-400" : "text-amber-400")}>
+                  <p className={cn("text-2xl font-bold", toNum(signal.reviewSentimentScore)! >= 0.6 ? "text-[var(--sage)]" : "text-[var(--amber)]")}>
                     {pct(signal.reviewSentimentScore)}
                   </p>
                   {signal.digitalGrowthTrend && (
@@ -358,29 +358,29 @@ export default function DealShare() {
                 </div>
               )}
               {signal.killProbability != null && (
-                <div className="rounded-xl bg-white/[0.03] border border-white/10 p-4">
+                <div className="rounded-xl bg-white/[0.03] border border-[var(--rule)] p-4">
                   <p className="text-xs text-white/40 mb-1">Kill Probability</p>
-                  <p className={cn("text-2xl font-bold", toNum(signal.killProbability)! <= 0.3 ? "text-emerald-400" : toNum(signal.killProbability)! <= 0.6 ? "text-amber-400" : "text-red-400")}>
+                  <p className={cn("text-2xl font-bold", toNum(signal.killProbability)! <= 0.3 ? "text-[var(--sage)]" : toNum(signal.killProbability)! <= 0.6 ? "text-[var(--amber)]" : "text-[var(--clay)]")}>
                     {pct(signal.killProbability)}
                   </p>
                 </div>
               )}
             </div>
             {signal.ownerProfileSummary && (
-              <div className="rounded-xl bg-white/[0.02] border border-white/5 p-4 mb-4">
+              <div className="rounded-xl bg-white/[0.02] border border-[var(--rule)] p-4 mb-4">
                 <p className="text-xs text-white/40 mb-2 uppercase tracking-wider">Owner Psychology</p>
                 <p className="text-sm text-white/70 leading-relaxed">{signal.ownerProfileSummary}</p>
               </div>
             )}
             {redFlags.length > 0 && (
               <div className="rounded-xl bg-red-950/20 border border-red-500/15 p-4">
-                <p className="text-xs text-red-400/70 mb-3 uppercase tracking-wider flex items-center gap-1.5">
+                <p className="text-xs text-[var(--clay)]/70 mb-3 uppercase tracking-wider flex items-center gap-1.5">
                   <AlertTriangle className="w-3 h-3" />Red Flags ({redFlags.length})
                 </p>
                 <div className="space-y-1.5">
                   {redFlags.map((flag, i) => (
                     <div key={i} className="flex items-start gap-2">
-                      <XCircle className="w-3.5 h-3.5 text-red-400/60 mt-0.5 shrink-0" />
+                      <XCircle className="w-3.5 h-3.5 text-[var(--clay)]/60 mt-0.5 shrink-0" />
                       <p className="text-xs text-white/60">{flag}</p>
                     </div>
                   ))}
@@ -409,7 +409,7 @@ export default function DealShare() {
         )}
 
         {/* ── Footer ─────────────────────────────────────────────────────────── */}
-        <div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/25">
+        <div className="pt-8 border-t border-[var(--rule)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/25">
           <p>Generated by Project Million · Third Signal Intelligence Platform</p>
           <p>This document is confidential and intended solely for the recipient.</p>
         </div>

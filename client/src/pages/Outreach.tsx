@@ -23,8 +23,8 @@ import { Textarea } from "@/components/ui/textarea";
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   pending: { label: "Pending", color: "bg-muted/60 text-muted-foreground", icon: <Clock className="w-3 h-3" /> },
   sent: { label: "Sent", color: "bg-blue-500/20 text-blue-400", icon: <Send className="w-3 h-3" /> },
-  opened: { label: "Opened", color: "bg-amber-500/20 text-amber-400", icon: <Mail className="w-3 h-3" /> },
-  replied: { label: "Replied", color: "bg-emerald-500/20 text-emerald-400", icon: <MessageSquare className="w-3 h-3" /> },
+  opened: { label: "Opened", color: "bg-amber-500/20 text-[var(--amber)]", icon: <Mail className="w-3 h-3" /> },
+  replied: { label: "Replied", color: "bg-emerald-500/20 text-[var(--sage)]", icon: <MessageSquare className="w-3 h-3" /> },
   meeting_scheduled: { label: "Meeting", color: "bg-purple-500/20 text-purple-400", icon: <Calendar className="w-3 h-3" /> },
   no_response: { label: "No Response", color: "bg-muted/30 text-muted-foreground/60", icon: <AlertCircle className="w-3 h-3" /> },
   not_interested: { label: "Not Interested", color: "bg-destructive/20 text-destructive", icon: <AlertCircle className="w-3 h-3" /> },

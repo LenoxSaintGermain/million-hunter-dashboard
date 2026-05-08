@@ -26,7 +26,7 @@ const CHAPTERS = [
     videoUrl:
       "https://d2xsxph8kpxj0f.cloudfront.net/87291783/GeCPeFFiEBRZFpk6xckkAz/Signal_Hunter_OS__The_Math_of_Zero-Tax_Arbitrage_642c7fa9.mp4",
     tag: "Tax Architecture",
-    tagColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
+    tagColor: "bg-emerald-500/15 text-[var(--sage)] border-emerald-500/25",
   },
   {
     id: 2,
@@ -64,11 +64,11 @@ function VideoProgress({
   return (
     <div
       ref={barRef}
-      className="w-full h-1 bg-white/10 rounded-full cursor-pointer group"
+      className="w-full h-1 bg-[var(--bone)] rounded-full cursor-pointer group"
       onClick={handleClick}
     >
       <div
-        className="h-full bg-white/80 rounded-full transition-all duration-100 group-hover:bg-white relative"
+        className="h-full bg-[var(--bone)]0 rounded-full transition-all duration-100 group-hover:bg-white relative"
         style={{ width: `${pct}%` }}
       >
         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" />
@@ -231,7 +231,7 @@ export default function Lobby() {
       {buffering && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 rounded-full border-2 border-white/10 border-t-white/70 animate-spin" />
+            <div className="w-12 h-12 rounded-full border-2 border-[var(--rule)] border-t-white/70 animate-spin" />
             <p className="text-[11px] text-white/40 font-medium tracking-widest uppercase">Loading</p>
           </div>
         </div>
@@ -259,7 +259,7 @@ export default function Lobby() {
         {/* Chapter selector pill */}
         <button
           onClick={() => setShowChapterSelect(!showChapterSelect)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 transition-colors backdrop-blur-sm"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bone)] hover:bg-[var(--bone)] border border-[var(--rule)] transition-colors backdrop-blur-sm"
         >
           <span className="text-xs text-white/80 font-medium">
             {chapter.subtitle} of {CHAPTERS.length}
@@ -279,14 +279,14 @@ export default function Lobby() {
 
       {/* ── Chapter selector dropdown ── */}
       {showChapterSelect && (
-        <div className="absolute top-16 right-6 z-30 w-72 rounded-xl bg-black/90 border border-white/10 backdrop-blur-xl overflow-hidden shadow-2xl">
+        <div className="absolute top-16 right-6 z-30 w-72 rounded-xl bg-black/90 border border-[var(--rule)] backdrop-blur-xl overflow-hidden shadow-2xl">
           {CHAPTERS.map((ch, idx) => (
             <button
               key={ch.id}
               onClick={() => goToChapter(idx)}
               className={cn(
-                "w-full flex items-start gap-3 p-4 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-0",
-                idx === chapterIdx && "bg-white/8"
+                "w-full flex items-start gap-3 p-4 text-left hover:bg-[var(--bone)] transition-colors border-b border-[var(--rule)] last:border-0",
+                idx === chapterIdx && "bg-[var(--bone)]"
               )}
             >
               <div className={cn(
@@ -295,7 +295,7 @@ export default function Lobby() {
                   ? "bg-emerald-500 border-emerald-500"
                   : idx === chapterIdx
                   ? "border-white/60"
-                  : "border-white/20"
+                  : "border-[var(--rule)]"
               )}>
                 {completed.has(ch.id) ? (
                   <CheckCircle2 className="w-3 h-3 text-white" />
@@ -318,7 +318,7 @@ export default function Lobby() {
           onClick={togglePlay}
           className="absolute inset-0 z-10 flex items-center justify-center group"
         >
-          <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 group-hover:scale-105 transition-all duration-200 shadow-2xl">
+          <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-[var(--bone)] border border-[var(--rule)] backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 group-hover:scale-105 transition-all duration-200 shadow-2xl">
             <Play className="w-7 h-7 md:w-8 md:h-8 text-white fill-white ml-1" />
           </div>
         </button>
@@ -358,7 +358,7 @@ export default function Lobby() {
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
-              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-full bg-[var(--bone)] hover:bg-white/20 flex items-center justify-center transition-colors"
             >
               {playing ? (
                 <Pause className="w-3.5 h-3.5 text-white" />
@@ -370,7 +370,7 @@ export default function Lobby() {
             {/* Mute */}
             <button
               onClick={toggleMute}
-              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-full bg-[var(--bone)] hover:bg-white/20 flex items-center justify-center transition-colors"
             >
               {muted ? (
                 <VolumeX className="w-3.5 h-3.5 text-white/60" />
@@ -399,7 +399,7 @@ export default function Lobby() {
                       ? "w-4 h-1.5 bg-white"
                       : completed.has(ch.id)
                       ? "w-1.5 h-1.5 bg-emerald-400"
-                      : "w-1.5 h-1.5 bg-white/25 hover:bg-white/50"
+                      : "w-1.5 h-1.5 bg-white/25 hover:bg-[var(--bone)]0"
                   )}
                 />
               ))}
@@ -420,7 +420,7 @@ export default function Lobby() {
                 size="sm"
                 variant="outline"
                 onClick={() => goToChapter(chapterIdx + 1)}
-                className="h-8 px-3 text-xs border-white/20 text-white/80 hover:bg-white/10 hover:text-white gap-1.5 bg-transparent"
+                className="h-8 px-3 text-xs border-[var(--rule)] text-white/80 hover:bg-[var(--bone)] hover:text-white gap-1.5 bg-transparent"
               >
                 Next Chapter
                 <ChevronRight className="w-3 h-3" />
@@ -435,7 +435,7 @@ export default function Lobby() {
         <div className="absolute inset-0 z-25 flex items-center justify-center pointer-events-none">
           <div className="pointer-events-auto text-center px-6">
             <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+              <CheckCircle2 className="w-6 h-6 text-[var(--sage)]" />
             </div>
             <h3 className="text-xl font-bold text-white mb-2">You're briefed.</h3>
             <p className="text-sm text-white/50 mb-6 max-w-xs mx-auto">

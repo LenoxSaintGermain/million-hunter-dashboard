@@ -21,17 +21,17 @@ import {
 import { Link } from "wouter";
 
 function StatCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
-  const ac = accent ?? "oklch(0.65 0.22 250)";
+  const ac = accent ?? "var(--ink)";
   return (
     <div style={{
-      background: "oklch(0.14 0.01 260)",
-      border: "1px solid oklch(0.22 0.01 260)",
+      background: "var(--paper)",
+      border: "1px solid var(--rule)",
       borderRadius: 10,
       padding: "14px 16px",
     }}>
-      <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: "oklch(0.40 0.01 260)", marginBottom: 6 }}>{label}</p>
+      <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--sh-fg-3)", marginBottom: 6 }}>{label}</p>
       <p style={{ fontFamily: "var(--font-mono)", fontSize: 20, fontWeight: 700, color: ac }}>{value}</p>
-      {sub && <p style={{ fontSize: 11, color: "oklch(0.55 0.01 260)", marginTop: 2 }}>{sub}</p>}
+      {sub && <p style={{ fontSize: 11, color: "var(--sh-fg-4)", marginTop: 2 }}>{sub}</p>}
     </div>
   );
 }
@@ -160,7 +160,7 @@ export default function DealDetail() {
 
   const { deal, signal, memo } = data;
   const score = toNum(deal.score);
-  const scoreColorVal = score == null ? "oklch(0.40 0.01 260)" : score >= 0.8 ? "oklch(0.70 0.18 160)" : score >= 0.65 ? "oklch(0.75 0.20 80)" : "oklch(0.60 0.22 25)";
+  const scoreColorVal = score == null ? "var(--sh-fg-3)" : score >= 0.8 ? "var(--sage)" : score >= 0.65 ? "var(--amber)" : "var(--clay)";
 
   return (
     <DashboardLayout>
@@ -184,7 +184,7 @@ export default function DealDetail() {
                 {deal.stage.replace(/_/g, " ")}
               </span>
               {deal.opportunityZone && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-[var(--sage)] border border-emerald-500/25">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   Opportunity Zone
                 </span>
@@ -221,7 +221,7 @@ export default function DealDetail() {
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 40, fontWeight: 700, color: scoreColorVal, lineHeight: 1 }}>
                 {score != null ? score.toFixed(3) : "—"}
               </div>
-              <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: "oklch(0.40 0.01 260)", marginTop: 4 }}>AI Score</p>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--sh-fg-3)", marginTop: 4 }}>AI Score</p>
             </div>
             <div className="flex flex-col gap-2">
               <Button size="sm" className="h-8 text-xs" onClick={() => scoreDeal.mutate({ id: dealId })} disabled={scoreDeal.isPending}>
@@ -417,7 +417,7 @@ export default function DealDetail() {
               </SignalCard>
 
               {/* Capital Stack Preview */}
-              <SignalCard icon={DollarSign} title="Capital Stack" color="bg-emerald-500/20 text-emerald-400">
+              <SignalCard icon={DollarSign} title="Capital Stack" color="bg-emerald-500/20 text-[var(--sage)]">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">SBA Eligible</span>
@@ -595,15 +595,15 @@ export default function DealDetail() {
                   {consensusData.divergenceFlag && (
                     <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-500/30 bg-amber-500/8">
                       <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0 mt-0.5">
-                        <XCircle className="w-4 h-4 text-amber-400" />
+                        <XCircle className="w-4 h-4 text-[var(--amber)]" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-amber-400">Models Disagree — Manual Review Required</p>
-                        <p className="text-xs text-amber-400/70 mt-0.5">
+                        <p className="text-sm font-semibold text-[var(--amber)]">Models Disagree — Manual Review Required</p>
+                        <p className="text-xs text-[var(--amber)]/70 mt-0.5">
                           Divergence score: <span className="font-bold">{((toNum(consensusData.divergenceScore) ?? 0) * 100).toFixed(0)}%</span>. When AI models disagree this significantly, it signals genuine ambiguity in the deal fundamentals. Do not advance to LOI without a direct conversation with the broker.
                         </p>
                         <div className="flex items-center gap-2 mt-2">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-[var(--amber)] border border-amber-500/25">
                             ⚠️ High Uncertainty
                           </span>
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
@@ -617,8 +617,8 @@ export default function DealDetail() {
                   {/* ✅ Agreement Banner — shown when models align */}
                   {!consensusData.divergenceFlag && (
                     <div className="flex items-center gap-3 p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <p className="text-xs text-emerald-400 font-medium">All 3 models in agreement — consensus score is reliable</p>
+                      <CheckCircle2 className="w-4 h-4 text-[var(--sage)] shrink-0" />
+                      <p className="text-xs text-[var(--sage)] font-medium">All 3 models in agreement — consensus score is reliable</p>
                     </div>
                   )}
 
@@ -632,9 +632,9 @@ export default function DealDetail() {
                       <p className="text-xs text-muted-foreground">Divergence</p>
                       <div className="flex items-center gap-1.5 justify-end mt-1">
                         {consensusData.divergenceFlag ? (
-                          <><XCircle className="w-4 h-4 text-amber-400" /><span className="text-sm font-semibold text-amber-400">{((toNum(consensusData.divergenceScore) ?? 0) * 100).toFixed(0)}% — Review</span></>
+                          <><XCircle className="w-4 h-4 text-[var(--amber)]" /><span className="text-sm font-semibold text-[var(--amber)]">{((toNum(consensusData.divergenceScore) ?? 0) * 100).toFixed(0)}% — Review</span></>
                         ) : (
-                          <><CheckCircle2 className="w-4 h-4 text-emerald-400" /><span className="text-sm font-semibold text-emerald-400">Models Agree</span></>
+                          <><CheckCircle2 className="w-4 h-4 text-[var(--sage)]" /><span className="text-sm font-semibold text-[var(--sage)]">Models Agree</span></>
                         )}
                       </div>
                     </div>
@@ -872,16 +872,16 @@ function AgentLoopPanel({ dealId, dealName }: { dealId: number; dealName: string
   const isAnyRunning = architectMutation.isPending || redTeamMutation.isPending || remediationMutation.isPending;
 
   const severityColor: Record<string, string> = {
-    critical: "text-red-400 bg-red-500/10 border-red-500/20",
+    critical: "text-[var(--clay)] bg-red-500/10 border-red-500/20",
     high: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-    medium: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+    medium: "text-[var(--amber)] bg-amber-500/10 border-amber-500/20",
     low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
   };
 
   const goNoGoColor: Record<string, string> = {
-    go: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
-    conditional_go: "text-amber-400 bg-amber-500/10 border-amber-500/30",
-    no_go: "text-red-400 bg-red-500/10 border-red-500/30",
+    go: "text-[var(--sage)] bg-emerald-500/10 border-emerald-500/30",
+    conditional_go: "text-[var(--amber)] bg-amber-500/10 border-amber-500/30",
+    no_go: "text-[var(--clay)] bg-red-500/10 border-red-500/30",
   };
 
   const artifactIcon: Record<string, React.ReactNode> = {
@@ -931,12 +931,12 @@ function AgentLoopPanel({ dealId, dealName }: { dealId: number; dealName: string
               <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold", architectRun ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>1</div>
               <span className="text-sm font-medium">Deal Architect</span>
             </div>
-            {architectRun && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+            {architectRun && <CheckCircle2 className="h-4 w-4 text-[var(--sage)]" />}
             {architectMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
           </div>
           <p className="text-xs text-muted-foreground">Generates 6 deal artifacts: cold outreach, LOI, thesis, DD checklist, seller profile, negotiation playbook.</p>
           {architectRun ? (
-            <div className="text-xs text-emerald-400 font-medium">{(architectRun.artifacts as any[])?.length ?? 0} artifacts ready</div>
+            <div className="text-xs text-[var(--sage)] font-medium">{(architectRun.artifacts as any[])?.length ?? 0} artifacts ready</div>
           ) : (
             <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={() => architectMutation.mutate({ dealId })} disabled={isAnyRunning}>
               {architectMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Bot className="h-3 w-3 mr-1" />}
@@ -952,16 +952,16 @@ function AgentLoopPanel({ dealId, dealName }: { dealId: number; dealName: string
               <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold", redTeamRun ? "bg-red-500 text-white" : "bg-muted text-muted-foreground")}>2</div>
               <span className="text-sm font-medium">Red Team</span>
             </div>
-            {redTeamRun && <Swords className="h-4 w-4 text-red-400" />}
-            {redTeamMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-red-400" />}
+            {redTeamRun && <Swords className="h-4 w-4 text-[var(--clay)]" />}
+            {redTeamMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-[var(--clay)]" />}
           </div>
           <p className="text-xs text-muted-foreground">Adversarial stress-test. Finds deal-killers, red flags, and gaps across 6 risk categories.</p>
           {redTeamRun ? (
-            <div className="text-xs text-red-400 font-medium">
+            <div className="text-xs text-[var(--clay)] font-medium">
               {(redTeamRun.findings as any[])?.filter((f: any) => f.severity === 'critical').length ?? 0} critical · {(redTeamRun.findings as any[])?.length ?? 0} total risks
             </div>
           ) : (
-            <Button size="sm" variant="outline" className="w-full h-7 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={() => redTeamMutation.mutate({ dealId, architectRunId: architectRun?.id })} disabled={isAnyRunning}>
+            <Button size="sm" variant="outline" className="w-full h-7 text-xs border-red-500/30 text-[var(--clay)] hover:bg-red-500/10" onClick={() => redTeamMutation.mutate({ dealId, architectRunId: architectRun?.id })} disabled={isAnyRunning}>
               {redTeamMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Swords className="h-3 w-3 mr-1" />}
               Stress-Test Deal
             </Button>
@@ -975,8 +975,8 @@ function AgentLoopPanel({ dealId, dealName }: { dealId: number; dealName: string
               <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold", remediationRun ? "bg-amber-500 text-black" : "bg-muted text-muted-foreground")}>3</div>
               <span className="text-sm font-medium">Remediation</span>
             </div>
-            {remediationRun && <Wrench className="h-4 w-4 text-amber-400" />}
-            {remediationMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-amber-400" />}
+            {remediationRun && <Wrench className="h-4 w-4 text-[var(--amber)]" />}
+            {remediationMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-[var(--amber)]" />}
           </div>
           <p className="text-xs text-muted-foreground">Fills gaps, generates missing artifacts, and delivers a Go/No-Go recommendation.</p>
           {remediationRun ? (
@@ -984,7 +984,7 @@ function AgentLoopPanel({ dealId, dealName }: { dealId: number; dealName: string
               {String((remediationRun as any).goNoGoRecommendation ?? "PENDING").replace(/_/g, " ").toUpperCase()}
             </div>
           ) : (
-            <Button size="sm" variant="outline" className="w-full h-7 text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10" onClick={() => { if (redTeamRun) remediationMutation.mutate({ dealId, redTeamRunId: redTeamRun.id }); else toast.error("Run Red Team first"); }} disabled={isAnyRunning || !redTeamRun}>
+            <Button size="sm" variant="outline" className="w-full h-7 text-xs border-amber-500/30 text-[var(--amber)] hover:bg-amber-500/10" onClick={() => { if (redTeamRun) remediationMutation.mutate({ dealId, redTeamRunId: redTeamRun.id }); else toast.error("Run Red Team first"); }} disabled={isAnyRunning || !redTeamRun}>
               {remediationMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Wrench className="h-3 w-3 mr-1" />}
               Remediate Gaps
             </Button>
@@ -1037,7 +1037,7 @@ function AgentLoopPanel({ dealId, dealName }: { dealId: number; dealName: string
         <Card className="border-red-500/20">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Swords className="h-4 w-4 text-red-400" />
+              <Swords className="h-4 w-4 text-[var(--clay)]" />
               Red Team Findings
               <Badge variant="destructive" className="text-xs ml-auto">
                 {(redTeamRun.findings as any[]).filter((f: any) => f.severity === 'critical').length} critical
@@ -1048,7 +1048,7 @@ function AgentLoopPanel({ dealId, dealName }: { dealId: number; dealName: string
             {(redTeamRun.findings as any[]).map((finding: any, i: number) => (
               <div key={i} className={cn("border rounded-lg overflow-hidden", severityColor[finding.severity] ?? "border-border/50")}>
                 <button
-                  className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors text-left"
+                  className="w-full flex items-center justify-between p-3 hover:bg-[var(--bone)] transition-colors text-left"
                   onClick={() => setExpandedFinding(expandedFinding === i ? null : i)}
                 >
                   <div className="flex items-center gap-2">
@@ -1077,7 +1077,7 @@ function AgentLoopPanel({ dealId, dealName }: { dealId: number; dealName: string
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-2">
-                <Wrench className="h-4 w-4 text-amber-400" />
+                <Wrench className="h-4 w-4 text-[var(--amber)]" />
                 Remediation Plan
               </CardTitle>
               {(remediationRun as any).goNoGoRecommendation && (
@@ -1095,7 +1095,7 @@ function AgentLoopPanel({ dealId, dealName }: { dealId: number; dealName: string
               <div key={i} className="border border-border/50 rounded-lg p-4 space-y-2">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-xs">{rem.findingCategory}</Badge>
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 ml-auto" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[var(--sage)] ml-auto" />
                 </div>
                 <p className="text-sm">{rem.action}</p>
                 {rem.artifact && (
@@ -1159,8 +1159,8 @@ function OutreachTab({ dealId }: { dealId: number }) {
   const statusColor: Record<string, string> = {
     not_contacted: "bg-muted/60 text-muted-foreground",
     email_sent: "bg-blue-500/20 text-blue-400",
-    responded: "bg-emerald-500/20 text-emerald-400",
-    call_scheduled: "bg-amber-500/20 text-amber-400",
+    responded: "bg-emerald-500/20 text-[var(--sage)]",
+    call_scheduled: "bg-amber-500/20 text-[var(--amber)]",
     nda_sent: "bg-purple-500/20 text-purple-400",
     nda_signed: "bg-primary/20 text-primary",
     passed: "bg-muted/30 text-muted-foreground/60",

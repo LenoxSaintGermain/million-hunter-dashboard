@@ -36,7 +36,7 @@ const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
 const STATUS_COLORS: Record<AssetStatus, string> = {
   new: "bg-muted/50 text-muted-foreground border-border",
   reviewing: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  qualified: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  qualified: "bg-emerald-500/10 text-[var(--sage)] border-emerald-500/20",
   rejected: "bg-destructive/10 text-destructive border-destructive/20",
   acquired: "bg-primary/10 text-primary border-primary/20",
 };
@@ -175,7 +175,7 @@ function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
               className="w-4 h-4 accent-primary"
             />
             <Label htmlFor="oz-check" className="text-sm cursor-pointer">
-              Located in an <span className="text-emerald-400 font-semibold">Opportunity Zone</span>
+              Located in an <span className="text-[var(--sage)] font-semibold">Opportunity Zone</span>
             </Label>
           </div>
         </div>
@@ -252,7 +252,7 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
                 <span className="text-[11px] text-muted-foreground">{asset.city}, {asset.state}</span>
               </div>
               {asset.opportunityZone && (
-                <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">OZ</span>
+                <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-emerald-500/15 text-[var(--sage)] border border-emerald-500/20">OZ</span>
               )}
               {asset.tadDistrict && (
                 <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">TAD</span>
@@ -307,11 +307,11 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
             <BarChart3 className="w-3 h-3 text-primary shrink-0" />
             <div className="flex-1 min-w-0">
               <span className="text-xs text-muted-foreground">AI Score: </span>
-              <span className={cn("text-sm font-bold", score >= 0.75 ? "text-emerald-400" : score >= 0.6 ? "text-amber-400" : "text-muted-foreground")}>
+              <span className={cn("text-sm font-bold", score >= 0.75 ? "text-[var(--sage)]" : score >= 0.6 ? "text-[var(--amber)]" : "text-muted-foreground")}>
                 {score.toFixed(3)}
               </span>
             </div>
-            <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-3 h-3 text-[var(--sage)] shrink-0" />
           </div>
         ); })()}
 
@@ -454,8 +454,8 @@ export default function Scout() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: "Total Assets", value: stats.total.toString(), icon: Building2, color: "text-primary" },
-            { label: "Qualified", value: stats.qualified.toString(), icon: CheckCircle2, color: "text-emerald-400" },
-            { label: "In OZ", value: stats.ozCount.toString(), icon: TrendingUp, color: "text-emerald-400" },
+            { label: "Qualified", value: stats.qualified.toString(), icon: CheckCircle2, color: "text-[var(--sage)]" },
+            { label: "In OZ", value: stats.ozCount.toString(), icon: TrendingUp, color: "text-[var(--sage)]" },
             { label: "Pipeline Value", value: fmt(stats.totalValue), icon: DollarSign, color: "text-primary" },
           ].map((k) => (
             <Card key={k.label} className="bg-card border-border">
@@ -492,7 +492,7 @@ export default function Scout() {
               className={cn(
                 "inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all",
                 filterOZ
-                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                  ? "bg-emerald-500/20 text-[var(--sage)] border-emerald-500/30"
                   : "bg-muted/30 text-muted-foreground border-border hover:border-emerald-500/30"
               )}
             >

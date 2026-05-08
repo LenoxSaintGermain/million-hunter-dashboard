@@ -335,7 +335,7 @@ function MobileBottomSheet({
           "rounded-t-[20px] border-t border-border",
         )}
         style={{
-          background: "var(--sh-surface-1)",
+          background: "var(--paper)",
           maxHeight: "88dvh",
           transform: open
             ? `translateY(${dragOffset}px)`
@@ -351,7 +351,7 @@ function MobileBottomSheet({
         <div className="flex justify-center pt-3 pb-1 shrink-0">
           <div
             className="w-10 h-1 rounded-full"
-            style={{ background: "var(--sh-border)" }}
+            style={{ background: "var(--rule)" }}
           />
         </div>
 
@@ -368,7 +368,7 @@ function MobileBottomSheet({
           </div>
           <button
             className="w-8 h-8 flex items-center justify-center rounded-full"
-            style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-3)" }}
+              style={{ background: "var(--bone)", color: "var(--sh-fg-3)" }}
             onClick={onClose}
           >
             <X className="w-4 h-4" />
@@ -462,7 +462,7 @@ function MobileBottomSheet({
           </div>
           <button
             className="w-8 h-8 flex items-center justify-center rounded-full shrink-0"
-            style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-3)" }}
+            style={{ background: "var(--bone)", color: "var(--sh-fg-3)" }}
             onClick={() => { onClose(); logout(); }}
             title="Sign out"
           >
@@ -504,7 +504,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           "transition-all duration-[280ms]",
           collapsed ? "w-16" : "w-60"
         )}
-        style={{ background: "var(--sh-surface-1)" }}
+        style={{ background: "var(--paper)" }}
       >
         <LogoBlock collapsed={collapsed} />
         <SidebarNav
@@ -517,7 +517,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="absolute -right-3 top-20 w-6 h-6 flex items-center justify-center rounded-full border border-border z-10"
-          style={{ background: "var(--sh-surface-1)", color: "var(--sh-fg-3)" }}
+          style={{ background: "var(--paper)", color: "var(--sh-fg-3)" }}
           onMouseEnter={(e) => (e.currentTarget.style.color = "var(--sh-fg-1)")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "var(--sh-fg-3)")}
         >
@@ -530,7 +530,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Top bar */}
         <header
           className="h-16 border-b border-border flex items-center justify-between px-4 lg:px-6 shrink-0"
-          style={{ background: "oklch(0.14 0.01 260 / 0.5)" }}
+          style={{ background: "var(--paper)", borderBottom: "1px solid var(--rule)" }}
         >
           <div className="flex items-center gap-3">
             {/* Mobile: logo + hamburger */}

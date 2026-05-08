@@ -59,8 +59,8 @@ const stageColor: Record<string, string> = {
   new: "bg-muted/60 text-muted-foreground",
   scanning: "bg-blue-500/20 text-blue-400",
   qualified: "bg-primary/20 text-primary",
-  high_priority: "bg-emerald-500/20 text-emerald-400",
-  in_diligence: "bg-amber-500/20 text-amber-400",
+  high_priority: "bg-emerald-500/20 text-[var(--sage)]",
+  in_diligence: "bg-amber-500/20 text-[var(--amber)]",
   loi_sent: "bg-purple-500/20 text-purple-400",
   under_contract: "bg-orange-500/20 text-orange-400",
   closed: "bg-emerald-600/30 text-emerald-300",
@@ -377,13 +377,13 @@ export default function Scan() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <CardTitle className="text-sm font-semibold text-amber-400">Off-Market Scout</CardTitle>
-              <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400">AI Agent</Badge>
+              <CardTitle className="text-sm font-semibold text-[var(--amber)]">Off-Market Scout</CardTitle>
+              <Badge variant="outline" className="text-xs border-amber-500/40 text-[var(--amber)]">AI Agent</Badge>
             </div>
             <Button
               size="sm"
               variant="outline"
-              className="h-7 text-xs gap-1.5 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+              className="h-7 text-xs gap-1.5 border-amber-500/40 text-[var(--amber)] hover:bg-amber-500/10"
               onClick={() => huntOffMarket.mutate({ targetLocations, industries: [], minCashFlow })}
               disabled={huntOffMarket.isPending}
             >
@@ -419,9 +419,9 @@ export default function Scan() {
                     <div><span className="text-muted-foreground">Est. Asking</span><br /><span className="font-medium">${(opp.estimatedAskingPrice / 1e6).toFixed(1)}M</span></div>
                   </div>
                   <div className="text-xs space-y-1">
-                    <p><span className="text-amber-400 font-medium">Signal:</span> {opp.offMarketSignal}</p>
+                    <p><span className="text-[var(--amber)] font-medium">Signal:</span> {opp.offMarketSignal}</p>
                     <p><span className="text-blue-400 font-medium">Angle:</span> {opp.acquisitionAngle}</p>
-                    <p><span className="text-emerald-400 font-medium">Contact:</span> {opp.contactStrategy}</p>
+                    <p><span className="text-[var(--sage)] font-medium">Contact:</span> {opp.contactStrategy}</p>
                   </div>
                   <Button
                     size="sm"
@@ -507,8 +507,8 @@ export default function Scan() {
               const scColor = sc == null ? "oklch(0.40 0.01 260)" : sc >= 0.8 ? "oklch(0.70 0.18 160)" : sc >= 0.65 ? "oklch(0.75 0.20 80)" : "oklch(0.60 0.22 25)";
               return (
               <div key={deal.id} className="card-hover-lift" style={{
-                background: "oklch(0.14 0.01 260)",
-                border: "1px solid oklch(0.22 0.01 260)",
+                background: "var(--paper)",
+                border: "1px solid var(--rule)",
                 borderRadius: 12,
                 padding: "16px",
                 display: "flex",
@@ -518,13 +518,13 @@ export default function Scan() {
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <Link href={`/deal/${deal.id}`}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "oklch(0.95 0.01 260)", cursor: "pointer", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.4 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", cursor: "pointer", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.4 }}>
                         {deal.name}
                       </p>
                     </Link>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
                       {deal.location && (
-                        <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "oklch(0.55 0.01 260)" }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--sh-fg-3)" }}>
                           <MapPin style={{ width: 10, height: 10 }} />{deal.location}
                         </span>
                       )}
@@ -536,7 +536,7 @@ export default function Scan() {
                       )}
                     </div>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6, flexShrink: 0, background: "oklch(0.18 0.01 260)", color: "oklch(0.55 0.01 260)", border: "1px solid oklch(0.22 0.01 260)" }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6, flexShrink: 0, background: "var(--bone)", color: "var(--sh-fg-3)", border: "1px solid var(--rule)" }}>
                     {deal.stage.replace(/_/g, " ")}
                   </span>
                 </div>
@@ -546,24 +546,24 @@ export default function Scan() {
                     { label: "Cash Flow", value: fmt(deal.cashFlow) },
                     { label: "Asking", value: fmt(deal.askingPrice) },
                   ].map((f) => (
-                    <div key={f.label} style={{ background: "oklch(0.18 0.01 260)", borderRadius: 8, padding: "8px", textAlign: "center" }}>
-                      <p style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "oklch(0.40 0.01 260)", marginBottom: 3 }}>{f.label}</p>
-                      <p style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: "oklch(0.85 0.01 260)" }}>{f.value}</p>
+                    <div key={f.label} style={{ background: "var(--bone)", borderRadius: 8, padding: "8px", textAlign: "center" }}>
+                      <p style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--sh-fg-3)", marginBottom: 3 }}>{f.label}</p>
+                      <p style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>{f.value}</p>
                     </div>
                   ))}
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: "oklch(0.40 0.01 260)" }}>AI Score</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--sh-fg-3)" }}>AI Score</span>
                     {deal.redFlagCount != null && deal.redFlagCount > 0 && (
-                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "oklch(0.60 0.22 25)" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "var(--clay)" }}>
                         <AlertTriangle style={{ width: 10, height: 10 }} />
                         {deal.redFlagCount} flags
                       </span>
                     )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ flex: 1, height: 4, borderRadius: 2, background: "oklch(0.18 0.01 260)", overflow: "hidden" }}>
+                    <div style={{ flex: 1, height: 4, borderRadius: 2, background: "var(--bone)", overflow: "hidden" }}>
                       <div style={{ height: "100%", width: `${Math.round((sc ?? 0) * 100)}%`, background: scColor, borderRadius: 2, transition: "width 0.85s cubic-bezier(0.16,1,0.3,1)" }} />
                     </div>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: scColor, flexShrink: 0 }}>
@@ -574,7 +574,7 @@ export default function Scan() {
                 <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
                   <button
                     className="btn-press"
-                    style={{ flex: 1, height: 30, fontSize: 11, fontWeight: 500, borderRadius: 7, background: "transparent", border: "1px solid oklch(0.22 0.01 260)", color: "oklch(0.55 0.01 260)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
+                    style={{ flex: 1, height: 30, fontSize: 11, fontWeight: 500, borderRadius: 7, background: "transparent", border: "1px solid var(--rule)", color: "var(--sh-fg-3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
                     onClick={() => scoreDeal.mutate({ id: deal.id })}
                     disabled={scoreDeal.isPending}
                   >

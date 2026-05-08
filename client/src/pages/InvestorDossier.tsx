@@ -39,7 +39,7 @@ const formatCurrency = (v: number) =>
 function AgentCommentary({ message, color = "cyan" }: { message: string; color?: "cyan" | "emerald" | "purple" }) {
   const colorMap = {
     cyan: { border: "border-cyan-500/20", bg: "from-cyan-500/5", icon: "text-cyan-400", label: "text-cyan-400" },
-    emerald: { border: "border-emerald-500/20", bg: "from-emerald-500/5", icon: "text-emerald-400", label: "text-emerald-400" },
+    emerald: { border: "border-emerald-500/20", bg: "from-emerald-500/5", icon: "text-[var(--sage)]", label: "text-[var(--sage)]" },
     purple: { border: "border-purple-500/20", bg: "from-purple-500/5", icon: "text-purple-400", label: "text-purple-400" },
   };
   const c = colorMap[color];
@@ -100,9 +100,9 @@ function InvestorReceiptDrawer({ dossier, onClose }: { dossier: any; onClose: ()
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed inset-y-0 right-0 w-full md:w-[480px] bg-[#0a0a0a] border-l border-white/10 z-50 overflow-y-auto"
+      className="fixed inset-y-0 right-0 w-full md:w-[480px] bg-[#0a0a0a] border-l border-[var(--rule)] z-50 overflow-y-auto"
     >
-      <div className="sticky top-0 bg-[#0a0a0a]/90 backdrop-blur border-b border-white/8 p-4 flex items-center justify-between">
+      <div className="sticky top-0 bg-[#0a0a0a]/90 backdrop-blur border-b border-[var(--rule)] p-4 flex items-center justify-between">
         <div>
           <div className="text-xs font-bold tracking-widest uppercase text-cyan-400">Investor Receipt</div>
           <div className="text-sm font-semibold text-white mt-0.5">{dossier.dealName}</div>
@@ -120,10 +120,10 @@ function InvestorReceiptDrawer({ dossier, onClose }: { dossier: any; onClose: ()
             {[
               { label: "Asking Price", value: formatCurrency(dossier.askingPrice ?? 0), color: "text-white" },
               { label: "Down Payment", value: formatCurrency(dossier.downPayment ?? 0), color: "text-blue-400" },
-              { label: "Monthly Cash Flow", value: formatCurrency(dossier.monthlyCashFlow ?? 0), color: "text-emerald-400" },
+              { label: "Monthly Cash Flow", value: formatCurrency(dossier.monthlyCashFlow ?? 0), color: "text-[var(--sage)]" },
               { label: "Annual Return", value: `${dossier.annualReturn ?? 0}%`, color: "text-purple-400" },
             ].map((row) => (
-              <div key={row.label} className="bg-white/3 border border-white/8 rounded-xl p-3">
+              <div key={row.label} className="bg-[var(--paper)] border border-[var(--rule)] rounded-xl p-3">
                 <div className="text-[10px] text-muted-foreground">{row.label}</div>
                 <div className={cn("text-lg font-bold mt-0.5", row.color)}>{row.value}</div>
               </div>
@@ -151,7 +151,7 @@ function InvestorReceiptDrawer({ dossier, onClose }: { dossier: any; onClose: ()
             <div className="space-y-2">
               {dossier.riskFactors.map((risk: string, i: number) => (
                 <div key={i} className="flex items-start gap-2 text-sm text-gray-400">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <AlertCircle className="w-3.5 h-3.5 text-[var(--amber)] shrink-0 mt-0.5" />
                   {risk}
                 </div>
               ))}
@@ -166,7 +166,7 @@ function InvestorReceiptDrawer({ dossier, onClose }: { dossier: any; onClose: ()
             <div className="space-y-2">
               {dossier.mitigations.map((m: string, i: number) => (
                 <div key={i} className="flex items-start gap-2 text-sm text-gray-400">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[var(--sage)] shrink-0 mt-0.5" />
                   {m}
                 </div>
               ))}
@@ -175,12 +175,12 @@ function InvestorReceiptDrawer({ dossier, onClose }: { dossier: any; onClose: ()
         )}
 
         {/* CTA */}
-        <div className="pt-4 border-t border-white/8 space-y-3">
+        <div className="pt-4 border-t border-[var(--rule)] space-y-3">
           <Button className="w-full gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 text-white border-0">
             <Download className="w-4 h-4" />
             Export PDF Dossier
           </Button>
-          <Button variant="outline" className="w-full gap-2 border-white/10">
+          <Button variant="outline" className="w-full gap-2 border-[var(--rule)]">
             <Share2 className="w-4 h-4" />
             Share with Investor
           </Button>
@@ -242,7 +242,7 @@ export default function InvestorDossier() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] border border-white/5 p-6 md:p-8"
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] border border-[var(--rule)] p-6 md:p-8"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-cyan-500/5" />
           <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
@@ -284,7 +284,7 @@ export default function InvestorDossier() {
             >
               <div className="lg:col-span-2 space-y-5">
                 {/* Deal Info */}
-                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-4">
                     <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Deal Details</div>
                     <div className="grid gap-3">
@@ -294,7 +294,7 @@ export default function InvestorDossier() {
                           value={form.dealName}
                           onChange={(e) => setForm((f) => ({ ...f, dealName: e.target.value }))}
                           placeholder="Metro Commercial Cleaning — Atlanta"
-                          className="bg-transparent border-white/10 text-white"
+                          className="bg-transparent border-[var(--rule)] text-white"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
@@ -303,14 +303,14 @@ export default function InvestorDossier() {
                           <select
                             value={form.dealType}
                             onChange={(e) => setForm((f) => ({ ...f, dealType: e.target.value }))}
-                            className="w-full h-10 bg-black/40 border border-white/10 rounded-md text-white text-sm px-3"
+                            className="w-full h-10 bg-black/40 border border-[var(--rule)] rounded-md text-white text-sm px-3"
                           >
                             {DEAL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                           </select>
                         </div>
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 block">Location</label>
-                          <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-md px-3 h-10">
+                          <div className="flex items-center gap-2 bg-black/40 border border-[var(--rule)] rounded-md px-3 h-10">
                             <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                             <Input
                               value={form.location}
@@ -325,7 +325,7 @@ export default function InvestorDossier() {
                 </Card>
 
                 {/* Financials */}
-                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-4">
                     <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Financials</div>
                     <div className="grid grid-cols-2 gap-3">
@@ -337,7 +337,7 @@ export default function InvestorDossier() {
                       ].map((field) => (
                         <div key={field.key}>
                           <label className="text-xs text-muted-foreground mb-1 block">{field.label}</label>
-                          <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-md px-3 h-10">
+                          <div className="flex items-center gap-2 bg-black/40 border border-[var(--rule)] rounded-md px-3 h-10">
                             <DollarSign className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                             <Input
                               type="number"
@@ -353,7 +353,7 @@ export default function InvestorDossier() {
                 </Card>
 
                 {/* Key Highlights */}
-                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-3">
                     <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Key Highlights (optional)</div>
                     <textarea
@@ -361,7 +361,7 @@ export default function InvestorDossier() {
                       onChange={(e) => setForm((f) => ({ ...f, highlights: e.target.value }))}
                       placeholder="Recurring government contracts. 12-year operating history. Owner retiring — motivated seller. SBA pre-qualified..."
                       rows={3}
-                      className="w-full bg-black/40 border border-white/10 rounded-md text-white text-sm px-3 py-2 resize-none focus:outline-none focus:border-white/20"
+                      className="w-full bg-black/40 border border-[var(--rule)] rounded-md text-white text-sm px-3 py-2 resize-none focus:outline-none focus:border-[var(--rule)]"
                     />
                   </CardContent>
                 </Card>
@@ -392,7 +392,7 @@ export default function InvestorDossier() {
                             "w-full flex items-start gap-3 p-3 rounded-xl border transition-all text-left",
                             form.investorProfile === profile.id
                               ? "bg-purple-500/10 border-purple-500/30"
-                              : "bg-white/3 border-white/8 hover:border-white/20"
+                              : "bg-[var(--paper)] border-[var(--rule)] hover:border-[var(--rule)]"
                           )}
                         >
                           <Icon className={cn(
@@ -517,7 +517,7 @@ export default function InvestorDossier() {
                     <FileText className="w-4 h-4" />
                     View Receipt
                   </Button>
-                  <Button variant="outline" className="gap-2 border-white/10" onClick={() => setStep("intake")}>
+                  <Button variant="outline" className="gap-2 border-[var(--rule)]" onClick={() => setStep("intake")}>
                     New Dossier
                   </Button>
                 </div>
@@ -532,9 +532,9 @@ export default function InvestorDossier() {
               <div className="grid gap-4 lg:grid-cols-2">
                 {/* Investment Thesis */}
                 {result.investmentThesis && (
-                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5">
-                      <DossierSection title="Investment Thesis" icon={TrendingUp} color="text-emerald-400">
+                      <DossierSection title="Investment Thesis" icon={TrendingUp} color="text-[var(--sage)]">
                         <p className="text-sm text-gray-300 leading-relaxed">{result.investmentThesis}</p>
                       </DossierSection>
                     </CardContent>
@@ -543,7 +543,7 @@ export default function InvestorDossier() {
 
                 {/* Capital Stack */}
                 {result.capitalStack && (
-                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5">
                       <DossierSection title="Recommended Capital Stack" icon={BarChart3} color="text-blue-400">
                         <div className="space-y-2">
@@ -563,7 +563,7 @@ export default function InvestorDossier() {
                                       {formatCurrency(value)} <span className="text-muted-foreground">({pct}%)</span>
                                     </span>
                                   </div>
-                                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                  <div className="h-1.5 bg-[var(--bone)] rounded-full overflow-hidden">
                                     <motion.div
                                       initial={{ width: 0 }}
                                       animate={{ width: `${pct}%` }}
@@ -585,7 +585,7 @@ export default function InvestorDossier() {
 
                 {/* Investor Pitch */}
                 {result.investorPitch && (
-                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5">
                       <DossierSection title={`Message for ${selectedProfile.label}`} icon={Users} color="text-purple-400">
                         <p className="text-sm text-gray-300 leading-relaxed">{result.investorPitch}</p>
@@ -596,14 +596,14 @@ export default function InvestorDossier() {
 
                 {/* Risk & Mitigations */}
                 {(result.riskFactors?.length > 0 || result.mitigations?.length > 0) && (
-                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5 space-y-4">
                       {result.riskFactors?.length > 0 && (
-                        <DossierSection title="Risk Factors" icon={AlertCircle} color="text-amber-400">
+                        <DossierSection title="Risk Factors" icon={AlertCircle} color="text-[var(--amber)]">
                           <div className="space-y-2">
                             {result.riskFactors.map((r: string, i: number) => (
                               <div key={i} className="flex items-start gap-2 text-sm text-gray-400">
-                                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                                <AlertCircle className="w-3.5 h-3.5 text-[var(--amber)] shrink-0 mt-0.5" />
                                 {r}
                               </div>
                             ))}
@@ -611,11 +611,11 @@ export default function InvestorDossier() {
                         </DossierSection>
                       )}
                       {result.mitigations?.length > 0 && (
-                        <DossierSection title="Mitigations" icon={Shield} color="text-emerald-400">
+                        <DossierSection title="Mitigations" icon={Shield} color="text-[var(--sage)]">
                           <div className="space-y-2">
                             {result.mitigations.map((m: string, i: number) => (
                               <div key={i} className="flex items-start gap-2 text-sm text-gray-400">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                                <CheckCircle2 className="w-3.5 h-3.5 text-[var(--sage)] shrink-0 mt-0.5" />
                                 {m}
                               </div>
                             ))}
@@ -641,11 +641,11 @@ export default function InvestorDossier() {
                   <FileText className="w-4 h-4" />
                   Open Investor Receipt
                 </Button>
-                <Button variant="outline" className="gap-2 border-white/10">
+                <Button variant="outline" className="gap-2 border-[var(--rule)]">
                   <Download className="w-4 h-4" />
                   Export PDF
                 </Button>
-                <Button variant="outline" className="gap-2 border-white/10">
+                <Button variant="outline" className="gap-2 border-[var(--rule)]">
                   <Share2 className="w-4 h-4" />
                   Share Link
                 </Button>
@@ -660,7 +660,7 @@ export default function InvestorDossier() {
             <p className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Recent Dossiers</p>
             <div className="grid gap-3 md:grid-cols-3">
               {savedDossiers.slice(0, 3).map((d: any) => (
-                <Card key={d.id} className="bg-card/50 border-white/8 hover:border-white/15 transition-all cursor-pointer" style={{ background: "var(--sh-surface-1)" }}>
+                <Card key={d.id} className="bg-card/50 border-[var(--rule)] hover:border-[var(--rule)] transition-all cursor-pointer" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-4 space-y-2">
                     <div className="text-sm font-semibold text-white truncate">{d.dealName}</div>
                     <div className="flex items-center justify-between">

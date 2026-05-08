@@ -79,9 +79,9 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
       )}>
         <div className="flex items-center gap-2.5">
           {isFailed ? (
-            <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+            <XCircle className="w-4 h-4 text-[var(--clay)] shrink-0" />
           ) : isComplete ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-[var(--sage)] shrink-0" />
           ) : (
             <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
           )}
@@ -140,7 +140,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
                   <div className={cn(
                     "w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300",
                     isActive ? "bg-primary text-primary-foreground ring-2 ring-primary/30 ring-offset-1 ring-offset-card" :
-                    isPast ? "bg-emerald-500/20 text-emerald-400" :
+                    isPast ? "bg-emerald-500/20 text-[var(--sage)]" :
                     "bg-muted/40 text-muted-foreground/40"
                   )}>
                     {isActive ? (
@@ -154,7 +154,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
                   <span className={cn(
                     "text-[9px] mt-1 font-medium text-center leading-tight",
                     isActive ? "text-primary" :
-                    isPast ? "text-emerald-400" :
+                    isPast ? "text-[var(--sage)]" :
                     "text-muted-foreground/40"
                   )}>
                     {phase.label}
@@ -182,16 +182,16 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
               <p className="text-[10px] text-muted-foreground">Listings Found</p>
             </div>
             <div className="text-center border-x border-border/30">
-              <p className="text-lg font-bold text-amber-400 tabular-nums">{job.listingsQualified ?? 0}</p>
+              <p className="text-lg font-bold text-[var(--amber)] tabular-nums">{job.listingsQualified ?? 0}</p>
               <p className="text-[10px] text-muted-foreground">Qualified</p>
             </div>
             <div className="text-center">
-              <p className="text-lg font-bold text-emerald-400 tabular-nums">{job.dealsScored ?? 0}</p>
+              <p className="text-lg font-bold text-[var(--sage)] tabular-nums">{job.dealsScored ?? 0}</p>
               <p className="text-[10px] text-muted-foreground">Scored & Added</p>
             </div>
           </div>
           <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3 text-emerald-400" />
+            <TrendingUp className="w-3 h-3 text-[var(--sage)]" />
             Deals are now in your pipeline — check the Command Center
           </p>
         </div>
@@ -201,9 +201,9 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
       {isFailed && (
         <div className="px-4 pb-4 pt-0">
           <div className="rounded-lg bg-red-500/5 border border-red-500/20 p-3 flex items-start gap-2">
-            <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
+            <AlertTriangle className="w-3.5 h-3.5 text-[var(--clay)] mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs font-medium text-red-400">Pipeline error</p>
+              <p className="text-xs font-medium text-[var(--clay)]">Pipeline error</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">{job.errorMessage ?? "An unexpected error occurred. Please retry."}</p>
             </div>
           </div>

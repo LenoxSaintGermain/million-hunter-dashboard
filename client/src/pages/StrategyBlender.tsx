@@ -19,8 +19,8 @@ import { cn } from "@/lib/utils";
 
 const DEAL_TYPES = [
   { type: "sba_business", label: "SBA Business", icon: Building2, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", defaultMonthly: 8000, defaultInvestment: 300000 },
-  { type: "rental", label: "Rental Property", icon: Home, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20", defaultMonthly: 1200, defaultInvestment: 80000 },
-  { type: "flip", label: "Fix & Flip", icon: Wrench, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20", defaultMonthly: 5000, defaultInvestment: 120000 },
+  { type: "rental", label: "Rental Property", icon: Home, color: "text-[var(--sage)]", bg: "bg-emerald-500/10 border-emerald-500/20", defaultMonthly: 1200, defaultInvestment: 80000 },
+  { type: "flip", label: "Fix & Flip", icon: Wrench, color: "text-[var(--amber)]", bg: "bg-amber-500/10 border-amber-500/20", defaultMonthly: 5000, defaultInvestment: 120000 },
   { type: "microloan", label: "Microloan Fund", icon: Coins, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20", defaultMonthly: 800, defaultInvestment: 50000 },
   { type: "land_play", label: "Land Play", icon: MapPin, color: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20", defaultMonthly: 0, defaultInvestment: 150000 },
   { type: "parking_arbitrage", label: "Parking Arb", icon: Target, color: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20", defaultMonthly: 3500, defaultInvestment: 95000 },
@@ -37,7 +37,7 @@ const LEVERAGE_OPTIONS = [
 
 const SCENARIO_CONFIG = {
   conservative: { label: "Conservative", multiplier: 0.75, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
-  base: { label: "Base Case", multiplier: 1.0, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
+  base: { label: "Base Case", multiplier: 1.0, color: "text-[var(--sage)]", bg: "bg-emerald-500/10 border-emerald-500/20" },
   aggressive: { label: "Aggressive", multiplier: 1.35, color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20" },
 };
 
@@ -131,7 +131,7 @@ export default function StrategyBlender() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] border border-white/5 p-6 md:p-8"
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] border border-[var(--rule)] p-6 md:p-8"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-blue-500/5" />
           <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent" />
@@ -139,9 +139,9 @@ export default function StrategyBlender() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                  <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
+                  <BarChart3 className="w-3.5 h-3.5 text-[var(--sage)]" />
                 </div>
-                <span className="text-xs font-bold tracking-[0.2em] uppercase text-emerald-400">Strategy Blender</span>
+                <span className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--sage)]">Strategy Blender</span>
               </div>
               <h1 className="text-3xl md:text-4xl font-bold text-white">
                 Engineer your{" "}
@@ -154,7 +154,7 @@ export default function StrategyBlender() {
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <div className="text-xs text-muted-foreground">Projected Monthly</div>
-                <div className="text-2xl font-bold text-emerald-400">{formatCurrency(adjustedMonthly)}</div>
+                <div className="text-2xl font-bold text-[var(--sage)]">{formatCurrency(adjustedMonthly)}</div>
               </div>
             </div>
           </div>
@@ -171,7 +171,7 @@ export default function StrategyBlender() {
                   onClick={() => setScenario(key as any)}
                   className={cn(
                     "flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border",
-                    scenario === key ? `${cfg.bg} ${cfg.color}` : "bg-white/3 border-white/8 text-gray-500 hover:text-gray-300"
+                    scenario === key ? `${cfg.bg} ${cfg.color}` : "bg-[var(--paper)] border-[var(--rule)] text-gray-500 hover:text-gray-300"
                   )}
                 >
                   {cfg.label}
@@ -203,7 +203,7 @@ export default function StrategyBlender() {
                                 <Input
                                   value={item.label}
                                   onChange={(e) => updateItem(item.id, "label", e.target.value)}
-                                  className="bg-transparent border-white/10 text-white font-semibold text-sm h-8 px-2"
+                                  className="bg-transparent border-[var(--rule)] text-white font-semibold text-sm h-8 px-2"
                                 />
                                 <button
                                   onClick={() => removeItem(item.id)}
@@ -221,7 +221,7 @@ export default function StrategyBlender() {
                                       type="number"
                                       value={item.investment}
                                       onChange={(e) => updateItem(item.id, "investment", Number(e.target.value))}
-                                      className="bg-transparent border-white/10 text-white text-xs h-7 px-1"
+                                      className="bg-transparent border-[var(--rule)] text-white text-xs h-7 px-1"
                                     />
                                   </div>
                                 </div>
@@ -233,7 +233,7 @@ export default function StrategyBlender() {
                                       type="number"
                                       value={item.expectedMonthly}
                                       onChange={(e) => updateItem(item.id, "expectedMonthly", Number(e.target.value))}
-                                      className="bg-transparent border-white/10 text-white text-xs h-7 px-1"
+                                      className="bg-transparent border-[var(--rule)] text-white text-xs h-7 px-1"
                                     />
                                   </div>
                                 </div>
@@ -242,7 +242,7 @@ export default function StrategyBlender() {
                                   <select
                                     value={item.leverage}
                                     onChange={(e) => updateItem(item.id, "leverage", e.target.value)}
-                                    className="mt-1 w-full h-7 text-xs bg-black/40 border border-white/10 rounded text-white px-1"
+                                    className="mt-1 w-full h-7 text-xs bg-black/40 border border-[var(--rule)] rounded text-white px-1"
                                   >
                                     {LEVERAGE_OPTIONS.map((opt) => (
                                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -311,13 +311,13 @@ export default function StrategyBlender() {
           {/* Right: Analysis Panel */}
           <div className="lg:col-span-2 space-y-4">
             {/* Live Totals */}
-            <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+            <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
               <CardContent className="p-5 space-y-3">
                 <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Live Stack Summary</div>
                 <div className="space-y-2">
                   {[
                     { label: "Total Investment", value: formatCurrency(totalInvestment), color: "text-white" },
-                    { label: `${scenario} Monthly`, value: formatCurrency(adjustedMonthly), color: "text-emerald-400" },
+                    { label: `${scenario} Monthly`, value: formatCurrency(adjustedMonthly), color: "text-[var(--sage)]" },
                     { label: "Annual Run Rate", value: formatCurrency(adjustedMonthly * 12), color: "text-blue-400" },
                     { label: "Cash-on-Cash", value: totalInvestment > 0 ? `${((adjustedMonthly * 12 / totalInvestment) * 100).toFixed(1)}%` : "—", color: "text-purple-400" },
                   ].map((row) => (
@@ -328,10 +328,10 @@ export default function StrategyBlender() {
                   ))}
                 </div>
                 {analysis?.dscr && (
-                  <div className="pt-2 border-t border-white/5">
+                  <div className="pt-2 border-t border-[var(--rule)]">
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-muted-foreground">DSCR</span>
-                      <span className={cn("text-sm font-bold", analysis.dscr >= 1.25 ? "text-emerald-400" : analysis.dscr >= 1.0 ? "text-amber-400" : "text-rose-400")}>
+                      <span className={cn("text-sm font-bold", analysis.dscr >= 1.25 ? "text-[var(--sage)]" : analysis.dscr >= 1.0 ? "text-[var(--amber)]" : "text-rose-400")}>
                         {analysis.dscr.toFixed(2)}x
                         <span className="text-xs font-normal ml-1 text-muted-foreground">
                           {analysis.dscr >= 1.25 ? "✓ SBA Ready" : analysis.dscr >= 1.0 ? "Borderline" : "Below Min"}
@@ -346,12 +346,12 @@ export default function StrategyBlender() {
             {/* Capital Levers */}
             {analysis?.levers && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Capital Levers</div>
                       {leverSavings > 0 && (
-                        <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-xs">
+                        <Badge className="bg-emerald-500/10 text-[var(--sage)] border-emerald-500/20 text-xs">
                           -{formatK(leverSavings)} saved
                         </Badge>
                       )}
@@ -365,7 +365,7 @@ export default function StrategyBlender() {
                             "w-full text-left p-3 rounded-xl border transition-all",
                             activeLevers.has(lever.id)
                               ? "bg-emerald-500/10 border-emerald-500/30"
-                              : "bg-white/3 border-white/8 hover:border-white/20"
+                              : "bg-[var(--paper)] border-[var(--rule)] hover:border-[var(--rule)]"
                           )}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -391,7 +391,7 @@ export default function StrategyBlender() {
             {/* Capital Stack Breakdown */}
             {analysis?.capitalStack && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-3">
                     <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Capital Stack</div>
                     {Object.entries(analysis.capitalStack)
@@ -408,7 +408,7 @@ export default function StrategyBlender() {
                               <span className="text-gray-400">{labels[key] ?? key}</span>
                               <span className="text-white font-semibold">{formatK(value)} <span className="text-muted-foreground">({pct}%)</span></span>
                             </div>
-                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-[var(--bone)] rounded-full overflow-hidden">
                               <motion.div
                                 initial={{ width: 0 }}
                                 animate={{ width: `${pct}%` }}
@@ -430,7 +430,7 @@ export default function StrategyBlender() {
                 <Card className="bg-gradient-to-br from-emerald-500/5 to-blue-500/5 border-emerald-500/10">
                   <CardContent className="p-5">
                     <div className="flex items-start gap-3">
-                      <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <Sparkles className="w-4 h-4 text-[var(--sage)] shrink-0 mt-0.5" />
                       <p className="text-sm text-gray-300 leading-relaxed">{analysis.agentInsight}</p>
                     </div>
                   </CardContent>
@@ -443,10 +443,10 @@ export default function StrategyBlender() {
         {/* 5-Year Projection Chart */}
         {analysis?.projections && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+            <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  <TrendingUp className="w-4 h-4 text-[var(--sage)]" />
                   5-Year Projection — {SCENARIO_CONFIG[scenario].label}
                 </CardTitle>
               </CardHeader>

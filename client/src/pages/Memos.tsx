@@ -89,7 +89,7 @@ export default function Memos() {
       {dealsWithoutMemo.length > 0 && (
         <div
           className="rounded-xl border p-4"
-          style={{ background: "oklch(0.20 0.06 80 / 0.12)", borderColor: "oklch(0.75 0.20 80 / 0.25)" }}
+          style={{ background: "oklch(0.66 0.14 55 / 0.08)", borderColor: "oklch(0.66 0.14 55 / 0.25)" }}
         >
           <div className="flex items-center gap-1.5 mb-2">
             <Zap className="w-3.5 h-3.5" style={{ color: "var(--sh-amber)" }} />

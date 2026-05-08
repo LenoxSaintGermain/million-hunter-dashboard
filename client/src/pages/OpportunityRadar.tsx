@@ -18,11 +18,11 @@ import { cn } from "@/lib/utils";
 const SIGNAL_CONFIG: Record<string, { icon: any; color: string; bg: string; label: string; description: string }> = {
   permit_filed: { icon: FileText, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", label: "Permit Filed", description: "Construction permits signal incoming development" },
   tad_boundary: { icon: Landmark, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20", label: "TAD Boundary", description: "Tax Allocation District plays" },
-  zoning_change: { icon: Building2, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20", label: "Zoning Change", description: "Rezoning creates value arbitrage" },
+  zoning_change: { icon: Building2, color: "text-[var(--amber)]", bg: "bg-amber-500/10 border-amber-500/20", label: "Zoning Change", description: "Rezoning creates value arbitrage" },
   world_event: { icon: Globe, color: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20", label: "World Event", description: "Major events create demand spikes" },
   land_play: { icon: MapPin, color: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20", label: "Land Play", description: "Undervalued land with optionality" },
   gas_station_hold: { icon: Fuel, color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20", label: "Gas Station Hold", description: "Corner lots with redevelopment optionality" },
-  parking_arbitrage: { icon: ParkingCircle, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20", label: "Parking Arb", description: "Surface lots in density corridors" },
+  parking_arbitrage: { icon: ParkingCircle, color: "text-[var(--sage)]", bg: "bg-emerald-500/10 border-emerald-500/20", label: "Parking Arb", description: "Surface lots in density corridors" },
   lot_prep: { icon: Target, color: "text-teal-400", bg: "bg-teal-500/10 border-teal-500/20", label: "Lot Prep", description: "Prep for acquisition by major developer" },
   microloan: { icon: Coins, color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20", label: "Microloan", description: "CDFI capital arbitrage" },
   other: { icon: Zap, color: "text-gray-400", bg: "bg-gray-500/10 border-gray-500/20", label: "Signal", description: "Creative opportunity" },
@@ -33,7 +33,7 @@ const formatCurrency = (v: number) =>
 
 const UrgencyBar = ({ score }: { score: number }) => (
   <div className="flex items-center gap-2">
-    <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+    <div className="flex-1 h-1.5 bg-[var(--bone)] rounded-full overflow-hidden">
       <motion.div
         initial={{ width: 0 }}
         animate={{ width: `${score * 100}%` }}
@@ -46,7 +46,7 @@ const UrgencyBar = ({ score }: { score: number }) => (
     </div>
     <span className={cn(
       "text-xs font-bold w-8 text-right",
-      score >= 0.8 ? "text-rose-400" : score >= 0.6 ? "text-amber-400" : "text-emerald-400"
+      score >= 0.8 ? "text-rose-400" : score >= 0.6 ? "text-[var(--amber)]" : "text-[var(--sage)]"
     )}>
       {Math.round(score * 100)}
     </span>
@@ -95,7 +95,7 @@ export default function OpportunityRadar() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] border border-white/5 p-6 md:p-8"
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] border border-[var(--rule)] p-6 md:p-8"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 via-transparent to-cyan-500/5" />
           <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-rose-500/50 to-transparent" />
@@ -126,7 +126,7 @@ export default function OpportunityRadar() {
 
         {/* Scan Controls */}
         <div className="flex gap-3">
-          <div className="flex-1 flex items-center gap-2 bg-card/50 border border-white/8 rounded-xl px-4" style={{ background: "var(--sh-surface-1)" }}>
+          <div className="flex-1 flex items-center gap-2 bg-card/50 border border-[var(--rule)] rounded-xl px-4" style={{ background: "var(--sh-surface-1)" }}>
             <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
             <Input
               value={location}
@@ -159,8 +159,8 @@ export default function OpportunityRadar() {
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all",
                 activeFilter === null
-                  ? "bg-white/10 border-white/20 text-white"
-                  : "bg-white/3 border-white/8 text-gray-500 hover:text-gray-300"
+                  ? "bg-[var(--bone)] border-[var(--rule)] text-white"
+                  : "bg-[var(--paper)] border-[var(--rule)] text-gray-500 hover:text-gray-300"
               )}
             >
               <Filter className="w-3 h-3" />
@@ -175,7 +175,7 @@ export default function OpportunityRadar() {
                   onClick={() => setActiveFilter(type === activeFilter ? null : type)}
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all",
-                    activeFilter === type ? `${cfg.bg} ${cfg.color}` : "bg-white/3 border-white/8 text-gray-500 hover:text-gray-300"
+                    activeFilter === type ? `${cfg.bg} ${cfg.color}` : "bg-[var(--paper)] border-[var(--rule)] text-gray-500 hover:text-gray-300"
                   )}
                 >
                   <Icon className="w-3 h-3" />
@@ -256,7 +256,7 @@ export default function OpportunityRadar() {
                     <Card
                       className={cn(
                         "border cursor-pointer transition-all hover:scale-[1.01]",
-                        isExpanded ? cfg.bg : "bg-card/50 border-white/8 hover:border-white/15"
+                        isExpanded ? cfg.bg : "bg-card/50 border-[var(--rule)] hover:border-[var(--rule)]"
                       )}
                       onClick={() => setExpandedId(isExpanded ? null : signal.id)}
                     >
@@ -284,7 +284,7 @@ export default function OpportunityRadar() {
                             <div className={cn(
                               "text-xs font-bold",
                               (signal.urgencyScore ?? 0) >= 0.8 ? "text-rose-400" :
-                              (signal.urgencyScore ?? 0) >= 0.6 ? "text-amber-400" : "text-emerald-400"
+                              (signal.urgencyScore ?? 0) >= 0.6 ? "text-[var(--amber)]" : "text-[var(--sage)]"
                             )}>
                               {(signal.urgencyScore ?? 0) >= 0.8 ? "🔴 URGENT" :
                                (signal.urgencyScore ?? 0) >= 0.6 ? "🟡 WATCH" : "🟢 MONITOR"}
@@ -306,7 +306,7 @@ export default function OpportunityRadar() {
                           {signal.estimatedROI && (
                             <div className="text-center">
                               <div className="text-[10px] text-muted-foreground">Est. ROI</div>
-                              <div className="text-sm font-bold text-emerald-400">
+                              <div className="text-sm font-bold text-[var(--sage)]">
                                 {((signal.estimatedROI - 1) * 100).toFixed(0)}%
                               </div>
                             </div>
@@ -338,7 +338,7 @@ export default function OpportunityRadar() {
                               exit={{ opacity: 0, height: 0 }}
                               className="overflow-hidden"
                             >
-                              <div className="pt-3 border-t border-white/10">
+                              <div className="pt-3 border-t border-[var(--rule)]">
                                 <div className="flex items-center gap-2 mb-2">
                                   <Sparkles className={cn("w-3.5 h-3.5", cfg.color)} />
                                   <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">AI Analysis</span>
@@ -347,7 +347,7 @@ export default function OpportunityRadar() {
                                 <div className="flex gap-2 mt-3">
                                   <Button
                                     size="sm"
-                                    className="flex-1 h-8 text-xs bg-gradient-to-r from-rose-500/20 to-cyan-500/20 border border-white/10 text-white hover:border-white/20"
+                                    className="flex-1 h-8 text-xs bg-gradient-to-r from-rose-500/20 to-cyan-500/20 border border-[var(--rule)] text-white hover:border-[var(--rule)]"
                                     onClick={(e) => { e.stopPropagation(); window.location.href = "/strategy-blender"; }}
                                   >
                                     Add to Blender
@@ -356,7 +356,7 @@ export default function OpportunityRadar() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-8 text-xs border-white/10"
+                                    className="h-8 text-xs border-[var(--rule)]"
                                     onClick={(e) => { e.stopPropagation(); window.location.href = "/investor-dossier"; }}
                                   >
                                     Build Dossier
@@ -395,7 +395,7 @@ export default function OpportunityRadar() {
                 const cfg = SIGNAL_CONFIG[play.type];
                 const Icon = cfg.icon;
                 return (
-                  <Card key={play.title} className="bg-card/50 border-white/8 opacity-60" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card key={play.title} className="bg-card/50 border-[var(--rule)] opacity-60" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-4 space-y-2">
                       <div className="flex items-center gap-2">
                         <Icon className={cn("w-4 h-4", cfg.color)} />

@@ -505,4 +505,15 @@
 - [x] Build TIDE.tsx dashboard page: flow feed with category filter, convergence events panel, prediction track record
 - [x] Add TIDE Intelligence nav item to DashboardLayout sidebar (amber New badge)
 - [x] Add /tide route to App.tsx
+- [x] 81/81 tests passing, zero TypeScript errors## Sprint 26 — Editorial Finance Design System Overhaul
+- [x] Define Editorial Finance CSS token spec: bone/paper/ink/amber/sage/clay/rule, sh-fg-1–4, sh-cyan, sh-violet
+- [x] Load Fraunces display font + JetBrains Mono via Google Fonts CDN in index.html
+- [x] Set --font-display, --font-mono, --font-sans in index.css @theme inline
+- [x] Add .eyebrow utility class (10px, 700, uppercase, 0.12em tracking)
+- [x] Overhaul DashboardLayout: bone/paper sidebar, eyebrow section labels, no colored backgrounds
+- [x] Overhaul TIDE.tsx: contextual flow explanations (no raw FEC dump links), "Why this matters" copy per convergence event, fmtMoney/fmtPct number formatting, blur-in animations
+- [x] Global color token sweep: 251 replacements across 28 files (zinc/white → bone/paper/ink/rule/amber/sage/clay)
+- [x] Fix DealDetail.tsx StatCard dark oklch → paper/rule/ink tokens
+- [x] Fix Scan.tsx deal card dark oklch → bone/paper/rule tokens
+- [x] Fix Memos.tsx amber background to use Editorial Finance amber token
 - [x] 81/81 tests passing, zero TypeScript errors

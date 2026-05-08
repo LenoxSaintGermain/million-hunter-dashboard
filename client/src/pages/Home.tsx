@@ -23,24 +23,24 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────
 const C = {
-  p:   "oklch(0.65 0.22 250)",
-  em:  "oklch(0.70 0.18 160)",
-  am:  "oklch(0.75 0.20 80)",
-  ba:  "oklch(0.66 0.14 55)",    // burnt amber — Tripoli accent
-  re:  "oklch(0.60 0.22 25)",
-  cy:  "oklch(0.75 0.15 200)",
-  vi:  "oklch(0.65 0.22 290)",
-  ro:  "oklch(0.65 0.20 15)",
-  fg1: "oklch(0.95 0.01 260)",
-  fg2: "oklch(0.85 0.01 260)",
-  fg3: "oklch(0.55 0.01 260)",
-  fg4: "oklch(0.40 0.01 260)",
-  s1:  "oklch(0.14 0.01 260)",
-  s2:  "oklch(0.18 0.01 260)",
-  bd:  "oklch(0.22 0.01 260)",
+  p:   "var(--ink)",
+  em:  "var(--sage)",
+  am:  "var(--amber)",
+  ba:  "var(--amber)",              // burnt amber — Editorial Finance accent
+  re:  "var(--clay)",
+  cy:  "var(--sh-cyan)",
+  vi:  "var(--sh-violet)",
+  ro:  "var(--clay)",
+  fg1: "var(--ink)",
+  fg2: "oklch(0.35 0.018 250)",
+  fg3: "oklch(0.48 0.018 250)",
+  fg4: "oklch(0.60 0.012 250)",
+  s1:  "var(--paper)",
+  s2:  "var(--bone)",
+  bd:  "var(--rule)",
 };
 
-const scoreColor = (v: number) => v >= 0.8 ? C.em : v >= 0.65 ? C.am : C.re;
+const scoreColor = (v: number) => v >= 0.8 ? "var(--sage)" : v >= 0.65 ? "var(--amber)" : "var(--clay)";
 const fmt = (n: number | null | undefined) => {
   if (n == null) return "—";
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
@@ -98,7 +98,7 @@ function ConfidenceBar({ score }: { score: any }) {
   const color = pct >= 85 ? C.em : pct >= 70 ? C.am : C.fg3;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-      <div style={{ flex: 1, height: 2, borderRadius: 1, background: C.bd, overflow: "hidden" }}>
+      <div style={{ flex: 1, height: 2, borderRadius: 1, background: "var(--rule)", overflow: "hidden" }}>
         <motion.div
           style={{ height: "100%", borderRadius: 1, background: color }}
           initial={{ width: 0 }}
@@ -192,7 +192,7 @@ function InvestorInterestsPanel() {
                 <select
                   value={interest.status}
                   onChange={(e) => updateStatus.mutate({ interestId: interest.id, status: e.target.value as any })}
-                  style={{ fontSize: 10, background: C.s2, color: C.fg3, border: `1px solid ${C.bd}`, borderRadius: 4, padding: "2px 4px" }}
+                  style={{ fontSize: 10, background: "var(--bone)", color: "var(--sh-fg-3)", border: `1px solid ${C.bd}`, borderRadius: 4, padding: "2px 4px" }}
                 >
                   {Object.entries(INTEREST_STATUS_LABELS).map(([v, l]) => (
                     <option key={v} value={v}>{l}</option>
@@ -401,20 +401,20 @@ function SignalStream() {
                       >
                         <p style={{ fontSize: 11, color: C.fg2, lineHeight: 1.65 }}>{sig.summary}</p>
                         {sig.roryPitch && (
-                          <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 5, background: `${C.ba}08`, borderLeft: `2px solid ${C.ba}40` }}>
-                            <p style={{ fontSize: 9, color: `${C.ba}`, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>Signal Insight</p>
+                          <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 5, background: "oklch(0.66 0.14 55 / 0.06)", borderLeft: "2px solid oklch(0.66 0.14 55 / 0.30)" }}>
+                            <p style={{ fontSize: 9, color: "var(--amber)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>Signal Insight</p>
                             <p style={{ fontSize: 11, color: C.fg1, fontStyle: "italic", lineHeight: 1.6 }}>"{sig.roryPitch}"</p>
                           </div>
                         )}
                         {sig.recommendedAction && (
-                          <div style={{ marginTop: 6, padding: "8px 10px", borderRadius: 5, background: `${C.em}08`, borderLeft: `2px solid ${C.em}40` }}>
-                            <p style={{ fontSize: 9, color: C.em, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>Recommended Action</p>
+                          <div style={{ marginTop: 6, padding: "8px 10px", borderRadius: 5, background: "oklch(0.55 0.06 155 / 0.06)", borderLeft: "2px solid oklch(0.55 0.06 155 / 0.30)" }}>
+                            <p style={{ fontSize: 9, color: "var(--sage)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3 }}>Recommended Action</p>
                             <p style={{ fontSize: 11, color: C.fg1, lineHeight: 1.6 }}>{sig.recommendedAction}</p>
                           </div>
                         )}
                         {sig.sourceUrl && (
                           <a href={sig.sourceUrl} target="_blank" rel="noopener noreferrer"
-                            style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, color: C.ba, textDecoration: "none", marginTop: 6 }}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, color: "var(--amber)", textDecoration: "none", marginTop: 6 }}
                             onClick={(e) => e.stopPropagation()}>
                             <ExternalLink style={{ width: 9, height: 9 }} />
                             Source
@@ -560,7 +560,7 @@ function IntelligenceFeed({ deals, isLoading, onDelete }: {
                       </span>
                     )}
                     {deal.industry && (
-                      <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 6px", borderRadius: 3, background: C.s2, color: C.fg3 }}>
+                      <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 6px", borderRadius: 3, background: "var(--bone)", color: "var(--sh-fg-3)" }}>
                         {deal.industry}
                       </span>
                     )}
@@ -604,7 +604,7 @@ function IntelligenceFeed({ deals, isLoading, onDelete }: {
                   position: "absolute", right: 52, top: "50%", transform: "translateY(-50%)",
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                   width: 22, height: 22, borderRadius: 4, border: `1px solid ${C.bd}`,
-                  background: C.s1, color: C.fg4, cursor: "pointer", zIndex: 2,
+                  background: "var(--paper)", color: "var(--sh-fg-4)", cursor: "pointer", zIndex: 2,
                 }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.re; (e.currentTarget as HTMLButtonElement).style.borderColor = `${C.re}40`; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.fg4; (e.currentTarget as HTMLButtonElement).style.borderColor = C.bd; }}
@@ -749,8 +749,7 @@ export default function Home() {
         initial={{ opacity: 0, y: 16, filter: "blur(6px)" }}
         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         transition={{ duration: 0.9, ease: EASE }}
-        className="sh-hero-panel"
-        style={{ padding: 0, overflow: "hidden" }}
+        style={{ padding: 0, overflow: "hidden", background: "var(--paper)", border: "1px solid var(--rule)", borderRadius: "var(--radius-lg)" }}
       >
         {/* Operator briefing bar */}
         <div style={{
@@ -813,8 +812,8 @@ export default function Home() {
                 display: "inline-flex", alignItems: "center", gap: 8,
                 height: 42, padding: "0 22px", borderRadius: 9999,
                 fontSize: 12, fontWeight: 600, cursor: "pointer",
-                background: triggerScan.isPending || activeScanJobId !== null ? `${C.p}60` : C.p,
-                border: "none", color: "oklch(0.98 0.005 260)",
+                background: triggerScan.isPending || activeScanJobId !== null ? "oklch(0.18 0.018 250 / 0.5)" : "var(--ink)",
+                border: "none", color: "var(--paper)",
                 letterSpacing: "0.02em",
               }}
             >
@@ -861,10 +860,10 @@ export default function Home() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: EASE, delay: 0.3 }}
         className="editorial-grid"
-        style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 0, minHeight: 0 }}
+        style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 0, minHeight: 0, background: "var(--paper)", border: "1px solid var(--rule)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}
       >
         {/* LEFT: Intelligence Feed + Activity */}
-        <div style={{ borderRight: `1px solid ${C.bd}`, display: "flex", flexDirection: "column" }}>
+        <div style={{ borderRight: "1px solid var(--rule)", display: "flex", flexDirection: "column" }}>
 
           {/* Feed header */}
           <div style={{

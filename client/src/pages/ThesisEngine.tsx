@@ -77,7 +77,7 @@ function WeightBar({ weight, isCustom }: { weight: number; isCustom: boolean }) 
           style={{ width: `${weight}%` }}
         />
       </div>
-      <span className={cn("text-xs font-mono tabular-nums w-8 text-right", isCustom ? "text-amber-400" : "text-primary")}>
+      <span className={cn("text-xs font-mono tabular-nums w-8 text-right", isCustom ? "text-[var(--amber)]" : "text-primary")}>
         {weight}%
       </span>
     </div>
@@ -180,7 +180,7 @@ export default function ThesisEngine() {
                 custom scoring dimensions, and evidence requirements — then runs the pipeline.
               </p>
             </div>
-            <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-500/5 text-xs">
+            <Badge variant="outline" className="border-amber-500/40 text-[var(--amber)] bg-amber-500/5 text-xs">
               <Sparkles className="h-3 w-3 mr-1" />
               Hunter Tier
             </Badge>
@@ -212,7 +212,7 @@ export default function ThesisEngine() {
                       <span className="text-base">{t.icon}</span>
                       <span className={cn(
                         "text-sm font-medium transition-colors",
-                        activeTemplate === t.id ? "text-amber-400" : "text-foreground group-hover:text-foreground"
+                        activeTemplate === t.id ? "text-[var(--amber)]" : "text-foreground group-hover:text-foreground"
                       )}>
                         {t.label}
                       </span>
@@ -460,7 +460,7 @@ export default function ThesisEngine() {
                             <span className="text-xs text-foreground flex items-center gap-1.5">
                               {w.dimension}
                               {w.isCustom && (
-                                <Badge variant="outline" className="text-[10px] px-1 py-0 border-amber-500/40 text-amber-400">
+                                <Badge variant="outline" className="text-[10px] px-1 py-0 border-amber-500/40 text-[var(--amber)]">
                                   custom
                                 </Badge>
                               )}

@@ -17,8 +17,8 @@ import { cn } from "@/lib/utils";
 
 const DEAL_TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string; label: string }> = {
   sba_business: { icon: Building2, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", label: "SBA Business" },
-  rental: { icon: Home, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20", label: "Rental" },
-  flip: { icon: Wrench, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20", label: "Fix & Flip" },
+  rental: { icon: Home, color: "text-[var(--sage)]", bg: "bg-emerald-500/10 border-emerald-500/20", label: "Rental" },
+  flip: { icon: Wrench, color: "text-[var(--amber)]", bg: "bg-amber-500/10 border-amber-500/20", label: "Fix & Flip" },
   microloan: { icon: Coins, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20", label: "Microloan" },
   land_play: { icon: MapPin, color: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20", label: "Land Play" },
   parking_arbitrage: { icon: Target, color: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20", label: "Parking Arb" },
@@ -79,7 +79,7 @@ export default function FreedomMap() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] border border-white/5 p-8 md:p-12"
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] border border-[var(--rule)] p-8 md:p-12"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5" />
           <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
@@ -122,7 +122,7 @@ export default function FreedomMap() {
                       <button
                         key={preset.label}
                         onClick={() => applyPreset(preset)}
-                        className="group relative px-3 py-2.5 rounded-xl bg-white/3 hover:bg-white/8 border border-white/8 hover:border-white/20 transition-all duration-300 text-left"
+                        className="group relative px-3 py-2.5 rounded-xl bg-[var(--paper)] hover:bg-[var(--bone)] border border-[var(--rule)] hover:border-[var(--rule)] transition-all duration-300 text-left"
                       >
                         <div className="text-xs font-semibold text-gray-300 group-hover:text-white transition-colors">{preset.label}</div>
                         <div className="text-[10px] text-gray-500 mt-0.5">{formatCurrency(preset.targetMonthlyIncome)}/mo</div>
@@ -132,7 +132,7 @@ export default function FreedomMap() {
                 </div>
 
                 {/* Target Income */}
-                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-semibold text-white">Target Monthly Income</label>
@@ -152,7 +152,7 @@ export default function FreedomMap() {
 
                 {/* Capital & Timeline */}
                 <div className="grid grid-cols-2 gap-4">
-                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5 space-y-3">
                       <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Investment Capital</label>
                       <div className="flex items-center gap-2">
@@ -161,12 +161,12 @@ export default function FreedomMap() {
                           type="number"
                           value={form.investmentCapital}
                           onChange={(e) => setForm((f) => ({ ...f, investmentCapital: Number(e.target.value) }))}
-                          className="bg-transparent border-white/10 text-white font-semibold"
+                          className="bg-transparent border-[var(--rule)] text-white font-semibold"
                         />
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5 space-y-3">
                       <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Timeline (Years)</label>
                       <div className="flex items-center gap-2">
@@ -176,7 +176,7 @@ export default function FreedomMap() {
                           value={form.timelineYears}
                           onChange={(e) => setForm((f) => ({ ...f, timelineYears: Number(e.target.value) }))}
                           min={1} max={10}
-                          className="bg-transparent border-white/10 text-white font-semibold"
+                          className="bg-transparent border-[var(--rule)] text-white font-semibold"
                         />
                       </div>
                     </CardContent>
@@ -196,7 +196,7 @@ export default function FreedomMap() {
                             "flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all border",
                             form.riskTolerance === r
                               ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
-                              : "bg-white/3 border-white/8 text-gray-400 hover:border-white/20"
+                              : "bg-[var(--paper)] border-[var(--rule)] text-gray-400 hover:border-[var(--rule)]"
                           )}
                         >
                           {r}
@@ -215,7 +215,7 @@ export default function FreedomMap() {
                             "flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all border",
                             form.situation === s
                               ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
-                              : "bg-white/3 border-white/8 text-gray-400 hover:border-white/20"
+                              : "bg-[var(--paper)] border-[var(--rule)] text-gray-400 hover:border-[var(--rule)]"
                           )}
                         >
                           {s}
@@ -226,7 +226,7 @@ export default function FreedomMap() {
                 </div>
 
                 {/* Location */}
-                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-2">
                     <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Target Market</label>
                     <div className="flex items-center gap-2">
@@ -235,7 +235,7 @@ export default function FreedomMap() {
                         value={form.location}
                         onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
                         placeholder="Atlanta, GA"
-                        className="bg-transparent border-white/10 text-white"
+                        className="bg-transparent border-[var(--rule)] text-white"
                       />
                     </div>
                   </CardContent>
@@ -254,7 +254,7 @@ export default function FreedomMap() {
 
               {/* Side Panel */}
               <div className="space-y-4">
-                <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-6 space-y-4">
                     <div className="flex items-center gap-2 text-sm font-semibold text-white">
                       <Zap className="w-4 h-4 text-yellow-400" />
@@ -364,11 +364,11 @@ export default function FreedomMap() {
               {/* Summary Stats */}
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  { label: "Projected Monthly", value: formatCurrency(result.totalProjectedMonthly), icon: TrendingUp, color: "text-emerald-400" },
+                  { label: "Projected Monthly", value: formatCurrency(result.totalProjectedMonthly), icon: TrendingUp, color: "text-[var(--sage)]" },
                   { label: "Total Investment", value: formatCurrency(result.totalInvestmentRequired), icon: DollarSign, color: "text-blue-400" },
                   { label: "Deal Components", value: `${result.recipe?.length ?? 0} assets`, icon: Building2, color: "text-purple-400" },
                 ].map((stat) => (
-                  <Card key={stat.label} className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card key={stat.label} className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-4 text-center">
                       <stat.icon className={cn("w-5 h-5 mx-auto mb-2", stat.color)} />
                       <div className={cn("text-xl font-bold", stat.color)}>{stat.value}</div>
@@ -387,8 +387,8 @@ export default function FreedomMap() {
                     className={cn(
                       "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border",
                       viewMode === mode
-                        ? "bg-white/10 border-white/20 text-white"
-                        : "bg-white/3 border-white/8 text-gray-500 hover:text-gray-300"
+                        ? "bg-[var(--bone)] border-[var(--rule)] text-white"
+                        : "bg-[var(--paper)] border-[var(--rule)] text-gray-500 hover:text-gray-300"
                     )}
                   >
                     {mode}
@@ -427,7 +427,7 @@ export default function FreedomMap() {
                               <div className="font-semibold text-white text-sm">{item.label}</div>
                               <div className="text-xs text-gray-400 mt-1 leading-relaxed">{item.description}</div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--rule)]">
                               <div>
                                 <div className="text-[10px] text-muted-foreground">Monthly Income</div>
                                 <div className={cn("text-sm font-bold", cfg.color)}>{formatCurrency(item.estimatedMonthlyIncome)}</div>
@@ -470,7 +470,7 @@ export default function FreedomMap() {
                           <div className="absolute -left-10 top-1 w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 flex items-center justify-center">
                             <Star className="w-3.5 h-3.5 text-cyan-400" />
                           </div>
-                          <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                          <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between gap-4">
                                 <div>
@@ -479,7 +479,7 @@ export default function FreedomMap() {
                                   <div className="text-sm text-gray-400 mt-1">{m.description}</div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <div className="text-lg font-bold text-emerald-400">{formatCurrency(m.monthlyIncome)}</div>
+                                  <div className="text-lg font-bold text-[var(--sage)]">{formatCurrency(m.monthlyIncome)}</div>
                                   <div className="text-xs text-muted-foreground">/month</div>
                                 </div>
                               </div>
@@ -499,18 +499,18 @@ export default function FreedomMap() {
                   animate={{ opacity: 1 }}
                   className="space-y-4"
                 >
-                  <Card className="bg-card/50 border-white/8" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-6 space-y-4">
                       <div className="text-sm font-semibold text-white">AI Rationale</div>
                       <p className="text-gray-400 leading-relaxed">{result.rationale}</p>
-                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--rule)]">
                         <div>
                           <div className="text-xs text-muted-foreground mb-1">Annual Run Rate</div>
                           <div className="text-2xl font-bold text-white">{formatCurrency(result.totalProjectedMonthly * 12)}</div>
                         </div>
                         <div>
                           <div className="text-xs text-muted-foreground mb-1">Cash-on-Cash Yield</div>
-                          <div className="text-2xl font-bold text-emerald-400">
+                          <div className="text-2xl font-bold text-[var(--sage)]">
                             {result.totalInvestmentRequired > 0
                               ? `${((result.totalProjectedMonthly * 12 / result.totalInvestmentRequired) * 100).toFixed(1)}%`
                               : "—"}
@@ -527,7 +527,7 @@ export default function FreedomMap() {
                 <Button
                   onClick={() => setStep("intake")}
                   variant="outline"
-                  className="gap-2 border-white/10"
+                  className="gap-2 border-[var(--rule)]"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Adjust Goals
