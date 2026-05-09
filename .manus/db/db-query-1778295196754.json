@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS invite_tokens (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  token VARCHAR(64) NOT NULL UNIQUE,\n  assign_role ENUM('user', 'admin', 'investor', 'insurance') NOT NULL,\n  label VARCHAR(256),\n  recipient_email VARCHAR(256),\n  created_by_user_id INT NOT NULL,\n  expires_at TIMESTAMP NULL,\n  consumed_at TIMESTAMP NULL,\n  consumed_by_user_id INT,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute CREATE TABLE IF NOT EXISTS invite_tokens (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  token VARCHAR(64) NOT NULL UNIQUE,\n  assign_role ENUM('user', 'admin', 'investor', 'insurance') NOT NULL,\n  label VARCHAR(256),\n  recipient_email VARCHAR(256),\n  created_by_user_id INT NOT NULL,\n  expires_at TIMESTAMP NULL,\n  consumed_at TIMESTAMP NULL,\n  consumed_by_user_id INT,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 364
+}

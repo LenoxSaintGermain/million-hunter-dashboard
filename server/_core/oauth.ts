@@ -9,6 +9,33 @@ function getQueryParam(req: Request, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+/**
+ * Parse the OAuth state parameter to extract the return path.
+ *
+ * The state is a base64-encoded JSON object with shape:
+ *   { origin: string; returnPath?: string }
+ *
+ * The InviteAccept page encodes /invite/:token as returnPath so the callback
+ * redirects back to the invite page after authentication.
+ *
+ * Falls back to "/" if state is malformed or returnPath is missing.
+ * Only allows same-origin redirects (must start with "/") to prevent open redirect.
+ */
+function parseReturnPath(state: string): string {
+  try {
+    const decoded = Buffer.from(state, "base64").toString("utf8");
+    const parsed = JSON.parse(decoded);
+    const returnPath = parsed?.returnPath;
+    // Security: only allow relative paths to prevent open redirect attacks
+    if (typeof returnPath === "string" && returnPath.startsWith("/")) {
+      return returnPath;
+    }
+  } catch {
+    // Malformed state — fall through to default
+  }
+  return "/";
+}
+
 export function registerOAuthRoutes(app: Express) {
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
@@ -44,7 +71,10 @@ export function registerOAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      res.redirect(302, "/");
+      // Redirect to the return path encoded in state (e.g. /invite/:token)
+      // Falls back to "/" if no returnPath is present
+      const returnPath = parseReturnPath(state);
+      res.redirect(302, returnPath);
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
       res.status(500).json({ error: "OAuth callback failed" });

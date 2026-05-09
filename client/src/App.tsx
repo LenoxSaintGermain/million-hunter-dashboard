@@ -19,6 +19,7 @@ import ThesisEngine from "./pages/ThesisEngine";
 import TIDEPage from "./pages/TIDE";
 import InsuranceProspector from "./pages/InsuranceProspector";
 import AdminPanel from "./pages/AdminPanel";
+import InviteAccept from "./pages/InviteAccept";
 import DealShare from "./pages/DealShare";
 import Lobby from "./pages/Lobby";
 import InvestorDealRoom from "./pages/investor/DealRoom";
@@ -47,7 +48,7 @@ function OnboardingGuard() {
   const alreadyChecked = typeof window !== "undefined" &&
     sessionStorage.getItem("onboarding_checked") === "done";
 
-  const isPublicPage = location === "/lobby" || location === "/404" || location.startsWith("/deal-share");
+  const isPublicPage = location === "/lobby" || location === "/404" || location.startsWith("/deal-share") || location.startsWith("/invite");
   const isInvestorArea = location.startsWith("/investor");
 
   // Operator onboarding check
@@ -99,7 +100,7 @@ function OnboardingGuard() {
 function GlobalCoPilot() {
   const { isAuthenticated, user } = useAuth();
   const [location] = useLocation();
-  const isPublicPage = location.startsWith("/lobby") || location.startsWith("/deal-share");
+  const isPublicPage = location.startsWith("/lobby") || location.startsWith("/deal-share") || location.startsWith("/invite");
   const isInvestorPage = location.startsWith("/investor");
   if (!isAuthenticated || isPublicPage || isInvestorPage) return null;
   if ((user as any)?.role === "investor") return null;
@@ -140,6 +141,9 @@ function Router() {
         <Route path="/tide" component={TIDEPage} />
         <Route path="/insurance-prospector" component={InsuranceProspector} />
         <Route path="/admin" component={AdminPanel} />
+
+        {/* Invite accept — role assignment on first login */}
+        <Route path="/invite/:token" component={InviteAccept} />
 
         {/* Public deal share — no auth required */}
         <Route path="/deal-share/:token" component={DealShare} />

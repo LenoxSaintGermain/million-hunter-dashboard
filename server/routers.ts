@@ -27,6 +27,7 @@ import { poeChat, POE_MODELS } from "./poe";
 import { thesisRouter } from "./thesisRouter";
 import { tideRouter } from "./tideRouter";
 import { insuranceRouter } from "./insuranceRouter";
+import { inviteRouter } from "./inviteRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -1918,6 +1919,7 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
 
   // ─── Insurance Prospector ────────────────────────────────────────────────────
   insurance: insuranceRouter,
+  invite: inviteRouter,
   // ─── Admin — User Management ─────────────────────────────────────────────────
   admin: router({
     /** List all users (admin only) */

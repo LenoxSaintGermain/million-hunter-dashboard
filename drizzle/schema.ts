@@ -601,3 +601,29 @@ export const insuranceProspects = mysqlTable("insurance_prospects", {
 export type InsuranceProspect = typeof insuranceProspects.$inferSelect;
 export type InsertInsuranceProspect = typeof insuranceProspects.$inferInsert;
 
+// ─── Invite Tokens (one-click role-assignment invites) ────────────────────────
+// Admin generates a signed token; recipient clicks the link, authenticates via
+// Manus OAuth, and the callback auto-assigns the specified role on first use.
+export const inviteTokens = mysqlTable("invite_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  // Cryptographically random token (32-byte hex)
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  // Role to assign when the invite is consumed
+  assignRole: mysqlEnum("assign_role", ["user", "admin", "investor", "insurance"]).notNull(),
+  // Optional label for the admin to identify the invite (e.g. "NY Life — John Smith")
+  label: varchar("label", { length: 256 }),
+  // Optional email to pre-fill / restrict to a specific recipient
+  recipientEmail: varchar("recipient_email", { length: 256 }),
+  // Who created this invite
+  createdByUserId: int("created_by_user_id").notNull(),
+  // When the invite expires (NULL = never, default 30 days)
+  expiresAt: timestamp("expires_at"),
+  // When the invite was consumed (NULL = not yet used)
+  consumedAt: timestamp("consumed_at"),
+  // Which user consumed the invite
+  consumedByUserId: int("consumed_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type InviteToken = typeof inviteTokens.$inferSelect;
+export type InsertInviteToken = typeof inviteTokens.$inferInsert;
+
