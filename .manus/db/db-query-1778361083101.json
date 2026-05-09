@@ -1,0 +1,76 @@
+{
+  "query": "SELECT id, title, signal_type, confidence_score FROM macro_signals ORDER BY created_at DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT id, title, signal_type, confidence_score FROM macro_signals ORDER BY created_at DESC;",
+  "rows": [
+    {
+      "id": "420007",
+      "title": "Boomer SMB Owner Retirement Wave Accelerates in Texas and Arizona Q2 2026",
+      "signal_type": "macro_momentum",
+      "confidence_score": "0.780"
+    },
+    {
+      "id": "420006",
+      "title": "Florida Hurricane Season Prep Mandates Boost Roofing Demand June-November",
+      "signal_type": "government",
+      "confidence_score": "0.820"
+    },
+    {
+      "id": "420005",
+      "title": "Sun Belt Cooling Season Onset Drives HVAC Acquisition Premium Window",
+      "signal_type": "seasonal",
+      "confidence_score": "0.860"
+    },
+    {
+      "id": "270019",
+      "title": "Metro Atlanta Logistics Demand Decouples from National Freight Softness",
+      "signal_type": "macro_momentum",
+      "confidence_score": "0.710"
+    },
+    {
+      "id": "270018",
+      "title": "Georgia SBA 7(a) Lending Posture Tightens on Search Fund Acquisitions",
+      "signal_type": "government",
+      "confidence_score": "0.780"
+    },
+    {
+      "id": "270017",
+      "title": "Atlanta Cooling Season Ramp Creates HVAC Cash Flow Visibility Window",
+      "signal_type": "seasonal",
+      "confidence_score": "0.840"
+    },
+    {
+      "id": "1",
+      "title": "Blackstone Acquires 3 Atlanta Industrial Parks",
+      "signal_type": "institutional",
+      "confidence_score": "0.910"
+    },
+    {
+      "id": "2",
+      "title": "Atlanta BeltLine TAD Extension Approved — $180M Committed",
+      "signal_type": "government",
+      "confidence_score": "0.950"
+    },
+    {
+      "id": "3",
+      "title": "Super Bowl LXI Awarded to Atlanta — 2027",
+      "signal_type": "event",
+      "confidence_score": "0.880"
+    },
+    {
+      "id": "4",
+      "title": "Fed Signals Rate Pause — CRE Financing Window Opens",
+      "signal_type": "macro_momentum",
+      "confidence_score": "0.790"
+    },
+    {
+      "id": "5",
+      "title": "Q2 Seller Motivation Peak — Listing Volume Up 23%",
+      "signal_type": "seasonal",
+      "confidence_score": "0.820"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tsignal_type\tconfidence_score\n420007\tBoomer SMB Owner Retirement Wave Accelerates in Texas and Arizona Q2 2026\tmacro_momentum\t0.780\n420006\tFlorida Hurricane Season Prep Mandates Boost Roofing Demand June-November\tgovernment\t0.820\n420005\tSun Belt Cooling Season Onset Drives HVAC Acquisition Premium Window\tseasonal\t0.860\n270019\tMetro Atlanta Logistics Demand Decouples from National Freight Softness\tmacro_momentum\t0.710\n270018\tGeorgia SBA 7(a) Lending Posture Tightens on Search Fund Acquisitions\tgovernment\t0.780\n270017\tAtlanta Cooling Season Ramp Creates HVAC Cash Flow Visibility Window\tseasonal\t0.840\n1\tBlackstone Acquires 3 Atlanta Industrial Parks\tinstitutional\t0.910\n2\tAtlanta BeltLine TAD Extension Approved — $180M Committed\tgovernment\t0.950\n3\tSuper Bowl LXI Awarded to Atlanta — 2027\tevent\t0.880\n4\tFed Signals Rate Pause — CRE Financing Window Opens\tmacro_momentum\t0.790\n5\tQ2 Seller Motivation Peak — Listing Volume Up 23%\tseasonal\t0.820\n",
+  "stderr": "",
+  "execution_time_ms": 259
+}

@@ -1,0 +1,8 @@
+{
+  "query": "SELECT id, title, category, source, created_at FROM sentinel_signals ORDER BY created_at DESC LIMIT 30;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT id, title, category, source, created_at FROM sentinel_signals ORDER BY created_at DESC LIMIT 30;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1146 (42S02) at line 1: Table 'gecpeffiebrzfpk6xckkaz.sentinel_signals' doesn't exist"
+  ]
+}

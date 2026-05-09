@@ -129,6 +129,7 @@ function InviteManager() {
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<"user" | "admin" | "investor" | "insurance">("insurance");
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
 
   const { data: invites, isLoading } = trpc.invite.list.useQuery(undefined, {
     refetchOnWindowFocus: false,
@@ -142,6 +143,17 @@ function InviteManager() {
       toast.success("Invite link created");
     },
     onError: (e) => toast.error(`Failed: ${e.message}`),
+  });
+
+  const sendEmail = trpc.invite.sendEmail.useMutation({
+    onSuccess: (result) => {
+      setSendingEmailId(null);
+      toast.success(`Invite email queued for ${result.sentTo} — check Manus UI to confirm send`);
+    },
+    onError: (e) => {
+      setSendingEmailId(null);
+      toast.error(`Email failed: ${e.message}`);
+    },
   });
 
   const revokeInvite = trpc.invite.revoke.useMutation({
@@ -298,6 +310,26 @@ function InviteManager() {
                   {/* Actions */}
                   {!isConsumed && !isExpired && (
                     <div className="flex items-center gap-1 flex-shrink-0">
+                      {/* Send Email button — only shown when recipientEmail is set */}
+                      {inv.recipientEmail && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-400/10"
+                          onClick={() => {
+                            setSendingEmailId(inv.id);
+                            sendEmail.mutate({ inviteId: inv.id, origin: window.location.origin });
+                          }}
+                          disabled={sendingEmailId === inv.id}
+                          title={`Send invite email to ${inv.recipientEmail}`}
+                        >
+                          {sendingEmailId === inv.id ? (
+                            <><span className="animate-spin text-xs">⟳</span> Sending…</>
+                          ) : (
+                            <><Mail className="w-3 h-3" /> Email</>
+                          )}
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"

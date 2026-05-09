@@ -13,11 +13,15 @@
  */
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
-import { eq, desc, isNull } from "drizzle-orm";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "./db";
 import { inviteTokens, users } from "../drizzle/schema";
 import { protectedProcedure, router } from "./_core/trpc";
+
+const execFileAsync = promisify(execFile);
 
 // 30-day default expiry
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -178,6 +182,95 @@ export const inviteRouter = router({
       ]);
 
       return { success: true, role: row.assignRole, alreadyConsumed: false };
+    }),
+
+  /**
+   * Send invite email via Gmail MCP.
+   * Shells out to manus-mcp-cli which surfaces a confirmation dialog in the Manus UI.
+   * Admin-only.
+   */
+  sendEmail: protectedProcedure
+    .input(
+      z.object({
+        inviteId: z.number(),
+        /** Origin of the frontend (window.location.origin) — used to build the invite URL */
+        origin: z.string().url(),
+        /** Optional personal note to include in the email */
+        personalNote: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [row] = await db
+        .select()
+        .from(inviteTokens)
+        .where(eq(inviteTokens.id, input.inviteId))
+        .limit(1);
+
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Invite not found" });
+      if (!row.recipientEmail) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No recipient email on this invite" });
+      }
+      if (row.consumedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This invite has already been used" });
+      }
+
+      const inviteUrl = `${input.origin}/invite/${row.token}`;
+      const roleLabel = row.assignRole === "insurance" ? "Insurance Partner" :
+        row.assignRole === "investor" ? "Investor" :
+        row.assignRole === "admin" ? "Admin" : "User";
+
+      const personalSection = input.personalNote
+        ? `\n\nPersonal note from ${ctx.user.name || "Lenox"}:\n${input.personalNote}\n`
+        : "";
+
+      const emailBody = `Hi${row.label ? ` ${row.label.split(" ")[0]}` : ""},
+
+I'd like to invite you to access Signal Hunter — my AI-powered business acquisition intelligence platform.
+
+Your access level: ${roleLabel}
+${personalSection}
+Click the link below to accept your invitation and set up your account:
+
+${inviteUrl}
+
+This link is single-use and expires in 30 days. Once you accept, you'll have access to the platform immediately.
+
+If you have any questions before accepting, just reply to this email.
+
+Best,
+${ctx.user.name || "Lenox"}`;
+
+      const mcpInput = JSON.stringify({
+        messages: [
+          {
+            to: [row.recipientEmail],
+            subject: `You're invited to Signal Hunter${row.label ? ` — ${row.label}` : ""}`,
+            content: emailBody,
+          },
+        ],
+      });
+
+      try {
+        await execFileAsync("manus-mcp-cli", [
+          "tool", "call", "gmail_send_messages",
+          "--server", "gmail",
+          "--input", mcpInput,
+        ], { timeout: 30_000 });
+
+        return { success: true, sentTo: row.recipientEmail };
+      } catch (err: any) {
+        console.error("[InviteEmail] Gmail MCP error:", err?.message);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Email send failed — check Gmail MCP connection",
+        });
+      }
     }),
 
   /**

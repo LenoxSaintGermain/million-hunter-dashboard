@@ -1,0 +1,178 @@
+{
+  "query": "SELECT id, title, signal_type, confidence_score, created_at FROM macro_signals ORDER BY created_at DESC LIMIT 50;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT id, title, signal_type, confidence_score, created_at FROM macro_signals ORDER BY created_at DESC LIMIT 50;",
+  "rows": [
+    {
+      "id": "900004",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1778295527170"
+    },
+    {
+      "id": "870003",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1778294072032"
+    },
+    {
+      "id": "840001",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1778270475396"
+    },
+    {
+      "id": "810003",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1778217862496"
+    },
+    {
+      "id": "780004",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1778207620879"
+    },
+    {
+      "id": "750001",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1778112233843"
+    },
+    {
+      "id": "720003",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1777947473627"
+    },
+    {
+      "id": "690004",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1777825873592"
+    },
+    {
+      "id": "660004",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1777775722298"
+    },
+    {
+      "id": "630003",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1777737270320"
+    },
+    {
+      "id": "600001",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1777736943045"
+    },
+    {
+      "id": "570001",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1777733751278"
+    },
+    {
+      "id": "540001",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "confidence_score": "0.750",
+      "created_at": "1777415424005"
+    },
+    {
+      "id": "420007",
+      "title": "Boomer SMB Owner Retirement Wave Accelerates in Texas and Arizona Q2 2026",
+      "signal_type": "macro_momentum",
+      "confidence_score": "0.780",
+      "created_at": "1777261724508"
+    },
+    {
+      "id": "420006",
+      "title": "Florida Hurricane Season Prep Mandates Boost Roofing Demand June-November",
+      "signal_type": "government",
+      "confidence_score": "0.820",
+      "created_at": "1777261724499"
+    },
+    {
+      "id": "420005",
+      "title": "Sun Belt Cooling Season Onset Drives HVAC Acquisition Premium Window",
+      "signal_type": "seasonal",
+      "confidence_score": "0.860",
+      "created_at": "1777261724490"
+    },
+    {
+      "id": "270019",
+      "title": "Metro Atlanta Logistics Demand Decouples from National Freight Softness",
+      "signal_type": "macro_momentum",
+      "confidence_score": "0.710",
+      "created_at": "1777156387568"
+    },
+    {
+      "id": "270018",
+      "title": "Georgia SBA 7(a) Lending Posture Tightens on Search Fund Acquisitions",
+      "signal_type": "government",
+      "confidence_score": "0.780",
+      "created_at": "1777156387470"
+    },
+    {
+      "id": "270017",
+      "title": "Atlanta Cooling Season Ramp Creates HVAC Cash Flow Visibility Window",
+      "signal_type": "seasonal",
+      "confidence_score": "0.840",
+      "created_at": "1777156387460"
+    },
+    {
+      "id": "1",
+      "title": "Blackstone Acquires 3 Atlanta Industrial Parks",
+      "signal_type": "institutional",
+      "confidence_score": "0.910",
+      "created_at": "1774546456001"
+    },
+    {
+      "id": "2",
+      "title": "Atlanta BeltLine TAD Extension Approved — $180M Committed",
+      "signal_type": "government",
+      "confidence_score": "0.950",
+      "created_at": "1774535656001"
+    },
+    {
+      "id": "3",
+      "title": "Super Bowl LXI Awarded to Atlanta — 2027",
+      "signal_type": "event",
+      "confidence_score": "0.880",
+      "created_at": "1774510456001"
+    },
+    {
+      "id": "4",
+      "title": "Fed Signals Rate Pause — CRE Financing Window Opens",
+      "signal_type": "macro_momentum",
+      "confidence_score": "0.790",
+      "created_at": "1774467256001"
+    },
+    {
+      "id": "5",
+      "title": "Q2 Seller Motivation Peak — Listing Volume Up 23%",
+      "signal_type": "seasonal",
+      "confidence_score": "0.820",
+      "created_at": "1774424056001"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tsignal_type\tconfidence_score\tcreated_at\n900004\tSprint6 Test Signal\tevent\t0.750\t1778295527170\n870003\tSprint6 Test Signal\tevent\t0.750\t1778294072032\n840001\tSprint6 Test Signal\tevent\t0.750\t1778270475396\n810003\tSprint6 Test Signal\tevent\t0.750\t1778217862496\n780004\tSprint6 Test Signal\tevent\t0.750\t1778207620879\n750001\tSprint6 Test Signal\tevent\t0.750\t1778112233843\n720003\tSprint6 Test Signal\tevent\t0.750\t1777947473627\n690004\tSprint6 Test Signal\tevent\t0.750\t1777825873592\n660004\tSprint6 Test Signal\tevent\t0.750\t1777775722298\n630003\tSprint6 Test Signal\tevent\t0.750\t1777737270320\n600001\tSprint6 Test Signal\tevent\t0.750\t1777736943045\n570001\tSprint6 Test Signal\tevent\t0.750\t1777733751278\n540001\tSprint6 Test Signal\tevent\t0.750\t1777415424005\n420007\tBoomer SMB Owner Retirement Wave Accelerates in Texas and Arizona Q2 2026\tmacro_momentum\t0.780\t1777261724508\n420006\tFlorida Hurricane Season Prep Mandates Boost Roofing Demand June-November\tgovernment\t0.820\t1777261724499\n420005\tSun Belt Cooling Season Onset Drives HVAC Acquisition Premium Window\tseasonal\t0.860\t1777261724490\n270019\tMetro Atlanta Logistics Demand Decouples from National Freight Softness\tmacro_momentum\t0.710\t1777156387568\n270018\tGeorgia SBA 7(a) Lending Posture Tightens on Search Fund Acquisitions\tgovernment\t0.780\t1777156387470\n270017\tAtlanta Cooling Season Ramp Creates HVAC Cash Flow Visibility Window\tseasonal\t0.840\t1777156387460\n1\tBlackstone Acquires 3 Atlanta Industrial Parks\tinstitutional\t0.910\t1774546456001\n2\tAtlanta BeltLine TAD Extension Approved — $180M Committed\tgovernment\t0.950\t1774535656001\n3\tSuper Bowl LXI Awarded to Atlanta — 2027\tevent\t0.880\t1774510456001\n4\tFed Signals Rate Pause — CRE Financing Window Opens\tmacro_momentum\t0.790\t1774467256001\n5\tQ2 Seller Motivation Peak — Listing Volume Up 23%\tseasonal\t0.820\t1774424056001\n",
+  "stderr": "",
+  "execution_time_ms": 265
+}

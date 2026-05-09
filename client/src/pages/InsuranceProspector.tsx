@@ -270,6 +270,8 @@ export default function InsuranceProspector() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [riskFilter, setRiskFilter] = useState<string>("all");
   const [isBatchScoring, setIsBatchScoring] = useState(false);
+  const [scoringStep, setScoringStep] = useState<string | null>(null);
+  const [scoringProgress, setScoringProgress] = useState(0);
 
   const { data: prospects, isLoading } = trpc.insurance.listProspects.useQuery(
     statusFilter !== "all" || riskFilter !== "all"
@@ -284,13 +286,18 @@ export default function InsuranceProspector() {
   const batchScore = trpc.insurance.batchScore.useMutation({
     onSuccess: (result) => {
       setIsBatchScoring(false);
+      setScoringStep(null);
+      setScoringProgress(100);
+      setTimeout(() => setScoringProgress(0), 2000);
       toast.success(`Scored ${result.scored} prospects`, {
-        description: result.errors.length > 0 ? `${result.errors.length} errors` : "All prospects briefed",
+        description: result.errors.length > 0 ? `${result.errors.length} errors — partial success` : "All prospects briefed and ready",
       });
       utils.insurance.listProspects.invalidate();
     },
     onError: (e) => {
       setIsBatchScoring(false);
+      setScoringStep(null);
+      setScoringProgress(0);
       toast.error(`Batch scoring failed: ${e.message}`);
     },
   });
@@ -302,7 +309,30 @@ export default function InsuranceProspector() {
 
   const handleBatchScore = () => {
     setIsBatchScoring(true);
-    batchScore.mutate();
+    setScoringProgress(5);
+    setScoringStep("Fetching qualified deals from pipeline...");
+    const steps = [
+      { pct: 15, msg: "Analyzing revenue and employee signals..." },
+      { pct: 30, msg: "Classifying industry risk profiles..." },
+      { pct: 45, msg: "Mapping policy fit for each business..." },
+      { pct: 60, msg: "Estimating premium ranges..." },
+      { pct: 75, msg: "Generating pre-call briefs..." },
+      { pct: 88, msg: "Saving prospect records..." },
+      { pct: 95, msg: "Finalizing analysis..." },
+    ];
+    let stepIdx = 0;
+    const interval = setInterval(() => {
+      if (stepIdx < steps.length) {
+        setScoringProgress(steps[stepIdx].pct);
+        setScoringStep(steps[stepIdx].msg);
+        stepIdx++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 2800);
+    batchScore.mutate(undefined, {
+      onSettled: () => clearInterval(interval),
+    });
   };
 
   const handleStatusChange = (dealId: number, status: string) => {
@@ -346,6 +376,35 @@ export default function InsuranceProspector() {
             )}
           </Button>
         </div>
+
+        {/* Scoring Progress Bar */}
+        {isBatchScoring && (
+          <div
+            className="rounded-xl border p-4 space-y-2"
+            style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border)" }}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-foreground flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                AI Underwriting in Progress
+              </p>
+              <span className="text-xs font-mono text-muted-foreground tabular-nums">{scoringProgress}%</span>
+            </div>
+            {/* Progress track */}
+            <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: "var(--sh-surface-2)" }}>
+              <div
+                className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{
+                  width: `${scoringProgress}%`,
+                  background: "linear-gradient(90deg, var(--sh-amber), oklch(0.75 0.18 60))",
+                }}
+              />
+            </div>
+            {scoringStep && (
+              <p className="text-[11px] text-muted-foreground">{scoringStep}</p>
+            )}
+          </div>
+        )}
 
         {/* KPI Strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -542,3 +542,11 @@
 - [ ] Extract fmtMoney/fmtPct into client/src/lib/format.ts and import site-wide
 - [ ] Seed Sentinel Signals with 8 real macro signals (archive test entries)
 - [x] 81+ tests passing, zero TypeScript errors
+
+## Sprint 28 — Email Invite + Insurance Score All
+
+- [ ] Wire Gmail MCP into inviteRouter.create — send invite link to recipientEmail
+- [ ] Add email sent confirmation to Admin Panel InviteManager UI
+- [ ] Add Score All Deals button to InsuranceProspector with progress bar
+- [ ] scoreAllDeals procedure in insuranceRouter — batch AI scoring with progress
+- [ ] Empty state onboarding CTA for insurance users with zero scored deals
