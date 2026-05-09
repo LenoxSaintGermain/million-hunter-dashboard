@@ -1925,10 +1925,24 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
-      const rows = await db.execute(
-        sql`SELECT id, open_id, name, email, login_method, role, created_at, updated_at, last_signed_in, onboarding_completed FROM users ORDER BY created_at DESC LIMIT 200`
-      ) as unknown as { rows: Record<string, unknown>[] };
-      return rows.rows ?? [];
+      const { users: usersTable } = await import("../drizzle/schema");
+      const rows = await db
+        .select({
+          id: usersTable.id,
+          openId: usersTable.openId,
+          name: usersTable.name,
+          email: usersTable.email,
+          loginMethod: usersTable.loginMethod,
+          role: usersTable.role,
+          createdAt: usersTable.createdAt,
+          updatedAt: usersTable.updatedAt,
+          lastSignedIn: usersTable.lastSignedIn,
+          onboardingCompleted: usersTable.onboardingCompleted,
+        })
+        .from(usersTable)
+        .orderBy(desc(usersTable.createdAt))
+        .limit(200);
+      return rows;
     }),
     /** Update a user's role (admin only) */
     updateRole: protectedProcedure
@@ -1940,7 +1954,10 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
         if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        await db.execute(sql`UPDATE users SET role = ${input.role}, updated_at = NOW() WHERE id = ${input.userId}`);
+        const { users: usersTable } = await import("../drizzle/schema");
+        await db.update(usersTable)
+          .set({ role: input.role, updatedAt: new Date() })
+          .where(eq(usersTable.id, input.userId));
         return { success: true };
       }),
     /** Get platform stats (admin only) */
@@ -1948,12 +1965,28 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return null;
-      const [users, deals_count, prospects] = await Promise.all([
-        db.execute(sql`SELECT role, COUNT(*) as count FROM users GROUP BY role`) as Promise<unknown>,
-        db.execute(sql`SELECT stage, COUNT(*) as count FROM deals WHERE is_archived = 0 GROUP BY stage`) as Promise<unknown>,
-        db.execute(sql`SELECT status, COUNT(*) as count FROM insurance_prospects GROUP BY status`) as Promise<unknown>,
-      ]);
-      return { users: (users as { rows: unknown[] }).rows, deals: (deals_count as { rows: unknown[] }).rows, prospects: (prospects as { rows: unknown[] }).rows };
+      const { users: usersTable, deals: dealsTable } = await import("../drizzle/schema");
+      // User counts by role
+      const userRows = await db
+        .select({ role: usersTable.role, count: sql<number>`COUNT(*)` })
+        .from(usersTable)
+        .groupBy(usersTable.role);
+      // Deal counts by stage (non-archived)
+      const dealRows = await db
+        .select({ stage: dealsTable.stage, count: sql<number>`COUNT(*)` })
+        .from(dealsTable)
+        .where(eq(dealsTable.isArchived, false))
+        .groupBy(dealsTable.stage);
+      // Insurance prospect counts by status
+      let prospectRows: { status: string; count: number }[] = [];
+      try {
+        const result = await db.execute(
+          sql`SELECT status, COUNT(*) as count FROM insurance_prospects GROUP BY status`
+        ) as any;
+        const arr = Array.isArray(result[0]) ? result[0] : (result.rows ?? result);
+        prospectRows = (arr as any[]).map((r: any) => ({ status: String(r.status ?? ""), count: Number(r.count ?? 0) }));
+      } catch (_) { /* table may not exist yet */ }
+      return { users: userRows, deals: dealRows, prospects: prospectRows };
     }),
   }),
   // ─── Thesis Engine (STRATEGIST agent — Spec TSL-SCI-PROD-001-A1) ─────────────

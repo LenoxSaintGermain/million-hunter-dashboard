@@ -43,9 +43,9 @@ interface UserRow {
   name: string | null;
   email: string | null;
   role: string;
-  created_at: string;
-  last_signed_in: string;
-  login_method: string | null;
+  createdAt: Date | string | null;
+  lastSignedIn: Date | string | null;
+  loginMethod: string | null;
 }
 
 function UserTableRow({ user, onRoleChange }: {
@@ -83,17 +83,17 @@ function UserTableRow({ user, onRoleChange }: {
 
       {/* Login Method */}
       <div className="hidden md:block text-[11px] text-muted-foreground w-20 text-center">
-        {user.login_method ?? "—"}
+        {user.loginMethod ?? "—"}
       </div>
 
       {/* Last Sign In */}
       <div className="hidden lg:block text-[11px] text-muted-foreground w-28 text-right">
-        {formatDate(user.last_signed_in)}
+        {formatDate(user.lastSignedIn as string)}
       </div>
 
       {/* Joined */}
       <div className="hidden lg:block text-[11px] text-muted-foreground w-28 text-right">
-        {formatDate(user.created_at)}
+        {formatDate(user.createdAt as string)}
       </div>
 
       {/* Role Badge + Selector */}
