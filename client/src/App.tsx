@@ -18,6 +18,7 @@ import Scout from "./pages/Scout";
 import ThesisEngine from "./pages/ThesisEngine";
 import TIDEPage from "./pages/TIDE";
 import InsuranceProspector from "./pages/InsuranceProspector";
+import CapitalStack from "./pages/CapitalStack";
 import AdminPanel from "./pages/AdminPanel";
 import InviteAccept from "./pages/InviteAccept";
 import DealShare from "./pages/DealShare";
@@ -140,6 +141,7 @@ function Router() {
         <Route path="/scout" component={Scout} />
         <Route path="/tide" component={TIDEPage} />
         <Route path="/insurance-prospector" component={InsuranceProspector} />
+        <Route path="/stack" component={CapitalStack} />
         <Route path="/admin" component={AdminPanel} />
 
         {/* Invite accept — role assignment on first login */}

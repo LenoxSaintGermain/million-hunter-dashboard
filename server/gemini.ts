@@ -345,30 +345,56 @@ Return ONLY valid JSON.`;
 }
 
 // ─── Composite Scorer (rule-based, no LLM call) ───────────────────────────────
-export async function scoreDeal(deal: Deal): Promise<{ score: number; redFlagCount: number }> {
+// ─── SCORER Dimension Stubs ──────────────────────────────────────────────────
+// TSL-DIM-CAP-STACK-001  Capital Stack Compatibility  (stub -> Sprint 2 full impl)
+// TSL-DIM-OPS-ALPHA-001  Operational Alpha            (stub -> Sprint 2 full impl)
+// TSL-DIM-MACRO-ARB-001  Macro Arbitrage Exposure     (stub -> Sprint 2 full impl)
+
+/** Capital Stack Compatibility stub — returns 0.5 until Sprint 2 */
+function scoreCapitalStackCompatibility(_deal: Deal): number { return 0.5; }
+
+/** Operational Alpha stub — returns 0.5 until Sprint 2 */
+function scoreOperationalAlpha(_deal: Deal): number { return 0.5; }
+
+/** Macro Arbitrage Exposure stub — returns 0.5 until Sprint 2 */
+function scoreMacroArbitrage(_deal: Deal): number { return 0.5; }
+
+export async function scoreDeal(deal: Deal): Promise<{ score: number; redFlagCount: number; dimensions?: Record<string, number> }> {
   const cashFlow = deal.cashFlow ?? 0;
   const revenue = deal.revenue ?? 0;
   const askingPrice = deal.askingPrice ?? 1;
   const multiple = deal.multiple ?? (askingPrice / (cashFlow || 1));
 
-  // Rule-based base score
-  let score = 0;
-
-  // Financial score (55% weight)
+  // Dimension 1: Financial (40% weight)
   const marginScore = revenue > 0 ? Math.min(1, cashFlow / revenue / 0.4) : 0;
   const multipleScore = multiple > 0 ? Math.max(0, 1 - (multiple - 2) / 4) : 0;
   const sizeScore = cashFlow >= 1000000 ? 1 : cashFlow >= 500000 ? 0.7 : cashFlow >= 250000 ? 0.4 : 0.2;
-  score += 0.55 * (marginScore * 0.4 + multipleScore * 0.35 + sizeScore * 0.25);
+  const financialScore = marginScore * 0.4 + multipleScore * 0.35 + sizeScore * 0.25;
 
-  // Strategic score (30% weight) — heuristics
+  // Dimension 2: Strategic / Industry Fit (20% weight)
   const industryBonus = ["hvac", "plumbing", "pest control", "cleaning", "logistics", "healthcare"].some(
     (kw) => (deal.industry ?? "").toLowerCase().includes(kw)
   ) ? 0.8 : 0.5;
-  score += 0.30 * industryBonus;
 
-  // Deal structure (15% weight)
+  // Dimension 3: Deal Structure (10% weight)
   const dealScore = multiple <= 3 ? 1 : multiple <= 4 ? 0.7 : 0.4;
-  score += 0.15 * dealScore;
+
+  // Dimension 4: Capital Stack Compatibility (15% weight) — TSL-DIM-CAP-STACK-001
+  const capitalStackScore = scoreCapitalStackCompatibility(deal);
+
+  // Dimension 5: Operational Alpha (10% weight) — TSL-DIM-OPS-ALPHA-001
+  const operationalAlphaScore = scoreOperationalAlpha(deal);
+
+  // Dimension 6: Macro Arbitrage Exposure (5% weight) — TSL-DIM-MACRO-ARB-001
+  const macroArbitrageScore = scoreMacroArbitrage(deal);
+
+  const score =
+    0.40 * financialScore +
+    0.20 * industryBonus +
+    0.10 * dealScore +
+    0.15 * capitalStackScore +
+    0.10 * operationalAlphaScore +
+    0.05 * macroArbitrageScore;
 
   const redFlagCount = [
     multiple > 5,
@@ -376,5 +402,14 @@ export async function scoreDeal(deal: Deal): Promise<{ score: number; redFlagCou
     (deal.employees ?? 0) > 100,
   ].filter(Boolean).length;
 
-  return { score: Math.min(1, Math.max(0, score)), redFlagCount };
+  const dimensions = {
+    financial: financialScore,
+    strategic: industryBonus,
+    dealStructure: dealScore,
+    capitalStackCompatibility: capitalStackScore,
+    operationalAlpha: operationalAlphaScore,
+    macroArbitrage: macroArbitrageScore,
+  };
+
+  return { score: Math.min(1, Math.max(0, score)), redFlagCount, dimensions };
 }

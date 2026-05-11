@@ -59,6 +59,14 @@ const TEMPLATES = [
     description: "Family business succession plays",
     text: "Family-owned businesses where the founder's children are not interested in taking over. $1–8M EBITDA, any geography, essential services (HVAC, plumbing, pest control, commercial cleaning). Business age 20+ years. Owner surname match across org chart.",
   },
+  {
+    id: "continental_keystone",
+    label: "Continental Keystone",
+    icon: "🏔️",
+    badge: "TSL Flagship",
+    description: "Near-zero equity · Macro-arbitrage positioned · Sunbelt + Cross-border",
+    text: "Essential trade-service businesses at the intersection of three structural tailwinds: succession-driven seller motivation, AI-enabled operational alpha, and macro capital-flow arbitrage. Target NAICS: HVAC contractors (238220), electrical contractors (238210), janitorial/industrial services (561720), machine shops (332710), freight trucking (484121), site prep contractors (238910), security services (561612). Revenue $3M–$15M, EBITDA $500K–$2.5M, 15–75 employees, business age 12+ years. Founder-owned, no PE, no VC, no franchise. Owner age 55+. Geographic Tier 1: NC, SC, GA, FL, TN, TX, AZ (Sunbelt Service Belt). Geographic Tier 2 optional: Northern Mexico — Nuevo León, Coahuila, Baja California. Geographic Tier 3 optional: Canadian metros — GTA, Vancouver, Montreal periphery. Exclusions: PE-owned, public, VC-backed, franchise, regional chains over $50M revenue. Evidence required: founder still active, no outside institutional capital, at least one inefficiency signal (clipboard ops, no FSM, call-for-quote website), verified commercial customer base, license and bonding verified. Auto-disqualifiers: sole proprietorship with no employees, owner under 50, active material litigation, PE or VC board representation, franchise agreement. Scoring weights: Tech Debt 20%, Owner Transition 20%, Capital Stack Compatibility 15%, Operational Alpha 15%, Macro Arbitrage Exposure 10%, Survival Resilience 10%, Labor Substitutability 5%, AI Implementation Cost 5%.",
+  },
 ];
 
 // ── Fade-in animation variant ─────────────────────────────────────────────────
@@ -216,6 +224,11 @@ export default function ThesisEngine() {
                       )}>
                         {t.label}
                       </span>
+                      {(t as any).badge && (
+                        <span className="ml-auto text-[9px] font-semibold tracking-widest uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                          {(t as any).badge}
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground leading-snug">{t.description}</p>
                   </button>

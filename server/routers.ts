@@ -28,6 +28,7 @@ import { thesisRouter } from "./thesisRouter";
 import { tideRouter } from "./tideRouter";
 import { insuranceRouter } from "./insuranceRouter";
 import { inviteRouter } from "./inviteRouter";
+import { stackRouter } from "./stackRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -1920,6 +1921,7 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
   // ─── Insurance Prospector ────────────────────────────────────────────────────
   insurance: insuranceRouter,
   invite: inviteRouter,
+  stack: stackRouter,
   // ─── Admin — User Management ─────────────────────────────────────────────────
   admin: router({
     /** List all users (admin only) */

@@ -25,6 +25,7 @@ import {
   Zap,
   Shield,
   Settings2,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -46,7 +47,8 @@ const navSections = [
   {
     label: "Capital Stack",
     items: [
-      { href: "/freedom-map", icon: Target, label: "Freedom Map", badge: { label: "New", color: "amber" } },
+      { href: "/stack", icon: Layers, label: "Capital Stack Modeler", badge: { label: "New", color: "amber" } },
+      { href: "/freedom-map", icon: Target, label: "Freedom Map", badge: null },
       { href: "/strategy-blender", icon: BarChart3, label: "Strategy Blender", badge: null },
       { href: "/opportunity-radar", icon: Radar, label: "Opportunity Radar", badge: null },
       { href: "/investor-dossier", icon: Sparkles, label: "Investor Dossier", badge: null },

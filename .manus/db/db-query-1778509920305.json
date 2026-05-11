@@ -1,0 +1,52 @@
+{
+  "query": "SELECT name, is_principal_default, target_ltv, target_equity_pct FROM capital_stack_templates ORDER BY id LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT name, is_principal_default, target_ltv, target_equity_pct FROM capital_stack_templates ORDER BY id LIMIT 10;",
+  "rows": [
+    {
+      "name": "Project Raleigh Keystone",
+      "is_principal_default": "1",
+      "target_ltv": "90.00",
+      "target_equity_pct": "5.00"
+    },
+    {
+      "name": "Standard SBA 7(a)",
+      "is_principal_default": "0",
+      "target_ltv": "90.00",
+      "target_equity_pct": "10.00"
+    },
+    {
+      "name": "SBA 504 + Seller Note",
+      "is_principal_default": "0",
+      "target_ltv": "90.00",
+      "target_equity_pct": "0.00"
+    },
+    {
+      "name": "Independent Sponsor",
+      "is_principal_default": "0",
+      "target_ltv": "30.00",
+      "target_equity_pct": "65.00"
+    },
+    {
+      "name": "Veteran-Anchored SBA",
+      "is_principal_default": "0",
+      "target_ltv": "90.00",
+      "target_equity_pct": "10.00"
+    },
+    {
+      "name": "Roll-up Add-on",
+      "is_principal_default": "0",
+      "target_ltv": "60.00",
+      "target_equity_pct": "5.00"
+    },
+    {
+      "name": "REAP-Enhanced SBA 7(a)",
+      "is_principal_default": "0",
+      "target_ltv": "90.00",
+      "target_equity_pct": "2.00"
+    }
+  ],
+  "messages": [],
+  "stdout": "name\tis_principal_default\ttarget_ltv\ttarget_equity_pct\nProject Raleigh Keystone\t1\t90.00\t5.00\nStandard SBA 7(a)\t0\t90.00\t10.00\nSBA 504 + Seller Note\t0\t90.00\t0.00\nIndependent Sponsor\t0\t30.00\t65.00\nVeteran-Anchored SBA\t0\t90.00\t10.00\nRoll-up Add-on\t0\t60.00\t5.00\nREAP-Enhanced SBA 7(a)\t0\t90.00\t2.00\n",
+  "stderr": "",
+  "execution_time_ms": 317
+}
