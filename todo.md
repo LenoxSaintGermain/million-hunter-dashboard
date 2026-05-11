@@ -674,3 +674,10 @@
 - [x] IC Review: col-span-8 article + col-span-4 sticky Consensus Dashboard, Stitch masthead
 - [x] Design tokens: font-hero-h1, font-eyebrow, font-card-title, font-section-h2, font-data-mono added to @theme
 - [x] All inline styles replaced with Tailwind editorial utility classes
+
+## Sprint 33 — Permanent Test Artifact Elimination
+- [x] Delete all Sprint 6 hardcoded SAMPLE_LISTINGS from runScanPipeline (Peach State, Charlotte Logistics, Route-Based Pest Control, Metro HVAC, TX Government, Southeast Plumbing, Gulf Coast Electrical, Florida Pool, Mid-Atlantic Medical, Carolinas Roofing)
+- [x] Replace static SAMPLE_LISTINGS array with LLM-generated dynamic listings (unique per scan, never repeats)
+- [x] Delete Sprint11 test rows from production DB (Sprint11 Scout Prefill Test, Sprint11 Share Test Deal, source='test')
+- [x] Confirmed no auto-seed on server startup in _core/index.ts
+- [x] 96/96 tests passing after removal

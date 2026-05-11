@@ -1,0 +1,9 @@
+{
+  "query": "\nDELETE FROM deals WHERE name IN (\n  'Metro HVAC Services — Atlanta',\n  'Peach State Commercial Cleaning',\n  'Charlotte Logistics & Last-Mile',\n  'TX Government Delivery Services',\n  'Route-Based Pest Control — ATL',\n  'Southeast Plumbing Group',\n  'Gulf Coast Electrical Contractors',\n  'Florida Pool & Spa Services',\n  'Mid-Atlantic Medical Staffing',\n  'Carolinas Roofing & Restoration',\n  'Metro Commercial Cleaning - Atlanta',\n  'Logistics & Delivery Service Charlotte',\n  'TX Government Logistics & Delivery',\n  'Route-Based Pest Control Service Atlanta',\n  'Peach State Commercial Cleaning Georgia'\n);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute \nDELETE FROM deals WHERE name IN (\n  'Metro HVAC Services — Atlanta',\n  'Peach State Commercial Cleaning',\n  'Charlotte Logistics & Last-Mile',\n  'TX Government Delivery Services',\n  'Route-Based Pest Control — ATL',\n  'Southeast Plumbing Group',\n  'Gulf Coast Electrical Contractors',\n  'Florida Pool & Spa Services',\n  'Mid-Atlantic Medical Staffing',\n  'Carolinas Roofing & Restoration',\n  'Metro Commercial Cleaning - Atlanta',\n  'Logistics & Delivery Service Charlotte',\n  'TX Government Logistics & Delivery',\n  'Route-Based Pest Control Service Atlanta',\n  'Peach State Commercial Cleaning Georgia'\n);\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 316
+}

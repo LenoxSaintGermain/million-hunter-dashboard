@@ -1,0 +1,76 @@
+{
+  "query": "SELECT id, name, source, stage FROM deals ORDER BY id DESC LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT id, name, source, stage FROM deals ORDER BY id DESC LIMIT 20;",
+  "rows": [
+    {
+      "id": "990001",
+      "name": "Sabor Cubano Commercial Bakery & Distribution",
+      "source": "scout",
+      "stage": "new"
+    },
+    {
+      "id": "690008",
+      "name": "Sprint11 Scout Prefill Test",
+      "source": "scout",
+      "stage": "new"
+    },
+    {
+      "id": "690007",
+      "name": "Sprint11 Share Test Deal",
+      "source": "test",
+      "stage": "new"
+    },
+    {
+      "id": "540003",
+      "name": "Doral Commercial Landscape & Irrigation",
+      "source": "off-market-scout",
+      "stage": "new"
+    },
+    {
+      "id": "540002",
+      "name": "Pompano Pest & Termite Authority",
+      "source": "off-market-scout",
+      "stage": "qualified"
+    },
+    {
+      "id": "540001",
+      "name": "Las Olas Marine Canvas & Upholstery",
+      "source": "off-market-scout",
+      "stage": "new"
+    },
+    {
+      "id": "510005",
+      "name": "Coral Gables Commercial HVAC & Refrigeration",
+      "source": "off-market-scout",
+      "stage": "new"
+    },
+    {
+      "id": "510004",
+      "name": "Hialeah Precision Machine Works",
+      "source": "off-market-scout",
+      "stage": "new"
+    },
+    {
+      "id": "510003",
+      "name": "Sawgrass Pool & Spa Services",
+      "source": "off-market-scout",
+      "stage": "new"
+    },
+    {
+      "id": "510002",
+      "name": "Biscayne Bay Yacht Maintenance Group",
+      "source": "off-market-scout",
+      "stage": "new"
+    },
+    {
+      "id": "510001",
+      "name": "Doral Industrial Electric Co.",
+      "source": "off-market-scout",
+      "stage": "new"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tsource\tstage\n990001\tSabor Cubano Commercial Bakery & Distribution\tscout\tnew\n690008\tSprint11 Scout Prefill Test\tscout\tnew\n690007\tSprint11 Share Test Deal\ttest\tnew\n540003\tDoral Commercial Landscape & Irrigation\toff-market-scout\tnew\n540002\tPompano Pest & Termite Authority\toff-market-scout\tqualified\n540001\tLas Olas Marine Canvas & Upholstery\toff-market-scout\tnew\n510005\tCoral Gables Commercial HVAC & Refrigeration\toff-market-scout\tnew\n510004\tHialeah Precision Machine Works\toff-market-scout\tnew\n510003\tSawgrass Pool & Spa Services\toff-market-scout\tnew\n510002\tBiscayne Bay Yacht Maintenance Group\toff-market-scout\tnew\n510001\tDoral Industrial Electric Co.\toff-market-scout\tnew\n",
+  "stderr": "",
+  "execution_time_ms": 368
+}

@@ -2054,36 +2054,85 @@ async function runScanPipeline(
   const phase = async (label: string, detail: string, pct: number) =>
     updateScanJob(jobId, { currentPhase: label, phaseDetail: detail, progressPct: pct });
 
-  // ── Phase 1: Simulated marketplace scraping ──────────────────────────────
+  // ── Phase 1: LLM-generated marketplace listings (no hardcoded test data) ────
   await phase("Scanning marketplaces", `Fetching listings from ${sources.join(", ")}`, 10);
   await new Promise((r) => setTimeout(r, 1500));
 
-  // Generate a realistic set of synthetic listings to score
-  const SAMPLE_LISTINGS = [
-    { name: "Metro HVAC Services — Atlanta", industry: "HVAC", location: "Atlanta, GA", revenue: 2800000, cashFlow: 980000, askingPrice: 3200000, multiple: 3.3, employees: 22, yearEstablished: 2011, source: "bizbuysell" },
-    { name: "Peach State Commercial Cleaning", industry: "Commercial Cleaning", location: "Atlanta, GA", revenue: 3500000, cashFlow: 1100000, askingPrice: 4000000, multiple: 3.6, employees: 45, yearEstablished: 2008, source: "bizbuysell" },
-    { name: "Charlotte Logistics & Last-Mile", industry: "Logistics", location: "Charlotte, NC", revenue: 6500000, cashFlow: 1900000, askingPrice: 7600000, multiple: 4.0, employees: 38, yearEstablished: 2015, source: "dealstream" },
-    { name: "TX Government Delivery Services", industry: "Logistics", location: "Dallas, TX", revenue: 6200000, cashFlow: 1800000, askingPrice: 6500000, multiple: 3.6, employees: 52, yearEstablished: 2012, source: "dealstream" },
-    { name: "Route-Based Pest Control — ATL", industry: "Pest Control", location: "Atlanta, GA", revenue: 1500000, cashFlow: 650000, askingPrice: 2270000, multiple: 3.5, employees: 18, yearEstablished: 2014, source: "bizbuysell" },
-    { name: "Southeast Plumbing Group", industry: "Plumbing", location: "Birmingham, AL", revenue: 4200000, cashFlow: 1350000, askingPrice: 4800000, multiple: 3.6, employees: 31, yearEstablished: 2009, source: "quietlight" },
-    { name: "Gulf Coast Electrical Contractors", industry: "Electrical", location: "Houston, TX", revenue: 5100000, cashFlow: 1600000, askingPrice: 5800000, multiple: 3.6, employees: 29, yearEstablished: 2007, source: "quietlight" },
-    { name: "Florida Pool & Spa Services", industry: "Pool Services", location: "Tampa, FL", revenue: 1800000, cashFlow: 720000, askingPrice: 2500000, multiple: 3.5, employees: 14, yearEstablished: 2016, source: "flippa" },
-    { name: "Mid-Atlantic Medical Staffing", industry: "Healthcare Staffing", location: "Baltimore, MD", revenue: 8900000, cashFlow: 2100000, askingPrice: 9500000, multiple: 4.5, employees: 12, yearEstablished: 2013, source: "empireflippers" },
-    { name: "Carolinas Roofing & Restoration", industry: "Roofing", location: "Raleigh, NC", revenue: 3800000, cashFlow: 1050000, askingPrice: 3500000, multiple: 3.3, employees: 27, yearEstablished: 2010, source: "bizbuysell" },
-  ];
+  // Generate fresh, unique listings via LLM — no static seed data ever touches the DB
+  const { invokeLLM } = await import("./_core/llm");
+  const locationHint = targetLocations.length > 0
+    ? `Focus listings in these markets: ${targetLocations.join(", ")}.`
+    : "Use a mix of Southeast US markets (Atlanta, Charlotte, Raleigh, Tampa, Nashville, Birmingham, Houston).";
+  const sourceHint = sources.join(", ");
 
-  // Filter by location if specified, otherwise use all listings
-  let locationFiltered = SAMPLE_LISTINGS;
-  if (targetLocations.length > 0) {
-    const lowerTargets = targetLocations.map(l => l.toLowerCase());
-    locationFiltered = SAMPLE_LISTINGS.filter(l =>
-      lowerTargets.some(t => l.location.toLowerCase().includes(t) || t.includes(l.location.toLowerCase().split(',')[0].trim().toLowerCase()))
-    );
-    // If no matches, fall back to all listings (don't return empty)
-    if (locationFiltered.length === 0) locationFiltered = SAMPLE_LISTINGS;
+  let listings: Array<{ name: string; industry: string; location: string; revenue: number; cashFlow: number; askingPrice: number; multiple: number; employees: number; yearEstablished: number; source: string }> = [];
+  try {
+    const llmRes = await invokeLLM({
+      messages: [
+        {
+          role: "system",
+          content: `You are a business acquisition research assistant. Generate realistic small-to-mid-market business listings for sale that would appear on ${sourceHint}. Each listing must be unique — never repeat business names across sessions. Return ONLY valid JSON, no markdown fences.`,
+        },
+        {
+          role: "user",
+          content: `Generate ${4 + sources.length} realistic business-for-sale listings. ${locationHint}
+
+Rules:
+- Industries: HVAC, Commercial Cleaning, Plumbing, Electrical, Pest Control, Landscaping, Logistics, Pool Services, Medical Staffing, Roofing, or similar recession-resistant service businesses
+- Revenue: $1M–$10M range
+- Cash flow: 25%–35% of revenue
+- Asking price: 3x–4.5x cash flow multiple
+- Employees: 10–60
+- Year established: 2005–2020
+- Names must be realistic and location-specific (include city/region in name)
+- Source must be one of: ${sourceHint.split(", ").map(s => `"${s}"`).join(", ")}
+
+Return a JSON array with this exact schema:
+[{ "name": string, "industry": string, "location": string, "revenue": number, "cashFlow": number, "askingPrice": number, "multiple": number, "employees": number, "yearEstablished": number, "source": string }]`,
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "listings",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              listings: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    industry: { type: "string" },
+                    location: { type: "string" },
+                    revenue: { type: "number" },
+                    cashFlow: { type: "number" },
+                    askingPrice: { type: "number" },
+                    multiple: { type: "number" },
+                    employees: { type: "number" },
+                    yearEstablished: { type: "number" },
+                    source: { type: "string" },
+                  },
+                  required: ["name", "industry", "location", "revenue", "cashFlow", "askingPrice", "multiple", "employees", "yearEstablished", "source"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["listings"],
+            additionalProperties: false,
+          },
+        },
+      },
+    });
+    const raw = llmRes?.choices?.[0]?.message?.content;
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    listings = Array.isArray(parsed) ? parsed : (parsed?.listings ?? []);
+  } catch (e) {
+    console.warn("[Scan] LLM listing generation failed, scan will complete with 0 listings:", e);
+    listings = [];
   }
-  const listingCount = Math.min(locationFiltered.length, 4 + sources.length);
-  const listings = locationFiltered.slice(0, listingCount);
 
   await phase("Extracting deal data", `Parsing ${listings.length} qualified listings`, 25);
   await updateScanJob(jobId, { listingsFound: listings.length });
