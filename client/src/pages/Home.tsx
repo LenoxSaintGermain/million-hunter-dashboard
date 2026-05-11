@@ -368,6 +368,16 @@ function SignalStream() {
                         }}>
                           {cfg.label}
                         </span>
+                        {(sig as any).direction && (
+                          <span style={{
+                            fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3,
+                            background: (sig as any).direction === "headwind" ? "rgba(224,123,90,0.15)" : "rgba(255,186,32,0.12)",
+                            color: (sig as any).direction === "headwind" ? "var(--clay, #e07b5a)" : "var(--signal-gold, #ffba20)",
+                            textTransform: "uppercase", letterSpacing: "0.08em",
+                          }}>
+                            {(sig as any).direction === "headwind" ? "↓" : "↑"}
+                          </span>
+                        )}
                         <button
                           onClick={(e) => { e.stopPropagation(); if (confirm("Remove this signal?")) deleteSignal.mutate({ id: sig.id }); }}
                           title="Remove"
@@ -719,6 +729,7 @@ export default function Home() {
   const [activeScanJobId, setActiveScanJobId] = useState<number | null>(null);
   const utils = trpc.useUtils();
   const { data, isLoading, refetch } = trpc.dashboard.stats.useQuery();
+  const { data: macroPosture } = trpc.dashboard.macroPosture.useQuery();
   const { data: topDealsData } = trpc.deals.list.useQuery({ limit: 8 });
 
   const deleteDeal = trpc.deals.delete.useMutation({
@@ -812,7 +823,51 @@ export default function Home() {
                 ? `${stats.total} deal${stats.total !== 1 ? "s" : ""} in active pipeline. ${stats.highPriority ? `${stats.highPriority} ready for outreach.` : "No immediate action required."}`
                 : "Pipeline monitoring active. Run a market scan to surface acquisition-ready targets."}
             </p>
-            {/* Posture metrics bar — Stitch pattern */}
+            {/* TIDE Ticker — top 2 live macro signals */}
+            {macroPosture?.topSignals && macroPosture.topSignals.length > 0 && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8, marginBottom: 16,
+                padding: "8px 12px", borderRadius: 6,
+                background: "rgba(255,186,32,0.06)",
+                border: "1px solid rgba(255,186,32,0.15)",
+                maxWidth: 640,
+              }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--signal-gold, #ffba20)",
+                  fontFamily: "var(--font-mono)",
+                  flexShrink: 0,
+                }}>TIDE</span>
+                <span style={{ width: 1, height: 14, background: "rgba(255,186,32,0.25)", flexShrink: 0 }} />
+                <div style={{ display: "flex", gap: 16, overflow: "hidden", flex: 1 }}>
+                  {macroPosture.topSignals.map((sig, i) => (
+                    <div key={sig.id} style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      fontSize: 11, color: "var(--on-surface-variant, #d5c4ab)",
+                      flexShrink: 0,
+                    }}>
+                      <span style={{
+                        width: 5, height: 5, borderRadius: "50%", flexShrink: 0,
+                        background: sig.direction === "headwind"
+                          ? "var(--clay, #e07b5a)"
+                          : "var(--signal-gold, #ffba20)",
+                      }} />
+                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10 }}>
+                        {sig.title.length > 52 ? sig.title.slice(0, 52) + "…" : sig.title}
+                      </span>
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+                        color: sig.direction === "headwind" ? "var(--clay, #e07b5a)" : "var(--sage)",
+                        textTransform: "uppercase",
+                        fontFamily: "var(--font-mono)",
+                      }}>{Math.round((sig.confidenceScore ?? 0.5) * 100)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Posture metrics bar — wired to live macro signal data */}
             <div style={{
               display: "grid",
               gridTemplateColumns: "repeat(4, 1fr)",
@@ -822,10 +877,28 @@ export default function Home() {
               maxWidth: 640,
             }}>
               {[
-                { label: "POSTURE", value: (stats?.highPriority ?? 0) > 2 ? "AGGRESSIVE" : (stats?.highPriority ?? 0) > 0 ? "ACTIVE" : "MONITORING", isGold: true },
-                { label: "PIPELINE", value: stats?.total != null ? `${stats.total} DEALS` : "—", isGold: false },
-                { label: "AVG SCORE", value: stats?.avgScore != null ? parseFloat(String(stats.avgScore)).toFixed(3) : "—", isGold: false },
-                { label: "CONFIDENCE", value: stats?.avgScore != null ? `${Math.round(parseFloat(String(stats.avgScore)) * 100)}%` : "—", isGold: true },
+                {
+                  label: "POSTURE",
+                  value: macroPosture?.posture ?? ((stats?.highPriority ?? 0) > 2 ? "AGGRESSIVE" : (stats?.highPriority ?? 0) > 0 ? "ACTIVE" : "MONITORING"),
+                  isGold: true,
+                },
+                {
+                  label: "PIPELINE",
+                  value: stats?.total != null ? `${stats.total} DEALS` : "—",
+                  isGold: false,
+                },
+                {
+                  label: "AVG SCORE",
+                  value: stats?.avgScore != null ? parseFloat(String(stats.avgScore)).toFixed(3) : "—",
+                  isGold: false,
+                },
+                {
+                  label: "SIGNALS",
+                  value: macroPosture != null
+                    ? `${macroPosture.tailwindCount}↑ ${macroPosture.headwindCount}↓`
+                    : "—",
+                  isGold: macroPosture != null && macroPosture.headwindCount === 0,
+                },
               ].map((m, i) => (
                 <div key={i} style={{ paddingRight: i < 3 ? 16 : 0 }}>
                   <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--on-surface-variant, #d5c4ab)", marginBottom: 4 }}>{m.label}</div>

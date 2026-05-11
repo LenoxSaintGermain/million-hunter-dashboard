@@ -173,99 +173,294 @@ export default function DealDetail() {
       </Link>
 
       {/* Deal header */}
-      <div className="sh-hero-panel" style={{ padding: "24px 28px" }}>
-        <div className="absolute top-0 right-0 w-48 h-48 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" style={{ background: "oklch(0.65 0.22 250 / 0.05)" }} />
-        <div className="relative flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              {deal.industry && <Badge variant="secondary" className="text-xs">{deal.industry}</Badge>}
-              {deal.source && <Badge variant="outline" className="text-xs border-border">{deal.source}</Badge>}
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/15 text-primary">
-                {deal.stage.replace(/_/g, " ")}
-              </span>
-              {deal.opportunityZone && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-[var(--sage)] border border-emerald-500/25">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  Opportunity Zone
-                </span>
-              )}
-              {deal.tadDistrict && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/25">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                  {deal.tadDistrict}
-                </span>
-              )}
-            </div>
-            <h1 className="text-2xl font-bold text-foreground mb-1">{deal.name}</h1>
-            <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-              {deal.location && (
-                <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{deal.location}</span>
-              )}
-              {deal.employees && (
-                <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{deal.employees} employees</span>
-              )}
-              {deal.yearEstablished && (
-                <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />Est. {deal.yearEstablished}</span>
-              )}
-              {deal.listingUrl && (
-                <a href={deal.listingUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
-                  <ExternalLink className="w-3.5 h-3.5" />View Listing
-                </a>
-              )}
-            </div>
-          </div>
-
-          {/* Score + Actions */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="text-center">
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 40, fontWeight: 700, color: scoreColorVal, lineHeight: 1 }}>
-                {score != null ? score.toFixed(3) : "—"}
+      {/* ── Stitch Intelligence Dossier Hero ─────────────────────────────────── */}
+      <div style={{
+        background: "var(--surface, #1e2a34)",
+        border: "1px solid rgba(255,186,32,0.12)",
+        borderRadius: 12,
+        overflow: "hidden",
+      }}>
+        {/* Dossier Header */}
+        <div style={{
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          padding: "20px 24px",
+          background: "rgba(255,186,32,0.03)",
+        }}>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-0">
+              {/* Eyebrow */}
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <span style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
+                  textTransform: "uppercase" as const,
+                  color: "var(--signal-gold, #ffba20)",
+                  fontFamily: "var(--font-mono)",
+                }}>TARGET DOSSIER</span>
+                <span style={{ color: "rgba(255,255,255,0.15)", fontSize: 10 }}>·</span>
+                {deal.industry && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 600, letterSpacing: "0.1em",
+                    textTransform: "uppercase" as const,
+                    color: "var(--on-surface-variant, #d5c4ab)",
+                    fontFamily: "var(--font-mono)",
+                  }}>{deal.industry}</span>
+                )}
+                {deal.opportunityZone && (
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    padding: "2px 8px", borderRadius: 4,
+                    fontSize: 10, fontWeight: 600, letterSpacing: "0.08em",
+                    background: "rgba(52,211,153,0.12)",
+                    color: "var(--sage)",
+                    border: "1px solid rgba(52,211,153,0.25)",
+                  }}>
+                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--sage)", display: "inline-block" }} />
+                    OZ
+                  </span>
+                )}
+                {deal.tadDistrict && (
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    padding: "2px 8px", borderRadius: 4,
+                    fontSize: 10, fontWeight: 600, letterSpacing: "0.08em",
+                    background: "rgba(96,165,250,0.12)",
+                    color: "#60a5fa",
+                    border: "1px solid rgba(96,165,250,0.25)",
+                  }}>{deal.tadDistrict}</span>
+                )}
+                <span style={{
+                  padding: "2px 8px", borderRadius: 4,
+                  fontSize: 10, fontWeight: 600, letterSpacing: "0.08em",
+                  background: "rgba(255,186,32,0.10)",
+                  color: "var(--signal-gold, #ffba20)",
+                  border: "1px solid rgba(255,186,32,0.20)",
+                  textTransform: "uppercase" as const,
+                }}>{deal.stage.replace(/_/g, " ")}</span>
               </div>
-              <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.2em", color: "var(--sh-fg-3)", marginTop: 4 }}>AI Score</p>
+              {/* Deal Name */}
+              <h1 style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "clamp(22px, 3vw, 32px)",
+                fontWeight: 400,
+                letterSpacing: "-0.02em",
+                color: "var(--on-surface, #dae3ee)",
+                lineHeight: 1.2,
+                marginBottom: 10,
+              }}>{deal.name}</h1>
+              {/* Meta row */}
+              <div className="flex items-center gap-4 flex-wrap" style={{ fontSize: 12, color: "var(--on-surface-variant, #d5c4ab)" }}>
+                {deal.location && (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="w-3 h-3" style={{ color: "var(--signal-gold, #ffba20)" }} />
+                    {deal.location}
+                  </span>
+                )}
+                {deal.employees && (
+                  <span className="flex items-center gap-1.5">
+                    <Users className="w-3 h-3" />
+                    {deal.employees} employees
+                  </span>
+                )}
+                {deal.yearEstablished && (
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-3 h-3" />
+                    Est. {deal.yearEstablished}
+                  </span>
+                )}
+                {deal.source && (
+                  <span className="flex items-center gap-1.5" style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}>
+                    {deal.source}
+                  </span>
+                )}
+                {deal.listingUrl && (
+                  <a href={deal.listingUrl} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 hover:underline"
+                    style={{ color: "var(--signal-gold, #ffba20)" }}>
+                    <ExternalLink className="w-3 h-3" />View Listing
+                  </a>
+                )}
+              </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <Button size="sm" className="h-8 text-xs" onClick={() => scoreDeal.mutate({ id: dealId })} disabled={scoreDeal.isPending}>
-                <Zap className="w-3 h-3 mr-1.5" />
-                {scoreDeal.isPending ? "Scoring..." : "Score"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs border-border"
-                onClick={() => analyzeSignals.mutate({ dealId })}
-                disabled={analyzeSignals.isPending}
-              >
-                <Brain className="w-3 h-3 mr-1.5" />
-                {analyzeSignals.isPending ? "Analyzing..." : "Run Signals"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs border-border text-primary border-primary/30 hover:bg-primary/10"
-                onClick={() => createShareToken.mutate({ dealId })}
-                disabled={createShareToken.isPending}
-              >
-                <Share2 className="w-3 h-3 mr-1.5" />
-                {createShareToken.isPending ? "Generating..." : "Share"}
-              </Button>
+            {/* Conviction Score */}
+            <div className="flex flex-col items-end gap-2 shrink-0">
+              <span style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
+                textTransform: "uppercase" as const,
+                color: "var(--on-surface-variant, #d5c4ab)",
+                fontFamily: "var(--font-mono)",
+              }}>Conviction Score</span>
+              <div style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 52,
+                fontWeight: 400,
+                color: score != null && score >= 0.8
+                  ? "var(--signal-gold, #ffba20)"
+                  : score != null && score >= 0.65
+                  ? "var(--amber)"
+                  : "var(--clay)",
+                lineHeight: 1,
+                letterSpacing: "-0.03em",
+              }}>
+                {score != null ? `${Math.round(score * 100)}%` : "—"}
+              </div>
+              <div className="flex gap-1.5 mt-1">
+                <Button size="sm" style={{
+                  height: 28, fontSize: 11, padding: "0 12px",
+                  background: "var(--signal-gold, #ffba20)",
+                  color: "#0d1117",
+                  fontWeight: 700,
+                  border: "none",
+                }} onClick={() => scoreDeal.mutate({ id: dealId })} disabled={scoreDeal.isPending}>
+                  <Zap className="w-3 h-3 mr-1" />
+                  {scoreDeal.isPending ? "..." : "Score"}
+                </Button>
+                <Button size="sm" variant="outline" style={{
+                  height: 28, fontSize: 11, padding: "0 10px",
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  color: "var(--on-surface, #dae3ee)",
+                }} onClick={() => createShareToken.mutate({ dealId })} disabled={createShareToken.isPending}>
+                  <Share2 className="w-3 h-3 mr-1" />
+                  Share
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Financial KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Annual Revenue" value={fmt(deal.revenue)} accent="oklch(0.65 0.22 250)" />
-        <StatCard
-          label="Cash Flow / SDE"
-          value={fmt(deal.cashFlow)}
-          sub={deal.revenue && deal.cashFlow ? `${Math.round((deal.cashFlow / deal.revenue) * 100)}% margin` : undefined}
-          accent="oklch(0.70 0.18 160)"
-        />
-        <StatCard label="Asking Price" value={fmt(deal.askingPrice)} accent="oklch(0.75 0.20 80)" />
-        <StatCard label="Multiple" value={toNum(deal.multiple) != null ? `${toNum(deal.multiple)!.toFixed(2)}x` : "—"} sub="EBITDA multiple" accent="oklch(0.75 0.15 200)" />
-      </div>
+        {/* Financial KPIs — Stitch bento row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          {[
+            { label: "Annual Revenue", value: fmt(deal.revenue), sub: null, accent: "oklch(0.65 0.22 250)" },
+            {
+              label: "Cash Flow / SDE",
+              value: fmt(deal.cashFlow),
+              sub: deal.revenue && deal.cashFlow ? `${Math.round((parseFloat(String(deal.cashFlow)) / parseFloat(String(deal.revenue))) * 100)}% margin` : null,
+              accent: "var(--sage)",
+            },
+            { label: "Asking Price", value: fmt(deal.askingPrice), sub: null, accent: "var(--signal-gold, #ffba20)" },
+            {
+              label: "Multiple",
+              value: toNum(deal.multiple) != null ? `${toNum(deal.multiple)!.toFixed(2)}x` : "—",
+              sub: "EBITDA",
+              accent: "var(--amber)",
+            },
+          ].map((kpi, i) => (
+            <div key={i} style={{
+              padding: "16px 20px",
+              borderRight: i < 3 ? "1px solid rgba(255,255,255,0.06)" : "none",
+            }}>
+              <p style={{
+                fontSize: 9, fontWeight: 700, textTransform: "uppercase" as const,
+                letterSpacing: "0.14em", color: "var(--on-surface-variant, #d5c4ab)",
+                fontFamily: "var(--font-mono)", marginBottom: 6,
+              }}>{kpi.label}</p>
+              <p style={{
+                fontFamily: "var(--font-mono)", fontSize: 22, fontWeight: 400,
+                color: kpi.accent, lineHeight: 1,
+              }}>{kpi.value}</p>
+              {kpi.sub && <p style={{ fontSize: 11, color: "var(--on-surface-variant, #d5c4ab)", marginTop: 3 }}>{kpi.sub}</p>}
+            </div>
+          ))}
+        </div>
 
+        {/* Macro Alignment Alert — shown when signal analysis exists */}
+        {signal?.redTeamSummary && (
+          <div style={{
+            padding: "14px 20px",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            borderLeft: "3px solid var(--signal-gold, #ffba20)",
+            background: "rgba(255,186,32,0.04)",
+            display: "flex", gap: 12, alignItems: "flex-start",
+          }}>
+            <TrendingUp className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--signal-gold, #ffba20)" }} />
+            <div>
+              <p style={{
+                fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const,
+                letterSpacing: "0.1em", color: "var(--on-surface, #dae3ee)",
+                fontFamily: "var(--font-mono)", marginBottom: 4,
+              }}>Macro Strategic Alignment</p>
+              <p style={{ fontSize: 13, color: "var(--on-surface-variant, #d5c4ab)", lineHeight: 1.5, maxWidth: 800 }}>
+                {typeof signal.redTeamSummary === "string"
+                  ? signal.redTeamSummary.slice(0, 280) + (signal.redTeamSummary.length > 280 ? "…" : "")
+                  : "Third Signal analysis available in the Intelligence tab below."}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Agent Copilot Action Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+          {[
+            {
+              icon: Brain,
+              label: "Run Third Signal",
+              sub: "Analyze macro + competitive signals",
+              primary: false,
+              action: () => analyzeSignals.mutate({ dealId }),
+              pending: analyzeSignals.isPending,
+            },
+            {
+              icon: FileText,
+              label: "Generate Investment Memo",
+              sub: "Auto-compile IC-ready document",
+              primary: true,
+              action: () => generateMemo.mutate({ dealId }),
+              pending: generateMemo.isPending,
+            },
+            {
+              icon: Mail,
+              label: "Draft Outreach",
+              sub: "Personalized founder approach",
+              primary: false,
+              action: () => { toast.info("Navigate to Outreach tab to draft"); },
+              pending: false,
+            },
+          ].map((action, i) => (
+            <button
+              key={i}
+              onClick={action.action}
+              disabled={action.pending}
+              className="flex items-center gap-3 text-left transition-all"
+              style={{
+                padding: "14px 20px",
+                borderRight: i < 2 ? "1px solid rgba(255,255,255,0.06)" : "none",
+                background: action.primary
+                  ? "rgba(255,186,32,0.08)"
+                  : "transparent",
+                cursor: action.pending ? "not-allowed" : "pointer",
+                opacity: action.pending ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!action.primary) (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.03)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = action.primary ? "rgba(255,186,32,0.08)" : "transparent";
+              }}
+            >
+              <div style={{
+                width: 32, height: 32, borderRadius: 6,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: action.primary ? "rgba(255,186,32,0.15)" : "rgba(255,255,255,0.06)",
+                flexShrink: 0,
+              }}>
+                {action.pending
+                  ? <Loader2 className="w-4 h-4 animate-spin" style={{ color: action.primary ? "var(--signal-gold, #ffba20)" : "var(--on-surface-variant, #d5c4ab)" }} />
+                  : <action.icon className="w-4 h-4" style={{ color: action.primary ? "var(--signal-gold, #ffba20)" : "var(--on-surface-variant, #d5c4ab)" }} />
+                }
+              </div>
+              <div>
+                <p style={{
+                  fontSize: 12, fontWeight: 600,
+                  color: action.primary ? "var(--signal-gold, #ffba20)" : "var(--on-surface, #dae3ee)",
+                  letterSpacing: "0.01em",
+                }}>{action.label}</p>
+                <p style={{ fontSize: 11, color: "var(--on-surface-variant, #d5c4ab)", marginTop: 1 }}>{action.sub}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
       {/* Tabs */}
       <Tabs defaultValue="signals">
         <TabsList className="bg-card border border-border h-9 flex-wrap gap-0.5">

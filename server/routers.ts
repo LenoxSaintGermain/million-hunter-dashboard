@@ -88,6 +88,45 @@ export const appRouter = router({
       ]);
       return { dealStats, outreachStats, recentActivity, latestScan };
     }),
+    macroPosture: publicProcedure.query(async () => {
+      const { getMacroSignals } = await import('./db');
+      const signals = await getMacroSignals(20);
+      const now = Date.now();
+      // Filter to active (non-archived, non-expired) signals only
+      const active = signals.filter((s: any) => {
+        if (s.archived) return false;
+        if (s.expiresAt && s.expiresAt < now) return false;
+        return true;
+      });
+      const tailwinds = active.filter((s: any) => s.direction !== 'headwind');
+      const headwinds = active.filter((s: any) => s.direction === 'headwind');
+      // Weighted confidence sum
+      const tailwindScore = tailwinds.reduce((sum: number, s: any) => sum + (s.confidenceScore ?? 0.5), 0);
+      const headwindScore = headwinds.reduce((sum: number, s: any) => sum + (s.confidenceScore ?? 0.5), 0);
+      // Posture: AGGRESSIVE if tailwinds dominate, DEFENSIVE if headwinds dominate, ACTIVE otherwise
+      let posture: 'AGGRESSIVE' | 'ACTIVE' | 'DEFENSIVE' | 'MONITORING' = 'MONITORING';
+      if (active.length === 0) posture = 'MONITORING';
+      else if (headwindScore > tailwindScore * 1.5) posture = 'DEFENSIVE';
+      else if (tailwindScore > headwindScore * 1.5 && tailwinds.length >= 2) posture = 'AGGRESSIVE';
+      else if (active.length > 0) posture = 'ACTIVE';
+      // Top 2 signals for TIDE ticker (highest confidence, prioritize tailwinds)
+      const sorted = [...active].sort((a: any, b: any) => (b.confidenceScore ?? 0) - (a.confidenceScore ?? 0));
+      const topSignals = sorted.slice(0, 2).map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        signalType: s.signalType,
+        direction: (s.direction as string) ?? 'tailwind',
+        confidenceScore: s.confidenceScore ?? 0.5,
+        roryPitch: s.roryPitch,
+      }));
+      return {
+        posture,
+        tailwindCount: tailwinds.length,
+        headwindCount: headwinds.length,
+        totalActive: active.length,
+        topSignals,
+      };
+    }),
   }),
 
   deals: router({
@@ -1423,6 +1462,7 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         impactedAssetClasses: z.array(z.string()).optional(),
         recommendedAction: z.string().optional(),
         confidenceScore: z.number().min(0).max(1).optional(),
+        direction: z.enum(["tailwind", "headwind", "neutral"]).optional().default("tailwind"),
         sourceUrl: z.string().url().optional(),
         expiresAt: z.number().int().optional(),
       }))

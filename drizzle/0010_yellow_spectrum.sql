@@ -1,0 +1,1 @@
+ALTER TABLE `macro_signals` ADD `direction` enum('tailwind','headwind','neutral') DEFAULT 'tailwind' NOT NULL;

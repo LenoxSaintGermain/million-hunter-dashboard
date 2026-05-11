@@ -575,3 +575,12 @@
 - [x] Logo icon upgraded to signal gold tint on dark surface
 - [x] Material Symbols Outlined loaded for wb_twilight and sensors icons
 - [x] ping keyframe animation for live indicator
+
+## Sprint 30 — Stitch UI Integration + Real Posture Wiring
+- [x] Stitch Intelligence Dossier hero on DealDetail page (conviction score, macro alignment alert, agent action row)
+- [x] Add direction field (tailwind/headwind/neutral) to macro_signals schema + DB migration
+- [x] Add dashboard.macroPosture tRPC procedure (weighted confidence posture calculation)
+- [x] Wire posture bar to live macro signal data (AGGRESSIVE/ACTIVE/DEFENSIVE/MONITORING)
+- [x] Add TIDE ticker strip to Morning Brief hero (top 2 signals inline)
+- [x] Add direction ↑/↓ badge to Signal Stream items
+- [x] Add direction field to sentinel.create input schema

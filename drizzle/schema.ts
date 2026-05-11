@@ -398,6 +398,7 @@ export const macroSignals = mysqlTable("macro_signals", {
   impactedAssetClasses: json("impacted_asset_classes").$type<string[]>(),
   recommendedAction: text("recommended_action"),
   confidenceScore: float("confidence_score"),
+  direction: mysqlEnum("direction", ["tailwind", "headwind", "neutral"]).default("tailwind").notNull(),
   sourceUrl: text("source_url"),
   expiresAt: bigint("expires_at", { mode: "number" }),
   archived: boolean("archived").default(false).notNull(),
