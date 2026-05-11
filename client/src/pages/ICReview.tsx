@@ -215,39 +215,63 @@ export default function ICReview() {
         <span className="text-xs font-medium text-[#8b7355] uppercase tracking-wider">IC Review</span>
       </div>
 
-      {/* Article header */}
-      <motion.div {...fadeUp} className="mb-8">
-        <div className="text-xs font-mono font-bold text-[#ffba20] uppercase tracking-widest mb-3">
-          Investment Committee · Confidential
+      {/* ── Stitch Editorial Masthead — IC Review ── */}
+      <motion.div {...fadeUp} className="border-b border-rule pb-10 mb-10">
+        <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">
+          INVESTMENT COMMITTEE &middot; CONFIDENTIAL
+        </p>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
+          <div className="lg:col-span-8">
+            <h1 className="font-hero-h1 text-hero-h1 text-ink leading-[1.05] mb-3">
+              {deal.name}
+            </h1>
+            <p className="font-card-title text-[20px] text-muted-foreground leading-tight">
+              Investment Committee Brief
+            </p>
+          </div>
+          <div className="lg:col-span-4 flex flex-col items-end gap-3">
+            <div className="text-right">
+              <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1 uppercase tracking-widest">CONVICTION SCORE</p>
+              <p className={`font-data-mono text-[48px] leading-none ${score != null && score >= 0.8 ? "text-sage" : score != null && score >= 0.65 ? "text-amber" : "text-clay"}`}>
+                {score != null ? (score * 100).toFixed(0) : "—"}
+              </p>
+            </div>
+            <Badge variant="outline" className="font-eyebrow text-eyebrow border-rule text-muted-foreground capitalize">
+              {deal.stage.replace(/_/g, " ")}
+            </Badge>
+          </div>
         </div>
-        <h1 className="font-display text-3xl md:text-4xl font-normal text-[#1a1208] leading-tight mb-3" style={{ fontFamily: "var(--font-display, 'Fraunces', serif)" }}>
-          {deal.name}
-        </h1>
-        <div className="flex items-center gap-3 flex-wrap">
-          {deal.industry && <span className="text-sm text-[#8b7355]">{deal.industry}</span>}
-          {deal.location && (
-            <>
-              <span className="text-[#c4b49a]">·</span>
-              <span className="text-sm text-[#8b7355]">{deal.location}</span>
-            </>
+        <div className="mt-8 pt-6 border-t border-rule flex items-center gap-8 flex-wrap">
+          {deal.industry && (
+            <div>
+              <p className="font-eyebrow text-eyebrow text-muted-foreground mb-0.5 uppercase tracking-widest">INDUSTRY</p>
+              <p className="font-body-base text-body-base text-ink">{deal.industry}</p>
+            </div>
           )}
-          <span className="text-[#c4b49a]">·</span>
-          <span className="text-sm font-mono font-bold text-[#1a1208]">
-            Score: {score != null ? score.toFixed(3) : "—"}
-          </span>
-          <Badge variant="outline" className="text-xs border-[#e8e0d4] text-[#8b7355] capitalize">
-            {deal.stage.replace(/_/g, " ")}
-          </Badge>
+          {deal.location && (
+            <div>
+              <p className="font-eyebrow text-eyebrow text-muted-foreground mb-0.5 uppercase tracking-widest">LOCATION</p>
+              <p className="font-body-base text-body-base text-ink">{deal.location}</p>
+            </div>
+          )}
+          {deal.askingPrice && (
+            <div>
+              <p className="font-eyebrow text-eyebrow text-muted-foreground mb-0.5 uppercase tracking-widest">ASKING PRICE</p>
+              <p className="font-data-mono text-data-mono text-ink">${(Number(deal.askingPrice) / 1000000).toFixed(2)}M</p>
+            </div>
+          )}
+          {deal.revenue && (
+            <div>
+              <p className="font-eyebrow text-eyebrow text-muted-foreground mb-0.5 uppercase tracking-widest">REVENUE</p>
+              <p className="font-data-mono text-data-mono text-ink">${(Number(deal.revenue) / 1000000).toFixed(2)}M</p>
+            </div>
+          )}
         </div>
-        {/* Rule */}
-        <div className="mt-4 h-px bg-gradient-to-r from-[#ffba20]/40 via-[#e8e0d4] to-transparent" />
       </motion.div>
-
       {/* Editorial 2-column layout */}
-      <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-10 lg:grid-cols-12">
+        <div className="lg:col-span-8 space-y-8">
 
-        {/* Main content */}
-        <div className="space-y-8">
 
           {/* Section nav */}
           <div className="flex gap-4 border-b border-[#e8e0d4] pb-0">

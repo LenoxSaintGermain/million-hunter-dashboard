@@ -455,60 +455,70 @@ export default function TIDEPage() {
 
   return (
     <EditorialTopNav>
-      {/* ── Header ── */}
-      <motion.div
-        initial={{ opacity: 0, filter: "blur(6px)" }}
-        animate={{ opacity: 1, filter: "blur(0px)" }}
-        transition={{ duration: 0.7, ease: EASE }}
-        className="mb-6"
-      >
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <span className="eyebrow" style={{ color: "var(--amber)" }}>
-              TIDE · Temporal Intelligence for Deployment Events
-            </span>
-            <h1
-              className="mt-2"
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: "clamp(1.5rem, 3vw, 2.2rem)",
-                fontWeight: 400,
-                color: "var(--ink)",
-                letterSpacing: "-0.025em",
-                lineHeight: 1.05,
-              }}
-            >
-              Capital Flow Intelligence
-            </h1>
-            <p className="text-sm mt-2 max-w-xl" style={{ color: "var(--sh-fg-3)", lineHeight: 1.6 }}>
-              Monitor federal contracts, regulatory signals, and political capital flows to detect
-              convergence events before the market prices them in. Each signal is contextualized
-              so you understand what it means for acquisition targets in that geography.
-            </p>
-          </div>
-          <div className="flex items-stretch gap-0 rounded-lg overflow-hidden" style={{ border: "1px solid var(--rule)" }}>
-            {[
-              { label: "Capital Tracked", value: totalCapital > 0 ? fmtMoney(totalCapital / 100) : "—" },
-              { label: "Active Events",   value: String(convergenceEvents.length) },
-              ...(accuracy !== null ? [{ label: "Prediction Accuracy", value: `${accuracy}%` }] : []),
-            ].map((stat, i, arr) => (
-              <div
-                key={stat.label}
-                className="px-5 py-3 text-right"
-                style={{ background: "var(--paper)", borderRight: i < arr.length - 1 ? "1px solid var(--rule)" : "none" }}
-              >
-                <div
-                  className="tabular-nums"
-                  style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1 }}
-                >
-                  {stat.value}
+      {/* ── TIDE Editorial Masthead — Stitch Reference Layout ── */}
+      <div className="border-b border-rule pb-10 mb-10">
+        <motion.div
+          initial={{ opacity: 0, filter: "blur(6px)" }}
+          animate={{ opacity: 1, filter: "blur(0px)" }}
+          transition={{ duration: 0.7, ease: EASE }}
+        >
+          <p className="font-eyebrow text-eyebrow text-amber mb-4 uppercase tracking-widest">
+            TIDE · TEMPORAL INTELLIGENCE FOR DEPLOYMENT EVENTS
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+            {/* Left: Headline col-span-7 */}
+            <div className="lg:col-span-7">
+              <h1 className="font-hero-h1 text-hero-h1 text-ink leading-[1.05] mb-6">
+                Temporal Intelligence<br />
+                for Deployment Events
+              </h1>
+              <p className="font-body-base text-body-base text-muted-foreground leading-relaxed max-w-lg mb-8">
+                Monitor federal contracts, regulatory signals, and political capital flows to detect
+                convergence events before the market prices them in. Each signal is contextualized
+                for acquisition targets in that geography.
+              </p>
+              {/* Stat strip */}
+              <div className="grid grid-cols-3 gap-0 border border-rule divide-x divide-rule">
+                <div className="px-6 py-4">
+                  <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1 uppercase tracking-widest">CAPITAL TRACKED</p>
+                  <p className="font-data-mono text-[32px] leading-none text-ink">
+                    {totalCapital > 0 ? fmtMoney(totalCapital / 100) : "—"}
+                  </p>
                 </div>
-                <div className="eyebrow mt-1">{stat.label}</div>
+                <div className="px-6 py-4">
+                  <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1 uppercase tracking-widest">ACTIVE EVENTS</p>
+                  <p className="font-data-mono text-[32px] leading-none text-ink">{convergenceEvents.length}</p>
+                </div>
+                <div className="px-6 py-4">
+                  <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1 uppercase tracking-widest">ACCURACY</p>
+                  <p className="font-data-mono text-[32px] leading-none text-ink">
+                    {accuracy !== null ? `${accuracy}%` : "—"}
+                  </p>
+                </div>
               </div>
-            ))}
+            </div>
+            {/* Right: US Map placeholder col-span-5 */}
+            <div className="lg:col-span-5 border border-rule bg-bone/50 aspect-[4/3] flex items-center justify-center relative overflow-hidden">
+              <div className="absolute inset-0 opacity-10">
+                <svg viewBox="0 0 800 500" className="w-full h-full" fill="none">
+                  {/* Simplified US outline */}
+                  <path d="M120,180 L180,120 L280,100 L380,80 L480,90 L580,100 L660,140 L700,200 L680,280 L620,340 L540,380 L440,400 L340,410 L240,400 L160,360 L120,300 Z" stroke="currentColor" strokeWidth="2" className="text-ink"/>
+                  <circle cx="300" cy="250" r="6" fill="currentColor" className="text-amber"/>
+                  <circle cx="450" cy="220" r="4" fill="currentColor" className="text-amber"/>
+                  <circle cx="380" cy="300" r="5" fill="currentColor" className="text-amber"/>
+                  <circle cx="520" cy="280" r="3" fill="currentColor" className="text-amber"/>
+                </svg>
+              </div>
+              <div className="relative z-10 text-center">
+                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-2 uppercase tracking-widest">SIGNAL DENSITY MAP</p>
+                <p className="font-body-base text-body-base text-muted-foreground text-[12px]">
+                  {flows.length > 0 ? `${flows.length} signals tracked` : "Run a scan to populate"}
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
 
       {/* ── Scan Bar ── */}
       <motion.div

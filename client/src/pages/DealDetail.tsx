@@ -17,7 +17,7 @@ import {
   FileText, Mail, AlertTriangle, TrendingUp,
   Building2, MapPin, Users, Calendar, ExternalLink,
   GitBranch, BarChart3, UserSearch, CheckCircle2, XCircle, Loader2, Share2,
-  Bot, Swords, Wrench, ChevronDown, ChevronRight, Copy, Download,
+  Bot, Swords, Wrench, ChevronDown, ChevronRight, Copy, Download, Activity, ArrowRight,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -165,303 +165,236 @@ export default function DealDetail() {
 
   return (
     <EditorialTopNav>
-      {/* Back nav */}
-      <Link href="/scan">
-        <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground -ml-2">
-          <ArrowLeft className="w-3 h-3 mr-1.5" />
-          Back to Scan
-        </Button>
-      </Link>
+      <div className="max-w-[1280px] mx-auto w-full px-6 lg:px-10 py-10">
 
-      {/* Deal header */}
-      {/* ── Stitch Intelligence Dossier Hero ─────────────────────────────────── */}
-      <div style={{
-        background: "var(--surface, #1e2a34)",
-        border: "1px solid rgba(255,186,32,0.12)",
-        borderRadius: 12,
-        overflow: "hidden",
-      }}>
-        {/* Dossier Header */}
-        <div style={{
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          padding: "20px 24px",
-          background: "rgba(255,186,32,0.03)",
-        }}>
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="flex-1 min-w-0">
-              {/* Eyebrow */}
-              <div className="flex items-center gap-2 mb-3 flex-wrap">
-                <span style={{
-                  fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
-                  textTransform: "uppercase" as const,
-                  color: "var(--signal-gold, #ffba20)",
-                  fontFamily: "var(--font-mono)",
-                }}>TARGET DOSSIER</span>
-                <span style={{ color: "rgba(255,255,255,0.15)", fontSize: 10 }}>·</span>
-                {deal.industry && (
-                  <span style={{
-                    fontSize: 10, fontWeight: 600, letterSpacing: "0.1em",
-                    textTransform: "uppercase" as const,
-                    color: "var(--on-surface-variant, #d5c4ab)",
-                    fontFamily: "var(--font-mono)",
-                  }}>{deal.industry}</span>
-                )}
-                {deal.opportunityZone && (
-                  <span style={{
-                    display: "inline-flex", alignItems: "center", gap: 4,
-                    padding: "2px 8px", borderRadius: 4,
-                    fontSize: 10, fontWeight: 600, letterSpacing: "0.08em",
-                    background: "rgba(52,211,153,0.12)",
-                    color: "var(--sage)",
-                    border: "1px solid rgba(52,211,153,0.25)",
-                  }}>
-                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--sage)", display: "inline-block" }} />
-                    OZ
-                  </span>
-                )}
-                {deal.tadDistrict && (
-                  <span style={{
-                    display: "inline-flex", alignItems: "center", gap: 4,
-                    padding: "2px 8px", borderRadius: 4,
-                    fontSize: 10, fontWeight: 600, letterSpacing: "0.08em",
-                    background: "rgba(96,165,250,0.12)",
-                    color: "#60a5fa",
-                    border: "1px solid rgba(96,165,250,0.25)",
-                  }}>{deal.tadDistrict}</span>
-                )}
-                <span style={{
-                  padding: "2px 8px", borderRadius: 4,
-                  fontSize: 10, fontWeight: 600, letterSpacing: "0.08em",
-                  background: "rgba(255,186,32,0.10)",
-                  color: "var(--signal-gold, #ffba20)",
-                  border: "1px solid rgba(255,186,32,0.20)",
-                  textTransform: "uppercase" as const,
-                }}>{deal.stage.replace(/_/g, " ")}</span>
-              </div>
-              {/* Deal Name */}
-              <h1 style={{
-                fontFamily: "var(--font-display)",
-                fontSize: "clamp(22px, 3vw, 32px)",
-                fontWeight: 400,
-                letterSpacing: "-0.02em",
-                color: "var(--on-surface, #dae3ee)",
-                lineHeight: 1.2,
-                marginBottom: 10,
-              }}>{deal.name}</h1>
-              {/* Meta row */}
-              <div className="flex items-center gap-4 flex-wrap" style={{ fontSize: 12, color: "var(--on-surface-variant, #d5c4ab)" }}>
-                {deal.location && (
-                  <span className="flex items-center gap-1.5">
-                    <MapPin className="w-3 h-3" style={{ color: "var(--signal-gold, #ffba20)" }} />
-                    {deal.location}
-                  </span>
-                )}
-                {deal.employees && (
-                  <span className="flex items-center gap-1.5">
-                    <Users className="w-3 h-3" />
-                    {deal.employees} employees
-                  </span>
-                )}
-                {deal.yearEstablished && (
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="w-3 h-3" />
-                    Est. {deal.yearEstablished}
-                  </span>
-                )}
-                {deal.source && (
-                  <span className="flex items-center gap-1.5" style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}>
-                    {deal.source}
-                  </span>
-                )}
-                {deal.listingUrl && (
-                  <a href={deal.listingUrl} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 hover:underline"
-                    style={{ color: "var(--signal-gold, #ffba20)" }}>
-                    <ExternalLink className="w-3 h-3" />View Listing
-                  </a>
-                )}
+        {/* ── Back nav ─────────────────────────────────────────────────────── */}
+        <Link href="/scan">
+          <div className="inline-flex items-center gap-2 font-eyebrow text-eyebrow text-muted-foreground hover:text-amber transition-colors cursor-pointer mb-10">
+            <ArrowLeft className="w-3 h-3" />
+            PIPELINE
+          </div>
+        </Link>
+
+        {/* ── Broadsheet Masthead ───────────────────────────────────────────── */}
+        <div className="border-b border-rule pb-10 mb-10">
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">INTELLIGENCE DOSSIER</span>
+            <span className="w-8 h-px bg-rule" />
+            {deal.industry && (
+              <span className="font-eyebrow text-eyebrow text-muted-foreground border border-rule px-2 py-0.5 rounded-sm">{deal.industry}</span>
+            )}
+            {deal.location && (
+              <span className="font-eyebrow text-eyebrow text-muted-foreground flex items-center gap-1">
+                <MapPin className="w-2.5 h-2.5" />{deal.location}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 items-end">
+            <div>
+              <p className="font-eyebrow text-eyebrow text-amber mb-2 uppercase tracking-widest">PROJECT {(deal.name || "").split(" ").slice(-1)[0].toUpperCase()}:</p>
+              <h1 className="font-hero-h1 text-hero-h1 text-ink leading-[1.05] mb-6">{deal.name}</h1>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-rule pt-8">
+                {[
+                  { label: "CASH FLOW", value: fmt(deal.cashFlow) },
+                  { label: "ASKING PRICE", value: fmt(deal.askingPrice) },
+                  { label: "REVENUE", value: fmt(deal.revenue) },
+                  { label: "AI SCORE", value: score != null ? score.toFixed(3) : "—" },
+                ].map((item, i) => (
+                  <div key={i}>
+                    <p className="font-eyebrow text-eyebrow text-muted-foreground mb-2 uppercase tracking-widest">{item.label}</p>
+                    <p className={`font-data-mono text-section-h2 leading-none ${i === 3 && score != null ? (score >= 0.8 ? "text-amber" : score >= 0.65 ? "text-sage" : "text-clay") : "text-ink"}`}>{item.value}</p>
+                  </div>
+                ))}
               </div>
             </div>
-            {/* Conviction Score */}
-            <div className="flex flex-col items-end gap-2 shrink-0">
-              <span style={{
-                fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
-                textTransform: "uppercase" as const,
-                color: "var(--on-surface-variant, #d5c4ab)",
-                fontFamily: "var(--font-mono)",
-              }}>Conviction Score</span>
-              <div style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 52,
-                fontWeight: 400,
-                color: score != null && score >= 0.8
-                  ? "var(--signal-gold, #ffba20)"
-                  : score != null && score >= 0.65
-                  ? "var(--amber)"
-                  : "var(--clay)",
-                lineHeight: 1,
-                letterSpacing: "-0.03em",
-              }}>
-                {score != null ? `${Math.round(score * 100)}%` : "—"}
-              </div>
-              <div className="flex gap-1.5 mt-1">
-                <Button size="sm" style={{
-                  height: 28, fontSize: 11, padding: "0 12px",
-                  background: "var(--signal-gold, #ffba20)",
-                  color: "#0d1117",
-                  fontWeight: 700,
-                  border: "none",
-                }} onClick={() => scoreDeal.mutate({ id: dealId })} disabled={scoreDeal.isPending}>
-                  <Zap className="w-3 h-3 mr-1" />
-                  {scoreDeal.isPending ? "..." : "Score"}
-                </Button>
-                <Button size="sm" variant="outline" style={{
-                  height: 28, fontSize: 11, padding: "0 10px",
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  color: "var(--on-surface, #dae3ee)",
-                }} onClick={() => createShareToken.mutate({ dealId })} disabled={createShareToken.isPending}>
-                  <Share2 className="w-3 h-3 mr-1" />
-                  Share
-                </Button>
-              </div>
+            <div className="flex flex-col items-end gap-3 shrink-0">
+              <button onClick={() => createShareToken.mutate({ dealId })} disabled={createShareToken.isPending}
+                className="flex items-center gap-2 border border-rule bg-paper font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:border-amber/40 hover:text-amber transition-all">
+                <Share2 className="w-3 h-3" />SHARE DOSSIER
+              </button>
+              <button onClick={() => scoreDeal.mutate({ id: dealId })} disabled={scoreDeal.isPending}
+                className="flex items-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:opacity-90 transition-all">
+                {scoreDeal.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
+                RE-SCORE
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Financial KPIs — Stitch bento row */}
-        <div className="grid grid-cols-2 lg:grid-cols-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        {/* ── Enrichment Strip ─────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border border-rule divide-x divide-rule mb-10">
           {[
-            { label: "Annual Revenue", value: fmt(deal.revenue), sub: null, accent: "oklch(0.65 0.22 250)" },
-            {
-              label: "Cash Flow / SDE",
-              value: fmt(deal.cashFlow),
-              sub: deal.revenue && deal.cashFlow ? `${Math.round((parseFloat(String(deal.cashFlow)) / parseFloat(String(deal.revenue))) * 100)}% margin` : null,
-              accent: "var(--sage)",
-            },
-            { label: "Asking Price", value: fmt(deal.askingPrice), sub: null, accent: "var(--signal-gold, #ffba20)" },
-            {
-              label: "Multiple",
-              value: toNum(deal.multiple) != null ? `${toNum(deal.multiple)!.toFixed(2)}x` : "—",
-              sub: "EBITDA",
-              accent: "var(--amber)",
-            },
-          ].map((kpi, i) => (
-            <div key={i} style={{
-              padding: "16px 20px",
-              borderRight: i < 3 ? "1px solid rgba(255,255,255,0.06)" : "none",
-            }}>
-              <p style={{
-                fontSize: 9, fontWeight: 700, textTransform: "uppercase" as const,
-                letterSpacing: "0.14em", color: "var(--on-surface-variant, #d5c4ab)",
-                fontFamily: "var(--font-mono)", marginBottom: 6,
-              }}>{kpi.label}</p>
-              <p style={{
-                fontFamily: "var(--font-mono)", fontSize: 22, fontWeight: 400,
-                color: kpi.accent, lineHeight: 1,
-              }}>{kpi.value}</p>
-              {kpi.sub && <p style={{ fontSize: 11, color: "var(--on-surface-variant, #d5c4ab)", marginTop: 3 }}>{kpi.sub}</p>}
+            { label: "MULTIPLE", value: deal.askingPrice && deal.cashFlow ? `${(parseFloat(String(deal.askingPrice)) / parseFloat(String(deal.cashFlow))).toFixed(1)}x` : "—" },
+            { label: "DSCR", value: deal.cashFlow && deal.askingPrice ? `${(parseFloat(String(deal.cashFlow)) / (parseFloat(String(deal.askingPrice)) * 0.07)).toFixed(2)}` : "—" },
+            { label: "EMPLOYEES", value: (deal as any).employeeCount ? String((deal as any).employeeCount) : "—" },
+            { label: "YEARS EST.", value: (deal as any).yearsInOperation ? String((deal as any).yearsInOperation) : "—" },
+          ].map((item, i) => (
+            <div key={i} className="px-6 py-4">
+              <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1 uppercase tracking-widest">{item.label}</p>
+              <p className="font-data-mono text-[20px] text-ink leading-none">{item.value}</p>
             </div>
           ))}
         </div>
 
-        {/* Macro Alignment Alert — shown when signal analysis exists */}
+        {/* ── Macro Alignment Alert ────────────────────────────────────────── */}
         {signal?.redTeamSummary && (
-          <div style={{
-            padding: "14px 20px",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
-            borderLeft: "3px solid var(--signal-gold, #ffba20)",
-            background: "rgba(255,186,32,0.04)",
-            display: "flex", gap: 12, alignItems: "flex-start",
-          }}>
-            <TrendingUp className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--signal-gold, #ffba20)" }} />
-            <div>
-              <p style={{
-                fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const,
-                letterSpacing: "0.1em", color: "var(--on-surface, #dae3ee)",
-                fontFamily: "var(--font-mono)", marginBottom: 4,
-              }}>Macro Strategic Alignment</p>
-              <p style={{ fontSize: 13, color: "var(--on-surface-variant, #d5c4ab)", lineHeight: 1.5, maxWidth: 800 }}>
-                {typeof signal.redTeamSummary === "string"
-                  ? signal.redTeamSummary.slice(0, 280) + (signal.redTeamSummary.length > 280 ? "…" : "")
-                  : "Third Signal analysis available in the Intelligence tab below."}
-              </p>
-            </div>
+          <div className="border-l-2 border-amber pl-6 mb-10 py-2">
+            <p className="font-eyebrow text-eyebrow text-amber mb-2 uppercase tracking-widest">MACRO STRATEGIC ALIGNMENT</p>
+            <p className="font-body-base text-body-base text-ink/80 leading-relaxed max-w-3xl">
+              {typeof signal.redTeamSummary === "string"
+                ? signal.redTeamSummary.slice(0, 320) + (signal.redTeamSummary.length > 320 ? "…" : "")
+                : "Third Signal analysis available in the Intelligence tab below."}
+            </p>
           </div>
         )}
 
-        {/* Agent Copilot Action Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-3" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-          {[
-            {
-              icon: Brain,
-              label: "Run Third Signal",
-              sub: "Analyze macro + competitive signals",
-              primary: false,
-              action: () => analyzeSignals.mutate({ dealId }),
-              pending: analyzeSignals.isPending,
-            },
-            {
-              icon: FileText,
-              label: "Generate Investment Memo",
-              sub: "Auto-compile IC-ready document",
-              primary: true,
-              action: () => generateMemo.mutate({ dealId }),
-              pending: generateMemo.isPending,
-            },
-            {
-              icon: Mail,
-              label: "Draft Outreach",
-              sub: "Personalized founder approach",
-              primary: false,
-              action: () => { toast.info("Navigate to Outreach tab to draft"); },
-              pending: false,
-            },
-          ].map((action, i) => (
-            <button
-              key={i}
-              onClick={action.action}
-              disabled={action.pending}
-              className="flex items-center gap-3 text-left transition-all"
-              style={{
-                padding: "14px 20px",
-                borderRight: i < 2 ? "1px solid rgba(255,255,255,0.06)" : "none",
-                background: action.primary
-                  ? "rgba(255,186,32,0.08)"
-                  : "transparent",
-                cursor: action.pending ? "not-allowed" : "pointer",
-                opacity: action.pending ? 0.6 : 1,
-              }}
-              onMouseEnter={(e) => {
-                if (!action.primary) (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.03)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = action.primary ? "rgba(255,186,32,0.08)" : "transparent";
-              }}
-            >
-              <div style={{
-                width: 32, height: 32, borderRadius: 6,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: action.primary ? "rgba(255,186,32,0.15)" : "rgba(255,255,255,0.06)",
-                flexShrink: 0,
-              }}>
-                {action.pending
-                  ? <Loader2 className="w-4 h-4 animate-spin" style={{ color: action.primary ? "var(--signal-gold, #ffba20)" : "var(--on-surface-variant, #d5c4ab)" }} />
-                  : <action.icon className="w-4 h-4" style={{ color: action.primary ? "var(--signal-gold, #ffba20)" : "var(--on-surface-variant, #d5c4ab)" }} />
-                }
+        {/* ── 12-col grid: main content + Agent Monitoring aside ───────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-10">
+
+          {/* LEFT: Bento modules — col-span-8 */}
+          <div className="lg:col-span-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Module 1: Owner Psychology */}
+              <div className="border border-rule bg-paper p-6">
+                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Owner Psychology</p>
+                <p className="font-card-title text-[18px] text-ink leading-tight mb-3">
+                  {(sellerData?.personaJson as any)?.motivation ?? "Run Third Signal to analyze"}
+                </p>
+                {(sellerData?.personaJson as any)?.urgencyLevel && (
+                  <div>
+                    <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">URGENCY</p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1 bg-rule rounded-full overflow-hidden">
+                        <div className="h-full bg-amber rounded-full" style={{ width: `${(((sellerData?.personaJson as any)?.urgencyLevel ?? 0) / 10) * 100}%` }} />
+                      </div>
+                      <span className="font-data-mono text-data-mono text-ink">{(sellerData?.personaJson as any)?.urgencyLevel ?? 0}/10</span>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div>
-                <p style={{
-                  fontSize: 12, fontWeight: 600,
-                  color: action.primary ? "var(--signal-gold, #ffba20)" : "var(--on-surface, #dae3ee)",
-                  letterSpacing: "0.01em",
-                }}>{action.label}</p>
-                <p style={{ fontSize: 11, color: "var(--on-surface-variant, #d5c4ab)", marginTop: 1 }}>{action.sub}</p>
+
+              {/* Module 2: Digital Audit */}
+              <div className="border border-rule bg-paper p-6">
+                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Digital Audit</p>
+                <p className="font-card-title text-[18px] text-ink leading-tight mb-3">
+                  {signal?.digitalAuditSummary ? String(signal.digitalAuditSummary).slice(0, 80) + "…" : "Pending analysis"}
+                </p>
+                <button onClick={() => analyzeSignals.mutate({ dealId })} disabled={analyzeSignals.isPending}
+                  className="font-eyebrow text-eyebrow text-amber hover:underline flex items-center gap-1">
+                  {analyzeSignals.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                  {signal?.digitalAuditSummary ? "Re-analyze" : "Run Analysis"}
+                </button>
               </div>
-            </button>
-          ))}
+
+              {/* Module 3: Red Team Analysis */}
+              <div className="border border-rule bg-paper p-6">
+                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Red Team Analysis</p>
+                <p className="font-card-title text-[18px] text-ink leading-tight mb-3">
+                  {signal?.redTeamSummary ? String(signal.redTeamSummary).slice(0, 80) + "…" : "No risks flagged yet"}
+                </p>
+                {signal?.redTeamSummary && (
+                  <span className="font-eyebrow text-eyebrow text-clay">RISKS IDENTIFIED</span>
+                )}
+              </div>
+
+              {/* Module 4: Capital Study */}
+              <div className="border border-rule bg-paper p-6">
+                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Capital Study</p>
+                {deal.askingPrice ? (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">SBA 7(a) DOWN</p>
+                      <p className="font-data-mono text-[20px] text-ink">{fmt(parseFloat(String(deal.askingPrice)) * 0.1)}</p>
+                    </div>
+                    <div>
+                      <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">LOAN AMOUNT</p>
+                      <p className="font-data-mono text-[20px] text-ink">{fmt(parseFloat(String(deal.askingPrice)) * 0.9)}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="font-body-base text-body-base text-muted-foreground">No asking price set</p>
+                )}
+              </div>
+
+              {/* Module 5: Investment Memo — col-span-2 */}
+              <div className="border border-rule bg-paper p-6 md:col-span-2">
+                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Investment Memo</p>
+                {memo ? (
+                  <div>
+                    <p className="font-card-title text-[18px] text-ink leading-tight mb-4">
+                      {typeof memo.executiveSummary === "string" ? memo.executiveSummary.slice(0, 200) + "…" : "Memo generated"}
+                    </p>
+                    <button className="font-eyebrow text-eyebrow text-amber hover:underline flex items-center gap-1">
+                      VIEW FULL MEMO <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-body-base text-body-base text-muted-foreground mb-4">Auto-compile an IC-ready investment brief</p>
+                    <button onClick={() => generateMemo.mutate({ dealId })} disabled={generateMemo.isPending}
+                      className="flex items-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:opacity-90 transition-all">
+                      {generateMemo.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+                      GENERATE MEMO
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Module 6: Model Consensus */}
+              <div className="border border-rule bg-paper p-6">
+                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Model Consensus</p>
+                {consensusData ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`font-data-mono text-[28px] leading-none ${parseFloat(String(consensusData.consensusScore ?? 0)) >= 0.7 ? "text-sage" : "text-clay"}`}>
+                        {parseFloat(String(consensusData.consensusScore ?? 0)).toFixed(3)}
+                      </span>
+                      {consensusData.divergenceFlag && (
+                        <span className="font-eyebrow text-eyebrow text-clay border border-clay/30 px-2 py-0.5 rounded-sm">DIVERGE</span>
+                      )}
+                    </div>
+                    <p className="font-eyebrow text-eyebrow text-muted-foreground">{(consensusData as any).overallRecommendation ?? (consensusData as any).recommendation ?? "—"}</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-body-base text-body-base text-muted-foreground mb-4">3-model weighted vote</p>
+                    <button onClick={() => consensusScore.mutate({ dealId })} disabled={consensusScore.isPending}
+                      className="font-eyebrow text-eyebrow text-amber hover:underline flex items-center gap-1">
+                      {consensusScore.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                      RUN CONSENSUS
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Quick action strip */}
+            <div className="grid grid-cols-3 border border-rule divide-x divide-rule mt-6">
+              {[
+                { icon: Brain, label: "Third Signal", sub: "Macro + competitive analysis", action: () => analyzeSignals.mutate({ dealId }), pending: analyzeSignals.isPending },
+                { icon: FileText, label: "Investment Memo", sub: "IC-ready document", action: () => generateMemo.mutate({ dealId }), pending: generateMemo.isPending },
+                { icon: Mail, label: "Draft Outreach", sub: "Personalized approach", action: () => toast.info("Navigate to Outreach tab"), pending: false },
+              ].map((act, i) => (
+                <button key={i} onClick={act.action} disabled={act.pending}
+                  className="flex items-center gap-3 p-5 text-left hover:bg-bone/60 transition-colors disabled:opacity-50 group">
+                  <div className="w-8 h-8 border border-rule rounded-sm flex items-center justify-center shrink-0 group-hover:border-amber/40 transition-colors">
+                    {act.pending ? <Loader2 className="w-4 h-4 animate-spin text-amber" /> : <act.icon className="w-4 h-4 text-muted-foreground group-hover:text-amber transition-colors" />}
+                  </div>
+                  <div>
+                    <p className="font-eyebrow text-eyebrow text-ink group-hover:text-amber transition-colors">{act.label}</p>
+                    <p className="font-body-base text-[11px] text-muted-foreground mt-0.5">{act.sub}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* RIGHT: Agent Monitoring Panel — col-span-4 */}
+          <div className="lg:col-span-4 lg:border-l lg:border-rule lg:pl-8">
+            <AgentMonitoringPanel dealId={dealId} />
+          </div>
         </div>
-      </div>
+
       {/* Tabs */}
       <Tabs defaultValue="signals">
         <TabsList className="bg-card border border-border h-9 flex-wrap gap-0.5">
@@ -1031,6 +964,7 @@ export default function DealDetail() {
        </Tabs>
       {/* Co-Pilot with deal-specific context injected */}
       <CoPilot dealId={dealId} dealName={deal.name} />
+      </div>
     </EditorialTopNav>
   );
 }

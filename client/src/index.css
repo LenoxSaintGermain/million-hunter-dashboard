@@ -13,6 +13,36 @@
   --font-sans:    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   --font-serif:   'IBM Plex Serif', Georgia, serif;
+  /* ── Stitch Editorial Font-Family Utilities ── */
+  --font-hero-h1:    'Fraunces', Georgia, serif;
+  --font-eyebrow:    'JetBrains Mono', ui-monospace, monospace;
+  --font-card-title: 'Fraunces', Georgia, serif;
+  --font-section-h2: 'Fraunces', Georgia, serif;
+  --font-section-h3: 'Fraunces', Georgia, serif;
+  --font-data-mono:  'JetBrains Mono', ui-monospace, monospace;
+  --font-body-base:  'Inter', ui-sans-serif, sans-serif;
+  --font-body:       'Inter', ui-sans-serif, sans-serif;
+  --font-legal:      'Inter', ui-sans-serif, sans-serif;
+  /* ── Stitch Editorial Font-Size Utilities ── */
+  --text-hero-h1:    clamp(2.5rem, 7vw, 5.5rem);
+  --text-eyebrow:    11px;
+  --text-card-title: 24px;
+  --text-section-h2: 40px;
+  --text-section-h3: 48px;
+  --text-data-mono:  13px;
+  --text-body-base:  15px;
+  --text-body:       15px;
+  --text-legal:      11px;
+  /* ── Stitch Spacing Utilities ── */
+  --spacing-max-width:       1280px;
+  --spacing-section-gap:     7rem;
+  --spacing-card-padding:    1.5rem;
+  --spacing-gutter:          2.5rem;
+  --spacing-eyebrow-gap:     0.75rem;
+  --spacing-container-max:   1280px;
+  --spacing-section-gap-md:  6rem;
+  --spacing-section-gap-lg:  8rem;
+  --spacing-grid-gutter:     1rem;
 
   /* ── Editorial Finance Color Tokens ── */
   --color-bone:              var(--bone);

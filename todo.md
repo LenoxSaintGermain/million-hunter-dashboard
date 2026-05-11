@@ -665,3 +665,12 @@
 - [x] IC Review page — editorial article layout, Consensus Dashboard aside, Gutter Float notes
 - [x] Behavioral Profile page — Agentic Insight card, Negotiation Rehearsal scenarios
 - [x] Routes wired: /ic-review/:id, /behavioral/:id
+
+## Sprint 32 — Stitch Editorial Layout Rebuild (Complete)
+- [x] Command Center: Fraunces hero-h1 masthead, lg:grid-cols-12, editorial deal cards, signal timeline
+- [x] Deal Room: PROJECT [NAME]: masthead at clamp(2.5rem,7vw,5.5rem), enrichment strip, 3-col bento grid, Agent Monitoring aside
+- [x] Behavioral Profile: 64px metric numbers, 2-col editorial layout, Negotiation Rehearsal 3-col grid, Agentic Friction card
+- [x] TIDE: col-span-7 hero + col-span-5 map, stat strip, editorial signal feed
+- [x] IC Review: col-span-8 article + col-span-4 sticky Consensus Dashboard, Stitch masthead
+- [x] Design tokens: font-hero-h1, font-eyebrow, font-card-title, font-section-h2, font-data-mono added to @theme
+- [x] All inline styles replaced with Tailwind editorial utility classes
