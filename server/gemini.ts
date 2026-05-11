@@ -344,20 +344,215 @@ Return ONLY valid JSON.`;
   }
 }
 
-// ─── Composite Scorer (rule-based, no LLM call) ───────────────────────────────
-// ─── SCORER Dimension Stubs ──────────────────────────────────────────────────
-// TSL-DIM-CAP-STACK-001  Capital Stack Compatibility  (stub -> Sprint 2 full impl)
-// TSL-DIM-OPS-ALPHA-001  Operational Alpha            (stub -> Sprint 2 full impl)
-// TSL-DIM-MACRO-ARB-001  Macro Arbitrage Exposure     (stub -> Sprint 2 full impl)
+// ─── Composite Scorer ────────────────────────────────────────────────────────
+// TSL-DIM-CAP-STACK-001  Capital Stack Compatibility  — real LTV/DSCR logic
+// TSL-DIM-OPS-ALPHA-001  Operational Alpha            — real industry/employee scoring
+// TSL-DIM-MACRO-ARB-001  Macro Arbitrage Exposure     — real TIDE signal overlap
 
-/** Capital Stack Compatibility stub — returns 0.5 until Sprint 2 */
-function scoreCapitalStackCompatibility(_deal: Deal): number { return 0.5; }
+/**
+ * TSL-DIM-CAP-STACK-001 — Capital Stack Compatibility
+ *
+ * Scores how well the deal's financials fit standard SBA/seller-note capital structures.
+ * Uses three sub-signals:
+ *   1. DSCR (Debt Service Coverage Ratio) — cash flow vs estimated annual debt service
+ *   2. LTV (Loan-to-Value) — asking price vs SBA-eligible LTV ceiling (90%)
+ *   3. Equity check — buyer equity injection as % of asking price (target ≤ 20%)
+ *
+ * Scoring bands:
+ *   DSCR ≥ 1.35 → 1.0 | 1.25–1.35 → 0.8 | 1.10–1.25 → 0.5 | < 1.10 → 0.2
+ *   LTV ≤ 80%   → 1.0 | 80–90%    → 0.7 | 90–100%   → 0.4 | > 100% → 0.1
+ *   Equity ≤ 10% → 1.0 | 10–20%   → 0.7 | 20–30%    → 0.4 | > 30%  → 0.2
+ */
+function scoreCapitalStackCompatibility(deal: Deal): number {
+  const cashFlow = deal.cashFlow ?? 0;
+  const askingPrice = deal.askingPrice ?? 0;
 
-/** Operational Alpha stub — returns 0.5 until Sprint 2 */
-function scoreOperationalAlpha(_deal: Deal): number { return 0.5; }
+  if (askingPrice <= 0 || cashFlow <= 0) return 0.3; // insufficient data — below neutral
 
-/** Macro Arbitrage Exposure stub — returns 0.5 until Sprint 2 */
-function scoreMacroArbitrage(_deal: Deal): number { return 0.5; }
+  // Estimate annual debt service: SBA 7(a) at 90% LTV, 10-year term, ~11.5% rate
+  // Monthly payment formula: P * r / (1 - (1+r)^-n)
+  const loanAmount = askingPrice * 0.90;
+  const monthlyRate = 0.115 / 12;
+  const nMonths = 120; // 10-year SBA
+  const monthlyPayment = loanAmount * monthlyRate / (1 - Math.pow(1 + monthlyRate, -nMonths));
+  const annualDebtService = monthlyPayment * 12;
+
+  // Sub-signal 1: DSCR
+  const dscr = cashFlow / annualDebtService;
+  const dscrScore = dscr >= 1.35 ? 1.0
+    : dscr >= 1.25 ? 0.8
+    : dscr >= 1.10 ? 0.5
+    : 0.2;
+
+  // Sub-signal 2: LTV (asking price vs appraised value — use asking as proxy)
+  // SBA ceiling is 90% LTV; below 80% is ideal
+  const ltv = (loanAmount / askingPrice) * 100;
+  const ltvScore = ltv <= 80 ? 1.0
+    : ltv <= 90 ? 0.7
+    : ltv <= 100 ? 0.4
+    : 0.1;
+
+  // Sub-signal 3: Equity injection required (10% of asking = SBA minimum)
+  const equityPct = (askingPrice * 0.10) / askingPrice * 100; // always 10% for SBA
+  // Adjust: if DSCR is strong, seller note can reduce equity; if weak, equity rises
+  const effectiveEquityPct = dscr >= 1.25 ? 10 : dscr >= 1.10 ? 15 : 25;
+  const equityScore = effectiveEquityPct <= 10 ? 1.0
+    : effectiveEquityPct <= 20 ? 0.7
+    : effectiveEquityPct <= 30 ? 0.4
+    : 0.2;
+
+  // Weighted composite: DSCR is most critical for SBA approval
+  return Math.min(1, dscrScore * 0.55 + ltvScore * 0.25 + equityScore * 0.20);
+}
+
+/**
+ * TSL-DIM-OPS-ALPHA-001 — Operational Alpha
+ *
+ * Scores the operational leverage potential — how much value can be unlocked
+ * post-acquisition through AI, process optimization, and route/recurring model scaling.
+ *
+ * Scoring factors:
+ *   1. Industry archetype — route-based / recurring / fragmented = high alpha
+ *   2. Revenue per employee — lean operations = more automation headroom
+ *   3. Owner-dependency signals — keywords in description suggesting key-man risk
+ *   4. Employee count — smaller teams are easier to optimize; >100 = complexity penalty
+ */
+function scoreOperationalAlpha(deal: Deal): number {
+  const industry = (deal.industry ?? "").toLowerCase();
+  const description = (deal.description ?? "").toLowerCase();
+  const employees = deal.employees ?? 0;
+  const revenue = deal.revenue ?? 0;
+
+  // Sub-signal 1: Industry archetype
+  // Route-based and recurring-revenue businesses have the highest AI/ops leverage
+  const highAlphaIndustries = [
+    "pest control", "hvac", "plumbing", "cleaning", "janitorial",
+    "landscaping", "lawn", "pool", "fire protection", "security",
+    "waste", "recycling", "laundry", "vending", "route",
+  ];
+  const medAlphaIndustries = [
+    "logistics", "delivery", "trucking", "freight", "staffing",
+    "healthcare", "dental", "medical", "childcare", "auto repair",
+    "printing", "signage", "restoration",
+  ];
+  const isHighAlpha = highAlphaIndustries.some(kw => industry.includes(kw));
+  const isMedAlpha = medAlphaIndustries.some(kw => industry.includes(kw));
+  const industryScore = isHighAlpha ? 1.0 : isMedAlpha ? 0.65 : 0.35;
+
+  // Sub-signal 2: Revenue per employee (higher = leaner = more automation headroom)
+  let revPerEmpScore = 0.5; // default if no employee data
+  if (employees > 0 && revenue > 0) {
+    const revPerEmp = revenue / employees;
+    revPerEmpScore = revPerEmp >= 300000 ? 1.0  // $300K+ per head = very lean
+      : revPerEmp >= 200000 ? 0.8
+      : revPerEmp >= 100000 ? 0.55
+      : 0.3; // labor-heavy
+  }
+
+  // Sub-signal 3: Owner-dependency penalty
+  // Keywords that indicate the business is tied to the owner's personal relationships
+  const ownerDependencyKeywords = [
+    "owner operated", "owner-operated", "owner runs", "owner manages",
+    "family run", "family-run", "founder led", "founder-led",
+    "key relationships", "personal relationships", "owner's clients",
+    "owner will train", "absentee not possible",
+  ];
+  const hasOwnerDependency = ownerDependencyKeywords.some(kw => description.includes(kw));
+  const ownerPenalty = hasOwnerDependency ? 0.25 : 0;
+
+  // Sub-signal 4: Team size score (smaller = easier to optimize)
+  const teamScore = employees === 0 ? 0.5  // unknown
+    : employees <= 10 ? 1.0
+    : employees <= 25 ? 0.8
+    : employees <= 50 ? 0.6
+    : employees <= 100 ? 0.4
+    : 0.2; // 100+ = complexity risk
+
+  const raw = industryScore * 0.40 + revPerEmpScore * 0.30 + teamScore * 0.30;
+  return Math.min(1, Math.max(0, raw - ownerPenalty));
+}
+
+/**
+ * TSL-DIM-MACRO-ARB-001 — Macro Arbitrage Exposure
+ *
+ * Scores the deal's alignment with active macro tailwinds in the macro_signals table.
+ * Queries live signals and cross-references impacted_asset_classes against the deal's
+ * industry, and affected_geography against the deal's location.
+ *
+ * This function is synchronous — it accepts pre-fetched signals to avoid async in scorer.
+ * The caller (scoreDeal) fetches signals once and passes them in.
+ *
+ * Scoring:
+ *   - Each matching signal contributes: confidence_score * directionMultiplier
+ *   - direction='tailwind' → positive; direction='headwind' → negative
+ *   - Score = clamp(sum / normalization_factor, 0, 1)
+ *   - No matching signals → 0.35 (neutral-low, not zero — unknown ≠ bad)
+ */
+function scoreMacroArbitrageFromSignals(
+  deal: Deal,
+  signals: Array<{
+    title: string;
+    signal_type: string;
+    confidence_score: string | number;
+    impacted_asset_classes: string[] | null;
+    affected_naics: string[] | null;
+    affected_geography: string[] | null;
+    direction: string | null;
+  }>
+): number {
+  const industry = (deal.industry ?? "").toLowerCase();
+  const location = (deal.location ?? "").toLowerCase();
+
+  if (signals.length === 0) return 0.35;
+
+  let matchScore = 0;
+  let matchCount = 0;
+
+  for (const sig of signals) {
+    const conf = parseFloat(String(sig.confidence_score)) || 0;
+    const direction = sig.direction ?? "tailwind";
+    const dirMult = direction === "headwind" ? -1 : 1;
+
+    // Check industry match via impacted_asset_classes
+    const assetClasses = sig.impacted_asset_classes ?? [];
+    const industryMatch = assetClasses.some(ac => {
+      const acLower = ac.toLowerCase();
+      return industry.includes(acLower) || acLower.includes(industry.split(" ")[0]);
+    });
+
+    // Check location match via affected_geography
+    const geoList = sig.affected_geography ?? [];
+    const locationMatch = geoList.length === 0 // no geo restriction = national signal
+      || geoList.some(geo => {
+        const geoLower = geo.toLowerCase();
+        return location.includes(geoLower) || geoLower.includes(location.split(",")[0].trim());
+      });
+
+    // Signal must match industry OR be a broad macro signal (macro_momentum/seasonal with no geo)
+    const isBroadSignal = (sig.signal_type === "macro_momentum" || sig.signal_type === "seasonal")
+      && geoList.length === 0;
+
+    if (industryMatch && locationMatch) {
+      // Strong match: industry + location aligned
+      matchScore += conf * dirMult * 1.0;
+      matchCount++;
+    } else if (industryMatch && isBroadSignal) {
+      // Partial match: industry aligned, national signal
+      matchScore += conf * dirMult * 0.6;
+      matchCount++;
+    } else if (locationMatch && geoList.length > 0) {
+      // Location match only — some relevance
+      matchScore += conf * dirMult * 0.3;
+      matchCount++;
+    }
+  }
+
+  if (matchCount === 0) return 0.35; // no relevant signals found
+
+  // Normalize: 3 strong signals at 0.9 confidence = perfect score
+  const normalized = matchScore / (3 * 0.9);
+  return Math.min(1, Math.max(0, 0.35 + normalized * 0.65));
+}
 
 export async function scoreDeal(deal: Deal): Promise<{ score: number; redFlagCount: number; dimensions?: Record<string, number> }> {
   const cashFlow = deal.cashFlow ?? 0;
@@ -365,7 +560,7 @@ export async function scoreDeal(deal: Deal): Promise<{ score: number; redFlagCou
   const askingPrice = deal.askingPrice ?? 1;
   const multiple = deal.multiple ?? (askingPrice / (cashFlow || 1));
 
-  // Dimension 1: Financial (40% weight)
+  // Dimension 1: Financial Health (40% weight)
   const marginScore = revenue > 0 ? Math.min(1, cashFlow / revenue / 0.4) : 0;
   const multipleScore = multiple > 0 ? Math.max(0, 1 - (multiple - 2) / 4) : 0;
   const sizeScore = cashFlow >= 1000000 ? 1 : cashFlow >= 500000 ? 0.7 : cashFlow >= 250000 ? 0.4 : 0.2;
@@ -386,7 +581,21 @@ export async function scoreDeal(deal: Deal): Promise<{ score: number; redFlagCou
   const operationalAlphaScore = scoreOperationalAlpha(deal);
 
   // Dimension 6: Macro Arbitrage Exposure (5% weight) — TSL-DIM-MACRO-ARB-001
-  const macroArbitrageScore = scoreMacroArbitrage(deal);
+  // Fetch active macro signals once; pass to synchronous scorer
+  let macroArbitrageScore = 0.35; // safe default if DB unavailable
+  try {
+    const { getDb } = await import("./db.js");
+    const db = await getDb();
+    if (db) {
+      const [rows] = await db.execute(
+        "SELECT title, signal_type, confidence_score, impacted_asset_classes, affected_naics, affected_geography, direction FROM macro_signals WHERE archived = 0 LIMIT 50"
+      ) as any;
+      const signals = Array.isArray(rows) ? rows : [];
+      macroArbitrageScore = scoreMacroArbitrageFromSignals(deal, signals);
+    }
+  } catch {
+    // DB unavailable — keep default 0.35
+  }
 
   const score =
     0.40 * financialScore +

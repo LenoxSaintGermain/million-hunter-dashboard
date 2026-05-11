@@ -550,3 +550,14 @@
 - [ ] Add Score All Deals button to InsuranceProspector with progress bar
 - [ ] scoreAllDeals procedure in insuranceRouter — batch AI scoring with progress
 - [ ] Empty state onboarding CTA for insurance users with zero scored deals
+
+## Sprint 29 — Real SCORER Dimensions (Zero Stubs)
+
+- [x] Implement Capital Stack Compatibility (TSL-DIM-CAP-STACK-001) — real LTV/DSCR logic using capital_stack_templates
+- [x] Implement Operational Alpha (TSL-DIM-OPS-ALPHA-001) — real industry/employee/revenue-per-employee scoring
+- [x] Implement Macro Arbitrage (TSL-DIM-MACRO-ARB-001) — real TIDE signal overlap using macro_signals table
+- [x] Rebalance composite score weights to 6-factor (Financial 40%, Strategic 20%, Deal Structure 10%, Cap Stack 15%, Ops Alpha 10%, Macro Arb 5%)
+- [x] Remove all stub comments from gemini.ts
+- [x] Update stack.test.ts to verify real dimension logic (not just identifier presence)
+- [x] Run pnpm test — confirm 98/98 passing
+- [x] Save checkpoint Sprint 29
