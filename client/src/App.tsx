@@ -23,6 +23,8 @@ import AdminPanel from "./pages/AdminPanel";
 import InviteAccept from "./pages/InviteAccept";
 import DealShare from "./pages/DealShare";
 import Lobby from "./pages/Lobby";
+import ICReview from "./pages/ICReview";
+import BehavioralProfile from "./pages/BehavioralProfile";
 import InvestorDealRoom from "./pages/investor/DealRoom";
 import InvestorDealDetail from "./pages/investor/InvestorDealDetail";
 import MemoVault from "./pages/investor/MemoVault";
@@ -131,6 +133,8 @@ function Router() {
         <Route path="/scan" component={Scan} />
         <Route path="/thesis" component={ThesisEngine} />
         <Route path="/deal/:id" component={DealDetail} />
+        <Route path="/ic-review/:id" component={ICReview} />
+        <Route path="/behavioral/:id" component={BehavioralProfile} />
         <Route path="/memos" component={Memos} />
         <Route path="/outreach" component={Outreach} />
         <Route path="/settings" component={Settings} />
@@ -160,9 +164,9 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="dark">
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
-          <Toaster theme="dark" />
+          <Toaster theme="light" />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

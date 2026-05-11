@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -389,7 +389,7 @@ export default function AdminPanel() {
   // Guard: non-admin users see a locked state
   if (currentUser && currentUser.role !== "admin") {
     return (
-      <DashboardLayout>
+      <EditorialTopNav>
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
           <Lock className="w-16 h-16 text-muted-foreground/20 mb-4" />
           <h2 className="text-xl font-semibold text-foreground mb-2">Admin Access Required</h2>
@@ -397,7 +397,7 @@ export default function AdminPanel() {
             This panel is restricted to platform administrators. Contact the operator to request access.
           </p>
         </div>
-      </DashboardLayout>
+      </EditorialTopNav>
     );
   }
 
@@ -413,7 +413,7 @@ export default function AdminPanel() {
   const totalProspects = prospectStats.reduce((sum, p) => sum + Number(p.count), 0);
 
   return (
-    <DashboardLayout>
+    <EditorialTopNav>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -617,6 +617,6 @@ export default function AdminPanel() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }

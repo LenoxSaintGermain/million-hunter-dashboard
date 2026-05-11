@@ -8,7 +8,7 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -454,7 +454,7 @@ export default function TIDEPage() {
   }, [flows]);
 
   return (
-    <DashboardLayout>
+    <EditorialTopNav>
       {/* ── Header ── */}
       <motion.div
         initial={{ opacity: 0, filter: "blur(6px)" }}
@@ -751,6 +751,6 @@ export default function TIDEPage() {
           </div>
         </motion.div>
       </div>
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }

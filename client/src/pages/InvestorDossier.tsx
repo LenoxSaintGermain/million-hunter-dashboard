@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -236,7 +236,7 @@ export default function InvestorDossier() {
   const ProfileIcon = selectedProfile.icon;
 
   return (
-    <DashboardLayout>
+    <EditorialTopNav>
       <div className="space-y-6">
         {/* Header */}
         <motion.div
@@ -694,6 +694,6 @@ export default function InvestorDossier() {
           </>
         )}
       </AnimatePresence>
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }

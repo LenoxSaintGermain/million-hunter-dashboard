@@ -628,3 +628,94 @@ export const inviteTokens = mysqlTable("invite_tokens", {
 export type InviteToken = typeof inviteTokens.$inferSelect;
 export type InsertInviteToken = typeof inviteTokens.$inferInsert;
 
+// ─── Deal Agent Runs (Multi-Model Orchestration) ──────────────────────────────
+// Stores the output of each AI analysis run on a deal.
+// Each run can contain multiple model outputs (Claude, Gemini, Perplexity/Sonar).
+// The "consensus" field is the synthesized verdict across all models.
+export const dealAgentRuns = mysqlTable("deal_agent_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  dealId: int("deal_id").notNull(),
+  // Analysis type: which lens was applied
+  analysisType: mysqlEnum("analysis_type", [
+    "consensus",
+    "behavioral",
+    "redteam",
+    "capital_stack",
+    "digital_alpha",
+  ]).notNull(),
+  // Status of the run
+  status: mysqlEnum("status", ["pending", "running", "complete", "failed"]).default("pending").notNull(),
+  // Per-model outputs (raw JSON from each model)
+  claudeOutput: json("claude_output").$type<{
+    verdict?: string;
+    confidence?: number;
+    rationale?: string;
+    keyRisks?: string[];
+    keyStrengths?: string[];
+    rawText?: string;
+  }>(),
+  geminiOutput: json("gemini_output").$type<{
+    verdict?: string;
+    confidence?: number;
+    rationale?: string;
+    keyRisks?: string[];
+    keyStrengths?: string[];
+    rawText?: string;
+  }>(),
+  sonarOutput: json("sonar_output").$type<{
+    verdict?: string;
+    confidence?: number;
+    rationale?: string;
+    keyRisks?: string[];
+    keyStrengths?: string[];
+    rawText?: string;
+    sources?: string[];
+  }>(),
+  // Synthesized consensus across all models
+  consensus: json("consensus").$type<{
+    verdict: string;
+    confidence: number;
+    divergence: boolean;
+    summary: string;
+    actionItem: string;
+  }>(),
+  // Behavioral profile (used for analysisType = "behavioral")
+  behavioralProfile: json("behavioral_profile").$type<{
+    ownerArchetype?: string;
+    motivationPrimary?: string;
+    negotiationStyle?: string;
+    frictionPoints?: string[];
+    openingMove?: string;
+    anchorStrategy?: string;
+    rehearsalScenarios?: Array<{
+      scenario: string;
+      ownerResponse: string;
+      counterMove: string;
+    }>;
+  }>(),
+  // Red team analysis
+  redTeamAnalysis: json("red_team_analysis").$type<{
+    dealBreakers?: string[];
+    hiddenRisks?: string[];
+    optimisticAssumptions?: string[];
+    worstCaseScenario?: string;
+    mitigations?: string[];
+  }>(),
+  // Digital alpha analysis
+  digitalAlpha: json("digital_alpha").$type<{
+    currentTechStack?: string;
+    automationOpportunities?: string[];
+    aiLeveragePoints?: string[];
+    estimatedEfficiencyGain?: string;
+    quickWins?: string[];
+  }>(),
+  totalTokens: int("total_tokens"),
+  triggeredByUserId: int("triggered_by_user_id"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type DealAgentRun = typeof dealAgentRuns.$inferSelect;
+export type InsertDealAgentRun = typeof dealAgentRuns.$inferInsert;

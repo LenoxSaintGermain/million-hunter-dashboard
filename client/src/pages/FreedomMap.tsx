@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -73,7 +73,7 @@ export default function FreedomMap() {
   };
 
   return (
-    <DashboardLayout>
+    <EditorialTopNav>
       <div className="space-y-8">
         {/* Hero */}
         <motion.div
@@ -544,6 +544,6 @@ export default function FreedomMap() {
           )}
         </AnimatePresence>
       </div>
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }

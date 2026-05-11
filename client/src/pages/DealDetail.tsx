@@ -1,8 +1,9 @@
 import React from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import CoPilot from "@/components/CoPilot";
+import AgentMonitoringPanel from "@/components/AgentMonitoringPanel";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -129,7 +130,7 @@ export default function DealDetail() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
+      <EditorialTopNav>
         <div className="space-y-4">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-32 w-full" />
@@ -137,13 +138,13 @@ export default function DealDetail() {
             {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />)}
           </div>
         </div>
-      </DashboardLayout>
+      </EditorialTopNav>
     );
   }
 
   if (!data) {
     return (
-      <DashboardLayout>
+      <EditorialTopNav>
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Building2 className="w-12 h-12 text-muted-foreground/20 mb-4" />
           <p className="text-sm font-medium text-muted-foreground">Deal not found</p>
@@ -154,7 +155,7 @@ export default function DealDetail() {
             </Button>
           </Link>
         </div>
-      </DashboardLayout>
+      </EditorialTopNav>
     );
   }
 
@@ -163,7 +164,7 @@ export default function DealDetail() {
   const scoreColorVal = score == null ? "var(--sh-fg-3)" : score >= 0.8 ? "var(--sage)" : score >= 0.65 ? "var(--amber)" : "var(--clay)";
 
   return (
-    <DashboardLayout>
+    <EditorialTopNav>
       {/* Back nav */}
       <Link href="/scan">
         <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground -ml-2">
@@ -1016,12 +1017,21 @@ export default function DealDetail() {
           </Card>
         </TabsContent>
         <TabsContent value="agents" className="mt-4">
-          <AgentLoopPanel dealId={dealId} dealName={deal.name} />
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <AgentLoopPanel dealId={dealId} dealName={deal.name} />
+            </div>
+            <div className="lg:col-span-1">
+              <div className="sticky top-4 p-4 bg-[#faf7f2] border border-[#e8e0d4] rounded-xl">
+                <AgentMonitoringPanel dealId={dealId} />
+              </div>
+            </div>
+          </div>
         </TabsContent>
        </Tabs>
       {/* Co-Pilot with deal-specific context injected */}
       <CoPilot dealId={dealId} dealName={deal.name} />
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }
 // ─── Agent Loop Panel (Hermes-pattern: Architect → Red Team → Remediation) ────

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Streamdown } from "streamdown";
@@ -74,7 +74,7 @@ export default function Memos() {
   );
 
   return (
-    <DashboardLayout>
+    <EditorialTopNav>
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -221,6 +221,6 @@ export default function Memos() {
           })}
         </div>
       )}
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }

@@ -4,7 +4,7 @@
  */
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -424,7 +424,7 @@ export default function CapitalStackPage() {
   };
 
   return (
-    <DashboardLayout>
+    <EditorialTopNav>
       <div style={{ maxWidth: "900px", margin: "0 auto", padding: "0 0 40px" }}>
         {/* Page Header */}
         <div style={{ marginBottom: "32px" }}>
@@ -671,6 +671,6 @@ export default function CapitalStackPage() {
           <StackModeler stackId={activeStackId} onClose={() => { setView("gallery"); setActiveStackId(null); }} />
         )}
       </div>
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }

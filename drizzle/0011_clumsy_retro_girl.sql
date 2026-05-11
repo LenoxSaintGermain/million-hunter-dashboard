@@ -1,0 +1,20 @@
+CREATE TABLE `deal_agent_runs` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`deal_id` int NOT NULL,
+	`analysis_type` enum('consensus','behavioral','redteam','capital_stack','digital_alpha') NOT NULL,
+	`status` enum('pending','running','complete','failed') NOT NULL DEFAULT 'pending',
+	`claude_output` json,
+	`gemini_output` json,
+	`sonar_output` json,
+	`consensus` json,
+	`behavioral_profile` json,
+	`red_team_analysis` json,
+	`digital_alpha` json,
+	`total_tokens` int,
+	`triggered_by_user_id` int,
+	`started_at` timestamp,
+	`completed_at` timestamp,
+	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `deal_agent_runs_id` PRIMARY KEY(`id`)
+);

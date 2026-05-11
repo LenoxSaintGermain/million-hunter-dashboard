@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import ScanProgress from "@/components/ScanProgress";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -258,7 +258,7 @@ export default function Settings() {
   const MODULES = Object.keys(MODULE_LABELS) as AnalysisModule[];
 
   return (
-    <DashboardLayout>
+    <EditorialTopNav>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground">System Settings</h1>
@@ -620,6 +620,6 @@ export default function Settings() {
           </Card>
         </div>
       )}
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }

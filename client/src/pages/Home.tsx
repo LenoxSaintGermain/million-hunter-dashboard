@@ -3,7 +3,7 @@ import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import ScanProgress from "@/components/ScanProgress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -725,6 +725,245 @@ function ActivityLog({ activities }: { activities: any[] | undefined }) {
 }
 
 // ─── Command Center (main page) ───────────────────────────────────────────────
+// ─── Co-Analyst Insight Banner ───────────────────────────────────────────────
+function CoAnalystBanner({ stats, macroPosture }: { stats: any; macroPosture: any }) {
+  const insight = (() => {
+    if (!stats) return null;
+    const hp = stats.highPriority ?? 0;
+    const total = stats.total ?? 0;
+    const posture = macroPosture?.posture ?? "MONITORING";
+    const headwinds = macroPosture?.headwindCount ?? 0;
+    const tailwinds = macroPosture?.tailwindCount ?? 0;
+
+    if (hp >= 3 && tailwinds > 0)
+      return { text: `${hp} targets at high-conviction status with ${tailwinds} macro tailwind${tailwinds > 1 ? "s" : ""} active. Deployment window is open — initiate outreach on the top-ranked deal immediately.`, urgency: "high" };
+    if (hp > 0 && headwinds === 0)
+      return { text: `${hp} deal${hp > 1 ? "s" : ""} ready for outreach. No active headwinds detected. Recommend initiating broker contact within 24 hours to capture current market window.`, urgency: "medium" };
+    if (headwinds > tailwinds)
+      return { text: `${headwinds} macro headwind${headwinds > 1 ? "s" : ""} detected. Maintain DEFENSIVE posture — prioritize deals with strong recurring revenue and low owner-dependency until signals resolve.`, urgency: "caution" };
+    if (total === 0)
+      return { text: "Pipeline is empty. Run a market scan to surface acquisition-ready targets across your target sectors.", urgency: "neutral" };
+    return { text: `${total} deal${total !== 1 ? "s" : ""} in active pipeline. System nominal — no immediate action required.`, urgency: "neutral" };
+  })();
+
+  if (!insight) return null;
+
+  const borderColor = insight.urgency === "high" ? "var(--sage)" : insight.urgency === "caution" ? "var(--clay)" : "var(--amber)";
+  const bg = insight.urgency === "high" ? "oklch(0.55 0.06 155 / 0.04)" : insight.urgency === "caution" ? "oklch(0.55 0.14 28 / 0.04)" : "oklch(0.66 0.14 55 / 0.04)";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: EASE }}
+      style={{
+        borderLeft: `2px solid ${borderColor}`,
+        background: bg,
+        padding: "12px 20px",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 12,
+        borderBottom: "1px solid var(--rule)",
+      }}
+    >
+      <div style={{
+        width: 6, height: 6, borderRadius: "50%",
+        background: borderColor,
+        marginTop: 5, flexShrink: 0,
+        animation: insight.urgency === "high" ? "livepulse 2s ease-in-out infinite" : "none",
+      }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 9, fontWeight: 600,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: borderColor,
+          }}>Co-Analyst · Signal Hunter OS</span>
+        </div>
+        <p style={{
+          fontSize: 13,
+          color: "var(--ink)",
+          lineHeight: 1.55,
+          fontFamily: "var(--font-sans)",
+          margin: 0,
+        }}>{insight.text}</p>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Editorial Hero Strip ─────────────────────────────────────────────────────
+function EditorialHero({ stats, macroPosture, isLoading, onScan, scanPending }: {
+  stats: any; macroPosture: any; isLoading: boolean; onScan: () => void; scanPending: boolean;
+}) {
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening";
+  const dateStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+  return (
+    <div style={{
+      padding: "32px 40px 24px",
+      borderBottom: "1px solid var(--rule)",
+      background: "var(--paper)",
+    }}>
+      {/* Dateline */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <span style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 10, fontWeight: 500,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          color: "var(--sh-fg-4)",
+        }}>{dateStr}</span>
+        <span style={{ width: 1, height: 10, background: "var(--rule)" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{
+            width: 5, height: 5, borderRadius: "50%",
+            background: "var(--sage)",
+            display: "inline-block",
+            animation: "livepulse 2.5s ease-in-out infinite",
+          }} />
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 10, letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: "var(--sage)",
+          }}>Live</span>
+        </div>
+      </div>
+
+      {/* Display headline — Fraunces */}
+      <h1 style={{
+        fontFamily: "'Fraunces', Georgia, serif",
+        fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)",
+        fontWeight: 400,
+        fontStyle: "italic",
+        color: "var(--ink)",
+        letterSpacing: "-0.02em",
+        lineHeight: 1.15,
+        marginBottom: 10,
+        maxWidth: "780px",
+      }}>
+        {stats?.highPriority
+          ? `${stats.highPriority} target${stats.highPriority > 1 ? "s" : ""} at high-conviction status — deployment window open.`
+          : `Good ${greeting}, Lenox. Acquisition intelligence is active.`}
+      </h1>
+
+      {/* Sub-narrative */}
+      <p style={{
+        fontSize: 14,
+        color: "var(--sh-fg-2)",
+        lineHeight: 1.6,
+        marginBottom: 20,
+        maxWidth: 620,
+        fontFamily: "var(--font-sans)",
+      }}>
+        {stats?.total
+          ? `${stats.total} deal${stats.total !== 1 ? "s" : ""} in active pipeline.${stats.highPriority ? ` ${stats.highPriority} ready for outreach.` : " No immediate action required."}`
+          : "Pipeline monitoring active. Run a market scan to surface acquisition-ready targets."}
+      </p>
+
+      {/* TIDE Ticker */}
+      {macroPosture?.topSignals && macroPosture.topSignals.length > 0 && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          marginBottom: 20,
+          padding: "8px 14px",
+          background: "var(--bone)",
+          border: "1px solid var(--rule)",
+          borderRadius: 4,
+          maxWidth: 680,
+        }}>
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 9, fontWeight: 700,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            color: "var(--sh-fg-4)",
+            flexShrink: 0,
+          }}>TIDE</span>
+          <span style={{ width: 1, height: 12, background: "var(--rule)", flexShrink: 0 }} />
+          <div style={{ display: "flex", gap: 20, overflow: "hidden", flex: 1, flexWrap: "wrap" }}>
+            {macroPosture.topSignals.map((sig: any) => (
+              <div key={sig.id} style={{
+                display: "flex", alignItems: "center", gap: 6,
+                fontSize: 11, color: "var(--sh-fg-2)",
+                flexShrink: 0,
+              }}>
+                <span style={{
+                  width: 5, height: 5, borderRadius: "50%", flexShrink: 0,
+                  background: sig.direction === "headwind" ? "var(--clay)" : "var(--sage)",
+                }} />
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 10 }}>
+                  {sig.title.length > 50 ? sig.title.slice(0, 50) + "…" : sig.title}
+                </span>
+                <span style={{
+                  fontSize: 9, fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  color: sig.direction === "headwind" ? "var(--clay)" : "var(--sage)",
+                  textTransform: "uppercase",
+                  fontFamily: "var(--font-mono)",
+                }}>{Math.round((sig.confidenceScore ?? 0.5) * 100)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Posture metrics bar */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(4, auto)",
+        gap: "0 32px",
+        borderTop: "1px solid var(--rule)",
+        paddingTop: 16,
+      }}>
+        {[
+          {
+            label: "POSTURE",
+            value: macroPosture?.posture ?? ((stats?.highPriority ?? 0) > 2 ? "AGGRESSIVE" : (stats?.highPriority ?? 0) > 0 ? "ACTIVE" : "MONITORING"),
+            accent: true,
+          },
+          {
+            label: "PIPELINE",
+            value: stats?.total != null ? `${stats.total} DEALS` : "—",
+            accent: false,
+          },
+          {
+            label: "AVG SCORE",
+            value: stats?.avgScore != null ? parseFloat(String(stats.avgScore)).toFixed(3) : "—",
+            accent: false,
+          },
+          {
+            label: "SIGNALS",
+            value: macroPosture != null ? `${macroPosture.tailwindCount}↑ ${macroPosture.headwindCount}↓` : "—",
+            accent: macroPosture != null && macroPosture.headwindCount === 0,
+          },
+        ].map((m, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <span style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 9, fontWeight: 500,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "var(--sh-fg-4)",
+            }}>{m.label}</span>
+            <span style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 14, fontWeight: 500,
+              color: m.accent ? "var(--ink)" : "var(--sh-fg-2)",
+              letterSpacing: "0.04em",
+            }}>{isLoading ? "—" : m.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Command Center (main page) ───────────────────────────────────────────────
 export default function Home() {
   const [activeScanJobId, setActiveScanJobId] = useState<number | null>(null);
   const utils = trpc.useUtils();
@@ -733,9 +972,14 @@ export default function Home() {
   const { data: topDealsData } = trpc.deals.list.useQuery({ limit: 8 });
 
   const deleteDeal = trpc.deals.delete.useMutation({
-    onSuccess: () => { toast.success("Deal removed"); utils.deals.list.invalidate(); utils.dashboard.stats.invalidate(); },
+    onSuccess: () => {
+      toast.success("Deal removed");
+      utils.deals.list.invalidate();
+      utils.dashboard.stats.invalidate();
+    },
     onError: (e) => toast.error(`Delete failed: ${e.message}`),
   });
+
   const triggerScan = trpc.scan.trigger.useMutation({
     onSuccess: (d) => {
       toast.success(d.message);
@@ -747,273 +991,130 @@ export default function Home() {
   const stats = data?.dealStats;
   const outStats = data?.outreachStats;
 
-  const systemAnnotation = (() => {
-    if (!stats) return null;
-    if ((stats.highPriority ?? 0) > 0) return { text: `${stats.highPriority} deal${stats.highPriority > 1 ? "s" : ""} ready for outreach — initiate contact`, color: C.em };
-    if ((stats.total ?? 0) === 0) return { text: "Pipeline empty — run a market scan to begin intelligence gathering", color: C.am };
-    if ((outStats?.responded ?? 0) > 0) return { text: `${outStats?.responded} broker response${(outStats?.responded ?? 0) > 1 ? "s" : ""} pending review`, color: C.p };
-    return { text: "System nominal — no immediate action required", color: C.fg3 };
-  })();
-
   return (
-    <DashboardLayout>
-      {/* ── MORNING BRIEF HERO (Stitch Intelligence Terminal) ─────────────── */}
+    <EditorialTopNav>
+      {/* ── Co-Analyst Insight Banner ─────────────────────────────────────── */}
+      <CoAnalystBanner stats={stats} macroPosture={macroPosture} />
+
+      {/* ── Editorial Hero Strip ──────────────────────────────────────────── */}
+      <EditorialHero
+        stats={stats}
+        macroPosture={macroPosture}
+        isLoading={isLoading}
+        onScan={() => triggerScan.mutate({})}
+        scanPending={triggerScan.isPending}
+      />
+
+      {/* ── Scan Progress ─────────────────────────────────────────────────── */}
+      {activeScanJobId !== null && (
+        <div style={{ padding: "0 40px" }}>
+          <ScanProgress
+            jobId={activeScanJobId}
+            onComplete={() => {
+              setActiveScanJobId(null);
+              refetch();
+              utils.deals.list.invalidate();
+              utils.dashboard.stats.invalidate();
+            }}
+            onRetry={() => { setActiveScanJobId(null); triggerScan.mutate({}); }}
+          />
+        </div>
+      )}
+
+      {/* ── Stat Strip ────────────────────────────────────────────────────── */}
+      <div style={{ borderBottom: "1px solid var(--rule)", background: "var(--paper)" }}>
+        <StatStrip stats={stats} outStats={outStats} isLoading={isLoading} />
+      </div>
+
+      {/* ── Main Editorial Grid ───────────────────────────────────────────── */}
       <motion.div
-        initial={{ opacity: 0, y: 16, filter: "blur(6px)" }}
-        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-        transition={{ duration: 0.9, ease: EASE }}
-        style={{ padding: 0, overflow: "hidden", borderRadius: "var(--radius-lg)" }}
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: EASE, delay: 0.2 }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 340px",
+          gap: 0,
+          minHeight: "calc(100vh - 56px - 240px)",
+          background: "var(--bone)",
+        }}
       >
-        {/* Cinematic hero section */}
+        {/* LEFT: Intelligence Feed */}
         <div style={{
-          position: "relative",
-          overflow: "hidden",
-          background: "var(--surface-container, #182028)",
-          border: "1px solid rgba(81,69,50,0.18)",
-          borderRadius: "var(--radius-lg) var(--radius-lg) 0 0",
-          minHeight: 260,
+          borderRight: "1px solid var(--rule)",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "flex-end",
+          background: "var(--paper)",
         }}>
-          {/* Background texture overlay */}
+          {/* Feed header */}
           <div style={{
-            position: "absolute", inset: 0,
-            backgroundImage: "url('https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2070&auto=format&fit=crop')",
-            backgroundSize: "cover", backgroundPosition: "center",
-            opacity: 0.10, mixBlendMode: "luminosity",
-          }} />
-          {/* Gradient fade */}
-          <div style={{
-            position: "absolute", inset: 0,
-            background: "linear-gradient(to top, #182028 0%, rgba(24,32,40,0.88) 50%, transparent 100%)",
-            zIndex: 1, pointerEvents: "none",
-          }} />
-          {/* Content */}
-          <div style={{ position: "relative", zIndex: 2, padding: "28px 32px 24px" }}>
-            {/* Dateline */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 14, color: "var(--signal-gold, #ffba20)" }}>wb_twilight</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--signal-gold, #ffba20)" }}>
-                Morning Brief: {new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase()}
-              </span>
-              <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
-              <span className="live-dot" style={{ background: "var(--signal-gold, #ffba20)" }} />
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--signal-gold, #ffba20)" }}>Live</span>
-            </div>
-            {/* Display headline — IBM Plex Serif */}
-            <h1 style={{
-              fontFamily: "var(--font-serif, 'IBM Plex Serif', Georgia, serif)",
-              fontSize: "clamp(1.5rem, 3.5vw, 2.4rem)",
-              fontWeight: 500,
-              color: "var(--on-surface, #dae3ee)",
-              letterSpacing: "-0.02em",
-              lineHeight: 1.2,
-              marginBottom: 12,
-              textWrap: "balance",
-              maxWidth: "720px",
-            }}>
-              {stats?.highPriority
-                ? `${stats.highPriority} target${stats.highPriority > 1 ? "s" : ""} at high-conviction status — deployment window open.`
-                : "Signal Hunter Command Center — Acquisition Intelligence Active."}
-            </h1>
-            {/* Sub-narrative */}
-            <p style={{ fontSize: 13, color: "var(--on-surface-variant, #d5c4ab)", marginBottom: 20, maxWidth: 600, lineHeight: 1.6 }}>
-              {stats?.total
-                ? `${stats.total} deal${stats.total !== 1 ? "s" : ""} in active pipeline. ${stats.highPriority ? `${stats.highPriority} ready for outreach.` : "No immediate action required."}`
-                : "Pipeline monitoring active. Run a market scan to surface acquisition-ready targets."}
-            </p>
-            {/* TIDE Ticker — top 2 live macro signals */}
-            {macroPosture?.topSignals && macroPosture.topSignals.length > 0 && (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 8, marginBottom: 16,
-                padding: "8px 12px", borderRadius: 6,
-                background: "rgba(255,186,32,0.06)",
-                border: "1px solid rgba(255,186,32,0.15)",
-                maxWidth: 640,
-              }}>
-                <span style={{
-                  fontSize: 9, fontWeight: 700, letterSpacing: "0.14em",
-                  textTransform: "uppercase",
-                  color: "var(--signal-gold, #ffba20)",
-                  fontFamily: "var(--font-mono)",
-                  flexShrink: 0,
-                }}>TIDE</span>
-                <span style={{ width: 1, height: 14, background: "rgba(255,186,32,0.25)", flexShrink: 0 }} />
-                <div style={{ display: "flex", gap: 16, overflow: "hidden", flex: 1 }}>
-                  {macroPosture.topSignals.map((sig, i) => (
-                    <div key={sig.id} style={{
-                      display: "flex", alignItems: "center", gap: 6,
-                      fontSize: 11, color: "var(--on-surface-variant, #d5c4ab)",
-                      flexShrink: 0,
-                    }}>
-                      <span style={{
-                        width: 5, height: 5, borderRadius: "50%", flexShrink: 0,
-                        background: sig.direction === "headwind"
-                          ? "var(--clay, #e07b5a)"
-                          : "var(--signal-gold, #ffba20)",
-                      }} />
-                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10 }}>
-                        {sig.title.length > 52 ? sig.title.slice(0, 52) + "…" : sig.title}
-                      </span>
-                      <span style={{
-                        fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
-                        color: sig.direction === "headwind" ? "var(--clay, #e07b5a)" : "var(--sage)",
-                        textTransform: "uppercase",
-                        fontFamily: "var(--font-mono)",
-                      }}>{Math.round((sig.confidenceScore ?? 0.5) * 100)}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Posture metrics bar — wired to live macro signal data */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: 0,
-              borderTop: "1px solid rgba(81,69,50,0.25)",
-              paddingTop: 16,
-              maxWidth: 640,
-            }}>
-              {[
-                {
-                  label: "POSTURE",
-                  value: macroPosture?.posture ?? ((stats?.highPriority ?? 0) > 2 ? "AGGRESSIVE" : (stats?.highPriority ?? 0) > 0 ? "ACTIVE" : "MONITORING"),
-                  isGold: true,
-                },
-                {
-                  label: "PIPELINE",
-                  value: stats?.total != null ? `${stats.total} DEALS` : "—",
-                  isGold: false,
-                },
-                {
-                  label: "AVG SCORE",
-                  value: stats?.avgScore != null ? parseFloat(String(stats.avgScore)).toFixed(3) : "—",
-                  isGold: false,
-                },
-                {
-                  label: "SIGNALS",
-                  value: macroPosture != null
-                    ? `${macroPosture.tailwindCount}↑ ${macroPosture.headwindCount}↓`
-                    : "—",
-                  isGold: macroPosture != null && macroPosture.headwindCount === 0,
-                },
-              ].map((m, i) => (
-                <div key={i} style={{ paddingRight: i < 3 ? 16 : 0 }}>
-                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--on-surface-variant, #d5c4ab)", marginBottom: 4 }}>{m.label}</div>
-                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 400, color: m.isGold ? "var(--signal-gold, #ffba20)" : "var(--on-surface, #dae3ee)", letterSpacing: "0.02em" }}>{m.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        {/* Action bar + stat strip */}
-        <div style={{ background: "var(--paper)", border: "1px solid var(--rule)", borderTop: "none", borderRadius: "0 0 var(--radius-lg) var(--radius-lg)", overflow: "hidden" }}>
-          <div style={{
-            padding: "10px 28px",
-            borderBottom: `1px solid ${C.bd}`,
-            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+            padding: "14px 24px 12px",
+            borderBottom: "1px solid var(--rule)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "var(--paper)",
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {data?.latestScan && (
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: C.fg4 }}>
-                  Last scan: {new Date(data.latestScan.createdAt).toLocaleString()} · {(data.latestScan.sources as string[] | null)?.length ?? 0} platforms
-                </span>
-              )}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Brain style={{ width: 13, height: 13, color: "var(--amber)" }} />
+              <div>
+                <span style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10, fontWeight: 500,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                  color: "var(--sh-fg-2)",
+                }}>Opportunity Command Table</span>
+                <p style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 9, letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: "var(--sh-fg-4)",
+                  marginTop: 2,
+                }}>Ranked by AI acquisition score</p>
+              </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
-                className={cn(!triggerScan.isPending && !activeScanJobId && "scan-btn-idle")}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
                 onClick={() => triggerScan.mutate({})}
-                disabled={triggerScan.isPending || activeScanJobId !== null}
+                disabled={triggerScan.isPending}
                 style={{
-                  display: "inline-flex", alignItems: "center", gap: 8,
-                  height: 34, padding: "0 18px", borderRadius: 9999,
-                  fontSize: 10, fontWeight: 600, cursor: "pointer",
-                  background: triggerScan.isPending || activeScanJobId !== null ? "var(--sh-primary-20)" : "var(--signal-gold, #ffba20)",
-                  border: "none", color: triggerScan.isPending || activeScanJobId !== null ? "var(--sh-fg-3)" : "#412d00",
-                  letterSpacing: "0.08em", textTransform: "uppercase",
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  fontSize: 10, fontWeight: 600, height: 26, padding: "0 10px",
+                  borderRadius: 4,
+                  background: "var(--ink)",
+                  border: "none",
+                  color: "var(--bone)",
+                  cursor: triggerScan.isPending ? "not-allowed" : "pointer",
+                  opacity: triggerScan.isPending ? 0.6 : 1,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
                   fontFamily: "var(--font-mono)",
                 }}
               >
-                {triggerScan.isPending || activeScanJobId !== null
-                  ? <><Loader2 style={{ width: 12, height: 12 }} className="animate-spin" /> Scanning Market</>
-                  : <><ScanLine style={{ width: 12, height: 12 }} /> Execute Scan</>
-                }
-              </motion.button>
+                <ScanLine style={{ width: 9, height: 9 }} />
+                {triggerScan.isPending ? "Scanning…" : "Scan"}
+              </button>
               <Link href="/scan">
                 <button style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  height: 28, padding: "0 12px", borderRadius: 9999,
-                  fontSize: 9, fontWeight: 500, cursor: "pointer",
-                  background: "transparent", border: `1px solid ${C.bd}`, color: C.fg3,
-                  fontFamily: "var(--font-mono)", letterSpacing: "0.06em", textTransform: "uppercase",
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  fontSize: 9, fontWeight: 600, height: 26, padding: "0 10px",
+                  borderRadius: 4,
+                  background: "transparent",
+                  border: "1px solid var(--rule)",
+                  color: "var(--sh-fg-3)",
+                  cursor: "pointer",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  fontFamily: "var(--font-mono)",
                 }}>
-                  View Pipeline →
+                  All Deals <ChevronRight style={{ width: 9, height: 9 }} />
                 </button>
               </Link>
             </div>
           </div>
-          {/* Scan progress */}
-          {activeScanJobId !== null && (
-            <ScanProgress
-              jobId={activeScanJobId}
-              onComplete={() => {
-                setActiveScanJobId(null);
-                refetch();
-                utils.deals.list.invalidate();
-                utils.dashboard.stats.invalidate();
-              }}
-              onRetry={() => { setActiveScanJobId(null); triggerScan.mutate({}); }}
-            />
-          )}
-          <StatStrip stats={stats} outStats={outStats} isLoading={isLoading} />
-        </div>
-      </motion.div>
 
-      {/* ── MAIN EDITORIAL GRID ──────────────────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: EASE, delay: 0.3 }}
-        className="editorial-grid"
-        style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 0, minHeight: 0, background: "var(--paper)", border: "1px solid var(--rule)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}
-      >
-        {/* LEFT: Intelligence Feed + Activity */}
-        <div style={{ borderRight: "1px solid var(--rule)", display: "flex", flexDirection: "column" }}>
-
-          {/* Feed header */}
-          <div style={{
-            padding: "14px 20px 10px",
-            borderBottom: `1px solid ${C.bd}`,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            background: `${C.s2}30`,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Brain style={{ width: 13, height: 13, color: C.ba }} />
-              <div>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.10em", color: C.fg2 }}>
-                  Opportunity Command Table
-                </span>
-                <p className="eyebrow" style={{ marginTop: 2 }}>Ranked by AI acquisition score</p>
-              </div>
-            </div>
-            <Link href="/scan">
-              <button style={{
-                display: "inline-flex", alignItems: "center", gap: 4,
-                fontSize: 9, fontWeight: 600, height: 22, padding: "0 8px", borderRadius: 4,
-                background: "transparent", border: `1px solid ${C.bd}`, color: C.fg4, cursor: "pointer",
-                textTransform: "uppercase", letterSpacing: "0.08em",
-              }}>
-                All Deals <ChevronRight style={{ width: 9, height: 9 }} />
-              </button>
-            </Link>
-          </div>
-
-          {/* Deal feed — deduplicated by name (keep highest-score entry per unique name) */}
+          {/* Deal feed */}
           <IntelligenceFeed
             deals={(() => {
               if (!topDealsData) return topDealsData;
@@ -1038,9 +1139,9 @@ export default function Home() {
           {/* Velocity strip */}
           {!isLoading && (
             <div style={{
-              padding: "14px 20px",
-              borderTop: `1px solid ${C.bd}`,
-              background: `${C.s2}20`,
+              padding: "14px 24px",
+              borderTop: "1px solid var(--rule)",
+              background: "var(--bone)",
             }}>
               <VelocityMini />
             </div>
@@ -1048,17 +1149,22 @@ export default function Home() {
 
           {/* Investor interests */}
           {!isLoading && (
-            <div style={{ padding: "0 20px 20px" }}>
+            <div style={{ padding: "0 24px 24px", background: "var(--bone)" }}>
               <InvestorInterestsPanel />
             </div>
           )}
 
           {/* Activity log */}
           {data?.recentActivity && data.recentActivity.length > 0 && (
-            <div style={{ borderTop: `1px solid ${C.bd}` }}>
-              <div style={{ padding: "12px 18px 8px", display: "flex", alignItems: "center", gap: 8 }}>
-                <Activity style={{ width: 11, height: 11, color: C.fg4 }} />
-                <span className="eyebrow">System Log</span>
+            <div style={{ borderTop: "1px solid var(--rule)", background: "var(--paper)" }}>
+              <div style={{ padding: "12px 24px 8px", display: "flex", alignItems: "center", gap: 8 }}>
+                <Activity style={{ width: 11, height: 11, color: "var(--sh-fg-4)" }} />
+                <span style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 9, letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: "var(--sh-fg-4)",
+                }}>System Log</span>
               </div>
               <ActivityLog activities={data.recentActivity} />
             </div>
@@ -1066,10 +1172,16 @@ export default function Home() {
         </div>
 
         {/* RIGHT: Signal Stream */}
-        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          background: "var(--paper)",
+          borderLeft: "1px solid var(--rule)",
+        }}>
           <SignalStream />
         </div>
       </motion.div>
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -163,7 +163,7 @@ export default function Outreach() {
   const replyRate = totalContacts > 0 ? Math.round((replied / totalContacts) * 100) : 0;
 
   return (
-    <DashboardLayout>
+    <EditorialTopNav>
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -301,6 +301,6 @@ export default function Outreach() {
           })}
         </div>
       )}
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }

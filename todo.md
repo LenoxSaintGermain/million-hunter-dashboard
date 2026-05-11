@@ -584,3 +584,84 @@
 - [x] Add TIDE ticker strip to Morning Brief hero (top 2 signals inline)
 - [x] Add direction ↑/↓ badge to Signal Stream items
 - [x] Add direction field to sentinel.create input schema
+
+## Sprint 31–39 — Signal Hunter OS Editorial Edition (Full Build)
+
+### Sprint 31 — Design System Migration
+- [ ] Install Fraunces font via Google Fonts CDN in index.html
+- [ ] Replace dark terminal CSS tokens with Editorial Finance light tokens in index.css
+- [ ] Build EditorialTopNav component (replaces DashboardLayout sidebar)
+- [ ] Update App.tsx to use EditorialTopNav layout wrapper
+- [ ] Purge dark terminal anti-patterns (navy bg, Signal Gold #ffba20, colored section backgrounds)
+
+### Sprint 32 — Command Center Rebuild
+- [ ] Rebuild Home.tsx with editorial layout (top nav, warm paper background)
+- [ ] Add Co-Analyst Insight banner (amber border-l-2 strip with LLM directive)
+- [ ] Rebuild stat strip with Fraunces section-h2 numbers and hover-lift
+- [ ] Rebuild deal list with editorial card anatomy (eyebrow + card-title + body + data footer)
+- [ ] Rebuild Sentinel signal feed with editorial timeline dots
+- [ ] Add dashboard.coAnalystInsight tRPC procedure (Poe API powered, 4hr cache)
+
+### Sprint 33 — Deal Room Bento Grid
+- [ ] Rebuild DealDetail.tsx with editorial bento grid (6 AI modules)
+- [ ] Build AgentMonitoringPanel component (fixed right aside, xl+)
+- [ ] Build BentoModule component (Owner Psychology, Digital Audit, Red Team, Capital Stack, Investment Memo, Consensus)
+- [ ] Add editorial hero strip (Location Catalyst, Event Horizon, Deal Velocity metadata)
+- [ ] Wire bento modules to deals.getAgenticInsight tRPC procedure
+
+### Sprint 34 — Multi-Model Orchestration Backend
+- [ ] Add deal_agent_runs table to schema + migration
+- [ ] Build Poe API helper (server/_core/poe.ts)
+- [ ] Add deals.runAgentAnalysis procedure (parallel 3-model runs)
+- [ ] Add deals.getAgentRuns procedure
+- [ ] Add deals.getConsensusScore procedure (weighted vote + divergence detection)
+- [ ] Add deals.getAgenticInsight procedure (behavioral|redteam|capital|digital|memo)
+- [ ] Add dashboard.coAnalystInsight procedure (pipeline-level directive)
+
+### Sprint 35 — IC Review Page
+- [ ] Build /deal/:id/ic-review route and page
+- [ ] Editorial article layout (Executive Summary, Strategic Rationale, Risk Factors)
+- [ ] Consensus Dashboard right aside (model votes, divergence flag, confidence score)
+- [ ] Action Bar (Approve for LOI, Request Revision, Share with LPs)
+- [ ] Gutter Float Note component (left margin AI annotations)
+
+### Sprint 36 — Behavioral Profile + Owner Psychology
+- [ ] Build /deal/:id/behavioral-profile route and page
+- [ ] Build /deal/:id/owner-psychology route and page
+- [ ] Agentic Insight Card component (Fraunces 32px headline, recommendation block)
+- [ ] Negotiation Rehearsal section (3 scenario cards with win probability)
+- [ ] Wire to deals.getAgenticInsight(dealId, 'behavioral') and 'psychology'
+
+### Sprint 37 — TIDE + Market Scan Redesign
+- [ ] Redesign TIDE.tsx with editorial signal cards (eyebrow + card-title + body + data footer)
+- [ ] Direction badges: sage (tailwind) / clay (headwind) — text color only
+- [ ] Redesign Scan.tsx with underline filter inputs (no box borders)
+- [ ] Add TIDE hero with capital tracked stat ($18.7B Fraunces headline)
+
+### Sprint 38 — Framer Motion System
+- [ ] Install framer-motion (already installed — verify)
+- [ ] Build useEditorialEntrance hook (blur-fade choreography)
+- [ ] Apply entrance animations to Command Center hero + stat strip
+- [ ] Apply scroll-reveal to all section headings
+- [ ] Apply card hover-lift (y: -3, no scale)
+- [ ] Apply list stagger (delay: index * 0.07)
+- [ ] Implement header scroll behavior (transparent → paper/80 + border-rule)
+
+### Sprint 39 — Polish + Tests
+- [ ] Run full test suite — confirm all passing
+- [ ] Fix any TypeScript errors
+- [ ] Save final checkpoint
+
+## Sprint 31–39 — Signal Hunter OS Editorial Edition
+
+- [x] Design system migration: Fraunces font, Editorial Finance tokens, light theme
+- [x] EditorialTopNav component (replaces DashboardLayout sidebar)
+- [x] Batch layout swap — all 15 operator pages migrated to EditorialTopNav
+- [x] Command Center (Home.tsx) rebuilt with Co-Analyst Insight banner + TIDE ticker + posture bar
+- [x] deal_agent_runs schema added to DB
+- [x] Multi-model orchestration router (agentRouter.ts) — Poe API integration
+- [x] AgentMonitoringPanel component — live agent status, model attribution
+- [x] AgentMonitoringPanel integrated into DealDetail agents tab
+- [x] IC Review page — editorial article layout, Consensus Dashboard aside, Gutter Float notes
+- [x] Behavioral Profile page — Agentic Insight card, Negotiation Rehearsal scenarios
+- [x] Routes wired: /ic-review/:id, /behavioral/:id

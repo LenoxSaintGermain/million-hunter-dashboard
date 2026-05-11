@@ -29,9 +29,11 @@ import { tideRouter } from "./tideRouter";
 import { insuranceRouter } from "./insuranceRouter";
 import { inviteRouter } from "./inviteRouter";
 import { stackRouter } from "./stackRouter";
+import { agentRouter } from "./routers/agentRouter";
 
 export const appRouter = router({
   system: systemRouter,
+  agent: agentRouter,
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),

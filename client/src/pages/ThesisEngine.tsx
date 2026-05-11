@@ -10,7 +10,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -175,7 +175,7 @@ export default function ThesisEngine() {
   const notes: string[] = compilationResult?.confidenceNotes ?? [];
 
   return (
-    <DashboardLayout>
+    <EditorialTopNav>
       <div className="space-y-6">
         {/* ── Header ── */}
         <motion.div variants={fadeIn} initial="hidden" animate="visible">
@@ -577,6 +577,6 @@ export default function ThesisEngine() {
           </Badge>
         </motion.div>
       </div>
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }

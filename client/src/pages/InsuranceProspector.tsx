@@ -7,7 +7,7 @@
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -350,7 +350,7 @@ export default function InsuranceProspector() {
   const highPriorityCount = prospectList.filter(p => (p.prospect_score ?? 0) >= 0.7).length;
 
   return (
-    <DashboardLayout>
+    <EditorialTopNav>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between">
@@ -537,6 +537,6 @@ export default function InsuranceProspector() {
           </p>
         </div>
       </div>
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }

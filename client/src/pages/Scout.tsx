@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -427,7 +427,7 @@ export default function Scout() {
   };
 
   return (
-    <DashboardLayout>
+    <EditorialTopNav>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -611,6 +611,6 @@ export default function Scout() {
           autoScore.mutate({ id });
         }}
       />
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }
