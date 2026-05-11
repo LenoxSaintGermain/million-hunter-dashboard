@@ -244,6 +244,44 @@ export const appRouter = router({
         return data;
       }),
   }),
+  publicDeals: router({
+    // Sanitized, limited deal search for unauthenticated visitors.
+    // Returns only name, industry, location, and a blurred score — no financials.
+    search: publicProcedure
+      .input(z.object({ q: z.string().optional(), limit: z.number().optional() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return { results: [], total: 0 };
+        const limit = Math.min(input.limit ?? 6, 12);
+        const q = (input.q ?? "").trim();
+        const rows = await db.execute(
+          q
+            ? sql`SELECT id, name, industry, location, stage, score FROM deals
+                  WHERE (name LIKE ${`%${q}%`} OR industry LIKE ${`%${q}%`} OR location LIKE ${`%${q}%`})
+                  AND is_archived = 0
+                  ORDER BY score DESC LIMIT ${limit}`
+            : sql`SELECT id, name, industry, location, stage, score FROM deals
+                  WHERE is_archived = 0
+                  ORDER BY score DESC LIMIT ${limit}`
+        );
+        const rowsArr = Array.isArray((rows as any)[0]) ? (rows as any)[0] : (rows as any);
+        // Sanitize: blur exact score (round to 1 decimal), strip financials
+        const results = (rowsArr as any[]).map((r: any) => ({
+          id: Number(r.id),
+          name: String(r.name ?? ""),
+          industry: String(r.industry ?? "Service Business"),
+          location: String(r.location ?? "Southeast US"),
+          stage: String(r.stage ?? "new"),
+          scoreBlurred: r.score != null ? Math.round(Number(r.score) * 10) / 10 : null,
+        }));
+        // Count total
+        const countRow = await db.execute(sql`SELECT COUNT(*) as cnt FROM deals WHERE is_archived = 0`);
+        const countArr = Array.isArray((countRow as any)[0]) ? (countRow as any)[0] : (countRow as any);
+        const total = Number((countArr as any[])[0]?.cnt ?? 0);
+        return { results, total };
+      }),
+  }),
+
   signals: router({
     getByDealId: publicProcedure
       .input(z.object({ dealId: z.number() }))

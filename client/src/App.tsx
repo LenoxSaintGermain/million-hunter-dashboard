@@ -37,6 +37,31 @@ import { trpc } from "@/lib/trpc";
 import { useEffect } from "react";
 import CoPilot from "@/components/CoPilot";
 import { useAuth } from "./_core/hooks/useAuth";
+import LandingPage from "./pages/LandingPage";
+import PublicSearch from "./pages/PublicSearch";
+import { getLoginUrl } from "./const";
+
+// ─── Protected Route ─────────────────────────────────────────────────────────
+// Redirects unauthenticated users to the landing page.
+// Shows nothing while auth state is loading to prevent flash.
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null; // silent while resolving
+  if (!isAuthenticated) {
+    window.location.href = getLoginUrl();
+    return null;
+  }
+  return <Component />;
+}
+
+// ─── Root Route ───────────────────────────────────────────────────────────────
+// Authenticated users → Command Center. Unauth → Marketing Landing Page.
+function RootRoute() {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) return <LandingPage />;
+  return <Home />;
+}
 
 // ─── Onboarding Guard ─────────────────────────────────────────────────────────
 // Handles two flows:
@@ -128,25 +153,30 @@ function Router() {
         <Route path="/investor/scout" component={InvestorScout} />
         <Route path="/investor/dna" component={InvestorDNAProfile} />
 
-        {/* ── Operator routes ── */}
-        <Route path="/" component={Home} />
-        <Route path="/scan" component={Scan} />
-        <Route path="/thesis" component={ThesisEngine} />
-        <Route path="/deal/:id" component={DealDetail} />
-        <Route path="/ic-review/:id" component={ICReview} />
-        <Route path="/behavioral/:id" component={BehavioralProfile} />
-        <Route path="/memos" component={Memos} />
-        <Route path="/outreach" component={Outreach} />
-        <Route path="/settings" component={Settings} />
-        <Route path="/freedom-map" component={FreedomMap} />
-        <Route path="/strategy-blender" component={StrategyBlender} />
-        <Route path="/opportunity-radar" component={OpportunityRadar} />
-        <Route path="/investor-dossier" component={InvestorDossier} />
-        <Route path="/scout" component={Scout} />
-        <Route path="/tide" component={TIDEPage} />
-        <Route path="/insurance-prospector" component={InsuranceProspector} />
-        <Route path="/stack" component={CapitalStack} />
-        <Route path="/admin" component={AdminPanel} />
+        {/* ── Public routes (no auth required) ── */}
+        <Route path="/explore" component={PublicSearch} />
+
+        {/* ── Root: Landing for unauth, Command Center for auth ── */}
+        <Route path="/" component={RootRoute} />
+
+        {/* ── Operator routes — all protected ── */}
+        <Route path="/scan">{() => <ProtectedRoute component={Scan} />}</Route>
+        <Route path="/thesis">{() => <ProtectedRoute component={ThesisEngine} />}</Route>
+        <Route path="/deal/:id">{() => <ProtectedRoute component={DealDetail} />}</Route>
+        <Route path="/ic-review/:id">{() => <ProtectedRoute component={ICReview} />}</Route>
+        <Route path="/behavioral/:id">{() => <ProtectedRoute component={BehavioralProfile} />}</Route>
+        <Route path="/memos">{() => <ProtectedRoute component={Memos} />}</Route>
+        <Route path="/outreach">{() => <ProtectedRoute component={Outreach} />}</Route>
+        <Route path="/settings">{() => <ProtectedRoute component={Settings} />}</Route>
+        <Route path="/freedom-map">{() => <ProtectedRoute component={FreedomMap} />}</Route>
+        <Route path="/strategy-blender">{() => <ProtectedRoute component={StrategyBlender} />}</Route>
+        <Route path="/opportunity-radar">{() => <ProtectedRoute component={OpportunityRadar} />}</Route>
+        <Route path="/investor-dossier">{() => <ProtectedRoute component={InvestorDossier} />}</Route>
+        <Route path="/scout">{() => <ProtectedRoute component={Scout} />}</Route>
+        <Route path="/tide">{() => <ProtectedRoute component={TIDEPage} />}</Route>
+        <Route path="/insurance-prospector">{() => <ProtectedRoute component={InsuranceProspector} />}</Route>
+        <Route path="/stack">{() => <ProtectedRoute component={CapitalStack} />}</Route>
+        <Route path="/admin">{() => <ProtectedRoute component={AdminPanel} />}</Route>
 
         {/* Invite accept — role assignment on first login */}
         <Route path="/invite/:token" component={InviteAccept} />

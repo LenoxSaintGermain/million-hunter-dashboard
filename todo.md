@@ -681,3 +681,13 @@
 - [x] Delete Sprint11 test rows from production DB (Sprint11 Scout Prefill Test, Sprint11 Share Test Deal, source='test')
 - [x] Confirmed no auto-seed on server startup in _core/index.ts
 - [x] 96/96 tests passing after removal
+
+## Sprint 34 — Unauth Lockdown + Marketing Landing Page
+- [x] Build LandingPage.tsx — editorial broadsheet hero, value props, social proof, CTA
+- [x] Build PublicSearch.tsx — limited read-only deal search with blur gates and upgrade CTA
+- [x] Add publicDeals.search tRPC procedure — returns limited/sanitized deal data for unauth users
+- [x] Wire / route: unauth → LandingPage, auth → Home (Command Center)
+- [x] Wire /explore route → PublicSearch (public, no auth required)
+- [x] Add ProtectedRoute wrapper — all operator routes redirect unauth users to login
+- [x] Lock all 15+ operator routes behind ProtectedRoute
+- [x] Run tests, save checkpoint
