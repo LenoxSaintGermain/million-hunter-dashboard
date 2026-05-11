@@ -257,21 +257,19 @@ function SignalStream() {
         height: "100%",
       }}
     >
-      {/* Stream header */}
+      {/* Stream header — Stitch SIGNAL STREAM style */}
       <div style={{
-        padding: "14px 18px 10px",
+        padding: "12px 16px 10px",
         borderBottom: `1px solid ${C.bd}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        background: `${C.s2}40`,
+        background: "rgba(24,32,40,0.5)",
+        borderRadius: "0",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Radio style={{ width: 13, height: 13, color: C.em }} />
-          <div>
-            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: C.fg2 }}>
-              Signal Stream
-            </span>
-            <p className="eyebrow" style={{ marginTop: 2 }}>Macro · Institutional · Seasonal</p>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 14, color: "var(--signal-gold, #ffba20)" }}>sensors</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.10em", color: "var(--on-surface, #dae3ee)" }}>
+            Signal Stream
+          </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
@@ -279,9 +277,9 @@ function SignalStream() {
             disabled={aiRefresh.isPending}
             style={{
               display: "inline-flex", alignItems: "center", gap: 4,
-              fontSize: 9, fontWeight: 600, height: 22, padding: "0 8px", borderRadius: 4,
+              fontSize: 9, fontWeight: 600, height: 20, padding: "0 8px", borderRadius: 3,
               background: "transparent", border: `1px solid ${C.bd}`, color: C.fg4, cursor: "pointer",
-              textTransform: "uppercase", letterSpacing: "0.08em",
+              textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "var(--font-mono)",
             }}
           >
             {aiRefresh.isPending
@@ -289,9 +287,13 @@ function SignalStream() {
               : <RefreshCw style={{ width: 9, height: 9 }} />}
             {aiRefresh.isPending ? "Scanning" : "Refresh"}
           </button>
+          {/* Stitch live ping indicator */}
+          <span style={{ position: "relative", display: "inline-flex", width: 8, height: 8 }}>
+            <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "var(--signal-gold, #ffba20)", opacity: 0.75, animation: "ping 1.5s cubic-bezier(0,0,0.2,1) infinite" }} />
+            <span style={{ position: "relative", width: 8, height: 8, borderRadius: "50%", background: "var(--signal-gold, #ffba20)", display: "inline-flex" }} />
+          </span>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span className="live-dot" />
-            <span style={{ fontSize: 9, color: C.em, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Live</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--signal-gold, #ffba20)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Live</span>
           </div>
         </div>
       </div>
@@ -331,8 +333,8 @@ function SignalStream() {
                 style={{
                   padding: "11px 18px",
                   borderBottom: `1px solid ${C.bd}30`,
-                  borderLeft: `2px solid ${isHighUrgency ? C.re : isFirst ? C.ba : "transparent"}`,
-                  background: isOpen ? `${C.p}06` : isHighUrgency ? `${C.re}05` : "transparent",
+                  borderLeft: `2px solid ${isHighUrgency ? "var(--signal-gold, #ffba20)" : isFirst ? "var(--signal-gold, #ffba20)" : "transparent"}`,
+                  background: isOpen ? `${C.p}06` : isHighUrgency ? "rgba(255,186,32,0.04)" : "transparent",
                   cursor: "pointer",
                   transition: "background 0.2s ease",
                 }}
@@ -522,7 +524,7 @@ function IntelligenceFeed({ deals, isLoading, onDelete }: {
                   display: "flex", alignItems: "center", gap: 16,
                   padding: "14px 20px",
                   borderBottom: `1px solid ${C.bd}30`,
-                  borderLeft: `2px solid ${isTop ? C.ba : "transparent"}`,
+                  borderLeft: `2px solid ${isTop ? "var(--signal-gold, #ffba20)" : score != null && score >= 0.75 ? "var(--signal-gold, #ffba20)" : "transparent"}`,
                   background: isHovered ? `${C.s2}60` : "transparent",
                   cursor: "pointer",
                   transition: "background 0.15s ease",
@@ -532,7 +534,7 @@ function IntelligenceFeed({ deals, isLoading, onDelete }: {
                 <span style={{
                   fontFamily: "var(--font-display)",
                   fontSize: 18, fontWeight: 400,
-                  color: isTop ? C.ba : C.fg4,
+                  color: isTop ? "var(--signal-gold, #ffba20)" : score != null && score >= 0.75 ? "var(--signal-gold, #ffba20)" : C.fg4,
                   width: 24, flexShrink: 0, textAlign: "center",
                   letterSpacing: "-0.02em",
                 }}>
@@ -543,7 +545,7 @@ function IntelligenceFeed({ deals, isLoading, onDelete }: {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {/* Business name — Fraunces */}
                   <p style={{
-                    fontFamily: "var(--font-display)",
+                    fontFamily: "var(--font-serif, 'IBM Plex Serif', Georgia, serif)",
                     fontSize: 15, fontWeight: 400,
                     color: C.fg1,
                     letterSpacing: "-0.015em",
@@ -581,7 +583,7 @@ function IntelligenceFeed({ deals, isLoading, onDelete }: {
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <p className="eyebrow" style={{ marginBottom: 2 }}>Score</p>
-                    <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, color: score != null ? scoreColor(score) : C.fg4 }}>
+                    <p style={{ fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 400, color: score != null && score >= 0.8 ? "var(--signal-gold, #ffba20)" : score != null ? scoreColor(score) : C.fg4 }}>
                       {score != null && !isNaN(score) ? score.toFixed(3) : "—"}
                     </p>
                   </div>
@@ -744,114 +746,159 @@ export default function Home() {
 
   return (
     <DashboardLayout>
-      {/* ── BRIEFING HEADER ─────────────────────────────────────────────────── */}
+      {/* ── MORNING BRIEF HERO (Stitch Intelligence Terminal) ─────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 16, filter: "blur(6px)" }}
         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         transition={{ duration: 0.9, ease: EASE }}
-        style={{ padding: 0, overflow: "hidden", background: "var(--paper)", border: "1px solid var(--rule)", borderRadius: "var(--radius-lg)" }}
+        style={{ padding: 0, overflow: "hidden", borderRadius: "var(--radius-lg)" }}
       >
-        {/* Operator briefing bar */}
+        {/* Cinematic hero section */}
         <div style={{
-          padding: "20px 28px 18px",
-          borderBottom: `1px solid ${C.bd}`,
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20,
+          position: "relative",
+          overflow: "hidden",
+          background: "var(--surface-container, #182028)",
+          border: "1px solid rgba(81,69,50,0.18)",
+          borderRadius: "var(--radius-lg) var(--radius-lg) 0 0",
+          minHeight: 260,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "flex-end",
         }}>
-          <div style={{ flex: 1 }}>
+          {/* Background texture overlay */}
+          <div style={{
+            position: "absolute", inset: 0,
+            backgroundImage: "url('https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2070&auto=format&fit=crop')",
+            backgroundSize: "cover", backgroundPosition: "center",
+            opacity: 0.10, mixBlendMode: "luminosity",
+          }} />
+          {/* Gradient fade */}
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "linear-gradient(to top, #182028 0%, rgba(24,32,40,0.88) 50%, transparent 100%)",
+            zIndex: 1, pointerEvents: "none",
+          }} />
+          {/* Content */}
+          <div style={{ position: "relative", zIndex: 2, padding: "28px 32px 24px" }}>
             {/* Dateline */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <span className="live-dot" />
-              <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: C.em }}>
-                System Operational
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14, color: "var(--signal-gold, #ffba20)" }}>wb_twilight</span>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--signal-gold, #ffba20)" }}>
+                Morning Brief: {new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase()}
               </span>
-              <span style={{ color: C.bd }}>·</span>
-              <span className="dateline">
-                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).toUpperCase()}
-              </span>
+              <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+              <span className="live-dot" style={{ background: "var(--signal-gold, #ffba20)" }} />
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--signal-gold, #ffba20)" }}>Live</span>
             </div>
-
-            {/* Headline — Fraunces display */}
+            {/* Display headline — IBM Plex Serif */}
             <h1 style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "clamp(1.6rem, 3vw, 2.4rem)",
-              fontWeight: 400,
-              color: C.fg1,
-              letterSpacing: "-0.025em",
-              lineHeight: 1.0,
-              marginBottom: 10,
+              fontFamily: "var(--font-serif, 'IBM Plex Serif', Georgia, serif)",
+              fontSize: "clamp(1.5rem, 3.5vw, 2.4rem)",
+              fontWeight: 500,
+              color: "var(--on-surface, #dae3ee)",
+              letterSpacing: "-0.02em",
+              lineHeight: 1.2,
+              marginBottom: 12,
               textWrap: "balance",
+              maxWidth: "720px",
             }}>
-              Signal Hunter Command Center
+              {stats?.highPriority
+                ? `${stats.highPriority} target${stats.highPriority > 1 ? "s" : ""} at high-conviction status — deployment window open.`
+                : "Signal Hunter Command Center — Acquisition Intelligence Active."}
             </h1>
-
-            {/* System annotation */}
-            {systemAnnotation && (
-              <p style={{ fontSize: 12, color: systemAnnotation.color, display: "flex", alignItems: "center", gap: 6 }}>
-                <Shield style={{ width: 11, height: 11, flexShrink: 0 }} />
-                {systemAnnotation.text}
-              </p>
-            )}
-
-            {/* Last scan */}
-            {data?.latestScan && (
-              <p style={{ fontSize: 10, color: C.fg4, marginTop: 6, fontFamily: "var(--font-mono)" }}>
-                Last scan: {new Date(data.latestScan.createdAt).toLocaleString()} · {(data.latestScan.sources as string[] | null)?.length ?? 0} platforms
-              </p>
-            )}
-          </div>
-
-          {/* Primary actions */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, alignItems: "flex-end" }}>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              className={cn(!triggerScan.isPending && !activeScanJobId && "scan-btn-idle")}
-              onClick={() => triggerScan.mutate({})}
-              disabled={triggerScan.isPending || activeScanJobId !== null}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 8,
-                height: 42, padding: "0 22px", borderRadius: 9999,
-                fontSize: 12, fontWeight: 600, cursor: "pointer",
-                background: triggerScan.isPending || activeScanJobId !== null ? "var(--sh-primary-20)" : "var(--amber)",
-                border: "none", color: triggerScan.isPending || activeScanJobId !== null ? "var(--sh-fg-3)" : "var(--amber-foreground)",
-                letterSpacing: "0.02em",
-              }}
-            >
-              {triggerScan.isPending || activeScanJobId !== null
-                ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Scanning Market</>
-                : <><ScanLine style={{ width: 14, height: 14 }} /> Run Market Scan</>
-              }
-            </motion.button>
-            <Link href="/scan">
-              <button style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                height: 30, padding: "0 14px", borderRadius: 9999,
-                fontSize: 11, fontWeight: 500, cursor: "pointer",
-                background: "transparent", border: `1px solid ${C.bd}`, color: C.fg3,
-              }}>
-                <TrendingUp style={{ width: 12, height: 12 }} />
-                View Pipeline →
-              </button>
-            </Link>
+            {/* Sub-narrative */}
+            <p style={{ fontSize: 13, color: "var(--on-surface-variant, #d5c4ab)", marginBottom: 20, maxWidth: 600, lineHeight: 1.6 }}>
+              {stats?.total
+                ? `${stats.total} deal${stats.total !== 1 ? "s" : ""} in active pipeline. ${stats.highPriority ? `${stats.highPriority} ready for outreach.` : "No immediate action required."}`
+                : "Pipeline monitoring active. Run a market scan to surface acquisition-ready targets."}
+            </p>
+            {/* Posture metrics bar — Stitch pattern */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 0,
+              borderTop: "1px solid rgba(81,69,50,0.25)",
+              paddingTop: 16,
+              maxWidth: 640,
+            }}>
+              {[
+                { label: "POSTURE", value: (stats?.highPriority ?? 0) > 2 ? "AGGRESSIVE" : (stats?.highPriority ?? 0) > 0 ? "ACTIVE" : "MONITORING", isGold: true },
+                { label: "PIPELINE", value: stats?.total != null ? `${stats.total} DEALS` : "—", isGold: false },
+                { label: "AVG SCORE", value: stats?.avgScore != null ? parseFloat(String(stats.avgScore)).toFixed(3) : "—", isGold: false },
+                { label: "CONFIDENCE", value: stats?.avgScore != null ? `${Math.round(parseFloat(String(stats.avgScore)) * 100)}%` : "—", isGold: true },
+              ].map((m, i) => (
+                <div key={i} style={{ paddingRight: i < 3 ? 16 : 0 }}>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--on-surface-variant, #d5c4ab)", marginBottom: 4 }}>{m.label}</div>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 400, color: m.isGold ? "var(--signal-gold, #ffba20)" : "var(--on-surface, #dae3ee)", letterSpacing: "0.02em" }}>{m.value}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-
-        {/* Scan progress */}
-        {activeScanJobId !== null && (
-          <ScanProgress
-            jobId={activeScanJobId}
-            onComplete={() => {
-              setActiveScanJobId(null);
-              refetch();
-              utils.deals.list.invalidate();
-              utils.dashboard.stats.invalidate();
-            }}
-            onRetry={() => { setActiveScanJobId(null); triggerScan.mutate({}); }}
-          />
-        )}
-
-        {/* Stat strip */}
-        <StatStrip stats={stats} outStats={outStats} isLoading={isLoading} />
+        {/* Action bar + stat strip */}
+        <div style={{ background: "var(--paper)", border: "1px solid var(--rule)", borderTop: "none", borderRadius: "0 0 var(--radius-lg) var(--radius-lg)", overflow: "hidden" }}>
+          <div style={{
+            padding: "10px 28px",
+            borderBottom: `1px solid ${C.bd}`,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {data?.latestScan && (
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: C.fg4 }}>
+                  Last scan: {new Date(data.latestScan.createdAt).toLocaleString()} · {(data.latestScan.sources as string[] | null)?.length ?? 0} platforms
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                className={cn(!triggerScan.isPending && !activeScanJobId && "scan-btn-idle")}
+                onClick={() => triggerScan.mutate({})}
+                disabled={triggerScan.isPending || activeScanJobId !== null}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  height: 34, padding: "0 18px", borderRadius: 9999,
+                  fontSize: 10, fontWeight: 600, cursor: "pointer",
+                  background: triggerScan.isPending || activeScanJobId !== null ? "var(--sh-primary-20)" : "var(--signal-gold, #ffba20)",
+                  border: "none", color: triggerScan.isPending || activeScanJobId !== null ? "var(--sh-fg-3)" : "#412d00",
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                  fontFamily: "var(--font-mono)",
+                }}
+              >
+                {triggerScan.isPending || activeScanJobId !== null
+                  ? <><Loader2 style={{ width: 12, height: 12 }} className="animate-spin" /> Scanning Market</>
+                  : <><ScanLine style={{ width: 12, height: 12 }} /> Execute Scan</>
+                }
+              </motion.button>
+              <Link href="/scan">
+                <button style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  height: 28, padding: "0 12px", borderRadius: 9999,
+                  fontSize: 9, fontWeight: 500, cursor: "pointer",
+                  background: "transparent", border: `1px solid ${C.bd}`, color: C.fg3,
+                  fontFamily: "var(--font-mono)", letterSpacing: "0.06em", textTransform: "uppercase",
+                }}>
+                  View Pipeline →
+                </button>
+              </Link>
+            </div>
+          </div>
+          {/* Scan progress */}
+          {activeScanJobId !== null && (
+            <ScanProgress
+              jobId={activeScanJobId}
+              onComplete={() => {
+                setActiveScanJobId(null);
+                refetch();
+                utils.deals.list.invalidate();
+                utils.dashboard.stats.invalidate();
+              }}
+              onRetry={() => { setActiveScanJobId(null); triggerScan.mutate({}); }}
+            />
+          )}
+          <StatStrip stats={stats} outStats={outStats} isLoading={isLoading} />
+        </div>
       </motion.div>
 
       {/* ── MAIN EDITORIAL GRID ──────────────────────────────────────────────── */}
@@ -875,8 +922,8 @@ export default function Home() {
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <Brain style={{ width: 13, height: 13, color: C.ba }} />
               <div>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: C.fg2 }}>
-                  Intelligence Feed
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.10em", color: C.fg2 }}>
+                  Opportunity Command Table
                 </span>
                 <p className="eyebrow" style={{ marginTop: 2 }}>Ranked by AI acquisition score</p>
               </div>

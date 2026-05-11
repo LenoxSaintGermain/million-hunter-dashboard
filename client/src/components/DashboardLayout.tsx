@@ -121,13 +121,13 @@ function NavItem({
             {isActive && (
               <div
                 className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-4 rounded-r-full"
-                style={{ background: "var(--amber)" }}
+                style={{ background: "var(--signal-gold, #ffba20)" }}
               />
             )}
             <item.icon
               className={cn("shrink-0", collapsed ? "w-[17px] h-[17px]" : "w-[15px] h-[15px]")}
               style={{
-                color: isActive ? "var(--ink)" : "var(--sh-fg-3)",
+                color: isActive ? "var(--on-surface, #dae3ee)" : "var(--sh-fg-3)",
               }}
             />
             {!collapsed && (
@@ -135,7 +135,7 @@ function NavItem({
                 <span
                   className="flex-1 truncate text-[13px] font-medium"
                   style={{
-                    color: isActive ? "var(--ink)" : "var(--sh-fg-2)",
+                    color: isActive ? "var(--signal-gold, #ffba20)" : "var(--sh-fg-2)",
                     letterSpacing: "-0.01em",
                   }}
                 >
@@ -176,13 +176,13 @@ function LogoBlock({ collapsed, onClose }: { collapsed?: boolean; onClose?: () =
         "flex items-center h-14 border-b shrink-0",
         collapsed ? "justify-center px-0" : "px-4 gap-2.5"
       )}
-      style={{ borderColor: "var(--rule)" }}
+      style={{ borderColor: "rgba(81,69,50,0.15)" }}
     >
       <div
         className="flex items-center justify-center w-7 h-7 rounded-[7px] shrink-0 overflow-hidden"
-        style={{ background: "var(--ink)" }}
+        style={{ background: "rgba(255,186,32,0.12)", border: "1px solid rgba(255,186,32,0.25)" }}
       >
-        <Zap className="w-3.5 h-3.5" style={{ color: "var(--amber)" }} />
+        <Zap className="w-3.5 h-3.5" style={{ color: "var(--signal-gold, #ffba20)" }} />
       </div>
       {!collapsed && (
         <div className="fade-in flex flex-col min-w-0 overflow-hidden">
@@ -192,7 +192,7 @@ function LogoBlock({ collapsed, onClose }: { collapsed?: boolean; onClose?: () =
               fontSize: 14,
               fontWeight: 400,
               letterSpacing: "-0.025em",
-              color: "var(--ink)",
+              color: "var(--on-surface, #dae3ee)",
               lineHeight: 1.15,
             }}
           >
@@ -565,7 +565,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [location]);
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bone)" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "var(--surface-container, #182028)" }}>
       <MobileBottomSheet
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
@@ -581,7 +581,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           "hidden lg:flex flex-col border-r shrink-0 relative transition-all duration-[280ms]",
           collapsed ? "w-[52px]" : "w-[220px]"
         )}
-        style={{ background: "var(--paper)", borderColor: "var(--rule)" }}
+        style={{ background: "var(--surface, #1e2a34)", borderColor: "rgba(81,69,50,0.15)" }}
       >
         <LogoBlock collapsed={collapsed} />
         <SidebarNav
@@ -594,7 +594,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="absolute -right-3 top-[72px] w-6 h-6 flex items-center justify-center rounded-full border z-10 transition-colors"
-          style={{ background: "var(--paper)", borderColor: "var(--rule)", color: "var(--sh-fg-3)" }}
+          style={{ background: "var(--surface, #1e2a34)", borderColor: "rgba(81,69,50,0.15)", color: "var(--sh-fg-3)" }}
           onMouseEnter={(e) => (e.currentTarget.style.color = "var(--ink)")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "var(--sh-fg-3)")}
         >
@@ -607,13 +607,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Top bar */}
         <header
           className="h-14 border-b flex items-center justify-between px-4 lg:px-6 shrink-0"
-          style={{ background: "var(--paper)", borderColor: "var(--rule)" }}
+          style={{ background: "var(--surface, #1e2a34)", borderColor: "rgba(81,69,50,0.15)" }}
         >
           <div className="flex items-center gap-3">
             {/* Mobile logo */}
             <div className="flex items-center gap-2 lg:hidden">
-              <div className="w-7 h-7 rounded-[7px] flex items-center justify-center shrink-0" style={{ background: "var(--ink)" }}>
-                <Zap className="w-3.5 h-3.5" style={{ color: "var(--amber)" }} />
+              <div className="w-7 h-7 rounded-[7px] flex items-center justify-center shrink-0" style={{ background: "rgba(255,186,32,0.12)", border: "1px solid rgba(255,186,32,0.25)" }}>
+                <Zap className="w-3.5 h-3.5" style={{ color: "var(--signal-gold, #ffba20)" }} />
               </div>
               <div>
                 <p style={{ fontFamily: "var(--font-display)", fontSize: 13, fontWeight: 400, letterSpacing: "-0.025em", color: "var(--ink)", lineHeight: 1.2 }}>
@@ -667,7 +667,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {/* Mobile menu */}
             <button
               className="lg:hidden h-8 w-8 flex items-center justify-center rounded-md"
-              style={{ color: "var(--sh-fg-3)", background: "var(--bone)" }}
+              style={{ color: "var(--sh-fg-3)", background: "rgba(255,255,255,0.05)" }}
               onClick={() => setMobileOpen(true)}
             >
               <Menu className="w-4 h-4" />
@@ -676,7 +676,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </header>
 
         {/* Page content */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-6" style={{ background: "var(--bone)" }}>
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6" style={{ background: "var(--surface-container, #182028)" }}>
           <div className="max-w-[1400px] mx-auto space-y-6">
             {children}
           </div>

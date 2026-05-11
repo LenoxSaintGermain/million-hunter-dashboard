@@ -561,3 +561,17 @@
 - [x] Update stack.test.ts to verify real dimension logic (not just identifier presence)
 - [x] Run pnpm test — confirm 98/98 passing
 - [x] Save checkpoint Sprint 29
+
+## Stitch UI Integration — Signal Hunter Intelligence Terminal
+- [x] Pull reference UI from Stitch MCP (Command Center + Intelligence Dossier screens)
+- [x] Apply Stitch design tokens: signal-gold #ffba20, surface-container #182028, surface #1e2a34
+- [x] Morning Brief cinematic hero with IBM Plex Serif headline and posture metrics bar
+- [x] Signal Gold conviction borders on high-score deal rows (score >= 0.75)
+- [x] Signal Gold score display for deals scoring >= 0.8
+- [x] Stitch Signal Stream header with sensors icon and live ping indicator
+- [x] Signal Gold left border on high-conviction signals
+- [x] DashboardLayout dark terminal surfaces (sidebar, topbar, content area)
+- [x] Signal Gold active nav indicator bar and label
+- [x] Logo icon upgraded to signal gold tint on dark surface
+- [x] Material Symbols Outlined loaded for wb_twilight and sensors icons
+- [x] ping keyframe animation for live indicator
