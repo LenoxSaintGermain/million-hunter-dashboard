@@ -184,6 +184,13 @@ export default function LandingPage() {
               <span className="material-symbols-outlined text-[20px]">search</span>
               Browse Active Deals
             </Link>
+            <Link
+              href="/demo"
+              className="inline-flex items-center justify-center gap-2 text-[#5c4a32] text-base font-medium px-4 py-4 hover:text-[#1a1208] transition-colors underline underline-offset-4 decoration-[#ffba20]"
+            >
+              See a live thesis
+              <span className="material-symbols-outlined text-[18px]">arrow_right_alt</span>
+            </Link>
           </div>
         </div>
 

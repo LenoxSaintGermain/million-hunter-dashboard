@@ -727,18 +727,34 @@
 - [x] Run tests, save checkpoint — 96/96 passing
 
 ## Sprint 38 — Rory Sutherland Copy Rewrite + Persona Role Map
-- [ ] Audit all copy surfaces: LandingPage, PublicSearch, CoPilot, Consensus, Deal Room, TIDE, Settings
-- [ ] Define persona role map: assign named roles to each AI function (no model names in UI)
-- [ ] Rewrite LandingPage.tsx hero, value props, social proof, CTA with Rory Sutherland oblique framing
-- [ ] Rewrite PublicSearch.tsx gated CTA copy with same psychological register
-- [ ] Replace all model name badges in CoPilot panel with persona role names
-- [ ] Replace all model name badges in Consensus Dashboard with persona role names
-- [ ] Replace all model name badges in Deal Room (Third Signal, War Room) with persona role names
-- [ ] Replace all model name badges in TIDE intelligence stream with persona role names
-- [ ] Replace all model name badges in Settings AI Engine tab with persona role names
-- [ ] Run tests, save checkpoint
+- [x] Audit all copy surfaces: LandingPage, PublicSearch, CoPilot, Consensus, Deal Room, TIDE, Settings
+- [x] Define persona role map: assign named roles to each AI function (no model names in UI)
+- [x] Rewrite LandingPage.tsx hero, value props, social proof, CTA with Rory Sutherland oblique framing
+- [x] Rewrite PublicSearch.tsx gated CTA copy with same psychological register
+- [x] Replace all model name badges in CoPilot panel with persona role names
+- [x] Replace all model name badges in Consensus Dashboard with persona role names
+- [x] Replace all model name badges in Deal Room (Third Signal, War Room) with persona role names
+- [x] Replace all model name badges in TIDE intelligence stream with persona role names
+- [x] Replace all model name badges in Settings AI Engine tab with persona role names
+- [x] Run tests, save checkpoint
 
 ## Sprint 39 — Google Maps Singleton Fix
 - [x] Audit Map.tsx loader logic and Scout page for multiple MapView instances causing duplicate script loads
 - [x] Implement singleton Google Maps script loader (module-level guard, deduplicate across all MapView mounts)
+- [x] Run tests, save checkpoint — 96/96 passing
+
+## Sprint 40 — Deal Scoring + Market Scan v2026 + LOI Generation
+- [x] Score all 15 live deals via financial algorithm — 3 HIGH PRIORITY, 5 QUALIFIED, avg 0.74
+- [x] Wire /demo CTA on LandingPage.tsx — "See a live thesis →" button pointing to /demo
+- [x] Fix Consensus Dashboard persona labels — replaced with The Quant, The Skeptic, The Scout
+- [x] Market Scan: add Deal DNA v2026 comparison table (Operational Moat, Key-Man Risk, Institutional Readiness, Owner Psychology)
+- [x] Market Scan: add Macro Signal Alignment panel (TIDE overlap signals with match %)
+- [x] Market Scan: add Agentic Hunting live feed (off-market agent log with living-border animation)
+- [x] Build LOIGeneration.tsx component with living-border draft canvas
+- [x] LOI: left pane — LOI parameters (purchase price, earn-out, exclusivity, contingencies)
+- [x] LOI: right pane — draft canvas with The Architect synthesis badge, NON-BINDING LOI preview
+- [x] LOI: agent monitoring sidebar — The Orchestrator, The Auditor, The Architect with live activity log
+- [x] LOI: Co-Analyst earn-out guidance panel (legacy preservation framing)
+- [x] LOI: "Share with Counsel" + "Review Final Draft" action buttons
+- [x] Add LOI Draft tab to DealDetail.tsx tabs
 - [x] Run tests, save checkpoint — 96/96 passing

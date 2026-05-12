@@ -1,0 +1,194 @@
+{
+  "query": "DESCRIBE signals;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute DESCRIBE signals;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "dealId",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ownerDistressScore",
+      "Type": "float",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ownerRetirementSignal",
+      "Type": "tinyint(1)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ownerNegotiationStyle",
+      "Type": "varchar(64)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ownerProfileSummary",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "techDebtScore",
+      "Type": "float",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "digitalGrowthTrend",
+      "Type": "enum('growing','stable','declining')",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "seoAuthorityScore",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "reviewSentimentScore",
+      "Type": "float",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "digitalAuditSummary",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "killProbability",
+      "Type": "float",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "redFlags",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "redTeamSummary",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "sbaEligible",
+      "Type": "tinyint(1)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "recommendedSbaAmount",
+      "Type": "bigint",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "recommendedSellerNote",
+      "Type": "bigint",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "recommendedEquity",
+      "Type": "bigint",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "dscr",
+      "Type": "float",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "cashOnCashReturn",
+      "Type": "float",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "capitalStackSummary",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "analyzedAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "modelVersions",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\ndealId\tint\tNO\t\tNULL\t\nownerDistressScore\tfloat\tYES\t\tNULL\t\nownerRetirementSignal\ttinyint(1)\tYES\t\tNULL\t\nownerNegotiationStyle\tvarchar(64)\tYES\t\tNULL\t\nownerProfileSummary\ttext\tYES\t\tNULL\t\ntechDebtScore\tfloat\tYES\t\tNULL\t\ndigitalGrowthTrend\tenum('growing','stable','declining')\tYES\t\tNULL\t\nseoAuthorityScore\tint\tYES\t\tNULL\t\nreviewSentimentScore\tfloat\tYES\t\tNULL\t\ndigitalAuditSummary\ttext\tYES\t\tNULL\t\nkillProbability\tfloat\tYES\t\tNULL\t\nredFlags\tjson\tYES\t\tNULL\t\nredTeamSummary\ttext\tYES\t\tNULL\t\nsbaEligible\ttinyint(1)\tYES\t\tNULL\t\nrecommendedSbaAmount\tbigint\tYES\t\tNULL\t\nrecommendedSellerNote\tbigint\tYES\t\tNULL\t\nrecommendedEquity\tbigint\tYES\t\tNULL\t\ndscr\tfloat\tYES\t\tNULL\t\ncashOnCashReturn\tfloat\tYES\t\tNULL\t\ncapitalStackSummary\ttext\tYES\t\tNULL\t\nanalyzedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nmodelVersions\tjson\tYES\t\tNULL\t\n",
+  "stderr": "",
+  "execution_time_ms": 267
+}

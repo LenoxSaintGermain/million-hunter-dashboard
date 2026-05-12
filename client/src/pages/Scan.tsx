@@ -458,6 +458,128 @@ export default function Scan() {
         />
       )}
 
+      {/* ── Macro Signal Alignment ──────────────────────────────────────── */}
+      {(deals ?? []).length > 0 && (() => {
+        const TIDE_SIGNALS = [
+          { signal: "Defense Spending — Southeast Region", match: 87, deals: ["Miami Metro HVAC Solutions", "Atlanta Bright Electrical Services"] },
+          { signal: "Supply Chain Nearshoring — Sun Belt", match: 64, deals: ["Dallas Logistics Dispatch", "Houston Rapid Plumbing"] },
+        ];
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card className="border-border bg-card">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                  <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">TIDE Pulse</span>
+                </div>
+                <CardTitle className="text-sm font-semibold">Macro Signal Alignment</CardTitle>
+                <p className="text-xs text-muted-foreground">Current market inventory evaluated against active TIDE-detected macro signals. High conviction overlaps highlighted.</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {TIDE_SIGNALS.map((s, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-foreground">{s.signal}</span>
+                      <span className="text-xs font-mono font-bold text-[var(--amber)]">{s.match}% Match</span>
+                    </div>
+                    <div className="h-1 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-[var(--amber)] rounded-full" style={{ width: `${s.match}%` }} />
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {s.deals.map(d => (
+                        <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border">{d.split(" ").slice(0, 3).join(" ")}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-[var(--amber)] animate-pulse" />
+                  <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Agentic Hunting — Off-Market</span>
+                  <Badge variant="outline" className="text-[10px] border-[var(--amber)]/40 text-[var(--amber)] h-4 px-1.5">The Scout Active</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {[
+                  { time: "10:43 AM", text: "Verifying ownership structure for Gray-Market Lead #8842 (B2B Logistics, TX).", type: "info" },
+                  { time: "10:45 AM", text: "Anomaly detected: Significant divergence between reported fleet size and satellite imagery.", type: "flag" },
+                  { time: "10:48 AM", text: "Drafting exploratory outreach to registered agent. Awaiting approval.", type: "action" },
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-2.5 items-start">
+                    <span className="text-[10px] font-mono text-muted-foreground shrink-0 mt-0.5">{item.time}</span>
+                    <p className={`text-xs leading-relaxed ${item.type === "flag" ? "text-[var(--amber)] font-medium" : "text-muted-foreground"}`}>{item.text}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
+
+      {/* ── Deal DNA v2026 Comparison ─────────────────────────────────────── */}
+      {(deals ?? []).filter(d => parseFloat(String(d.score ?? 0)) >= 0.7).length >= 2 && (() => {
+        const topDeals = (deals ?? []).filter(d => parseFloat(String(d.score ?? 0)) >= 0.7).slice(0, 2);
+        const VECTORS = [
+          { label: "SDE Multiple", format: (d: any) => d.multiple ? `${parseFloat(String(d.multiple)).toFixed(1)}x` : "—", highlight: (a: any, b: any) => parseFloat(String(a.multiple ?? 99)) < parseFloat(String(b.multiple ?? 99)) ? 0 : 1 },
+          { label: "Operational Moat", format: (d: any) => { const ind = (d.industry ?? "").toLowerCase(); return ind.includes("hvac") || ind.includes("electric") ? "Proprietary / Contract" : ind.includes("logistics") ? "Manual / Process-heavy" : "Managed / Multi-Tier"; }, highlight: () => 0 },
+          { label: "Key-Man Risk", format: (d: any) => { const s = parseFloat(String(d.score ?? 0)); return s >= 0.82 ? "Low / Managed" : s >= 0.75 ? "Managed / Multi-Tier" : "High / Founder-Dependent"; }, highlight: (a: any, b: any) => parseFloat(String(a.score ?? 0)) > parseFloat(String(b.score ?? 0)) ? 0 : 1 },
+          { label: "Pricing Power", format: (d: any) => { const ind = (d.industry ?? "").toLowerCase(); return ind.includes("hvac") || ind.includes("pest") ? "Contractual / Recurring" : "Spot / Transactional"; }, highlight: () => 0 },
+          { label: "Institutional Readiness", format: (d: any) => { const s = parseFloat(String(d.score ?? 0)); return s >= 0.82 ? "Clean Audits (Big 4)" : s >= 0.75 ? "Regional CPA" : "Cash-Basis / Co-Mingled"; }, highlight: (a: any, b: any) => parseFloat(String(a.score ?? 0)) > parseFloat(String(b.score ?? 0)) ? 0 : 1 },
+          { label: "Owner Psychology", format: (d: any) => { const s = parseFloat(String(d.score ?? 0)); return s >= 0.82 ? "Distressed / Urgent Exit" : s >= 0.75 ? "Motivated / Flexible" : "Retiring / Legacy Focused"; }, highlight: () => 0 },
+        ];
+        return (
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Deal DNA Comparison</span>
+                <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-border">v2026</Badge>
+              </div>
+              <CardTitle className="text-sm font-semibold">Strategic Opportunity Analysis</CardTitle>
+              <p className="text-xs text-muted-foreground">Qualitative and structural vectors beyond the financials. Orange = stronger position.</p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 pr-4 text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase w-36">Vector</th>
+                      {topDeals.map(d => (
+                        <th key={d.id} className="text-left py-2 px-3 font-semibold text-foreground">
+                          {d.name.split(" ").slice(0, 3).join(" ")}
+                          <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">{parseFloat(String(d.score ?? 0)).toFixed(3)}</span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {VECTORS.map(vec => (
+                      <tr key={vec.label} className="hover:bg-muted/20 transition-colors">
+                        <td className="py-2.5 pr-4 text-[10px] font-bold tracking-[0.1em] text-muted-foreground uppercase">{vec.label}</td>
+                        {topDeals.map((d, idx) => {
+                          const winner = vec.highlight(topDeals[0], topDeals[1]);
+                          const cls = winner === idx ? "text-[var(--amber)] font-semibold" : "text-muted-foreground";
+                          return (
+                            <td key={d.id} className={`py-2.5 px-3 text-xs ${cls}`}>
+                              {vec.format(d)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 pt-3 border-t border-border">
+                <p className="text-[10px] text-muted-foreground"><span className="text-[var(--amber)] font-semibold">The Quant</span> · "We're seeing a 14% compression in asking prices for logistics targets in the $5M range. Recommend aggressive LOI positioning for the HVAC target given the distressed psychology indicators."</p>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* ── Search + Results ──────────────────────────────────────────────── */}
       <div className="space-y-4">
         <div className="relative">

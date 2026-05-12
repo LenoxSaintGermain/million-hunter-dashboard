@@ -2180,6 +2180,113 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
   // ─── Thesis Engine (STRATEGIST agent — Spec TSL-SCI-PROD-001-A1) ─────────────
   thesis: thesisRouter,
   tide: tideRouter,
+  // ─── LOI Generation (GEMINI 3.1 FLASH — Agentic Drafting) ────────────────────
+  loi: router({
+    generate: protectedProcedure
+      .input(z.object({
+        dealId: z.number(),
+        purchasePrice: z.number(),
+        earnOutYear1: z.number().optional(),
+        earnOutYear2: z.number().optional(),
+        exclusivityDays: z.number().default(60),
+        contingencies: z.array(z.string()).default([]),
+      }))
+      .mutation(async ({ input }) => {
+        const deal = await getDealById(input.dealId);
+        if (!deal) throw new TRPCError({ code: "NOT_FOUND", message: "Deal not found" });
+        const { invokeLLM } = await import("./_core/llm");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+        const systemPrompt = `You are The Architect — a senior M&A attorney drafting a Letter of Intent.
+Generate a professional, legally-structured LOI with these sections:
+1. Purchase Price and Payment
+2. Earn-Out Structure (if applicable)
+3. Exclusivity Period
+4. Representations and Warranties (tailor based on owner psychology signals)
+5. Key Employee Retention
+6. Due Diligence Period
+7. Closing Conditions
+
+Return JSON: {
+  "loiText": "full LOI markdown text",
+  "repsAndWarrantiesNote": "behavioral insight note for the R&W section",
+  "earnOutRationale": "strategic rationale for earn-out structure",
+  "coAnalystContext": "Co-Analyst earn-out guidance paragraph",
+  "agentLog": [{"time": "HH:MM AM", "action": "...", "type": "info|flag|action"}]
+}`;
+
+        const userPrompt = `Deal: ${deal.name} (${deal.industry ?? "Unknown"}, ${deal.location ?? "Unknown"})
+Revenue: $${((deal.revenue || 0) / 1e6).toFixed(2)}M | Cash Flow: $${((deal.cashFlow || 0) / 1e3).toFixed(0)}k | Asking: $${((deal.askingPrice || 0) / 1e6).toFixed(2)}M
+Purchase Price: $${(input.purchasePrice / 1e6).toFixed(2)}M
+${input.earnOutYear1 ? `Earn-Out: $${(input.earnOutYear1 / 1e6).toFixed(1)}M Year 1 / $${((input.earnOutYear2 || 0) / 1e6).toFixed(1)}M Year 2` : "No earn-out"}
+Exclusivity: ${input.exclusivityDays} days
+Contingencies: ${input.contingencies.join(", ") || "Standard"}
+
+Draft the LOI. For R&W, note that behavioral profiling indicates the owner may have legacy preservation motivations — tailor accordingly to reduce friction.`;
+
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "loi_output",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  loiText: { type: "string" },
+                  repsAndWarrantiesNote: { type: "string" },
+                  earnOutRationale: { type: "string" },
+                  coAnalystContext: { type: "string" },
+                  agentLog: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        time: { type: "string" },
+                        action: { type: "string" },
+                        type: { type: "string" },
+                      },
+                      required: ["time", "action", "type"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["loiText", "repsAndWarrantiesNote", "earnOutRationale", "coAnalystContext", "agentLog"],
+                additionalProperties: false,
+              },
+            },
+          },
+        });
+
+        const raw = response.choices[0].message.content;
+        const parsed = JSON.parse(raw as string);
+
+        await logActivity({
+          type: "signal_analyzed",
+          title: `LOI Draft generated for ${deal.name} — $${(input.purchasePrice / 1e6).toFixed(2)}M`,
+          dealId: input.dealId,
+        });
+
+        return {
+          dealName: deal.name,
+          purchasePrice: input.purchasePrice,
+          earnOutYear1: input.earnOutYear1,
+          earnOutYear2: input.earnOutYear2,
+          exclusivityDays: input.exclusivityDays,
+          contingencies: input.contingencies,
+          loiText: parsed.loiText,
+          repsAndWarrantiesNote: parsed.repsAndWarrantiesNote,
+          earnOutRationale: parsed.earnOutRationale,
+          coAnalystContext: parsed.coAnalystContext,
+          agentLog: parsed.agentLog,
+        };
+      }),
+  }),
 });
 export type AppRouter = typeof appRouter;
 

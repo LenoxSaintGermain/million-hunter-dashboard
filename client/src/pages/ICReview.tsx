@@ -68,9 +68,9 @@ function ConsensusDashboard({ dealId }: { dealId: number }) {
   });
 
   const models = [
-    { key: "claudeScore", label: "Claude", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
-    { key: "geminiScore", label: "Gemini", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
-    { key: "sonarScore", label: "Sonar", color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-200" },
+    { key: "claudeScore", label: "The Strategist", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
+    { key: "geminiScore", label: "The Quant", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
+    { key: "sonarScore", label: "The Scout", color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-200" },
   ];
 
   const cs = consensusData;

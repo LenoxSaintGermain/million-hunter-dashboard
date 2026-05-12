@@ -1,0 +1,85 @@
+{
+  "query": "SELECT name, score, stage FROM deals ORDER BY score DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT name, score, stage FROM deals ORDER BY score DESC;",
+  "rows": [
+    {
+      "name": "Miami Metro HVAC Solutions",
+      "score": "0.85",
+      "stage": "high_priority"
+    },
+    {
+      "name": "Atlanta Bright Electrical Services",
+      "score": "0.83",
+      "stage": "high_priority"
+    },
+    {
+      "name": "Coral Gables Commercial HVAC & Refrigeration",
+      "score": "0.82",
+      "stage": "high_priority"
+    },
+    {
+      "name": "Dallas Elite Commercial Cleaning",
+      "score": "0.81",
+      "stage": "qualified"
+    },
+    {
+      "name": "Pompano Pest & Termite Authority",
+      "score": "0.78",
+      "stage": "qualified"
+    },
+    {
+      "name": "Houston Rapid Plumbing",
+      "score": "0.77",
+      "stage": "qualified"
+    },
+    {
+      "name": "Atlanta Medical Staffing Solutions",
+      "score": "0.76",
+      "stage": "qualified"
+    },
+    {
+      "name": "Hialeah Precision Machine Works",
+      "score": "0.74",
+      "stage": "qualified"
+    },
+    {
+      "name": "Miami Coastal Pest Control",
+      "score": "0.72",
+      "stage": "qualified"
+    },
+    {
+      "name": "Doral Industrial Electric Co.",
+      "score": "0.71",
+      "stage": "new"
+    },
+    {
+      "name": "Dallas Logistics Dispatch",
+      "score": "0.69",
+      "stage": "high_priority"
+    },
+    {
+      "name": "Sawgrass Pool & Spa Services",
+      "score": "0.68",
+      "stage": "new"
+    },
+    {
+      "name": "Doral Commercial Landscape & Irrigation",
+      "score": "0.66",
+      "stage": "new"
+    },
+    {
+      "name": "Biscayne Bay Yacht Maintenance Group",
+      "score": "0.63",
+      "stage": "new"
+    },
+    {
+      "name": "Las Olas Marine Canvas & Upholstery",
+      "score": "0.59",
+      "stage": "new"
+    }
+  ],
+  "messages": [],
+  "stdout": "name\tscore\tstage\nMiami Metro HVAC Solutions\t0.85\thigh_priority\nAtlanta Bright Electrical Services\t0.83\thigh_priority\nCoral Gables Commercial HVAC & Refrigeration\t0.82\thigh_priority\nDallas Elite Commercial Cleaning\t0.81\tqualified\nPompano Pest & Termite Authority\t0.78\tqualified\nHouston Rapid Plumbing\t0.77\tqualified\nAtlanta Medical Staffing Solutions\t0.76\tqualified\nHialeah Precision Machine Works\t0.74\tqualified\nMiami Coastal Pest Control\t0.72\tqualified\nDoral Industrial Electric Co.\t0.71\tnew\nDallas Logistics Dispatch\t0.69\thigh_priority\nSawgrass Pool & Spa Services\t0.68\tnew\nDoral Commercial Landscape & Irrigation\t0.66\tnew\nBiscayne Bay Yacht Maintenance Group\t0.63\tnew\nLas Olas Marine Canvas & Upholstery\t0.59\tnew\n",
+  "stderr": "",
+  "execution_time_ms": 266
+}

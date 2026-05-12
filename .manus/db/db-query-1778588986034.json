@@ -1,0 +1,85 @@
+{
+  "query": "SELECT d.id, d.name, s.ownerDistressScore FROM deals d LEFT JOIN signals s ON d.id = s.dealId ORDER BY d.id LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT d.id, d.name, s.ownerDistressScore FROM deals d LEFT JOIN signals s ON d.id = s.dealId ORDER BY d.id LIMIT 20;",
+  "rows": [
+    {
+      "id": "510001",
+      "name": "Doral Industrial Electric Co.",
+      "ownerDistressScore": "0.35"
+    },
+    {
+      "id": "510002",
+      "name": "Biscayne Bay Yacht Maintenance Group",
+      "ownerDistressScore": "NULL"
+    },
+    {
+      "id": "510003",
+      "name": "Sawgrass Pool & Spa Services",
+      "ownerDistressScore": "NULL"
+    },
+    {
+      "id": "510004",
+      "name": "Hialeah Precision Machine Works",
+      "ownerDistressScore": "NULL"
+    },
+    {
+      "id": "510005",
+      "name": "Coral Gables Commercial HVAC & Refrigeration",
+      "ownerDistressScore": "NULL"
+    },
+    {
+      "id": "540001",
+      "name": "Las Olas Marine Canvas & Upholstery",
+      "ownerDistressScore": "NULL"
+    },
+    {
+      "id": "540002",
+      "name": "Pompano Pest & Termite Authority",
+      "ownerDistressScore": "0.55"
+    },
+    {
+      "id": "540003",
+      "name": "Doral Commercial Landscape & Irrigation",
+      "ownerDistressScore": "NULL"
+    },
+    {
+      "id": "1560009",
+      "name": "Miami Metro HVAC Solutions",
+      "ownerDistressScore": "NULL"
+    },
+    {
+      "id": "1560010",
+      "name": "Dallas Elite Commercial Cleaning",
+      "ownerDistressScore": "NULL"
+    },
+    {
+      "id": "1560011",
+      "name": "Houston Rapid Plumbing",
+      "ownerDistressScore": "NULL"
+    },
+    {
+      "id": "1560012",
+      "name": "Atlanta Bright Electrical Services",
+      "ownerDistressScore": "NULL"
+    },
+    {
+      "id": "1560013",
+      "name": "Miami Coastal Pest Control",
+      "ownerDistressScore": "NULL"
+    },
+    {
+      "id": "1560014",
+      "name": "Dallas Logistics Dispatch",
+      "ownerDistressScore": "NULL"
+    },
+    {
+      "id": "1560015",
+      "name": "Atlanta Medical Staffing Solutions",
+      "ownerDistressScore": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\townerDistressScore\n510001\tDoral Industrial Electric Co.\t0.35\n510002\tBiscayne Bay Yacht Maintenance Group\tNULL\n510003\tSawgrass Pool & Spa Services\tNULL\n510004\tHialeah Precision Machine Works\tNULL\n510005\tCoral Gables Commercial HVAC & Refrigeration\tNULL\n540001\tLas Olas Marine Canvas & Upholstery\tNULL\n540002\tPompano Pest & Termite Authority\t0.55\n540003\tDoral Commercial Landscape & Irrigation\tNULL\n1560009\tMiami Metro HVAC Solutions\tNULL\n1560010\tDallas Elite Commercial Cleaning\tNULL\n1560011\tHouston Rapid Plumbing\tNULL\n1560012\tAtlanta Bright Electrical Services\tNULL\n1560013\tMiami Coastal Pest Control\tNULL\n1560014\tDallas Logistics Dispatch\tNULL\n1560015\tAtlanta Medical Staffing Solutions\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 262
+}

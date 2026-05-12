@@ -1,4 +1,5 @@
 import React from "react";
+import LOIGeneration from "./LOIGeneration";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import EditorialTopNav from "@/components/EditorialTopNav";
@@ -413,6 +414,9 @@ export default function DealDetail() {
           </TabsTrigger>
           <TabsTrigger value="trajectory" className="text-xs h-7">
             <GitBranch className="w-3 h-3 mr-1" />Trajectory
+          </TabsTrigger>
+          <TabsTrigger value="loi" className="text-xs h-7">
+            <FileText className="w-3 h-3 mr-1" />LOI Draft
           </TabsTrigger>
         </TabsList>
 
@@ -960,6 +964,11 @@ export default function DealDetail() {
               </div>
             </div>
           </div>
+        </TabsContent>
+
+        {/* LOI Generation Tab */}
+        <TabsContent value="loi" className="mt-4">
+          <LOIGeneration dealId={dealId} dealName={deal.name} askingPrice={deal.askingPrice} />
         </TabsContent>
        </Tabs>
       {/* Co-Pilot with deal-specific context injected */}
