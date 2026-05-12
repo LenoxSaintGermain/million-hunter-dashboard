@@ -33,9 +33,9 @@ function ConsensusModelConfig() {
   const dataRef = useState(() => ({ loaded: false }))[0];
   if (consensusData && !dataRef.loaded) {
     dataRef.loaded = true;
-    setM1(consensusData.consensus_model_1 ?? "gemini-2.5-pro");
-    setM2(consensusData.consensus_model_2 ?? "gemini-2.5-flash");
-    setM3(consensusData.consensus_model_3 ?? "gemini-2.5-flash-lite");
+    setM1(consensusData.consensus_model_1 ?? "gemini-3.1-pro");
+    setM2(consensusData.consensus_model_2 ?? "gemini-3.1-flash");
+    setM3(consensusData.consensus_model_3 ?? "gemini-3.1-flash");
   }
 
   const updateConsensus = trpc.models.updateConsensus.useMutation({

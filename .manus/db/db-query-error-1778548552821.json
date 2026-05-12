@@ -1,0 +1,14 @@
+{
+  "query": "\nSELECT 'commercial_assets' as tbl, id, name FROM commercial_assets WHERE name LIKE '%Sprint%' OR name LIKE '%Test%' LIMIT 5;\nSELECT 'outreach' as tbl, id, name FROM outreach WHERE name LIKE '%Sprint%' OR name LIKE '%Test%' LIMIT 5;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute \nSELECT 'commercial_assets' as tbl, id, name FROM commercial_assets WHERE name LIKE '%Sprint%' OR name LIKE '%Test%' LIMIT 5;\nSELECT 'outreach' as tbl, id, name FROM outreach WHERE name LIKE '%Sprint%' OR name LIKE '%Test%' LIMIT 5;\n",
+  "returncode": 1,
+  "logs": [
+    "tbl\tid\tname",
+    "commercial_assets\t420001\tSprint6 Test Retail Strip 1777231258191",
+    "commercial_assets\t450001\tSprint6 Test Retail Strip 1777241816591",
+    "commercial_assets\t480001\tSprint6 Test Retail Strip 1777261629886",
+    "commercial_assets\t510001\tSprint6 Test Retail Strip 1777263923380",
+    "commercial_assets\t510005\tSprint6 Test Retail Strip 1777264877750",
+    "ERROR 1054 (42S22) at line 3: Unknown column 'name' in 'where clause'"
+  ]
+}

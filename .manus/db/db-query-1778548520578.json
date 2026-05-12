@@ -1,0 +1,30 @@
+{
+  "query": "SELECT id, title, confidence_score FROM macro_signals WHERE title LIKE '%Sprint6%' OR title LIKE '%Sprint 6%' OR title LIKE '%Test Signal%' OR title LIKE '%test%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT id, title, confidence_score FROM macro_signals WHERE title LIKE '%Sprint6%' OR title LIKE '%Sprint 6%' OR title LIKE '%Test Signal%' OR title LIKE '%test%';",
+  "rows": [
+    {
+      "id": "930001",
+      "title": "Sprint6 Test Signal",
+      "confidence_score": "0.750"
+    },
+    {
+      "id": "1140003",
+      "title": "Sprint6 Test Signal",
+      "confidence_score": "0.750"
+    },
+    {
+      "id": "1170004",
+      "title": "Sprint6 Test Signal",
+      "confidence_score": "0.750"
+    },
+    {
+      "id": "1200003",
+      "title": "Sprint6 Test Signal",
+      "confidence_score": "0.750"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tconfidence_score\n930001\tSprint6 Test Signal\t0.750\n1140003\tSprint6 Test Signal\t0.750\n1170004\tSprint6 Test Signal\t0.750\n1200003\tSprint6 Test Signal\t0.750\n",
+  "stderr": "",
+  "execution_time_ms": 264
+}

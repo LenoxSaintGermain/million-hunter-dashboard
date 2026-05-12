@@ -700,3 +700,28 @@
 - [x] Add demo.refresh protectedProcedure — LLM-powered scenario regeneration with fresh market data
 - [x] Wire "Refresh Scan" button in demo UI (visible only to authenticated operator)
 - [x] Run tests, save checkpoint (96/96 passing)
+
+## Sprint 36 — Co-Pilot Removal + TIDE Reference Rebuild
+- [x] Remove Co-Pilot sparkle icon from EditorialTopNav (not in spec)
+- [x] Remove embedded CoPilot state from EditorialTopNav entirely
+- [x] Rebuild TIDE.tsx: dark editorial bg (#0F0F1E), Fraunces hero title, eyebrow badge
+- [x] TIDE: Real US map (MapView component) with convergence cluster markers
+- [x] TIDE: Live intelligence stream feed (right column) — convergence events, FEC signals, Federal Register
+- [x] TIDE: AI analyst commentary strip below map
+- [x] TIDE: Stat strip — Capital Tracked, Active Deals, Active Signals
+- [x] TIDE: Match Stitch reference layout exactly (col-span-7 map + col-span-5 stream)
+- [x] Run tests, save checkpoint
+
+## Sprint 37 — Model Version Sync + TIDE Layout Rebuild
+- [x] Audit all model strings in server/routers.ts and server/routers/ subdirectories
+- [x] Update invokeLLM model overrides: Claude 4 Opus for owner psychology + Sentinel
+- [x] Update invokeLLM model overrides: Gemini 3.1 Pro for Consensus + Red Team
+- [x] Update invokeLLM model overrides: Gemini 3.1 Flash for TIDE enrichment + scan
+- [x] Update Perplexity calls to sonar-pro model string
+- [x] Update all UI model badge labels (CoPilot panel, Consensus Dashboard, Deal Room)
+- [x] Rebuild TIDE hero: dark #0F0F1E bg, Fraunces title, eyebrow badge, system status
+- [x] TIDE: Replace fake SVG map with real MapView + convergence cluster AdvancedMarkers
+- [x] TIDE: Add live intelligence stream column (right, col-span-5) with timestamped event cards
+- [x] TIDE: Stat strip at bottom — Capital Tracked, Active Events, Prediction Accuracy
+- [x] TIDE: AI analyst commentary strip below map (Gemini 3.1 Flash label)
+- [x] Run tests, save checkpoint — 96/96 passing

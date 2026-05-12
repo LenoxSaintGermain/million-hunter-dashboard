@@ -1,0 +1,346 @@
+{
+  "query": "DESCRIBE commercial_assets; DESCRIBE outreach;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute DESCRIBE commercial_assets; DESCRIBE outreach;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "name",
+      "Type": "varchar(255)",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "address",
+      "Type": "varchar(500)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "city",
+      "Type": "varchar(100)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "state",
+      "Type": "varchar(50)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "zip",
+      "Type": "varchar(20)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "property_type",
+      "Type": "enum('office','industrial','retail','mixed_use','land','warehouse','flex')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "retail",
+      "Extra": ""
+    },
+    {
+      "Field": "square_footage",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "asking_price",
+      "Type": "decimal(15,2)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "cap_rate",
+      "Type": "decimal(5,3)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "noi",
+      "Type": "decimal(15,2)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "lease_type",
+      "Type": "enum('nnn','gross','modified_gross','vacant')",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "zoning",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "opportunity_zone",
+      "Type": "tinyint(1)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "oz_tract_id",
+      "Type": "varchar(20)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "tad_district",
+      "Type": "varchar(100)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "distance_to_venue",
+      "Type": "decimal(5,2)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "event_revenue_low",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "event_revenue_high",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "source",
+      "Type": "varchar(100)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "manual",
+      "Extra": ""
+    },
+    {
+      "Field": "source_url",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ai_score",
+      "Type": "decimal(4,3)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ai_analysis",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "status",
+      "Type": "enum('new','reviewing','qualified','rejected','acquired')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "new",
+      "Extra": ""
+    },
+    {
+      "Field": "created_at",
+      "Type": "bigint",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "updated_at",
+      "Type": "bigint",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "Field",
+      "Type": "Type",
+      "Null": "Null",
+      "Key": "Key",
+      "Default": "Default",
+      "Extra": "Extra"
+    },
+    {
+      "Field": "id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "dealId",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "contactName",
+      "Type": "varchar(256)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "contactRole",
+      "Type": "varchar(128)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "contactEmail",
+      "Type": "varchar(320)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "contactPhone",
+      "Type": "varchar(32)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "status",
+      "Type": "enum('pending','sent','opened','replied','meeting_scheduled','no_response','not_interested','closed')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "pending",
+      "Extra": ""
+    },
+    {
+      "Field": "lastContactedAt",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "nextFollowUpAt",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "notes",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "createdAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "updatedAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    },
+    {
+      "Field": "channel",
+      "Type": "enum('email','phone','linkedin','sms')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "email",
+      "Extra": ""
+    },
+    {
+      "Field": "subject",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "body",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\nname\tvarchar(255)\tNO\tMUL\tNULL\t\naddress\tvarchar(500)\tNO\t\tNULL\t\ncity\tvarchar(100)\tNO\t\tNULL\t\nstate\tvarchar(50)\tNO\t\tNULL\t\nzip\tvarchar(20)\tYES\t\tNULL\t\nproperty_type\tenum('office','industrial','retail','mixed_use','land','warehouse','flex')\tNO\t\tretail\t\nsquare_footage\tint\tYES\t\tNULL\t\nasking_price\tdecimal(15,2)\tYES\t\tNULL\t\ncap_rate\tdecimal(5,3)\tYES\t\tNULL\t\nnoi\tdecimal(15,2)\tYES\t\tNULL\t\nlease_type\tenum('nnn','gross','modified_gross','vacant')\tYES\t\tNULL\t\nzoning\ttext\tYES\t\tNULL\t\nopportunity_zone\ttinyint(1)\tNO\t\t0\t\noz_tract_id\tvarchar(20)\tYES\t\tNULL\t\ntad_district\tvarchar(100)\tYES\t\tNULL\t\ndistance_to_venue\tdecimal(5,2)\tYES\t\tNULL\t\nevent_revenue_low\tint\tYES\t\tNULL\t\nevent_revenue_high\tint\tYES\t\tNULL\t\nsource\tvarchar(100)\tNO\t\tmanual\t\nsource_url\ttext\tYES\t\tNULL\t\nai_score\tdecimal(4,3)\tYES\t\tNULL\t\nai_analysis\ttext\tYES\t\tNULL\t\nstatus\tenum('new','reviewing','qualified','rejected','acquired')\tNO\t\tnew\t\ncreated_at\tbigint\tNO\t\tNULL\t\nupdated_at\tbigint\tNO\t\tNULL\t\nField\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\ndealId\tint\tNO\t\tNULL\t\ncontactName\tvarchar(256)\tYES\t\tNULL\t\ncontactRole\tvarchar(128)\tYES\t\tNULL\t\ncontactEmail\tvarchar(320)\tYES\t\tNULL\t\ncontactPhone\tvarchar(32)\tYES\t\tNULL\t\nstatus\tenum('pending','sent','opened','replied','meeting_scheduled','no_response','not_interested','closed')\tNO\t\tpending\t\nlastContactedAt\ttimestamp\tYES\t\tNULL\t\nnextFollowUpAt\ttimestamp\tYES\t\tNULL\t\nnotes\ttext\tYES\t\tNULL\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\nchannel\tenum('email','phone','linkedin','sms')\tNO\t\temail\t\nsubject\ttext\tYES\t\tNULL\t\nbody\ttext\tYES\t\tNULL\t\n",
+  "stderr": "",
+  "execution_time_ms": 260
+}

@@ -166,7 +166,7 @@ Return a JSON object with key "classifications" containing an array of classific
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${forgeKey}` },
       body: JSON.stringify({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
         max_tokens: 2048,
@@ -234,7 +234,7 @@ Return a JSON object with key "events" containing an array. If no clear converge
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${forgeKey}` },
       body: JSON.stringify({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
         max_tokens: 2048,

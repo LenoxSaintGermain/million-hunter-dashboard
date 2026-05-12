@@ -445,7 +445,7 @@ export const appRouter = router({
             cashOnCashReturn: capital.cashOnCashReturn,
             capitalStackSummary: capital.summary,
           }),
-          modelVersions: { psychology: "claude-opus-4.7", digital: "claude-opus-4.7", redteam: "gemini-3.1-pro-preview", capital: "gemini-3-flash-preview" },
+          modelVersions: { psychology: "claude-opus-4", digital: "claude-opus-4", redteam: "gemini-3.1-pro", capital: "gemini-3.1-flash" },
         };
         await upsertSignal(signalData);
         await logActivity({
@@ -497,7 +497,7 @@ export const appRouter = router({
           investmentThesis: memo.investmentThesis,
           riskFactors: memo.riskFactors,
           aiOptimizationOpportunities: memo.aiOptimizationOpportunities,
-          generatedBy: "gemini-2.5-pro",
+          generatedBy: "gemini-3.1-pro",
           version: (existingMemo?.version ?? 0) + 1,
         });
         await logActivity({ dealId: input.dealId, type: "memo_generated", title: `Investment memo generated for ${deal.name}` });
@@ -650,9 +650,9 @@ export const appRouter = router({
         await upsertModelConfig(module as AnalysisModule, modelId, true);
       }
       // Reset consensus models to defaults
-      await upsertModelConfig("consensus_model_1" as AnalysisModule, "gemini-2.5-pro", true);
-      await upsertModelConfig("consensus_model_2" as AnalysisModule, "gemini-2.5-flash", true);
-      await upsertModelConfig("consensus_model_3" as AnalysisModule, "gemini-2.5-flash-lite", true);
+      await upsertModelConfig("consensus_model_1" as AnalysisModule, "gemini-3.1-pro", true);
+      await upsertModelConfig("consensus_model_2" as AnalysisModule, "gemini-3.1-flash", true);
+      await upsertModelConfig("consensus_model_3" as AnalysisModule, "gemini-3.1-flash", true);
       return { success: true };
     }),
 
@@ -660,9 +660,9 @@ export const appRouter = router({
     consensusConfig: publicProcedure.query(async () => {
       const saved = await getAllModelConfigs();
       const defaults = {
-        consensus_model_1: "gemini-2.5-pro",
-        consensus_model_2: "gemini-2.5-flash",
-        consensus_model_3: "gemini-2.5-flash-lite",
+        consensus_model_1: "gemini-3.1-pro",
+        consensus_model_2: "gemini-3.1-flash",
+        consensus_model_3: "gemini-3.1-flash",
       };
       const result: Record<string, string> = {};
       for (const [key, defaultModel] of Object.entries(defaults)) {
@@ -1616,7 +1616,7 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         return { success: true };
       }),
 
-    // AI Refresh: use Claude-Opus-4.7 via Poe to generate 3 real-time macro signals
+    // AI Refresh: use Claude-Opus-4 via Poe to generate 3 real-time macro signals
     aiRefresh: protectedProcedure
       .mutation(async () => {
         const { insertMacroSignal } = await import("./db");
@@ -1655,7 +1655,7 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
           });
           inserted++;
         }
-        return { inserted, message: `${inserted} new signals generated via Claude-Opus-4.7` };
+        return { inserted, message: `${inserted} new signals generated via Claude-Opus-4` };
       }),
     // Archive a single signal manually
     archive: protectedProcedure
@@ -1818,7 +1818,7 @@ Be concise. Be direct. Be right.`;
 
   // ─── Off-Market Scout Agent ───────────────────────────────────────────────
   offMarket: router({
-    // Hunt for off-market opportunities using Claude-Opus-4.7 web-grounded research
+    // Hunt for off-market opportunities using Claude-Opus-4 web-grounded research
     hunt: protectedProcedure
       .input(z.object({
         targetLocations: z.array(z.string()).min(1),
@@ -2289,7 +2289,7 @@ Return a JSON array with this exact schema:
   await new Promise((r) => setTimeout(r, 800));
 
   // ── Phase 3: Score each deal ──────────────────────────────────────────────
-  await phase("AI scoring", `Scoring ${qualified.length} deals with Gemini 2.5 Flash`, 45);
+  await phase("AI scoring", `Scoring ${qualified.length} deals with Gemini 3.1 Flash`, 45);
   let scored = 0;
   for (const listing of qualified) {
     // Upsert deal — ON DUPLICATE KEY UPDATE handles re-scan deduplication

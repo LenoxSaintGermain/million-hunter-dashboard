@@ -5,7 +5,8 @@
  * Editorial Finance design system — warm bone/paper, Fraunces display,
  * contextual "why this matters" explanations, no raw FEC dump links.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { MapView } from "@/components/Map";
 import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import EditorialTopNav from "@/components/EditorialTopNav";
@@ -15,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Zap, TrendingUp, MapPin, AlertTriangle, CheckCircle2,
   Clock, ArrowRight, BarChart2, Loader2, Target, BookOpen,
-  Archive, RefreshCw, ChevronDown, ChevronUp, Info,
+  Archive, RefreshCw, ChevronDown, ChevronUp, Info, Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -453,69 +454,275 @@ export default function TIDEPage() {
     return ["all", ...Array.from(cats)];
   }, [flows]);
 
+  // ── Geography → lat/lng lookup for map markers ──────────────────────────────
+  const GEO_COORDS: Record<string, { lat: number; lng: number }> = {
+    "Atlanta, GA":      { lat: 33.749, lng: -84.388 },
+    "Charlotte, NC":    { lat: 35.227, lng: -80.843 },
+    "Miami, FL":        { lat: 25.761, lng: -80.191 },
+    "Dallas, TX":       { lat: 32.776, lng: -96.796 },
+    "Nashville, TN":    { lat: 36.162, lng: -86.781 },
+    "Phoenix, AZ":      { lat: 33.448, lng: -112.074 },
+    "Denver, CO":       { lat: 39.739, lng: -104.984 },
+    "Washington, DC":   { lat: 38.907, lng: -77.036 },
+    "Houston, TX":      { lat: 29.760, lng: -95.369 },
+    "Chicago, IL":      { lat: 41.878, lng: -87.629 },
+    "Los Angeles, CA":  { lat: 34.052, lng: -118.243 },
+    "New York, NY":     { lat: 40.712, lng: -74.005 },
+    "Seattle, WA":      { lat: 47.606, lng: -122.332 },
+    "Austin, TX":       { lat: 30.267, lng: -97.743 },
+    "Tampa, FL":        { lat: 27.947, lng: -82.458 },
+    "Raleigh, NC":      { lat: 35.779, lng: -78.638 },
+  };
+
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+
+  // Build convergence cluster markers from live data
+  const clusterPoints = useMemo(() => {
+    const geoMap = new Map<string, { count: number; capital: number; types: string[] }>();
+    flows.forEach((f) => {
+      const geo = f.geography;
+      const existing = geoMap.get(geo) || { count: 0, capital: 0, types: [] };
+      geoMap.set(geo, {
+        count: existing.count + 1,
+        capital: existing.capital + (f.amount || 0),
+        types: existing.types.includes(f.category) ? existing.types : [...existing.types, f.category],
+      });
+    });
+    convergenceEvents.forEach((e) => {
+      const geo = e.geography;
+      const existing = geoMap.get(geo) || { count: 0, capital: 0, types: [] };
+      geoMap.set(geo, {
+        count: existing.count + 2, // convergence events count double
+        capital: existing.capital + (e.total_capital || 0),
+        types: existing.types.includes(e.signal_type) ? existing.types : [...existing.types, e.signal_type],
+      });
+    });
+    return Array.from(geoMap.entries())
+      .map(([geo, data]) => ({ geo, ...data, coords: GEO_COORDS[geo] }))
+      .filter((p) => p.coords);
+  }, [flows, convergenceEvents]);
+
+  // Place/update markers whenever map or data changes
+  useEffect(() => {
+    if (!mapRef.current) return;
+    // Clear old markers
+    markersRef.current.forEach((m) => { m.map = null; });
+    markersRef.current = [];
+    clusterPoints.forEach(({ coords, count, capital }) => {
+      const size = Math.min(8 + count * 2, 24);
+      const el = document.createElement("div");
+      el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:oklch(0.66 0.14 55);border:2px solid oklch(0.85 0.10 55);box-shadow:0 0 ${size}px oklch(0.66 0.14 55 / 0.6);cursor:pointer;`;
+      const marker = new google.maps.marker.AdvancedMarkerElement({
+        map: mapRef.current!,
+        position: coords,
+        content: el,
+        title: `${count} signals · ${fmtMoney(capital / 100)}`,
+      });
+      markersRef.current.push(marker);
+    });
+  }, [clusterPoints]);
+
   return (
     <EditorialTopNav>
-      {/* ── TIDE Editorial Masthead — Stitch Reference Layout ── */}
-      <div className="border-b border-rule pb-10 mb-10">
+      {/* ── TIDE Dark Hero — Stitch Reference Layout ── */}
+      <div
+        className="-mx-4 sm:-mx-6 lg:-mx-8 mb-0 relative overflow-hidden"
+        style={{ background: "oklch(0.10 0.015 250)", borderBottom: "1px solid oklch(0.20 0.015 250)" }}
+      >
         <motion.div
-          initial={{ opacity: 0, filter: "blur(6px)" }}
-          animate={{ opacity: 1, filter: "blur(0px)" }}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: EASE }}
+          className="px-4 sm:px-6 lg:px-8 pt-10 pb-0"
         >
-          <p className="font-eyebrow text-eyebrow text-amber mb-4 uppercase tracking-widest">
-            TIDE · TEMPORAL INTELLIGENCE FOR DEPLOYMENT EVENTS
+          {/* Eyebrow + system badge */}
+          <div className="flex items-center gap-3 mb-6">
+            <span
+              className="font-mono text-[10px] px-2.5 py-1 rounded-full uppercase tracking-widest border"
+              style={{ color: "oklch(0.66 0.14 55)", borderColor: "oklch(0.66 0.14 55 / 0.35)", background: "oklch(0.66 0.14 55 / 0.08)" }}
+            >
+              SYSTEM MODULE
+            </span>
+            <span className="font-mono text-[10px]" style={{ color: "oklch(0.55 0.06 155)" }}>● USASpending.gov ACTIVE</span>
+            <span className="font-mono text-[10px]" style={{ color: "oklch(0.45 0.08 220)" }}>● Federal Register LIVE</span>
+          </div>
+
+          {/* Hero title */}
+          <h1
+            className="mb-3 leading-[1.0]"
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "clamp(2.5rem, 6vw, 4.5rem)",
+              fontWeight: 400,
+              letterSpacing: "-0.03em",
+              color: "oklch(0.96 0.005 250)",
+            }}
+          >
+            Temporal Intelligence<br />for Deployment Events
+          </h1>
+          <p className="mb-8 max-w-2xl" style={{ color: "oklch(0.65 0.01 250)", fontSize: 14, lineHeight: 1.6 }}>
+            Ingesting USASpending.gov, Federal Register, and FEC data to detect 18–36 month demand
+            implications. The platform closes the information asymmetry gap by deploying frontier AI
+            models against government data sources.
           </p>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-            {/* Left: Headline col-span-7 */}
-            <div className="lg:col-span-7">
-              <h1 className="font-hero-h1 text-hero-h1 text-ink leading-[1.05] mb-6">
-                Temporal Intelligence<br />
-                for Deployment Events
-              </h1>
-              <p className="font-body-base text-body-base text-muted-foreground leading-relaxed max-w-lg mb-8">
-                Monitor federal contracts, regulatory signals, and political capital flows to detect
-                convergence events before the market prices them in. Each signal is contextualized
-                for acquisition targets in that geography.
-              </p>
-              {/* Stat strip */}
-              <div className="grid grid-cols-3 gap-0 border border-rule divide-x divide-rule">
-                <div className="px-6 py-4">
-                  <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1 uppercase tracking-widest">CAPITAL TRACKED</p>
-                  <p className="font-data-mono text-[32px] leading-none text-ink">
-                    {totalCapital > 0 ? fmtMoney(totalCapital / 100) : "—"}
-                  </p>
-                </div>
-                <div className="px-6 py-4">
-                  <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1 uppercase tracking-widest">ACTIVE EVENTS</p>
-                  <p className="font-data-mono text-[32px] leading-none text-ink">{convergenceEvents.length}</p>
-                </div>
-                <div className="px-6 py-4">
-                  <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1 uppercase tracking-widest">ACCURACY</p>
-                  <p className="font-data-mono text-[32px] leading-none text-ink">
-                    {accuracy !== null ? `${accuracy}%` : "—"}
-                  </p>
-                </div>
+
+          {/* Two-column body: Map (left, col-7) + Intelligence Stream (right, col-5) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch" style={{ borderTop: "1px solid oklch(0.20 0.015 250)" }}>
+            {/* Left: Real Google Map with convergence clusters */}
+            <div className="lg:col-span-7 relative" style={{ borderRight: "1px solid oklch(0.20 0.015 250)" }}>
+              <div className="px-0 pt-4 pb-2">
+                <p className="font-mono text-[10px] uppercase tracking-widest mb-3 px-4" style={{ color: "oklch(0.45 0.01 250)" }}>
+                  CONVERGENCE MAP (90-DAY CLUSTERS)
+                </p>
               </div>
-            </div>
-            {/* Right: US Map placeholder col-span-5 */}
-            <div className="lg:col-span-5 border border-rule bg-bone/50 aspect-[4/3] flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 opacity-10">
-                <svg viewBox="0 0 800 500" className="w-full h-full" fill="none">
-                  {/* Simplified US outline */}
-                  <path d="M120,180 L180,120 L280,100 L380,80 L480,90 L580,100 L660,140 L700,200 L680,280 L620,340 L540,380 L440,400 L340,410 L240,400 L160,360 L120,300 Z" stroke="currentColor" strokeWidth="2" className="text-ink"/>
-                  <circle cx="300" cy="250" r="6" fill="currentColor" className="text-amber"/>
-                  <circle cx="450" cy="220" r="4" fill="currentColor" className="text-amber"/>
-                  <circle cx="380" cy="300" r="5" fill="currentColor" className="text-amber"/>
-                  <circle cx="520" cy="280" r="3" fill="currentColor" className="text-amber"/>
-                </svg>
+              <div style={{ height: 340 }}>
+                <MapView
+                  initialCenter={{ lat: 36.5, lng: -95.5 }}
+                  initialZoom={4}
+                  onMapReady={(map) => {
+                    mapRef.current = map;
+                    // Apply dark map style
+                    map.setOptions({
+                      styles: [
+                        { elementType: "geometry", stylers: [{ color: "#0f0f1e" }] },
+                        { elementType: "labels.text.fill", stylers: [{ color: "#4a4a6a" }] },
+                        { elementType: "labels.text.stroke", stylers: [{ color: "#0f0f1e" }] },
+                        { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#1e1e3a" }] },
+                        { featureType: "road", stylers: [{ visibility: "off" }] },
+                        { featureType: "poi", stylers: [{ visibility: "off" }] },
+                        { featureType: "water", elementType: "geometry", stylers: [{ color: "#080818" }] },
+                        { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#12121e" }] },
+                        { featureType: "administrative.country", elementType: "geometry.stroke", stylers: [{ color: "#2a2a4a" }, { weight: 1 }] },
+                        { featureType: "administrative.province", elementType: "geometry.stroke", stylers: [{ color: "#1a1a30" }, { weight: 0.5 }] },
+                      ],
+                      disableDefaultUI: true,
+                      gestureHandling: "greedy",
+                    });
+                  }}
+                />
               </div>
-              <div className="relative z-10 text-center">
-                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-2 uppercase tracking-widest">SIGNAL DENSITY MAP</p>
-                <p className="font-body-base text-body-base text-muted-foreground text-[12px]">
-                  {flows.length > 0 ? `${flows.length} signals tracked` : "Run a scan to populate"}
+              {/* AI Analyst commentary strip */}
+              <div className="px-4 py-3" style={{ borderTop: "1px solid oklch(0.20 0.015 250)" }}>
+                <p className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: "oklch(0.45 0.01 250)" }}>CO-ANALYST INSIGHT</p>
+                <p className="text-xs italic leading-relaxed" style={{ color: "oklch(0.55 0.01 250)" }}>
+                  {clusterPoints.length > 0
+                    ? `SIGNAL OVERLAP (Gemini 3.1 Flash cross-reference): ${clusterPoints[0]?.geo} shows ${clusterPoints[0]?.count} converging signals totaling ${fmtMoney((clusterPoints[0]?.capital || 0) / 100)} — matches Investor DNA for "${clusterPoints[0]?.types[0] ?? "Infrastructure"} Deployment".`
+                    : "Run a TIDE scan to generate AI analyst commentary on convergence patterns."}
                 </p>
               </div>
             </div>
+
+            {/* Right: Live Intelligence Stream */}
+            <div className="lg:col-span-5 flex flex-col" style={{ maxHeight: 440, overflowY: "auto" }}>
+              <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-10" style={{ background: "oklch(0.10 0.015 250)", borderBottom: "1px solid oklch(0.20 0.015 250)" }}>
+                <p className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "oklch(0.45 0.01 250)" }}>INTELLIGENCE STREAM</p>
+                <div className="flex items-center gap-1.5">
+                  <Radio className="h-3 w-3" style={{ color: "oklch(0.55 0.06 155)" }} />
+                  <span className="font-mono text-[10px]" style={{ color: "oklch(0.55 0.06 155)" }}>LIVE</span>
+                </div>
+              </div>
+              {/* Convergence events as stream cards */}
+              {convergenceQuery.isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-4 w-4 animate-spin" style={{ color: "oklch(0.35 0.01 250)" }} />
+                </div>
+              ) : convergenceEvents.length === 0 ? (
+                <div className="px-4 py-8">
+                  <p className="font-mono text-[10px] uppercase tracking-widest mb-2" style={{ color: "oklch(0.35 0.01 250)" }}>CONVERGENCE EVENT</p>
+                  <p className="text-sm font-medium mb-1" style={{ color: "oklch(0.65 0.01 250)" }}>No active signals</p>
+                  <p className="text-xs" style={{ color: "oklch(0.40 0.01 250)" }}>Run a TIDE scan to populate the intelligence stream with live government data.</p>
+                </div>
+              ) : (
+                convergenceEvents.slice(0, 8).map((event, i) => (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, x: 12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05, duration: 0.4, ease: EASE }}
+                    className="px-4 py-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                    style={{ borderBottom: "1px solid oklch(0.18 0.015 250)" }}
+                    onClick={() => setGeography(event.geography)}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span
+                        className="font-mono text-[9px] px-1.5 py-0.5 rounded uppercase tracking-widest"
+                        style={{
+                          color: event.confidence >= 0.8 ? "oklch(0.66 0.14 55)" : "oklch(0.55 0.06 155)",
+                          background: event.confidence >= 0.8 ? "oklch(0.66 0.14 55 / 0.10)" : "oklch(0.55 0.06 155 / 0.10)",
+                          border: `1px solid ${event.confidence >= 0.8 ? "oklch(0.66 0.14 55 / 0.25)" : "oklch(0.55 0.06 155 / 0.25)"}`,
+                        }}
+                      >
+                        {event.confidence >= 0.8 ? "CONVERGENCE EVENT" : "FEC SIGNAL"}
+                      </span>
+                      <span className="font-mono text-[10px] shrink-0" style={{ color: "oklch(0.35 0.01 250)" }}>
+                        {new Date(event.created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium leading-snug mb-1" style={{ color: "oklch(0.85 0.005 250)" }}>
+                      {event.thesis_seed?.slice(0, 80) ?? SIGNAL_LABELS[event.signal_type as SignalType] ?? "Capital Convergence"}
+                    </p>
+                    <p className="text-xs leading-relaxed" style={{ color: "oklch(0.45 0.01 250)" }}>
+                      {event.geography} · {fmtPct(event.confidence)} confidence
+                    </p>
+                    {event.total_capital > 0 && (
+                      <p className="font-mono text-[10px] mt-1" style={{ color: "oklch(0.55 0.06 155)" }}>
+                        {fmtMoney(event.total_capital / 100)} tracked
+                      </p>
+                    )}
+                  </motion.div>
+                ))
+              )}
+              {/* Capital flows as stream items */}
+              {flows.slice(0, 5).map((flow, i) => (
+                <motion.div
+                  key={`flow-${flow.id}`}
+                  initial={{ opacity: 0, x: 12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: (convergenceEvents.length + i) * 0.05, duration: 0.4, ease: EASE }}
+                  className="px-4 py-4"
+                  style={{ borderBottom: "1px solid oklch(0.15 0.015 250)" }}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <span
+                      className="font-mono text-[9px] px-1.5 py-0.5 rounded uppercase tracking-widest"
+                      style={{ color: "oklch(0.45 0.08 220)", background: "oklch(0.45 0.08 220 / 0.10)", border: "1px solid oklch(0.45 0.08 220 / 0.25)" }}
+                    >
+                      FEDERAL REGISTER
+                    </span>
+                    <span className="font-mono text-[10px] shrink-0" style={{ color: "oklch(0.35 0.01 250)" }}>
+                      {new Date(flow.flow_date || Date.now()).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium leading-snug mb-1" style={{ color: "oklch(0.75 0.005 250)" }}>
+                    {flow.entity?.slice(0, 70)}
+                  </p>
+                  {flow.amount && flow.amount > 0 && (
+                    <p className="font-mono text-[10px]" style={{ color: "oklch(0.45 0.01 250)" }}>
+                      {fmtMoney(flow.amount / 100)} · {flow.geography}
+                    </p>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          {/* Stat strip */}
+          <div
+            className="grid grid-cols-2 sm:grid-cols-4 divide-x"
+            style={{ borderTop: "1px solid oklch(0.20 0.015 250)" }}
+          >
+            {[
+              { label: "CAPITAL TRACKED", value: totalCapital > 0 ? fmtMoney(totalCapital / 100) : "—" },
+              { label: "ACTIVE EVENTS", value: String(convergenceEvents.length) },
+              { label: "ACTIVE DEALS", value: String(flows.length) },
+              { label: "ACCURACY", value: accuracy !== null ? `${accuracy}%` : "—" },
+            ].map(({ label, value }) => (
+              <div key={label} className="px-4 sm:px-6 py-4">
+                <p className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: "oklch(0.35 0.01 250)" }}>{label}</p>
+                <p className="font-mono text-2xl tabular-nums" style={{ color: "oklch(0.85 0.005 250)", fontWeight: 600 }}>{value}</p>
+              </div>
+            ))}
           </div>
         </motion.div>
       </div>

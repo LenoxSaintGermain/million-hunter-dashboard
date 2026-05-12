@@ -1,0 +1,220 @@
+{
+  "query": "\nSELECT 'commercial_assets' as tbl, id, name FROM commercial_assets WHERE name LIKE '%Sprint%' OR name LIKE '%Test%' OR source LIKE '%test%';\nSELECT 'scan_jobs' as tbl, id, status FROM scan_jobs WHERE status LIKE '%test%' LIMIT 5;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute \nSELECT 'commercial_assets' as tbl, id, name FROM commercial_assets WHERE name LIKE '%Sprint%' OR name LIKE '%Test%' OR source LIKE '%test%';\nSELECT 'scan_jobs' as tbl, id, status FROM scan_jobs WHERE status LIKE '%test%' LIMIT 5;\n",
+  "rows": [
+    {
+      "tbl": "commercial_assets",
+      "id": "420001",
+      "name": "Sprint6 Test Retail Strip 1777231258191"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "450001",
+      "name": "Sprint6 Test Retail Strip 1777241816591"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "480001",
+      "name": "Sprint6 Test Retail Strip 1777261629886"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "510001",
+      "name": "Sprint6 Test Retail Strip 1777263923380"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "510005",
+      "name": "Sprint6 Test Retail Strip 1777264877750"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "510009",
+      "name": "Sprint6 Test Retail Strip 1777265255247"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "510013",
+      "name": "Sprint6 Test Retail Strip 1777265700831"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "540001",
+      "name": "Sprint6 Test Retail Strip 1777315505560"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "570001",
+      "name": "Sprint6 Test Retail Strip 1777316613374"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "630001",
+      "name": "Sprint6 Test Retail Strip 1777415423650"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "660001",
+      "name": "Sprint6 Test Retail Strip 1777733750461"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "690002",
+      "name": "Sprint6 Test Retail Strip 1777736940982"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "720001",
+      "name": "Sprint6 Test Retail Strip 1777737270003"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "750002",
+      "name": "Sprint6 Test Retail Strip 1777775721928"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "780002",
+      "name": "Sprint6 Test Retail Strip 1777825873156"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "810001",
+      "name": "Sprint6 Test Retail Strip 1777947473311"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "840001",
+      "name": "Sprint6 Test Retail Strip 1778112233553"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "900002",
+      "name": "Sprint6 Test Retail Strip 1778207620133"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "930001",
+      "name": "Sprint6 Test Retail Strip 1778217861968"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "960001",
+      "name": "Sprint6 Test Retail Strip 1778270475111"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "990001",
+      "name": "Sprint6 Test Retail Strip 1778294071435"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1020002",
+      "name": "Sprint6 Test Retail Strip 1778295526523"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1050001",
+      "name": "Sprint6 Test Retail Strip 1778361408942"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1080001",
+      "name": "Sprint6 Test Retail Strip 1778509696277"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1080005",
+      "name": "Sprint6 Test Retail Strip 1778509741660"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1080009",
+      "name": "Sprint6 Test Retail Strip 1778509766684"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1080013",
+      "name": "Sprint6 Test Retail Strip 1778509794929"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1080017",
+      "name": "Sprint6 Test Retail Strip 1778509827687"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1080021",
+      "name": "Sprint6 Test Retail Strip 1778509895413"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1080025",
+      "name": "Sprint6 Test Retail Strip 1778509905503"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1080029",
+      "name": "Sprint6 Test Retail Strip 1778509937106"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1110001",
+      "name": "Sprint6 Test Retail Strip 1778520461884"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1110005",
+      "name": "Sprint6 Test Retail Strip 1778520584236"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1110009",
+      "name": "Sprint6 Test Retail Strip 1778520593431"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1110013",
+      "name": "Sprint6 Test Retail Strip 1778520620872"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1140001",
+      "name": "Sprint6 Test Retail Strip 1778525724596"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1170001",
+      "name": "Sprint6 Test Retail Strip 1778526867864"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1200001",
+      "name": "Sprint6 Test Retail Strip 1778532413683"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1230001",
+      "name": "Sprint6 Test Retail Strip 1778534887155"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1260001",
+      "name": "Sprint6 Test Retail Strip 1778536032313"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1290001",
+      "name": "Sprint6 Test Retail Strip 1778541819904"
+    },
+    {
+      "tbl": "commercial_assets",
+      "id": "1320001",
+      "name": "Sprint6 Test Retail Strip 1778544763531"
+    }
+  ],
+  "messages": [],
+  "stdout": "tbl\tid\tname\ncommercial_assets\t420001\tSprint6 Test Retail Strip 1777231258191\ncommercial_assets\t450001\tSprint6 Test Retail Strip 1777241816591\ncommercial_assets\t480001\tSprint6 Test Retail Strip 1777261629886\ncommercial_assets\t510001\tSprint6 Test Retail Strip 1777263923380\ncommercial_assets\t510005\tSprint6 Test Retail Strip 1777264877750\ncommercial_assets\t510009\tSprint6 Test Retail Strip 1777265255247\ncommercial_assets\t510013\tSprint6 Test Retail Strip 1777265700831\ncommercial_assets\t540001\tSprint6 Test Retail Strip 1777315505560\ncommercial_assets\t570001\tSprint6 Test Retail Strip 1777316613374\ncommercial_assets\t630001\tSprint6 Test Retail Strip 1777415423650\ncommercial_assets\t660001\tSprint6 Test Retail Strip 1777733750461\ncommercial_assets\t690002\tSprint6 Test Retail Strip 1777736940982\ncommercial_assets\t720001\tSprint6 Test Retail Strip 1777737270003\ncommercial_assets\t750002\tSprint6 Test Retail Strip 1777775721928\ncommercial_assets\t780002\tSprint6 Test Retail Strip 1777825873156\ncommercial_assets\t810001\tSprint6 Test Retail Strip 1777947473311\ncommercial_assets\t840001\tSprint6 Test Retail Strip 1778112233553\ncommercial_assets\t900002\tSprint6 Test Retail Strip 1778207620133\ncommercial_assets\t930001\tSprint6 Test Retail Strip 1778217861968\ncommercial_assets\t960001\tSprint6 Test Retail Strip 1778270475111\ncommercial_assets\t990001\tSprint6 Test Retail Strip 1778294071435\ncommercial_assets\t1020002\tSprint6 Test Retail Strip 1778295526523\ncommercial_assets\t1050001\tSprint6 Test Retail Strip 1778361408942\ncommercial_assets\t1080001\tSprint6 Test Retail Strip 1778509696277\ncommercial_assets\t1080005\tSprint6 Test Retail Strip 1778509741660\ncommercial_assets\t1080009\tSprint6 Test Retail Strip 1778509766684\ncommercial_assets\t1080013\tSprint6 Test Retail Strip 1778509794929\ncommercial_assets\t1080017\tSprint6 Test Retail Strip 1778509827687\ncommercial_assets\t1080021\tSprint6 Test Retail Strip 1778509895413\ncommercial_assets\t1080025\tSprint6 Test Retail Strip 1778509905503\ncommercial_assets\t1080029\tSprint6 Test Retail Strip 1778509937106\ncommercial_assets\t1110001\tSprint6 Test Retail Strip 1778520461884\ncommercial_assets\t1110005\tSprint6 Test Retail Strip 1778520584236\ncommercial_assets\t1110009\tSprint6 Test Retail Strip 1778520593431\ncommercial_assets\t1110013\tSprint6 Test Retail Strip 1778520620872\ncommercial_assets\t1140001\tSprint6 Test Retail Strip 1778525724596\ncommercial_assets\t1170001\tSprint6 Test Retail Strip 1778526867864\ncommercial_assets\t1200001\tSprint6 Test Retail Strip 1778532413683\ncommercial_assets\t1230001\tSprint6 Test Retail Strip 1778534887155\ncommercial_assets\t1260001\tSprint6 Test Retail Strip 1778536032313\ncommercial_assets\t1290001\tSprint6 Test Retail Strip 1778541819904\ncommercial_assets\t1320001\tSprint6 Test Retail Strip 1778544763531\n",
+  "stderr": "",
+  "execution_time_ms": 264
+}

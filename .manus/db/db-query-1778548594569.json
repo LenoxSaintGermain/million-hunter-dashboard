@@ -1,0 +1,19 @@
+{
+  "query": "\nSELECT id, contactName FROM outreach WHERE contactName LIKE '%Sprint%' OR contactName LIKE '%Test%' OR notes LIKE '%Sprint%' LIMIT 5;\nSELECT COUNT(*) as total_commercial FROM commercial_assets;\nSELECT COUNT(*) as total_macro FROM macro_signals WHERE title LIKE '%Sprint%' OR title LIKE '%Test%';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute \nSELECT id, contactName FROM outreach WHERE contactName LIKE '%Sprint%' OR contactName LIKE '%Test%' OR notes LIKE '%Sprint%' LIMIT 5;\nSELECT COUNT(*) as total_commercial FROM commercial_assets;\nSELECT COUNT(*) as total_macro FROM macro_signals WHERE title LIKE '%Sprint%' OR title LIKE '%Test%';\n",
+  "rows": [
+    {
+      "total_commercial": "13"
+    },
+    {
+      "total_commercial": "total_macro"
+    },
+    {
+      "total_commercial": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_commercial\n13\ntotal_macro\n0\n",
+  "stderr": "",
+  "execution_time_ms": 268
+}

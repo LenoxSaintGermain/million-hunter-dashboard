@@ -3,15 +3,15 @@
  *
  * Model routing:
  *   Google Gemini (direct API) — all Gemini tasks:
- *     gemini-3.1-pro-preview    → Deep reasoning: Red Team, investment memo synthesis
- *     gemini-3-flash-preview    → Fast structured extraction, capital stack math
- *     gemini-3.1-flash-lite-preview → High-volume scoring, market scan
+ *     gemini-3.1-pro    → Deep reasoning: Red Team, investment memo synthesis
+ *     gemini-3.1-flash    → Fast structured extraction, capital stack math
+ *     gemini-3.1-flash → High-volume scoring, market scan
  *
  *   Poe API (OpenAI-compatible gateway) — non-Gemini models:
- *     Claude-Opus-4.7           → Owner Psychology profiling (nuanced language analysis)
+ *     Claude-Opus-4           → Owner Psychology profiling (nuanced language analysis)
  *
  *   Perplexity Sonar Pro (direct) — live web research:
- *     Claude-Opus-4.7 (Poe)     → Digital Footprint Audit
+ *     Claude-Opus-4 (Poe)     → Digital Footprint Audit
  */
 
 import { GoogleGenAI } from "@google/genai";
@@ -21,9 +21,9 @@ import type { Deal } from "../drizzle/schema";
 const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 // ─── Gemini model IDs ─────────────────────────────────────────────────────────
-const GEMINI_PRO    = "gemini-3.1-pro-preview";
-const GEMINI_FLASH  = "gemini-3-flash-preview";
-const GEMINI_LITE   = "gemini-3.1-flash-lite-preview";
+const GEMINI_PRO    = "gemini-3.1-pro";
+const GEMINI_FLASH  = "gemini-3.1-flash";
+const GEMINI_LITE   = "gemini-3.1-flash";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface OwnerPsychologyResult {
@@ -66,7 +66,7 @@ export interface InvestmentMemoResult {
   aiOptimizationOpportunities: string[];
 }
 
-// ─── Owner Psychology (Claude Opus 4.7 via Poe) ───────────────────────────────
+// ─── Owner Psychology (Claude 4 Opus via Poe) ───────────────────────────────
 export async function analyzeOwnerPsychology(deal: Deal): Promise<OwnerPsychologyResult> {
   const prompt = `You are an expert M&A psychologist and negotiation strategist. Analyze this business listing and infer the seller's psychological profile and motivation.
 
@@ -122,7 +122,7 @@ Analyze and return a JSON object with:
   }
 }
 
-// ─── Digital Footprint Audit (Claude-Opus-4.7 via Poe) ───────────────────────
+// ─── Digital Footprint Audit (Claude-Opus-4 via Poe) ───────────────────────
 export async function runDigitalAudit(deal: Deal): Promise<DigitalAuditResult> {
   const { poeJSON, POE_MODELS } = await import("./poe");
   const prompt = `Research the digital footprint of this business and return a JSON analysis:

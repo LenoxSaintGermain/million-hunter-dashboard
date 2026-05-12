@@ -213,7 +213,7 @@ export default function BehavioralProfile() {
               <AgenticInsightCard
                 title="Agentic Friction Detected"
                 insight={String(signal.ownerProfileSummary)}
-                model="Gemini 2.5 Pro"
+                model="Gemini 3.1 Pro"
                 type={signal.ownerDistressScore && toNum(signal.ownerDistressScore)! > 0.6 ? "warning" : "insight"}
               />
             </motion.div>

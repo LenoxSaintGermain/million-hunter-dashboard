@@ -1,5 +1,5 @@
 /**
- * AI Co-Pilot — Floating panel powered by Claude-Opus-4.7 via Poe
+ * AI Co-Pilot — Floating panel powered by Claude-Opus-4 via Poe
  *
  * A persistent, context-aware strategic advisor that lives in the corner
  * of every page. Knows Lenox's full pipeline, recent activity, and deal
@@ -173,7 +173,7 @@ export default function CoPilot({ dealId, dealName, embedded, externalOpen, onCl
                   variant="secondary"
                   className="text-[9px] px-1.5 py-0 h-4 bg-violet-500/20 text-violet-300 border-violet-500/30 font-mono"
                 >
-                  Claude Opus 4.7
+                  Claude 4 Opus
                 </Badge>
               </div>
               {dealName ? (

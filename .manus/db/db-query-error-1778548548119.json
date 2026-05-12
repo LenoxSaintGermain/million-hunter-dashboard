@@ -1,0 +1,8 @@
+{
+  "query": "\nSELECT 'activity_log' as tbl, id, action as name FROM activity_log WHERE action LIKE '%Sprint6%' OR action LIKE '%Test Signal%' OR action LIKE '%sprint%' LIMIT 5;\nSELECT 'commercial_assets' as tbl, id, name FROM commercial_assets WHERE name LIKE '%Sprint%' OR name LIKE '%test%' OR name LIKE '%Test%' LIMIT 5;\nSELECT 'outreach' as tbl, id, name FROM outreach WHERE name LIKE '%Sprint%' OR name LIKE '%test%' OR name LIKE '%Test%' LIMIT 5;\nSELECT 'memos' as tbl, id, deal_id as name FROM memos WHERE content LIKE '%Sprint6 Test%' LIMIT 5;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute \nSELECT 'activity_log' as tbl, id, action as name FROM activity_log WHERE action LIKE '%Sprint6%' OR action LIKE '%Test Signal%' OR action LIKE '%sprint%' LIMIT 5;\nSELECT 'commercial_assets' as tbl, id, name FROM commercial_assets WHERE name LIKE '%Sprint%' OR name LIKE '%test%' OR name LIKE '%Test%' LIMIT 5;\nSELECT 'outreach' as tbl, id, name FROM outreach WHERE name LIKE '%Sprint%' OR name LIKE '%test%' OR name LIKE '%Test%' LIMIT 5;\nSELECT 'memos' as tbl, id, deal_id as name FROM memos WHERE content LIKE '%Sprint6 Test%' LIMIT 5;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 2: Unknown column 'action' in 'where clause'"
+  ]
+}

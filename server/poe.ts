@@ -5,7 +5,7 @@
  * Auth: Poe_api_key (stored in env as Poe_api_key)
  *
  * Poe bot name reference (as of April 2026):
- *   Claude-Opus-4.7         → Anthropic Claude Opus 4.7 (most capable)
+ *   Claude-Opus-4         → Anthropic Claude 4 Opus (most capable)
  *   Claude-Sonnet-4.6       → Anthropic Claude Sonnet 4.6 (speed+intelligence)
  *   Claude-Haiku-4.5        → Anthropic Claude Haiku 4.5 (fastest Claude)
  *   Gemini-3.1-Pro          → Google Gemini 3.1 Pro Preview (complex reasoning)
@@ -44,7 +44,7 @@ function getPoeClient(): OpenAI {
 
 export const POE_MODELS = {
   // Anthropic via Poe
-  CLAUDE_OPUS: "Claude-Opus-4.7",
+  CLAUDE_OPUS: "Claude-Opus-4",
   CLAUDE_SONNET: "Claude-Sonnet-4.6",
   CLAUDE_HAIKU: "Claude-Haiku-4.5",
 

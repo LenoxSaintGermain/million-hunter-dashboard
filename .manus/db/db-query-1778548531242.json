@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, title, confidence_score, signal_type FROM macro_signals ORDER BY created_at DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT id, title, confidence_score, signal_type FROM macro_signals ORDER BY created_at DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "960005",
+      "title": "Sunbelt Migration Acceleration — IRS Flow Data",
+      "confidence_score": "0.910",
+      "signal_type": "macro_momentum"
+    },
+    {
+      "id": "960004",
+      "title": "IRA Energy Credits + USDA REAP Program Active",
+      "confidence_score": "0.880",
+      "signal_type": "government"
+    },
+    {
+      "id": "960006",
+      "title": "USMCA Review 2026 — Chinese FDI Throttle Risk",
+      "confidence_score": "0.650",
+      "signal_type": "government"
+    },
+    {
+      "id": "960001",
+      "title": "CNY Revaluation — USD/CNY Target 6.50",
+      "confidence_score": "0.780",
+      "signal_type": "macro_momentum"
+    },
+    {
+      "id": "960003",
+      "title": "CHIPS Act Phase 2 — $39B Fab Disbursement",
+      "confidence_score": "0.920",
+      "signal_type": "government"
+    },
+    {
+      "id": "960002",
+      "title": "Canada-China EV Agreement — Tariff Cut to 6.1%",
+      "confidence_score": "0.850",
+      "signal_type": "government"
+    },
+    {
+      "id": "420007",
+      "title": "Boomer SMB Owner Retirement Wave Accelerates in Texas and Arizona Q2 2026",
+      "confidence_score": "0.780",
+      "signal_type": "macro_momentum"
+    },
+    {
+      "id": "420006",
+      "title": "Florida Hurricane Season Prep Mandates Boost Roofing Demand June-November",
+      "confidence_score": "0.820",
+      "signal_type": "government"
+    },
+    {
+      "id": "420005",
+      "title": "Sun Belt Cooling Season Onset Drives HVAC Acquisition Premium Window",
+      "confidence_score": "0.860",
+      "signal_type": "seasonal"
+    },
+    {
+      "id": "270019",
+      "title": "Metro Atlanta Logistics Demand Decouples from National Freight Softness",
+      "confidence_score": "0.710",
+      "signal_type": "macro_momentum"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tconfidence_score\tsignal_type\n960005\tSunbelt Migration Acceleration — IRS Flow Data\t0.910\tmacro_momentum\n960004\tIRA Energy Credits + USDA REAP Program Active\t0.880\tgovernment\n960006\tUSMCA Review 2026 — Chinese FDI Throttle Risk\t0.650\tgovernment\n960001\tCNY Revaluation — USD/CNY Target 6.50\t0.780\tmacro_momentum\n960003\tCHIPS Act Phase 2 — $39B Fab Disbursement\t0.920\tgovernment\n960002\tCanada-China EV Agreement — Tariff Cut to 6.1%\t0.850\tgovernment\n420007\tBoomer SMB Owner Retirement Wave Accelerates in Texas and Arizona Q2 2026\t0.780\tmacro_momentum\n420006\tFlorida Hurricane Season Prep Mandates Boost Roofing Demand June-November\t0.820\tgovernment\n420005\tSun Belt Cooling Season Onset Drives HVAC Acquisition Premium Window\t0.860\tseasonal\n270019\tMetro Atlanta Logistics Demand Decouples from National Freight Softness\t0.710\tmacro_momentum\n",
+  "stderr": "",
+  "execution_time_ms": 264
+}

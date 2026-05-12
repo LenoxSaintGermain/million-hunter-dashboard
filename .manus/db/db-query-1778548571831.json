@@ -1,0 +1,9 @@
+{
+  "query": "DELETE FROM commercial_assets WHERE name LIKE '%Sprint6%' OR name LIKE '%Sprint 6%' OR source LIKE '%test%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute DELETE FROM commercial_assets WHERE name LIKE '%Sprint6%' OR name LIKE '%Sprint 6%' OR source LIKE '%test%';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 263
+}
