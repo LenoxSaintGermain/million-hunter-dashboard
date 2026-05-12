@@ -20,6 +20,8 @@ import TIDEPage from "./pages/TIDE";
 import InsuranceProspector from "./pages/InsuranceProspector";
 import CapitalStack from "./pages/CapitalStack";
 import AdminPanel from "./pages/AdminPanel";
+import OperatorRegistry from "./pages/OperatorRegistry";
+import OperatorIdentity from "./pages/OperatorIdentity";
 import InviteAccept from "./pages/InviteAccept";
 import DealShare from "./pages/DealShare";
 import Lobby from "./pages/Lobby";
@@ -167,6 +169,8 @@ function Router() {
         <Route path="/insurance-prospector">{() => <ProtectedRoute component={InsuranceProspector} />}</Route>
         <Route path="/stack">{() => <ProtectedRoute component={CapitalStack} />}</Route>
         <Route path="/admin">{() => <ProtectedRoute component={AdminPanel} />}</Route>
+        <Route path="/operator-registry">{() => <ProtectedRoute component={OperatorRegistry} />}</Route>
+        <Route path="/profile">{() => <ProtectedRoute component={OperatorIdentity} />}</Route>
 
         {/* Invite accept — role assignment on first login */}
         <Route path="/invite/:token" component={InviteAccept} />

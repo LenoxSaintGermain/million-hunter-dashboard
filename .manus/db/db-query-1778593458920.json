@@ -1,0 +1,82 @@
+{
+  "query": "SELECT id, name, email, role, onboarding_completed, DATE_FORMAT(createdAt, '%Y-%m-%d %H:%i') as joined FROM users ORDER BY createdAt DESC LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT id, name, email, role, onboarding_completed, DATE_FORMAT(createdAt, '%Y-%m-%d %H:%i') as joined FROM users ORDER BY createdAt DESC LIMIT 20;",
+  "rows": [
+    {
+      "id": "6090006",
+      "name": "CLIPIT",
+      "email": "kvng.gunner@gmail.com",
+      "role": "investor",
+      "onboarding_completed": "0",
+      "joined": "2026-05-12 13:34"
+    },
+    {
+      "id": "690004",
+      "name": "Trevor Travers",
+      "email": "trevortravers@gmail.com",
+      "role": "user",
+      "onboarding_completed": "1",
+      "joined": "2026-03-27 14:43"
+    },
+    {
+      "id": "690001",
+      "name": "Jimmy Butler",
+      "email": "lifecalendarai@gmail.com",
+      "role": "user",
+      "onboarding_completed": "0",
+      "joined": "2026-03-27 14:43"
+    },
+    {
+      "id": "630052",
+      "name": "Sprint8 Test User",
+      "email": "sprint8-1774572137791@test.com",
+      "role": "user",
+      "onboarding_completed": "1",
+      "joined": "2026-03-27 00:42"
+    },
+    {
+      "id": "630053",
+      "name": "Sprint8 Complete User",
+      "email": "sprint8c-1774572137823@test.com",
+      "role": "user",
+      "onboarding_completed": "0",
+      "joined": "2026-03-27 00:42"
+    },
+    {
+      "id": "630050",
+      "name": "Sprint8 Complete User",
+      "email": "sprint8c-1774572128083@test.com",
+      "role": "user",
+      "onboarding_completed": "0",
+      "joined": "2026-03-27 00:42"
+    },
+    {
+      "id": "630049",
+      "name": "Sprint8 Test User",
+      "email": "sprint8-1774572128061@test.com",
+      "role": "user",
+      "onboarding_completed": "1",
+      "joined": "2026-03-27 00:42"
+    },
+    {
+      "id": "510005",
+      "name": "Lortir Pierre-Louis",
+      "email": "lortir27@gmail.com",
+      "role": "user",
+      "onboarding_completed": "0",
+      "joined": "2026-03-26 22:34"
+    },
+    {
+      "id": "1",
+      "name": "Lenox Saint Germain",
+      "email": "treble.design@gmail.com",
+      "role": "admin",
+      "onboarding_completed": "1",
+      "joined": "2026-03-25 17:55"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\temail\trole\tonboarding_completed\tjoined\n6090006\tCLIPIT\tkvng.gunner@gmail.com\tinvestor\t0\t2026-05-12 13:34\n690004\tTrevor Travers\ttrevortravers@gmail.com\tuser\t1\t2026-03-27 14:43\n690001\tJimmy Butler\tlifecalendarai@gmail.com\tuser\t0\t2026-03-27 14:43\n630052\tSprint8 Test User\tsprint8-1774572137791@test.com\tuser\t1\t2026-03-27 00:42\n630053\tSprint8 Complete User\tsprint8c-1774572137823@test.com\tuser\t0\t2026-03-27 00:42\n630050\tSprint8 Complete User\tsprint8c-1774572128083@test.com\tuser\t0\t2026-03-27 00:42\n630049\tSprint8 Test User\tsprint8-1774572128061@test.com\tuser\t1\t2026-03-27 00:42\n510005\tLortir Pierre-Louis\tlortir27@gmail.com\tuser\t0\t2026-03-26 22:34\n1\tLenox Saint Germain\ttreble.design@gmail.com\tadmin\t1\t2026-03-25 17:55\n",
+  "stderr": "",
+  "execution_time_ms": 385
+}

@@ -767,3 +767,16 @@
 - [x] Add "Already have access? Sign in" link to access request section
 - [x] Visual QA: TypeScript clean (0 errors), 96/96 tests passing
 - [x] Run tests, save checkpoint
+
+## Sprint 42 — Operator Registry + Operator Identity + Default Role Fix
+- [x] Fix default role: new sign-ins default to 'user' (operator experience) instead of 'investor'
+- [x] Add admin.listAccessRequests procedure — lists pending access_requests rows
+- [x] Add admin.updateAccessRequestStatus procedure — approve/reject with status update
+- [x] Build OperatorRegistry.tsx — Admin DNA view (Verified Operators stats, DNA Matching cards, Access Protocol table, Deal Assignment Queue, Live Stream Activity)
+- [x] Build OperatorIdentity.tsx — User profile (Clearance badge, Investment DNA Heatmap, Agentic Command input, Security & Access log)
+- [x] Wire /operator-registry route (admin only) and /profile route (all authenticated users)
+- [x] Add Operator Registry + Operator Identity links to DashboardLayout Platform section
+- [x] Add hunting_params column to users table (db:push migration 0014)
+- [x] Add user.getProfile and user.saveHuntingParams tRPC procedures
+- [x] CLIPIT (kvng.gunner@gmail.com) promoted from investor → user immediately
+- [x] 96/96 tests passing, 0 TS errors, save checkpoint

@@ -52,7 +52,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   textFields.forEach(assignNullable);
   if (user.lastSignedIn !== undefined) { values.lastSignedIn = user.lastSignedIn; updateSet.lastSignedIn = user.lastSignedIn; }
   // Role assignment: set on INSERT only — never overwrite on re-login (preserves operator-assigned roles).
-  // Owner → admin, everyone else → investor by default.
+  // Owner → admin. New sign-ins default to 'user' (operator experience).
+  // Assign 'investor' role manually via Admin Panel for capital allocators.
   if (user.role !== undefined) {
     values.role = user.role;
     // Don't put role in updateSet — operator may have changed it
@@ -60,9 +61,9 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     values.role = "admin";
     // Don't put in updateSet — preserve admin on re-login without overwriting
   } else {
-    // New users default to investor; existing users keep their current role
-    values.role = "investor";
-    // Intentionally NOT in updateSet — role is set once at registration
+    // New users default to 'user' (operator/UAT experience).
+    // Intentionally NOT in updateSet — role is set once at registration.
+    values.role = "user";
   }
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();

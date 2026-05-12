@@ -23,6 +23,7 @@ export const users = mysqlTable("users", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
+  huntingParams: text("hunting_params"), // Free-text agentic command / hunting parameters
 });
 
 export type User = typeof users.$inferSelect;

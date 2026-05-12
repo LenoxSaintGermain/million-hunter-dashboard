@@ -65,6 +65,8 @@ const navSections = [
     label: "Platform",
     items: [
       { href: "/admin", icon: Settings2, label: "Admin Panel", badge: null, roles: ["admin"] as string[] },
+      { href: "/operator-registry", icon: User, label: "Operator Registry", badge: { label: "DNA", color: "amber" }, roles: ["admin"] as string[] },
+      { href: "/profile", icon: User, label: "Operator Identity", badge: null },
     ],
   },
 ];

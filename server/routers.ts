@@ -81,6 +81,28 @@ export const appRouter = router({
         .where(eq(users.openId, ctx.user.openId));
       return { success: true };
     }),
+    // Returns the current user's full profile including hunting params
+    getProfile: protectedProcedure.query(async ({ ctx }) => {
+      const db = await (await import("./db")).getDb();
+      if (!db) return null;
+      const { users } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const [row] = await db.select().from(users).where(eq(users.openId, ctx.user.openId)).limit(1);
+      return row ?? null;
+    }),
+    // Saves the user's agentic hunting parameters (free-text command)
+    saveHuntingParams: protectedProcedure
+      .input(z.object({ params: z.string().max(2000) }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await (await import("./db")).getDb();
+        if (!db) return { success: false };
+        const { users } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        await db.update(users)
+          .set({ huntingParams: input.params, updatedAt: new Date() })
+          .where(eq(users.openId, ctx.user.openId));
+        return { success: true };
+      }),
   }),
 
   dashboard: router({
@@ -2208,6 +2230,30 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
       } catch (_) { /* table may not exist yet */ }
       return { users: userRows, deals: dealRows, prospects: prospectRows };
     }),
+    /** List access requests (admin only) */
+    listAccessRequests: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return [];
+      const { accessRequests } = await import("../drizzle/schema");
+      return db.select().from(accessRequests).orderBy(desc(accessRequests.createdAt)).limit(100);
+    }),
+    /** Update access request status (admin only) */
+    updateAccessRequestStatus: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        status: z.enum(["pending", "approved", "rejected"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { accessRequests } = await import("../drizzle/schema");
+        await db.update(accessRequests)
+          .set({ status: input.status })
+          .where(eq(accessRequests.id, input.id));
+        return { success: true };
+      }),
   }),
   // ─── Thesis Engine (STRATEGIST agent — Spec TSL-SCI-PROD-001-A1) ─────────────
   thesis: thesisRouter,

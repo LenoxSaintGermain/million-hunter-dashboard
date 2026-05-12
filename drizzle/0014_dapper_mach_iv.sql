@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `hunting_params` text;
