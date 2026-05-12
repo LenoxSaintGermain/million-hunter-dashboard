@@ -96,7 +96,7 @@ export default function InvestorScout() {
         <div className="grid gap-4 sm:grid-cols-2">
           {filtered.map((asset: any) => {
             const hasInterest = requestedInterest.has(asset.id);
-            const capRate = asset.capRate ?? 0;
+            const capRate = Number(asset.capRate ?? 0);
             return (
               <div
                 key={asset.id}
@@ -133,9 +133,9 @@ export default function InvestorScout() {
                 {/* Financial grid */}
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { label: "Asking", value: asset.askingPrice ? `$${(asset.askingPrice / 1000000).toFixed(1)}M` : "—" },
-                    { label: "NOI", value: asset.noi ? `$${(asset.noi / 1000).toFixed(0)}K` : "—" },
-                    { label: "Sq Ft", value: asset.sqft ? `${(asset.sqft / 1000).toFixed(0)}K` : "—" },
+                    { label: "Asking", value: asset.askingPrice ? `$${(Number(asset.askingPrice) / 1000000).toFixed(1)}M` : "—" },
+                    { label: "NOI", value: asset.noi ? `$${(Number(asset.noi) / 1000).toFixed(0)}K` : "—" },
+                    { label: "Sq Ft", value: asset.sqft ? `${(Number(asset.sqft) / 1000).toFixed(0)}K` : "—" },
                   ].map(({ label, value }) => (
                     <div key={label} className="rounded-xl p-2.5 text-center" style={{ background: "var(--sh-surface-2)" }}>
                       <p className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: "var(--sh-fg-4)" }}>{label}</p>
