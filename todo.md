@@ -737,3 +737,8 @@
 - [ ] Replace all model name badges in TIDE intelligence stream with persona role names
 - [ ] Replace all model name badges in Settings AI Engine tab with persona role names
 - [ ] Run tests, save checkpoint
+
+## Sprint 39 — Google Maps Singleton Fix
+- [x] Audit Map.tsx loader logic and Scout page for multiple MapView instances causing duplicate script loads
+- [x] Implement singleton Google Maps script loader (module-level guard, deduplicate across all MapView mounts)
+- [x] Run tests, save checkpoint — 96/96 passing

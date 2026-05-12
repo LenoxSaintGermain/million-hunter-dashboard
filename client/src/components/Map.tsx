@@ -92,21 +92,45 @@ const FORGE_BASE_URL =
   "https://forge.butterfly-effect.dev";
 const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
 
-function loadMapScript() {
-  return new Promise(resolve => {
+// Module-level singleton — only ever loads the Maps script once,
+// regardless of how many MapView components mount concurrently.
+let _mapsScriptPromise: Promise<void> | null = null;
+
+function loadMapScript(): Promise<void> {
+  // Already loaded — resolve immediately
+  if (window.google?.maps) {
+    return Promise.resolve();
+  }
+  // Load already in flight — return the same promise
+  if (_mapsScriptPromise) {
+    return _mapsScriptPromise;
+  }
+  _mapsScriptPromise = new Promise<void>((resolve, reject) => {
+    // Script tag already injected by a prior navigation — poll until ready
+    const existing = document.querySelector(
+      `script[src*="${MAPS_PROXY_URL}/maps/api/js"]`
+    );
+    if (existing) {
+      const poll = setInterval(() => {
+        if (window.google?.maps) {
+          clearInterval(poll);
+          resolve();
+        }
+      }, 50);
+      return;
+    }
     const script = document.createElement("script");
     script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
     script.async = true;
     script.crossOrigin = "anonymous";
-    script.onload = () => {
-      resolve(null);
-      script.remove(); // Clean up immediately
-    };
+    script.onload = () => resolve();
     script.onerror = () => {
-      console.error("Failed to load Google Maps script");
+      _mapsScriptPromise = null; // Allow retry on next mount
+      reject(new Error("Failed to load Google Maps script"));
     };
     document.head.appendChild(script);
   });
+  return _mapsScriptPromise;
 }
 
 interface MapViewProps {
