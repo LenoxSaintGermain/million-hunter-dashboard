@@ -35,6 +35,12 @@ interface CoPilotProps {
   dealId?: number;
   /** Optional deal name for display */
   dealName?: string;
+  /** When true, suppresses the floating FAB — open state is controlled externally */
+  embedded?: boolean;
+  /** External open state (used when embedded=true) */
+  externalOpen?: boolean;
+  /** Callback to close the panel (used when embedded=true) */
+  onClose?: () => void;
 }
 
 const SUGGESTED_PROMPTS = [
@@ -45,8 +51,14 @@ const SUGGESTED_PROMPTS = [
   "Identify the weakest deal in my pipeline and tell me why.",
 ];
 
-export default function CoPilot({ dealId, dealName }: CoPilotProps) {
+export default function CoPilot({ dealId, dealName, embedded, externalOpen, onClose }: CoPilotProps) {
   const [isOpen, setIsOpen] = useState(false);
+  // When embedded, sync with external open state
+  const effectiveOpen = embedded ? (externalOpen ?? false) : isOpen;
+  const handleClose = () => {
+    if (embedded && onClose) onClose();
+    else setIsOpen(false);
+  };
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -113,8 +125,8 @@ export default function CoPilot({ dealId, dealName }: CoPilotProps) {
 
   return (
     <>
-      {/* ── Floating Trigger Button ──────────────────────────────────────── */}
-      {!isOpen && (
+      {/* ── Floating Trigger Button (only in non-embedded mode) ───────────────── */}
+      {!embedded && !effectiveOpen && (
         <button
           onClick={() => setIsOpen(true)}
           className={cn(
@@ -134,8 +146,8 @@ export default function CoPilot({ dealId, dealName }: CoPilotProps) {
         </button>
       )}
 
-      {/* ── Co-Pilot Panel ───────────────────────────────────────────────── */}
-      {isOpen && (
+      {/* ── Co-Pilot Panel ─────────────────────────────────────────────────────────────── */}
+      {effectiveOpen && (
         <div
           className={cn(
             "fixed bottom-6 right-6 z-50",
@@ -190,7 +202,7 @@ export default function CoPilot({ dealId, dealName }: CoPilotProps) {
                 {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               </button>
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={handleClose}
                 className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                 title="Close"
               >

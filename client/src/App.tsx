@@ -35,10 +35,10 @@ import InvestorScout from "./pages/investor/InvestorScout";
 import InvestorDNAProfile from "./pages/investor/InvestorDNAProfile";
 import { trpc } from "@/lib/trpc";
 import { useEffect } from "react";
-import CoPilot from "@/components/CoPilot";
 import { useAuth } from "./_core/hooks/useAuth";
 import LandingPage from "./pages/LandingPage";
 import PublicSearch from "./pages/PublicSearch";
+import DemoScenario from "./pages/DemoScenario";
 import { getLoginUrl } from "./const";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
@@ -124,17 +124,6 @@ function OnboardingGuard() {
   return null;
 }
 
-// Renders the Co-Pilot only for operator/admin users (not investors, not on lobby/deal-share)
-function GlobalCoPilot() {
-  const { isAuthenticated, user } = useAuth();
-  const [location] = useLocation();
-  const isPublicPage = location.startsWith("/lobby") || location.startsWith("/deal-share") || location.startsWith("/invite");
-  const isInvestorPage = location.startsWith("/investor");
-  if (!isAuthenticated || isPublicPage || isInvestorPage) return null;
-  if ((user as any)?.role === "investor") return null;
-  return <CoPilot />;
-}
-
 function Router() {
   return (
     <>
@@ -155,6 +144,7 @@ function Router() {
 
         {/* ── Public routes (no auth required) ── */}
         <Route path="/explore" component={PublicSearch} />
+        <Route path="/demo" component={DemoScenario} />
 
         {/* ── Root: Landing for unauth, Command Center for auth ── */}
         <Route path="/" component={RootRoute} />
@@ -186,7 +176,6 @@ function Router() {
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
-      <GlobalCoPilot />
     </>
   );
 }

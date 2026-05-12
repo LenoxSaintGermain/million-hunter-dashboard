@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { cn } from "@/lib/utils";
+import CoPilot from "@/components/CoPilot";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +23,7 @@ import {
   Settings,
   User,
   ChevronDown,
+  Sparkles,
   Scan,
   LayoutDashboard,
   FileText,
@@ -93,6 +95,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
   const { user, isAuthenticated, logout } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
 
   /* Scroll detection for header blur */
   useEffect(() => {
@@ -201,6 +204,26 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
 
           {/* Right actions */}
           <div className="flex items-center gap-3">
+            {/* Co-Pilot inline trigger — only for authenticated operator */}
+            {isAuthenticated && (
+              <button
+                onClick={() => setCopilotOpen(true)}
+                title="Open Co-Pilot"
+                className={cn(
+                  "relative flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200",
+                  "bg-gradient-to-br from-violet-600/20 to-indigo-600/20 hover:from-violet-600/40 hover:to-indigo-600/40",
+                  "border border-violet-500/30 hover:border-violet-500/60",
+                  "group"
+                )}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-violet-400 group-hover:text-violet-300 transition-colors" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+              </button>
+            )}
+            {/* Embedded Co-Pilot panel */}
+            {isAuthenticated && (
+              <CoPilot embedded externalOpen={copilotOpen} onClose={() => setCopilotOpen(false)} />
+            )}
             {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

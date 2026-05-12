@@ -282,6 +282,110 @@ export const appRouter = router({
       }),
   }),
 
+  demo: router({
+    // Returns the active demo scenario for public consumption
+    getActive: publicProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return null;
+      const rows = await db.execute(
+        sql`SELECT * FROM demo_scenarios WHERE is_active = 1 ORDER BY snapshot_at DESC LIMIT 1`
+      );
+      const rowsArr = Array.isArray((rows as any)[0]) ? (rows as any)[0] : (rows as any);
+      const row = (rowsArr as any[])[0];
+      if (!row) return null;
+      return {
+        id: Number(row.id),
+        thesisTitle: String(row.thesis_title ?? ""),
+        thesisSummary: row.thesis_summary ? String(row.thesis_summary) : null,
+        businessName: String(row.business_name ?? ""),
+        industry: row.industry ? String(row.industry) : null,
+        location: row.location ? String(row.location) : null,
+        revenue: row.revenue ? Number(row.revenue) : null,
+        cashFlow: row.cash_flow ? Number(row.cash_flow) : null,
+        askingPrice: row.asking_price ? Number(row.asking_price) : null,
+        multiple: row.multiple ? Number(row.multiple) : null,
+        employees: row.employees ? Number(row.employees) : null,
+        yearEstablished: row.year_established ? Number(row.year_established) : null,
+        score: row.score ? Number(row.score) : null,
+        scoreBreakdown: row.score_breakdown ? (typeof row.score_breakdown === 'string' ? JSON.parse(row.score_breakdown) : row.score_breakdown) : null,
+        signals: row.signals ? (typeof row.signals === 'string' ? JSON.parse(row.signals) : row.signals) : null,
+        icSummary: row.ic_summary ? String(row.ic_summary) : null,
+        investmentThesis: row.investment_thesis ? String(row.investment_thesis) : null,
+        keyRisks: row.key_risks ? (typeof row.key_risks === 'string' ? JSON.parse(row.key_risks) : row.key_risks) : null,
+        catalysts: row.catalysts ? (typeof row.catalysts === 'string' ? JSON.parse(row.catalysts) : row.catalysts) : null,
+        snapshotAt: row.snapshot_at ? new Date(row.snapshot_at) : new Date(),
+        dataSourcesUsed: row.data_sources_used ? (typeof row.data_sources_used === 'string' ? JSON.parse(row.data_sources_used) : row.data_sources_used) : null,
+      };
+    }),
+
+    // Operator-only: regenerate the demo scenario with fresh AI analysis
+    refresh: protectedProcedure.mutation(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const { invokeLLM } = await import('./_core/llm');
+
+      // Generate fresh scenario via LLM
+      const result = await invokeLLM({
+        messages: [
+          {
+            role: 'system',
+            content: `You are a business acquisition analyst. Generate a realistic, detailed demo scenario for a small-to-medium business acquisition opportunity. Use real market dynamics, real industry data, and realistic financials. This will be shown publicly as a live thesis example.`,
+          },
+          {
+            role: 'user',
+            content: `Generate a fresh acquisition thesis scenario for a business in the Southeast US (Atlanta, Charlotte, Nashville, or Dallas area). Pick a high-cash-flow service business (commercial cleaning, HVAC, pest control, logistics, or similar). Make the data realistic and current as of ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}. Return JSON matching this exact schema: { thesisTitle, thesisSummary, businessName, industry, location, revenue, cashFlow, askingPrice, multiple, employees, yearEstablished, score (0-1 float), scoreBreakdown: { financialHealth, marketPosition, operationalRisk, growthPotential, sbaEligibility, ownerDependency } (each 0-1), signals: [{ type: 'tailwind'|'headwind'|'neutral', title, summary, source, relevanceScore }] (5-7 signals), icSummary (2-3 paragraph IC committee summary), investmentThesis (1 paragraph), keyRisks (array of 3-5 strings), catalysts (array of 3-5 strings), dataSourcesUsed (array of source names) }`,
+          },
+        ],
+        response_format: { type: 'json_object' },
+      });
+
+      let parsed: any;
+      try {
+        const content = result?.choices?.[0]?.message?.content ?? '{}';
+        parsed = typeof content === 'string' ? JSON.parse(content) : content;
+      } catch {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to parse LLM response' });
+      }
+
+      // Deactivate old scenarios
+      await db.execute(sql`UPDATE demo_scenarios SET is_active = 0`);
+
+      // Insert new scenario
+      await db.execute(
+        sql`INSERT INTO demo_scenarios (
+          thesis_title, thesis_summary, business_name, industry, location,
+          revenue, cash_flow, asking_price, multiple, employees, year_established,
+          score, score_breakdown, signals, ic_summary, investment_thesis,
+          key_risks, catalysts, data_sources_used, snapshot_at, is_active
+        ) VALUES (
+          ${parsed.thesisTitle ?? 'Atlanta Service Business Acquisition Thesis'},
+          ${parsed.thesisSummary ?? null},
+          ${parsed.businessName ?? 'Southeast Service Co.'},
+          ${parsed.industry ?? 'Commercial Services'},
+          ${parsed.location ?? 'Atlanta, GA'},
+          ${parsed.revenue ?? null},
+          ${parsed.cashFlow ?? null},
+          ${parsed.askingPrice ?? null},
+          ${parsed.multiple ?? null},
+          ${parsed.employees ?? null},
+          ${parsed.yearEstablished ?? null},
+          ${parsed.score ?? null},
+          ${JSON.stringify(parsed.scoreBreakdown ?? null)},
+          ${JSON.stringify(parsed.signals ?? [])},
+          ${parsed.icSummary ?? null},
+          ${parsed.investmentThesis ?? null},
+          ${JSON.stringify(parsed.keyRisks ?? [])},
+          ${JSON.stringify(parsed.catalysts ?? [])},
+          ${JSON.stringify(parsed.dataSourcesUsed ?? [])},
+          NOW(),
+          1
+        )`
+      );
+
+      return { success: true, refreshedAt: new Date() };
+    }),
+  }),
+
   signals: router({
     getByDealId: publicProcedure
       .input(z.object({ dealId: z.number() }))

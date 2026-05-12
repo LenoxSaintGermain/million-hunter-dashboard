@@ -691,3 +691,12 @@
 - [x] Add ProtectedRoute wrapper — all operator routes redirect unauth users to login
 - [x] Lock all 15+ operator routes behind ProtectedRoute
 - [x] Run tests, save checkpoint
+
+## Sprint 35 — Co-Pilot Embed + Living Demo Scenario
+- [x] Remove floating Co-Pilot FAB bubble from GlobalCoPilot component
+- [x] Embed Co-Pilot trigger as inline icon in EditorialTopNav (right side, near user avatar)
+- [x] Create demo_scenarios table: thesis_title, snapshot_at, signals, score_breakdown, ic_summary, catalysts, key_risks, data_sources_used
+- [x] Build /demo route — read-only rails UI with thesis deal, real signals, AI scoring, IC summary, snapshot timestamp
+- [x] Add demo.refresh protectedProcedure — LLM-powered scenario regeneration with fresh market data
+- [x] Wire "Refresh Scan" button in demo UI (visible only to authenticated operator)
+- [x] Run tests, save checkpoint (96/96 passing)

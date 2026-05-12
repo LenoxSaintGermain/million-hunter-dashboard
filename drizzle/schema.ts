@@ -719,3 +719,52 @@ export const dealAgentRuns = mysqlTable("deal_agent_runs", {
 
 export type DealAgentRun = typeof dealAgentRuns.$inferSelect;
 export type InsertDealAgentRun = typeof dealAgentRuns.$inferInsert;
+
+// ─── Demo Scenario (living public thesis deal) ────────────────────────────────
+// A single curated deal that powers the /demo public experience.
+// Operators can trigger a refresh scan to update the snapshot with real data.
+export const demoScenarios = mysqlTable("demo_scenarios", {
+  id: int("id").autoincrement().primaryKey(),
+  thesisTitle: varchar("thesis_title", { length: 256 }).notNull(),
+  thesisSummary: text("thesis_summary"),
+  dealId: int("deal_id"), // FK to deals table (optional — can be standalone)
+  // Core deal data (denormalized for fast public reads)
+  businessName: varchar("business_name", { length: 256 }).notNull(),
+  industry: varchar("industry", { length: 128 }),
+  location: varchar("location", { length: 256 }),
+  revenue: bigint("revenue", { mode: "number" }),
+  cashFlow: bigint("cash_flow", { mode: "number" }),
+  askingPrice: bigint("asking_price", { mode: "number" }),
+  multiple: float("multiple"),
+  employees: int("employees"),
+  yearEstablished: int("year_established"),
+  // AI outputs
+  score: float("score"),
+  scoreBreakdown: json("score_breakdown").$type<{
+    financialHealth: number;
+    marketPosition: number;
+    operationalRisk: number;
+    growthPotential: number;
+    sbaEligibility: number;
+    ownerDependency: number;
+  }>(),
+  signals: json("signals").$type<Array<{
+    type: "tailwind" | "headwind" | "neutral";
+    title: string;
+    summary: string;
+    source: string;
+    relevanceScore: number;
+  }>>(),
+  icSummary: text("ic_summary"),
+  investmentThesis: text("investment_thesis"),
+  keyRisks: json("key_risks").$type<string[]>(),
+  catalysts: json("catalysts").$type<string[]>(),
+  // Snapshot metadata
+  snapshotAt: timestamp("snapshot_at").defaultNow().notNull(),
+  dataSourcesUsed: json("data_sources_used").$type<string[]>(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type DemoScenario = typeof demoScenarios.$inferSelect;
+export type InsertDemoScenario = typeof demoScenarios.$inferInsert;
