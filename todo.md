@@ -780,3 +780,10 @@
 - [x] Add user.getProfile and user.saveHuntingParams tRPC procedures
 - [x] CLIPIT (kvng.gunner@gmail.com) promoted from investor → user immediately
 - [x] 96/96 tests passing, 0 TS errors, save checkpoint
+
+## Sprint 42b — Theme Fix: Operator Registry + Operator Identity
+- [x] Audit app CSS design tokens (index.css) — mapped var(--bone), var(--paper), var(--rule), var(--sh-fg-*), var(--signal-gold), var(--sage), var(--clay), var(--amber)
+- [x] Rewrite OperatorRegistry.tsx — replaced all hardcoded dark hex colors with CSS design tokens; switched DashboardLayout → EditorialTopNav
+- [x] Rewrite OperatorIdentity.tsx — replaced all hardcoded dark hex colors with CSS design tokens; switched DashboardLayout → EditorialTopNav
+- [x] Both pages now match the app's light cream/parchment aesthetic (same as Command Center, AdminPanel, Scan)
+- [x] 0 TypeScript errors, 96/96 tests passing, save checkpoint

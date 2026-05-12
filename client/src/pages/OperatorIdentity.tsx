@@ -7,16 +7,17 @@
 import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import DashboardLayout from "@/components/DashboardLayout";
+import EditorialTopNav from "@/components/EditorialTopNav";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ArrowRight, Loader2, ChevronRight, Eye, EyeOff } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const ROLE_CLEARANCE: Record<string, { label: string; level: string; color: string }> = {
-  admin: { label: "ADMIN", level: "L-LEVEL-00", color: "text-[#ffba20] border-[#ffba20]/40" },
-  user: { label: "OPERATOR", level: "L-LEVEL-07", color: "text-emerald-400 border-emerald-400/40" },
-  investor: { label: "INVESTOR", level: "L-LEVEL-04", color: "text-blue-400 border-blue-400/40" },
-  insurance: { label: "INSURANCE", level: "L-LEVEL-03", color: "text-purple-400 border-purple-400/40" },
+const ROLE_CLEARANCE: Record<string, { label: string; level: string; colorClass: string }> = {
+  admin: { label: "ADMIN", level: "L-LEVEL-00", colorClass: "text-amber-700 border-amber-500/40 bg-amber-500/10" },
+  user: { label: "OPERATOR", level: "L-LEVEL-07", colorClass: "text-emerald-700 border-emerald-600/40 bg-emerald-600/10" },
+  investor: { label: "INVESTOR", level: "L-LEVEL-04", colorClass: "text-blue-700 border-blue-600/40 bg-blue-600/10" },
+  insurance: { label: "INSURANCE", level: "L-LEVEL-03", colorClass: "text-purple-700 border-purple-600/40 bg-purple-600/10" },
 };
 
 function initials(name: string | null | undefined) {
@@ -24,20 +25,20 @@ function initials(name: string | null | undefined) {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
-// Deterministic DNA heatmap values from user ID
 function dnaProfile(userId: number) {
   const seed = userId || 1;
   return {
-    riskTolerance: ((seed * 3571) % 40) + 45,      // 45–85
-    sectorBias: ((seed * 7919) % 35) + 50,          // 50–85
-    dealVelocity: ((seed * 1009) % 45) + 40,        // 40–85
-    capitalDeployment: ((seed * 4649) % 30) + 55,   // 55–85
-    negotiationStyle: ((seed * 2311) % 50) + 35,    // 35–85
-    diligenceDepth: ((seed * 6271) % 40) + 50,      // 50–90
+    riskTolerance: ((seed * 3571) % 40) + 45,
+    sectorBias: ((seed * 7919) % 35) + 50,
+    dealVelocity: ((seed * 1009) % 45) + 40,
+    capitalDeployment: ((seed * 4649) % 30) + 55,
+    negotiationStyle: ((seed * 2311) % 50) + 35,
+    diligenceDepth: ((seed * 6271) % 40) + 50,
   };
 }
 
-function HeatBar({ label, value, active = true }: { label: string; value: number; active?: boolean }) {
+// ─── Heat Bar ────────────────────────────────────────────────────────────────
+function HeatBar({ label, value }: { label: string; value: number }) {
   const [animated, setAnimated] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -45,24 +46,28 @@ function HeatBar({ label, value, active = true }: { label: string; value: number
     return () => clearTimeout(t);
   }, []);
 
-  const color = value >= 75 ? "#ffba20" : value >= 60 ? "#f97316" : "#8b7355";
+  const barColor = value >= 75 ? "var(--signal-gold)" : value >= 60 ? "var(--amber)" : "var(--clay)";
+  const textColor = value >= 75 ? "var(--signal-gold)" : value >= 60 ? "var(--amber)" : "var(--sh-fg-3)";
+
   return (
     <div ref={ref} className="space-y-1.5">
       <div className="flex justify-between items-center">
-        <span className="text-[10px] font-bold tracking-[0.12em] text-[#8b7355] uppercase">{label}</span>
-        <span className="text-[11px] font-bold" style={{ color }}>{value}</span>
+        <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>{label}</span>
+        <span className="text-[11px] font-bold tabular-nums" style={{ color: textColor, fontFamily: "var(--font-mono)" }}>
+          {value}
+        </span>
       </div>
-      <div className="h-1.5 bg-[#1a1208] rounded-full overflow-hidden">
+      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--sh-primary-8)" }}>
         <div
           className="h-full rounded-full transition-all duration-1000 ease-out"
-          style={{ width: animated ? `${value}%` : "0%", background: color }}
+          style={{ width: animated ? `${value}%` : "0%", background: barColor }}
         />
       </div>
     </div>
   );
 }
 
-// Visual heatmap grid — 5×8 cells colored by DNA intensity
+// ─── DNA Heat Grid ────────────────────────────────────────────────────────────
 function DNAHeatGrid({ dna }: { dna: ReturnType<typeof dnaProfile> }) {
   const values = Object.values(dna);
   const cells = Array.from({ length: 40 }, (_, i) => {
@@ -78,9 +83,11 @@ function DNAHeatGrid({ dna }: { dna: ReturnType<typeof dnaProfile> }) {
           key={i}
           className="h-5 rounded-sm transition-all duration-500"
           style={{
-            background: v >= 75 ? `rgba(255,186,32,${v / 100})` :
-                        v >= 55 ? `rgba(249,115,22,${v / 100 * 0.8})` :
-                                  `rgba(139,115,85,${v / 100 * 0.5})`,
+            background: v >= 75
+              ? `oklch(0.78 0.15 80 / ${v / 100})`
+              : v >= 55
+              ? `oklch(0.65 0.14 50 / ${(v / 100) * 0.8})`
+              : `oklch(0.50 0.04 60 / ${(v / 100) * 0.5})`,
           }}
         />
       ))}
@@ -88,7 +95,7 @@ function DNAHeatGrid({ dna }: { dna: ReturnType<typeof dnaProfile> }) {
   );
 }
 
-// ─── Agentic Command Input ────────────────────────────────────────────────────
+// ─── Agentic Command Panel ────────────────────────────────────────────────────
 function AgenticCommandPanel({ userId, initialParams }: { userId: number; initialParams: string | null }) {
   const [command, setCommand] = useState(initialParams ?? "");
   const [committed, setCommitted] = useState(false);
@@ -122,83 +129,110 @@ function AgenticCommandPanel({ userId, initialParams }: { userId: number; initia
   ];
 
   return (
-    <div className="border border-[#2a2010] bg-[#0f0c08]">
-      <div className="px-5 py-4 border-b border-[#1a1208]">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="h-px w-6 bg-[#ffba20]" />
-          <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Agentic Interface</span>
+    <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--rule)" }}>
+      {/* Section header */}
+      <div className="px-6 py-5 border-b" style={{ background: "var(--bone)", borderColor: "var(--rule)" }}>
+        <div className="flex items-center gap-2 mb-1">
+          <div className="h-px w-6" style={{ background: "var(--signal-gold)" }} />
+          <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>AGENTIC INTERFACE</span>
         </div>
-        <h3 className="font-['Fraunces',_serif] text-xl font-black text-[#faf8f5]">Direct Configuration</h3>
-        <p className="text-[#5c4a32] text-xs mt-1 leading-relaxed">
+        <h3
+          className="text-xl font-black mb-1"
+          style={{ fontFamily: "var(--font-display)", color: "var(--sh-fg-1)" }}
+        >
+          Direct Configuration
+        </h3>
+        <p className="text-xs leading-relaxed" style={{ color: "var(--sh-fg-3)" }}>
           The OS does not utilize static forms. Instruct your assigned agents via natural language to refine signal filters, threshold alerts, and deal prioritization logic.
         </p>
       </div>
 
-      {/* Active protocol examples */}
-      <div className="px-5 py-4 border-b border-[#1a1208]">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#ffba20] animate-pulse" />
-          <span className="text-[10px] font-bold tracking-[0.15em] text-[#ffba20] uppercase">Active Protocol</span>
-        </div>
-        <div className="space-y-2">
-          {EXAMPLE_PROMPTS.map((p, i) => (
-            <button
-              key={i}
-              onClick={() => { setCommand(p); textareaRef.current?.focus(); }}
-              className="w-full text-left text-xs text-[#8b7355] italic px-3 py-2 border border-[#1a1208] hover:border-[#3d2e1e] hover:text-[#faf8f5] transition-colors"
-            >
-              "{p}"
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Command input */}
-      <div className="px-5 py-4">
-        <div className="border border-[#2a2010] bg-[#080604] focus-within:border-[#ffba20]/50 transition-colors">
-          <div className="px-4 pt-3 pb-1">
-            <span className="text-[9px] font-bold tracking-[0.2em] text-[#5c4a32] uppercase">Command Input</span>
+      <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x" style={{ borderColor: "var(--rule)" }}>
+        {/* Active protocol examples */}
+        <div className="px-5 py-5" style={{ background: "var(--paper)" }}>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--signal-gold)" }} />
+            <span className="label-caps" style={{ color: "var(--signal-gold)" }}>ACTIVE PROTOCOL</span>
           </div>
-          <textarea
-            ref={textareaRef}
-            value={command}
-            onChange={(e) => setCommand(e.target.value)}
-            placeholder="Instruct the Signal Hunter OS..."
-            rows={4}
-            className="w-full bg-transparent text-[#faf8f5] placeholder-[#3d2e1e] px-4 pb-3 text-sm focus:outline-none resize-none"
-          />
-          <div className="flex items-center justify-between px-4 pb-3 border-t border-[#1a1208] pt-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] text-[#5c4a32] font-mono">COMMITTED TO</span>
-              <span className="text-[9px] text-[#ffba20] font-mono font-bold">CLAUDE_01_CORE</span>
+          <div className="space-y-2">
+            {EXAMPLE_PROMPTS.map((p, i) => (
+              <button
+                key={i}
+                onClick={() => { setCommand(p); textareaRef.current?.focus(); }}
+                className="w-full text-left text-[11px] italic px-3 py-2 rounded border transition-all hover:border-[var(--signal-gold)]/40"
+                style={{
+                  color: "var(--sh-fg-3)",
+                  borderColor: "var(--rule)",
+                  background: "var(--bone)",
+                }}
+              >
+                &ldquo;{p}&rdquo;
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Command input */}
+        <div className="px-5 py-5" style={{ background: "var(--paper)" }}>
+          <div
+            className="rounded border overflow-hidden"
+            style={{ borderColor: "var(--rule)", background: "var(--bone)" }}
+          >
+            <div className="px-4 pt-3 pb-1 border-b" style={{ borderColor: "var(--rule)" }}>
+              <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>COMMAND INPUT</span>
             </div>
-            <button
-              onClick={handleCommit}
-              disabled={transmitting || !command.trim()}
-              className={cn(
-                "flex items-center gap-2 text-[10px] font-bold tracking-[0.15em] px-4 py-1.5 transition-all disabled:opacity-40",
-                committed
-                  ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-400"
-                  : "bg-[#ffba20] text-[#1a1208] hover:bg-[#ffd060]"
-              )}
+            <textarea
+              ref={textareaRef}
+              value={command}
+              onChange={(e) => setCommand(e.target.value)}
+              placeholder="Instruct the Signal Hunter OS..."
+              rows={5}
+              className="w-full bg-transparent px-4 py-3 text-sm focus:outline-none resize-none"
+              style={{
+                color: "var(--sh-fg-1)",
+                fontFamily: "var(--font-mono)",
+              }}
+            />
+            <div
+              className="flex items-center justify-between px-4 py-2.5 border-t"
+              style={{ borderColor: "var(--rule)" }}
             >
-              {transmitting ? (
-                <>
-                  <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
-                  TRANSMITTING
-                </>
-              ) : committed ? (
-                <>
-                  <span className="material-symbols-outlined text-[14px]">check</span>
-                  COMMITTED
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                  TRANSMIT INSTRUCTION
-                </>
-              )}
-            </button>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px]" style={{ color: "var(--sh-fg-4)", fontFamily: "var(--font-mono)" }}>
+                  COMMITTED TO
+                </span>
+                <span
+                  className="text-[9px] font-bold"
+                  style={{ color: "var(--signal-gold)", fontFamily: "var(--font-mono)" }}
+                >
+                  CLAUDE_01_CORE
+                </span>
+              </div>
+              <button
+                onClick={handleCommit}
+                disabled={transmitting || !command.trim()}
+                className={cn(
+                  "flex items-center gap-1.5 text-[10px] font-bold tracking-[0.12em] px-3 py-1.5 rounded transition-all disabled:opacity-40",
+                  committed
+                    ? "bg-emerald-600/10 border border-emerald-600/40 text-emerald-700"
+                    : "text-[var(--ink)]"
+                )}
+                style={!committed ? {
+                  background: "var(--signal-gold)",
+                  fontFamily: "var(--font-mono)",
+                } : {
+                  fontFamily: "var(--font-mono)",
+                }}
+              >
+                {transmitting ? (
+                  <><Loader2 className="w-3 h-3 animate-spin" />TRANSMITTING</>
+                ) : committed ? (
+                  <>COMMITTED</>
+                ) : (
+                  <>TRANSMIT INSTRUCTION<ArrowRight className="w-3 h-3" /></>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -206,8 +240,9 @@ function AgenticCommandPanel({ userId, initialParams }: { userId: number; initia
   );
 }
 
-// ─── Security & Access ────────────────────────────────────────────────────────
+// ─── Security Panel ───────────────────────────────────────────────────────────
 function SecurityPanel({ user }: { user: any }) {
+  const [hashVisible, setHashVisible] = useState(false);
   const identityHash = user?.openId
     ? `SHA256:${user.openId.slice(0, 8).toUpperCase()}...${user.openId.slice(-4).toUpperCase()}`
     : "SHA256:PENDING...";
@@ -219,47 +254,87 @@ function SecurityPanel({ user }: { user: any }) {
   ];
 
   return (
-    <div className="border border-[#2a2010] bg-[#0f0c08]">
-      <div className="px-5 py-4 border-b border-[#1a1208]">
-        <h3 className="font-['Fraunces',_serif] text-xl font-black text-[#faf8f5]">Security & Access</h3>
+    <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--rule)" }}>
+      <div className="px-6 py-4 border-b" style={{ background: "var(--bone)", borderColor: "var(--rule)" }}>
+        <h3
+          className="text-xl font-black"
+          style={{ fontFamily: "var(--font-display)", color: "var(--sh-fg-1)" }}
+        >
+          Security & Access
+        </h3>
       </div>
-      <div className="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[#1a1208]">
+      <div className="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x" style={{ borderColor: "var(--rule)" }}>
         {/* Session log */}
-        <div className="px-5 py-4">
-          <span className="text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase block mb-3">Encrypted Session Log</span>
-          <div className="space-y-3">
+        <div className="px-5 py-5" style={{ background: "var(--paper)" }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>ENCRYPTED SESSION LOG</span>
+            <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>STATE: ACTIVE</span>
+          </div>
+          <div className="space-y-1">
             {SESSION_LOG.map((item, i) => (
-              <div key={i} className="flex items-start gap-3 py-2 border-b border-[#1a1208] last:border-b-0 cursor-pointer hover:bg-[#1a1208] -mx-2 px-2 transition-colors">
-                <span className="text-[10px] text-[#5c4a32] font-mono w-14 flex-shrink-0 mt-0.5">{item.time}</span>
+              <div
+                key={i}
+                className="flex items-start gap-3 py-2.5 px-2 rounded cursor-pointer transition-colors hover:bg-[var(--bone)] border-b last:border-b-0"
+                style={{ borderColor: "var(--rule)" }}
+              >
+                <span
+                  className="text-[10px] w-14 shrink-0 mt-0.5 tabular-nums"
+                  style={{ color: "var(--sh-fg-4)", fontFamily: "var(--font-mono)" }}
+                >
+                  {item.time}
+                </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[#faf8f5] text-xs font-medium">{item.event}</p>
-                  <p className="text-[#5c4a32] text-[10px] font-mono mt-0.5 truncate">{item.detail}</p>
+                  <p className="text-xs font-medium" style={{ color: "var(--sh-fg-1)" }}>{item.event}</p>
+                  <p
+                    className="text-[10px] mt-0.5 truncate"
+                    style={{ color: "var(--sh-fg-4)", fontFamily: "var(--font-mono)" }}
+                  >
+                    {item.detail}
+                  </p>
                 </div>
-                <span className="material-symbols-outlined text-[#3d2e1e] text-[14px] flex-shrink-0 mt-0.5">chevron_right</span>
+                <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: "var(--sh-fg-4)" }} />
               </div>
             ))}
           </div>
         </div>
 
         {/* Hardware key + identity hash */}
-        <div className="px-5 py-4 space-y-5">
+        <div className="px-5 py-5 space-y-5" style={{ background: "var(--paper)" }}>
           <div>
-            <span className="text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase block mb-2">Hardware Key</span>
+            <span className="label-caps block mb-2" style={{ color: "var(--sh-fg-4)" }}>HARDWARE KEY</span>
             <div className="flex items-center justify-between">
-              <span className="text-[#faf8f5] text-sm font-semibold">YubiKey Elite</span>
-              <span className="material-symbols-outlined text-[#8b7355] text-[18px]">visibility_off</span>
+              <span className="text-sm font-semibold" style={{ color: "var(--sh-fg-1)" }}>YubiKey Elite</span>
+              <button onClick={() => setHashVisible(v => !v)} style={{ color: "var(--sh-fg-4)" }}>
+                {hashVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
             </div>
-            <p className="text-[#5c4a32] text-xs mt-1">Primary hardware authorization for all TIDE-level transaction signing.</p>
+            <p className="text-xs mt-1" style={{ color: "var(--sh-fg-3)" }}>
+              Primary hardware authorization for all TIDE-level transaction signing.
+            </p>
             <div className="flex items-center gap-2 mt-2">
-              <span className="text-[9px] text-[#5c4a32] uppercase tracking-widest">Signal Strength</span>
-              <span className="text-[9px] text-emerald-400 font-bold">OPTIMAL</span>
+              <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>Signal Strength</span>
+              <span className="text-[9px] font-bold text-emerald-700" style={{ fontFamily: "var(--font-mono)" }}>
+                OPTIMAL
+              </span>
             </div>
           </div>
 
-          <div className="border-t border-[#1a1208] pt-4">
-            <span className="text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase block mb-2">Identity Hash</span>
-            <p className="text-[#5c4a32] text-[10px] font-mono break-all leading-relaxed">{identityHash}</p>
-            <button className="mt-3 w-full border border-[#3d2e1e] text-[#8b7355] text-[10px] font-bold tracking-[0.15em] py-2 hover:border-[#ffba20] hover:text-[#ffba20] transition-colors">
+          <div className="border-t pt-4" style={{ borderColor: "var(--rule)" }}>
+            <span className="label-caps block mb-2" style={{ color: "var(--sh-fg-4)" }}>IDENTITY HASH</span>
+            <p
+              className="text-[10px] break-all leading-relaxed"
+              style={{ color: "var(--sh-fg-3)", fontFamily: "var(--font-mono)" }}
+            >
+              {hashVisible ? identityHash : "SHA256:••••••••...••••"}
+            </p>
+            <button
+              className="mt-3 w-full rounded border py-2 text-[10px] font-bold tracking-[0.12em] transition-colors hover:border-[var(--signal-gold)] hover:text-[var(--signal-gold)]"
+              style={{
+                borderColor: "var(--rule)",
+                color: "var(--sh-fg-3)",
+                fontFamily: "var(--font-mono)",
+              }}
+            >
               ROTATE IDENTITY KEY
             </button>
           </div>
@@ -279,73 +354,122 @@ export default function OperatorIdentity() {
   const dna = dnaProfile(profile?.id ?? 1);
 
   const AGENTS = [
-    { name: "Claude Orchestrator", status: "Active Orchestration", icon: "smart_toy", active: true },
-    { name: "Perplexity Research", status: "Standby", icon: "search", active: false },
-    { name: "Gemini Analysis", status: "Standby", icon: "analytics", active: false },
+    { name: "Claude Orchestrator", status: "Active Orchestration", active: true },
+    { name: "Perplexity Research", status: "Standby", active: false },
+    { name: "Gemini Analysis", status: "Standby", active: false },
   ];
 
   if (isLoading) {
     return (
-      <DashboardLayout>
+      <EditorialTopNav>
         <div className="flex items-center justify-center h-64">
-          <span className="material-symbols-outlined text-[#ffba20] text-3xl animate-spin">progress_activity</span>
+          <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--signal-gold)" }} />
         </div>
-      </DashboardLayout>
+      </EditorialTopNav>
     );
   }
 
   return (
-    <DashboardLayout>
-      <div className="space-y-8 pb-12">
+    <EditorialTopNav>
+      <div className="max-w-[1280px] mx-auto px-6 py-10 space-y-8 pb-16">
+
         {/* ── Header ── */}
         <div className="grid lg:grid-cols-12 gap-6 items-start">
           {/* Left — identity headline */}
           <div className="lg:col-span-8">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-px w-8 bg-[#ffba20]" />
-              <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Personal Bureau</span>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-px w-8" style={{ background: "var(--signal-gold)" }} />
+              <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>PERSONAL BUREAU</span>
             </div>
-            <div className="flex items-end gap-6 flex-wrap">
-              <div>
-                <h1 className="font-['Fraunces',_serif] font-black text-foreground leading-none" style={{ fontSize: "clamp(2.5rem, 6vw, 4rem)" }}>
-                  Operator<br />Identity
-                </h1>
+            <h1
+              className="font-black leading-none tracking-tight mb-5"
+              style={{
+                fontFamily: "var(--font-display)",
+                color: "var(--sh-fg-1)",
+                fontSize: "clamp(2.5rem, 6vw, 4rem)",
+              }}
+            >
+              Operator<br />Identity
+            </h1>
+            <div className="flex flex-wrap gap-x-8 gap-y-2">
+              <div className="flex items-center gap-3">
+                <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>CLEARANCE</span>
+                <span
+                  className={cn("text-[10px] font-bold border px-2 py-0.5 rounded tracking-widest", clearance.colorClass)}
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  {clearance.level}
+                </span>
               </div>
-              <div className="flex flex-col gap-2 pb-1">
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] text-[#5c4a32] uppercase tracking-widest">Clearance</span>
-                  <span className={cn("text-[10px] font-bold border px-2 py-0.5 tracking-widest", clearance.color)}>
-                    {clearance.level}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] text-[#5c4a32] uppercase tracking-widest">Active Modules</span>
-                  <span className="text-[10px] font-bold text-emerald-400">14 ACTIVE</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] text-[#5c4a32] uppercase tracking-widest">Designation</span>
-                  <span className="text-[10px] font-bold text-[#faf8f5]">{clearance.label}</span>
-                </div>
+              <div className="flex items-center gap-3">
+                <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>ACTIVE MODULES</span>
+                <span
+                  className="text-[10px] font-bold text-emerald-700"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  14 ACTIVE
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>DESIGNATION</span>
+                <span
+                  className="text-[10px] font-bold"
+                  style={{ color: "var(--sh-fg-1)", fontFamily: "var(--font-mono)" }}
+                >
+                  {clearance.label}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Right — agent monitoring sidebar */}
+          {/* Right — agent monitoring */}
           <div className="lg:col-span-4">
-            <div className="border border-[#2a2010] bg-[#0f0c08]">
-              <div className="px-4 py-3 border-b border-[#1a1208] flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase">Agent Monitoring</span>
+            <div
+              className="rounded-lg border overflow-hidden"
+              style={{ borderColor: "var(--rule)" }}
+            >
+              <div
+                className="px-4 py-3 border-b flex items-center gap-2"
+                style={{ background: "var(--bone)", borderColor: "var(--rule)" }}
+              >
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--sage)" }} />
+                <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>AGENT MONITORING</span>
               </div>
-              <div className="divide-y divide-[#1a1208]">
-                {AGENTS.map((agent) => (
-                  <div key={agent.name} className={cn("px-4 py-3 flex items-center gap-3", agent.active ? "bg-[#1a1208]" : "")}>
-                    <span className={cn("material-symbols-outlined text-[18px]", agent.active ? "text-[#ffba20]" : "text-[#3d2e1e]")}>
-                      {agent.icon}
-                    </span>
+              <div style={{ background: "var(--paper)" }}>
+                {AGENTS.map((agent, i) => (
+                  <div
+                    key={agent.name}
+                    className={cn(
+                      "px-4 py-3 flex items-center gap-3 border-b last:border-b-0",
+                      agent.active ? "" : "opacity-60"
+                    )}
+                    style={{
+                      borderColor: "var(--rule)",
+                      background: agent.active ? "var(--sh-primary-8)" : "transparent",
+                    }}
+                  >
+                    <div
+                      className="w-7 h-7 rounded flex items-center justify-center text-[11px] font-bold shrink-0"
+                      style={{
+                        background: agent.active ? "var(--sh-primary-15)" : "var(--sh-primary-8)",
+                        color: agent.active ? "var(--sh-fg-1)" : "var(--sh-fg-4)",
+                      }}
+                    >
+                      {agent.name.charAt(0)}
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <div className={cn("text-xs font-semibold", agent.active ? "text-[#faf8f5]" : "text-[#5c4a32]")}>{agent.name}</div>
-                      <div className={cn("text-[10px]", agent.active ? "text-emerald-400" : "text-[#3d2e1e]")}>{agent.status}</div>
+                      <div
+                        className="text-xs font-semibold truncate"
+                        style={{ color: agent.active ? "var(--sh-fg-1)" : "var(--sh-fg-3)" }}
+                      >
+                        {agent.name}
+                      </div>
+                      <div
+                        className="text-[10px]"
+                        style={{ color: agent.active ? "var(--sage)" : "var(--sh-fg-4)" }}
+                      >
+                        {agent.status}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -355,48 +479,71 @@ export default function OperatorIdentity() {
         </div>
 
         {/* ── Investment DNA ── */}
-        <div className="border border-[#2a2010] bg-[#0f0c08]">
-          <div className="px-6 py-5 border-b border-[#1a1208]">
+        <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--rule)" }}>
+          <div className="px-6 py-5 border-b" style={{ background: "var(--bone)", borderColor: "var(--rule)" }}>
             <div className="flex items-center gap-2 mb-1">
-              <div className="h-px w-6 bg-[#ffba20]" />
-              <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Visual Profile</span>
+              <div className="h-px w-6" style={{ background: "var(--signal-gold)" }} />
+              <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>VISUAL PROFILE</span>
             </div>
-            <h2 className="font-['Fraunces',_serif] text-2xl font-black text-[#faf8f5]">Investment DNA</h2>
-            <p className="text-[#5c4a32] text-xs mt-1 max-w-md">
+            <h2
+              className="text-2xl font-black"
+              style={{ fontFamily: "var(--font-display)", color: "var(--sh-fg-1)" }}
+            >
+              Investment DNA
+            </h2>
+            <p className="text-xs mt-1 max-w-md" style={{ color: "var(--sh-fg-3)" }}>
               Your algorithmic footprint across global sectors. This visual map represents a synthesis of your historical deployments, risk tolerance adjustments, and sector-specific alpha.
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-[#1a1208]">
+          <div
+            className="grid lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x"
+            style={{ borderColor: "var(--rule)" }}
+          >
             {/* Heatmap grid */}
-            <div className="p-6">
+            <div className="p-6" style={{ background: "var(--paper)" }}>
               <DNAHeatGrid dna={dna} />
-              <div className="flex items-center justify-between mt-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] text-[#5c4a32] uppercase tracking-widest">Determinacy</span>
-                  <span className="text-[10px] font-bold text-[#faf8f5]">ASYMMETRIC / AGGRESSIVE</span>
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>DETERMINACY</span>
+                    <span
+                      className="text-[10px] font-bold"
+                      style={{ color: "var(--sh-fg-1)", fontFamily: "var(--font-mono)" }}
+                    >
+                      ASYMMETRIC / AGGRESSIVE
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full" style={{ background: "var(--signal-gold)" }} />
+                    <span
+                      className="text-[10px] font-bold"
+                      style={{ color: "var(--signal-gold)", fontFamily: "var(--font-mono)" }}
+                    >
+                      ACTIVE
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#ffba20]" />
-                  <span className="text-[10px] text-[#ffba20] font-bold">ACTIVE</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between mt-2">
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] text-[#5c4a32] uppercase tracking-widest">Sector Bias</span>
-                  <span className="text-[10px] font-bold text-[#faf8f5]">INFRASTRUCTURE & LOGISTICS</span>
+                  <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>SECTOR BIAS</span>
+                  <span
+                    className="text-[10px] font-bold"
+                    style={{ color: "var(--sh-fg-1)", fontFamily: "var(--font-mono)" }}
+                  >
+                    INFRASTRUCTURE & LOGISTICS
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* DNA bars */}
-            <div className="p-6 space-y-4">
-              <HeatBar label="Risk Tolerance" value={dna.riskTolerance} />
-              <HeatBar label="Sector Bias" value={dna.sectorBias} />
-              <HeatBar label="Deal Velocity" value={dna.dealVelocity} />
-              <HeatBar label="Capital Deployment" value={dna.capitalDeployment} />
-              <HeatBar label="Negotiation Style" value={dna.negotiationStyle} />
-              <HeatBar label="Diligence Depth" value={dna.diligenceDepth} />
+            <div className="p-6 space-y-4" style={{ background: "var(--paper)" }}>
+              <HeatBar label="RISK TOLERANCE" value={dna.riskTolerance} />
+              <HeatBar label="SECTOR BIAS" value={dna.sectorBias} />
+              <HeatBar label="DEAL VELOCITY" value={dna.dealVelocity} />
+              <HeatBar label="CAPITAL DEPLOYMENT" value={dna.capitalDeployment} />
+              <HeatBar label="NEGOTIATION STYLE" value={dna.negotiationStyle} />
+              <HeatBar label="DILIGENCE DEPTH" value={dna.diligenceDepth} />
             </div>
           </div>
         </div>
@@ -407,6 +554,6 @@ export default function OperatorIdentity() {
         {/* ── Security & Access ── */}
         <SecurityPanel user={profile} />
       </div>
-    </DashboardLayout>
+    </EditorialTopNav>
   );
 }
