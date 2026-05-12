@@ -758,3 +758,12 @@
 - [x] LOI: "Share with Counsel" + "Review Final Draft" action buttons
 - [x] Add LOI Draft tab to DealDetail.tsx tabs
 - [x] Run tests, save checkpoint — 96/96 passing
+
+## Sprint 41 — Access Request Form + Visual QA
+- [x] Add inline access request form to LandingPage.tsx (name, email, deal thesis, capital access)
+- [x] Add publicAccess.requestAccess tRPC procedure — saves to DB + notifyOwner ping
+- [x] Add access_requests table to DB schema (access_requests: id, name, email, deal_thesis, capital_access, status, created_at)
+- [x] Refactor LandingPage hero CTA to scroll to #request-access anchor instead of login redirect
+- [x] Add "Already have access? Sign in" link to access request section
+- [x] Visual QA: TypeScript clean (0 errors), 96/96 tests passing
+- [x] Run tests, save checkpoint

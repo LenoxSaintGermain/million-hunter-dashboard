@@ -1,0 +1,13 @@
+{
+  "query": "SHOW TABLES LIKE 'access_requests';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SHOW TABLES LIKE 'access_requests';",
+  "rows": [
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz (access_requests)": "access_requests"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_GeCPeFFiEBRZFpk6xckkAz (access_requests)\naccess_requests\n",
+  "stderr": "",
+  "execution_time_ms": 285
+}

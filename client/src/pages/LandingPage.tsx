@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getLoginUrl } from "@/const";
 import { Link } from "wouter";
+import { trpc } from "@/lib/trpc";
 
 // ─── Static data ─────────────────────────────────────────────────────────────
 const STATS = [
@@ -70,6 +71,15 @@ const TESTIMONIALS = [
   },
 ];
 
+const CAPITAL_OPTIONS = [
+  "Under $250K",
+  "$250K – $500K",
+  "$500K – $1M",
+  "$1M – $2.5M",
+  "$2.5M – $5M",
+  "$5M+",
+];
+
 // ─── Animated counter ────────────────────────────────────────────────────────
 function AnimatedStat({ value, label }: { value: string; label: string }) {
   const [visible, setVisible] = useState(false);
@@ -112,6 +122,124 @@ function FeatureCard({ eyebrow, title, body, icon, index }: { eyebrow: string; t
   );
 }
 
+// ─── Access Request Form ──────────────────────────────────────────────────────
+function AccessRequestForm() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [dealThesis, setDealThesis] = useState("");
+  const [capitalAccess, setCapitalAccess] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+
+  const requestAccess = trpc.publicAccess.requestAccess.useMutation({
+    onSuccess: () => setSubmitted(true),
+    onError: (err) => setError(err.message || "Something went wrong. Please try again."),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!name.trim() || !email.trim()) {
+      setError("Name and email are required.");
+      return;
+    }
+    requestAccess.mutate({ name: name.trim(), email: email.trim(), dealThesis: dealThesis.trim() || undefined, capitalAccess: capitalAccess || undefined });
+  };
+
+  if (submitted) {
+    return (
+      <div className="bg-[#1a1208] border border-[#ffba20]/30 p-10 text-center">
+        <span className="material-symbols-outlined text-[#ffba20] text-4xl mb-4 block">check_circle</span>
+        <h3 className="font-['Fraunces',_serif] text-2xl font-black text-[#faf8f5] mb-3">Request received.</h3>
+        <p className="text-[#8b7355] text-sm max-w-sm mx-auto">
+          We review every request manually. If your thesis and capital access align with the platform's operator profile, you'll hear from us within 48 hours.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-[#0f0c08] border border-[#3d2e1e] p-8 lg:p-10">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="h-px w-8 bg-[#ffba20]" />
+        <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Request Operator Access</span>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-5 mb-5">
+        <div>
+          <label className="block text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase mb-2">Full Name *</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your name"
+            className="w-full bg-[#1a1208] border border-[#3d2e1e] text-[#faf8f5] placeholder-[#5c4a32] px-4 py-3 text-sm focus:outline-none focus:border-[#ffba20] transition-colors"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase mb-2">Email Address *</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className="w-full bg-[#1a1208] border border-[#3d2e1e] text-[#faf8f5] placeholder-[#5c4a32] px-4 py-3 text-sm focus:outline-none focus:border-[#ffba20] transition-colors"
+            required
+          />
+        </div>
+      </div>
+      <div className="mb-5">
+        <label className="block text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase mb-2">Capital Access</label>
+        <select
+          value={capitalAccess}
+          onChange={(e) => setCapitalAccess(e.target.value)}
+          className="w-full bg-[#1a1208] border border-[#3d2e1e] text-[#faf8f5] px-4 py-3 text-sm focus:outline-none focus:border-[#ffba20] transition-colors appearance-none"
+        >
+          <option value="">Select range...</option>
+          {CAPITAL_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      </div>
+      <div className="mb-7">
+        <label className="block text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase mb-2">
+          Deal Thesis <span className="text-[#5c4a32] normal-case tracking-normal font-normal">(optional — increases approval odds)</span>
+        </label>
+        <textarea
+          value={dealThesis}
+          onChange={(e) => setDealThesis(e.target.value)}
+          placeholder="What type of business are you targeting? What's your acquisition thesis? What markets are you focused on?"
+          rows={3}
+          className="w-full bg-[#1a1208] border border-[#3d2e1e] text-[#faf8f5] placeholder-[#5c4a32] px-4 py-3 text-sm focus:outline-none focus:border-[#ffba20] transition-colors resize-none"
+        />
+      </div>
+      {error && (
+        <p className="text-red-400 text-sm mb-4">{error}</p>
+      )}
+      <button
+        type="submit"
+        disabled={requestAccess.isPending}
+        className="w-full bg-[#ffba20] text-[#1a1208] font-bold text-sm py-4 hover:bg-[#ffd060] transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      >
+        {requestAccess.isPending ? (
+          <>
+            <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+            Submitting...
+          </>
+        ) : (
+          <>
+            <span className="material-symbols-outlined text-[18px]">lock_open</span>
+            Submit Access Request
+          </>
+        )}
+      </button>
+      <p className="text-[#5c4a32] text-xs text-center mt-4">
+        Access is reviewed manually. We approve operators with a defined thesis and verified capital access.
+      </p>
+    </form>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -145,7 +273,7 @@ export default function LandingPage() {
               href={loginUrl}
               className="bg-[#1a1208] text-[#faf8f5] text-sm font-medium px-5 py-2 hover:bg-[#3d2e1e] transition-colors"
             >
-              Request Access
+              Sign In
             </a>
           </div>
         </div>
@@ -171,7 +299,8 @@ export default function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <a
-              href={loginUrl}
+              href="#request-access"
+              onClick={(e) => { e.preventDefault(); document.getElementById("request-access")?.scrollIntoView({ behavior: "smooth" }); }}
               className="inline-flex items-center justify-center gap-2 bg-[#1a1208] text-[#faf8f5] text-base font-semibold px-8 py-4 hover:bg-[#3d2e1e] transition-colors"
             >
               <span className="material-symbols-outlined text-[#ffba20] text-[20px]">lock_open</span>
@@ -222,7 +351,8 @@ export default function LandingPage() {
               The information asymmetry in acquisition has always existed. Signal Hunter OS is what happens when you close it — permanently, and in your favor.
             </p>
             <a
-              href={loginUrl}
+              href="#request-access"
+              onClick={(e) => { e.preventDefault(); document.getElementById("request-access")?.scrollIntoView({ behavior: "smooth" }); }}
               className="inline-flex items-center gap-2 text-sm font-semibold text-[#1a1208] border-b-2 border-[#ffba20] pb-0.5 hover:text-[#ffba20] transition-colors"
             >
               Get operator access
@@ -264,35 +394,49 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Final CTA ── */}
-      <section className="py-28 px-6 bg-[#1a1208]">
-        <div className="max-w-3xl mx-auto text-center">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="h-px w-8 bg-[#ffba20]" />
-            <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Access</span>
-            <div className="h-px w-8 bg-[#ffba20]" />
-          </div>
-          <h2 className="font-['Fraunces',_serif] text-5xl lg:text-6xl font-black text-[#faf8f5] leading-tight mb-6">
-            The advantage<br />
-            <span className="text-[#ffba20]">compounds.</span>
-          </h2>
-          <p className="text-[#8b7355] text-lg mb-10 max-w-xl mx-auto">
-            Signal Hunter OS is invite-only. Access is granted to operators with a defined deal thesis, verified capital access, and a bias toward execution over deliberation.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
-              href={loginUrl}
-              className="inline-flex items-center justify-center gap-2 bg-[#ffba20] text-[#1a1208] text-base font-bold px-10 py-4 hover:bg-[#ffd060] transition-colors"
-            >
-              <span className="material-symbols-outlined text-[20px]">lock_open</span>
-              Request Operator Access
-            </a>
-            <Link
-              href="/explore"
-              className="inline-flex items-center justify-center gap-2 border border-[#8b7355] text-[#8b7355] text-base font-medium px-10 py-4 hover:border-[#faf8f5] hover:text-[#faf8f5] transition-colors"
-            >
-              Browse Active Deals
-            </Link>
+      {/* ── Access Request Form Section ── */}
+      <section id="request-access" className="py-28 px-6 bg-[#1a1208]">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-16 items-start">
+            {/* Left — editorial copy */}
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-px w-8 bg-[#ffba20]" />
+                <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Access</span>
+              </div>
+              <h2 className="font-['Fraunces',_serif] text-5xl lg:text-6xl font-black text-[#faf8f5] leading-tight mb-6">
+                The advantage<br />
+                <span className="text-[#ffba20]">compounds.</span>
+              </h2>
+              <p className="text-[#8b7355] text-lg mb-8 leading-relaxed">
+                Signal Hunter OS is invite-only. Access is granted to operators with a defined deal thesis, verified capital access, and a bias toward execution over deliberation.
+              </p>
+              <div className="space-y-4">
+                {[
+                  { icon: "verified", text: "Manual review — every request is read by a human" },
+                  { icon: "timer", text: "48-hour response for qualified operators" },
+                  { icon: "lock", text: "No credit card required to request access" },
+                ].map((item) => (
+                  <div key={item.icon} className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-[#ffba20] text-[18px]">{item.icon}</span>
+                    <span className="text-[#8b7355] text-sm">{item.text}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-10 pt-8 border-t border-[#3d2e1e]">
+                <p className="text-[#5c4a32] text-sm mb-4">Already have access?</p>
+                <a
+                  href={loginUrl}
+                  className="inline-flex items-center gap-2 text-[#faf8f5] text-sm font-medium border-b border-[#8b7355] pb-0.5 hover:border-[#ffba20] hover:text-[#ffba20] transition-colors"
+                >
+                  Sign in to your account
+                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Right — form */}
+            <AccessRequestForm />
           </div>
         </div>
       </section>

@@ -768,3 +768,17 @@ export const demoScenarios = mysqlTable("demo_scenarios", {
 });
 export type DemoScenario = typeof demoScenarios.$inferSelect;
 export type InsertDemoScenario = typeof demoScenarios.$inferInsert;
+
+// ─── Access Requests ──────────────────────────────────────────────────────────
+// Captures inbound operator access requests from the public landing page.
+export const accessRequests = mysqlTable("access_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  dealThesis: text("deal_thesis"),
+  capitalAccess: varchar("capital_access", { length: 100 }),
+  status: varchar("status", { length: 50 }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type AccessRequest = typeof accessRequests.$inferSelect;
+export type InsertAccessRequest = typeof accessRequests.$inferInsert;

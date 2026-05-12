@@ -282,6 +282,38 @@ export const appRouter = router({
       }),
   }),
 
+  publicAccess: router({
+    // Captures an inbound access request from the landing page.
+    // Saves to DB and pings the owner via notifyOwner.
+    requestAccess: publicProcedure
+      .input(z.object({
+        name: z.string().min(1).max(255),
+        email: z.string().email().max(255),
+        dealThesis: z.string().max(2000).optional(),
+        capitalAccess: z.string().max(100).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { accessRequests } = await import("../drizzle/schema");
+        await db.insert(accessRequests).values({
+          name: input.name,
+          email: input.email,
+          dealThesis: input.dealThesis ?? null,
+          capitalAccess: input.capitalAccess ?? null,
+          status: "pending",
+        });
+        try {
+          const { notifyOwner } = await import("./_core/notification");
+          await notifyOwner({
+            title: `New Access Request — ${input.name}`,
+            content: `Name: ${input.name}\nEmail: ${input.email}\nCapital Access: ${input.capitalAccess ?? "Not specified"}\n\nDeal Thesis:\n${input.dealThesis ?? "Not provided"}`,
+          });
+        } catch {}
+        return { success: true };
+      }),
+  }),
+
   demo: router({
     // Returns the active demo scenario for public consumption
     getActive: publicProcedure.query(async () => {
