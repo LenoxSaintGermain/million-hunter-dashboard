@@ -607,7 +607,7 @@ export default function TIDEPage() {
                 <p className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: "oklch(0.45 0.01 250)" }}>CO-ANALYST INSIGHT</p>
                 <p className="text-xs italic leading-relaxed" style={{ color: "oklch(0.55 0.01 250)" }}>
                   {clusterPoints.length > 0
-                    ? `SIGNAL OVERLAP (Gemini 3.1 Flash cross-reference): ${clusterPoints[0]?.geo} shows ${clusterPoints[0]?.count} converging signals totaling ${fmtMoney((clusterPoints[0]?.capital || 0) / 100)} — matches Investor DNA for "${clusterPoints[0]?.types[0] ?? "Infrastructure"} Deployment".`
+                    ? `SIGNAL OVERLAP (The Scout cross-reference): ${clusterPoints[0]?.geo} shows ${clusterPoints[0]?.count} converging signals totaling ${fmtMoney((clusterPoints[0]?.capital || 0) / 100)} — matches Investor DNA for "${clusterPoints[0]?.types[0] ?? "Infrastructure"} Deployment".`
                     : "Run a TIDE scan to generate AI analyst commentary on convergence patterns."}
                 </p>
               </div>

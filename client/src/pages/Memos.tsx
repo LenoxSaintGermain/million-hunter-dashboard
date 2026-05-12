@@ -80,7 +80,7 @@ export default function Memos() {
         <div>
           <h1 className="sh-heading-2" style={{ color: "var(--sh-fg-1)" }}>Investment Memos</h1>
           <p className="text-xs mt-0.5" style={{ color: "var(--sh-fg-3)" }}>
-            {memos?.length ?? 0} memo{(memos?.length ?? 0) !== 1 ? "s" : ""} generated · Powered by Gemini 3.1 Pro
+            {memos?.length ?? 0} memo{(memos?.length ?? 0) !== 1 ? "s" : ""} generated · Authored by The Architect
           </p>
         </div>
       </div>
@@ -199,7 +199,7 @@ export default function Memos() {
                     </span>
                     <span className="flex items-center gap-1 font-mono">
                       <Zap className="w-2.5 h-2.5" />
-                      {memo.generatedBy ?? "Gemini 3.1 Pro"}
+                      {memo.generatedBy ?? "The Architect"}
                     </span>
                   </div>
                   <div className="flex gap-2 pt-1">

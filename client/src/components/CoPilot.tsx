@@ -1,5 +1,5 @@
 /**
- * AI Co-Pilot — Floating panel powered by Claude-Opus-4 via Poe
+ * AI Co-Pilot — The Strategist, The Quant, and The Skeptic, always in context
  *
  * A persistent, context-aware strategic advisor that lives in the corner
  * of every page. Knows Lenox's full pipeline, recent activity, and deal
@@ -44,11 +44,12 @@ interface CoPilotProps {
 }
 
 const SUGGESTED_PROMPTS = [
-  "What's the highest-leverage move in my pipeline right now?",
-  "Which deal should I prioritize for SBA 7(a) this week?",
-  "Stress-test my acquisition thesis — what am I missing?",
-  "What's the fastest path to $1M cash flow from current pipeline?",
-  "Identify the weakest deal in my pipeline and tell me why.",
+  "Where is the highest-leverage move in my pipeline right now?",
+  "Which deal should go to LOI first — and why?",
+  "What is The Skeptic's strongest objection to my current thesis?",
+  "What is the fastest path to $1M annual cash flow from what I have?",
+  "Which deal in my pipeline has the most hidden downside risk?",
+  "What would The Behaviorist say about my weakest seller relationship?",
 ];
 
 export default function CoPilot({ dealId, dealName, embedded, externalOpen, onClose }: CoPilotProps) {
@@ -173,7 +174,7 @@ export default function CoPilot({ dealId, dealName, embedded, externalOpen, onCl
                   variant="secondary"
                   className="text-[9px] px-1.5 py-0 h-4 bg-violet-500/20 text-violet-300 border-violet-500/30 font-mono"
                 >
-                  Claude 4 Opus
+                  The Strategist
                 </Badge>
               </div>
               {dealName ? (
@@ -181,7 +182,7 @@ export default function CoPilot({ dealId, dealName, embedded, externalOpen, onCl
                   Context: <span className="text-violet-400">{dealName}</span>
                 </p>
               ) : (
-                <p className="text-[10px] text-muted-foreground">Full pipeline context loaded</p>
+                <p className="text-[10px] text-muted-foreground">All agents in context</p>
               )}
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -221,9 +222,9 @@ export default function CoPilot({ dealId, dealName, embedded, externalOpen, onCl
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600/20 to-indigo-600/20 border border-violet-500/20 flex items-center justify-center mx-auto mb-3">
                       <Zap className="w-6 h-6 text-violet-400" />
                     </div>
-                    <p className="text-sm font-semibold text-foreground">Your Strategic Co-Pilot</p>
+                    <p className="text-sm font-semibold text-foreground">Signal Hunter Intelligence</p>
                     <p className="text-xs text-muted-foreground mt-1 max-w-[280px] mx-auto leading-relaxed">
-                      Donna Paulsen meets Olivia Pope. I know your pipeline, your thesis, and your blind spots.
+                      The Strategist, The Skeptic, and The Scout — in context, always. I know your pipeline, your thesis, and where the risk lives.
                     </p>
                   </div>
 

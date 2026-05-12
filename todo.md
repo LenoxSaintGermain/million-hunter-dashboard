@@ -725,3 +725,15 @@
 - [x] TIDE: Stat strip at bottom — Capital Tracked, Active Events, Prediction Accuracy
 - [x] TIDE: AI analyst commentary strip below map (Gemini 3.1 Flash label)
 - [x] Run tests, save checkpoint — 96/96 passing
+
+## Sprint 38 — Rory Sutherland Copy Rewrite + Persona Role Map
+- [ ] Audit all copy surfaces: LandingPage, PublicSearch, CoPilot, Consensus, Deal Room, TIDE, Settings
+- [ ] Define persona role map: assign named roles to each AI function (no model names in UI)
+- [ ] Rewrite LandingPage.tsx hero, value props, social proof, CTA with Rory Sutherland oblique framing
+- [ ] Rewrite PublicSearch.tsx gated CTA copy with same psychological register
+- [ ] Replace all model name badges in CoPilot panel with persona role names
+- [ ] Replace all model name badges in Consensus Dashboard with persona role names
+- [ ] Replace all model name badges in Deal Room (Third Signal, War Room) with persona role names
+- [ ] Replace all model name badges in TIDE intelligence stream with persona role names
+- [ ] Replace all model name badges in Settings AI Engine tab with persona role names
+- [ ] Run tests, save checkpoint

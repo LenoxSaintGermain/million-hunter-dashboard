@@ -433,7 +433,7 @@ export default function Settings() {
                                 return (
                                   <div key={provider}>
                                     <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                      {provider === "google" ? "Google Gemini" : provider === "openai" ? "OpenAI" : "Perplexity"}
+                                      {provider === "google" ? "Gemini Engine" : provider === "openai" ? "Language Engine" : "Research Engine"}
                                     </div>
                                     {providerModels.map((model) => (
                                       <SelectItem key={model.id} value={model.id} className="text-xs">

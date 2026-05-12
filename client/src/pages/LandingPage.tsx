@@ -4,66 +4,66 @@ import { Link } from "wouter";
 
 // ─── Static data ─────────────────────────────────────────────────────────────
 const STATS = [
-  { value: "$2.4M", label: "Avg. deal cash flow" },
+  { value: "$2.4M", label: "Avg. cash flow, qualified deal" },
   { value: "3.2×", label: "Avg. acquisition multiple" },
   { value: "94%", label: "SBA 7(a) eligibility rate" },
-  { value: "48h", label: "Avg. time to scored deal" },
+  { value: "48h", label: "From listing to scored thesis" },
 ];
 
 const FEATURES = [
   {
     eyebrow: "SIGNAL INTELLIGENCE",
-    title: "Every deal scored before you read it.",
-    body: "Six-dimension AI scoring — financial health, capital stack fit, operational alpha, macro arbitrage, deal structure, and strategic alignment — runs automatically on every inbound listing.",
+    title: "The deal is already scored. You just haven't seen it yet.",
+    body: "Six dimensions — cash flow health, capital stack fit, operational leverage, macro timing, deal structure, and strategic alignment — run before you open the teaser. By the time you read it, you already know.",
     icon: "analytics",
   },
   {
     eyebrow: "TIDE CAPITAL FLOW",
-    title: "Follow the federal money before it lands.",
-    body: "TIDE tracks USAspending disbursements, Federal Register actions, and FEC filings to surface capital convergence events 60–90 days before they show up in deal flow.",
+    title: "The federal government telegraphs its moves. Most people aren't listening.",
+    body: "TIDE reads USASpending disbursements, Federal Register actions, and FEC filings to surface capital convergence events 60–90 days before they appear in deal flow. The information was always public. The advantage was always in the reading.",
     icon: "trending_up",
   },
   {
     eyebrow: "IC REVIEW",
-    title: "Three AI models. One consensus verdict.",
-    body: "Claude, Gemini, and Perplexity run parallel investment committee reviews. When they disagree, the divergence flag tells you exactly where the risk lives.",
+    title: "Three independent minds. One verdict. The disagreements are the point.",
+    body: "The Quant, The Skeptic, and The Scout run parallel investment committee reviews on every deal. When they diverge, the flag tells you exactly where the risk lives — before you've spent a dollar on diligence.",
     icon: "how_to_vote",
   },
   {
     eyebrow: "BEHAVIORAL PROFILE",
-    title: "Know the seller before the first call.",
-    body: "AI-generated owner psychology profiles, negotiation rehearsal scenarios, and agentic friction scoring — so you walk in with leverage, not questions.",
+    title: "The seller already told you everything. You just weren't in the room.",
+    body: "The Behaviorist constructs owner psychology profiles, negotiation rehearsal scenarios, and friction maps from public signals. You walk into the first call knowing the levers, the fears, and the real number.",
     icon: "psychology",
   },
   {
     eyebrow: "AGENT ORCHESTRATION",
-    title: "Your deal team. Automated.",
-    body: "Multi-model agent runs (Red Team, Capital Stack, Digital Audit, Behavioral) execute in parallel and stream results into your Intelligence Dossier in real time.",
+    title: "A deal team that doesn't sleep, doesn't bill by the hour, and doesn't miss.",
+    body: "The Red Team, The Architect, The Auditor, and The Behaviorist run in parallel and stream their findings into your Intelligence Dossier. The work that used to take three weeks happens before your morning coffee.",
     icon: "smart_toy",
   },
   {
     eyebrow: "SENTINEL SIGNALS",
-    title: "Macro headwinds and tailwinds, live.",
-    body: "A curated signal feed tracks interest rate shifts, SBA policy changes, sector tailwinds, and geographic arbitrage windows — weighted and scored against your active pipeline.",
+    title: "The macro environment is a signal, not a headline.",
+    body: "The Scout monitors rate shifts, SBA policy changes, sector tailwinds, and geographic arbitrage windows — then weights each signal against your live pipeline. The market is always speaking. This is how you hear it.",
     icon: "radar",
   },
 ];
 
 const TESTIMONIALS = [
   {
-    quote: "I ran three deals through the IC Review before my first LOI. The divergence flag on deal two saved me from a $2.1M mistake.",
+    quote: "I ran three deals through the IC Review before my first LOI. The Skeptic flagged a cash flow restatement risk on deal two that the broker's deck buried in footnote 14. Saved me from a $2.1M mistake.",
     name: "Marcus T.",
     role: "Independent Sponsor, Southeast US",
     initial: "M",
   },
   {
-    quote: "The TIDE tracker surfaced a $180M BeltLine TAD commitment two months before any broker knew about it. We had three qualified targets identified before the press release.",
+    quote: "TIDE surfaced a $180M BeltLine TAD commitment two months before any broker knew about it. We had three qualified acquisition targets identified before the press release hit.",
     name: "Priya S.",
     role: "Search Fund Operator, Atlanta",
     initial: "P",
   },
   {
-    quote: "The behavioral profile on my target seller was more accurate than the NDA package. Walked into the LOI negotiation knowing exactly what levers to pull.",
+    quote: "The Behaviorist's profile on my target seller was more accurate than anything in the NDA package. I walked into the LOI negotiation knowing the real number before I asked for it.",
     name: "Derek W.",
     role: "Acquisition Entrepreneur, Charlotte",
     initial: "D",
@@ -156,18 +156,18 @@ export default function LandingPage() {
         <div className="max-w-4xl">
           <div className="flex items-center gap-3 mb-8">
             <div className="h-px w-12 bg-[#ffba20]" />
-            <span className="text-[10px] font-bold tracking-[0.25em] text-[#8b7355] uppercase">Acquisition Intelligence Platform</span>
+              <span className="text-[10px] font-bold tracking-[0.25em] text-[#8b7355] uppercase">Acquisition Intelligence OS</span>
           </div>
-          <h1
+            <h1
             className="font-['Fraunces',_serif] font-black text-[#1a1208] leading-[0.92] mb-8"
             style={{ fontSize: "clamp(3.5rem, 9vw, 7rem)" }}
           >
-            Find the deal.<br />
-            <span className="text-[#ffba20]">Before</span> the<br />
-            broker does.
+            The market<br />
+            <span className="text-[#ffba20]">already knows.</span><br />
+            Do you?
           </h1>
           <p className="text-[#5c4a32] text-xl leading-relaxed max-w-2xl mb-10">
-            Signal Hunter OS is an AI-powered acquisition intelligence platform for independent sponsors and search fund operators targeting $1M–$10M cash flow businesses in the Southeast US.
+            Most acquisition platforms give you a faster spreadsheet. Signal Hunter OS gives you a different vantage point — one where the deal is already scored, the seller is already profiled, and the federal capital is already mapped before you open the teaser.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <a
@@ -209,10 +209,10 @@ export default function LandingPage() {
               <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">The System</span>
             </div>
             <h2 className="font-['Fraunces',_serif] text-4xl lg:text-5xl font-black text-[#1a1208] leading-tight mb-6">
-              Six layers of intelligence. One pipeline.
+              Six layers of intelligence. One unfair advantage.
             </h2>
             <p className="text-[#5c4a32] leading-relaxed mb-8">
-              Most acquisition tools give you a spreadsheet. Signal Hunter OS gives you a war room — with AI analysts running parallel diligence before you've read the teaser.
+              The information asymmetry in acquisition has always existed. Signal Hunter OS is what happens when you close it — permanently, and in your favor.
             </p>
             <a
               href={loginUrl}
@@ -237,7 +237,7 @@ export default function LandingPage() {
             <div className="h-px w-8 bg-[#ffba20]" />
             <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">From the Field</span>
           </div>
-          <h2 className="font-['Fraunces',_serif] text-4xl font-black text-[#1a1208] mb-14">Operators in the pipeline.</h2>
+          <h2 className="font-['Fraunces',_serif] text-4xl font-black text-[#1a1208] mb-14">From the field.</h2>
           <div className="grid md:grid-cols-3 gap-8">
             {TESTIMONIALS.map((t) => (
               <div key={t.name} className="bg-[#faf8f5] border border-[#e8e0d4] p-8">
@@ -266,11 +266,11 @@ export default function LandingPage() {
             <div className="h-px w-8 bg-[#ffba20]" />
           </div>
           <h2 className="font-['Fraunces',_serif] text-5xl lg:text-6xl font-black text-[#faf8f5] leading-tight mb-6">
-            The pipeline is live.<br />
-            <span className="text-[#ffba20]">Are you?</span>
+            The advantage<br />
+            <span className="text-[#ffba20]">compounds.</span>
           </h2>
           <p className="text-[#8b7355] text-lg mb-10 max-w-xl mx-auto">
-            Signal Hunter OS is invite-only. Operators are vetted for deal focus, capital access, and execution velocity.
+            Signal Hunter OS is invite-only. Access is granted to operators with a defined deal thesis, verified capital access, and a bias toward execution over deliberation.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
