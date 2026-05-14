@@ -32,6 +32,45 @@ export async function getDb() {
   return _db;
 }
 
+// ─── Numeric coercion ───────────────────────────────────────────────────────
+// MySQL2 returns float/decimal/bigint columns as strings in certain query paths.
+// This utility normalises a row's numeric fields to JS numbers at the data layer
+// so callers never need to sprinkle Number() casts across the UI.
+const NUMERIC_FIELDS = new Set([
+  // deals
+  "revenue", "cashFlow", "askingPrice", "multiple", "score", "redFlagCount", "employees",
+  // signals
+  "ownerDistressScore", "killProbability", "dscr", "sbaLoanAmount",
+  // commercial assets
+  "capRate", "noi", "sqft", "aiScore",
+  "eventRevenueLow", "eventRevenueHigh", "eventProximityMiles",
+  // macro signals + opportunity radar
+  "confidenceScore", "estimatedROI", "capitalRequired", "urgencyScore", "estimatedHoldYears",
+  // consensus scores
+  "consensusScore", "divergenceScore",
+  // scan jobs
+  "listingsFound", "listingsQualified", "progressPct", "dealsScored",
+  // insurance prospects
+  "prospectScore",
+  // share tokens
+  "viewCount", "expiresAt",
+]);
+
+function coerceRow<T extends Record<string, unknown>>(row: T): T {
+  const out = { ...row };
+  for (const key of Object.keys(out)) {
+    if (NUMERIC_FIELDS.has(key) && out[key] !== null && out[key] !== undefined) {
+      const n = Number(out[key]);
+      if (!isNaN(n)) (out as Record<string, unknown>)[key] = n;
+    }
+  }
+  return out;
+}
+
+function coerceRows<T extends Record<string, unknown>>(rows: T[]): T[] {
+  return rows.map(coerceRow);
+}
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
@@ -96,14 +135,14 @@ export async function getDeals(opts?: { limit?: number; offset?: number }) {
       seen.set(key, deal);
     }
   }
-  return Array.from(seen.values()).slice(0, opts?.limit ?? 50);
+  return coerceRows(Array.from(seen.values()).slice(0, opts?.limit ?? 50));
 }
 
 export async function getDealById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(deals).where(eq(deals.id, id)).limit(1);
-  return result[0];
+  return result[0] ? coerceRow(result[0]) : undefined;
 }
 
 export async function createDeal(data: InsertDeal) {
@@ -165,7 +204,7 @@ export async function getSignalByDealId(dealId: number) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(signals).where(eq(signals.dealId, dealId)).limit(1);
-  return result[0];
+  return result[0] ? coerceRow(result[0]) : undefined;
 }
 
 export async function upsertSignal(data: InsertSignal) {
@@ -321,14 +360,14 @@ export async function getCommercialAssets(opts?: { limit?: number; offset?: numb
     .orderBy(desc(commercialAssets.createdAt))
     .limit(opts?.limit ?? 50)
     .offset(opts?.offset ?? 0);
-  return await query;
+  return coerceRows(await query);
 }
 
 export async function getCommercialAssetById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(commercialAssets).where(eq(commercialAssets.id, id)).limit(1);
-  return result[0];
+  return result[0] ? coerceRow(result[0]) : undefined;
 }
 
 export async function createCommercialAsset(data: InsertCommercialAsset) {
@@ -358,9 +397,10 @@ import { macroSignals, type InsertMacroSignal } from "../drizzle/schema";
 export async function getMacroSignals(limit = 20) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(macroSignals)
+  const macroRows = await db.select().from(macroSignals)
     .orderBy(desc(macroSignals.createdAt))
     .limit(limit);
+  return coerceRows(macroRows);
 }
 
 export async function insertMacroSignal(data: Omit<InsertMacroSignal, "id">) {
@@ -470,10 +510,11 @@ export async function archiveSignalById(id: number): Promise<void> {
 export async function getMacroSignalsActive(limit = 20) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(macroSignals)
+  const activeMacroRows = await db.select().from(macroSignals)
     .where(eq(macroSignals.archived, false))
     .orderBy(desc(macroSignals.confidenceScore))
     .limit(limit);
+  return coerceRows(activeMacroRows);
 }
 
 // ─── Deal Share Tokens ────────────────────────────────────────────────────────
@@ -492,7 +533,7 @@ export async function getDealShareToken(token: string) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(dealShareTokens).where(eq(dealShareTokens.token, token)).limit(1);
-  return result[0];
+  return result[0] ? coerceRow(result[0]) : undefined;
 }
 
 export async function incrementShareTokenViewCount(token: string): Promise<void> {

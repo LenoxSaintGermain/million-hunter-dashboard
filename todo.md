@@ -787,3 +787,12 @@
 - [x] Rewrite OperatorIdentity.tsx — replaced all hardcoded dark hex colors with CSS design tokens; switched DashboardLayout → EditorialTopNav
 - [x] Both pages now match the app's light cream/parchment aesthetic (same as Command Center, AdminPanel, Scan)
 - [x] 0 TypeScript errors, 96/96 tests passing, save checkpoint
+
+## Sprint 43 — Global String-to-Number Audit
+- [x] Scan all client pages for .toFixed(), division, and numeric comparison on DB-sourced fields
+- [x] Added coerceRow()/coerceRows() utility to server/db.ts — normalizes 20+ numeric fields at the data layer
+- [x] Applied coercion to getDeals, getDealById, getSignalByDealId, getCommercialAssets, getCommercialAssetById, getMacroSignals, getMacroSignalsActive, getDealShareToken
+- [x] Fixed inline opportunityRadar.list query in routers.ts (urgencyScore, estimatedROI, capitalRequired, estimatedHoldYears)
+- [x] Fixed inline getConsensusScore query in routers.ts (consensusScore, divergenceScore)
+- [x] Pre-emptively coerced InvestorScout capRate, askingPrice, noi, sqft with Number() as defense-in-depth
+- [x] 0 TypeScript errors, 96/96 tests passing, save checkpoint

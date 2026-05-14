@@ -965,7 +965,14 @@ Return JSON:
       if (!db) return [];
       const { opportunityRadar } = await import("../drizzle/schema");
       const { desc, eq } = await import("drizzle-orm");
-      return db.select().from(opportunityRadar).where(eq(opportunityRadar.isActive, true)).orderBy(desc(opportunityRadar.urgencyScore)).limit(30);
+      const radarRows = await db.select().from(opportunityRadar).where(eq(opportunityRadar.isActive, true)).orderBy(desc(opportunityRadar.urgencyScore)).limit(30);
+      return radarRows.map((r: any) => ({
+        ...r,
+        urgencyScore: r.urgencyScore != null ? Number(r.urgencyScore) : r.urgencyScore,
+        estimatedROI: r.estimatedROI != null ? Number(r.estimatedROI) : r.estimatedROI,
+        capitalRequired: r.capitalRequired != null ? Number(r.capitalRequired) : r.capitalRequired,
+        estimatedHoldYears: r.estimatedHoldYears != null ? Number(r.estimatedHoldYears) : r.estimatedHoldYears,
+      }));
     }),
 
     scan: protectedProcedure
@@ -1273,7 +1280,13 @@ Generate a JSON dossier:
           .where(eq(consensusScores.dealId, input.dealId))
           .orderBy(desc(consensusScores.createdAt))
           .limit(1);
-        return rows[0] ?? null;
+        if (!rows[0]) return null;
+        const r = rows[0];
+        return {
+          ...r,
+          consensusScore: r.consensusScore != null ? Number(r.consensusScore) : r.consensusScore,
+          divergenceScore: r.divergenceScore != null ? Number(r.divergenceScore) : r.divergenceScore,
+        };
       }),
 
     // Get trajectory steps for a deal
