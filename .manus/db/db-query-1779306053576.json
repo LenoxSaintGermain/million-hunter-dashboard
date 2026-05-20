@@ -1,0 +1,38 @@
+{
+  "query": "SELECT id, title, signal_type, archived, created_at FROM macro_signals WHERE title LIKE '%Sprint%' OR title LIKE '%Test%' OR title LIKE '%sprint%' OR title LIKE '%test%' ORDER BY created_at DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT id, title, signal_type, archived, created_at FROM macro_signals WHERE title LIKE '%Sprint%' OR title LIKE '%Test%' OR title LIKE '%sprint%' OR title LIKE '%test%' ORDER BY created_at DESC;",
+  "rows": [
+    {
+      "id": "1410001",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "archived": "0",
+      "created_at": "1778596490335"
+    },
+    {
+      "id": "1380003",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "archived": "0",
+      "created_at": "1778595058498"
+    },
+    {
+      "id": "1350001",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "archived": "0",
+      "created_at": "1778590310813"
+    },
+    {
+      "id": "1320003",
+      "title": "Sprint6 Test Signal",
+      "signal_type": "event",
+      "archived": "0",
+      "created_at": "1778589715220"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tsignal_type\tarchived\tcreated_at\n1410001\tSprint6 Test Signal\tevent\t0\t1778596490335\n1380003\tSprint6 Test Signal\tevent\t0\t1778595058498\n1350001\tSprint6 Test Signal\tevent\t0\t1778590310813\n1320003\tSprint6 Test Signal\tevent\t0\t1778589715220\n",
+  "stderr": "",
+  "execution_time_ms": 266
+}

@@ -1,0 +1,162 @@
+{
+  "query": "DESCRIBE macro_signals;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute DESCRIBE macro_signals;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "signal_type",
+      "Type": "enum('institutional','government','seasonal','event','macro_momentum')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "title",
+      "Type": "varchar(255)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "summary",
+      "Type": "text",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "rory_pitch",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "impacted_asset_classes",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "recommended_action",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "confidence_score",
+      "Type": "decimal(4,3)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "source_url",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "expires_at",
+      "Type": "bigint",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "created_at",
+      "Type": "bigint",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "archived",
+      "Type": "tinyint(1)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "direction",
+      "Type": "enum('tailwind','headwind')",
+      "Null": "YES",
+      "Key": "",
+      "Default": "tailwind",
+      "Extra": ""
+    },
+    {
+      "Field": "magnitude",
+      "Type": "tinyint",
+      "Null": "YES",
+      "Key": "",
+      "Default": "5",
+      "Extra": ""
+    },
+    {
+      "Field": "time_horizon_months",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "12",
+      "Extra": ""
+    },
+    {
+      "Field": "affected_naics",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "affected_geography",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "active_from",
+      "Type": "bigint",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "active_to",
+      "Type": "bigint",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\nsignal_type\tenum('institutional','government','seasonal','event','macro_momentum')\tNO\t\tNULL\t\ntitle\tvarchar(255)\tNO\t\tNULL\t\nsummary\ttext\tNO\t\tNULL\t\nrory_pitch\ttext\tYES\t\tNULL\t\nimpacted_asset_classes\tjson\tYES\t\tNULL\t\nrecommended_action\ttext\tYES\t\tNULL\t\nconfidence_score\tdecimal(4,3)\tYES\t\tNULL\t\nsource_url\ttext\tYES\t\tNULL\t\nexpires_at\tbigint\tYES\t\tNULL\t\ncreated_at\tbigint\tNO\t\tNULL\t\narchived\ttinyint(1)\tNO\t\t0\t\ndirection\tenum('tailwind','headwind')\tYES\t\ttailwind\t\nmagnitude\ttinyint\tYES\t\t5\t\ntime_horizon_months\tint\tYES\t\t12\t\naffected_naics\tjson\tYES\t\tNULL\t\naffected_geography\tjson\tYES\t\tNULL\t\nactive_from\tbigint\tYES\t\tNULL\t\nactive_to\tbigint\tYES\t\tNULL\t\n",
+  "stderr": "",
+  "execution_time_ms": 392
+}

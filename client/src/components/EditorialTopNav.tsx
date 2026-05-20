@@ -36,6 +36,8 @@ import {
   Building2,
   BarChart3,
   Target,
+  Users,
+  ShieldCheck,
 } from "lucide-react";
 
 /* ── Nav items ─────────────────────────────────────────────────────────────── */
@@ -91,6 +93,8 @@ function NavLink({
 export default function EditorialTopNav({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
+  const userRole = (user as any)?.role as string | undefined;
+  const isAdmin = userRole === "admin";
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   /* Scroll detection for header blur */
@@ -227,6 +231,14 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                     </p>
                   </div>
                   <DropdownMenuItem asChild>
+                    <Link href="/profile">
+                      <span className="flex items-center gap-2 text-[13px] text-[var(--sh-fg-2)] cursor-pointer w-full">
+                        <User className="w-3.5 h-3.5" />
+                        Operator Identity
+                      </span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/settings">
                       <span className="flex items-center gap-2 text-[13px] text-[var(--sh-fg-2)] cursor-pointer w-full">
                         <Settings className="w-3.5 h-3.5" />
@@ -234,6 +246,30 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                       </span>
                     </Link>
                   </DropdownMenuItem>
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator className="bg-[var(--rule)]" />
+                      <div className="px-3 py-1">
+                        <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium">Admin</p>
+                      </div>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin">
+                          <span className="flex items-center gap-2 text-[13px] text-[var(--sh-fg-2)] cursor-pointer w-full">
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            Admin Panel
+                          </span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/operator-registry">
+                          <span className="flex items-center gap-2 text-[13px] text-[var(--sh-fg-2)] cursor-pointer w-full">
+                            <Users className="w-3.5 h-3.5" />
+                            Operator Registry
+                          </span>
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator className="bg-[var(--rule)]" />
                   <DropdownMenuItem
                     onClick={() => logout()}
