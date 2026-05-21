@@ -322,7 +322,7 @@ export default function ICReview() {
                     <p>
                       The deal {score != null && score >= 0.7 ? "meets" : "partially meets"} our acquisition criteria
                       with a composite SCORER rating of <strong>{score?.toFixed(3) ?? "—"}</strong>.
-                      {dscr != null ? ` Estimated DSCR of ${dscr.toFixed(2)}x ${dscr >= 1.25 ? "satisfies" : "falls below"} SBA 7(a) threshold.` : ""}
+                      {dscr != null ? ` Estimated DSCR of ${dscr.toFixed(2)}x ${dscr >= 1.25 ? "satisfies" : "falls below"} SBA 7(a) threshold (1.15x PLP minimum, 1.25x standard).` : ""}
                     </p>
                   </div>
                 )}
@@ -375,7 +375,7 @@ export default function ICReview() {
           {activeSection === "financials" && (
             <motion.div {...fadeUp} className="space-y-6">
               <GutterNote type="insight">
-                Financial ratios benchmarked against SBA 7(a) underwriting standards. DSCR threshold: 1.25x.
+                Financial ratios benchmarked against SBA 7(a) underwriting standards. DSCR threshold: 1.15x (PLP lenders), 1.25x (standard lenders).
               </GutterNote>
               <h2 className="text-lg font-semibold text-[#1a1208]" style={{ fontFamily: "var(--font-display, 'Fraunces', serif)" }}>
                 Financial Summary
@@ -395,8 +395,8 @@ export default function ICReview() {
                       { metric: "Revenue", value: fmt(deal.revenue), benchmark: "> $1M", pass: toNum(deal.revenue) != null && toNum(deal.revenue)! >= 1_000_000 },
                       { metric: "Cash Flow (SDE)", value: fmt(deal.cashFlow), benchmark: "> $200k", pass: toNum(deal.cashFlow) != null && toNum(deal.cashFlow)! >= 200_000 },
                       { metric: "EBITDA Multiple", value: multiple != null ? `${multiple.toFixed(1)}x` : "—", benchmark: "< 5x", pass: multiple != null && multiple < 5 },
-                      { metric: "Est. DSCR", value: dscr != null ? dscr.toFixed(2) + "x" : "—", benchmark: "≥ 1.25x", pass: dscr != null && dscr >= 1.25 },
-                      { metric: "Asking Price", value: fmt(deal.askingPrice), benchmark: "< $5M", pass: toNum(deal.askingPrice) != null && toNum(deal.askingPrice)! < 5_000_000 },
+                      { metric: "Est. DSCR", value: dscr != null ? dscr.toFixed(2) + "x" : "—", benchmark: "≥ 1.15x (PLP)", pass: dscr != null && dscr >= 1.15 },
+                      { metric: "Asking Price", value: fmt(deal.askingPrice), benchmark: "≤ $10M (7(a)+504 combined)", pass: toNum(deal.askingPrice) != null && toNum(deal.askingPrice)! <= 10_000_000 },
                       { metric: "Employees", value: deal.employees ? String(deal.employees) : "—", benchmark: "< 50", pass: deal.employees != null && deal.employees < 50 },
                     ].map(({ metric, value, benchmark, pass }) => (
                       <tr key={metric} className="hover:bg-[#faf7f2] transition-colors">

@@ -1617,7 +1617,7 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         if (dealId) {
           try {
             // Derive SBA eligibility seed: commercial RE deals under $5M asking are typically SBA 504 eligible
-            const sbaEligibleSeed = askingPrice > 0 && askingPrice <= 5_000_000;
+            const sbaEligibleSeed = askingPrice > 0 && askingPrice <= 10_000_000;
             // Rough DSCR estimate from NOI / estimated annual debt service (6% on 90% LTV, 25yr)
             let dscrSeed: number | undefined;
             if (asset.noi && askingPrice > 0) {

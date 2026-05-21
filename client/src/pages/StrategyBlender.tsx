@@ -331,10 +331,10 @@ export default function StrategyBlender() {
                   <div className="pt-2 border-t border-[var(--rule)]">
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-muted-foreground">DSCR</span>
-                      <span className={cn("text-sm font-bold", analysis.dscr >= 1.25 ? "text-[var(--sage)]" : analysis.dscr >= 1.0 ? "text-[var(--amber)]" : "text-rose-400")}>
+                      <span className={cn("text-sm font-bold", analysis.dscr >= 1.25 ? "text-[var(--sage)]" : analysis.dscr >= 1.15 ? "text-[var(--amber)]" : "text-rose-400")}>
                         {analysis.dscr.toFixed(2)}x
                         <span className="text-xs font-normal ml-1 text-muted-foreground">
-                          {analysis.dscr >= 1.25 ? "✓ SBA Ready" : analysis.dscr >= 1.0 ? "Borderline" : "Below Min"}
+                          {analysis.dscr >= 1.25 ? "✓ SBA Ready" : analysis.dscr >= 1.15 ? "PLP Eligible" : "Below Min"}
                         </span>
                       </span>
                     </div>

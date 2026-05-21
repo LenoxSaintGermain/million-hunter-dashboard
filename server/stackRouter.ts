@@ -57,6 +57,11 @@ const DEFAULT_LAYERS: Record<string, Array<{
     { layer_order: 3, layer_type: "seller_note", label: "Seller Note", pct_of_total: 10, interest_rate: 5.5, term_months: 60, lender: "Seller", notes: "Subordinated. Deferred 12 months." },
     { layer_order: 4, layer_type: "equity", label: "Buyer Equity Injection", pct_of_total: 2, interest_rate: 0, term_months: 0, lender: "Buyer", notes: "Near-zero equity after REAP grant application." },
   ],
+  sba_7a_504_combined: [
+    { layer_order: 1, layer_type: "sba_7a", label: "SBA 7(a) — Business Acquisition", pct_of_total: 50, interest_rate: 11.5, term_months: 120, lender: "SBA-Approved Lender (PLP)", notes: "Up to $5M. Prime + 2.75%. 10-year term. Covers goodwill, working capital, and business assets. Effective July 4 2026 combined cap: $10M." },
+    { layer_order: 2, layer_type: "sba_504", label: "SBA 504 — Real Estate / Equipment", pct_of_total: 40, interest_rate: 6.5, term_months: 240, lender: "Certified Development Company (CDC)", notes: "Up to $5M additional. 20-year fixed rate. Covers real estate or major equipment. Combined with 7(a) enables $10M total SBA financing." },
+    { layer_order: 3, layer_type: "seller_note", label: "Seller Standby Note", pct_of_total: 10, interest_rate: 5.0, term_months: 60, lender: "Seller", notes: "Counts toward 10% equity injection per new SBA guidance. Enables 0% buyer cash-out-of-pocket. Standby for 24 months post-close." },
+  ],
 };
 
 // ─── Router ───────────────────────────────────────────────────────────────────

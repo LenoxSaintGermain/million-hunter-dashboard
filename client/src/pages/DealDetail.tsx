@@ -561,7 +561,7 @@ export default function DealDetail() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">DSCR</span>
                     <span className={cn("text-xs font-mono font-bold",
-                      (toNum(signal.dscr) ?? 0) >= 1.25 ? "text-emerald-500" : "text-destructive"
+                      (toNum(signal.dscr) ?? 0) >= 1.15 ? "text-emerald-500" : "text-destructive"
                     )}>{toNum(signal.dscr)?.toFixed(2) ?? "—"}</span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -666,9 +666,9 @@ export default function DealDetail() {
                     <div className="bg-muted/30 rounded-xl p-4 border border-border/50">
                       <p className="text-xs text-muted-foreground mb-1">DSCR</p>
                       <p className={cn("text-2xl font-bold font-mono",
-                        (toNum(signal.dscr) ?? 0) >= 1.25 ? "text-emerald-500" : "text-destructive"
+                        (toNum(signal.dscr) ?? 0) >= 1.15 ? "text-emerald-500" : "text-destructive"
                       )}>{toNum(signal.dscr)?.toFixed(2) ?? "—"}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Min 1.25 for SBA approval</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Min 1.15x (PLP lenders), 1.25x standard</p>
                     </div>
                     <div className="bg-muted/30 rounded-xl p-4 border border-border/50">
                       <p className="text-xs text-muted-foreground mb-1">Cash-on-Cash Return</p>

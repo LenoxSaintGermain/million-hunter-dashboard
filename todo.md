@@ -796,3 +796,19 @@
 - [x] Fixed inline getConsensusScore query in routers.ts (consensusScore, divergenceScore)
 - [x] Pre-emptively coerced InvestorScout capRate, askingPrice, noi, sqft with Number() as defense-in-depth
 - [x] 0 TypeScript errors, 96/96 tests passing, save checkpoint
+
+## Sprint 44 — SBA Rule Update (Effective July 4, 2026)
+- [x] gemini.ts: Updated capital stack prompt — SBA 7(a) max $5M per program, combined 7(a)+504 = $10M total; 504 stacking guidance for $5M–$10M deals with real estate/equipment
+- [x] gemini.ts: Added seller note standby note language (counts toward 10% equity injection, 0% out-of-pocket)
+- [x] gemini.ts: Updated fallback sbaEligible threshold $5.5M → $10.5M
+- [x] gemini.ts: Updated fallback sbaAmount cap Math.min(5000000) → Math.min(10000000)
+- [x] gemini.ts: Lowered DSCR kill floor from 1.25 → 1.15 (PLP minimum); 1.25 flagged as standard lender risk
+- [x] stackRouter.ts: Added sba_7a_504_combined DEFAULT_LAYERS template (7(a) 50% + 504 40% + Seller Standby 10%)
+- [x] ICReview.tsx: Updated benchmark "< $5M" → "≤ $10M (7(a)+504 combined)"; pass threshold updated to $10M
+- [x] ICReview.tsx: Updated DSCR benchmark "1.25x" → "≥ 1.15x (PLP)"; pass threshold updated to 1.15
+- [x] DealDetail.tsx: Updated DSCR label "Min 1.25 for SBA approval" → "Min 1.15x (PLP lenders), 1.25x standard"
+- [x] DealDetail.tsx: Updated DSCR color threshold from 1.25 → 1.15
+- [x] StrategyBlender.tsx: Updated DSCR color bands — 1.25+ green, 1.15–1.25 amber (PLP Eligible), <1.15 red
+- [x] DealShare.tsx: Updated DSCR threshold from 1.25 → 1.15
+- [x] routers.ts: Updated sbaEligibleSeed cap $5M → $10M
+- [x] 0 TypeScript errors, 96/96 tests passing, save checkpoint

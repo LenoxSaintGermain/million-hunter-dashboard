@@ -219,12 +219,17 @@ Annual Revenue: $${revenue.toLocaleString()}
 Multiple: ${deal.multiple ?? (askingPrice / (cashFlow || 1)).toFixed(2)}x
 Industry: ${deal.industry ?? "Unknown"}
 
-SBA 7(a) rules: max $5M loan, 10% down minimum, 10-year term at ~7.5% interest.
+SBA rules (effective July 4, 2026 — NEW): Combined SBA 7(a) + 504 cap is now $10M total (up from $5M).
+- SBA 7(a): up to $5M, general business acquisition, 10-year term at ~7.5% interest, 10% down minimum.
+- SBA 504: up to $5M additional, for fixed assets (real estate, equipment), 20-year term at ~6.5% fixed.
+- Combined 7(a)+504 stack: use when asking price is $5M-$10M and deal includes real estate or equipment.
+- Seller financing can count toward the 10% equity injection (standby note), enabling 0% out-of-pocket.
+- DSCR kill floor: 1.15x for Preferred Lender Program (PLP) banks; 1.25x for standard lenders.
 Seller note: typically 10-20% of purchase price, subordinated.
 Equity: remaining balance.
 
 Calculate DSCR = Annual Cash Flow / Annual Debt Service.
-Target DSCR >= 1.25.
+Target DSCR >= 1.15 (PLP minimum). Flag if below 1.25 as standard lender risk.
 
 Return JSON with:
 - sbaEligible: boolean
@@ -247,7 +252,7 @@ Return ONLY valid JSON.`;
     const parsed = JSON.parse(text);
     return {
       sbaEligible: parsed.sbaEligible ?? true,
-      sbaAmount: parsed.sbaAmount ?? Math.min(5000000, askingPrice * 0.8),
+      sbaAmount: parsed.sbaAmount ?? Math.min(10000000, askingPrice * 0.8),
       sellerNote: parsed.sellerNote ?? askingPrice * 0.1,
       equity: parsed.equity ?? askingPrice * 0.1,
       dscr: parsed.dscr ?? (cashFlow / (askingPrice * 0.09) || 1.0),
@@ -255,12 +260,12 @@ Return ONLY valid JSON.`;
       summary: parsed.summary ?? "Capital stack modeled.",
     };
   } catch {
-    const sbaAmount = Math.min(5000000, askingPrice * 0.8);
+    const sbaAmount = Math.min(10000000, askingPrice * 0.8);
     const sellerNote = askingPrice * 0.1;
     const equity = askingPrice - sbaAmount - sellerNote;
     const annualDebtService = sbaAmount * 0.09;
     return {
-      sbaEligible: askingPrice <= 5500000,
+      sbaEligible: askingPrice <= 10500000,
       sbaAmount,
       sellerNote,
       equity,

@@ -259,7 +259,7 @@ export default function DealShare() {
               {capital.dscr != null && (
                 <div>
                   <p className="text-xs text-white/40 mb-0.5">DSCR</p>
-                  <p className={cn("text-lg font-bold", (capital.dscr ?? 0) >= 1.25 ? "text-[var(--sage)]" : "text-[var(--amber)]")}>
+                  <p className={cn("text-lg font-bold", (capital.dscr ?? 0) >= 1.15 ? "text-[var(--sage)]" : "text-[var(--amber)]")}>
                     {capital.dscr.toFixed(2)}x
                   </p>
                 </div>
