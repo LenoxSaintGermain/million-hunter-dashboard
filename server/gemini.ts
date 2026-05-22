@@ -21,9 +21,9 @@ import type { Deal } from "../drizzle/schema";
 const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 // ─── Gemini model IDs ─────────────────────────────────────────────────────────
-const GEMINI_PRO    = "gemini-3.1-pro";
-const GEMINI_FLASH  = "gemini-3.1-flash";
-const GEMINI_LITE   = "gemini-3.1-flash";
+const GEMINI_PRO    = "gemini-3.1-pro-preview";
+const GEMINI_FLASH  = "gemini-3.1-flash-lite";
+const GEMINI_LITE   = "gemini-3.1-flash-lite";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface OwnerPsychologyResult {

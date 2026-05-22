@@ -499,7 +499,7 @@ export const appRouter = router({
             cashOnCashReturn: capital.cashOnCashReturn,
             capitalStackSummary: capital.summary,
           }),
-          modelVersions: { psychology: "claude-opus-4", digital: "claude-opus-4", redteam: "gemini-3.1-pro", capital: "gemini-3.1-flash" },
+          modelVersions: { psychology: "claude-opus-4", digital: "claude-opus-4", redteam: "gemini-3.1-pro-preview", capital: "gemini-3.1-flash-lite" },
         };
         await upsertSignal(signalData);
         await logActivity({
@@ -551,7 +551,7 @@ export const appRouter = router({
           investmentThesis: memo.investmentThesis,
           riskFactors: memo.riskFactors,
           aiOptimizationOpportunities: memo.aiOptimizationOpportunities,
-          generatedBy: "gemini-3.1-pro",
+          generatedBy: "gemini-3.1-pro-preview",
           version: (existingMemo?.version ?? 0) + 1,
         });
         await logActivity({ dealId: input.dealId, type: "memo_generated", title: `Investment memo generated for ${deal.name}` });
@@ -704,9 +704,9 @@ export const appRouter = router({
         await upsertModelConfig(module as AnalysisModule, modelId, true);
       }
       // Reset consensus models to defaults
-      await upsertModelConfig("consensus_model_1" as AnalysisModule, "gemini-3.1-pro", true);
-      await upsertModelConfig("consensus_model_2" as AnalysisModule, "gemini-3.1-flash", true);
-      await upsertModelConfig("consensus_model_3" as AnalysisModule, "gemini-3.1-flash", true);
+      await upsertModelConfig("consensus_model_1" as AnalysisModule, "gemini-3.1-pro-preview", true);
+      await upsertModelConfig("consensus_model_2" as AnalysisModule, "gemini-3.1-flash-lite", true);
+      await upsertModelConfig("consensus_model_3" as AnalysisModule, "gemini-3.1-flash-lite", true);
       return { success: true };
     }),
 
@@ -714,9 +714,9 @@ export const appRouter = router({
     consensusConfig: publicProcedure.query(async () => {
       const saved = await getAllModelConfigs();
       const defaults = {
-        consensus_model_1: "gemini-3.1-pro",
-        consensus_model_2: "gemini-3.1-flash",
-        consensus_model_3: "gemini-3.1-flash",
+        consensus_model_1: "gemini-3.1-pro-preview",
+        consensus_model_2: "gemini-3.1-flash-lite",
+        consensus_model_3: "gemini-3.1-flash-lite",
       };
       const result: Record<string, string> = {};
       for (const [key, defaultModel] of Object.entries(defaults)) {
