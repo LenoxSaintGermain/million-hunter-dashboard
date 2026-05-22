@@ -812,3 +812,24 @@
 - [x] DealShare.tsx: Updated DSCR threshold from 1.25 → 1.15
 - [x] routers.ts: Updated sbaEligibleSeed cap $5M → $10M
 - [x] 0 TypeScript errors, 96/96 tests passing, save checkpoint
+
+## Sprint 45 — UAT Blocker Fixes (logged in previous session)
+- [x] Purge all Sprint8 test users from DB
+- [x] Unblock CLIPIT + Jimmy Butler: set onboarding_completed=1, seed investor_dna records
+- [x] InvestorOnboarding.tsx: saveDna.onSuccess now calls markOnboardingComplete + invalidates dnaStatus cache
+- [x] OnboardingGuard: tightened guard condition to strict === false check
+- [x] OperatorRegistry: fix Last Active timestamps (MySQL UTC string parsed with 'Z' suffix)
+- [x] 96/96 tests passing, 0 TS errors, save checkpoint
+
+## Sprint 46 — Gemini API Fix (logged in previous session)
+- [x] Replace suspended Gemini API key with valid key
+- [x] Update model names: gemini-3.1-pro-preview + gemini-3.1-flash-lite
+- [x] 96/96 tests passing, 0 TS errors, save checkpoint
+
+## Sprint 47 — Investor Onboarding Redirect Loop Fix
+- [x] Root cause: OnboardingGuard had staleTime: Infinity on dnaStatus query — cache invalidation after quiz completion did not trigger a refetch
+- [x] Fix 1: Changed staleTime from Infinity → 0 on investor.getDnaStatus query in OnboardingGuard
+- [x] Fix 2: Added onboardingCompletedInDb bypass — reads authData.onboardingCompleted from auth.me; if true, skips redirect regardless of dnaStatus cache state
+- [x] Verified: auth.me returns full User row including onboardingCompleted boolean
+- [x] Verified: saveDna sets quizCompleted: true in investor_dna table (both insert and update paths)
+- [x] 0 TypeScript errors, 96/96 tests passing, save checkpoint

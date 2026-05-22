@@ -87,10 +87,11 @@ function OnboardingGuard() {
     staleTime: Infinity,
   });
 
-  // Investor DNA check
+  // Investor DNA check — staleTime intentionally NOT set to Infinity so cache invalidation
+  // after quiz completion triggers a fresh fetch and clears the onboarding redirect.
   const { data: dnaStatus } = trpc.investor.getDnaStatus.useQuery(undefined, {
     enabled: !!authData && userRole === "investor" && !isPublicPage,
-    staleTime: Infinity,
+    staleTime: 0,
   });
 
   useEffect(() => {
@@ -102,10 +103,17 @@ function OnboardingGuard() {
       return;
     }
 
-    // Investor DNA onboarding: if quiz not complete, redirect to onboarding
-    // Only redirect if BOTH dnaStatus.quizCompleted is false AND we have a definitive response
-    // This prevents re-trapping users whose cache is stale after completing the quiz
-    if (userRole === "investor" && dnaStatus !== undefined && dnaStatus.quizCompleted === false && location !== "/investor/onboarding") {
+    // Investor DNA onboarding: if quiz not complete, redirect to onboarding.
+    // Belt-and-suspenders: also check authData.onboardingCompleted as a bypass —
+    // if the DB record says complete, never redirect even if the dnaStatus cache is stale.
+    const onboardingCompletedInDb = !!(authData as any)?.onboardingCompleted;
+    if (
+      userRole === "investor" &&
+      !onboardingCompletedInDb &&
+      dnaStatus !== undefined &&
+      dnaStatus.quizCompleted === false &&
+      location !== "/investor/onboarding"
+    ) {
       navigate("/investor/onboarding");
       return;
     }
