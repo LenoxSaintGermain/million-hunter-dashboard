@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO investor_dna (user_id, time_horizon, risk_tolerance, liquidity_need, esg_conviction, sector_affinity, archetype_code, archetype_label, quiz_completed)\nVALUES \n  (6090006, 0.5, 0.5, 0.5, 0.5, '[]', 'ANCHOR-1', 'Steady Anchor', 1),\n  (690001, 0.5, 0.5, 0.5, 0.5, '[]', 'ANCHOR-1', 'Steady Anchor', 1)\nON DUPLICATE KEY UPDATE quiz_completed = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute INSERT INTO investor_dna (user_id, time_horizon, risk_tolerance, liquidity_need, esg_conviction, sector_affinity, archetype_code, archetype_label, quiz_completed)\nVALUES \n  (6090006, 0.5, 0.5, 0.5, 0.5, '[]', 'ANCHOR-1', 'Steady Anchor', 1),\n  (690001, 0.5, 0.5, 0.5, 0.5, '[]', 'ANCHOR-1', 'Steady Anchor', 1)\nON DUPLICATE KEY UPDATE quiz_completed = 1;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 338
+}

@@ -103,7 +103,9 @@ function OnboardingGuard() {
     }
 
     // Investor DNA onboarding: if quiz not complete, redirect to onboarding
-    if (userRole === "investor" && dnaStatus !== undefined && !dnaStatus.quizCompleted && location !== "/investor/onboarding") {
+    // Only redirect if BOTH dnaStatus.quizCompleted is false AND we have a definitive response
+    // This prevents re-trapping users whose cache is stale after completing the quiz
+    if (userRole === "investor" && dnaStatus !== undefined && dnaStatus.quizCompleted === false && location !== "/investor/onboarding") {
       navigate("/investor/onboarding");
       return;
     }

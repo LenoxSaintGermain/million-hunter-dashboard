@@ -132,8 +132,16 @@ export default function InvestorOnboarding() {
   const [quiz, setQuiz] = useState<QuizState>(INITIAL_STATE);
   const [archetype, setArchetype] = useState<{ code: string; label: string } | null>(null);
 
+  const utils = trpc.useUtils();
+  const markComplete = trpc.user.markOnboardingComplete.useMutation();
+
   const saveDna = trpc.investor.saveDna.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      // Mark onboarding complete in users table so the guard clears
+      await markComplete.mutateAsync();
+      // Invalidate the dnaStatus cache so OnboardingGuard re-fetches and stops redirecting
+      await utils.investor.getDnaStatus.invalidate();
+      await utils.user.onboardingStatus.invalidate();
       setArchetype({ code: data.archetypeCode, label: data.archetypeLabel });
       setStep(5); // Archetype reveal
     },

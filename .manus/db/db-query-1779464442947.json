@@ -1,0 +1,109 @@
+{
+  "query": "DESCRIBE investor_dna; SELECT * FROM investor_dna LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute DESCRIBE investor_dna; SELECT * FROM investor_dna LIMIT 5;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "user_id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "UNI",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "time_horizon",
+      "Type": "float",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0.5",
+      "Extra": ""
+    },
+    {
+      "Field": "risk_tolerance",
+      "Type": "float",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0.5",
+      "Extra": ""
+    },
+    {
+      "Field": "liquidity_need",
+      "Type": "float",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0.5",
+      "Extra": ""
+    },
+    {
+      "Field": "esg_conviction",
+      "Type": "float",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0.5",
+      "Extra": ""
+    },
+    {
+      "Field": "sector_affinity",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "archetype_code",
+      "Type": "varchar(32)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "archetype_label",
+      "Type": "varchar(128)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "quiz_completed",
+      "Type": "tinyint(1)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "created_at",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "updated_at",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    }
+  ],
+  "messages": [
+    "id\tuser_id\ttime_horizon\trisk_tolerance\tliquidity_need\tesg_conviction\tsector_affinity\tarchetype_code\tarchetype_label\tquiz_completed\tcreated_at\tupdated_at",
+    "1\t1\t0.82\t0.88\t0.22\t0.45\t[\"Commercial Services\", \"Logistics\", \"Healthcare Staffing\", \"B2B Services\", \"Government Contracts\"]\tALPHA-7\tAlpha Hunter\t1\t2026-04-27 04:33:50\t2026-04-27 04:33:50"
+  ],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\nuser_id\tint\tNO\tUNI\tNULL\t\ntime_horizon\tfloat\tNO\t\t0.5\t\nrisk_tolerance\tfloat\tNO\t\t0.5\t\nliquidity_need\tfloat\tNO\t\t0.5\t\nesg_conviction\tfloat\tNO\t\t0.5\t\nsector_affinity\tjson\tYES\t\tNULL\t\narchetype_code\tvarchar(32)\tYES\t\tNULL\t\narchetype_label\tvarchar(128)\tYES\t\tNULL\t\nquiz_completed\ttinyint(1)\tNO\t\t0\t\ncreated_at\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdated_at\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\nid\tuser_id\ttime_horizon\trisk_tolerance\tliquidity_need\tesg_conviction\tsector_affinity\tarchetype_code\tarchetype_label\tquiz_completed\tcreated_at\tupdated_at\n1\t1\t0.82\t0.88\t0.22\t0.45\t[\"Commercial Services\", \"Logistics\", \"Healthcare Staffing\", \"B2B Services\", \"Government Contracts\"]\tALPHA-7\tAlpha Hunter\t1\t2026-04-27 04:33:50\t2026-04-27 04:33:50\n",
+  "stderr": "",
+  "execution_time_ms": 262
+}

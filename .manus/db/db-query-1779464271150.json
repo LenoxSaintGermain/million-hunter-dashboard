@@ -1,0 +1,109 @@
+{
+  "query": "SELECT id, name, email, role, onboarding_completed, lastSignedIn, createdAt FROM users ORDER BY createdAt DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT id, name, email, role, onboarding_completed, lastSignedIn, createdAt FROM users ORDER BY createdAt DESC;",
+  "rows": [
+    {
+      "id": "7500001",
+      "name": "elbert clairmont",
+      "email": "malefic.treble@gmail.com",
+      "role": "investor",
+      "onboarding_completed": "1",
+      "lastSignedIn": "2026-05-22 15:37:32",
+      "createdAt": "2026-05-22 15:34:26"
+    },
+    {
+      "id": "7470015",
+      "name": "Jim Butler",
+      "email": "gws@conciergecareerservices.com",
+      "role": "user",
+      "onboarding_completed": "1",
+      "lastSignedIn": "2026-05-22 15:29:54",
+      "createdAt": "2026-05-22 15:29:22"
+    },
+    {
+      "id": "6090006",
+      "name": "CLIPIT",
+      "email": "kvng.gunner@gmail.com",
+      "role": "investor",
+      "onboarding_completed": "0",
+      "lastSignedIn": "2026-05-22 01:42:26",
+      "createdAt": "2026-05-12 13:34:08"
+    },
+    {
+      "id": "690004",
+      "name": "Trevor Travers",
+      "email": "trevortravers@gmail.com",
+      "role": "investor",
+      "onboarding_completed": "1",
+      "lastSignedIn": "2026-05-09 23:58:36",
+      "createdAt": "2026-03-27 14:43:33"
+    },
+    {
+      "id": "690001",
+      "name": "Jimmy Butler",
+      "email": "lifecalendarai@gmail.com",
+      "role": "investor",
+      "onboarding_completed": "0",
+      "lastSignedIn": "2026-05-22 15:28:28",
+      "createdAt": "2026-03-27 14:43:00"
+    },
+    {
+      "id": "630052",
+      "name": "Sprint8 Test User",
+      "email": "sprint8-1774572137791@test.com",
+      "role": "user",
+      "onboarding_completed": "1",
+      "lastSignedIn": "2026-03-27 00:42:17",
+      "createdAt": "2026-03-27 00:42:18"
+    },
+    {
+      "id": "630053",
+      "name": "Sprint8 Complete User",
+      "email": "sprint8c-1774572137823@test.com",
+      "role": "user",
+      "onboarding_completed": "0",
+      "lastSignedIn": "2026-03-27 00:42:17",
+      "createdAt": "2026-03-27 00:42:18"
+    },
+    {
+      "id": "630049",
+      "name": "Sprint8 Test User",
+      "email": "sprint8-1774572128061@test.com",
+      "role": "user",
+      "onboarding_completed": "1",
+      "lastSignedIn": "2026-03-27 00:42:08",
+      "createdAt": "2026-03-27 00:42:08"
+    },
+    {
+      "id": "630050",
+      "name": "Sprint8 Complete User",
+      "email": "sprint8c-1774572128083@test.com",
+      "role": "user",
+      "onboarding_completed": "0",
+      "lastSignedIn": "2026-03-27 00:42:08",
+      "createdAt": "2026-03-27 00:42:08"
+    },
+    {
+      "id": "510005",
+      "name": "Lortir Pierre-Louis",
+      "email": "lortir27@gmail.com",
+      "role": "admin",
+      "onboarding_completed": "0",
+      "lastSignedIn": "2026-03-26 22:35:50",
+      "createdAt": "2026-03-26 22:34:08"
+    },
+    {
+      "id": "1",
+      "name": "Lenox Saint Germain",
+      "email": "treble.design@gmail.com",
+      "role": "admin",
+      "onboarding_completed": "1",
+      "lastSignedIn": "2026-05-22 15:37:25",
+      "createdAt": "2026-03-25 17:55:38"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\temail\trole\tonboarding_completed\tlastSignedIn\tcreatedAt\n7500001\telbert clairmont\tmalefic.treble@gmail.com\tinvestor\t1\t2026-05-22 15:37:32\t2026-05-22 15:34:26\n7470015\tJim Butler\tgws@conciergecareerservices.com\tuser\t1\t2026-05-22 15:29:54\t2026-05-22 15:29:22\n6090006\tCLIPIT\tkvng.gunner@gmail.com\tinvestor\t0\t2026-05-22 01:42:26\t2026-05-12 13:34:08\n690004\tTrevor Travers\ttrevortravers@gmail.com\tinvestor\t1\t2026-05-09 23:58:36\t2026-03-27 14:43:33\n690001\tJimmy Butler\tlifecalendarai@gmail.com\tinvestor\t0\t2026-05-22 15:28:28\t2026-03-27 14:43:00\n630052\tSprint8 Test User\tsprint8-1774572137791@test.com\tuser\t1\t2026-03-27 00:42:17\t2026-03-27 00:42:18\n630053\tSprint8 Complete User\tsprint8c-1774572137823@test.com\tuser\t0\t2026-03-27 00:42:17\t2026-03-27 00:42:18\n630049\tSprint8 Test User\tsprint8-1774572128061@test.com\tuser\t1\t2026-03-27 00:42:08\t2026-03-27 00:42:08\n630050\tSprint8 Complete User\tsprint8c-1774572128083@test.com\tuser\t0\t2026-03-27 00:42:08\t2026-03-27 00:42:08\n510005\tLortir Pierre-Louis\tlortir27@gmail.com\tadmin\t0\t2026-03-26 22:35:50\t2026-03-26 22:34:08\n1\tLenox Saint Germain\ttreble.design@gmail.com\tadmin\t1\t2026-05-22 15:37:25\t2026-03-25 17:55:38\n",
+  "stderr": "",
+  "execution_time_ms": 260
+}
