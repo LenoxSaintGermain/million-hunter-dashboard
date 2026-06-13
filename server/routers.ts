@@ -29,6 +29,7 @@ import { tideRouter } from "./tideRouter";
 import { insuranceRouter } from "./insuranceRouter";
 import { inviteRouter } from "./inviteRouter";
 import { stackRouter } from "./stackRouter";
+import { rippleRouter } from "./rippleRouter";
 import { agentRouter } from "./routers/agentRouter";
 
 export const appRouter = router({
@@ -2271,6 +2272,7 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
   // ─── Thesis Engine (STRATEGIST agent — Spec TSL-SCI-PROD-001-A1) ─────────────
   thesis: thesisRouter,
   tide: tideRouter,
+  ripple: rippleRouter,
   // ─── LOI Generation (GEMINI 3.1 FLASH — Agentic Drafting) ────────────────────
   loi: router({
     generate: protectedProcedure

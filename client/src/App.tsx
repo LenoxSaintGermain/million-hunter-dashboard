@@ -41,6 +41,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 import LandingPage from "./pages/LandingPage";
 import PublicSearch from "./pages/PublicSearch";
 import DemoScenario from "./pages/DemoScenario";
+import RippleEffect from "./pages/RippleEffect";
 import { getLoginUrl } from "./const";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
@@ -178,6 +179,7 @@ function Router() {
         <Route path="/tide">{() => <ProtectedRoute component={TIDEPage} />}</Route>
         <Route path="/insurance-prospector">{() => <ProtectedRoute component={InsuranceProspector} />}</Route>
         <Route path="/stack">{() => <ProtectedRoute component={CapitalStack} />}</Route>
+        <Route path="/ripple">{() => <ProtectedRoute component={RippleEffect} />}</Route>
         <Route path="/admin">{() => <ProtectedRoute component={AdminPanel} />}</Route>
         <Route path="/operator-registry">{() => <ProtectedRoute component={OperatorRegistry} />}</Route>
         <Route path="/profile">{() => <ProtectedRoute component={OperatorIdentity} />}</Route>

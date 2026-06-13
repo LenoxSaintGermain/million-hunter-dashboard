@@ -38,6 +38,7 @@ import {
   Target,
   Users,
   ShieldCheck,
+  Waves,
 } from "lucide-react";
 
 /* ── Nav items ─────────────────────────────────────────────────────────────── */
@@ -58,6 +59,7 @@ const MORE_NAV = [
   { label: "Capital Stack", href: "/stack", icon: BarChart3 },
   { label: "Investor Dossier", href: "/investor-dossier", icon: Building2 },
   { label: "Insurance Prospector", href: "/insurance-prospector", icon: Shield },
+  { label: "RippleEffect", href: "/ripple", icon: Waves },
 ];
 
 /* ── NavLink ────────────────────────────────────────────────────────────────── */

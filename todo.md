@@ -833,3 +833,13 @@
 - [x] Verified: auth.me returns full User row including onboardingCompleted boolean
 - [x] Verified: saveDna sets quizCompleted: true in investor_dna table (both insert and update paths)
 - [x] 0 TypeScript errors, 96/96 tests passing, save checkpoint
+
+## Sprint 48 — RippleEffect Scanner
+- [x] Add ripple_signals table (auto-created via ensureTable() in rippleRouter.ts — no schema migration needed)
+- [x] Add rippleEffect tRPC router: scan, escalate, list, getById, dismiss
+- [x] scan: executes 8 surgical query templates via Perplexity Sonar, keyword-scores results, no LLM until escalation
+- [x] escalate: calls Gemini Flash with structured gap-analysis prompt, returns JSON plays
+- [x] Build RippleEffect.tsx page — signal queue, confidence bars, anchor type filters, escalate button, gap analysis drawer
+- [x] Gap analysis drawer: EV/food/lodging/housing gap cards, 2-3 Main Street plays with capital stack sketch
+- [x] Wire /ripple route in App.tsx, add Waves icon + RippleEffect to EditorialTopNav MORE_NAV
+- [x] 96/96 tests passing, 0 TS errors, save checkpoint
