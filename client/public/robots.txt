@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /investor/
+Disallow: /admin/
+Disallow: /settings/
+Disallow: /deal/
+Disallow: /ic-review/
+Disallow: /behavioral/
+
+Sitemap: https://wealth-signals.manus.space/sitemap.xml
