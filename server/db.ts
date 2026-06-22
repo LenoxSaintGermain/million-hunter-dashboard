@@ -398,6 +398,7 @@ export async function getMacroSignals(limit = 20) {
   const db = await getDb();
   if (!db) return [];
   const macroRows = await db.select().from(macroSignals)
+    .where(eq(macroSignals.archived, false))
     .orderBy(desc(macroSignals.createdAt))
     .limit(limit);
   return coerceRows(macroRows);
@@ -412,8 +413,14 @@ export async function insertMacroSignal(data: Omit<InsertMacroSignal, "id">) {
 export async function seedMacroSignals() {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const existing = await db.select().from(macroSignals).limit(1);
+  // Only count non-archived rows — if all seeds were deleted/archived, do not re-seed
+  const existing = await db.select().from(macroSignals)
+    .where(eq(macroSignals.archived, false))
+    .limit(1);
   if (existing.length > 0) return { seeded: false, message: "Already seeded" };
+  // Also check if any rows exist at all (including archived) — never re-seed if data was intentionally cleared
+  const anyRow = await db.select({ id: macroSignals.id }).from(macroSignals).limit(1);
+  if (anyRow.length > 0) return { seeded: false, message: "Signals exist (some archived) — use AI Refresh to add new signals" };
 
   const now = Date.now();
   const seeds: Omit<InsertMacroSignal, "id">[] = [
