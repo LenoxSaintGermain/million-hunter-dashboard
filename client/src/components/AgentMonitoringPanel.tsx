@@ -9,41 +9,53 @@
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import {
+  Vote,
+  Brain,
+  ShieldAlert,
+  Landmark,
+  Zap,
+  ChevronDown,
+  AlertTriangle,
+  CheckCircle2,
+  Play,
+  Bot,
+  Loader2,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 type AnalysisType = "consensus" | "behavioral" | "redteam" | "capital_stack" | "digital_alpha";
 
-const ANALYSIS_TYPES: { id: AnalysisType; label: string; icon: string; description: string }[] = [
-  { id: "consensus", label: "IC Consensus", icon: "how_to_vote", description: "3-model investment committee vote" },
-  { id: "behavioral", label: "Owner Profile", icon: "psychology", description: "Negotiation playbook & psychology" },
-  { id: "redteam", label: "Red Team", icon: "security", description: "Devil's advocate risk analysis" },
-  { id: "capital_stack", label: "Capital Stack", icon: "account_balance", description: "SBA structure optimization" },
-  { id: "digital_alpha", label: "Digital Alpha", icon: "bolt", description: "AI leverage & tech audit" },
+const ANALYSIS_TYPES: { id: AnalysisType; label: string; icon: LucideIcon; description: string }[] = [
+  { id: "consensus",     label: "IC Consensus",  icon: Vote,        description: "3-model investment committee vote" },
+  { id: "behavioral",    label: "Owner Profile",  icon: Brain,       description: "Negotiation playbook & psychology" },
+  { id: "redteam",       label: "Red Team",       icon: ShieldAlert, description: "Devil's advocate risk analysis" },
+  { id: "capital_stack", label: "Capital Stack",  icon: Landmark,    description: "SBA structure optimization" },
+  { id: "digital_alpha", label: "Digital Alpha",  icon: Zap,         description: "AI leverage & tech audit" },
 ];
 
 const MODEL_LABELS = [
   { key: "claudeOutput", label: "Claude", color: "text-amber-600" },
   { key: "geminiOutput", label: "Gemini", color: "text-blue-600" },
-  { key: "sonarOutput", label: "Sonar", color: "text-purple-600" },
+  { key: "sonarOutput",  label: "Sonar",  color: "text-purple-600" },
 ];
 
 function VerdictBadge({ verdict }: { verdict?: string }) {
   if (!verdict) return null;
   const map: Record<string, string> = {
-    GO: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    HOLD: "bg-amber-50 text-amber-700 border-amber-200",
-    PASS: "bg-red-50 text-red-700 border-red-200",
-    BANKABLE: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    CONDITIONAL: "bg-amber-50 text-amber-700 border-amber-200",
-    UNBANKABLE: "bg-red-50 text-red-700 border-red-200",
-    HIGH_ALPHA: "bg-blue-50 text-blue-700 border-blue-200",
-    MODERATE_ALPHA: "bg-sky-50 text-sky-700 border-sky-200",
-    LOW_ALPHA: "bg-slate-50 text-slate-600 border-slate-200",
-    ANALYZED: "bg-violet-50 text-violet-700 border-violet-200",
+    GO:            "bg-emerald-50 text-emerald-700 border-emerald-200",
+    HOLD:          "bg-amber-50 text-amber-700 border-amber-200",
+    PASS:          "bg-red-50 text-red-700 border-red-200",
+    BANKABLE:      "bg-emerald-50 text-emerald-700 border-emerald-200",
+    CONDITIONAL:   "bg-amber-50 text-amber-700 border-amber-200",
+    UNBANKABLE:    "bg-red-50 text-red-700 border-red-200",
+    HIGH_ALPHA:    "bg-blue-50 text-blue-700 border-blue-200",
+    MODERATE_ALPHA:"bg-sky-50 text-sky-700 border-sky-200",
+    LOW_ALPHA:     "bg-slate-50 text-slate-600 border-slate-200",
+    ANALYZED:      "bg-violet-50 text-violet-700 border-violet-200",
   };
   return (
     <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border", map[verdict] ?? "bg-slate-50 text-slate-600 border-slate-200")}>
@@ -54,11 +66,14 @@ function VerdictBadge({ verdict }: { verdict?: string }) {
 
 function RunCard({ run, isActive }: { run: any; isActive: boolean }) {
   const [expanded, setExpanded] = useState(false);
-  const consensus = run.consensus as any;
+  const consensus  = run.consensus as any;
   const behavioral = run.behavioralProfile as any;
-  const redTeam = run.redTeamAnalysis as any;
-  const digital = run.digitalAlpha as any;
-  const claude = run.claudeOutput as any;
+  const redTeam    = run.redTeamAnalysis as any;
+  const digital    = run.digitalAlpha as any;
+  const claude     = run.claudeOutput as any;
+
+  const typeConfig = ANALYSIS_TYPES.find(t => t.id === run.analysisType);
+  const Icon = typeConfig?.icon ?? Bot;
 
   return (
     <motion.div
@@ -75,12 +90,10 @@ function RunCard({ run, isActive }: { run: any; isActive: boolean }) {
         className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-[#f9f5ef] transition-colors"
       >
         <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-[18px] text-[#8b7355]">
-            {ANALYSIS_TYPES.find(t => t.id === run.analysisType)?.icon ?? "analytics"}
-          </span>
+          <Icon className="h-4 w-4 text-[#8b7355] shrink-0" />
           <div>
             <div className="text-sm font-medium text-[#1a1208]">
-              {ANALYSIS_TYPES.find(t => t.id === run.analysisType)?.label ?? run.analysisType}
+              {typeConfig?.label ?? run.analysisType}
             </div>
             <div className="text-xs text-[#8b7355]">
               {run.completedAt
@@ -104,9 +117,9 @@ function RunCard({ run, isActive }: { run: any; isActive: boolean }) {
           {run.status === "failed" && (
             <span className="text-xs text-red-600">Failed</span>
           )}
-          <span className="material-symbols-outlined text-[16px] text-[#8b7355] transition-transform" style={{ transform: expanded ? "rotate(180deg)" : "none" }}>
-            expand_more
-          </span>
+          <ChevronDown
+            className={cn("h-4 w-4 text-[#8b7355] transition-transform duration-200", expanded && "rotate-180")}
+          />
         </div>
       </button>
 
@@ -129,7 +142,7 @@ function RunCard({ run, isActive }: { run: any; isActive: boolean }) {
                     <span className="text-xs font-medium text-[#8b7355] uppercase tracking-wider">Consensus</span>
                     {consensus.divergence && (
                       <span className="text-xs text-amber-600 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">warning</span>
+                        <AlertTriangle className="h-3 w-3" />
                         Models diverged
                       </span>
                     )}
@@ -257,7 +270,7 @@ export default function AgentMonitoringPanel({ dealId }: AgentMonitoringPanelPro
   );
 
   const triggerRun = trpc.agent.triggerRun.useMutation({
-    onSuccess: (data) => {
+    onSuccess: () => {
       toast({ title: "Analysis started", description: "Results will appear when complete." });
       setActiveRun(null);
       refetch();
@@ -312,6 +325,7 @@ export default function AgentMonitoringPanel({ dealId }: AgentMonitoringPanelPro
         {ANALYSIS_TYPES.map((type) => {
           const existing = runsByType.get(type.id);
           const isRunning = activeRun === type.id || existing?.status === "running";
+          const TypeIcon = type.icon;
           return (
             <button
               key={type.id}
@@ -325,7 +339,7 @@ export default function AgentMonitoringPanel({ dealId }: AgentMonitoringPanelPro
               )}
             >
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[16px] text-[#8b7355]">{type.icon}</span>
+                <TypeIcon className="h-4 w-4 text-[#8b7355] shrink-0" />
                 <div>
                   <div className="text-xs font-medium text-[#1a1208]">{type.label}</div>
                   <div className="text-[11px] text-[#8b7355]">{type.description}</div>
@@ -333,12 +347,13 @@ export default function AgentMonitoringPanel({ dealId }: AgentMonitoringPanelPro
               </div>
               <div className="flex items-center gap-1.5">
                 {existing?.status === "complete" && (
-                  <span className="material-symbols-outlined text-[14px] text-emerald-500">check_circle</span>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                 )}
-                {isRunning && (
-                  <span className="text-[11px] text-amber-600 animate-pulse">●</span>
+                {isRunning ? (
+                  <Loader2 className="h-3.5 w-3.5 text-amber-500 animate-spin" />
+                ) : (
+                  <Play className="h-3.5 w-3.5 text-[#c4b49a]" />
                 )}
-                <span className="material-symbols-outlined text-[14px] text-[#c4b49a]">play_arrow</span>
               </div>
             </button>
           );
@@ -357,7 +372,7 @@ export default function AgentMonitoringPanel({ dealId }: AgentMonitoringPanelPro
         </div>
       ) : (
         <div className="text-center py-6 border border-dashed border-[#e8e0d4] rounded-lg">
-          <span className="material-symbols-outlined text-[32px] text-[#c4b49a] block mb-2">smart_toy</span>
+          <Bot className="h-8 w-8 text-[#c4b49a] mx-auto mb-2" />
           <div className="text-sm text-[#8b7355]">No analysis runs yet</div>
           <div className="text-xs text-[#c4b49a] mt-1">Trigger an analysis above to begin</div>
         </div>
