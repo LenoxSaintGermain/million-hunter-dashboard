@@ -843,3 +843,27 @@
 - [x] Gap analysis drawer: EV/food/lodging/housing gap cards, 2-3 Main Street plays with capital stack sketch
 - [x] Wire /ripple route in App.tsx, add Waves icon + RippleEffect to EditorialTopNav MORE_NAV
 - [x] 96/96 tests passing, 0 TS errors, save checkpoint
+
+## Sprint 49 — RippleEffect Persistence + Demo Experience
+
+### Phase 1: RippleEffect Persistence & Caching
+- [x] Add ripple_scan_cache table (24h TTL)
+- [x] Add ripple_favorites table (user_id, signal_snapshot, plays, gap_analysis, pipeline_status)
+- [x] Update rippleRouter.scan: check cache first, return cached result with fromCache flag
+- [x] ripple.saveAnalysis, ripple.favorite, ripple.listFavorites, ripple.unfavorite procedures
+- [x] RippleEffect.tsx: Save Analysis button, Favorite star, cache indicator, Favorites panel
+
+### Phase 2: Favorites → Cross-Tool Pipeline
+- [x] Add ripple_pipeline_jobs table (favorite_id, status, market_scan_results, tide_signals, ic_verdict)
+- [x] ripple.runPipeline mutation — async: Market Scan → TIDE → IC Consensus on favorited signal
+- [x] ripple.getPipelineStatus / listPipelineJobs procedures
+- [x] RippleEffect.tsx: Run Pipeline button on favorites, pipeline results drawer
+
+### Phase 3: On-Rails Demo Experience
+- [x] Create /demo-tour route in App.tsx (public, no auth)
+- [x] Create DemoTour.tsx — static 4-step on-rails walkthrough (Signal Detected → Deal Scored → IC Consensus → Main Street Plays)
+- [x] Zero live API calls — all data hardcoded, no reverse-engineering surface
+- [x] Chapter nav, step progress dots, animated score bars, IC verdict cards, Main Street play cards
+- [x] Gated CTA → Request Access on landing page
+- [x] LandingPage.tsx "See a live thesis" → /demo-tour
+- [x] 96/96 tests passing, 0 TS errors, checkpoint saved

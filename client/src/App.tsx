@@ -41,6 +41,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 import LandingPage from "./pages/LandingPage";
 import PublicSearch from "./pages/PublicSearch";
 import DemoScenario from "./pages/DemoScenario";
+import DemoTour from "./pages/DemoTour";
 import RippleEffect from "./pages/RippleEffect";
 import { getLoginUrl } from "./const";
 
@@ -158,6 +159,7 @@ function Router() {
         {/* ── Public routes (no auth required) ── */}
         <Route path="/explore" component={PublicSearch} />
         <Route path="/demo" component={DemoScenario} />
+        <Route path="/demo-tour" component={DemoTour} />
 
         {/* ── Root: Landing for unauth, Command Center for auth ── */}
         <Route path="/" component={RootRoute} />

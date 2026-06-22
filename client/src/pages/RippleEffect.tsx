@@ -8,10 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   Waves, MapPin, Zap, TrendingUp, AlertTriangle, Clock,
-  DollarSign, RefreshCw, Sparkles, ChevronDown, ChevronRight,
-  Building2, Target, Fuel, BatteryCharging, UtensilsCrossed,
-  BedDouble, Home, ArrowUpRight, Loader2, X, ExternalLink,
+  DollarSign, RefreshCw, Sparkles, ChevronDown,
+  Building2, Target, BatteryCharging, UtensilsCrossed,
+  BedDouble, Home, Loader2, X, ExternalLink,
   Factory, Server, Truck, Sun, Landmark,
+  Star, Database, Play, CheckCircle2, CircleDot,
+  Search, GitBranch, Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -60,22 +62,19 @@ function ConfidenceBar({ score }: { score: number }) {
   );
 }
 
-// ─── Gap analysis drawer ──────────────────────────────────────────────────────
+// ─── Gap analysis panel ───────────────────────────────────────────────────────
 
 function GapAnalysisPanel({ gapAnalysis }: { gapAnalysis: any }) {
   if (!gapAnalysis) return null;
-
   const urgencyColor = (u: string) =>
     u === "immediate" ? "text-rose-400 bg-rose-500/10 border-rose-500/20"
     : u === "6_months" ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
     : "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
-
   const urgencyLabel = (u: string) =>
     u === "immediate" ? "Act Now" : u === "6_months" ? "6-Month Window" : "12-Month Window";
 
   return (
     <div className="mt-4 space-y-4">
-      {/* Analyst note */}
       {gapAnalysis.analystNote && (
         <div className="rounded-xl border border-[var(--signal-gold)]/30 bg-[var(--signal-gold)]/5 p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -85,8 +84,6 @@ function GapAnalysisPanel({ gapAnalysis }: { gapAnalysis: any }) {
           <p className="text-sm text-[var(--ink)] leading-relaxed">{gapAnalysis.analystNote}</p>
         </div>
       )}
-
-      {/* Infrastructure gaps */}
       {gapAnalysis.gaps?.length > 0 && (
         <div>
           <h4 className="text-xs font-semibold text-[var(--sh-fg-muted)] uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -94,7 +91,6 @@ function GapAnalysisPanel({ gapAnalysis }: { gapAnalysis: any }) {
             Critical Infrastructure Gaps
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {/* EV chargers */}
             {gapAnalysis.evChargersWithin10mi !== null && (
               <div className="flex items-center gap-3 rounded-lg border border-[var(--rule)] bg-[var(--paper)] p-3">
                 <BatteryCharging className="h-4 w-4 text-cyan-400 shrink-0" />
@@ -107,7 +103,6 @@ function GapAnalysisPanel({ gapAnalysis }: { gapAnalysis: any }) {
                 )}
               </div>
             )}
-            {/* Food options */}
             {gapAnalysis.foodOptionsWithin5mi !== null && (
               <div className="flex items-center gap-3 rounded-lg border border-[var(--rule)] bg-[var(--paper)] p-3">
                 <UtensilsCrossed className="h-4 w-4 text-orange-400 shrink-0" />
@@ -120,7 +115,6 @@ function GapAnalysisPanel({ gapAnalysis }: { gapAnalysis: any }) {
                 )}
               </div>
             )}
-            {/* Lodging */}
             {gapAnalysis.lodgingCapacity && (
               <div className="flex items-center gap-3 rounded-lg border border-[var(--rule)] bg-[var(--paper)] p-3">
                 <BedDouble className="h-4 w-4 text-purple-400 shrink-0" />
@@ -133,7 +127,6 @@ function GapAnalysisPanel({ gapAnalysis }: { gapAnalysis: any }) {
                 )}
               </div>
             )}
-            {/* Housing */}
             {gapAnalysis.housingVacancyRate && (
               <div className="flex items-center gap-3 rounded-lg border border-[var(--rule)] bg-[var(--paper)] p-3">
                 <Home className="h-4 w-4 text-emerald-400 shrink-0" />
@@ -144,21 +137,17 @@ function GapAnalysisPanel({ gapAnalysis }: { gapAnalysis: any }) {
               </div>
             )}
           </div>
-          {/* Text gaps */}
           {gapAnalysis.gaps.length > 0 && (
             <ul className="mt-2 space-y-1">
               {gapAnalysis.gaps.map((g: string, i: number) => (
                 <li key={i} className="flex items-start gap-2 text-xs text-[var(--sh-fg-muted)]">
-                  <span className="text-rose-400 mt-0.5">▸</span>
-                  {g}
+                  <span className="text-rose-400 mt-0.5">▸</span>{g}
                 </li>
               ))}
             </ul>
           )}
         </div>
       )}
-
-      {/* Main Street plays */}
       {gapAnalysis.plays?.length > 0 && (
         <div>
           <h4 className="text-xs font-semibold text-[var(--sh-fg-muted)] uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -167,10 +156,7 @@ function GapAnalysisPanel({ gapAnalysis }: { gapAnalysis: any }) {
           </h4>
           <div className="space-y-3">
             {gapAnalysis.plays.map((play: any) => (
-              <div
-                key={play.rank}
-                className="rounded-xl border border-[var(--rule)] bg-[var(--paper)] p-4 space-y-2"
-              >
+              <div key={play.rank} className="rounded-xl border border-[var(--rule)] bg-[var(--paper)] p-4 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-[var(--signal-gold)] bg-[var(--signal-gold)]/10 rounded-full w-5 h-5 flex items-center justify-center">
@@ -197,13 +183,139 @@ function GapAnalysisPanel({ gapAnalysis }: { gapAnalysis: any }) {
                 </div>
                 {play.capitalStackSketch && (
                   <div className="rounded-lg bg-[var(--bone)] px-3 py-2 text-xs text-[var(--sh-fg-muted)]">
-                    <span className="font-semibold text-[var(--ink)]">Stack: </span>
-                    {play.capitalStackSketch}
+                    <span className="font-semibold text-[var(--ink)]">Stack: </span>{play.capitalStackSketch}
                   </div>
                 )}
               </div>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Pipeline results drawer ──────────────────────────────────────────────────
+
+function PipelineResultsDrawer({ job }: { job: any }) {
+  if (!job) return null;
+  const stepIcon = (step: string, jobStep: string | null, status: string) => {
+    if (status === "done") return <CheckCircle2 className="h-4 w-4 text-emerald-400" />;
+    if (jobStep === step && status === "running") return <Loader2 className="h-4 w-4 text-[var(--signal-gold)] animate-spin" />;
+    return <CircleDot className="h-4 w-4 text-[var(--sh-fg-muted)]" />;
+  };
+
+  return (
+    <div className="mt-4 space-y-4 rounded-xl border border-[var(--rule)] bg-[var(--bone)] p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <GitBranch className="h-3.5 w-3.5 text-[var(--signal-gold)]" />
+        <span className="text-xs font-semibold text-[var(--signal-gold)] uppercase tracking-wider">Pipeline Results</span>
+        <Badge className={cn("ml-auto text-[10px] border",
+          job.status === "done" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+          : job.status === "error" ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+          : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+        )}>
+          {job.status}
+        </Badge>
+      </div>
+
+      {/* Step indicators */}
+      <div className="flex items-center gap-2 text-xs">
+        {stepIcon("market_scan", job.currentStep, job.status)}
+        <span className={cn("font-medium", job.currentStep === "market_scan" && job.status === "running" ? "text-[var(--signal-gold)]" : "text-[var(--sh-fg-muted)]")}>
+          Market Scan
+        </span>
+        <div className="flex-1 h-px bg-[var(--rule)]" />
+        {stepIcon("tide", job.currentStep, job.status)}
+        <span className={cn("font-medium", job.currentStep === "tide" && job.status === "running" ? "text-[var(--signal-gold)]" : "text-[var(--sh-fg-muted)]")}>
+          TIDE
+        </span>
+        <div className="flex-1 h-px bg-[var(--rule)]" />
+        {stepIcon("ic", job.currentStep, job.status)}
+        <span className={cn("font-medium", job.currentStep === "ic" && job.status === "running" ? "text-[var(--signal-gold)]" : "text-[var(--sh-fg-muted)]")}>
+          IC Verdict
+        </span>
+      </div>
+
+      {/* Market scan results */}
+      {job.marketScanResults?.length > 0 && (
+        <div>
+          <h5 className="text-xs font-semibold text-[var(--ink)] mb-2 flex items-center gap-1.5">
+            <Search className="h-3 w-3" /> Market Scan — {job.marketScanResults.length} targets found
+          </h5>
+          <div className="space-y-2">
+            {job.marketScanResults.slice(0, 3).map((r: any, i: number) => (
+              <div key={i} className="rounded-lg border border-[var(--rule)] bg-[var(--paper)] p-3">
+                <div className="text-xs font-semibold text-[var(--ink)] line-clamp-1">{r.name}</div>
+                <div className="text-xs text-[var(--sh-fg-muted)] mt-0.5 line-clamp-2">{r.snippet}</div>
+                {r.url && (
+                  <a href={r.url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[10px] text-[var(--signal-gold)] hover:underline mt-1">
+                    <ExternalLink className="h-2.5 w-2.5" /> View listing
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TIDE signals */}
+      {job.tideSignals?.length > 0 && (
+        <div>
+          <h5 className="text-xs font-semibold text-[var(--ink)] mb-2 flex items-center gap-1.5">
+            <Zap className="h-3 w-3 text-cyan-400" /> TIDE — {job.tideSignals.length} federal capital signals
+          </h5>
+          <div className="space-y-1">
+            {job.tideSignals.map((s: any, i: number) => (
+              <div key={i} className="text-xs text-[var(--sh-fg-muted)] flex items-start gap-1.5">
+                <span className="text-cyan-400 mt-0.5 shrink-0">▸</span>
+                <span className="line-clamp-2">{s.title}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* IC Verdict */}
+      {job.icVerdict && (
+        <div className={cn("rounded-xl border p-4",
+          job.icVerdict.verdict === "approve" ? "border-emerald-500/30 bg-emerald-500/5"
+          : job.icVerdict.verdict === "pass" ? "border-rose-500/30 bg-rose-500/5"
+          : "border-amber-500/30 bg-amber-500/5"
+        )}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Cpu className="h-3.5 w-3.5 text-[var(--signal-gold)]" />
+              <span className="text-xs font-semibold text-[var(--ink)] uppercase tracking-wider">IC Verdict</span>
+            </div>
+            <Badge className={cn("text-[10px] border font-bold",
+              job.icVerdict.verdict === "approve" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+              : job.icVerdict.verdict === "pass" ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+              : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+            )}>
+              {job.icVerdict.verdict?.toUpperCase()} · {Math.round((job.icVerdict.score ?? 0) * 100)}
+            </Badge>
+          </div>
+          <p className="text-xs text-[var(--sh-fg-muted)] leading-relaxed">{job.icVerdict.rationale}</p>
+          {job.icVerdict.keyOpportunity && (
+            <div className="mt-2 text-xs">
+              <span className="font-semibold text-emerald-400">Opportunity: </span>
+              <span className="text-[var(--sh-fg-muted)]">{job.icVerdict.keyOpportunity}</span>
+            </div>
+          )}
+          {job.icVerdict.keyRisk && (
+            <div className="mt-1 text-xs">
+              <span className="font-semibold text-rose-400">Risk: </span>
+              <span className="text-[var(--sh-fg-muted)]">{job.icVerdict.keyRisk}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {job.status === "error" && job.errorMessage && (
+        <div className="text-xs text-rose-400 bg-rose-500/5 border border-rose-500/20 rounded-lg p-3">
+          {job.errorMessage}
         </div>
       )}
     </div>
@@ -218,14 +330,26 @@ function SignalCard({
   onToggle,
   onEscalate,
   onDismiss,
+  onFavorite,
+  onRunPipeline,
   isEscalating,
+  isFavoriting,
+  isFavorited,
+  pipelineJob,
+  isPipelining,
 }: {
   signal: any;
   expanded: boolean;
   onToggle: () => void;
   onEscalate: () => void;
   onDismiss: () => void;
+  onFavorite: () => void;
+  onRunPipeline: () => void;
   isEscalating: boolean;
+  isFavoriting: boolean;
+  isFavorited: boolean;
+  pipelineJob: any;
+  isPipelining: boolean;
 }) {
   const anchor = ANCHOR_CONFIG[signal.anchor_type] ?? ANCHOR_CONFIG.industrial;
   const AnchorIcon = anchor.icon;
@@ -244,15 +368,10 @@ function SignalCard({
       )}
     >
       {/* Card header */}
-      <div
-        className="flex items-start gap-3 p-4 cursor-pointer"
-        onClick={onToggle}
-      >
-        {/* Anchor type icon */}
+      <div className="flex items-start gap-3 p-4 cursor-pointer" onClick={onToggle}>
         <div className={cn("rounded-xl border p-2.5 shrink-0", anchor.bg)}>
           <AnchorIcon className={cn("h-4 w-4", anchor.color)} />
         </div>
-
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex items-start justify-between gap-2">
             <h3 className="text-sm font-semibold text-[var(--ink)] leading-snug line-clamp-2">
@@ -264,6 +383,22 @@ function SignalCard({
                   Analyzed
                 </Badge>
               )}
+              {isFavorited && (
+                <Badge className="text-[10px] bg-[var(--signal-gold)]/10 text-[var(--signal-gold)] border-[var(--signal-gold)]/20">
+                  Saved
+                </Badge>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); onFavorite(); }}
+                disabled={isFavoriting || isFavorited}
+                className={cn(
+                  "transition-colors",
+                  isFavorited ? "text-[var(--signal-gold)]" : "text-[var(--sh-fg-muted)] hover:text-[var(--signal-gold)]"
+                )}
+                title={isFavorited ? "Saved to favorites" : "Save to favorites"}
+              >
+                <Star className={cn("h-3.5 w-3.5", isFavorited && "fill-current")} />
+              </button>
               <button
                 onClick={(e) => { e.stopPropagation(); onDismiss(); }}
                 className="text-[var(--sh-fg-muted)] hover:text-rose-400 transition-colors"
@@ -272,36 +407,23 @@ function SignalCard({
               </button>
             </div>
           </div>
-
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1 text-xs text-[var(--sh-fg-muted)]">
-              <MapPin className="h-3 w-3" />
-              {signal.location}
+              <MapPin className="h-3 w-3" />{signal.location}
             </div>
-            <Badge className={cn("text-[10px] border", anchor.bg, anchor.color)}>
-              {anchor.label}
-            </Badge>
+            <Badge className={cn("text-[10px] border", anchor.bg, anchor.color)}>{anchor.label}</Badge>
             <Badge className="text-[10px] bg-[var(--bone)] text-[var(--sh-fg-muted)] border-[var(--rule)]">
               {SOURCE_LABELS[signal.source_type] ?? signal.source_type}
             </Badge>
           </div>
-
           {signal.estimated_scale && (
             <div className="flex items-center gap-1 text-xs text-[var(--sh-fg-muted)]">
-              <Zap className="h-3 w-3 text-[var(--amber)]" />
-              {signal.estimated_scale}
+              <Zap className="h-3 w-3 text-[var(--amber)]" />{signal.estimated_scale}
             </div>
           )}
-
           <ConfidenceBar score={signal.confidenceScore ?? signal.confidence_score ?? 0} />
         </div>
-
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 text-[var(--sh-fg-muted)] shrink-0 transition-transform duration-200",
-            expanded && "rotate-180"
-          )}
-        />
+        <ChevronDown className={cn("h-4 w-4 text-[var(--sh-fg-muted)] shrink-0 transition-transform duration-200", expanded && "rotate-180")} />
       </div>
 
       {/* Expanded content */}
@@ -315,29 +437,48 @@ function SignalCard({
             className="overflow-hidden"
           >
             <div className="px-4 pb-4 border-t border-[var(--rule)] pt-4 space-y-4">
-              {/* Snippet */}
               {signal.snippet && (
-                <p className="text-xs text-[var(--sh-fg-muted)] leading-relaxed line-clamp-4">
-                  {signal.snippet}
-                </p>
+                <p className="text-xs text-[var(--sh-fg-muted)] leading-relaxed line-clamp-4">{signal.snippet}</p>
               )}
-
-              {/* Source link */}
               {signal.source_url && (
-                <a
-                  href={signal.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs text-[var(--signal-gold)] hover:underline"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  View source
+                <a href={signal.source_url} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-[var(--signal-gold)] hover:underline">
+                  <ExternalLink className="h-3 w-3" />View source
                 </a>
               )}
 
-              {/* Gap analysis */}
+              {/* Gap analysis or escalate CTA */}
               {isAnalyzed && signal.gapAnalysis ? (
-                <GapAnalysisPanel gapAnalysis={signal.gapAnalysis} />
+                <>
+                  <GapAnalysisPanel gapAnalysis={signal.gapAnalysis} />
+                  {/* Pipeline CTA — only show after analysis */}
+                  {isFavorited && (
+                    <div className="flex items-center justify-between rounded-xl border border-dashed border-cyan-500/30 bg-cyan-500/5 p-4">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--ink)]">Run Cross-Tool Pipeline</p>
+                        <p className="text-xs text-[var(--sh-fg-muted)] mt-0.5">
+                          Market Scan → TIDE → IC Consensus on best acquisition target
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); onRunPipeline(); }}
+                        disabled={isPipelining || !!pipelineJob}
+                        className="shrink-0 bg-cyan-600 text-white hover:bg-cyan-500 border-0"
+                      >
+                        {isPipelining ? (
+                          <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Running…</>
+                        ) : pipelineJob ? (
+                          <><CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Ran</>
+                        ) : (
+                          <><Play className="h-3.5 w-3.5 mr-1.5" />Run Pipeline</>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                  {/* Pipeline results */}
+                  {pipelineJob && <PipelineResultsDrawer job={pipelineJob} />}
+                </>
               ) : (
                 <div className="flex items-center justify-between rounded-xl border border-dashed border-[var(--signal-gold)]/30 bg-[var(--signal-gold)]/5 p-4">
                   <div>
@@ -368,6 +509,59 @@ function SignalCard({
   );
 }
 
+// ─── Favorites panel ──────────────────────────────────────────────────────────
+
+function FavoritesPanel({ favorites, pipelineJobs }: { favorites: any[]; pipelineJobs: any[] }) {
+  if (!favorites.length) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-[var(--signal-gold)]/30 bg-[var(--signal-gold)]/5 p-5"
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <Star className="h-4 w-4 text-[var(--signal-gold)] fill-current" />
+        <h2 className="text-sm font-semibold text-[var(--ink)]">Saved Signals</h2>
+        <Badge className="ml-auto text-[10px] bg-[var(--signal-gold)]/10 text-[var(--signal-gold)] border-[var(--signal-gold)]/20">
+          {favorites.length}
+        </Badge>
+      </div>
+      <div className="space-y-2">
+        {favorites.map((fav) => {
+          const job = pipelineJobs.find((j) => j.favoriteId === fav.id);
+          const anchor = ANCHOR_CONFIG[fav.anchorType ?? "industrial"] ?? ANCHOR_CONFIG.industrial;
+          return (
+            <div key={fav.id} className="flex items-center gap-3 rounded-xl border border-[var(--rule)] bg-[var(--paper)] p-3">
+              <div className={cn("rounded-lg border p-2 shrink-0", anchor.bg)}>
+                <anchor.icon className={cn("h-3.5 w-3.5", anchor.color)} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-[var(--ink)] line-clamp-1">{fav.projectName}</div>
+                <div className="text-xs text-[var(--sh-fg-muted)] flex items-center gap-1">
+                  <MapPin className="h-2.5 w-2.5" />{fav.location}
+                </div>
+              </div>
+              {job ? (
+                <Badge className={cn("text-[10px] border shrink-0",
+                  job.status === "done" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                  : job.status === "error" ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                  : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                )}>
+                  {job.status === "done" ? "Pipeline done" : job.status === "error" ? "Error" : "Running"}
+                </Badge>
+              ) : (
+                <Badge className="text-[10px] bg-[var(--bone)] text-[var(--sh-fg-muted)] border-[var(--rule)] shrink-0">
+                  {fav.pipelineStatus === "none" ? "Saved" : fav.pipelineStatus}
+                </Badge>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function RippleEffect() {
@@ -377,21 +571,55 @@ export default function RippleEffect() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [escalatingId, setEscalatingId] = useState<number | null>(null);
+  const [favoritingId, setFavoritingId] = useState<number | null>(null);
+  const [pipeliningFavId, setPipeliningFavId] = useState<number | null>(null);
+  // Track which signal IDs have been favorited this session (by signal id → favorite id)
+  const [favoritedSignals, setFavoritedSignals] = useState<Record<number, number>>({});
+  // Track pipeline jobs by favorite id
+  const [pipelineJobIds, setPipelineJobIds] = useState<Record<number, number>>({});
 
   const { data: signals = [], refetch } = trpc.ripple.list.useQuery({
-    status: "all",
-    minConfidence: 0,
-    limit: 100,
+    status: "all", minConfidence: 0, limit: 100,
   });
+
+  const { data: favorites = [], refetch: refetchFavorites } = trpc.ripple.listFavorites.useQuery();
+  const { data: pipelineJobs = [], refetch: refetchJobs } = trpc.ripple.listPipelineJobs.useQuery();
+
+  // Poll pipeline jobs that are running
+  const runningJobs = (pipelineJobs as any[]).filter((j) => j.status === "queued" || j.status === "running");
+  const { data: polledJob } = trpc.ripple.getPipelineStatus.useQuery(
+    { jobId: runningJobs[0]?.id ?? 0 },
+    {
+      enabled: runningJobs.length > 0,
+      refetchInterval: 3000,
+      onSuccess: (job: any) => {
+        if (job?.status === "done" || job?.status === "error") {
+          refetchJobs();
+          refetchFavorites();
+          toast({
+            title: job.status === "done" ? "Pipeline complete" : "Pipeline error",
+            description: job.status === "done"
+              ? `Market Scan + TIDE + IC finished for ${(favorites as any[]).find((f) => f.id === job.favoriteId)?.projectName ?? "signal"}`
+              : job.errorMessage,
+            variant: job.status === "error" ? "destructive" : "default",
+          });
+        }
+      },
+    } as any
+  );
 
   const scanMutation = trpc.ripple.scan.useMutation({
     onSuccess: (data) => {
       setIsScanning(false);
       refetch();
-      toast({
-        title: `${data.signalsFound} signals detected`,
-        description: data.message,
-      });
+      if ((data as any).fromCache) {
+        toast({
+          title: `Cached result — ${data.signalsFound} signals`,
+          description: `${(data as any).cachedAgo} · Use force refresh to re-scan`,
+        });
+      } else {
+        toast({ title: `${data.signalsFound} signals detected`, description: data.message });
+      }
     },
     onError: (err) => {
       setIsScanning(false);
@@ -405,7 +633,7 @@ export default function RippleEffect() {
       refetch();
       const playCount = data.gapAnalysis?.plays?.length ?? 0;
       toast({
-        title: `Gap analysis complete`,
+        title: "Gap analysis complete",
         description: `${playCount} Main Street ${playCount === 1 ? "play" : "plays"} identified`,
       });
     },
@@ -415,20 +643,58 @@ export default function RippleEffect() {
     },
   });
 
-  const dismissMutation = trpc.ripple.dismiss.useMutation({
-    onSuccess: () => refetch(),
+  const dismissMutation = trpc.ripple.dismiss.useMutation({ onSuccess: () => refetch() });
+
+  const favoriteMutation = trpc.ripple.favorite.useMutation({
+    onSuccess: (data, variables) => {
+      setFavoritingId(null);
+      setFavoritedSignals((prev) => ({ ...prev, [variables.signalId]: data.favoriteId }));
+      refetchFavorites();
+      toast({ title: "Signal saved", description: "Favorited. Run the pipeline to get acquisition targets." });
+    },
+    onError: (err) => {
+      setFavoritingId(null);
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    },
   });
 
-  const handleScan = () => {
+  const pipelineMutation = trpc.ripple.runPipeline.useMutation({
+    onSuccess: (data, variables) => {
+      setPipeliningFavId(null);
+      setPipelineJobIds((prev) => ({ ...prev, [variables.favoriteId]: data.jobId }));
+      refetchJobs();
+      toast({ title: "Pipeline queued", description: "Market Scan → TIDE → IC running in background" });
+    },
+    onError: (err) => {
+      setPipeliningFavId(null);
+      toast({ title: "Pipeline failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleScan = (forceRefresh = false) => {
     if (!geography.trim()) return;
     setIsScanning(true);
-    scanMutation.mutate({ geography, minConfidence: 0.35 });
+    scanMutation.mutate({ geography, minConfidence: 0.35, forceRefresh });
   };
 
   const handleEscalate = (signalId: number) => {
     setEscalatingId(signalId);
     setExpandedId(signalId);
     escalateMutation.mutate({ signalId });
+  };
+
+  const handleFavorite = (signal: any) => {
+    setFavoritingId(signal.id);
+    favoriteMutation.mutate({
+      signalId: signal.id,
+      playsJson: signal.gapAnalysis?.plays,
+      gapAnalysisJson: signal.gapAnalysis,
+    });
+  };
+
+  const handleRunPipeline = (favoriteId: number) => {
+    setPipeliningFavId(favoriteId);
+    pipelineMutation.mutate({ favoriteId });
   };
 
   const activeSignals = (signals as any[]).filter((s) => s.status !== "dismissed");
@@ -443,6 +709,11 @@ export default function RippleEffect() {
 
   const analyzedCount = activeSignals.filter((s) => s.status === "analyzed").length;
   const highConfidenceCount = activeSignals.filter((s) => (s.confidenceScore ?? s.confidence_score ?? 0) >= 0.65).length;
+  const favoritesArr = favorites as any[];
+  const pipelineJobsArr = pipelineJobs as any[];
+
+  // Build a set of favorited signal IDs from DB favorites (by matching project_name)
+  const favoritedProjectNames = new Set(favoritesArr.map((f) => f.projectName));
 
   return (
     <EditorialTopNav>
@@ -455,22 +726,23 @@ export default function RippleEffect() {
         >
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-amber-500/5" />
           <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl" />
-
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-3">
               <Waves className="h-5 w-5 text-cyan-400" />
               <span className="text-xs font-semibold text-cyan-400 uppercase tracking-widest">RippleEffect Scanner</span>
+              <div className="ml-auto flex items-center gap-1.5 text-xs text-white/40">
+                <Database className="h-3 w-3" />
+                <span>24h cache · zero tokens on repeat</span>
+              </div>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-2 tracking-tight">
               Anchor Development Intelligence
             </h1>
             <p className="text-sm text-white/60 max-w-2xl leading-relaxed">
-              Detect massive industrial permits and press releases before they hit the mainstream. 
-              Surface the picks-and-shovels Main Street plays created by anchor developments — 
-              before the market prices them in.
+              Detect massive industrial permits and press releases before they hit the mainstream.
+              Surface the picks-and-shovels Main Street plays created by anchor developments.
+              Results cached 24h — favorite a signal to run the full acquisition pipeline.
             </p>
-
-            {/* Stats row */}
             <div className="flex flex-wrap gap-6 mt-5">
               <div>
                 <div className="text-xl font-bold text-white tabular-nums">{activeSignals.length}</div>
@@ -483,6 +755,10 @@ export default function RippleEffect() {
               <div>
                 <div className="text-xl font-bold text-[var(--signal-gold)] tabular-nums">{analyzedCount}</div>
                 <div className="text-xs text-white/50">Plays Generated</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold text-emerald-400 tabular-nums">{favoritesArr.length}</div>
+                <div className="text-xs text-white/50">Saved</div>
               </div>
             </div>
           </div>
@@ -509,7 +785,7 @@ export default function RippleEffect() {
               onKeyDown={(e) => e.key === "Enter" && handleScan()}
             />
             <Button
-              onClick={handleScan}
+              onClick={() => handleScan(false)}
               disabled={isScanning || !geography.trim()}
               className="bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink)]/90 border-0 shrink-0"
             >
@@ -519,21 +795,30 @@ export default function RippleEffect() {
                 <><Waves className="h-4 w-4 mr-2" />Run Scan</>
               )}
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleScan(true)}
+              disabled={isScanning || !geography.trim()}
+              className="shrink-0 border-[var(--rule)] text-[var(--sh-fg-muted)] hover:text-[var(--ink)]"
+              title="Force refresh — bypass 24h cache"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
           <p className="text-xs text-[var(--sh-fg-muted)] mt-3 leading-relaxed">
             Searches press release wires, EDC announcements, permit filings, workforce signals, and utility expansions.
-            Keyword-scores each hit. Only escalated signals invoke the AI analyst.
+            Results cached 24h per geography — use the refresh button to force a new scan.
           </p>
         </motion.div>
 
+        {/* Favorites panel */}
+        {favoritesArr.length > 0 && (
+          <FavoritesPanel favorites={favoritesArr} pipelineJobs={pipelineJobsArr} />
+        )}
+
         {/* Anchor type filters */}
         {Object.keys(anchorCounts).length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.15 }}
-            className="flex flex-wrap gap-2"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="flex flex-wrap gap-2">
             <button
               onClick={() => setActiveFilter(null)}
               className={cn(
@@ -567,15 +852,11 @@ export default function RippleEffect() {
 
         {/* Signal queue */}
         {filteredSignals.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="rounded-2xl border border-dashed border-[var(--rule)] p-12 text-center"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl border border-dashed border-[var(--rule)] p-12 text-center">
             <Waves className="h-10 w-10 text-[var(--sh-fg-muted)] mx-auto mb-4 opacity-40" />
             <h3 className="text-sm font-semibold text-[var(--ink)] mb-2">No signals yet</h3>
             <p className="text-xs text-[var(--sh-fg-muted)] max-w-sm mx-auto">
-              Enter a geography above and run a scan. The system will search 8 signal sources and surface 
+              Enter a geography above and run a scan. The system will search 8 signal sources and surface
               anchor developments above the confidence threshold.
             </p>
           </motion.div>
@@ -585,26 +866,38 @@ export default function RippleEffect() {
               <h2 className="text-xs font-semibold text-[var(--sh-fg-muted)] uppercase tracking-wider">
                 Signal Queue — {filteredSignals.length} {filteredSignals.length === 1 ? "signal" : "signals"}
               </h2>
-              <button
-                onClick={() => refetch()}
-                className="text-xs text-[var(--sh-fg-muted)] hover:text-[var(--ink)] flex items-center gap-1 transition-colors"
-              >
-                <RefreshCw className="h-3 w-3" />
-                Refresh
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => refetch()}
+                  className="text-xs text-[var(--sh-fg-muted)] hover:text-[var(--ink)] flex items-center gap-1 transition-colors"
+                >
+                  <RefreshCw className="h-3 w-3" />Refresh
+                </button>
+              </div>
             </div>
             <AnimatePresence>
-              {filteredSignals.map((signal: any) => (
-                <SignalCard
-                  key={signal.id}
-                  signal={signal}
-                  expanded={expandedId === signal.id}
-                  onToggle={() => setExpandedId(expandedId === signal.id ? null : signal.id)}
-                  onEscalate={() => handleEscalate(signal.id)}
-                  onDismiss={() => dismissMutation.mutate({ signalId: signal.id })}
-                  isEscalating={escalatingId === signal.id}
-                />
-              ))}
+              {filteredSignals.map((signal: any) => {
+                const isFavorited = favoritedProjectNames.has(signal.project_name) || signal.id in favoritedSignals;
+                const favoriteId = favoritedSignals[signal.id] ?? favoritesArr.find((f) => f.projectName === signal.project_name)?.id;
+                const pipelineJob = favoriteId ? pipelineJobsArr.find((j) => j.favoriteId === favoriteId) : null;
+                return (
+                  <SignalCard
+                    key={signal.id}
+                    signal={signal}
+                    expanded={expandedId === signal.id}
+                    onToggle={() => setExpandedId(expandedId === signal.id ? null : signal.id)}
+                    onEscalate={() => handleEscalate(signal.id)}
+                    onDismiss={() => dismissMutation.mutate({ signalId: signal.id })}
+                    onFavorite={() => handleFavorite(signal)}
+                    onRunPipeline={() => favoriteId && handleRunPipeline(favoriteId)}
+                    isEscalating={escalatingId === signal.id}
+                    isFavoriting={favoritingId === signal.id}
+                    isFavorited={isFavorited}
+                    pipelineJob={pipelineJob}
+                    isPipelining={pipeliningFavId === favoriteId}
+                  />
+                );
+              })}
             </AnimatePresence>
           </div>
         )}

@@ -783,3 +783,52 @@ export const accessRequests = mysqlTable("access_requests", {
 });
 export type AccessRequest = typeof accessRequests.$inferSelect;
 export type InsertAccessRequest = typeof accessRequests.$inferInsert;
+
+// ─── RippleEffect: Scan Cache ─────────────────────────────────────────────────
+// Caches Sonar search results per location for 24h to avoid redundant API calls.
+export const rippleScanCache = mysqlTable("ripple_scan_cache", {
+  id: int("id").autoincrement().primaryKey(),
+  location: varchar("location", { length: 255 }).notNull(),
+  queryHash: varchar("query_hash", { length: 64 }).notNull(), // MD5 of location+anchorTypes
+  resultsJson: json("results_json").$type<any[]>().notNull(),
+  signalCount: int("signal_count").default(0).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  expiresAt: bigint("expires_at", { mode: "number" }).notNull(), // createdAt + 24h
+});
+export type RippleScanCache = typeof rippleScanCache.$inferSelect;
+export type InsertRippleScanCache = typeof rippleScanCache.$inferInsert;
+
+// ─── RippleEffect: Favorites ──────────────────────────────────────────────────
+// User-saved RippleEffect signals for cross-tool pipeline enrichment.
+export const rippleFavorites = mysqlTable("ripple_favorites", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  location: varchar("location", { length: 255 }).notNull(),
+  anchorType: varchar("anchor_type", { length: 64 }),
+  projectName: varchar("project_name", { length: 255 }),
+  signalSnapshot: json("signal_snapshot").$type<any>().notNull(), // full signal object
+  playsJson: json("plays_json").$type<any[]>(), // gap analysis plays
+  gapAnalysisJson: json("gap_analysis_json").$type<any>(), // full gap analysis
+  pipelineStatus: mysqlEnum("pipeline_status", ["none", "queued", "running", "done", "error"]).default("none").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type RippleFavorite = typeof rippleFavorites.$inferSelect;
+export type InsertRippleFavorite = typeof rippleFavorites.$inferInsert;
+
+// ─── RippleEffect: Pipeline Jobs ──────────────────────────────────────────────
+// Async cross-tool enrichment jobs triggered when a signal is favorited.
+export const ripplePipelineJobs = mysqlTable("ripple_pipeline_jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  favoriteId: int("favorite_id").notNull(),
+  userId: int("user_id").notNull(),
+  status: mysqlEnum("status", ["queued", "running", "done", "error"]).default("queued").notNull(),
+  currentStep: varchar("current_step", { length: 64 }), // "market_scan" | "tide" | "ic"
+  marketScanResults: json("market_scan_results").$type<any[]>(),
+  tideSignals: json("tide_signals").$type<any[]>(),
+  icVerdict: json("ic_verdict").$type<any>(),
+  errorMessage: text("error_message"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  completedAt: bigint("completed_at", { mode: "number" }),
+});
+export type RipplePipelineJob = typeof ripplePipelineJobs.$inferSelect;
+export type InsertRipplePipelineJob = typeof ripplePipelineJobs.$inferInsert;
