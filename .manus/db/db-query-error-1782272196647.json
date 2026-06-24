@@ -1,0 +1,8 @@
+{
+  "query": "\nSELECT 'commercial_assets' as tbl, COUNT(*) as cnt FROM commercial_assets WHERE name LIKE '%Sprint%' OR name LIKE '%sprint%'\nUNION ALL\nSELECT 'deals', COUNT(*) FROM deals WHERE name LIKE '%Sprint%' OR name LIKE '%sprint%'\nUNION ALL\nSELECT 'macro_signals', COUNT(*) FROM macro_signals WHERE title LIKE '%Sprint%' OR title LIKE '%sprint%'\nUNION ALL\nSELECT 'opportunities', COUNT(*) FROM opportunities WHERE name LIKE '%Sprint%' OR name LIKE '%sprint%';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute \nSELECT 'commercial_assets' as tbl, COUNT(*) as cnt FROM commercial_assets WHERE name LIKE '%Sprint%' OR name LIKE '%sprint%'\nUNION ALL\nSELECT 'deals', COUNT(*) FROM deals WHERE name LIKE '%Sprint%' OR name LIKE '%sprint%'\nUNION ALL\nSELECT 'macro_signals', COUNT(*) FROM macro_signals WHERE title LIKE '%Sprint%' OR title LIKE '%sprint%'\nUNION ALL\nSELECT 'opportunities', COUNT(*) FROM opportunities WHERE name LIKE '%Sprint%' OR name LIKE '%sprint%';\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1146 (42S02) at line 2: Table 'gecpeffiebrzfpk6xckkaz.opportunities' doesn't exist"
+  ]
+}

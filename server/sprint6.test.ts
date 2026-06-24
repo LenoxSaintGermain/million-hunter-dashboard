@@ -3,8 +3,8 @@
  * - Scout: commercial asset CRUD + AI score procedure
  * - Sentinel: macro signals seed + list
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { db as getDb } from "./db";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { getDb } from "./db";
 import { commercialAssets, macroSignals } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -61,9 +61,9 @@ describe("Scout — commercial assets", () => {
     expect(found!.propertyType).toBe("retail");
   });
 
-  it("cleans up test asset", async () => {
-    const db = await (await import("./db")).db as any;
-    if (db) await db.delete(commercialAssets).where(eq(commercialAssets.id, assetId));
+  afterAll(async () => {
+    const db = await getDb();
+    if (db && assetId) await db.delete(commercialAssets).where(eq(commercialAssets.id, assetId));
   });
 });
 
@@ -116,7 +116,7 @@ describe("Sentinel — macro signals", () => {
     expect(found!.confidenceScore).toBeCloseTo(0.75, 1);
 
     // cleanup
-    const db = await (await import("./db")).db as any;
+    const db = await getDb();
     if (db && found) await db.delete(macroSignals).where(eq(macroSignals.id, found.id));
   });
 });

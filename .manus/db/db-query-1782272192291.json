@@ -1,0 +1,124 @@
+{
+  "query": "SHOW TABLES;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SHOW TABLES;",
+  "rows": [
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "__drizzle_migrations"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "access_requests"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "activity_log"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "agent_runs"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "capital_flows"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "capital_stack_layers"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "capital_stack_templates"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "capital_stacks"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "commercial_assets"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "consensus_scores"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "convergence_events"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "deal_agent_runs"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "deal_share_tokens"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "deal_trajectory"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "deals"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "demo_scenarios"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "freedom_goals"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "insurance_prospects"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "investor_dna"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "investor_dossiers"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "investor_interest"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "invite_tokens"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "macro_signals"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "memos"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "model_config"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "opportunity_radar"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "outreach"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "ripple_favorites"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "ripple_pipeline_jobs"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "ripple_scan_cache"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "ripple_signals"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "scan_jobs"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "seller_simulations"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "signals"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "strategy_blueprints"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "thesis_compilations"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "tide_predictions"
+    },
+    {
+      "Tables_in_GeCPeFFiEBRZFpk6xckkAz": "users"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_GeCPeFFiEBRZFpk6xckkAz\n__drizzle_migrations\naccess_requests\nactivity_log\nagent_runs\ncapital_flows\ncapital_stack_layers\ncapital_stack_templates\ncapital_stacks\ncommercial_assets\nconsensus_scores\nconvergence_events\ndeal_agent_runs\ndeal_share_tokens\ndeal_trajectory\ndeals\ndemo_scenarios\nfreedom_goals\ninsurance_prospects\ninvestor_dna\ninvestor_dossiers\ninvestor_interest\ninvite_tokens\nmacro_signals\nmemos\nmodel_config\nopportunity_radar\noutreach\nripple_favorites\nripple_pipeline_jobs\nripple_scan_cache\nripple_signals\nscan_jobs\nseller_simulations\nsignals\nstrategy_blueprints\nthesis_compilations\ntide_predictions\nusers\n",
+  "stderr": "",
+  "execution_time_ms": 261
+}

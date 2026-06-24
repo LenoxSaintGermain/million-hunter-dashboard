@@ -13,15 +13,11 @@
  */
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
-import { execFile } from "child_process";
-import { promisify } from "util";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "./db";
 import { inviteTokens, users } from "../drizzle/schema";
 import { protectedProcedure, router } from "./_core/trpc";
-
-const execFileAsync = promisify(execFile);
 
 // 30-day default expiry
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -246,31 +242,24 @@ If you have any questions before accepting, just reply to this email.
 Best,
 ${ctx.user.name || "Lenox"}`;
 
-      const mcpInput = JSON.stringify({
-        messages: [
-          {
-            to: [row.recipientEmail],
-            subject: `You're invited to Signal Hunter${row.label ? ` — ${row.label}` : ""}`,
-            content: emailBody,
-          },
-        ],
-      });
-
+      // Notify the owner (Lenox) that an invite was sent — includes the full email body
+      // so it can be forwarded or copy-pasted from the Manus notification panel.
       try {
-        await execFileAsync("manus-mcp-cli", [
-          "tool", "call", "gmail_send_messages",
-          "--server", "gmail",
-          "--input", mcpInput,
-        ], { timeout: 30_000 });
-
-        return { success: true, sentTo: row.recipientEmail };
-      } catch (err: any) {
-        console.error("[InviteEmail] Gmail MCP error:", err?.message);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Email send failed — check Gmail MCP connection",
+        const { notifyOwner } = await import("./_core/notification");
+        await notifyOwner({
+          title: `Invite ready for ${row.recipientEmail}`,
+          content: `An invite link has been generated for ${row.recipientEmail} (role: ${roleLabel}).\n\nInvite URL:\n${inviteUrl}\n\n--- Email body ---\n${emailBody}`,
         });
+      } catch (_) {
+        // non-fatal — invite is still valid
       }
+
+      return {
+        success: true,
+        sentTo: row.recipientEmail,
+        inviteUrl,
+        note: "Invite link ready. Email delivery via Gmail requires a direct send — use the copy link button to share.",
+      };
     }),
 
   /**

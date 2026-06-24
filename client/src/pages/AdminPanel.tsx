@@ -148,11 +148,18 @@ function InviteManager() {
   const sendEmail = trpc.invite.sendEmail.useMutation({
     onSuccess: (result) => {
       setSendingEmailId(null);
-      toast.success(`Invite email queued for ${result.sentTo} — check Manus UI to confirm send`);
+      // Copy invite URL to clipboard automatically
+      if (result.inviteUrl) {
+        navigator.clipboard.writeText(result.inviteUrl).catch(() => {});
+      }
+      toast.success(
+        `Invite link copied to clipboard for ${result.sentTo}. You've been notified via Manus — paste the link directly into Gmail.`,
+        { duration: 6000 }
+      );
     },
     onError: (e) => {
       setSendingEmailId(null);
-      toast.error(`Email failed: ${e.message}`);
+      toast.error(`Invite error: ${e.message}`);
     },
   });
 

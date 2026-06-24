@@ -1,0 +1,22 @@
+{
+  "query": "\nSELECT 'commercial_assets' as tbl, COUNT(*) as cnt FROM commercial_assets WHERE name LIKE '%Sprint%' OR name LIKE '%sprint%'\nUNION ALL\nSELECT 'deals', COUNT(*) FROM deals WHERE name LIKE '%Sprint%' OR name LIKE '%sprint%'\nUNION ALL\nSELECT 'macro_signals', COUNT(*) FROM macro_signals WHERE title LIKE '%Sprint%' OR title LIKE '%sprint%';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute \nSELECT 'commercial_assets' as tbl, COUNT(*) as cnt FROM commercial_assets WHERE name LIKE '%Sprint%' OR name LIKE '%sprint%'\nUNION ALL\nSELECT 'deals', COUNT(*) FROM deals WHERE name LIKE '%Sprint%' OR name LIKE '%sprint%'\nUNION ALL\nSELECT 'macro_signals', COUNT(*) FROM macro_signals WHERE title LIKE '%Sprint%' OR title LIKE '%sprint%';\n",
+  "rows": [
+    {
+      "tbl": "macro_signals",
+      "cnt": "1"
+    },
+    {
+      "tbl": "deals",
+      "cnt": "2"
+    },
+    {
+      "tbl": "commercial_assets",
+      "cnt": "14"
+    }
+  ],
+  "messages": [],
+  "stdout": "tbl\tcnt\nmacro_signals\t1\ndeals\t2\ncommercial_assets\t14\n",
+  "stderr": "",
+  "execution_time_ms": 270
+}
