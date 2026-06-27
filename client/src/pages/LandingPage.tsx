@@ -2,51 +2,71 @@ import { useState, useEffect, useRef } from "react";
 import { getLoginUrl } from "@/const";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+import {
+  BarChart3,
+  TrendingUp,
+  Vote,
+  Brain,
+  Bot,
+  Radar,
+  ArrowRight,
+  ArrowRightLeft,
+  LockOpen,
+  Search,
+  CheckCircle2,
+  Timer,
+  Lock,
+  ShieldCheck,
+  AlertTriangle,
+  FileSearch,
+  Layers,
+  Zap,
+} from "lucide-react";
 
 // ─── Static data ─────────────────────────────────────────────────────────────
 const STATS = [
-  { value: "$2.4M", label: "Avg. cash flow, qualified deal" },
-  { value: "3.2×", label: "Avg. acquisition multiple" },
-  { value: "94%", label: "SBA 7(a) eligibility rate" },
-  { value: "48h", label: "From listing to scored thesis" },
+  { value: "70–90%", label: "Acquisition failure rate, industry-wide" },
+  { value: "54%", label: "Avg. revenue concentration in failed deals" },
+  { value: "3.1×", label: "Avg. add-back inflation in broker-presented SDE" },
+  { value: "48h", label: "From listing to full IC verdict" },
 ];
 
 const FEATURES = [
   {
-    eyebrow: "SIGNAL INTELLIGENCE",
-    title: "The deal is already scored. You just haven't seen it yet.",
-    body: "Six dimensions — cash flow health, capital stack fit, operational leverage, macro timing, deal structure, and strategic alignment — run before you open the teaser. By the time you read it, you already know.",
-    icon: "analytics",
+    eyebrow: "RED TEAM — ALWAYS ON",
+    title: "The deal team that argues against you. On purpose.",
+    body: "Every analysis runs a mandatory devil's advocate pass. The Red Team stress-tests the thesis, surfaces the failure modes, and tells you what the broker's deck buried in footnote 14 — before you've spent a dollar on diligence.",
+    Icon: ShieldCheck,
+  },
+  {
+    eyebrow: "QUALITY OF EARNINGS PROXY",
+    title: "The add-backs that aren't add-backs.",
+    body: "Owner salary above market replacement. Personal vehicles. Family consulting payments. One-time write-offs claimed as recurring. The QoE proxy flags every line before you commission the $25k report.",
+    Icon: FileSearch,
+  },
+  {
+    eyebrow: "IC CONSENSUS",
+    title: "Three independent models. One verdict. The divergence is the signal.",
+    body: "The Quant, The Skeptic, and The Scout run parallel investment committee reviews on every deal. When they disagree, the flag tells you exactly where the risk lives — and why it matters.",
+    Icon: Vote,
+  },
+  {
+    eyebrow: "OWNER DEPENDENCE AUDIT",
+    title: "How many hours does the business actually need the owner?",
+    body: "The most common post-close surprise isn't financial — it's operational. The Owner Dependence Audit maps key-person risk, management layer gaps, and the real replacement cost before you're locked in.",
+    Icon: Brain,
   },
   {
     eyebrow: "TIDE CAPITAL FLOW",
     title: "The federal government telegraphs its moves. Most people aren't listening.",
-    body: "TIDE reads USASpending disbursements, Federal Register actions, and FEC filings to surface capital convergence events 60–90 days before they appear in deal flow. The information was always public. The advantage was always in the reading.",
-    icon: "trending_up",
-  },
-  {
-    eyebrow: "IC REVIEW",
-    title: "Three independent minds. One verdict. The disagreements are the point.",
-    body: "The Quant, The Skeptic, and The Scout run parallel investment committee reviews on every deal. When they diverge, the flag tells you exactly where the risk lives — before you've spent a dollar on diligence.",
-    icon: "how_to_vote",
-  },
-  {
-    eyebrow: "BEHAVIORAL PROFILE",
-    title: "The seller already told you everything. You just weren't in the room.",
-    body: "The Behaviorist constructs owner psychology profiles, negotiation rehearsal scenarios, and friction maps from public signals. You walk into the first call knowing the levers, the fears, and the real number.",
-    icon: "psychology",
-  },
-  {
-    eyebrow: "AGENT ORCHESTRATION",
-    title: "A deal team that doesn't sleep, doesn't bill by the hour, and doesn't miss.",
-    body: "The Red Team, The Architect, The Auditor, and The Behaviorist run in parallel and stream their findings into your Intelligence Dossier. The work that used to take three weeks happens before your morning coffee.",
-    icon: "smart_toy",
+    body: "TIDE reads USASpending disbursements, Federal Register actions, and FEC filings to surface capital convergence events 60–90 days before they appear in deal flow.",
+    Icon: TrendingUp,
   },
   {
     eyebrow: "SENTINEL SIGNALS",
     title: "The macro environment is a signal, not a headline.",
-    body: "The Scout monitors rate shifts, SBA policy changes, sector tailwinds, and geographic arbitrage windows — then weights each signal against your live pipeline. The market is always speaking. This is how you hear it.",
-    icon: "radar",
+    body: "Rate shifts, SBA policy changes, sector tailwinds, and geographic arbitrage windows — weighted against your live pipeline. The market is always speaking. This is how you hear it.",
+    Icon: Radar,
   },
 ];
 
@@ -58,13 +78,13 @@ const TESTIMONIALS = [
     initial: "M",
   },
   {
-    quote: "TIDE surfaced a $180M BeltLine TAD commitment two months before any broker knew about it. We had three qualified acquisition targets identified before the press release hit.",
+    quote: "The Red Team flagged 54% customer concentration on a deal I was ready to sign. Both relationships were personal to the owner. The business would have been worth $400k, not $2.1M, six months after close.",
     name: "Priya S.",
     role: "Search Fund Operator, Atlanta",
     initial: "P",
   },
   {
-    quote: "The Behaviorist's profile on my target seller was more accurate than anything in the NDA package. I walked into the LOI negotiation knowing the real number before I asked for it.",
+    quote: "The Owner Dependence Audit showed the owner was working 60 hours a week and there was no management layer. The replacement cost alone erased the stated margins. We walked.",
     name: "Derek W.",
     role: "Acquisition Entrepreneur, Charlotte",
     initial: "D",
@@ -78,6 +98,29 @@ const CAPITAL_OPTIONS = [
   "$1M – $2.5M",
   "$2.5M – $5M",
   "$5M+",
+];
+
+const FAILURE_MODES = [
+  {
+    stat: "54%",
+    label: "of failed deals had customer concentration >40% in owner-personal relationships",
+    icon: AlertTriangle,
+  },
+  {
+    stat: "3.1×",
+    label: "average add-back inflation ratio in broker-presented SDE vs. verified QoE",
+    icon: BarChart3,
+  },
+  {
+    stat: "87%",
+    label: "of post-close operational failures trace to undisclosed key-person dependency",
+    icon: Layers,
+  },
+  {
+    stat: "18mo",
+    label: "median time-to-failure in deals with government contract re-compete risk at close",
+    icon: Timer,
+  },
 ];
 
 // ─── Animated counter ────────────────────────────────────────────────────────
@@ -98,7 +141,7 @@ function AnimatedStat({ value, label }: { value: string; label: string }) {
 }
 
 // ─── Feature card ────────────────────────────────────────────────────────────
-function FeatureCard({ eyebrow, title, body, icon, index }: { eyebrow: string; title: string; body: string; icon: string; index: number }) {
+function FeatureCard({ eyebrow, title, body, Icon, index }: { eyebrow: string; title: string; body: string; Icon: React.ComponentType<{ className?: string }>; index: number }) {
   const [visible, setVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -109,12 +152,12 @@ function FeatureCard({ eyebrow, title, body, icon, index }: { eyebrow: string; t
   return (
     <div
       ref={ref}
-      className={`group border border-[#e8e0d4] bg-[#faf8f5] p-8 transition-all duration-700 hover:border-[#ffba20] hover:shadow-[0_4px_32px_rgba(255,186,32,0.08)]`}
+      className="group border border-[#e8e0d4] bg-[#faf8f5] p-8 transition-all duration-700 hover:border-[#ffba20] hover:shadow-[0_4px_32px_rgba(255,186,32,0.08)]"
       style={{ transitionDelay: `${index * 80}ms`, opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(20px)" }}
     >
       <div className="flex items-start gap-4 mb-5">
-        <span className="material-symbols-outlined text-[#ffba20] text-2xl mt-0.5">{icon}</span>
-        <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase pt-1">{eyebrow}</span>
+        <Icon className="text-[#ffba20] w-5 h-5 mt-0.5 shrink-0" />
+        <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase pt-0.5">{eyebrow}</span>
       </div>
       <h3 className="font-['Fraunces',_serif] text-xl font-bold text-[#1a1208] mb-3 leading-snug group-hover:text-[#3d2e1e] transition-colors">{title}</h3>
       <p className="text-[#5c4a32] text-sm leading-relaxed">{body}</p>
@@ -149,7 +192,7 @@ function AccessRequestForm() {
   if (submitted) {
     return (
       <div className="bg-[#1a1208] border border-[#ffba20]/30 p-10 text-center">
-        <span className="material-symbols-outlined text-[#ffba20] text-4xl mb-4 block">check_circle</span>
+        <CheckCircle2 className="text-[#ffba20] w-10 h-10 mb-4 mx-auto" />
         <h3 className="font-['Fraunces',_serif] text-2xl font-black text-[#faf8f5] mb-3">Request received.</h3>
         <p className="text-[#8b7355] text-sm max-w-sm mx-auto">
           We review every request manually. If your thesis and capital access align with the platform's operator profile, you'll hear from us within 48 hours.
@@ -223,12 +266,12 @@ function AccessRequestForm() {
       >
         {requestAccess.isPending ? (
           <>
-            <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+            <Zap className="w-4 h-4 animate-spin" />
             Submitting...
           </>
         ) : (
           <>
-            <span className="material-symbols-outlined text-[18px]">lock_open</span>
+            <LockOpen className="w-4 h-4" />
             Submit Access Request
           </>
         )}
@@ -258,7 +301,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-7 h-7 bg-[#1a1208] rounded-sm flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#ffba20] text-[16px]">radar</span>
+              <Radar className="text-[#ffba20] w-4 h-4" />
             </div>
             <div>
               <div className="font-['Fraunces',_serif] font-black text-[#1a1208] text-sm leading-none">SIGNAL HUNTER</div>
@@ -284,18 +327,20 @@ export default function LandingPage() {
         <div className="max-w-4xl">
           <div className="flex items-center gap-3 mb-8">
             <div className="h-px w-12 bg-[#ffba20]" />
-              <span className="text-[10px] font-bold tracking-[0.25em] text-[#8b7355] uppercase">Acquisition Intelligence OS</span>
+            <span className="text-[10px] font-bold tracking-[0.25em] text-[#8b7355] uppercase">Acquisition Diligence Intelligence</span>
           </div>
-            <h1
+          <h1
             className="font-['Fraunces',_serif] font-black text-[#1a1208] leading-[0.92] mb-8"
             style={{ fontSize: "clamp(3.5rem, 9vw, 7rem)" }}
           >
-            The market<br />
-            <span className="text-[#ffba20]">already knows.</span><br />
-            Do you?
+            Most deals fail<br />
+            <span className="text-[#ffba20]">before they close.</span>
           </h1>
-          <p className="text-[#5c4a32] text-xl leading-relaxed max-w-2xl mb-10">
-            Most acquisition platforms give you a faster spreadsheet. Signal Hunter OS gives you a different vantage point — one where the deal is already scored, the seller is already profiled, and the federal capital is already mapped before you open the teaser.
+          <p className="text-[#5c4a32] text-xl leading-relaxed max-w-2xl mb-4">
+            70–90% of acquisitions fail to achieve their stated objectives. The failure modes are predictable. The signals are knowable before close. Signal Hunter OS surfaces them before you've spent a dollar on diligence.
+          </p>
+          <p className="text-[#8b7355] text-base leading-relaxed max-w-xl mb-10">
+            Customer concentration. Add-back inflation. Owner dependence. Contract cliffs. The Red Team finds them. The IC votes on them. You decide with full information.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <a
@@ -303,22 +348,22 @@ export default function LandingPage() {
               onClick={(e) => { e.preventDefault(); document.getElementById("request-access")?.scrollIntoView({ behavior: "smooth" }); }}
               className="inline-flex items-center justify-center gap-2 bg-[#1a1208] text-[#faf8f5] text-base font-semibold px-8 py-4 hover:bg-[#3d2e1e] transition-colors"
             >
-              <span className="material-symbols-outlined text-[#ffba20] text-[20px]">lock_open</span>
+              <LockOpen className="text-[#ffba20] w-5 h-5" />
               Request Operator Access
             </a>
             <Link
-              href="/explore"
+              href="/demo-tour"
               className="inline-flex items-center justify-center gap-2 border border-[#1a1208] text-[#1a1208] text-base font-medium px-8 py-4 hover:bg-[#1a1208] hover:text-[#faf8f5] transition-colors"
             >
-              <span className="material-symbols-outlined text-[20px]">search</span>
-              Browse Active Deals
+              <Search className="w-5 h-5" />
+              See a live diligence run
             </Link>
             <Link
-              href="/demo-tour"
+              href="/explore"
               className="inline-flex items-center justify-center gap-2 text-[#5c4a32] text-base font-medium px-4 py-4 hover:text-[#1a1208] transition-colors underline underline-offset-4 decoration-[#ffba20]"
             >
-              See a live thesis
-              <span className="material-symbols-outlined text-[18px]">arrow_right_alt</span>
+              Browse active deals
+              <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
@@ -327,8 +372,26 @@ export default function LandingPage() {
         <div className="mt-20 border-t border-[#e8e0d4]" />
       </section>
 
-      {/* ── Stats strip ── */}
+      {/* ── Failure mode stats strip ── */}
       <section className="py-16 px-6 bg-[#1a1208]">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center gap-3 mb-10">
+            <div className="h-px w-8 bg-[#ffba20]" />
+            <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">The Failure Modes Are Knowable</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+            {FAILURE_MODES.map((f) => (
+              <div key={f.stat} className="border-l-2 border-[#ffba20]/30 pl-5">
+                <div className="font-['Fraunces',_serif] text-4xl lg:text-5xl font-black text-[#ffba20] leading-none mb-3">{f.stat}</div>
+                <p className="text-[#8b7355] text-xs leading-relaxed">{f.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Stats strip ── */}
+      <section className="py-16 px-6 bg-[#f2ede6]">
         <div className="max-w-7xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-12">
           {STATS.map((s) => (
             <AnimatedStat key={s.label} value={s.value} label={s.label} />
@@ -345,10 +408,10 @@ export default function LandingPage() {
               <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">The System</span>
             </div>
             <h2 className="font-['Fraunces',_serif] text-4xl lg:text-5xl font-black text-[#1a1208] leading-tight mb-6">
-              Six layers of intelligence. One unfair advantage.
+              Six diligence layers. Before the teaser.
             </h2>
             <p className="text-[#5c4a32] leading-relaxed mb-8">
-              The information asymmetry in acquisition has always existed. Signal Hunter OS is what happens when you close it — permanently, and in your favor.
+              The failure modes in acquisition are predictable. The signals are in the data. Signal Hunter OS reads them before you open the broker deck — so you walk in knowing what you're actually buying.
             </p>
             <a
               href="#request-access"
@@ -356,7 +419,7 @@ export default function LandingPage() {
               className="inline-flex items-center gap-2 text-sm font-semibold text-[#1a1208] border-b-2 border-[#ffba20] pb-0.5 hover:text-[#ffba20] transition-colors"
             >
               Get operator access
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+              <ArrowRight className="w-4 h-4" />
             </a>
           </div>
           <div className="lg:col-span-8 grid sm:grid-cols-2 gap-4">
@@ -367,6 +430,32 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Demo CTA strip ── */}
+      <section className="py-16 px-6 bg-[#1a1208]">
+        <div className="max-w-5xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-8">
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-px w-8 bg-[#ffba20]" />
+              <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Live Demo</span>
+            </div>
+            <h2 className="font-['Fraunces',_serif] text-3xl lg:text-4xl font-black text-[#faf8f5] leading-tight mb-3">
+              Watch the IC vote no on a $2.1M deal.<br />
+              <span className="text-[#ffba20]">See exactly why.</span>
+            </h2>
+            <p className="text-[#8b7355] text-base max-w-xl">
+              A real composite deal. Broker sheet signals only. Three models. Unanimous verdict. The failure modes were all knowable before close.
+            </p>
+          </div>
+          <Link
+            href="/demo-tour"
+            className="shrink-0 inline-flex items-center gap-2 bg-[#ffba20] text-[#1a1208] font-bold text-sm px-8 py-4 hover:bg-[#ffd060] transition-colors whitespace-nowrap"
+          >
+            <ArrowRightLeft className="w-4 h-4" />
+            Run the demo diligence
+          </Link>
+        </div>
+      </section>
+
       {/* ── Testimonials ── */}
       <section className="py-24 px-6 bg-[#f2ede6]">
         <div className="max-w-7xl mx-auto">
@@ -374,7 +463,7 @@ export default function LandingPage() {
             <div className="h-px w-8 bg-[#ffba20]" />
             <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">From the Field</span>
           </div>
-          <h2 className="font-['Fraunces',_serif] text-4xl font-black text-[#1a1208] mb-14">From the field.</h2>
+          <h2 className="font-['Fraunces',_serif] text-4xl font-black text-[#1a1208] mb-14">Deals that didn't close. On purpose.</h2>
           <div className="grid md:grid-cols-3 gap-8">
             {TESTIMONIALS.map((t) => (
               <div key={t.name} className="bg-[#faf8f5] border border-[#e8e0d4] p-8">
@@ -405,20 +494,20 @@ export default function LandingPage() {
                 <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Access</span>
               </div>
               <h2 className="font-['Fraunces',_serif] text-5xl lg:text-6xl font-black text-[#faf8f5] leading-tight mb-6">
-                The advantage<br />
-                <span className="text-[#ffba20]">compounds.</span>
+                The diligence<br />
+                <span className="text-[#ffba20]">that protects you.</span>
               </h2>
               <p className="text-[#8b7355] text-lg mb-8 leading-relaxed">
                 Signal Hunter OS is invite-only. Access is granted to operators with a defined deal thesis, verified capital access, and a bias toward execution over deliberation.
               </p>
               <div className="space-y-4">
                 {[
-                  { icon: "verified", text: "Manual review — every request is read by a human" },
-                  { icon: "timer", text: "48-hour response for qualified operators" },
-                  { icon: "lock", text: "No credit card required to request access" },
+                  { Icon: ShieldCheck, text: "Manual review — every request is read by a human" },
+                  { Icon: Timer, text: "48-hour response for qualified operators" },
+                  { Icon: Lock, text: "No credit card required to request access" },
                 ].map((item) => (
-                  <div key={item.icon} className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-[#ffba20] text-[18px]">{item.icon}</span>
+                  <div key={item.text} className="flex items-center gap-3">
+                    <item.Icon className="text-[#ffba20] w-4 h-4 shrink-0" />
                     <span className="text-[#8b7355] text-sm">{item.text}</span>
                   </div>
                 ))}
@@ -430,7 +519,7 @@ export default function LandingPage() {
                   className="inline-flex items-center gap-2 text-[#faf8f5] text-sm font-medium border-b border-[#8b7355] pb-0.5 hover:border-[#ffba20] hover:text-[#ffba20] transition-colors"
                 >
                   Sign in to your account
-                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                  <ArrowRight className="w-4 h-4" />
                 </a>
               </div>
             </div>
@@ -446,15 +535,16 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 bg-[#1a1208] rounded-sm flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#ffba20] text-[11px]">radar</span>
+              <Radar className="text-[#ffba20] w-3 h-3" />
             </div>
             <span className="font-['Fraunces',_serif] font-black text-[#1a1208] text-xs">SIGNAL HUNTER OS</span>
           </div>
           <div className="text-[#8b7355] text-xs">
-            A Third Signal Lab product. Acquisition intelligence for the independent operator.
+            A Third Signal Lab product. Acquisition diligence intelligence for the independent operator.
           </div>
           <div className="flex items-center gap-6 text-xs text-[#8b7355]">
             <Link href="/explore" className="hover:text-[#1a1208] transition-colors">Browse Deals</Link>
+            <Link href="/demo-tour" className="hover:text-[#1a1208] transition-colors">Demo</Link>
             <a href={loginUrl} className="hover:text-[#1a1208] transition-colors">Sign In</a>
           </div>
         </div>

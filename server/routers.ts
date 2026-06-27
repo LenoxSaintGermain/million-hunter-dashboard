@@ -31,6 +31,7 @@ import { inviteRouter } from "./inviteRouter";
 import { stackRouter } from "./stackRouter";
 import { rippleRouter } from "./rippleRouter";
 import { agentRouter } from "./routers/agentRouter";
+import { rolePermissionsRouter } from "./rolePermissionsRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -2273,6 +2274,7 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
   thesis: thesisRouter,
   tide: tideRouter,
   ripple: rippleRouter,
+  rolePermissions: rolePermissionsRouter,
   // ─── LOI Generation (GEMINI 3.1 FLASH — Agentic Drafting) ────────────────────
   loi: router({
     generate: protectedProcedure

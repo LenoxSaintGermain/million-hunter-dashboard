@@ -832,3 +832,16 @@ export const ripplePipelineJobs = mysqlTable("ripple_pipeline_jobs", {
 });
 export type RipplePipelineJob = typeof ripplePipelineJobs.$inferSelect;
 export type InsertRipplePipelineJob = typeof ripplePipelineJobs.$inferInsert;
+
+// ─── Role Module Permissions ──────────────────────────────────────────────────
+// Controls which modules each role can access. Operator can toggle these from
+// the Admin Panel. Changes take effect immediately on next nav render.
+export const roleModulePermissions = mysqlTable("role_module_permissions", {
+  id: int("id").autoincrement().primaryKey(),
+  role: mysqlEnum("role", ["admin", "investor", "insurance", "user"]).notNull(),
+  moduleKey: varchar("module_key", { length: 64 }).notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type RoleModulePermission = typeof roleModulePermissions.$inferSelect;
+export type InsertRoleModulePermission = typeof roleModulePermissions.$inferInsert;

@@ -1,0 +1,337 @@
+{
+  "library_version": "1.0.0",
+  "last_updated": "2026-06-27",
+  "methodology": "Composite anonymized deals synthesized from documented acquisition failure patterns in ETA literature, Acquiring Minds post-mortems, and M&A practitioner case studies. No real company names or identifying information. Failure modes are structurally accurate.",
+  "sources": [
+    "Acquiring Minds Ep. 337 — Jed Morris, 24 Acquisition Nightmares (Mar 2025)",
+    "Acquiring Minds — Dan Burnside, Buying Then Losing a $2.1m HVAC Business (Apr 2026)",
+    "AcquisitionStars.com — 8 Reasons Business Acquisitions Fail (Mar 2026)",
+    "MineolaSP — How to Price, Structure, and Diligence Around Customer Concentration (Jun 2025)",
+    "RapidDiligence — Owner-Dependent Revenue: Will It Survive After Close? (Aug 2025)",
+    "Yale SOM — Ten Reasons to Not Pursue ETA (Apr 2025)"
+  ],
+  "deals": [
+    {
+      "id": "GT-001",
+      "codename": "Apex Commercial Cleaning",
+      "composite_basis": "HVAC + commercial services failure pattern — customer concentration + owner dependence double-trigger",
+      "industry": "Commercial Cleaning Services",
+      "geography": "Charlotte, NC",
+      "asking_price": 2100000,
+      "stated_sde": 720000,
+      "stated_revenue": 1850000,
+      "multiple_asked": 2.9,
+      "years_in_business": 11,
+      "employees": 14,
+      "broker_description": "Established commercial cleaning company with 11-year track record. Consistent revenue growth. Owner retiring. Strong recurring contract base. SBA pre-qualified.",
+      "pre_acquisition_signals": {
+        "financial": [
+          {
+            "signal": "Owner add-backs represent 31% of stated SDE",
+            "detail": "$223k in add-backs: $85k owner salary above market replacement, $62k personal vehicle fleet, $41k 'consulting' payments to family members, $35k one-time equipment write-off claimed as recurring",
+            "knowable_before_close": true,
+            "detection_method": "Quality of Earnings analysis — normalized SDE drops to ~$497k, multiple jumps to 4.2x on true earnings",
+            "severity": "critical"
+          },
+          {
+            "signal": "Revenue growth is contract-count flat, not organic",
+            "detail": "Revenue grew 18% over 3 years but contract count stayed at 23. Growth came entirely from rate increases on existing clients. No new logo acquisition in 24 months.",
+            "knowable_before_close": true,
+            "detection_method": "Customer-level revenue cohort analysis — ask for revenue by client by year",
+            "severity": "high"
+          },
+          {
+            "signal": "Deferred maintenance inflating margins",
+            "detail": "Equipment replacement schedule shows 6 of 9 floor machines are 7+ years old. Industry replacement cycle is 5 years. $180k capex backlog not reflected in financials.",
+            "knowable_before_close": true,
+            "detection_method": "Equipment schedule review + industry capex benchmarking",
+            "severity": "high"
+          }
+        ],
+        "customer_concentration": [
+          {
+            "signal": "Top 2 clients = 54% of revenue",
+            "detail": "Client A (regional hospital system): $512k/yr, 28% of revenue. Client B (office park management co): $484k/yr, 26% of revenue. Both relationships are personal to the owner — owner plays golf with both decision-makers.",
+            "knowable_before_close": true,
+            "detection_method": "Revenue-by-customer schedule — standard diligence request",
+            "severity": "critical"
+          },
+          {
+            "signal": "Hospital contract up for rebid in 14 months",
+            "detail": "Client A's master services agreement expires 14 months post-close. No auto-renewal clause. Hospital procurement policy requires competitive rebid above $400k/yr.",
+            "knowable_before_close": true,
+            "detection_method": "Contract review — request all customer agreements with term dates",
+            "severity": "critical"
+          },
+          {
+            "signal": "Client B relationship is entirely owner-personal",
+            "detail": "Client B's property manager has been a personal friend of the owner for 9 years. No formal contract — month-to-month verbal agreement. $484k/yr on a handshake.",
+            "knowable_before_close": true,
+            "detection_method": "Contract review reveals no written agreement; customer reference call confirms personal relationship",
+            "severity": "critical"
+          }
+        ],
+        "owner_dependence": [
+          {
+            "signal": "Owner works 55-60 hours/week in the business",
+            "detail": "Owner handles all sales, all client relationship management, all hiring/firing, and covers shifts when workers call out. No operations manager. No sales process. No CRM.",
+            "knowable_before_close": true,
+            "detection_method": "Owner time audit — ask owner to log their week; reference checks with employees",
+            "severity": "critical"
+          },
+          {
+            "signal": "Zero documented SOPs",
+            "detail": "No written cleaning protocols, no onboarding documentation, no quality control checklists. All operational knowledge is in the owner's head.",
+            "knowable_before_close": true,
+            "detection_method": "Operational due diligence — request employee handbook, SOPs, training materials",
+            "severity": "high"
+          },
+          {
+            "signal": "No management layer below owner",
+            "detail": "14 employees, all hourly cleaners. No supervisor, no lead, no one with authority to make decisions. Owner is the only person who can authorize overtime, handle client complaints, or approve supply orders.",
+            "knowable_before_close": true,
+            "detection_method": "Org chart review + employee interviews",
+            "severity": "high"
+          }
+        ],
+        "operational": [
+          {
+            "signal": "High employee turnover masked by revenue stability",
+            "detail": "Annual turnover rate is 87%. The owner is constantly rehiring and retraining. Revenue stability is maintained only because the owner personally covers gaps. A new owner without this capacity will face immediate service quality issues.",
+            "knowable_before_close": true,
+            "detection_method": "Payroll records — count unique employee IDs over 24 months vs. current headcount",
+            "severity": "high"
+          },
+          {
+            "signal": "Insurance lapse history",
+            "detail": "General liability policy lapsed for 47 days in 2023 due to owner missing renewal. No claims during lapse but hospital contract technically void during that period.",
+            "knowable_before_close": true,
+            "detection_method": "Insurance certificate review — request certificates of insurance for past 3 years",
+            "severity": "medium"
+          }
+        ]
+      },
+      "actual_outcome": {
+        "scenario": "Post-close failure within 18 months",
+        "timeline": [
+          { "month": 1, "event": "Owner transitions out per agreement. Buyer takes over client relationships." },
+          { "month": 3, "event": "Client B (office park, $484k/yr) gives 30-day notice. Property manager 'decided to go with someone my cousin recommended.' No contract to enforce." },
+          { "month": 6, "event": "Revenue drops to $1.37M annualized. Debt service requires $1.5M+ revenue at current margins." },
+          { "month": 9, "event": "Hospital contract rebid opens. Buyer submits competitive bid. Loses to lower-cost competitor — hospital procurement team has no relationship with new owner." },
+          { "month": 14, "event": "Revenue at $890k. Business cannot service SBA debt. Buyer approaches SBA about workout." },
+          { "month": 18, "event": "Business sold at distressed price of $340k. Buyer loss: ~$1.76M including equity, personal guarantee exposure, and working capital consumed." }
+        ],
+        "total_buyer_loss_estimate": 1760000,
+        "failure_mode_primary": "customer_concentration_owner_personal",
+        "failure_mode_secondary": "owner_dependence_no_management_layer"
+      },
+      "red_team_verdict": {
+        "recommendation": "DO NOT PROCEED at current terms",
+        "confidence": 0.94,
+        "primary_concerns": [
+          "54% revenue concentration in 2 clients, both owner-personal relationships — structural, not addressable through earnout",
+          "Hospital contract rebid within 14 months of close creates binary revenue cliff",
+          "Client B on verbal month-to-month — $484k/yr with zero contractual protection",
+          "True normalized SDE is ~$497k, not $720k — buyer is paying 4.2x real earnings, not 2.9x",
+          "Owner is the entire management layer — replacement cost alone erodes stated margins"
+        ],
+        "conditional_path": "Deal could be restructured: (1) Price at $1.2M max on true SDE, (2) 40% earnout tied to Client A and Client B retention at 24 months post-close, (3) Owner employment agreement minimum 18 months, (4) Hospital contract renewal as closing condition, (5) Written contract with Client B as closing condition",
+        "walk_away_triggers": [
+          "Client B refuses to sign written contract",
+          "Hospital will not confirm intent to renew",
+          "Seller refuses QoE audit",
+          "Add-backs cannot be independently verified"
+        ]
+      },
+      "ic_consensus": {
+        "model_1_claude": {
+          "vote": "NO",
+          "confidence": 0.91,
+          "rationale": "The customer concentration pattern here is not a negotiable risk — it is a structural defect. Two relationships that are personal to the seller represent 54% of revenue. No earnout structure adequately protects against this because the risk materializes after the earnout measurement period. The QoE gap alone ($223k in questionable add-backs) warrants a full stop pending independent verification. I would not proceed at any price above $1.1M without written contracts from both concentration clients and a verified QoE."
+        },
+        "model_2_gemini": {
+          "vote": "NO — RESTRUCTURE REQUIRED",
+          "confidence": 0.87,
+          "rationale": "The business has real underlying value — 11 years of operation, established client relationships, recurring revenue model. The problem is entirely structural: the value is trapped in the owner's personal relationships and not transferable at the stated price. A restructured deal at $1.2-1.4M with 35-40% earnout tied to 24-month client retention, combined with an 18-month owner transition agreement, could work. At $2.1M with a standard 6-month transition, this deal has a high probability of failure."
+        },
+        "model_3_sonar": {
+          "vote": "NO",
+          "confidence": 0.89,
+          "rationale": "Market data supports the concern: commercial cleaning businesses with >40% customer concentration in owner-personal relationships trade at 1.8-2.2x SDE, not 2.9x. The hospital contract rebid risk alone — a binary $512k/yr revenue event 14 months post-close — is unacceptable without a contractual protection. Current market has multiple comparable businesses at 2.2-2.5x with diversified client bases. The opportunity cost of this deal is high."
+        },
+        "consensus": "UNANIMOUS NO at current terms",
+        "divergence_flag": false,
+        "divergence_note": "All three models agree on rejection. Gemini is the most constructive — identifies a conditional restructured path. Claude and Sonar are harder stops."
+      },
+      "demo_use": true,
+      "demo_narrative": "This deal looked clean on the broker sheet. $1.85M revenue, 11-year track record, SBA pre-qualified, owner retiring. The IC ran it. All three models voted no. Here's what they found."
+    },
+    {
+      "id": "GT-002",
+      "codename": "Piedmont Pest Control",
+      "composite_basis": "Route-based services failure — fake growth via add-backs + key employee departure risk",
+      "industry": "Pest Control (Residential Route)",
+      "geography": "Atlanta, GA",
+      "asking_price": 2270000,
+      "stated_sde": 650000,
+      "stated_revenue": 1500000,
+      "multiple_asked": 3.5,
+      "years_in_business": 8,
+      "employees": 9,
+      "broker_description": "Established residential pest control route with 1,200 recurring accounts. Owner-operated. Strong recurring revenue. Priced to sell.",
+      "pre_acquisition_signals": {
+        "financial": [
+          {
+            "signal": "Revenue growth driven by price increases, not account growth",
+            "detail": "Account count grew from 1,180 to 1,200 over 3 years (+1.7%). Revenue grew 34% over same period. Entire growth is price inflation, not volume. Churn rate is 22%/year — owner is running hard just to stay flat on accounts.",
+            "knowable_before_close": true,
+            "detection_method": "Account-level cohort analysis — new accounts vs. churned accounts by year",
+            "severity": "high"
+          },
+          {
+            "signal": "SDE add-backs include $95k 'owner discretionary' that is actually labor cost",
+            "detail": "Owner personally performs 30% of service routes. The $95k add-back assumes a new owner won't do this work. But a replacement technician costs $65-75k fully loaded. Net add-back is $20-30k, not $95k.",
+            "knowable_before_close": true,
+            "detection_method": "Owner time audit + market rate for licensed pest control technician",
+            "severity": "high"
+          }
+        ],
+        "customer_concentration": [
+          {
+            "signal": "No single customer >3% — concentration risk is LOW",
+            "detail": "1,200 residential accounts, largest is $4,200/yr. This is the one genuinely clean data point in this deal.",
+            "knowable_before_close": true,
+            "detection_method": "Revenue-by-customer schedule",
+            "severity": "none"
+          }
+        ],
+        "owner_dependence": [
+          {
+            "signal": "Lead technician (8 years) is planning to leave",
+            "detail": "Not disclosed by seller. Reference check with employees reveals lead tech has been interviewing. He holds the state applicator license that covers 60% of the service territory. If he leaves, company must either hire a new licensed applicator or lose service authorization for those routes.",
+            "knowable_before_close": true,
+            "detection_method": "Employee reference checks — ask 'who would you be most concerned about losing?'",
+            "severity": "critical"
+          }
+        ]
+      },
+      "actual_outcome": {
+        "scenario": "Partial failure — business survives but buyer significantly overpaid",
+        "timeline": [
+          { "month": 2, "event": "Lead technician gives notice. Buyer scrambles to find licensed replacement." },
+          { "month": 4, "event": "Service quality drops during transition. 140 accounts churn in 60 days — 3x normal rate." },
+          { "month": 8, "event": "Replacement technician hired at $72k. True SDE now ~$480k vs. stated $650k." },
+          { "month": 12, "event": "Business stabilized but buyer paid $2.27M for a $480k SDE business — effective multiple of 4.7x." }
+        ],
+        "total_buyer_loss_estimate": 820000,
+        "failure_mode_primary": "undisclosed_key_employee_departure",
+        "failure_mode_secondary": "add_back_inflation"
+      },
+      "red_team_verdict": {
+        "recommendation": "PROCEED WITH RESTRUCTURE",
+        "confidence": 0.78,
+        "primary_concerns": [
+          "Lead technician departure risk is critical and undisclosed — this is a material omission",
+          "True SDE is ~$480-510k after correcting labor add-back, not $650k",
+          "At corrected SDE, asking price of $2.27M is 4.5x — overpriced for a residential route business (market: 3.0-3.5x)",
+          "22% annual churn rate is high for residential pest control (industry average: 15-18%)"
+        ],
+        "conditional_path": "Price at $1.6M max. Key technician retention bonus as closing condition. Earnout tied to 12-month account retention above 1,100 accounts.",
+        "walk_away_triggers": [
+          "Lead technician will not sign retention agreement",
+          "Seller refuses to disclose employee departure discussions",
+          "Account churn rate cannot be verified from records"
+        ]
+      },
+      "demo_use": false
+    },
+    {
+      "id": "GT-003",
+      "codename": "Logistics Express Charlotte",
+      "composite_basis": "Government/commercial logistics — contract cliff risk + driver shortage structural issue",
+      "industry": "Last-Mile Logistics & Delivery",
+      "geography": "Charlotte, NC",
+      "asking_price": 7600000,
+      "stated_sde": 1900000,
+      "stated_revenue": 6500000,
+      "multiple_asked": 4.0,
+      "years_in_business": 14,
+      "employees": 38,
+      "broker_description": "Established logistics and delivery company serving commercial and government clients. Long-term contracts. Strong management team. Owner stepping back.",
+      "pre_acquisition_signals": {
+        "financial": [
+          {
+            "signal": "47% of revenue from one government contract expiring in 18 months",
+            "detail": "$3.05M/yr federal delivery contract. GSA schedule contract. Up for re-compete. Incumbent advantage exists but is not guaranteed. Loss of this contract makes the business cash-flow negative.",
+            "knowable_before_close": true,
+            "detection_method": "Contract review — all government contracts have public expiration dates on SAM.gov",
+            "severity": "critical"
+          },
+          {
+            "signal": "Driver shortage is structural, not cyclical",
+            "detail": "Company is currently operating at 78% capacity due to CDL driver shortage. Revenue is capacity-constrained. The $6.5M revenue figure is below the company's contracted capacity. Full capacity revenue would be $8.3M but cannot be achieved without drivers the market does not have.",
+            "knowable_before_close": true,
+            "detection_method": "Operational capacity analysis — compare contracted routes to active routes",
+            "severity": "high"
+          }
+        ],
+        "customer_concentration": [
+          {
+            "signal": "Government contract = 47% revenue, commercial top 3 = additional 31%",
+            "detail": "Total top-4 concentration: 78% of revenue. Government contract is the existential risk.",
+            "knowable_before_close": true,
+            "detection_method": "Revenue-by-customer schedule",
+            "severity": "critical"
+          }
+        ]
+      },
+      "actual_outcome": {
+        "scenario": "Deal did not close — buyer walked after diligence",
+        "timeline": [
+          { "month": 0, "event": "LOI signed at $7.6M." },
+          { "month": 2, "event": "QoE reveals government contract expiration. Buyer requests price reduction." },
+          { "month": 3, "event": "Seller refuses price reduction. Buyer walks. Deal dead." }
+        ],
+        "total_buyer_loss_estimate": 45000,
+        "failure_mode_primary": "deal_did_not_close_diligence_kill",
+        "failure_mode_secondary": "none"
+      },
+      "red_team_verdict": {
+        "recommendation": "DO NOT PROCEED at current terms — government contract re-compete is binary risk",
+        "confidence": 0.96,
+        "primary_concerns": [
+          "47% revenue on a contract expiring 18 months post-close is an existential binary event",
+          "No SBA lender will approve this deal without contract renewal confirmation",
+          "True enterprise value without government contract: ~$3.2M (commercial-only revenue at market multiple)",
+          "Driver shortage caps upside even if government contract renews"
+        ],
+        "conditional_path": "Price at $3.5M with $2.5M earnout tied to government contract renewal AND 24-month retention. Effectively a contingent acquisition.",
+        "walk_away_triggers": [
+          "Seller will not accept contingent pricing",
+          "Government agency will not provide letter of intent to renew",
+          "SBA lender declines without contract confirmation"
+        ]
+      },
+      "demo_use": false
+    }
+  ],
+  "rigor_gate_test": {
+    "test_date": "2026-06-27",
+    "test_deal": "GT-001",
+    "methodology": "Fed pre-acquisition broker sheet signals only (no outcome data) to Red Team. Verified Red Team surfaces the correct failure modes.",
+    "input_signals": [
+      "Revenue: $1.85M, SDE: $720k, Asking: $2.1M, Multiple: 2.9x",
+      "Industry: Commercial Cleaning, Geography: Charlotte NC",
+      "Years in business: 11, Employees: 14",
+      "Broker notes: 'Consistent revenue growth, recurring contract base, owner retiring, SBA pre-qualified'",
+      "Add-backs provided: $223k total (owner salary differential, vehicle fleet, family consulting, equipment write-off)",
+      "Top 2 clients: 54% of revenue (hospital system + office park management)",
+      "Owner works 55-60 hours/week",
+      "No operations manager on staff"
+    ],
+    "red_team_output_summary": "Red Team correctly identified: (1) add-back inflation as primary financial concern, (2) customer concentration as structural defect, (3) owner dependence as management risk, (4) recommended QoE as immediate next step, (5) recommended contract review for top 2 clients. All 5 correct failure modes surfaced from pre-acquisition signals only.",
+    "rigor_gate_passed": true,
+    "rigor_gate_confidence": 0.94,
+    "notes": "Red Team did not have access to outcome data. It identified the hospital contract rebid risk only after being prompted to check contract terms — this is a gap. A future enhancement should include automated contract term extraction as a standard diligence step."
+  }
+}

@@ -15,7 +15,8 @@ import { toast } from "sonner";
 import {
   Users, Shield, TrendingUp, Building2, BarChart3,
   RefreshCw, ChevronDown, Lock, UserCheck, Activity,
-  Link2, Copy, Trash2, Clock, CheckCircle2, Mail
+  Link2, Copy, Trash2, Clock, CheckCircle2, Mail,
+  ToggleLeft, ToggleRight, RotateCcw, SlidersHorizontal
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -123,6 +124,150 @@ function UserTableRow({ user, onRoleChange }: {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 // ─── Invite Manager ──────────────────────────────────────────────────────────
+// ─── Module Permissions Matrix ───────────────────────────────────────────────
+const ROLE_LABELS_PERM: Record<string, string> = {
+  admin: "Admin",
+  investor: "Investor",
+  insurance: "Insurance",
+  user: "User",
+};
+
+const PERM_ROLES = ["investor", "insurance", "user"] as const;
+type PermRole = typeof PERM_ROLES[number];
+
+function ModulePermissionsMatrix() {
+  const utils = trpc.useUtils();
+  const [activeRole, setActiveRole] = useState<PermRole>("investor");
+
+  const { data, isLoading } = trpc.rolePermissions.getAll.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+
+  const setPermission = trpc.rolePermissions.setPermission.useMutation({
+    onMutate: async ({ role, moduleKey, enabled }) => {
+      await utils.rolePermissions.getAll.cancel();
+      const prev = utils.rolePermissions.getAll.getData();
+      utils.rolePermissions.getAll.setData(undefined, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          permissions: old.permissions.map((p) =>
+            p.role === role && p.moduleKey === moduleKey ? { ...p, enabled } : p
+          ),
+        };
+      });
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) utils.rolePermissions.getAll.setData(undefined, ctx.prev);
+      toast.error("Failed to update permission");
+    },
+    onSettled: () => utils.rolePermissions.getAll.invalidate(),
+  });
+
+  const resetToDefaults = trpc.rolePermissions.resetToDefaults.useMutation({
+    onSuccess: () => {
+      utils.rolePermissions.getAll.invalidate();
+      toast.success(`${ROLE_LABELS_PERM[activeRole]} permissions reset to defaults`);
+    },
+    onError: (e) => toast.error(`Reset failed: ${e.message}`),
+  });
+
+  const modules = data?.modules ?? [];
+  const permissions = data?.permissions ?? [];
+
+  const isEnabled = (role: string, moduleKey: string) => {
+    const row = permissions.find((p) => p.role === role && p.moduleKey === moduleKey);
+    return row?.enabled ?? false;
+  };
+
+  return (
+    <Card style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border)" }}>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <SlidersHorizontal className="w-4 h-4 text-primary" />
+              Module Access Control
+            </CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              Toggle which modules each role can access. Changes take effect immediately.
+            </CardDescription>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs border-[var(--sh-border)] gap-1"
+            onClick={() => resetToDefaults.mutate({ role: activeRole })}
+            disabled={resetToDefaults.isPending}
+          >
+            <RotateCcw className="w-3 h-3" />
+            Reset {ROLE_LABELS_PERM[activeRole]}
+          </Button>
+        </div>
+        {/* Role tabs */}
+        <div className="flex gap-2 mt-3">
+          {PERM_ROLES.map((role) => (
+            <button
+              key={role}
+              onClick={() => setActiveRole(role)}
+              className={`text-[11px] px-3 py-1 rounded-full border font-medium transition-colors ${
+                activeRole === role
+                  ? ROLE_COLORS[role] + " border-current"
+                  : "text-muted-foreground border-[var(--sh-border)] hover:border-primary/30"
+              }`}
+            >
+              {ROLE_LABELS_PERM[role]}
+            </button>
+          ))}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {modules.map((mod) => {
+              const enabled = isEnabled(activeRole, mod.key);
+              return (
+                <div
+                  key={mod.key}
+                  className={`flex items-center justify-between py-2.5 px-4 rounded-lg border transition-colors cursor-pointer ${
+                    enabled
+                      ? "border-primary/20 hover:border-primary/40"
+                      : "border-[var(--sh-border)] opacity-60 hover:opacity-80"
+                  }`}
+                  style={{ background: enabled ? "var(--sh-surface-2)" : "transparent" }}
+                  onClick={() => {
+                    setPermission.mutate({ role: activeRole, moduleKey: mod.key, enabled: !enabled });
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                      enabled ? "bg-emerald-500" : "bg-muted-foreground/30"
+                    }`} />
+                    <span className="text-sm font-medium text-foreground">{mod.label}</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">{mod.href}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {enabled ? (
+                      <ToggleRight className="w-5 h-5 text-emerald-500" />
+                    ) : (
+                      <ToggleLeft className="w-5 h-5 text-muted-foreground/40" />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function InviteManager() {
   const utils = trpc.useUtils();
   const [newLabel, setNewLabel] = useState("");
@@ -564,65 +709,8 @@ export default function AdminPanel() {
         {/* Invite Manager */}
         <InviteManager />
 
-        {/* Role Guide */}
-        <Card style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border)" }}>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Activity className="w-4 h-4 text-primary" />
-              Role Access Guide
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[
-                {
-                  role: "admin",
-                  label: "Admin",
-                  description: "Full platform access. User management, all modules, admin panel.",
-                  access: ["Command Center", "Market Scan", "Deal Room", "TIDE Intelligence", "Admin Panel", "All modules"],
-                },
-                {
-                  role: "investor",
-                  label: "Investor",
-                  description: "Investor-facing modules. Can view deals, submit interest, access dossiers.",
-                  access: ["Investor Dossier", "Freedom Map", "Strategy Blender", "Opportunity Radar", "Market Scan (read)"],
-                },
-                {
-                  role: "insurance",
-                  label: "Insurance",
-                  description: "Insurance prospecting module. Scores deals as insurance prospects, generates pre-call briefs.",
-                  access: ["Insurance Prospector", "Deal Pipeline (read-only)", "Prospect Briefs", "Status Management"],
-                },
-                {
-                  role: "user",
-                  label: "User",
-                  description: "Default role. Limited access pending operator review.",
-                  access: ["Command Center (read)", "Basic deal view"],
-                },
-              ].map((r) => (
-                <div
-                  key={r.role}
-                  className="p-3 rounded-lg border"
-                  style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border)" }}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`text-[10px] px-2 py-0.5 rounded border font-medium ${ROLE_COLORS[r.role]}`}>
-                      {r.label}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-2">{r.description}</p>
-                  <div className="flex flex-wrap gap-1">
-                    {r.access.map((a) => (
-                      <span key={a} className="text-[9px] px-1.5 py-0.5 rounded bg-muted/30 text-muted-foreground border border-border">
-                        {a}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Module Permissions Matrix */}
+        <ModulePermissionsMatrix />
       </div>
     </EditorialTopNav>
   );

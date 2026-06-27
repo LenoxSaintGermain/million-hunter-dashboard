@@ -113,6 +113,20 @@
       "when": 1782099669449,
       "tag": "0015_soft_bill_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1782315883131,
+      "tag": "0016_quick_maestro",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1782315975121,
+      "tag": "0017_free_sersi",
+      "breakpoints": true
     }
   ]
 }

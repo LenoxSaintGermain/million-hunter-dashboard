@@ -867,3 +867,60 @@
 - [x] Gated CTA → Request Access on landing page
 - [x] LandingPage.tsx "See a live thesis" → /demo-tour
 - [x] 96/96 tests passing, 0 TS errors, checkpoint saved
+
+## Sprint 51 — Role-Based Module Permissions
+
+- [ ] Audit all nav modules and map to route keys (command_center, market_scan, tide, memos, outreach, deal_room, asset_scout, opportunity_radar, strategy_blender, freedom_map, ripple_effect, settings, admin)
+- [ ] Add role_module_permissions table: id, role (enum: operator/investor/user), module_key (string), enabled (bool), updated_at
+- [ ] Seed defaults: operator = all ON; investor = market_scan, deal_room, tide, memos, outreach ON; user = none
+- [ ] Add rolePermissions tRPC router: getAll (admin only), setPermission (admin only), getMyPermissions (protected — returns array of allowed module keys for current user)
+- [ ] Mount rolePermissions router in appRouter
+- [ ] Admin panel: add "Module Access" tab with role x module toggle matrix (3 columns: Operator / Investor / User, rows = all modules)
+- [ ] useModulePermissions hook — fetches user's allowed modules from trpc.rolePermissions.getMyPermissions, cached, returns Set<string>
+- [ ] EditorialTopNav: use useModulePermissions to hide nav links for modules user doesn't have access to
+- [ ] Route guard: PermissionGuard component — wraps protected routes, redirects to /unauthorized if module not in user's permission set
+- [ ] /unauthorized page — clean "Access Restricted" page with back button
+- [ ] Wire PermissionGuard around all non-admin routes in App.tsx
+- [ ] Tests for rolePermissions procedures (getAll, setPermission, getMyPermissions)
+- [ ] Checkpoint
+
+## TSL-BUILD-2026-003 — Diligence Reframe
+
+### WP4: Ground Truth Deal Library + Rigor Gate
+- [ ] Research ≥5 Acquiring Minds post-mortems, extract structured facts per schema
+- [ ] Build composite anonymized deal for public demo (no real names/identifiers)
+- [ ] Run rigor gate: feed pre-acquisition signals only to Red Team, verify it surfaces the correct failure mode
+- [ ] Save Ground Truth Library as JSON fixture at server/fixtures/ground-truth-deals.json
+- [ ] Document raw rigor-test output for report-back
+
+### WP1: Homepage Copy Reframe
+- [ ] Replace hero headline with Option C: "The deals that sink searchers all looked fine on the broker sheet."
+- [ ] Replace hero subhead with spec copy (QoE-upstream line above fold)
+- [ ] Update primary CTA to "Watch it catch a real landmine →" (routes to /demo-tour)
+- [ ] Update secondary CTA to "Request access"
+- [ ] Replace feature grid with 3 value sections (second opinion / partner who talks you out of it / decision to paper)
+- [ ] Add "Who this is for" block
+- [ ] Zero instances of banned vocabulary on any public route
+- [ ] Market Scan and Opportunity Radar not featured/linked on public homepage
+
+### WP3: Nav Reshuffle + IC Consensus Fix
+- [ ] Reorder primary nav: Deal Room → Thesis Engine → IC Consensus → Seller Sim → Red Team → Capital Stack → Memo → LOI
+- [ ] Move Market Scan + Opportunity Radar to "Labs (Experimental)" section with "Phase 2 — not live data" tag
+- [ ] Fix IC Consensus: route model 1 → Claude (Poe), model 2 → Gemini, model 3 → Sonar
+- [ ] Verify IC badge labels match actual model routing
+
+### WP2: Read-Only Cached Demo at /demo-tour
+- [ ] Pre-compute ONE full diligence run on WP4 composite deal, store as static fixture in client/src/fixtures/demo-run.ts
+- [ ] Rewrite DemoTour.tsx: land → IC vote (show divergence) → Red Team teardown → landmine reveal → outcome → CTA
+- [ ] Sequential reveal pacing — no spinner-to-verdict; show skepticism happening step by step
+- [ ] Zero API calls on this route (verify in network tab)
+- [ ] No login, no DB writes, no secrets reachable from this surface
+
+### WP5: Gated Free Run + Searcher Intelligence DB
+- [ ] Add searcher_intelligence table to schema (searcher_id, contact JSON, thesis JSON, behavior JSON, consent JSON, created_at)
+- [ ] Add tRPC procedures: freeRun.start, freeRun.getResult, freeRun.saveSearcher
+- [ ] Build /try route: deal input form → name+email gate (value-framed) → Red Team always-on + choose-2-of-4
+- [ ] Locked modules: count + teaser UI, zero LLM calls ("2 concerns locked — unlock with full access")
+- [ ] Every run writes Searcher Intelligence DB record with consent flags
+- [ ] Specific target company NOT persisted without explicit opt-in
+- [ ] Add /try to App.tsx public routes and landing page nav

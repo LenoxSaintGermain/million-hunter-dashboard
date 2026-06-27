@@ -1,0 +1,1 @@
+ALTER TABLE `role_module_permissions` MODIFY COLUMN `role` enum('admin','investor','insurance','user') NOT NULL;
