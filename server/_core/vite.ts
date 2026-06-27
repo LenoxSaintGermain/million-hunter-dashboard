@@ -1,12 +1,24 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import { type Server } from "http";
-import { nanoid } from "nanoid";
 import path from "path";
-import { createServer as createViteServer } from "vite";
-import viteConfig from "../../vite.config";
 
 export async function setupVite(app: Express, server: Server) {
+  // All vite imports are dynamic so esbuild never bundles vite or vite.config
+  // into the production artifact. vite.config.ts imports vite plugins which
+  // transitively import 'vite' — bundling that would break prod deploys.
+  const { createServer: createViteServer } = await import("vite");
+  const { nanoid } = await import("nanoid");
+
+  // Inline the minimal vite config needed for dev-mode SSR middleware.
+  // We do NOT import vite.config.ts here to avoid bundling vite plugins.
+  const { default: react } = await import("@vitejs/plugin-react");
+  const { default: tailwindcss } = await import("@tailwindcss/vite");
+  const { jsxLocPlugin } = await import("@builder.io/vite-plugin-jsx-loc");
+  const { vitePluginManusRuntime } = await import("vite-plugin-manus-runtime");
+
+  const projectRoot = path.resolve(import.meta.dirname, "../..");
+
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
@@ -14,9 +26,39 @@ export async function setupVite(app: Express, server: Server) {
   };
 
   const vite = await createViteServer({
-    ...viteConfig,
+    plugins: [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime()],
+    resolve: {
+      alias: {
+        "@": path.resolve(projectRoot, "client", "src"),
+        "@shared": path.resolve(projectRoot, "shared"),
+        "@assets": path.resolve(projectRoot, "attached_assets"),
+      },
+    },
+    envDir: projectRoot,
+    root: path.resolve(projectRoot, "client"),
+    publicDir: path.resolve(projectRoot, "client", "public"),
+    build: {
+      outDir: path.resolve(projectRoot, "dist/public"),
+      emptyOutDir: true,
+    },
+    server: {
+      ...serverOptions,
+      host: true,
+      allowedHosts: [
+        ".manuspre.computer",
+        ".manus.computer",
+        ".manus-asia.computer",
+        ".manuscomputer.ai",
+        ".manusvm.computer",
+        "localhost",
+        "127.0.0.1",
+      ],
+      fs: {
+        strict: true,
+        deny: ["**/.*"],
+      },
+    },
     configFile: false,
-    server: serverOptions,
     appType: "custom",
   });
 
@@ -25,18 +67,14 @@ export async function setupVite(app: Express, server: Server) {
     const url = req.originalUrl;
 
     try {
-      const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "../..",
-        "client",
-        "index.html"
-      );
+      const clientTemplate = path.resolve(projectRoot, "client", "index.html");
 
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
+      const id = nanoid();
       template = template.replace(
         `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`
+        `src="/src/main.tsx?v=${id}"`
       );
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
