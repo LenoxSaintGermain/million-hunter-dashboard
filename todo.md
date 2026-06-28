@@ -910,11 +910,11 @@
 - [ ] Verify IC badge labels match actual model routing
 
 ### WP2: Read-Only Cached Demo at /demo-tour
-- [ ] Pre-compute ONE full diligence run on WP4 composite deal, store as static fixture in client/src/fixtures/demo-run.ts
-- [ ] Rewrite DemoTour.tsx: land → IC vote (show divergence) → Red Team teardown → landmine reveal → outcome → CTA
-- [ ] Sequential reveal pacing — no spinner-to-verdict; show skepticism happening step by step
-- [ ] Zero API calls on this route (verify in network tab)
-- [ ] No login, no DB writes, no secrets reachable from this surface
+- [x] Pre-compute ONE full diligence run on WP4 composite deal, store as static fixture in client/src/fixtures/demo-run.ts
+- [x] Rewrite DemoTour.tsx: land → IC vote (show divergence) → Red Team teardown → landmine reveal → outcome → CTA
+- [x] Sequential reveal pacing — no spinner-to-verdict; show skepticism happening step by step
+- [x] Zero API calls on this route (verify in network tab)
+- [x] No login, no DB writes, no secrets reachable from this surface
 
 ### WP5: Gated Free Run + Searcher Intelligence DB
 - [ ] Add searcher_intelligence table to schema (searcher_id, contact JSON, thesis JSON, behavior JSON, consent JSON, created_at)
