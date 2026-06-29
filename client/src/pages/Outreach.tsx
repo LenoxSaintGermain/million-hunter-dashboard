@@ -205,8 +205,8 @@ export default function Outreach() {
           style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border)" }}
         >
           <Mail className="w-12 h-12 mb-4" style={{ color: "var(--sh-fg-3)", opacity: 0.3 }} />
-          <p className="text-sm font-medium" style={{ color: "var(--sh-fg-3)" }}>No outreach logged yet</p>
-          <p className="text-xs mt-1" style={{ color: "var(--sh-fg-3)", opacity: 0.6 }}>Log your first contact to start tracking the pipeline</p>
+          <p className="text-sm font-medium" style={{ color: "var(--sh-fg-3)" }}>No contacts logged yet</p>
+          <p className="text-xs mt-1" style={{ color: "var(--sh-fg-3)", opacity: 0.6 }}>Validated targets don't close themselves — log your first contact to open the outreach loop</p>
         </div>
       ) : (
         <div className="space-y-2">

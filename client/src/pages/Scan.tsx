@@ -378,7 +378,7 @@ export default function Scan() {
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
               <CardTitle className="text-sm font-semibold text-[var(--amber)]">Off-Market Scout</CardTitle>
-              <Badge variant="outline" className="text-xs border-amber-500/40 text-[var(--amber)]">AI Agent</Badge>
+              <Badge variant="outline" className="text-xs border-amber-500/40 text-[var(--amber)]">The Scout</Badge>
             </div>
             <Button
               size="sm"
@@ -395,7 +395,7 @@ export default function Scan() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            AI agent proactively researches unlisted businesses matching your criteria — owner-operated, aging owners, distressed signals, and acquisition-ready targets.
+The Scout proactively surfaces unlisted businesses matching your criteria — owner-operated, aging owners, distressed signals, and acquisition-ready targets not yet visible on broker platforms.
           </p>
         </CardHeader>
         {showOffMarket && offMarketResults.length > 0 && (
@@ -534,11 +534,11 @@ export default function Scan() {
           <Card className="border-border bg-card">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Deal DNA Comparison</span>
+                <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Structural Comparison</span>
                 <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-border">v2026</Badge>
               </div>
-              <CardTitle className="text-sm font-semibold">Strategic Opportunity Analysis</CardTitle>
-              <p className="text-xs text-muted-foreground">Qualitative and structural vectors beyond the financials. Orange = stronger position.</p>
+              <CardTitle className="text-sm font-semibold">Validation Vector Analysis</CardTitle>
+              <p className="text-xs text-muted-foreground">Qualitative and structural risk vectors beyond the financials. Orange = stronger validated position.</p>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -573,7 +573,7 @@ export default function Scan() {
                 </table>
               </div>
               <div className="mt-4 pt-3 border-t border-border">
-                <p className="text-[10px] text-muted-foreground"><span className="text-[var(--amber)] font-semibold">The Quant</span> · "We're seeing a 14% compression in asking prices for logistics targets in the $5M range. Recommend aggressive LOI positioning for the HVAC target given the distressed psychology indicators."</p>
+                <p className="text-[10px] text-muted-foreground"><span className="text-[var(--amber)] font-semibold">The Structuralist</span> · "14% compression in asking prices for logistics targets in the $5M range. Recommend aggressive LOI positioning on the HVAC target — distressed psychology indicators confirmed."</p>
               </div>
             </CardContent>
           </Card>
@@ -609,10 +609,10 @@ export default function Scan() {
             <CardContent className="flex flex-col items-center justify-center py-20 text-center">
               <Building2 className="w-12 h-12 text-muted-foreground/20 mb-4" />
               <p className="text-sm font-medium text-muted-foreground">
-                {search ? "No deals match your filter" : "No deals in pipeline yet"}
+                {search ? "No targets match your filter" : "Validation queue is empty"}
               </p>
               <p className="text-xs text-muted-foreground/60 mt-1">
-                {search ? "Try a different search term" : "Configure your target markets above and launch a scan"}
+                {search ? "Try a different search term" : "Configure your target markets above and run a scan to populate the queue"}
               </p>
               {!search && (
                 <Button size="sm" className="mt-4 h-8 text-xs gap-1.5" onClick={() => setShowConfig(true)}>

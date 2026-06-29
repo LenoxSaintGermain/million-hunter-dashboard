@@ -350,7 +350,7 @@ export default function Home() {
           {/* LEFT: Deal feed — col-span-8 */}
           <div className="lg:col-span-8">
             <div className="flex items-end justify-between mb-8 border-b border-rule pb-4">
-              <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">High-Priority Intelligence Feed</span>
+              <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">Validation Queue — High Conviction</span>
               <Link href="/scan">
                 <div className="flex items-center gap-1 text-ink/50 hover:text-amber transition-colors cursor-pointer">
                   <span className="font-eyebrow text-eyebrow uppercase tracking-widest">All Deals</span>
@@ -370,9 +370,9 @@ export default function Home() {
               </div>
             ) : !deals || deals.length === 0 ? (
               <div className="border border-rule bg-paper p-12 text-center">
-                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-4">NO DEALS IN PIPELINE</p>
+                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-4">NO TARGETS IN VALIDATION QUEUE</p>
                 <button onClick={() => triggerScan.mutate({})} disabled={triggerScan.isPending} className="font-eyebrow text-eyebrow text-amber hover:underline uppercase tracking-widest">
-                  {triggerScan.isPending ? "Scanning…" : "Run Market Scan"}
+                  {triggerScan.isPending ? "Scanning…" : "Run Target Scan"}
                 </button>
               </div>
             ) : (
@@ -389,12 +389,12 @@ export default function Home() {
                 <div>
                   <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">LOGICAL NEXT</p>
                   <p className="font-card-title text-[22px] text-ink leading-tight">
-                    {stats?.highPriority ? "Initiate outreach on top-scored targets" : "Run a market scan to surface new opportunities"}
+                    {stats?.highPriority ? "Initiate outreach on validated targets" : "Populate the validation queue — run a target scan"}
                   </p>
                 </div>
                 <Link href={stats?.highPriority ? "/outreach" : "/scan"}>
                   <div className="flex items-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-5 py-2.5 rounded-full hover:opacity-90 active:scale-[0.97] transition-all cursor-pointer">
-                    {stats?.highPriority ? "Start Outreach" : "Market Scan"}
+                    {stats?.highPriority ? "Start Outreach" : "Run Scan"}
                     <ArrowRight className="w-3 h-3" />
                   </div>
                 </Link>

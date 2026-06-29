@@ -118,8 +118,8 @@ export default function OpportunityRadar() {
               </span>
             </h1>
             <p className="text-gray-400 text-sm max-w-2xl">
-              Permits filed. TAD boundaries shifting. World Cup coming. Gas stations with optionality. 
-              The signals savvy investors act on — before the crowd catches on.
+              Permits filed. TAD boundaries shifting. Capital convergence patterns. The signals that
+              validate a thesis — or kill it — before you open a CIM.
             </p>
           </div>
         </motion.div>
@@ -198,7 +198,7 @@ export default function OpportunityRadar() {
             </div>
             <div className="text-center">
               <div className="text-white font-semibold mb-1">No signals yet</div>
-              <div className="text-sm text-gray-500">Enter a market and scan to discover creative investment opportunities</div>
+              <div className="text-sm text-gray-500">Enter a market to surface the macro signals that validate or invalidate a thesis</div>
             </div>
             <Button onClick={handleScan} className="gap-2 bg-gradient-to-r from-rose-500 to-cyan-500 text-white border-0">
               <Sparkles className="w-4 h-4" />

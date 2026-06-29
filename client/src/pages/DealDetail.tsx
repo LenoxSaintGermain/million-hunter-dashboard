@@ -331,11 +331,11 @@ export default function DealDetail() {
                   </div>
                 ) : (
                   <div>
-                    <p className="font-body-base text-body-base text-muted-foreground mb-4">Auto-compile an IC-ready investment brief</p>
+                    <p className="font-body-base text-body-base text-muted-foreground mb-4">Commission a diligence brief from The Architect — financials, risk flags, and IC posture in one document</p>
                     <button onClick={() => generateMemo.mutate({ dealId })} disabled={generateMemo.isPending}
                       className="flex items-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:opacity-90 transition-all">
                       {generateMemo.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
-                      GENERATE MEMO
+                      COMMISSION BRIEF
                     </button>
                   </div>
                 )}
@@ -343,7 +343,7 @@ export default function DealDetail() {
 
               {/* Module 6: Model Consensus */}
               <div className="border border-rule bg-paper p-6">
-                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Model Consensus</p>
+                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">IC Agent Consensus</p>
                 {consensusData ? (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
@@ -358,7 +358,7 @@ export default function DealDetail() {
                   </div>
                 ) : (
                   <div>
-                    <p className="font-body-base text-body-base text-muted-foreground mb-4">3-model weighted vote</p>
+                    <p className="font-body-base text-body-base text-muted-foreground mb-4">Three-agent weighted panel vote</p>
                     <button onClick={() => consensusScore.mutate({ dealId })} disabled={consensusScore.isPending}
                       className="font-eyebrow text-eyebrow text-amber hover:underline flex items-center gap-1">
                       {consensusScore.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
@@ -373,7 +373,7 @@ export default function DealDetail() {
             <div className="grid grid-cols-3 border border-rule divide-x divide-rule mt-6">
               {[
                 { icon: Brain, label: "Third Signal", sub: "Macro + competitive analysis", action: () => analyzeSignals.mutate({ dealId }), pending: analyzeSignals.isPending },
-                { icon: FileText, label: "Investment Memo", sub: "IC-ready document", action: () => generateMemo.mutate({ dealId }), pending: generateMemo.isPending },
+                { icon: FileText, label: "Diligence Brief", sub: "IC-ready document", action: () => generateMemo.mutate({ dealId }), pending: generateMemo.isPending },
                 { icon: Mail, label: "Draft Outreach", sub: "Personalized approach", action: () => toast.info("Navigate to Outreach tab"), pending: false },
               ].map((act, i) => (
                 <button key={i} onClick={act.action} disabled={act.pending}
@@ -699,10 +699,10 @@ export default function DealDetail() {
               <div>
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-primary" />
-                  Multi-Model Consensus Scoring
+                  IC Agent Consensus
                 </CardTitle>
                 <CardDescription className="text-xs mt-1">
-                  3 Gemini models score in parallel. High divergence = genuine uncertainty = manual review.
+                  Three independent agents score in parallel. High divergence = genuine uncertainty = do not advance.
                 </CardDescription>
               </div>
               <Button
@@ -719,8 +719,8 @@ export default function DealDetail() {
               {!consensusData ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <BarChart3 className="w-10 h-10 text-muted-foreground/20 mb-3" />
-                  <p className="text-sm text-muted-foreground">No consensus score yet</p>
-                  <p className="text-xs text-muted-foreground/60 mt-1">Run 3-model parallel scoring to detect genuine uncertainty</p>
+                  <p className="text-sm text-muted-foreground">No IC agent consensus yet</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Run the three-agent panel to surface divergence and detect genuine uncertainty</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -731,9 +731,9 @@ export default function DealDetail() {
                         <XCircle className="w-4 h-4 text-[var(--amber)]" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-[var(--amber)]">Models Disagree — Manual Review Required</p>
+                        <p className="text-sm font-semibold text-[var(--amber)]">Agents Diverge — Do Not Advance</p>
                         <p className="text-xs text-[var(--amber)]/70 mt-0.5">
-                          Divergence score: <span className="font-bold">{((toNum(consensusData.divergenceScore) ?? 0) * 100).toFixed(0)}%</span>. When AI models disagree this significantly, it signals genuine ambiguity in the deal fundamentals. Do not advance to LOI without a direct conversation with the broker.
+                          Divergence score: <span className="font-bold">{((toNum(consensusData.divergenceScore) ?? 0) * 100).toFixed(0)}%</span>. When the IC panel disagrees this significantly, it signals genuine ambiguity in the deal fundamentals. Do not advance to LOI without a direct conversation with the broker.
                         </p>
                         <div className="flex items-center gap-2 mt-2">
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-[var(--amber)] border border-amber-500/25">
@@ -751,7 +751,7 @@ export default function DealDetail() {
                   {!consensusData.divergenceFlag && (
                     <div className="flex items-center gap-3 p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
                       <CheckCircle2 className="w-4 h-4 text-[var(--sage)] shrink-0" />
-                      <p className="text-xs text-[var(--sage)] font-medium">All 3 models in agreement — consensus score is reliable</p>
+                      <p className="text-xs text-[var(--sage)] font-medium">All three agents in agreement — consensus score is reliable</p>
                     </div>
                   )}
 
@@ -834,7 +834,7 @@ export default function DealDetail() {
                   Seller Persona Simulation
                 </CardTitle>
                 <CardDescription className="text-xs mt-1">
-                  AI-generated seller profile + negotiation scenarios. Rehearse the LOI before you send it.
+                  Seller profile + negotiation scenarios built from deal data. Rehearse the LOI before you send it.
                 </CardDescription>
               </div>
               <Button

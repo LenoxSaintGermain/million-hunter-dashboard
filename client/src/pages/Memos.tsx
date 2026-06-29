@@ -98,7 +98,7 @@ export default function Memos() {
             </span>
           </div>
           <p className="text-xs mb-3" style={{ color: "oklch(0.75 0.20 80 / 0.70)" }}>
-            Generate AI investment memos to unlock full Third Signal analysis
+            Commission diligence briefs on these targets — The Architect synthesizes financials, risk flags, and IC posture into a single IC-ready document
           </p>
           <div className="flex flex-wrap gap-2">
             {dealsWithoutMemo.slice(0, 5).map((deal) => (
@@ -135,9 +135,9 @@ export default function Memos() {
           style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border)" }}
         >
           <FileText className="w-12 h-12 mb-4" style={{ color: "var(--sh-fg-3)", opacity: 0.3 }} />
-          <p className="text-sm font-medium" style={{ color: "var(--sh-fg-3)" }}>No memos generated yet</p>
+          <p className="text-sm font-medium" style={{ color: "var(--sh-fg-3)" }}>No diligence briefs commissioned yet</p>
           <p className="text-xs mt-1" style={{ color: "var(--sh-fg-3)", opacity: 0.6 }}>
-            Add deals to the pipeline and generate AI investment memos
+            Add targets to the validation queue, then commission a brief from The Architect
           </p>
           <Link href="/scan">
             <Button size="sm" className="mt-4 h-8 text-xs">

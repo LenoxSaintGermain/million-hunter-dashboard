@@ -35,28 +35,28 @@ function DnaStrand({ scores }: { scores: { timeHorizon: number; riskTolerance: n
 // ─── Archetype Card ────────────────────────────────────────────────────────────
 const ARCHETYPE_DESCRIPTIONS: Record<string, { tagline: string; description: string; traits: string[] }> = {
   "ALPHA-7": {
-    tagline: "You hunt asymmetric returns.",
-    description: "High conviction, long horizon, high risk tolerance. You see deals others miss and move fast when the signal is clear.",
+    tagline: "High conviction. Zero tolerance for hidden risk.",
+    description: "You move fast when the signal is clear — but you won't move at all if the diligence doesn't hold. The platform weights customer concentration, owner dependence, and add-back inflation as hard stops for your lens.",
     traits: ["Concentrated positions", "Operator-friendly", "5-10 year holds"],
   },
   "IMPACT-4": {
-    tagline: "Returns with a reason.",
-    description: "You want your capital to compound AND create change. You prioritize businesses that build community wealth alongside financial returns.",
+    tagline: "Returns with a reason. Risks with a cost.",
+    description: "You want capital to compound and create change. The platform flags deals where community impact claims mask operational fragility — because a failing business helps no one.",
     traits: ["ESG-aligned deals", "Community impact", "Patient capital"],
   },
   "COMPOUNDER-9": {
-    tagline: "Slow money, deep roots.",
-    description: "You think in decades. You lock capital into durable cash-flowing businesses and let compounding do the work.",
+    tagline: "Slow money demands clean books.",
+    description: "You think in decades. That means the QoE proxy, the owner dependence audit, and the add-back analysis are non-negotiable — because a structural defect at year one compounds into a decade of drag.",
     traits: ["Long-duration holds", "Cash flow focus", "Low turnover"],
   },
   "SPRINT-3": {
-    tagline: "Fast in, faster out.",
-    description: "You want velocity. Short holds, clear exits, and a deal flow that keeps your capital working without waiting.",
+    tagline: "Velocity requires clean exits. Clean exits require clean diligence.",
+    description: "Short holds and high IRR targets mean you can't afford post-close surprises. The platform front-loads the failure modes so you're not discovering them at month 18.",
     traits: ["2-3 year exits", "High IRR focus", "Active portfolio management"],
   },
   "ANCHOR-1": {
-    tagline: "Steady, reliable, compounding.",
-    description: "You value stability over excitement. You want predictable cash flow from proven businesses with low operational risk.",
+    tagline: "Predictable cash flow starts with verified cash flow.",
+    description: "You value stability over excitement. The platform's QoE proxy and owner dependence audit exist precisely for your thesis — because the most dangerous deals are the ones that look stable until they aren't.",
     traits: ["Stable cash flow", "Low volatility", "Diversified exposure"],
   },
 };
@@ -246,12 +246,12 @@ export default function InvestorOnboarding() {
           {!isReveal && (
             <>
               <h1 className="text-3xl font-bold mb-2" style={{ color: "var(--sh-text-primary)", fontFamily: "var(--font-display)" }}>
-                {step === 0 ? "Build Your Investor DNA" : `Step ${step} of ${totalSteps}`}
+                {step === 0 ? "Calibrate Your Diligence Lens" : `Step ${step} of ${totalSteps}`}
               </h1>
               <p style={{ color: "var(--sh-text-secondary)" }}>
                 {step === 0
-                  ? "5 questions to calibrate your deal feed and surface opportunities that match your thesis."
-                  : "Your answers shape which deals surface first in your Deal Room."}
+                  ? "5 questions to configure which risks the platform flags first — and which deals it filters out before you waste time on them."
+                  : "Your answers determine which failure modes surface first in your Deal Room."}
               </p>
             </>
           )}
@@ -278,20 +278,20 @@ export default function InvestorOnboarding() {
               <div className="text-6xl">🧬</div>
               <div className="space-y-3">
                 <h2 className="text-xl font-semibold" style={{ color: "var(--sh-text-primary)", fontFamily: "var(--font-display)" }}>
-                  Welcome to Signal Hunter
+                  Before you see a single deal —
                 </h2>
                 <p style={{ color: "var(--sh-text-secondary)", lineHeight: "1.7" }}>
-                  Your operator has curated a live deal flow of acquisition opportunities. Before you access the Deal Room,
-                  we'll build your <strong style={{ color: "var(--sh-signal)" }}>Investor DNA</strong> — a profile that
-                  surfaces deals matching your thesis and flags mismatches before you waste time on the wrong opportunities.
+                  Signal Hunter doesn't surface opportunities. It validates them — and kills the ones that would cost you.
+                  Your <strong style={{ color: "var(--sh-signal)" }}>Investor DNA</strong> configures the diligence engine:
+                  which risks to weight, which sectors to flag, and which deal structures to reject before you've spent a dollar.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 {[
                   { icon: "⚡", label: "5 questions", sub: "Takes 2 minutes" },
-                  { icon: "🎯", label: "DNA-matched deals", sub: "Curated for your thesis" },
-                  { icon: "🔒", label: "Operator-controlled", sub: "AI analysis on request" },
-                  { icon: "📊", label: "Live deal flow", sub: "Updated daily" },
+                  { icon: "🛡", label: "Risk-weighted lens", sub: "Flags your failure modes first" },
+                  { icon: "🔒", label: "Operator-controlled", sub: "Every analysis on demand" },
+                  { icon: "⚠️", label: "Landmine detection", sub: "Before you commission diligence" },
                 ].map((item) => (
                   <div
                     key={item.label}
@@ -403,15 +403,15 @@ export default function InvestorOnboarding() {
                 opacity: saveDna.isPending ? 0.7 : 1,
               }}
             >
-              {saveDna.isPending ? "Building profile…" : isLastQuizStep ? "Reveal My Archetype →" : step === 0 ? "Start →" : "Continue →"}
+                  {saveDna.isPending ? "Calibrating lens…" : isLastQuizStep ? "Reveal My Archetype →" : step === 0 ? "Configure Lens →" : "Continue →"}
             </button>
           ) : (
-            <button
+              <button
               onClick={() => navigate("/investor")}
               className="px-6 py-2.5 rounded-lg font-medium text-sm"
               style={{ background: "var(--sh-signal)", color: "var(--sh-bg)", fontFamily: "var(--font-display)" }}
             >
-              Enter Deal Room →
+              Enter the Deal Room →
             </button>
           )}
         </div>

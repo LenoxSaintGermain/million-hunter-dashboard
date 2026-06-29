@@ -13,8 +13,8 @@ const PHASES = [
   { key: "Scanning marketplaces",      icon: Database,    label: "Scan",     desc: "Fetching listings" },
   { key: "Extracting deal data",       icon: Database,    label: "Extract",  desc: "Parsing deal data" },
   { key: "Applying filters",           icon: Filter,      label: "Filter",   desc: "Applying criteria" },
-  { key: "AI scoring",                 icon: Cpu,         label: "Score",    desc: "AI scoring deals" },
-  { key: "Finalizing results",         icon: PackageCheck,label: "Finalize", desc: "Building pipeline" },
+  { key: "AI scoring",                 icon: Cpu,         label: "Score",    desc: "Validation scoring" },
+  { key: "Finalizing results",         icon: PackageCheck,label: "Finalize", desc: "Populating queue" },
   { key: "Scan complete",              icon: CheckCircle2,label: "Done",     desc: "Complete" },
 ];
 
@@ -192,7 +192,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
           </div>
           <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
             <TrendingUp className="w-3 h-3 text-[var(--sage)]" />
-            Deals are now in your pipeline — check the Command Center
+            Targets added to validation queue — check the Command Center
           </p>
         </div>
       )}

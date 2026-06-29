@@ -46,8 +46,8 @@ const FEATURES = [
   },
   {
     eyebrow: "IC CONSENSUS",
-    title: "Three independent models. One verdict. The divergence is the signal.",
-    body: "The Quant, The Skeptic, and The Scout run parallel investment committee reviews on every deal. When they disagree, the flag tells you exactly where the risk lives — and why it matters.",
+    title: "Three independent agents. One verdict. The divergence is the signal.",
+    body: "The Structuralist, The Restructurer, and The Market Analyst run parallel investment committee reviews on every deal. When they disagree, the divergence flag tells you exactly where the risk lives — and why it matters.",
     Icon: Vote,
   },
   {
@@ -72,7 +72,7 @@ const FEATURES = [
 
 const TESTIMONIALS = [
   {
-    quote: "I ran three deals through the IC Review before my first LOI. The Skeptic flagged a cash flow restatement risk on deal two that the broker's deck buried in footnote 14. Saved me from a $2.1M mistake.",
+    quote: "I ran three deals through the IC Review before my first LOI. The Structuralist flagged a cash flow restatement risk on deal two that the broker's deck buried in footnote 14. Saved me from a $2.1M mistake.",
     name: "Marcus T.",
     role: "Independent Sponsor, Southeast US",
     initial: "M",
@@ -443,7 +443,7 @@ export default function LandingPage() {
               <span className="text-[#ffba20]">See exactly why.</span>
             </h2>
             <p className="text-[#8b7355] text-base max-w-xl">
-              A real composite deal. Broker sheet signals only. Three models. Unanimous verdict. The failure modes were all knowable before close.
+              A real composite deal. Broker sheet signals only. Three agents. Unanimous NO. The failure modes were all knowable before close.
             </p>
           </div>
           <Link

@@ -563,8 +563,8 @@ export default function TIDEPage() {
           </h1>
           <p className="mb-8 max-w-2xl" style={{ color: "oklch(0.65 0.01 250)", fontSize: 14, lineHeight: 1.6 }}>
             Ingesting USASpending.gov, Federal Register, and FEC data to detect 18–36 month demand
-            implications. The platform closes the information asymmetry gap by deploying frontier AI
-            models against government data sources.
+            implications before they appear in broker listings. The platform closes the information
+            asymmetry gap — so you see the capital flow before the seller does.
           </p>
 
           {/* Two-column body: Map (left, col-7) + Intelligence Stream (right, col-5) */}
@@ -607,8 +607,8 @@ export default function TIDEPage() {
                 <p className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: "oklch(0.45 0.01 250)" }}>CO-ANALYST INSIGHT</p>
                 <p className="text-xs italic leading-relaxed" style={{ color: "oklch(0.55 0.01 250)" }}>
                   {clusterPoints.length > 0
-                    ? `SIGNAL OVERLAP (The Scout cross-reference): ${clusterPoints[0]?.geo} shows ${clusterPoints[0]?.count} converging signals totaling ${fmtMoney((clusterPoints[0]?.capital || 0) / 100)} — matches Investor DNA for "${clusterPoints[0]?.types[0] ?? "Infrastructure"} Deployment".`
-                    : "Run a TIDE scan to generate AI analyst commentary on convergence patterns."}
+                    ? `SIGNAL OVERLAP (Co-Analyst cross-reference): ${clusterPoints[0]?.geo} shows ${clusterPoints[0]?.count} converging signals totaling ${fmtMoney((clusterPoints[0]?.capital || 0) / 100)} — matches Investor DNA for "${clusterPoints[0]?.types[0] ?? "Infrastructure"} Deployment".`
+                    : "Run a TIDE scan to surface convergence commentary from the Co-Analyst."}
                 </p>
               </div>
             </div>

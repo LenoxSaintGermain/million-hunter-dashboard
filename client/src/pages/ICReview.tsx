@@ -68,9 +68,9 @@ function ConsensusDashboard({ dealId }: { dealId: number }) {
   });
 
   const models = [
-    { key: "claudeScore", label: "The Strategist", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
-    { key: "geminiScore", label: "The Quant", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
-    { key: "sonarScore", label: "The Scout", color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-200" },
+    { key: "claudeScore", label: "The Structuralist", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
+    { key: "geminiScore", label: "The Restructurer", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
+    { key: "sonarScore", label: "The Market Analyst", color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-200" },
   ];
 
   const cs = consensusData;
@@ -81,7 +81,7 @@ function ConsensusDashboard({ dealId }: { dealId: number }) {
       <div className="flex items-center justify-between">
         <div>
           <div className="text-xs font-medium text-[#8b7355] uppercase tracking-wider mb-0.5">IC Consensus</div>
-          <div className="text-sm font-semibold text-[#1a1208]">Model Vote</div>
+          <div className="text-sm font-semibold text-[#1a1208]">Agent Panel Vote</div>
         </div>
         <Button
           size="sm"
@@ -105,7 +105,7 @@ function ConsensusDashboard({ dealId }: { dealId: number }) {
             {cs.divergenceFlag && (
               <div className="mt-2 flex items-center justify-center gap-1 text-xs text-amber-600">
                 <AlertTriangle className="w-3 h-3" />
-                Models diverged ({Math.round((toNum(cs.divergenceScore) ?? 0) * 100)}%)
+                Agents diverged ({Math.round((toNum(cs.divergenceScore) ?? 0) * 100)}%) — do not advance
               </div>
             )}
           </div>
@@ -139,7 +139,7 @@ function ConsensusDashboard({ dealId }: { dealId: number }) {
         <div className="text-center py-8 border border-dashed border-[#e8e0d4] rounded-xl">
           <span className="material-symbols-outlined text-[28px] text-[#c4b49a] block mb-2">how_to_vote</span>
           <div className="text-sm text-[#8b7355]">No consensus data yet</div>
-          <div className="text-xs text-[#c4b49a] mt-1">Run consensus scoring to see model votes</div>
+          <div className="text-xs text-[#c4b49a] mt-1">Run the agent panel to surface votes and divergence flags</div>
         </div>
       )}
     </div>
