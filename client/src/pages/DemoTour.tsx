@@ -478,8 +478,7 @@ function ChapterContent({ chapter }: { chapter: number }) {
           <div>
             <div className="text-sm font-bold text-[#1a1208]">Unanimous NO at current terms</div>
             <div className="text-xs text-[#5c4a32] mt-1">
-              Claude and Sonar: hard stop. Gemini: conditional path at $1.2–1.4M with earnout + 18-month transition.
-              All three agree: at $2.1M with a 6-month transition, this deal fails.
+              The Structuralist and The Market Analyst: hard stop. The Restructurer: conditional path at $1.2–1.4M with earnout + 18-month transition. All three agree: at $2.1M with a 6-month transition, this deal fails.
             </div>
           </div>
         </div>
