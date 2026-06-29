@@ -105,8 +105,8 @@ const RED_TEAM_FLAGS = [
 // Chapter 4 — IC Consensus
 const IC_VOTES = [
   {
-    model: "Claude",
-    role: "The Structuralist",
+    model: "The Structuralist",
+    role: "Structural Risk Analysis",
     vote: "NO" as const,
     confidence: 0.91,
     color: "text-rose-400",
@@ -114,8 +114,8 @@ const IC_VOTES = [
     rationale: "The customer concentration pattern here is not a negotiable risk — it is a structural defect. Two relationships that are personal to the seller represent 54% of revenue. No earnout structure adequately protects against this because the risk materializes after the earnout measurement period. The QoE gap alone ($223K in questionable add-backs) warrants a full stop pending independent verification. I would not proceed at any price above $1.1M without written contracts from both concentration clients and a verified QoE.",
   },
   {
-    model: "Gemini",
-    role: "The Restructurer",
+    model: "The Restructurer",
+    role: "Deal Architecture",
     vote: "NO — RESTRUCTURE REQUIRED" as const,
     confidence: 0.87,
     color: "text-amber-400",
@@ -123,8 +123,8 @@ const IC_VOTES = [
     rationale: "The business has real underlying value — 11 years of operation, established client relationships, recurring revenue model. The problem is entirely structural: the value is trapped in the owner's personal relationships and not transferable at the stated price. A restructured deal at $1.2–1.4M with 35–40% earnout tied to 24-month client retention, combined with an 18-month owner transition agreement, could work. At $2.1M with a standard 6-month transition, this deal has a high probability of failure.",
   },
   {
-    model: "Sonar",
-    role: "The Market Analyst",
+    model: "The Market Analyst",
+    role: "Market Comparables",
     vote: "NO" as const,
     confidence: 0.89,
     color: "text-rose-400",
