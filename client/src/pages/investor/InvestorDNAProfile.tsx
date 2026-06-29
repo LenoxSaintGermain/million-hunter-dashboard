@@ -99,7 +99,7 @@ export default function InvestorDNAProfile() {
             <Button
               onClick={() => navigate("/investor/onboarding")}
               className="w-full font-bold"
-              style={{ background: "var(--sh-signal)", color: "#000" }}
+              style={{ background: "var(--sh-signal)", color: "var(--sh-bg)" }}
             >
               Build My DNA Profile →
             </Button>
@@ -150,7 +150,7 @@ export default function InvestorDNAProfile() {
             </p>
             <div className="flex gap-2 shrink-0">
               <Button size="sm" variant="ghost" onClick={() => setShowRetakeConfirm(false)} style={{ color: "var(--sh-fg-3)" }}>Cancel</Button>
-              <Button size="sm" onClick={() => navigate("/investor/onboarding")} style={{ background: "var(--sh-amber)", color: "#000" }}>
+              <Button size="sm" onClick={() => navigate("/investor/onboarding")} style={{ background: "var(--sh-amber)", color: "var(--sh-bg)" }}>
                 Retake →
               </Button>
             </div>
@@ -235,7 +235,7 @@ export default function InvestorDNAProfile() {
           <Button
             onClick={() => navigate("/investor")}
             className="font-bold gap-2"
-            style={{ background: "var(--sh-signal)", color: "#000" }}
+            style={{ background: "var(--sh-signal)", color: "var(--sh-bg)" }}
           >
             <Zap className="w-4 h-4" />
             View My Deal Room

@@ -269,7 +269,7 @@ export default function InvestorScan() {
                     className="w-full h-10 text-sm font-semibold"
                     onClick={() => expressInterest.mutate({ dealId: deal.id, allocationAmount: 0, investorNote: "Requesting AI analysis" })}
                     disabled={expressInterest.isPending}
-                    style={{ background: "var(--sh-primary)", color: "oklch(0.08 0.01 260)" }}
+                    style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
                   >
                     {expressInterest.isPending ? (
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />

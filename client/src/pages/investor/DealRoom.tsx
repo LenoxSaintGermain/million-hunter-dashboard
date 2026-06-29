@@ -257,7 +257,7 @@ function InterestModal({ deal, onClose }: { deal: any; onClose: () => void }) {
             onClick={() => express.mutate({ dealId: deal.id, allocationAmount: amount ? parseFloat(amount) : undefined, investorNote: note || undefined })}
             disabled={express.isPending}
             className="flex-1 py-2.5 rounded-lg text-sm font-semibold"
-            style={{ background: "var(--sh-primary)", color: "oklch(0.98 0 0)" }}
+            style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
           >
             {express.isPending ? "Sending…" : "Send to Operator →"}
           </button>

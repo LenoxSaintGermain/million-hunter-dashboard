@@ -157,6 +157,17 @@
   --sh-glow-green:     none;
   --sh-glow-red:       none;
   --sh-glow-amber:     none;
+  /* ── Missing tokens — light mode ── */
+  --sh-surface:        oklch(0.94 0.010 85);   /* slightly darker than paper */
+  --sh-surface-2:      oklch(0.92 0.010 85);   /* card inner / input bg */
+  --sh-surface-3:      oklch(0.89 0.010 85);   /* deeper nesting */
+  --sh-border-1:       oklch(0.82 0.010 85);   /* alias for sh-border */
+  --sh-signal:         oklch(0.55 0.14 55);    /* amber-gold accent */
+  --sh-primary-10:     oklch(0.18 0.018 250 / 0.10);
+  --sh-fg-muted:       oklch(0.62 0.010 250);  /* between fg-3 and fg-4 */
+  --sh-red:            var(--clay);
+  --sh-text-primary:   var(--ink);
+  --sh-text-secondary: oklch(0.35 0.018 250);
 
   /* Layout */
   --sidebar-width:      15rem;
@@ -212,6 +223,17 @@
   --sh-glow-green:  0 0 24px oklch(0.68 0.09 155 / 0.15);
   --sh-glow-red:    0 0 24px oklch(0.68 0.16 28 / 0.15);
   --sh-glow-amber:  0 0 24px oklch(0.75 0.16 62 / 0.20);
+  /* ── Missing tokens — dark mode ── */
+  --sh-surface:        oklch(0.15 0.016 255);  /* between bg and surface-1 */
+  --sh-surface-2:      oklch(0.20 0.016 255);  /* card inner / input bg */
+  --sh-surface-3:      oklch(0.24 0.016 255);  /* deeper nesting */
+  --sh-border-1:       oklch(1 0 0 / 9%);      /* alias for sh-border */
+  --sh-signal:         oklch(0.75 0.16 62);    /* amber-gold accent (same as sh-amber) */
+  --sh-primary-10:     oklch(0.96 0.008 80 / 0.10);
+  --sh-fg-muted:       oklch(0.50 0.010 80);   /* between fg-3 and fg-4 */
+  --sh-red:            oklch(0.68 0.16 28);
+  --sh-text-primary:   oklch(0.96 0.008 80);
+  --sh-text-secondary: oklch(0.60 0.010 80);
   --color-background:           oklch(0.13 0.018 255);
   --color-foreground:           oklch(0.96 0.008 80);
   --color-card:                 oklch(0.17 0.016 255);

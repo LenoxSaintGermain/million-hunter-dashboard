@@ -158,7 +158,7 @@ export default function InvestorScout() {
                     className="w-full h-9 text-sm font-semibold"
                     onClick={() => expressInterest.mutate({ dealId: asset.id, allocationAmount: 0, investorNote: "Requesting analysis on commercial asset" })}
                     disabled={expressInterest.isPending}
-                    style={{ background: "var(--sh-primary)", color: "oklch(0.08 0.01 260)" }}
+                    style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
                   >
                     <Send className="w-3.5 h-3.5 mr-2" />
                     Request Analysis
