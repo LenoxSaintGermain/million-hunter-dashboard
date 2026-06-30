@@ -24,6 +24,9 @@ import {
   Play,
   Bot,
   Loader2,
+  BookOpen,
+  ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -377,6 +380,124 @@ export default function AgentMonitoringPanel({ dealId }: AgentMonitoringPanelPro
           <div className="text-xs text-[#c4b49a] mt-1">Trigger an analysis above to begin</div>
         </div>
       )}
+
+      {/* Deal Dossier — live sonar-pro research */}
+      <DealDossierModule dealId={dealId} />
+    </div>
+  );
+}
+
+function DealDossierModule({ dealId }: { dealId: number }) {
+  const { toast } = useToast();
+  const [expanded, setExpanded] = useState(false);
+
+  const { data: dossier, isLoading, refetch } = trpc.research.getForDeal.useQuery(
+    { dealId },
+    { enabled: !isNaN(dealId) }
+  );
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refetch();
+    setIsRefreshing(false);
+    toast({ title: "Dossier refreshed", description: "Live citations updated from sonar-pro." });
+  };
+
+  return (
+    <div className="border border-[#e8e0d4] rounded-lg overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-3 py-2.5 bg-white hover:bg-[#fffdf7] transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-4 w-4 text-[#8b7355]" />
+          <div className="text-left">
+            <div className="text-xs font-semibold text-[#1a1208]">Deal Dossier</div>
+            <div className="text-[10px] text-[#8b7355]">
+              {dossier ? `${(dossier.citations as string[]).length} live citations` : "sonar-pro background research"}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {dossier && (
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          )}
+          <ChevronDown className={cn("h-3.5 w-3.5 text-[#c4b49a] transition-transform", expanded && "rotate-180")} />
+        </div>
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-3 pb-3 pt-1 border-t border-[#e8e0d4] bg-[#fffdf7] space-y-3">
+              {isLoading ? (
+                <div className="text-xs text-[#8b7355] py-3 text-center">Loading dossier...</div>
+              ) : dossier ? (
+                <>
+                  <div className="text-[11px] text-[#4a3728] leading-relaxed line-clamp-6">
+                    {dossier.content}
+                  </div>
+                  {(dossier.citations as string[]).length > 0 && (
+                    <div className="space-y-1">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-[#8b7355]">Sources</div>
+                      <div className="flex flex-wrap gap-1">
+                        {(dossier.citations as string[]).slice(0, 5).map((url, i) => {
+                          let host = url;
+                          try { host = new URL(url).hostname.replace('www.', ''); } catch {}
+                          return (
+                            <a
+                              key={i}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-[10px] text-amber-700 hover:bg-amber-100 transition-colors"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5" />
+                              {host}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="flex items-center gap-1.5 text-[10px] text-[#8b7355] hover:text-[#1a1208] transition-colors"
+                  >
+                    <RefreshCw className={cn("w-3 h-3", isRefreshing && "animate-spin")} />
+                    {isRefreshing ? "Refreshing..." : "Refresh research"}
+                  </button>
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  <div className="text-xs text-[#8b7355] mb-3">No dossier yet. Run sonar-pro research to surface live citations for this deal.</div>
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing || isLoading}
+                    className="flex items-center gap-1.5 mx-auto px-3 py-1.5 rounded bg-[#1a1208] text-white text-xs font-medium hover:bg-[#2a2010] transition-colors"
+                  >
+                    {isRefreshing || isLoading ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <BookOpen className="w-3 h-3" />
+                    )}
+                    {isRefreshing || isLoading ? "Researching..." : "Run Deal Research"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

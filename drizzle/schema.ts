@@ -845,3 +845,25 @@ export const roleModulePermissions = mysqlTable("role_module_permissions", {
 });
 export type RoleModulePermission = typeof roleModulePermissions.$inferSelect;
 export type InsertRoleModulePermission = typeof roleModulePermissions.$inferInsert;
+
+// ─── Deep Research Cache ──────────────────────────────────────────────────────
+// Stores cached results from Perplexity Sonar research calls.
+// subjectType: "deal" | "radar_signal" | "industry" | "market"
+// model: "sonar" | "sonar-pro" | "sonar-deep-research"
+// TTL enforced by expiresAt — service checks this before making new API calls.
+export const researchResults = mysqlTable("research_results", {
+  id: int("id").autoincrement().primaryKey(),
+  subjectKey: varchar("subject_key", { length: 256 }).notNull(), // e.g. "deal:42" or "radar:charlotte-nc-commercial"
+  subjectType: mysqlEnum("subject_type", ["deal", "radar_signal", "industry", "market"]).notNull(),
+  model: varchar("model", { length: 64 }).notNull(),
+  query: text("query").notNull(),
+  content: text("content").notNull(), // full markdown report from model
+  citations: json("citations").$type<string[]>().notNull(), // array of source URLs
+  searchResults: json("search_results").$type<Array<{ title: string; url: string; snippet: string; date?: string }>>(), // rich search result objects
+  numSearchQueries: int("num_search_queries"),
+  costUsd: float("cost_usd"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  expiresAt: bigint("expires_at", { mode: "number" }).notNull(), // unix ms — service respects TTL
+});
+export type ResearchResult = typeof researchResults.$inferSelect;
+export type InsertResearchResult = typeof researchResults.$inferInsert;

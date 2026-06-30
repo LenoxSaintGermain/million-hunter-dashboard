@@ -951,3 +951,36 @@
 - [x] B-14: Ask/CTA section — "Log in to run the live flow"
 - [x] B-15: End-of-page capability matrix (Live/Demo/Roadmap honest labels)
 - [x] B-16: Verify zero API calls on /brief route
+
+## TSL-BUILD-2026-005 — Deep Research Integration
+
+### WP-DR1: Schema + Service Layer
+- [x] Add research_results table to drizzle/schema.ts (subjectKey, subjectType, model, content, citations, searchResults, costUsd, createdAt, expiresAt)
+- [x] Run pnpm db:push to migrate
+- [x] Build server/deepResearch.ts service (sonar-pro for fast queries, sonar-deep-research via background job)
+- [x] Add researchCache helper (get/set with TTL check)
+- [x] Add tRPC procedures: research.getForDeal, research.getRadarSignals, research.triggerDeepDossier
+
+### WP-DR2: Opportunity Radar — Live Signals
+- [x] Replace hardcoded signal array in opportunityRadar router with sonar-pro research calls
+- [x] Cache results 24h in research_results table
+- [x] Render citations as clickable source links in OpportunityRadar.tsx
+- [x] Restore Opportunity Radar to primary nav (remove Labs demotion)
+- [x] Add "Powered by live research" badge with last-updated timestamp
+
+### WP-DR3: Market Scan — Parked Honestly
+- [x] Add "Experimental — AI-synthesized listings, not live marketplace data" banner to Scan.tsx
+- [x] Keep in Labs nav group (do not restore to primary)
+
+### WP-DR4: Per-Deal Diligence Dossier
+- [x] Add "Research Dossier" tab to DealDetail.tsx
+- [x] Wire trpc.research.getForDeal query (sonar-pro, cached 72h)
+- [x] Render: business background, owner/principal info, reviews/complaints, litigation flags, competitive context
+- [x] Show citations as numbered source links
+- [x] Feed dossier findings into Red Team flags (surface as "External Research" flag type)
+- [x] Show research cost + timestamp in dossier header
+
+### WP-DR5: /brief Simulators — Cached Cited Data
+- [x] Wire Opportunity Radar section in /brief to pull from research cache
+- [x] Add citation footnotes to IC Consensus and Red Team simulators in /brief
+- [x] Label all simulator data with source provenance

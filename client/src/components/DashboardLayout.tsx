@@ -39,6 +39,7 @@ const navSections = [
       { href: "/", icon: LayoutDashboard, label: "Command Center", badge: null },
       { href: "/thesis", icon: Sparkles, label: "Thesis Engine", badge: { label: "New", color: "amber" } },
       { href: "/scout", icon: Building2, label: "Asset Scout", badge: { label: "New", color: "amber" } },
+      { href: "/opportunity-radar", icon: Radar, label: "Opportunity Radar", badge: { label: "Live", color: "amber" } },
       { href: "/memos", icon: FileText, label: "Investment Memos", badge: null },
       { href: "/outreach", icon: Mail, label: "Outreach Pipeline", badge: null },
     ],
@@ -57,7 +58,6 @@ const navSections = [
     label: "Labs (Experimental)",
     items: [
       { href: "/scan", icon: Search, label: "Market Scan", badge: { label: "Experimental", color: "muted" } },
-      { href: "/opportunity-radar", icon: Radar, label: "Opportunity Radar", badge: { label: "Experimental", color: "muted" } },
     ],
   },
   {

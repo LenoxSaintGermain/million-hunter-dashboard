@@ -62,11 +62,21 @@ export default function OpportunityRadar() {
 
   const { data: signals = [], refetch } = trpc.opportunityRadar.list.useQuery();
 
+  const [lastResearchSummary, setLastResearchSummary] = useState<{ citations: string[]; model: string; numSearchQueries: number | null; createdAt: number } | null>(null);
+
   const scanMutation = trpc.opportunityRadar.scan.useMutation({
     onSuccess: (data) => {
       setIsScanning(false);
       refetch();
-      toast({ title: `${data.length} signals found`, description: `Opportunity scan complete for ${location}` });
+      if (data.researchSummary) setLastResearchSummary(data.researchSummary);
+      const count = data.signals?.length ?? 0;
+      const citationCount = data.researchSummary?.citations?.length ?? 0;
+      toast({
+        title: `${count} sourced signals found`,
+        description: citationCount > 0
+          ? `${citationCount} live citations from sonar-pro research for ${location}`
+          : `Opportunity scan complete for ${location}`,
+      });
     },
     onError: (err) => {
       setIsScanning(false);
@@ -150,6 +160,52 @@ export default function OpportunityRadar() {
             {isScanning ? "Scanning..." : "Scan Market"}
           </Button>
         </div>
+
+        {/* Research Source Attribution */}
+        {lastResearchSummary && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span className="text-xs font-bold tracking-widest uppercase text-cyan-400">Live Research</span>
+                  <span className="text-xs text-gray-500 ml-1">sonar-pro · {lastResearchSummary.numSearchQueries ?? 0} search queries</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {lastResearchSummary.citations.slice(0, 6).map((url, i) => {
+                    let host = url;
+                    try { host = new URL(url).hostname.replace('www.', ''); } catch {}
+                    return (
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-300 hover:bg-cyan-500/20 transition-colors"
+                      >
+                        <span className="w-3.5 h-3.5 rounded-sm bg-cyan-500/20 flex items-center justify-center text-[9px] font-bold">{i + 1}</span>
+                        {host}
+                      </a>
+                    );
+                  })}
+                  {lastResearchSummary.citations.length > 6 && (
+                    <span className="text-xs text-gray-500 self-center">+{lastResearchSummary.citations.length - 6} more</span>
+                  )}
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-xs text-gray-500">Cached until</div>
+                <div className="text-xs text-cyan-400 font-medium">
+                  {new Date(lastResearchSummary.createdAt + 24 * 60 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Signal Type Filters */}
         {signals.length > 0 && (

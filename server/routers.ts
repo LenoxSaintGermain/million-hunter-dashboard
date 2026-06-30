@@ -32,6 +32,7 @@ import { stackRouter } from "./stackRouter";
 import { rippleRouter } from "./rippleRouter";
 import { agentRouter } from "./routers/agentRouter";
 import { rolePermissionsRouter } from "./rolePermissionsRouter";
+import { researchRouter } from "./routers/research";
 
 export const appRouter = router({
   system: systemRouter,
@@ -981,53 +982,73 @@ Return JSON:
       .input(z.object({
         location: z.string().optional(),
         signalTypes: z.array(z.string()).optional(),
+        forceRefresh: z.boolean().optional().default(false),
       }))
       .mutation(async ({ input }) => {
-        const { invokeLLM } = await import("./_core/llm");
         const location = input.location ?? "Atlanta, GA metro area";
+        const { getRadarSignals } = await import("./deepResearch");
 
-        const prompt = `You are a Mainstreet Investor intelligence agent. Generate 6-8 creative investment opportunity signals for ${location}.
+        // Run sonar-pro research — cached 24h, real citations
+        const research = await getRadarSignals(location, input.forceRefresh ?? false);
+        if (!research) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Research service unavailable" });
 
-Include a mix of: permit filings, TAD boundary plays, world event arbitrage (e.g., World Cup 2026), land plays, parking arbitrage, gas station holds, microloan opportunities.
+        // Parse the research content into structured signals using LLM
+        const { invokeLLM } = await import("./_core/llm");
+        let signals: any[] = [];
+        try {
+          const parseRes = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: "You are a structured data extractor. Extract investment signals from research text and return a valid JSON array only. No markdown, no explanation.",
+              },
+              {
+                role: "user",
+                content: `Extract 4-8 investment opportunity signals from this research about ${location}. Each signal must be grounded in the research content — do not invent data not present in the text.
+
+Research:
+${research.content.slice(0, 4000)}
+
+Citations available: ${(research.citations as string[]).slice(0, 5).join(", ")}
 
 Return JSON array:
 [
   {
-    "signalType": "permit_filed" | "tad_boundary" | "zoning_change" | "world_event" | "land_play" | "gas_station_hold" | "parking_arbitrage" | "lot_prep" | "microloan",
-    "title": "Compelling signal title",
-    "location": "Specific area",
-    "description": "What the signal is and why it matters",
+    "signalType": "permit_filed" | "tad_boundary" | "zoning_change" | "world_event" | "land_play" | "gas_station_hold" | "parking_arbitrage" | "lot_prep" | "microloan" | "market_shift",
+    "title": "Specific, factual signal title",
+    "location": "Specific area within ${location}",
+    "description": "What was found and why it matters — cite the source",
     "urgencyScore": 0.0-1.0,
-    "estimatedROI": 0.0-3.0 (as multiplier, e.g. 1.8 = 80% ROI),
-    "estimatedHoldYears": number,
-    "capitalRequired": number,
-    "aiAnalysis": "2-3 sentence strategic analysis of why a savvy investor should act now"
+    "estimatedROI": 1.0-3.0,
+    "estimatedHoldYears": 1-7,
+    "capitalRequired": 50000-2000000,
+    "aiAnalysis": "Strategic analysis grounded in the research findings",
+    "sourceUrl": "one of the citation URLs if applicable"
   }
-]`;
-
-        let signals: any[] = [];
-        try {
-          const res = await invokeLLM({
-            messages: [
-              { role: "system", content: "You are a real estate intelligence agent. Respond with a valid JSON array only." },
-              { role: "user", content: prompt },
+]`,
+              },
             ],
           });
-          const content = (res as any).choices?.[0]?.message?.content ?? "[]";
+          const content = (parseRes as any).choices?.[0]?.message?.content ?? "[]";
           const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
           signals = JSON.parse(cleaned);
         } catch {
-          signals = [
-            { signalType: "world_event", title: "FIFA World Cup 2026 — Parking Arbitrage Near Mercedes-Benz Stadium", location: "Downtown Atlanta, GA", description: "3 surface lots within 0.4mi of stadium. 64 matches across 3 years of prep + event.", urgencyScore: 0.95, estimatedROI: 2.4, estimatedHoldYears: 2, capitalRequired: 180000, aiAnalysis: "World Cup 2026 brings 1.5M+ visitors to Atlanta. Surface lots near the stadium are trading at $40-60/space/day during events. A 50-space lot generates $2k-3k per match day. With 8 Atlanta matches, that's $16k-24k in direct event revenue alone — before considering the 3-year appreciation play." },
-            { signalType: "tad_boundary", title: "Westside TAD Expansion — Acquire Before Boundary Formalization", location: "Westside, Atlanta, GA", description: "City council vote on TAD expansion expected Q2. Properties inside boundary get tax increment financing.", urgencyScore: 0.88, estimatedROI: 1.9, estimatedHoldYears: 3, capitalRequired: 350000, aiAnalysis: "Tax Allocation Districts redirect property tax increments to fund infrastructure. Properties acquired before boundary formalization capture the full appreciation upside without the premium. The Westside expansion is expected to unlock $40M in public infrastructure investment." },
-            { signalType: "permit_filed", title: "Major Mixed-Use Permit Filed — Ponce City Market Corridor", location: "Old Fourth Ward, Atlanta, GA", description: "$180M mixed-use development permit filed. Adjacent parcels still at pre-development pricing.", urgencyScore: 0.82, estimatedROI: 1.6, estimatedHoldYears: 4, capitalRequired: 220000, aiAnalysis: "When a $180M anchor project files permits, the surrounding 3-block radius typically sees 40-60% appreciation within 24 months of groundbreaking. Three adjacent commercial parcels are still priced at pre-announcement levels." },
-            { signalType: "gas_station_hold", title: "Decommissioned Gas Station — Redevelopment Optionality Play", location: "Buckhead, Atlanta, GA", description: "Corner lot gas station, EPA Phase 1 clean. Zoned C-2. Owner motivated, 18 months on market.", urgencyScore: 0.75, estimatedROI: 2.1, estimatedHoldYears: 5, capitalRequired: 480000, aiAnalysis: "Corner lots in Buckhead are irreplaceable. The EPA Phase 1 clean status removes the biggest risk. Hold for 2 years while the corridor densifies, then sell to a developer or convert to EV charging + convenience — a model generating $8k-12k/month in passive income." },
-            { signalType: "microloan", title: "SBA Microloan Arbitrage — Underserved Business District", location: "South DeKalb, GA", description: "CDFI microloan fund offering 3% capital to qualified businesses. 40+ businesses in pipeline.", urgencyScore: 0.70, estimatedROI: 1.4, estimatedHoldYears: 1, capitalRequired: 50000, aiAnalysis: "CDFIs are deploying capital at 3% in underserved markets. As a co-investor or fund participant, you access 14-18% blended returns through the interest spread. Minimum $50k gets you into the fund with quarterly distributions." },
-            { signalType: "parking_arbitrage", title: "Surface Lot Conversion — Midtown Tech Corridor", location: "Midtown Atlanta, GA", description: "2 adjacent surface lots, combined 80 spaces. Tech office density increasing 40% YoY.", urgencyScore: 0.78, estimatedROI: 1.7, estimatedHoldYears: 2, capitalRequired: 95000, aiAnalysis: "Midtown's tech corridor is adding 8,000 employees within 0.5 miles. Monthly parking is $180-220/space. At 80% occupancy on 80 spaces, that's $11.5k-14k/month gross. OpEx is minimal. This is a 3-year hold before selling to a developer at 15-20x monthly revenue." },
-          ];
+          // If parsing fails, return a single signal summarizing the research
+          signals = [{
+            signalType: "market_shift",
+            title: `Market Intelligence — ${location}`,
+            location,
+            description: research.content.slice(0, 300),
+            urgencyScore: 0.6,
+            estimatedROI: 1.5,
+            estimatedHoldYears: 3,
+            capitalRequired: 250000,
+            aiAnalysis: "Research sourced from live data — see citations for details.",
+            sourceUrl: (research.citations as string[])[0] ?? null,
+          }];
         }
 
-        // Save signals to DB
+        // Save signals to DB with citation metadata
         const db = await import("./db").then((m) => m.getDb());
         if (db) {
           const { opportunityRadar: radarTable } = await import("../drizzle/schema");
@@ -1042,11 +1063,21 @@ Return JSON array:
               estimatedHoldYears: signal.estimatedHoldYears,
               capitalRequired: signal.capitalRequired,
               aiAnalysis: signal.aiAnalysis,
-            }).catch(() => {}); // ignore duplicates
+            }).catch(() => {});
           }
-          await logActivity({ type: "system", title: `Opportunity Radar scan: ${signals.length} signals found in ${location}` });
+          await logActivity({ type: "system", title: `Opportunity Radar scan: ${signals.length} sourced signals for ${location} (${(research.citations as string[]).length} citations)` });
         }
-        return signals;
+
+        return {
+          signals,
+          researchSummary: {
+            model: research.model,
+            citations: research.citations as string[],
+            numSearchQueries: research.numSearchQueries,
+            createdAt: research.createdAt,
+            expiresAt: research.expiresAt,
+          },
+        };
       }),
   }),
 
@@ -2274,6 +2305,7 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
   thesis: thesisRouter,
   tide: tideRouter,
   ripple: rippleRouter,
+  research: researchRouter,
   rolePermissions: rolePermissionsRouter,
   // ─── LOI Generation (GEMINI 3.1 FLASH — Agentic Drafting) ────────────────────
   loi: router({

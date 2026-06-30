@@ -174,9 +174,16 @@ export default function Scan() {
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <Radar className="w-5 h-5 text-primary" />
             Market Scan
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
+              Labs
+            </span>
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {(deals ?? []).length} deal{(deals ?? []).length !== 1 ? "s" : ""} in pipeline
+          </p>
+          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            Experimental — listings are AI-synthesized, not sourced from live marketplaces
           </p>
         </div>
         <div className="flex gap-2">
