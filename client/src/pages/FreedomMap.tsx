@@ -11,18 +11,18 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Target, Zap, TrendingUp, Home, Building2, Wrench, Coins,
   MapPin, ArrowRight, Sparkles, ChevronRight, RefreshCw,
-  DollarSign, Clock, Shield, Star
+  DollarSign, Clock, Star
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DEAL_TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string; label: string }> = {
-  sba_business: { icon: Building2, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", label: "SBA Business" },
+  sba_business: { icon: Building2, color: "text-[var(--sh-primary)]", bg: "bg-[var(--sh-primary-10)] border-[var(--sh-border-1)]", label: "SBA Business" },
   rental: { icon: Home, color: "text-[var(--sage)]", bg: "bg-emerald-500/10 border-emerald-500/20", label: "Rental" },
-  flip: { icon: Wrench, color: "text-[var(--amber)]", bg: "bg-amber-500/10 border-amber-500/20", label: "Fix & Flip" },
-  microloan: { icon: Coins, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20", label: "Microloan" },
-  land_play: { icon: MapPin, color: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20", label: "Land Play" },
-  parking_arbitrage: { icon: Target, color: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20", label: "Parking Arb" },
-  tad_hold: { icon: TrendingUp, color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20", label: "TAD Hold" },
+  flip: { icon: Wrench, color: "text-[var(--sh-amber)]", bg: "bg-amber-500/10 border-amber-500/20", label: "Fix & Flip" },
+  microloan: { icon: Coins, color: "text-[var(--sh-fg-muted)]", bg: "bg-[var(--sh-surface-2)] border-[var(--sh-border-1)]", label: "Microloan" },
+  land_play: { icon: MapPin, color: "text-[var(--sh-red)]", bg: "bg-rose-500/10 border-rose-500/20", label: "Land Play" },
+  parking_arbitrage: { icon: Target, color: "text-[var(--sh-signal)]", bg: "bg-[var(--sh-primary-10)] border-[var(--sh-border-1)]", label: "Parking Arb" },
+  tad_hold: { icon: TrendingUp, color: "text-[var(--sh-amber)]", bg: "bg-amber-500/10 border-amber-500/20", label: "TAD Hold" },
 };
 
 const PRESET_PROFILES = [
@@ -79,26 +79,23 @@ export default function FreedomMap() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] border border-[var(--rule)] p-8 md:p-12"
+          className="relative overflow-hidden rounded-2xl border border-[var(--sh-border-1)] p-8 md:p-12"
+          style={{ background: "var(--sh-surface-1)" }}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5" />
-          <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
-                <Target className="w-4 h-4 text-cyan-400" />
+              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--sh-primary-10)", border: "1px solid var(--sh-border-1)" }}>
+                <Target className="w-4 h-4" style={{ color: "var(--sh-signal)" }} />
               </div>
-              <span className="text-xs font-bold tracking-[0.2em] uppercase text-cyan-400">Freedom Map</span>
+              <span className="text-xs font-bold tracking-[0.2em] uppercase" style={{ color: "var(--sh-signal)" }}>Freedom Map</span>
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4" style={{ color: "var(--sh-text-primary)", fontFamily: "var(--font-display)" }}>
               Start with where you<br />
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">
-                want to be.
-              </span>
+              <span style={{ color: "var(--sh-signal)" }}>want to be.</span>
             </h1>
-            <p className="text-gray-400 text-lg max-w-2xl leading-relaxed">
-              Tell the AI your target. It engineers the exact deal blend — business, rentals, flips, land plays — 
-              to get you there. Not passive. Not generic. <strong className="text-white">Your recipe.</strong>
+            <p className="text-lg max-w-2xl leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>
+              Tell the system your target. It engineers the exact deal blend — business, rentals, flips,
+              land plays — to get you there. Not passive. Not generic. <strong style={{ color: "var(--sh-text-primary)" }}>Your recipe.</strong>
             </p>
           </div>
         </motion.div>
@@ -116,27 +113,33 @@ export default function FreedomMap() {
               <div className="lg:col-span-2 space-y-6">
                 {/* Preset Profiles */}
                 <div>
-                  <p className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-3">Quick Start Profiles</p>
+                  <p className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: "var(--sh-fg-muted)" }}>Quick Start Profiles</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {PRESET_PROFILES.map((preset) => (
                       <button
                         key={preset.label}
                         onClick={() => applyPreset(preset)}
-                        className="group relative px-3 py-2.5 rounded-xl bg-[var(--paper)] hover:bg-[var(--bone)] border border-[var(--rule)] hover:border-[var(--rule)] transition-all duration-300 text-left"
+                        className="group relative px-3 py-2.5 rounded-xl text-left transition-all duration-200 hover:scale-[1.02]"
+                        style={{
+                          background: "var(--sh-surface-2)",
+                          border: "1px solid var(--sh-border-1)",
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--sh-signal)")}
+                        onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--sh-border-1)")}
                       >
-                        <div className="text-xs font-semibold text-gray-300 group-hover:text-white transition-colors">{preset.label}</div>
-                        <div className="text-[10px] text-gray-500 mt-0.5">{formatCurrency(preset.targetMonthlyIncome)}/mo</div>
+                        <div className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>{preset.label}</div>
+                        <div className="text-[10px] mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>{formatCurrency(preset.targetMonthlyIncome)}/mo</div>
                       </button>
                     ))}
                   </div>
                 </div>
 
                 {/* Target Income */}
-                <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
+                <Card className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-6 space-y-4">
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-semibold text-white">Target Monthly Income</label>
-                      <span className="text-2xl font-bold text-cyan-400">{formatCurrency(form.targetMonthlyIncome)}</span>
+                      <label className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Target Monthly Income</label>
+                      <span className="text-2xl font-bold" style={{ color: "var(--sh-signal)", fontFamily: "var(--font-mono)" }}>{formatCurrency(form.targetMonthlyIncome)}</span>
                     </div>
                     <Slider
                       value={[form.targetMonthlyIncome]}
@@ -144,7 +147,7 @@ export default function FreedomMap() {
                       min={2000} max={100000} step={1000}
                       className="w-full"
                     />
-                    <div className="flex justify-between text-xs text-muted-foreground">
+                    <div className="flex justify-between text-xs" style={{ color: "var(--sh-fg-muted)" }}>
                       <span>$2k/mo</span><span>$50k/mo</span><span>$100k/mo</span>
                     </div>
                   </CardContent>
@@ -152,31 +155,33 @@ export default function FreedomMap() {
 
                 {/* Capital & Timeline */}
                 <div className="grid grid-cols-2 gap-4">
-                  <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5 space-y-3">
-                      <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Investment Capital</label>
+                      <label className="text-xs font-bold tracking-widest uppercase" style={{ color: "var(--sh-fg-muted)" }}>Investment Capital</label>
                       <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <DollarSign className="w-4 h-4 shrink-0" style={{ color: "var(--sh-fg-muted)" }} />
                         <Input
                           type="number"
                           value={form.investmentCapital}
                           onChange={(e) => setForm((f) => ({ ...f, investmentCapital: Number(e.target.value) }))}
-                          className="bg-transparent border-[var(--rule)] text-white font-semibold"
+                          className="border-[var(--sh-border-1)] font-semibold"
+                          style={{ background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}
                         />
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5 space-y-3">
-                      <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Timeline (Years)</label>
+                      <label className="text-xs font-bold tracking-widest uppercase" style={{ color: "var(--sh-fg-muted)" }}>Timeline (Years)</label>
                       <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <Clock className="w-4 h-4 shrink-0" style={{ color: "var(--sh-fg-muted)" }} />
                         <Input
                           type="number"
                           value={form.timelineYears}
                           onChange={(e) => setForm((f) => ({ ...f, timelineYears: Number(e.target.value) }))}
                           min={1} max={10}
-                          className="bg-transparent border-[var(--rule)] text-white font-semibold"
+                          className="border-[var(--sh-border-1)] font-semibold"
+                          style={{ background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}
                         />
                       </div>
                     </CardContent>
@@ -186,18 +191,17 @@ export default function FreedomMap() {
                 {/* Risk & Situation */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Risk Tolerance</label>
+                    <label className="text-xs font-bold tracking-widest uppercase" style={{ color: "var(--sh-fg-muted)" }}>Risk Tolerance</label>
                     <div className="flex gap-2">
                       {(["conservative", "moderate", "aggressive"] as const).map((r) => (
                         <button
                           key={r}
                           onClick={() => setForm((f) => ({ ...f, riskTolerance: r }))}
-                          className={cn(
-                            "flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all border",
-                            form.riskTolerance === r
-                              ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
-                              : "bg-[var(--paper)] border-[var(--rule)] text-gray-400 hover:border-[var(--rule)]"
-                          )}
+                          className="flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all border"
+                          style={form.riskTolerance === r
+                            ? { background: "var(--sh-primary-10)", borderColor: "var(--sh-signal)", color: "var(--sh-signal)" }
+                            : { background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }
+                          }
                         >
                           {r}
                         </button>
@@ -205,18 +209,17 @@ export default function FreedomMap() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Situation</label>
+                    <label className="text-xs font-bold tracking-widest uppercase" style={{ color: "var(--sh-fg-muted)" }}>Situation</label>
                     <div className="flex gap-2">
                       {(["single", "married", "family"] as const).map((s) => (
                         <button
                           key={s}
                           onClick={() => setForm((f) => ({ ...f, situation: s }))}
-                          className={cn(
-                            "flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all border",
-                            form.situation === s
-                              ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
-                              : "bg-[var(--paper)] border-[var(--rule)] text-gray-400 hover:border-[var(--rule)]"
-                          )}
+                          className="flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all border"
+                          style={form.situation === s
+                            ? { background: "var(--sh-primary-10)", borderColor: "var(--sh-signal)", color: "var(--sh-signal)" }
+                            : { background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }
+                          }
                         >
                           {s}
                         </button>
@@ -226,16 +229,17 @@ export default function FreedomMap() {
                 </div>
 
                 {/* Location */}
-                <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
+                <Card className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-5 space-y-2">
-                    <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Target Market</label>
+                    <label className="text-xs font-bold tracking-widest uppercase" style={{ color: "var(--sh-fg-muted)" }}>Target Market</label>
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <MapPin className="w-4 h-4 shrink-0" style={{ color: "var(--sh-fg-muted)" }} />
                       <Input
                         value={form.location}
                         onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
                         placeholder="Atlanta, GA"
-                        className="bg-transparent border-[var(--rule)] text-white"
+                        className="border-[var(--sh-border-1)]"
+                        style={{ background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}
                       />
                     </div>
                   </CardContent>
@@ -244,7 +248,8 @@ export default function FreedomMap() {
                 <Button
                   onClick={handleGenerate}
                   size="lg"
-                  className="w-full h-14 text-base font-bold bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white border-0 rounded-xl"
+                  className="w-full h-14 text-base font-bold rounded-xl border-0"
+                  style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
                 >
                   <Sparkles className="mr-2 w-5 h-5" />
                   Engineer My Freedom Path
@@ -254,10 +259,10 @@ export default function FreedomMap() {
 
               {/* Side Panel */}
               <div className="space-y-4">
-                <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
+                <Card className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-6 space-y-4">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                      <Zap className="w-4 h-4 text-yellow-400" />
+                    <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>
+                      <Zap className="w-4 h-4" style={{ color: "var(--sh-signal)" }} />
                       How it works
                     </div>
                     <div className="space-y-3">
@@ -268,17 +273,17 @@ export default function FreedomMap() {
                         { step: "04", text: "Get a milestone roadmap to execute" },
                       ].map((item) => (
                         <div key={item.step} className="flex items-start gap-3">
-                          <span className="text-xs font-mono text-cyan-500 mt-0.5 shrink-0">{item.step}</span>
-                          <span className="text-sm text-gray-400">{item.text}</span>
+                          <span className="text-xs font-mono mt-0.5 shrink-0" style={{ color: "var(--sh-signal)" }}>{item.step}</span>
+                          <span className="text-sm" style={{ color: "var(--sh-text-secondary)" }}>{item.text}</span>
                         </div>
                       ))}
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-cyan-500/5 to-purple-500/5 border-cyan-500/10">
+                <Card className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-surface-2)" }}>
                   <CardContent className="p-6">
-                    <div className="text-xs font-bold tracking-widest uppercase text-cyan-400 mb-2">Deal Blends Available</div>
+                    <div className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "var(--sh-signal)" }}>Deal Blends Available</div>
                     <div className="flex flex-wrap gap-1.5">
                       {Object.values(DEAL_TYPE_CONFIG).map((cfg) => (
                         <span key={cfg.label} className={cn("text-[10px] font-semibold px-2 py-1 rounded-full border", cfg.bg, cfg.color)}>
@@ -286,7 +291,7 @@ export default function FreedomMap() {
                         </span>
                       ))}
                     </div>
-                    <p className="text-xs text-gray-500 mt-3 leading-relaxed">
+                    <p className="text-xs mt-3 leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>
                       Mix and match like Blackrock — but for Mainstreet. SBA loans, seller notes, TAD plays, World Cup arbitrage, and more.
                     </p>
                   </CardContent>
@@ -304,21 +309,20 @@ export default function FreedomMap() {
               className="flex flex-col items-center justify-center py-24 space-y-6"
             >
               <div className="relative">
-                <div className="w-20 h-20 rounded-full border border-cyan-500/20 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ border: "1px solid var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                   >
-                    <Sparkles className="w-8 h-8 text-cyan-400" />
+                    <Sparkles className="w-8 h-8" style={{ color: "var(--sh-signal)" }} />
                   </motion.div>
                 </div>
-                <div className="absolute inset-0 rounded-full border border-cyan-500/10 animate-ping" />
               </div>
               <div className="text-center space-y-2">
-                <h3 className="text-xl font-bold text-white">Engineering your freedom path...</h3>
-                <p className="text-gray-400 text-sm">Analyzing {formatCurrency(form.targetMonthlyIncome)}/mo target across deal types</p>
+                <h3 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>Engineering your freedom path...</h3>
+                <p className="text-sm" style={{ color: "var(--sh-text-secondary)" }}>Analyzing {formatCurrency(form.targetMonthlyIncome)}/mo target across deal types</p>
               </div>
-              <div className="flex flex-col items-center gap-2 text-xs text-gray-500">
+              <div className="flex flex-col items-center gap-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
                 {["Calculating capital efficiency", "Modeling deal blend scenarios", "Generating milestone roadmap", "Writing your agent message"].map((msg, i) => (
                   <motion.div
                     key={msg}
@@ -327,7 +331,7 @@ export default function FreedomMap() {
                     transition={{ delay: i * 0.6 }}
                     className="flex items-center gap-2"
                   >
-                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--sh-signal)" }} />
                     {msg}
                   </motion.div>
                 ))}
@@ -347,16 +351,16 @@ export default function FreedomMap() {
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.1 }}
-                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] to-[#111] border border-cyan-500/20 p-6 md:p-8"
+                className="relative overflow-hidden rounded-2xl p-6 md:p-8"
+                style={{ background: "var(--sh-surface-1)", border: "1px solid var(--sh-border-1)" }}
               >
-                <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0 mt-1">
-                    <Sparkles className="w-5 h-5 text-cyan-400" />
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-1" style={{ background: "var(--sh-primary-10)", border: "1px solid var(--sh-border-1)" }}>
+                    <Sparkles className="w-5 h-5" style={{ color: "var(--sh-signal)" }} />
                   </div>
                   <div>
-                    <div className="text-xs font-bold tracking-widest uppercase text-cyan-400 mb-2">Your AI Advisor</div>
-                    <p className="text-white text-lg leading-relaxed font-light">{result.agentMessage}</p>
+                    <div className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "var(--sh-signal)" }}>Your Co-Analyst</div>
+                    <p className="text-lg leading-relaxed font-light" style={{ color: "var(--sh-text-primary)" }}>{result.agentMessage}</p>
                   </div>
                 </div>
               </motion.div>
@@ -364,15 +368,15 @@ export default function FreedomMap() {
               {/* Summary Stats */}
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  { label: "Projected Monthly", value: formatCurrency(result.totalProjectedMonthly), icon: TrendingUp, color: "text-[var(--sage)]" },
-                  { label: "Total Investment", value: formatCurrency(result.totalInvestmentRequired), icon: DollarSign, color: "text-blue-400" },
-                  { label: "Deal Components", value: `${result.recipe?.length ?? 0} assets`, icon: Building2, color: "text-purple-400" },
+                  { label: "Projected Monthly", value: formatCurrency(result.totalProjectedMonthly), icon: TrendingUp, color: "var(--sage)" },
+                  { label: "Total Investment", value: formatCurrency(result.totalInvestmentRequired), icon: DollarSign, color: "var(--sh-primary)" },
+                  { label: "Deal Components", value: `${result.recipe?.length ?? 0} assets`, icon: Building2, color: "var(--sh-signal)" },
                 ].map((stat) => (
-                  <Card key={stat.label} className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card key={stat.label} className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-4 text-center">
-                      <stat.icon className={cn("w-5 h-5 mx-auto mb-2", stat.color)} />
-                      <div className={cn("text-xl font-bold", stat.color)}>{stat.value}</div>
-                      <div className="text-xs text-muted-foreground mt-1">{stat.label}</div>
+                      <stat.icon className="w-5 h-5 mx-auto mb-2" style={{ color: stat.color }} />
+                      <div className="text-xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
+                      <div className="text-xs mt-1" style={{ color: "var(--sh-fg-muted)" }}>{stat.label}</div>
                     </CardContent>
                   </Card>
                 ))}
@@ -384,12 +388,11 @@ export default function FreedomMap() {
                   <button
                     key={mode}
                     onClick={() => setViewMode(mode)}
-                    className={cn(
-                      "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border",
-                      viewMode === mode
-                        ? "bg-[var(--bone)] border-[var(--rule)] text-white"
-                        : "bg-[var(--paper)] border-[var(--rule)] text-gray-500 hover:text-gray-300"
-                    )}
+                    className="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border"
+                    style={viewMode === mode
+                      ? { background: "var(--sh-primary-10)", borderColor: "var(--sh-signal)", color: "var(--sh-signal)" }
+                      : { background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }
+                    }
                   >
                     {mode}
                   </button>
@@ -424,20 +427,20 @@ export default function FreedomMap() {
                               </Badge>
                             </div>
                             <div>
-                              <div className="font-semibold text-white text-sm">{item.label}</div>
-                              <div className="text-xs text-gray-400 mt-1 leading-relaxed">{item.description}</div>
+                              <div className="font-semibold text-sm" style={{ color: "var(--sh-text-primary)" }}>{item.label}</div>
+                              <div className="text-xs mt-1 leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>{item.description}</div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--rule)]">
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--sh-border-1)]">
                               <div>
-                                <div className="text-[10px] text-muted-foreground">Monthly Income</div>
+                                <div className="text-[10px]" style={{ color: "var(--sh-fg-muted)" }}>Monthly Income</div>
                                 <div className={cn("text-sm font-bold", cfg.color)}>{formatCurrency(item.estimatedMonthlyIncome)}</div>
                               </div>
                               <div>
-                                <div className="text-[10px] text-muted-foreground">Investment</div>
-                                <div className="text-sm font-bold text-white">{formatCurrency(item.estimatedInvestment)}</div>
+                                <div className="text-[10px]" style={{ color: "var(--sh-fg-muted)" }}>Investment</div>
+                                <div className="text-sm font-bold" style={{ color: "var(--sh-text-primary)" }}>{formatCurrency(item.estimatedInvestment)}</div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
                               <Clock className="w-3 h-3" />
                               {item.timelineMonths} months to close
                             </div>
@@ -457,7 +460,7 @@ export default function FreedomMap() {
                   className="space-y-4"
                 >
                   <div className="relative">
-                    <div className="absolute left-6 top-0 bottom-0 w-px bg-gradient-to-b from-cyan-500/50 via-purple-500/30 to-transparent" />
+                    <div className="absolute left-6 top-0 bottom-0 w-px" style={{ background: "var(--sh-border-1)" }} />
                     <div className="space-y-6 pl-16">
                       {result.milestones?.map((m: any, i: number) => (
                         <motion.div
@@ -467,20 +470,20 @@ export default function FreedomMap() {
                           transition={{ delay: i * 0.15 }}
                           className="relative"
                         >
-                          <div className="absolute -left-10 top-1 w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 flex items-center justify-center">
-                            <Star className="w-3.5 h-3.5 text-cyan-400" />
+                          <div className="absolute -left-10 top-1 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--sh-primary-10)", border: "1px solid var(--sh-border-1)" }}>
+                            <Star className="w-3.5 h-3.5" style={{ color: "var(--sh-signal)" }} />
                           </div>
-                          <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
+                          <Card className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-surface-1)" }}>
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between gap-4">
                                 <div>
-                                  <div className="text-xs text-cyan-400 font-mono mb-1">Month {m.month}</div>
-                                  <div className="font-semibold text-white">{m.title}</div>
-                                  <div className="text-sm text-gray-400 mt-1">{m.description}</div>
+                                  <div className="text-xs font-mono mb-1" style={{ color: "var(--sh-signal)" }}>Month {m.month}</div>
+                                  <div className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{m.title}</div>
+                                  <div className="text-sm mt-1" style={{ color: "var(--sh-text-secondary)" }}>{m.description}</div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <div className="text-lg font-bold text-[var(--sage)]">{formatCurrency(m.monthlyIncome)}</div>
-                                  <div className="text-xs text-muted-foreground">/month</div>
+                                  <div className="text-lg font-bold" style={{ color: "var(--sage)" }}>{formatCurrency(m.monthlyIncome)}</div>
+                                  <div className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>/month</div>
                                 </div>
                               </div>
                             </CardContent>
@@ -499,18 +502,18 @@ export default function FreedomMap() {
                   animate={{ opacity: 1 }}
                   className="space-y-4"
                 >
-                  <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
+                  <Card className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-6 space-y-4">
-                      <div className="text-sm font-semibold text-white">AI Rationale</div>
-                      <p className="text-gray-400 leading-relaxed">{result.rationale}</p>
-                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--rule)]">
+                      <div className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Co-Analyst Rationale</div>
+                      <p className="leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>{result.rationale}</p>
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--sh-border-1)]">
                         <div>
-                          <div className="text-xs text-muted-foreground mb-1">Annual Run Rate</div>
-                          <div className="text-2xl font-bold text-white">{formatCurrency(result.totalProjectedMonthly * 12)}</div>
+                          <div className="text-xs mb-1" style={{ color: "var(--sh-fg-muted)" }}>Annual Run Rate</div>
+                          <div className="text-2xl font-bold" style={{ color: "var(--sh-text-primary)" }}>{formatCurrency(result.totalProjectedMonthly * 12)}</div>
                         </div>
                         <div>
-                          <div className="text-xs text-muted-foreground mb-1">Cash-on-Cash Yield</div>
-                          <div className="text-2xl font-bold text-[var(--sage)]">
+                          <div className="text-xs mb-1" style={{ color: "var(--sh-fg-muted)" }}>Cash-on-Cash Yield</div>
+                          <div className="text-2xl font-bold" style={{ color: "var(--sage)" }}>
                             {result.totalInvestmentRequired > 0
                               ? `${((result.totalProjectedMonthly * 12 / result.totalInvestmentRequired) * 100).toFixed(1)}%`
                               : "—"}
@@ -527,14 +530,16 @@ export default function FreedomMap() {
                 <Button
                   onClick={() => setStep("intake")}
                   variant="outline"
-                  className="gap-2 border-[var(--rule)]"
+                  className="gap-2 border-[var(--sh-border-1)]"
+                  style={{ color: "var(--sh-text-primary)" }}
                 >
                   <RefreshCw className="w-4 h-4" />
                   Adjust Goals
                 </Button>
                 <Button
                   onClick={() => window.location.href = "/strategy-blender"}
-                  className="gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 text-white border-0"
+                  className="gap-2 border-0"
+                  style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
                 >
                   Open Strategy Blender
                   <ChevronRight className="w-4 h-4" />

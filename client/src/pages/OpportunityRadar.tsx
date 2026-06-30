@@ -17,15 +17,15 @@ import { cn } from "@/lib/utils";
 
 const SIGNAL_CONFIG: Record<string, { icon: any; color: string; bg: string; label: string; description: string }> = {
   permit_filed: { icon: FileText, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", label: "Permit Filed", description: "Construction permits signal incoming development" },
-  tad_boundary: { icon: Landmark, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20", label: "TAD Boundary", description: "Tax Allocation District plays" },
+  tad_boundary: { icon: Landmark, color: "text-[var(--sh-signal)]", bg: "bg-[var(--sh-primary-10)] border-[var(--sh-border-1)]", label: "TAD Boundary", description: "Tax Allocation District plays" },
   zoning_change: { icon: Building2, color: "text-[var(--amber)]", bg: "bg-amber-500/10 border-amber-500/20", label: "Zoning Change", description: "Rezoning creates value arbitrage" },
-  world_event: { icon: Globe, color: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20", label: "World Event", description: "Major events create demand spikes" },
+  world_event: { icon: Globe, color: "text-[var(--sh-primary)]", bg: "bg-[var(--sh-primary-10)] border-[var(--sh-border-1)]", label: "World Event", description: "Major events create demand spikes" },
   land_play: { icon: MapPin, color: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20", label: "Land Play", description: "Undervalued land with optionality" },
   gas_station_hold: { icon: Fuel, color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20", label: "Gas Station Hold", description: "Corner lots with redevelopment optionality" },
   parking_arbitrage: { icon: ParkingCircle, color: "text-[var(--sage)]", bg: "bg-emerald-500/10 border-emerald-500/20", label: "Parking Arb", description: "Surface lots in density corridors" },
   lot_prep: { icon: Target, color: "text-teal-400", bg: "bg-teal-500/10 border-teal-500/20", label: "Lot Prep", description: "Prep for acquisition by major developer" },
   microloan: { icon: Coins, color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20", label: "Microloan", description: "CDFI capital arbitrage" },
-  other: { icon: Zap, color: "text-gray-400", bg: "bg-gray-500/10 border-gray-500/20", label: "Signal", description: "Creative opportunity" },
+  other: { icon: Zap, color: "text-[var(--sh-fg-muted)]", bg: "bg-[var(--sh-surface-2)] border-[var(--sh-border-1)]", label: "Signal", description: "Creative opportunity" },
 };
 
 const formatCurrency = (v: number) =>
@@ -105,29 +105,26 @@ export default function OpportunityRadar() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] border border-[var(--rule)] p-6 md:p-8"
+          className="relative overflow-hidden rounded-2xl border p-6 md:p-8"
+          style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border-1)" }}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 via-transparent to-cyan-500/5" />
-          <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-rose-500/50 to-transparent" />
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--sh-primary-10)", border: "1px solid var(--sh-border-1)" }}>
                 <Radar className="w-3.5 h-3.5 text-rose-400" />
               </div>
-              <span className="text-xs font-bold tracking-[0.2em] uppercase text-rose-400">Opportunity Radar</span>
+              <span className="text-xs font-bold tracking-[0.2em] uppercase" style={{ color: "var(--sh-signal)" }}>Opportunity Radar</span>
               {signals.length > 0 && (
-                <Badge className="bg-rose-500/10 text-rose-400 border-rose-500/20 text-xs ml-auto">
+                <Badge className="text-xs ml-auto" style={{ background: "var(--sh-primary-10)", color: "var(--sh-signal)", borderColor: "var(--sh-border-1)" }}>
                   {signals.length} active signals
                 </Badge>
               )}
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2" style={{ color: "var(--sh-text-primary)", fontFamily: "var(--font-display)" }}>
               See what the{" "}
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-rose-400 to-cyan-400">
-                market is telegraphing.
-              </span>
+              <span style={{ color: "var(--sh-signal)" }}>market is telegraphing.</span>
             </h1>
-            <p className="text-gray-400 text-sm max-w-2xl">
+            <p className="text-sm max-w-2xl" style={{ color: "var(--sh-text-secondary)" }}>
               Permits filed. TAD boundaries shifting. Capital convergence patterns. The signals that
               validate a thesis — or kill it — before you open a CIM.
             </p>
@@ -142,13 +139,13 @@ export default function OpportunityRadar() {
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="Atlanta, GA"
-              className="bg-transparent border-0 text-white placeholder:text-gray-500 focus-visible:ring-0 px-0"
+              className="bg-transparent border-0 focus-visible:ring-0 px-0" style={{ color: "var(--sh-text-primary)" }}
             />
           </div>
           <Button
             onClick={handleScan}
             disabled={isScanning}
-            className="gap-2 bg-gradient-to-r from-rose-500 to-cyan-500 hover:from-rose-400 hover:to-cyan-400 text-white border-0 rounded-xl px-6"
+            className="gap-2 border-0 rounded-xl px-6" style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
           >
             {isScanning ? (
               <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
@@ -166,14 +163,14 @@ export default function OpportunityRadar() {
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4"
+            className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-primary-10)" }}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                  <span className="text-xs font-bold tracking-widest uppercase text-cyan-400">Live Research</span>
-                  <span className="text-xs text-gray-500 ml-1">sonar-pro · {lastResearchSummary.numSearchQueries ?? 0} search queries</span>
+                  <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--sh-signal)" }} />
+                  <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "var(--sh-signal)" }}>Live Research</span>
+                  <span className="text-xs ml-1" style={{ color: "var(--sh-fg-muted)" }}>sonar-pro · {lastResearchSummary.numSearchQueries ?? 0} search queries</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {lastResearchSummary.citations.slice(0, 6).map((url, i) => {
@@ -185,7 +182,8 @@ export default function OpportunityRadar() {
                         href={url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-300 hover:bg-cyan-500/20 transition-colors"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs transition-colors"
+                        style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)", color: "var(--sh-text-secondary)" }}
                       >
                         <span className="w-3.5 h-3.5 rounded-sm bg-cyan-500/20 flex items-center justify-center text-[9px] font-bold">{i + 1}</span>
                         {host}
@@ -193,13 +191,13 @@ export default function OpportunityRadar() {
                     );
                   })}
                   {lastResearchSummary.citations.length > 6 && (
-                    <span className="text-xs text-gray-500 self-center">+{lastResearchSummary.citations.length - 6} more</span>
+                    <span className="text-xs self-center" style={{ color: "var(--sh-fg-muted)" }}>+{lastResearchSummary.citations.length - 6} more</span>
                   )}
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <div className="text-xs text-gray-500">Cached until</div>
-                <div className="text-xs text-cyan-400 font-medium">
+                <div className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Cached until</div>
+                <div className="text-xs font-medium" style={{ color: "var(--sh-signal)" }}>
                   {new Date(lastResearchSummary.createdAt + 24 * 60 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
@@ -215,9 +213,10 @@ export default function OpportunityRadar() {
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all",
                 activeFilter === null
-                  ? "bg-[var(--bone)] border-[var(--rule)] text-white"
-                  : "bg-[var(--paper)] border-[var(--rule)] text-gray-500 hover:text-gray-300"
+                  ? "border-[var(--sh-border-1)] text-[var(--sh-text-primary)]"
+                  : "border-[var(--sh-border-1)] text-[var(--sh-fg-muted)]"
               )}
+              style={activeFilter === null ? { background: "var(--sh-surface-1)" } : { background: "var(--sh-surface-2)" }}
             >
               <Filter className="w-3 h-3" />
               All ({signals.length})
@@ -231,8 +230,9 @@ export default function OpportunityRadar() {
                   onClick={() => setActiveFilter(type === activeFilter ? null : type)}
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all",
-                    activeFilter === type ? `${cfg.bg} ${cfg.color}` : "bg-[var(--paper)] border-[var(--rule)] text-gray-500 hover:text-gray-300"
+                    activeFilter === type ? `${cfg.bg} ${cfg.color}` : "border-[var(--sh-border-1)] text-[var(--sh-fg-muted)]"
                   )}
+                  style={activeFilter !== type ? { background: "var(--sh-surface-2)" } : undefined}
                 >
                   <Icon className="w-3 h-3" />
                   {cfg.label} ({count})
@@ -253,10 +253,10 @@ export default function OpportunityRadar() {
               <Radar className="w-8 h-8 text-rose-400/40" />
             </div>
             <div className="text-center">
-              <div className="text-white font-semibold mb-1">No signals yet</div>
-              <div className="text-sm text-gray-500">Enter a market to surface the macro signals that validate or invalidate a thesis</div>
+              <div className="font-semibold mb-1" style={{ color: "var(--sh-text-primary)" }}>No signals yet</div>
+              <div className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Enter a market to surface the macro signals that validate or invalidate a thesis</div>
             </div>
-            <Button onClick={handleScan} className="gap-2 bg-gradient-to-r from-rose-500 to-cyan-500 text-white border-0">
+            <Button onClick={handleScan} className="gap-2 border-0" style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}>
               <Sparkles className="w-4 h-4" />
               Scan {location}
             </Button>
@@ -286,8 +286,8 @@ export default function OpportunityRadar() {
               />
             </div>
             <div className="text-center">
-              <div className="text-white font-semibold">Scanning {location}...</div>
-              <div className="text-sm text-gray-500 mt-1">Analyzing permits, TADs, zoning changes, and creative plays</div>
+              <div className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Scanning {location}...</div>
+              <div className="text-sm mt-1" style={{ color: "var(--sh-fg-muted)" }}>Analyzing permits, TADs, zoning changes, and creative plays</div>
             </div>
           </motion.div>
         )}
@@ -327,7 +327,7 @@ export default function OpportunityRadar() {
                               <Badge variant="outline" className={cn("text-[10px] font-bold mb-1", cfg.color, cfg.bg)}>
                                 {cfg.label}
                               </Badge>
-                              <div className="font-semibold text-white text-sm leading-tight">{signal.title}</div>
+                              <div className="font-semibold text-sm leading-tight" style={{ color: "var(--sh-text-primary)" }}>{signal.title}</div>
                               {signal.location && (
                                 <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                                   <MapPin className="w-3 h-3" />
@@ -370,7 +370,7 @@ export default function OpportunityRadar() {
                           {signal.estimatedHoldYears && (
                             <div className="text-center">
                               <div className="text-[10px] text-muted-foreground">Hold Period</div>
-                              <div className="text-sm font-bold text-white">{signal.estimatedHoldYears}yr</div>
+                              <div className="text-sm font-bold" style={{ color: "var(--sh-text-primary)" }}>{signal.estimatedHoldYears}yr</div>
                             </div>
                           )}
                           {signal.capitalRequired && (
@@ -399,11 +399,12 @@ export default function OpportunityRadar() {
                                   <Sparkles className={cn("w-3.5 h-3.5", cfg.color)} />
                                   <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">AI Analysis</span>
                                 </div>
-                                <p className="text-sm text-gray-300 leading-relaxed">{signal.aiAnalysis}</p>
+                                <p className="text-sm leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>{signal.aiAnalysis}</p>
                                 <div className="flex gap-2 mt-3">
                                   <Button
                                     size="sm"
-                                    className="flex-1 h-8 text-xs bg-gradient-to-r from-rose-500/20 to-cyan-500/20 border border-[var(--rule)] text-white hover:border-[var(--rule)]"
+                                    className="flex-1 h-8 text-xs border"
+                                    style={{ background: "var(--sh-primary-10)", borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}
                                     onClick={(e) => { e.stopPropagation(); window.location.href = "/strategy-blender"; }}
                                   >
                                     Add to Blender
@@ -457,8 +458,8 @@ export default function OpportunityRadar() {
                         <Icon className={cn("w-4 h-4", cfg.color)} />
                         <Badge variant="outline" className={cn("text-[10px]", cfg.color, cfg.bg)}>{cfg.label}</Badge>
                       </div>
-                      <div className="text-sm font-semibold text-white">{play.title}</div>
-                      <div className="text-xs text-gray-500">{play.preview}</div>
+                      <div className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{play.title}</div>
+                      <div className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{play.preview}</div>
                       <div className="text-[10px] text-muted-foreground italic">Scan to unlock real signals like this</div>
                     </CardContent>
                   </Card>

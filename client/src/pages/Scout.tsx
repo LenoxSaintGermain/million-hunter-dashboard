@@ -348,7 +348,7 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
         {(asset.status === "qualified" || (asset.aiScore != null && parseFloat(String(asset.aiScore)) >= 0.70)) && (
           <Button
             size="sm"
-            className="w-full h-7 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white border-0 mt-1"
+            className="w-full h-7 text-[11px] border-0 mt-1" style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
             onClick={() => convertToDeal.mutate({ id: asset.id })}
             disabled={convertToDeal.isPending}
           >

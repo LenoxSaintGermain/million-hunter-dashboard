@@ -21,9 +21,9 @@ const DEAL_TYPES = [
   { type: "sba_business", label: "SBA Business", icon: Building2, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", defaultMonthly: 8000, defaultInvestment: 300000 },
   { type: "rental", label: "Rental Property", icon: Home, color: "text-[var(--sage)]", bg: "bg-emerald-500/10 border-emerald-500/20", defaultMonthly: 1200, defaultInvestment: 80000 },
   { type: "flip", label: "Fix & Flip", icon: Wrench, color: "text-[var(--amber)]", bg: "bg-amber-500/10 border-amber-500/20", defaultMonthly: 5000, defaultInvestment: 120000 },
-  { type: "microloan", label: "Microloan Fund", icon: Coins, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20", defaultMonthly: 800, defaultInvestment: 50000 },
+  { type: "microloan", label: "Microloan Fund", icon: Coins, color: "text-[var(--sh-fg-muted)]", bg: "bg-[var(--sh-surface-2)] border-[var(--sh-border-1)]", defaultMonthly: 800, defaultInvestment: 50000 },
   { type: "land_play", label: "Land Play", icon: MapPin, color: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20", defaultMonthly: 0, defaultInvestment: 150000 },
-  { type: "parking_arbitrage", label: "Parking Arb", icon: Target, color: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20", defaultMonthly: 3500, defaultInvestment: 95000 },
+  { type: "parking_arbitrage", label: "Parking Arb", icon: Target, color: "text-[var(--sh-signal)]", bg: "bg-[var(--sh-primary-10)] border-[var(--sh-border-1)]", defaultMonthly: 3500, defaultInvestment: 95000 },
   { type: "tad_hold", label: "TAD Hold", icon: TrendingUp, color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20", defaultMonthly: 0, defaultInvestment: 250000 },
 ];
 
@@ -131,25 +131,23 @@ export default function StrategyBlender() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] border border-[var(--rule)] p-6 md:p-8"
+          className="relative overflow-hidden rounded-2xl border p-6 md:p-8"
+          style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border-1)" }}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-blue-500/5" />
-          <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent" />
+
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--sh-primary-10)", border: "1px solid var(--sh-border-1)" }}>
                   <BarChart3 className="w-3.5 h-3.5 text-[var(--sage)]" />
                 </div>
                 <span className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--sage)]">Strategy Blender</span>
               </div>
-              <h1 className="text-3xl md:text-4xl font-bold text-white">
+              <h1 className="text-3xl md:text-4xl font-bold mt-2" style={{ color: "var(--sh-text-primary)", fontFamily: "var(--font-display)" }}>
                 Engineer your{" "}
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-blue-400">
-                  deal stack.
-                </span>
+                <span style={{ color: "var(--sh-signal)" }}>deal stack.</span>
               </h1>
-              <p className="text-gray-400 mt-2 text-sm">Mix asset types. Toggle capital levers. Move like Blackrock — on Mainstreet.</p>
+              <p className="mt-2 text-sm" style={{ color: "var(--sh-text-secondary)" }}>Mix asset types. Toggle capital levers. Move like Blackrock — on Mainstreet.</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right">
@@ -171,8 +169,9 @@ export default function StrategyBlender() {
                   onClick={() => setScenario(key as any)}
                   className={cn(
                     "flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border",
-                    scenario === key ? `${cfg.bg} ${cfg.color}` : "bg-[var(--paper)] border-[var(--rule)] text-gray-500 hover:text-gray-300"
+                    scenario === key ? `${cfg.bg} ${cfg.color}` : "border-[var(--sh-border-1)] text-[var(--sh-fg-muted)]"
                   )}
+                  style={scenario !== key ? { background: "var(--sh-surface-2)" } : undefined}
                 >
                   {cfg.label}
                 </button>
@@ -203,11 +202,12 @@ export default function StrategyBlender() {
                                 <Input
                                   value={item.label}
                                   onChange={(e) => updateItem(item.id, "label", e.target.value)}
-                                  className="bg-transparent border-[var(--rule)] text-white font-semibold text-sm h-8 px-2"
+                                  className="border-[var(--sh-border-1)] font-semibold text-sm h-8 px-2"
+                                  style={{ background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}
                                 />
                                 <button
                                   onClick={() => removeItem(item.id)}
-                                  className="text-gray-600 hover:text-rose-400 transition-colors shrink-0"
+                                  className="hover:text-rose-400 transition-colors shrink-0" style={{ color: "var(--sh-fg-muted)" }}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -216,24 +216,26 @@ export default function StrategyBlender() {
                                 <div>
                                   <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Investment</label>
                                   <div className="flex items-center gap-1 mt-1">
-                                    <span className="text-xs text-gray-500">$</span>
+                                    <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>$</span>
                                     <Input
                                       type="number"
                                       value={item.investment}
                                       onChange={(e) => updateItem(item.id, "investment", Number(e.target.value))}
-                                      className="bg-transparent border-[var(--rule)] text-white text-xs h-7 px-1"
+                                      className="border-[var(--sh-border-1)] text-xs h-7 px-1"
+                                      style={{ background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}
                                     />
                                   </div>
                                 </div>
                                 <div>
                                   <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Monthly</label>
                                   <div className="flex items-center gap-1 mt-1">
-                                    <span className="text-xs text-gray-500">$</span>
+                                    <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>$</span>
                                     <Input
                                       type="number"
                                       value={item.expectedMonthly}
                                       onChange={(e) => updateItem(item.id, "expectedMonthly", Number(e.target.value))}
-                                      className="bg-transparent border-[var(--rule)] text-white text-xs h-7 px-1"
+                                      className="border-[var(--sh-border-1)] text-xs h-7 px-1"
+                                      style={{ background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}
                                     />
                                   </div>
                                 </div>
@@ -242,7 +244,8 @@ export default function StrategyBlender() {
                                   <select
                                     value={item.leverage}
                                     onChange={(e) => updateItem(item.id, "leverage", e.target.value)}
-                                    className="mt-1 w-full h-7 text-xs bg-black/40 border border-[var(--rule)] rounded text-white px-1"
+                                    className="mt-1 w-full h-7 text-xs rounded px-1 border"
+                                    style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}
                                   >
                                     {LEVERAGE_OPTIONS.map((opt) => (
                                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -289,7 +292,8 @@ export default function StrategyBlender() {
               onClick={handleAnalyze}
               disabled={isAnalyzing || recipe.length === 0}
               size="lg"
-              className="w-full h-12 font-bold bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-400 hover:to-blue-400 text-white border-0 rounded-xl"
+              className="w-full h-12 font-bold border-0 rounded-xl"
+              style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
             >
               {isAnalyzing ? (
                 <>
@@ -316,14 +320,14 @@ export default function StrategyBlender() {
                 <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Live Stack Summary</div>
                 <div className="space-y-2">
                   {[
-                    { label: "Total Investment", value: formatCurrency(totalInvestment), color: "text-white" },
-                    { label: `${scenario} Monthly`, value: formatCurrency(adjustedMonthly), color: "text-[var(--sage)]" },
-                    { label: "Annual Run Rate", value: formatCurrency(adjustedMonthly * 12), color: "text-blue-400" },
-                    { label: "Cash-on-Cash", value: totalInvestment > 0 ? `${((adjustedMonthly * 12 / totalInvestment) * 100).toFixed(1)}%` : "—", color: "text-purple-400" },
+                    { label: "Total Investment", value: formatCurrency(totalInvestment), color: "var(--sh-text-primary)" },
+                    { label: `${scenario} Monthly`, value: formatCurrency(adjustedMonthly), color: "var(--sage)" },
+                    { label: "Annual Run Rate", value: formatCurrency(adjustedMonthly * 12), color: "var(--sh-primary)" },
+                    { label: "Cash-on-Cash", value: totalInvestment > 0 ? `${((adjustedMonthly * 12 / totalInvestment) * 100).toFixed(1)}%` : "—", color: "var(--sh-signal)" },
                   ].map((row) => (
                     <div key={row.label} className="flex justify-between items-center">
                       <span className="text-xs text-muted-foreground">{row.label}</span>
-                      <span className={cn("text-sm font-bold", row.color)}>{row.value}</span>
+                      <span className="text-sm font-bold" style={{ color: row.color }}>{row.value}</span>
                     </div>
                   ))}
                 </div>
@@ -370,15 +374,12 @@ export default function StrategyBlender() {
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1">
-                              <div className={cn("text-xs font-semibold", activeLevers.has(lever.id) ? "text-emerald-300" : "text-gray-300")}>
+                              <div className="text-xs font-semibold" style={{ color: activeLevers.has(lever.id) ? "var(--sage)" : "var(--sh-text-secondary)" }}>
                                 {lever.title}
                               </div>
-                              <div className="text-[10px] text-gray-500 mt-0.5">{lever.impact}</div>
+                              <div className="text-[10px] mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>{lever.impact}</div>
                             </div>
-                            <div className={cn(
-                              "w-4 h-4 rounded-full border-2 shrink-0 mt-0.5 transition-all",
-                              activeLevers.has(lever.id) ? "bg-emerald-500 border-emerald-500" : "border-gray-600"
-                            )} />
+                            <div className="w-4 h-4 rounded-full border-2 shrink-0 mt-0.5 transition-all" style={activeLevers.has(lever.id) ? { background: "var(--sage)", borderColor: "var(--sage)" } : { borderColor: "var(--sh-border-1)" }} />
                           </div>
                         </button>
                       ))}
@@ -401,12 +402,12 @@ export default function StrategyBlender() {
                         const total = analysis.capitalStack.total || 1;
                         const pct = Math.round((value / total) * 100);
                         const labels: Record<string, string> = { sba7a: "SBA 7(a)", sellerNote: "Seller Note", equity: "Equity", impactFund: "Impact Fund", greenStack: "Green Stack" };
-                        const colors: Record<string, string> = { sba7a: "bg-blue-500", sellerNote: "bg-purple-500", equity: "bg-emerald-500", impactFund: "bg-cyan-500", greenStack: "bg-teal-500" };
+                        const colors: Record<string, string> = { sba7a: "bg-blue-500", sellerNote: "bg-[var(--sh-primary)]", equity: "bg-emerald-500", impactFund: "bg-[var(--sh-signal)]", greenStack: "bg-teal-500" };
                         return (
                           <div key={key}>
                             <div className="flex justify-between text-xs mb-1">
-                              <span className="text-gray-400">{labels[key] ?? key}</span>
-                              <span className="text-white font-semibold">{formatK(value)} <span className="text-muted-foreground">({pct}%)</span></span>
+                              <span style={{ color: "var(--sh-text-secondary)" }}>{labels[key] ?? key}</span>
+                              <span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{formatK(value)} <span className="text-muted-foreground">({pct}%)</span></span>
                             </div>
                             <div className="h-1.5 bg-[var(--bone)] rounded-full overflow-hidden">
                               <motion.div
@@ -427,11 +428,11 @@ export default function StrategyBlender() {
             {/* Agent Insight */}
             {analysis?.agentInsight && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                <Card className="bg-gradient-to-br from-emerald-500/5 to-blue-500/5 border-emerald-500/10">
+                <Card className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-primary-10)" }}>
                   <CardContent className="p-5">
                     <div className="flex items-start gap-3">
-                      <Sparkles className="w-4 h-4 text-[var(--sage)] shrink-0 mt-0.5" />
-                      <p className="text-sm text-gray-300 leading-relaxed">{analysis.agentInsight}</p>
+                      <Sparkles className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--sh-signal)" }} />
+                      <p className="text-sm leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>{analysis.agentInsight}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -445,7 +446,7 @@ export default function StrategyBlender() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
             <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--sh-text-primary)" }}>
                   <TrendingUp className="w-4 h-4 text-[var(--sage)]" />
                   5-Year Projection — {SCENARIO_CONFIG[scenario].label}
                 </CardTitle>
@@ -463,12 +464,12 @@ export default function StrategyBlender() {
                         <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="year" tick={{ fill: "#6b7280", fontSize: 11 }} tickFormatter={(v) => `Yr ${v}`} />
-                    <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} tickFormatter={(v) => formatK(v)} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.08)" />
+                    <XAxis dataKey="year" tick={{ fill: "var(--sh-fg-muted)", fontSize: 11 }} tickFormatter={(v) => `Yr ${v}`} />
+                    <YAxis tick={{ fill: "var(--sh-fg-muted)", fontSize: 11 }} tickFormatter={(v) => formatK(v)} />
                     <Tooltip
-                      contentStyle={{ background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8 }}
-                      labelStyle={{ color: "#fff", fontWeight: 600 }}
+                      contentStyle={{ background: "var(--sh-surface-1)", border: "1px solid var(--sh-border-1)", borderRadius: 8 }}
+                      labelStyle={{ color: "var(--sh-text-primary)", fontWeight: 600 }}
                       formatter={(value: any, name: string) => [formatCurrency(value), name === "cashFlow" ? "Annual Cash Flow" : name === "equity" ? "Equity Value" : "Revenue"]}
                       labelFormatter={(v) => `Year ${v}`}
                     />

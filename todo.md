@@ -984,3 +984,12 @@
 - [x] Wire Opportunity Radar section in /brief to pull from research cache
 - [x] Add citation footnotes to IC Consensus and Red Team simulators in /brief
 - [x] Label all simulator data with source provenance
+
+## Color Scheme Audit — Theme Token Migration
+- [x] FreedomMap.tsx — replace all dark-first hardcoded colors with --sh-* tokens
+- [x] InvestorDossier.tsx — replace all dark-first hardcoded colors with --sh-* tokens
+- [x] StrategyBlender.tsx — replace all dark-first hardcoded colors with --sh-* tokens
+- [x] Scout.tsx — fix dark button color
+- [x] Outreach.tsx — fix purple meeting badge color
+- [x] OpportunityRadar.tsx — replace all dark-first hardcoded colors with --sh-* tokens
+- [x] Verify 0 TypeScript errors and 95/95 tests passing after all changes

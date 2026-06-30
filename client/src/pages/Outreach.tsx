@@ -25,7 +25,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   sent: { label: "Sent", color: "bg-blue-500/20 text-blue-400", icon: <Send className="w-3 h-3" /> },
   opened: { label: "Opened", color: "bg-amber-500/20 text-[var(--amber)]", icon: <Mail className="w-3 h-3" /> },
   replied: { label: "Replied", color: "bg-emerald-500/20 text-[var(--sage)]", icon: <MessageSquare className="w-3 h-3" /> },
-  meeting_scheduled: { label: "Meeting", color: "bg-purple-500/20 text-purple-400", icon: <Calendar className="w-3 h-3" /> },
+  meeting_scheduled: { label: "Meeting", color: "bg-[var(--sh-primary-10)] text-[var(--sh-signal)]", icon: <Calendar className="w-3 h-3" /> },
   no_response: { label: "No Response", color: "bg-muted/30 text-muted-foreground/60", icon: <AlertCircle className="w-3 h-3" /> },
   not_interested: { label: "Not Interested", color: "bg-destructive/20 text-destructive", icon: <AlertCircle className="w-3 h-3" /> },
   closed: { label: "Closed", color: "bg-emerald-600/30 text-emerald-300", icon: <CheckCircle2 className="w-3 h-3" /> },

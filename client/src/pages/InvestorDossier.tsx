@@ -36,27 +36,21 @@ const DEAL_TYPES = [
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(v);
 
-function AgentCommentary({ message, color = "cyan" }: { message: string; color?: "cyan" | "emerald" | "purple" }) {
-  const colorMap = {
-    cyan: { border: "border-cyan-500/20", bg: "from-cyan-500/5", icon: "text-cyan-400", label: "text-cyan-400" },
-    emerald: { border: "border-emerald-500/20", bg: "from-emerald-500/5", icon: "text-[var(--sage)]", label: "text-[var(--sage)]" },
-    purple: { border: "border-purple-500/20", bg: "from-purple-500/5", icon: "text-purple-400", label: "text-purple-400" },
-  };
-  const c = colorMap[color];
+function AgentCommentary({ message }: { message: string; color?: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn("relative overflow-hidden rounded-xl bg-gradient-to-br to-transparent border p-5", c.bg, c.border)}
+      className="relative overflow-hidden rounded-xl border p-5"
+      style={{ background: "var(--sh-primary-10)", borderColor: "var(--sh-border-1)" }}
     >
-      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-current to-transparent opacity-20" />
       <div className="flex items-start gap-3">
-        <div className={cn("w-8 h-8 rounded-full bg-black/30 border flex items-center justify-center shrink-0 mt-0.5", c.border)}>
-          <Sparkles className={cn("w-4 h-4", c.icon)} />
+        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
+          <Sparkles className="w-4 h-4" style={{ color: "var(--sh-signal)" }} />
         </div>
         <div>
-          <div className={cn("text-[10px] font-bold tracking-widest uppercase mb-1.5", c.label)}>AI Advisor</div>
-          <p className="text-sm text-gray-300 leading-relaxed">{message}</p>
+          <div className="text-[10px] font-bold tracking-widest uppercase mb-1.5" style={{ color: "var(--sh-signal)" }}>Co-Analyst</div>
+          <p className="text-sm leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>{message}</p>
         </div>
       </div>
     </motion.div>
@@ -73,7 +67,7 @@ function DossierSection({ title, icon: Icon, color, children }: any) {
       >
         <div className="flex items-center gap-2">
           <Icon className={cn("w-4 h-4", color)} />
-          <span className="text-sm font-bold text-white">{title}</span>
+          <span className="text-sm font-bold" style={{ color: "var(--sh-text-primary)" }}>{title}</span>
         </div>
         <ChevronRight className={cn("w-4 h-4 text-muted-foreground transition-transform", open && "rotate-90")} />
       </button>
@@ -100,14 +94,15 @@ function InvestorReceiptDrawer({ dossier, onClose }: { dossier: any; onClose: ()
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed inset-y-0 right-0 w-full md:w-[480px] bg-[#0a0a0a] border-l border-[var(--rule)] z-50 overflow-y-auto"
+      className="fixed inset-y-0 right-0 w-full md:w-[480px] border-l z-50 overflow-y-auto"
+      style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border-1)" }}
     >
-      <div className="sticky top-0 bg-[#0a0a0a]/90 backdrop-blur border-b border-[var(--rule)] p-4 flex items-center justify-between">
+      <div className="sticky top-0 backdrop-blur border-b p-4 flex items-center justify-between" style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border-1)" }}>
         <div>
-          <div className="text-xs font-bold tracking-widest uppercase text-cyan-400">Investor Receipt</div>
-          <div className="text-sm font-semibold text-white mt-0.5">{dossier.dealName}</div>
+          <div className="text-xs font-bold tracking-widest uppercase" style={{ color: "var(--sh-signal)" }}>Investor Receipt</div>
+          <div className="text-sm font-semibold mt-0.5" style={{ color: "var(--sh-text-primary)" }}>{dossier.dealName}</div>
         </div>
-        <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+        <button onClick={onClose} className="transition-colors" style={{ color: "var(--sh-fg-muted)" }}>
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -118,14 +113,14 @@ function InvestorReceiptDrawer({ dossier, onClose }: { dossier: any; onClose: ()
           <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Deal Snapshot</div>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: "Asking Price", value: formatCurrency(dossier.askingPrice ?? 0), color: "text-white" },
-              { label: "Down Payment", value: formatCurrency(dossier.downPayment ?? 0), color: "text-blue-400" },
-              { label: "Monthly Cash Flow", value: formatCurrency(dossier.monthlyCashFlow ?? 0), color: "text-[var(--sage)]" },
-              { label: "Annual Return", value: `${dossier.annualReturn ?? 0}%`, color: "text-purple-400" },
+              { label: "Asking Price", value: formatCurrency(dossier.askingPrice ?? 0), color: "var(--sh-text-primary)" },
+              { label: "Down Payment", value: formatCurrency(dossier.downPayment ?? 0), color: "var(--sh-primary)" },
+              { label: "Monthly Cash Flow", value: formatCurrency(dossier.monthlyCashFlow ?? 0), color: "var(--sage)" },
+              { label: "Annual Return", value: `${dossier.annualReturn ?? 0}%`, color: "var(--sh-signal)" },
             ].map((row) => (
-              <div key={row.label} className="bg-[var(--paper)] border border-[var(--rule)] rounded-xl p-3">
-                <div className="text-[10px] text-muted-foreground">{row.label}</div>
-                <div className={cn("text-lg font-bold mt-0.5", row.color)}>{row.value}</div>
+              <div key={row.label} className="rounded-xl p-3" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
+                <div className="text-[10px]" style={{ color: "var(--sh-fg-muted)" }}>{row.label}</div>
+                <div className="text-lg font-bold mt-0.5" style={{ color: row.color }}>{row.value}</div>
               </div>
             ))}
           </div>
@@ -140,7 +135,7 @@ function InvestorReceiptDrawer({ dossier, onClose }: { dossier: any; onClose: ()
         {dossier.whyThisDeal && (
           <div className="space-y-2">
             <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Why This Deal</div>
-            <p className="text-sm text-gray-300 leading-relaxed">{dossier.whyThisDeal}</p>
+            <p className="text-sm leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>{dossier.whyThisDeal}</p>
           </div>
         )}
 
@@ -150,7 +145,7 @@ function InvestorReceiptDrawer({ dossier, onClose }: { dossier: any; onClose: ()
             <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Risk Factors</div>
             <div className="space-y-2">
               {dossier.riskFactors.map((risk: string, i: number) => (
-                <div key={i} className="flex items-start gap-2 text-sm text-gray-400">
+                <div key={i} className="flex items-start gap-2 text-sm" style={{ color: "var(--sh-text-secondary)" }}>
                   <AlertCircle className="w-3.5 h-3.5 text-[var(--amber)] shrink-0 mt-0.5" />
                   {risk}
                 </div>
@@ -165,7 +160,7 @@ function InvestorReceiptDrawer({ dossier, onClose }: { dossier: any; onClose: ()
             <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Mitigations</div>
             <div className="space-y-2">
               {dossier.mitigations.map((m: string, i: number) => (
-                <div key={i} className="flex items-start gap-2 text-sm text-gray-400">
+                <div key={i} className="flex items-start gap-2 text-sm" style={{ color: "var(--sh-text-secondary)" }}>
                   <CheckCircle2 className="w-3.5 h-3.5 text-[var(--sage)] shrink-0 mt-0.5" />
                   {m}
                 </div>
@@ -176,7 +171,7 @@ function InvestorReceiptDrawer({ dossier, onClose }: { dossier: any; onClose: ()
 
         {/* CTA */}
         <div className="pt-4 border-t border-[var(--rule)] space-y-3">
-          <Button className="w-full gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 text-white border-0">
+          <Button className="w-full gap-2 border-0" style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}>
             <Download className="w-4 h-4" />
             Export PDF Dossier
           </Button>
@@ -242,31 +237,31 @@ export default function InvestorDossier() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] border border-[var(--rule)] p-6 md:p-8"
+          className="relative overflow-hidden rounded-2xl border p-6 md:p-8"
+          style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border-1)" }}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-cyan-500/5" />
-          <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
+
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                  <FileText className="w-3.5 h-3.5 text-purple-400" />
+                <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--sh-primary-10)", border: "1px solid var(--sh-border-1)" }}>
+                  <FileText className="w-3.5 h-3.5" style={{ color: "var(--sh-signal)" }} />
                 </div>
-                <span className="text-xs font-bold tracking-[0.2em] uppercase text-purple-400">Investor Dossier</span>
+                <span className="text-xs font-bold tracking-[0.2em] uppercase" style={{ color: "var(--sh-signal)" }}>Investor Dossier</span>
               </div>
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                The AI is{" "}
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">
-                  looking out for them.
+              <h1 className="text-3xl md:text-4xl font-bold mb-2" style={{ color: "var(--sh-text-primary)", fontFamily: "var(--font-display)" }}>
+                The analysis is{" "}
+                <span style={{ color: "var(--sh-signal)" }}>
+                  tailored to them.
                 </span>
               </h1>
-              <p className="text-gray-400 text-sm max-w-xl">
+              <p className="text-sm max-w-xl" style={{ color: "var(--sh-text-secondary)" }}>
                 Bespoke investor pitch decks engineered for your specific audience. 
                 Not a template — a tailored narrative that speaks their language.
               </p>
             </div>
             {savedDossiers.length > 0 && (
-              <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/20 self-start md:self-center">
+              <Badge className="self-start md:self-center" style={{ background: "var(--sh-primary-10)", color: "var(--sh-signal)", borderColor: "var(--sh-border-1)" }}>
                 {savedDossiers.length} dossiers saved
               </Badge>
             )}
@@ -294,7 +289,7 @@ export default function InvestorDossier() {
                           value={form.dealName}
                           onChange={(e) => setForm((f) => ({ ...f, dealName: e.target.value }))}
                           placeholder="Metro Commercial Cleaning — Atlanta"
-                          className="bg-transparent border-[var(--rule)] text-white"
+                          className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
@@ -303,19 +298,20 @@ export default function InvestorDossier() {
                           <select
                             value={form.dealType}
                             onChange={(e) => setForm((f) => ({ ...f, dealType: e.target.value }))}
-                            className="w-full h-10 bg-black/40 border border-[var(--rule)] rounded-md text-white text-sm px-3"
+                            className="w-full h-10 rounded-md text-sm px-3 border"
+                            style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}
                           >
                             {DEAL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                           </select>
                         </div>
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 block">Location</label>
-                          <div className="flex items-center gap-2 bg-black/40 border border-[var(--rule)] rounded-md px-3 h-10">
+                          <div className="flex items-center gap-2 rounded-md px-3 h-10 border" style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)" }}>
                             <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                             <Input
                               value={form.location}
                               onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                              className="bg-transparent border-0 text-white text-sm px-0 h-auto focus-visible:ring-0"
+                              className="bg-transparent border-0 text-sm px-0 h-auto focus-visible:ring-0" style={{ color: "var(--sh-text-primary)" }}
                             />
                           </div>
                         </div>
@@ -337,13 +333,13 @@ export default function InvestorDossier() {
                       ].map((field) => (
                         <div key={field.key}>
                           <label className="text-xs text-muted-foreground mb-1 block">{field.label}</label>
-                          <div className="flex items-center gap-2 bg-black/40 border border-[var(--rule)] rounded-md px-3 h-10">
+                          <div className="flex items-center gap-2 rounded-md px-3 h-10 border" style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)" }}>
                             <DollarSign className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                             <Input
                               type="number"
                               value={(form as any)[field.key]}
                               onChange={(e) => setForm((f) => ({ ...f, [field.key]: Number(e.target.value) }))}
-                              className="bg-transparent border-0 text-white text-sm px-0 h-auto focus-visible:ring-0"
+                              className="bg-transparent border-0 text-sm px-0 h-auto focus-visible:ring-0" style={{ color: "var(--sh-text-primary)" }}
                             />
                           </div>
                         </div>
@@ -361,7 +357,8 @@ export default function InvestorDossier() {
                       onChange={(e) => setForm((f) => ({ ...f, highlights: e.target.value }))}
                       placeholder="Recurring government contracts. 12-year operating history. Owner retiring — motivated seller. SBA pre-qualified..."
                       rows={3}
-                      className="w-full bg-black/40 border border-[var(--rule)] rounded-md text-white text-sm px-3 py-2 resize-none focus:outline-none focus:border-[var(--rule)]"
+                      className="w-full rounded-md text-sm px-3 py-2 resize-none focus:outline-none border"
+                      style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}
                     />
                   </CardContent>
                 </Card>
@@ -369,7 +366,8 @@ export default function InvestorDossier() {
                 <Button
                   onClick={handleGenerate}
                   size="lg"
-                  className="w-full h-14 text-base font-bold bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-400 hover:to-cyan-400 text-white border-0 rounded-xl"
+                  className="w-full h-14 text-base font-bold border-0 rounded-xl"
+                  style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
                 >
                   <Sparkles className="mr-2 w-5 h-5" />
                   Generate Bespoke Dossier
@@ -388,25 +386,18 @@ export default function InvestorDossier() {
                         <button
                           key={profile.id}
                           onClick={() => setForm((f) => ({ ...f, investorProfile: profile.id }))}
-                          className={cn(
-                            "w-full flex items-start gap-3 p-3 rounded-xl border transition-all text-left",
-                            form.investorProfile === profile.id
-                              ? "bg-purple-500/10 border-purple-500/30"
-                              : "bg-[var(--paper)] border-[var(--rule)] hover:border-[var(--rule)]"
-                          )}
+                          className="w-full flex items-start gap-3 p-3 rounded-xl border transition-all text-left"
+                          style={form.investorProfile === profile.id
+                            ? { background: "var(--sh-primary-10)", borderColor: "var(--sh-signal)" }
+                            : { background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)" }
+                          }
                         >
-                          <Icon className={cn(
-                            "w-4 h-4 shrink-0 mt-0.5",
-                            form.investorProfile === profile.id ? "text-purple-400" : "text-gray-500"
-                          )} />
+                          <Icon className="w-4 h-4 shrink-0 mt-0.5" style={{ color: form.investorProfile === profile.id ? "var(--sh-signal)" : "var(--sh-fg-muted)" }} />
                           <div>
-                            <div className={cn(
-                              "text-xs font-semibold",
-                              form.investorProfile === profile.id ? "text-purple-300" : "text-gray-300"
-                            )}>
+                            <div className="text-xs font-semibold" style={{ color: form.investorProfile === profile.id ? "var(--sh-text-primary)" : "var(--sh-text-secondary)" }}>
                               {profile.label}
                             </div>
-                            <div className="text-[10px] text-gray-500 mt-0.5">{profile.description}</div>
+                            <div className="text-[10px] mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>{profile.description}</div>
                           </div>
                         </button>
                       );
@@ -414,9 +405,9 @@ export default function InvestorDossier() {
                   </div>
                 </div>
 
-                <Card className="bg-gradient-to-br from-purple-500/5 to-cyan-500/5 border-purple-500/10">
+                <Card className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-surface-2)" }}>
                   <CardContent className="p-5">
-                    <div className="text-xs font-bold tracking-widest uppercase text-purple-400 mb-2">What you get</div>
+                    <div className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "var(--sh-signal)" }}>What you get</div>
                     <div className="space-y-2">
                       {[
                         "Narrative tailored to investor psychology",
@@ -425,8 +416,8 @@ export default function InvestorDossier() {
                         "Agent commentary throughout",
                         "Exportable PDF dossier",
                       ].map((item) => (
-                        <div key={item} className="flex items-center gap-2 text-xs text-gray-400">
-                          <CheckCircle2 className="w-3 h-3 text-purple-400 shrink-0" />
+                        <div key={item} className="flex items-center gap-2 text-xs" style={{ color: "var(--sh-text-secondary)" }}>
+                          <CheckCircle2 className="w-3 h-3 shrink-0" style={{ color: "var(--sh-signal)" }} />
                           {item}
                         </div>
                       ))}
@@ -446,23 +437,22 @@ export default function InvestorDossier() {
               className="flex flex-col items-center justify-center py-24 space-y-6"
             >
               <div className="relative">
-                <div className="w-20 h-20 rounded-full border border-purple-500/20 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ border: "1px solid var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                   >
-                    <FileText className="w-8 h-8 text-purple-400" />
+                    <FileText className="w-8 h-8" style={{ color: "var(--sh-signal)" }} />
                   </motion.div>
                 </div>
-                <div className="absolute inset-0 rounded-full border border-purple-500/10 animate-ping" />
               </div>
               <div className="text-center space-y-2">
-                <h3 className="text-xl font-bold text-white">Crafting your dossier...</h3>
-                <p className="text-gray-400 text-sm">
+                <h3 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>Crafting your dossier...</h3>
+                <p className="text-sm" style={{ color: "var(--sh-text-secondary)" }}>
                   Tailoring narrative for {selectedProfile.label} profile
                 </p>
               </div>
-              <div className="flex flex-col items-center gap-2 text-xs text-gray-500">
+              <div className="flex flex-col items-center gap-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
                 {[
                   "Analyzing deal financials",
                   "Profiling investor psychology",
@@ -477,7 +467,7 @@ export default function InvestorDossier() {
                     transition={{ delay: i * 0.7 }}
                     className="flex items-center gap-2"
                   >
-                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--sh-signal)" }} />
                     {msg}
                   </motion.div>
                 ))}
@@ -495,10 +485,10 @@ export default function InvestorDossier() {
               {/* Dossier Header */}
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-xs font-bold tracking-widest uppercase text-purple-400 mb-1">Investor Dossier</div>
-                  <h2 className="text-2xl font-bold text-white">{result.dealName}</h2>
+                  <div className="text-xs font-bold tracking-widest uppercase mb-1" style={{ color: "var(--sh-signal)" }}>Investor Dossier</div>
+                  <h2 className="text-2xl font-bold" style={{ color: "var(--sh-text-primary)" }}>{result.dealName}</h2>
                   <div className="flex items-center gap-3 mt-2">
-                    <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/20">{result.dealType}</Badge>
+                    <Badge style={{ background: "var(--sh-primary-10)", color: "var(--sh-signal)", borderColor: "var(--sh-border-1)" }}>{result.dealType}</Badge>
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
                       <MapPin className="w-3 h-3" />
                       {result.location}
@@ -512,7 +502,8 @@ export default function InvestorDossier() {
                 <div className="flex gap-2">
                   <Button
                     onClick={() => setReceiptOpen(true)}
-                    className="gap-2 bg-gradient-to-r from-purple-500 to-cyan-500 text-white border-0"
+                    className="gap-2 border-0"
+                  style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
                   >
                     <FileText className="w-4 h-4" />
                     View Receipt
@@ -535,7 +526,7 @@ export default function InvestorDossier() {
                   <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5">
                       <DossierSection title="Investment Thesis" icon={TrendingUp} color="text-[var(--sage)]">
-                        <p className="text-sm text-gray-300 leading-relaxed">{result.investmentThesis}</p>
+                        <p className="text-sm leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>{result.investmentThesis}</p>
                       </DossierSection>
                     </CardContent>
                   </Card>
@@ -554,12 +545,12 @@ export default function InvestorDossier() {
                               const total = result.capitalStack.total || 1;
                               const pct = Math.round((value / total) * 100);
                               const labels: Record<string, string> = { sba7a: "SBA 7(a)", sellerNote: "Seller Note", equity: "Equity", impactFund: "Impact Fund" };
-                              const colors: Record<string, string> = { sba7a: "bg-blue-500", sellerNote: "bg-purple-500", equity: "bg-emerald-500", impactFund: "bg-cyan-500" };
+                              const colors: Record<string, string> = { sba7a: "bg-blue-500", sellerNote: "bg-[var(--sh-primary)]", equity: "bg-emerald-500", impactFund: "bg-[var(--sh-signal)]" };
                               return (
                                 <div key={key}>
                                   <div className="flex justify-between text-xs mb-1">
-                                    <span className="text-gray-400">{labels[key] ?? key}</span>
-                                    <span className="text-white font-semibold">
+                                    <span style={{ color: "var(--sh-text-secondary)" }}>{labels[key] ?? key}</span>
+                                    <span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>
                                       {formatCurrency(value)} <span className="text-muted-foreground">({pct}%)</span>
                                     </span>
                                   </div>
@@ -575,7 +566,7 @@ export default function InvestorDossier() {
                               );
                             })}
                           {result.capitalStack.notes && (
-                            <p className="text-xs text-gray-500 mt-2">{result.capitalStack.notes}</p>
+                            <p className="text-xs mt-2" style={{ color: "var(--sh-fg-muted)" }}>{result.capitalStack.notes}</p>
                           )}
                         </div>
                       </DossierSection>
@@ -587,8 +578,8 @@ export default function InvestorDossier() {
                 {result.investorPitch && (
                   <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
                     <CardContent className="p-5">
-                      <DossierSection title={`Message for ${selectedProfile.label}`} icon={Users} color="text-purple-400">
-                        <p className="text-sm text-gray-300 leading-relaxed">{result.investorPitch}</p>
+                      <DossierSection title={`Message for ${selectedProfile.label}`} icon={Users} color="text-[var(--sh-primary)]">
+                        <p className="text-sm leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>{result.investorPitch}</p>
                       </DossierSection>
                     </CardContent>
                   </Card>
@@ -602,7 +593,7 @@ export default function InvestorDossier() {
                         <DossierSection title="Risk Factors" icon={AlertCircle} color="text-[var(--amber)]">
                           <div className="space-y-2">
                             {result.riskFactors.map((r: string, i: number) => (
-                              <div key={i} className="flex items-start gap-2 text-sm text-gray-400">
+                              <div key={i} className="flex items-start gap-2 text-sm" style={{ color: "var(--sh-text-secondary)" }}>
                                 <AlertCircle className="w-3.5 h-3.5 text-[var(--amber)] shrink-0 mt-0.5" />
                                 {r}
                               </div>
@@ -614,7 +605,7 @@ export default function InvestorDossier() {
                         <DossierSection title="Mitigations" icon={Shield} color="text-[var(--sage)]">
                           <div className="space-y-2">
                             {result.mitigations.map((m: string, i: number) => (
-                              <div key={i} className="flex items-start gap-2 text-sm text-gray-400">
+                              <div key={i} className="flex items-start gap-2 text-sm" style={{ color: "var(--sh-text-secondary)" }}>
                                 <CheckCircle2 className="w-3.5 h-3.5 text-[var(--sage)] shrink-0 mt-0.5" />
                                 {m}
                               </div>
@@ -636,7 +627,8 @@ export default function InvestorDossier() {
               <div className="flex flex-wrap gap-3 pt-2">
                 <Button
                   onClick={() => setReceiptOpen(true)}
-                  className="gap-2 bg-gradient-to-r from-purple-500 to-cyan-500 text-white border-0"
+                  className="gap-2 border-0"
+                  style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
                 >
                   <FileText className="w-4 h-4" />
                   Open Investor Receipt
@@ -662,9 +654,9 @@ export default function InvestorDossier() {
               {savedDossiers.slice(0, 3).map((d: any) => (
                 <Card key={d.id} className="bg-card/50 border-[var(--rule)] hover:border-[var(--rule)] transition-all cursor-pointer" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-4 space-y-2">
-                    <div className="text-sm font-semibold text-white truncate">{d.dealName}</div>
+                    <div className="text-sm font-semibold truncate" style={{ color: "var(--sh-text-primary)" }}>{d.dealName}</div>
                     <div className="flex items-center justify-between">
-                      <Badge variant="outline" className="text-[10px] text-purple-400 border-purple-500/20">{d.dealType}</Badge>
+                      <Badge variant="outline" className="text-[10px]" style={{ color: "var(--sh-signal)", borderColor: "var(--sh-border-1)" }}>{d.dealType}</Badge>
                       <span className="text-xs text-muted-foreground">{d.investorProfile}</span>
                     </div>
                     <div className="text-xs text-muted-foreground flex items-center gap-1">
@@ -687,7 +679,7 @@ export default function InvestorDossier() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+              className="fixed inset-0 backdrop-blur-sm z-40" style={{ background: "rgba(0,0,0,0.4)" }}
               onClick={() => setReceiptOpen(false)}
             />
             <InvestorReceiptDrawer dossier={result} onClose={() => setReceiptOpen(false)} />
