@@ -37,7 +37,6 @@ const navSections = [
     label: "Operations",
     items: [
       { href: "/", icon: LayoutDashboard, label: "Command Center", badge: null },
-      { href: "/scan", icon: Search, label: "Market Scan", badge: { label: "Live", color: "sage" } },
       { href: "/thesis", icon: Sparkles, label: "Thesis Engine", badge: { label: "New", color: "amber" } },
       { href: "/scout", icon: Building2, label: "Asset Scout", badge: { label: "New", color: "amber" } },
       { href: "/memos", icon: FileText, label: "Investment Memos", badge: null },
@@ -50,9 +49,15 @@ const navSections = [
       { href: "/stack", icon: Layers, label: "Capital Stack Modeler", badge: { label: "New", color: "amber" } },
       { href: "/freedom-map", icon: Target, label: "Freedom Map", badge: null },
       { href: "/strategy-blender", icon: BarChart3, label: "Strategy Blender", badge: null },
-      { href: "/opportunity-radar", icon: Radar, label: "Opportunity Radar", badge: null },
       { href: "/investor-dossier", icon: Sparkles, label: "Investor Dossier", badge: null },
       { href: "/tide", icon: Activity, label: "TIDE Intelligence", badge: { label: "New", color: "amber" } },
+    ],
+  },
+  {
+    label: "Labs (Experimental)",
+    items: [
+      { href: "/scan", icon: Search, label: "Market Scan", badge: { label: "Experimental", color: "muted" } },
+      { href: "/opportunity-radar", icon: Radar, label: "Opportunity Radar", badge: { label: "Experimental", color: "muted" } },
     ],
   },
   {
@@ -82,6 +87,11 @@ function badgeStyle(color: string) {
     color: "var(--amber)",
     background: "oklch(0.66 0.14 55 / 0.10)",
     border: "1px solid oklch(0.66 0.14 55 / 0.30)",
+  };
+  if (color === "muted") return {
+    color: "var(--sh-fg-4)",
+    background: "var(--sh-primary-8)",
+    border: "1px solid var(--sh-border)",
   };
   return {
     color: "var(--sh-fg-2)",

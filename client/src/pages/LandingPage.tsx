@@ -70,26 +70,7 @@ const FEATURES = [
   },
 ];
 
-const TESTIMONIALS = [
-  {
-    quote: "I ran three deals through the IC Review before my first LOI. The Structuralist flagged a cash flow restatement risk on deal two that the broker's deck buried in footnote 14. Saved me from a $2.1M mistake.",
-    name: "Marcus T.",
-    role: "Independent Sponsor, Southeast US",
-    initial: "M",
-  },
-  {
-    quote: "The Red Team flagged 54% customer concentration on a deal I was ready to sign. Both relationships were personal to the owner. The business would have been worth $400k, not $2.1M, six months after close.",
-    name: "Priya S.",
-    role: "Search Fund Operator, Atlanta",
-    initial: "P",
-  },
-  {
-    quote: "The Owner Dependence Audit showed the owner was working 60 hours a week and there was no management layer. The replacement cost alone erased the stated margins. We walked.",
-    name: "Derek W.",
-    role: "Acquisition Entrepreneur, Charlotte",
-    initial: "D",
-  },
-];
+// TESTIMONIALS removed — no fabricated endorsements on public routes (A-1)
 
 const CAPITAL_OPTIONS = [
   "Under $250K",
@@ -456,32 +437,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Testimonials ── */}
-      <section className="py-24 px-6 bg-[#f2ede6]">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="h-px w-8 bg-[#ffba20]" />
-            <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">From the Field</span>
-          </div>
-          <h2 className="font-['Fraunces',_serif] text-4xl font-black text-[#1a1208] mb-14">Deals that didn't close. On purpose.</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {TESTIMONIALS.map((t) => (
-              <div key={t.name} className="bg-[#faf8f5] border border-[#e8e0d4] p-8">
-                <p className="text-[#3d2e1e] text-base leading-relaxed mb-8 italic">"{t.quote}"</p>
-                <div className="flex items-center gap-3 border-t border-[#e8e0d4] pt-6">
-                  <div className="w-9 h-9 bg-[#1a1208] rounded-full flex items-center justify-center text-[#ffba20] font-bold text-sm font-['Fraunces',_serif]">
-                    {t.initial}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-[#1a1208] text-sm">{t.name}</div>
-                    <div className="text-[#8b7355] text-xs">{t.role}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Testimonials section removed — A-1: no fabricated endorsements on public routes */}
 
       {/* ── Access Request Form Section ── */}
       <section id="request-access" className="py-28 px-6 bg-[#1a1208]">

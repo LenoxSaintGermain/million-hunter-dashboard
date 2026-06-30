@@ -44,7 +44,6 @@ import {
 /* ── Nav items ─────────────────────────────────────────────────────────────── */
 const PRIMARY_NAV = [
   { label: "Command Center", href: "/", icon: LayoutDashboard },
-  { label: "Market Scan", href: "/scan", icon: Scan },
   { label: "TIDE", href: "/tide", icon: Zap },
   { label: "Memos", href: "/memos", icon: FileText },
   { label: "Outreach", href: "/outreach", icon: Mail },
@@ -53,13 +52,18 @@ const PRIMARY_NAV = [
 const MORE_NAV = [
   { label: "Freedom Map", href: "/freedom-map", icon: Map },
   { label: "Strategy Blender", href: "/strategy-blender", icon: Layers },
-  { label: "Opportunity Radar", href: "/opportunity-radar", icon: Radar },
   { label: "Scout", href: "/scout", icon: Target },
   { label: "Thesis Engine", href: "/thesis", icon: BookOpen },
   { label: "Capital Stack", href: "/stack", icon: BarChart3 },
   { label: "Investor Dossier", href: "/investor-dossier", icon: Building2 },
   { label: "Insurance Prospector", href: "/insurance-prospector", icon: Shield },
   { label: "RippleEffect", href: "/ripple", icon: Waves },
+];
+
+// Labs (Experimental) — synthesized data, not live feeds
+const LABS_NAV = [
+  { label: "Market Scan", href: "/scan", icon: Scan },
+  { label: "Opportunity Radar", href: "/opportunity-radar", icon: Radar },
 ];
 
 /* ── NavLink ────────────────────────────────────────────────────────────────── */
@@ -195,6 +199,31 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                         >
                           <Icon className="w-3.5 h-3.5 shrink-0" />
                           {item.label}
+                        </span>
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuSeparator className="bg-[var(--rule)]" />
+                <div className="px-3 py-1">
+                  <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium">Labs (Experimental)</p>
+                </div>
+                {LABS_NAV.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <DropdownMenuItem key={item.href} asChild>
+                      <Link href={item.href}>
+                        <span
+                          className={cn(
+                            "flex items-center gap-2.5 w-full text-[13px] cursor-pointer",
+                            isActive(item.href)
+                              ? "text-[var(--ink)] font-medium"
+                              : "text-[var(--sh-fg-4)]"
+                          )}
+                        >
+                          <Icon className="w-3.5 h-3.5 shrink-0" />
+                          {item.label}
+                          <span className="ml-auto text-[10px] text-[var(--sh-fg-4)] italic">not live data</span>
                         </span>
                       </Link>
                     </DropdownMenuItem>

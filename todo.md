@@ -924,3 +924,30 @@
 - [ ] Every run writes Searcher Intelligence DB record with consent flags
 - [ ] Specific target company NOT persisted without explicit opt-in
 - [ ] Add /try to App.tsx public routes and landing page nav
+
+## TSL-BUILD-2026-004 — Fix-It + Investor Brief
+
+### Part A — Fix-It (Ship Blockers)
+- [x] A-1: Remove all fabricated testimonials from LandingPage.tsx (FTC risk)
+- [x] A-2: Demote Market Scan + Opportunity Radar to Labs (Experimental) nav group in DashboardLayout.tsx
+- [x] A-3: Remove "Live" badge from Market Scan; replace with "Experimental — not live data" if any label remains
+- [x] A-4: Update EditorialTopNav.tsx to match Labs grouping
+- [x] A-5: Verify IC Consensus UI makes no multi-vendor model claim it doesn't fulfill
+
+### Part B — Investor Brief Page (/brief)
+- [x] B-1: Create /brief route in App.tsx (public, no auth)
+- [x] B-2: Build InvestorBrief.tsx shell with sticky nav rail + scroll sections using --sh-* tokens
+- [x] B-3: Hook section — category claim, market context (sourced/labeled)
+- [x] B-4: Problem/Why Now section — ETA boom, silver tsunami, diligence gap
+- [x] B-5: Thesis Engine inline simulator (zero API, deterministic, labeled demo)
+- [x] B-6: IC Consensus inline simulator (composite deal, agents disagree, labeled demo)
+- [x] B-7: Red Team inline simulator (landmine reveal one by one, the wow section, labeled demo)
+- [x] B-8: Owner/Seller Sim inline simulator (labeled demo)
+- [x] B-9: Capital Stack inline simulator (labeled demo)
+- [x] B-10: Memo/LOI inline simulator (labeled sample)
+- [x] B-11: Moat section — Searcher Intelligence DB (clearly labeled Roadmap)
+- [x] B-12: Business model section — wedge → conversion → data asset (projections labeled)
+- [x] B-13: Rigor gate validation section (honest, falsifiable)
+- [x] B-14: Ask/CTA section — "Log in to run the live flow"
+- [x] B-15: End-of-page capability matrix (Live/Demo/Roadmap honest labels)
+- [x] B-16: Verify zero API calls on /brief route
