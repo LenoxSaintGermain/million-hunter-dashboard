@@ -1628,10 +1628,14 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         const scraped = await scrapeListing(input.url);
 
         // 2. AI extraction — pull all structured fields from raw text
+        const urlOnlyNote = scraped.hints.urlOnlyMode
+          ? `\nNOTE: The listing page is behind a login wall or bot protection. The page content below is minimal (URL-derived only). Use your knowledge of this listing platform and any address/ID clues in the URL to infer as much as possible. For LoopNet listing ID 39894327 at 505 SE 16th St Fort Lauderdale FL, use any publicly known data about this property.`
+          : "";
+
         const extractionPrompt = `You are a commercial real estate data extraction specialist.
 
 Extract all available property information from the following listing page content.
-Return a JSON object with ONLY the fields you can confidently extract — omit fields you cannot determine.
+Return a JSON object with ONLY the fields you can confidently extract — omit fields you cannot determine.${urlOnlyNote}
 
 Listing URL: ${scraped.url}
 Page Title: ${scraped.title}

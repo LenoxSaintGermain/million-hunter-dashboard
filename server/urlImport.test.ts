@@ -11,11 +11,14 @@ import { eq } from "drizzle-orm";
 
 // ─── scrapeListing unit tests ─────────────────────────────────────────────────
 describe("scrapeListing — URL scraper", () => {
-  it("throws a descriptive error for an unreachable URL", async () => {
+  it("falls back to URL-only mode for an unreachable URL (no throw)", async () => {
     const { scrapeListing } = await import("./listingScraper");
-    await expect(scrapeListing("https://this-domain-does-not-exist-xyz123.com/listing/1"))
-      .rejects.toThrow(/Failed to fetch listing URL/i);
-  });
+    // Scraper now never throws — falls back to URL-only mode when all strategies fail
+    const result = await scrapeListing("https://this-domain-does-not-exist-xyz123.com/listing/1");
+    expect(result).toBeDefined();
+    expect(result.hints.urlOnlyMode).toBe(true);
+    expect(result.rawText).toContain("Listing URL");
+  }, 30_000);
 
   it("extracts title and rawText from a real public page", async () => {
     const { scrapeListing } = await import("./listingScraper");
