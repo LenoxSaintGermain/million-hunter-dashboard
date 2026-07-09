@@ -993,3 +993,11 @@
 - [x] Outreach.tsx — fix purple meeting badge color
 - [x] OpportunityRadar.tsx — replace all dark-first hardcoded colors with --sh-* tokens
 - [x] Verify 0 TypeScript errors and 95/95 tests passing after all changes
+
+## URL-to-Asset Import Pipeline
+- [x] Build server/listingScraper.ts — fetch URL with Puppeteer/axios, extract raw HTML
+- [x] Build scout.importFromUrl tRPC procedure — scrape + AI extract + create asset
+- [x] Add URL import modal to Scout.tsx with live extraction preview
+- [x] Support LoopNet, BizBuySell, CoStar, Crexi, and generic listing URLs
+- [x] Auto-trigger AI scoring after import
+- [x] Write vitest for importFromUrl procedure

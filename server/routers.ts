@@ -1616,6 +1616,171 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         return { score, summary: parsed.summary, strengths: parsed.strengths, risks: parsed.risks };
       }),
 
+    // Import a commercial asset from a listing URL (LoopNet, BizBuySell, CoStar, Crexi, etc.)
+    importFromUrl: protectedProcedure
+      .input(z.object({ url: z.string().url() }))
+      .mutation(async ({ input }) => {
+        const { scrapeListing } = await import("./listingScraper");
+        const { createCommercialAsset, updateCommercialAssetAiScore } = await import("./db");
+        const { invokeLLM } = await import("./_core/llm");
+
+        // 1. Scrape the listing page
+        const scraped = await scrapeListing(input.url);
+
+        // 2. AI extraction — pull all structured fields from raw text
+        const extractionPrompt = `You are a commercial real estate data extraction specialist.
+
+Extract all available property information from the following listing page content.
+Return a JSON object with ONLY the fields you can confidently extract — omit fields you cannot determine.
+
+Listing URL: ${scraped.url}
+Page Title: ${scraped.title}
+Meta hints: ${JSON.stringify(scraped.hints)}
+
+Page Content:
+${scraped.rawText}
+
+Extract into this schema (all fields optional except name):
+{
+  "name": string,           // property/business name
+  "address": string,        // street address
+  "city": string,
+  "state": string,          // 2-letter abbreviation
+  "zip": string,
+  "propertyType": one of ["office","industrial","retail","mixed_use","land","warehouse","flex"],
+  "squareFootage": number,  // integer sq ft
+  "askingPrice": number,    // in dollars (no commas)
+  "capRate": number,        // as decimal e.g. 0.0623 for 6.23%
+  "noi": number,            // annual NOI in dollars
+  "leaseType": one of ["nnn","gross","modified_gross","vacant"],
+  "zoning": string,
+  "opportunityZone": boolean,
+  "description": string,    // 2-3 sentence summary of the property
+  "highlights": [string]    // key selling points (max 5)
+}
+
+IMPORTANT: Return ONLY valid JSON. No markdown, no explanation.`;
+
+        const extractRes = await invokeLLM({
+          messages: [{ role: "user", content: extractionPrompt }],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "listing_extraction",
+              strict: false,
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  address: { type: "string" },
+                  city: { type: "string" },
+                  state: { type: "string" },
+                  zip: { type: "string" },
+                  propertyType: { type: "string" },
+                  squareFootage: { type: "number" },
+                  askingPrice: { type: "number" },
+                  capRate: { type: "number" },
+                  noi: { type: "number" },
+                  leaseType: { type: "string" },
+                  zoning: { type: "string" },
+                  opportunityZone: { type: "boolean" },
+                  description: { type: "string" },
+                  highlights: { type: "array", items: { type: "string" } },
+                },
+                required: ["name"],
+                additionalProperties: true,
+              },
+            },
+          },
+        });
+
+        let extracted: any = {};
+        try {
+          extracted = JSON.parse(extractRes.choices[0].message.content as string);
+        } catch {
+          extracted = { name: scraped.title };
+        }
+
+        // 3. Normalize and validate extracted fields
+        const VALID_PROPERTY_TYPES = ["office", "industrial", "retail", "mixed_use", "land", "warehouse", "flex"];
+        const VALID_LEASE_TYPES = ["nnn", "gross", "modified_gross", "vacant"];
+
+        const propertyType = VALID_PROPERTY_TYPES.includes(extracted.propertyType)
+          ? extracted.propertyType
+          : "retail";
+        const leaseType = VALID_LEASE_TYPES.includes(extracted.leaseType)
+          ? extracted.leaseType
+          : undefined;
+
+        // Normalize cap rate: if > 1, assume it was given as percentage (e.g. 6.23 → 0.0623)
+        let capRate = extracted.capRate ? parseFloat(String(extracted.capRate)) : undefined;
+        if (capRate && capRate > 1) capRate = capRate / 100;
+
+        const now = Date.now();
+        const assetData = {
+          name: extracted.name || scraped.title,
+          address: extracted.address || "",
+          city: extracted.city || "",
+          state: extracted.state || "",
+          zip: extracted.zip || undefined,
+          propertyType,
+          squareFootage: extracted.squareFootage ? Math.round(extracted.squareFootage) : undefined,
+          askingPrice: extracted.askingPrice ? parseFloat(String(extracted.askingPrice)) : undefined,
+          capRate,
+          noi: extracted.noi ? parseFloat(String(extracted.noi)) : undefined,
+          leaseType,
+          zoning: extracted.zoning || undefined,
+          opportunityZone: extracted.opportunityZone ?? false,
+          sourceUrl: input.url,
+          source: "url_import" as const,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const res = await createCommercialAsset(assetData) as any;
+        const assetId: number = res[0].insertId;
+
+        // 4. Auto-score the newly created asset
+        const scorePrompt = `You are a commercial real estate investment analyst. Score this property on a 0.000–1.000 scale for acquisition potential.
+
+Property: ${assetData.name}
+Address: ${assetData.address}, ${assetData.city}, ${assetData.state}
+Type: ${assetData.propertyType}
+Asking Price: ${assetData.askingPrice ? '$' + assetData.askingPrice.toLocaleString() : 'Unknown'}
+Cap Rate: ${assetData.capRate ? (assetData.capRate * 100).toFixed(2) + '%' : 'Unknown'}
+NOI: ${assetData.noi ? '$' + assetData.noi.toLocaleString() : 'Unknown'}
+SqFt: ${assetData.squareFootage ?? 'Unknown'}
+Lease Type: ${assetData.leaseType ?? 'Unknown'}
+Opportunity Zone: ${assetData.opportunityZone ? 'YES' : 'No'}
+Description: ${extracted.description ?? 'N/A'}
+Highlights: ${(extracted.highlights ?? []).join('; ')}
+
+Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], "risks": ["..."] }`;
+
+        let score = 0.5;
+        let summary = "AI scoring pending";
+        try {
+          const scoreRes = await invokeLLM({
+            messages: [{ role: "user", content: scorePrompt }],
+            response_format: { type: "json_schema", json_schema: { name: "asset_score", strict: true, schema: { type: "object", properties: { score: { type: "number" }, summary: { type: "string" }, strengths: { type: "array", items: { type: "string" } }, risks: { type: "array", items: { type: "string" } } }, required: ["score", "summary", "strengths", "risks"], additionalProperties: false } } },
+          });
+          const parsed = JSON.parse(scoreRes.choices[0].message.content as string);
+          score = Math.min(1, Math.max(0, parsed.score ?? 0.5));
+          summary = parsed.summary;
+          await updateCommercialAssetAiScore(assetId, score, summary);
+        } catch (scoreErr) {
+          console.warn("[Scout] Auto-scoring failed after URL import:", scoreErr);
+        }
+
+        return {
+          id: assetId,
+          extracted,
+          score,
+          summary,
+          message: `Asset imported from ${new URL(input.url).hostname}`,
+        };
+      }),
+
     // Convert a qualified Scout asset into a Deal record and route to War Room
     convertToDeal: protectedProcedure
       .input(z.object({ id: z.number().int() }))

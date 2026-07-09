@@ -16,7 +16,8 @@ import { useLocation } from "wouter";
 import {
   Building2, MapPin, DollarSign, TrendingUp, Zap, Plus, Search,
   Filter, SlidersHorizontal, RefreshCw, ChevronDown, ChevronUp,
-  Loader2, BarChart3, CheckCircle2, ArrowRight,
+  Loader2, BarChart3, CheckCircle2, ArrowRight, Link2, Sparkles,
+  ExternalLink, CheckCircle,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,6 +57,182 @@ function fmt(n: number | null | undefined): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}k`;
   return `$${n}`;
+}
+
+// ─── Import From URL Dialog ─────────────────────────────────────────────────────
+function ImportFromUrlDialog({ open, onClose, onImported }: { open: boolean; onClose: () => void; onImported: (id: number) => void }) {
+  const [url, setUrl] = useState("");
+  const [step, setStep] = useState<"input" | "importing" | "done">("input");
+  const [result, setResult] = useState<any>(null);
+
+  const importMutation = trpc.scout.importFromUrl.useMutation({
+    onSuccess: (data) => {
+      setResult(data);
+      setStep("done");
+    },
+    onError: (e) => {
+      toast.error(`Import failed: ${e.message}`);
+      setStep("input");
+    },
+  });
+
+  const handleImport = () => {
+    if (!url.trim()) return toast.error("Please enter a listing URL");
+    try { new URL(url); } catch { return toast.error("Please enter a valid URL (include https://)"); }
+    setStep("importing");
+    importMutation.mutate({ url: url.trim() });
+  };
+
+  const handleDone = () => {
+    if (result?.id) onImported(result.id);
+    onClose();
+    setUrl("");
+    setStep("input");
+    setResult(null);
+  };
+
+  const ext = result?.extracted ?? {};
+  const scoreColor = result?.score >= 0.8 ? "text-emerald-600" : result?.score >= 0.65 ? "text-amber-600" : "text-muted-foreground";
+
+  return (
+    <Dialog open={open} onOpenChange={() => { if (step !== "importing") { onClose(); setStep("input"); setUrl(""); setResult(null); } }}>
+      <DialogContent className="bg-card border-border max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Link2 className="w-4 h-4 text-primary" />
+            Import from Listing URL
+          </DialogTitle>
+        </DialogHeader>
+
+        {step === "input" && (
+          <div className="space-y-4 py-2">
+            <p className="text-xs text-muted-foreground">
+              Paste a LoopNet, BizBuySell, CoStar, Crexi, or any commercial listing URL.
+              The AI will extract all available property data and auto-score the asset.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Listing URL</Label>
+              <Input
+                className="h-9 text-sm bg-muted/30 border-border font-mono"
+                placeholder="https://www.loopnet.com/Listing/..."
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleImport()}
+                autoFocus
+              />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {["loopnet.com", "bizbuysell.com", "crexi.com", "costar.com"].map((site) => (
+                <span key={site} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted/40 text-muted-foreground border border-border">
+                  {site}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step === "importing" && (
+          <div className="py-8 flex flex-col items-center gap-4">
+            <div className="relative">
+              <div className="w-14 h-14 rounded-full border-2 border-primary/20 flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-primary animate-pulse" />
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-foreground">Analyzing listing...</p>
+              <p className="text-xs text-muted-foreground mt-1">Scraping page · Extracting fields · AI scoring</p>
+            </div>
+            <div className="flex gap-2 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Fetching page data</span>
+            </div>
+          </div>
+        )}
+
+        {step === "done" && result && (
+          <div className="space-y-4 py-2">
+            {/* Success header */}
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Asset imported successfully</p>
+                <p className="text-[10px] text-emerald-600/70 truncate">{result.message}</p>
+              </div>
+              <a href={url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+              </a>
+            </div>
+
+            {/* Extracted data preview */}
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+              <p className="text-xs font-semibold text-foreground">{ext.name ?? result.extracted?.name ?? "Property"}</p>
+              {(ext.address || ext.city) && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {[ext.address, ext.city, ext.state, ext.zip].filter(Boolean).join(", ")}
+                </p>
+              )}
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {ext.askingPrice && (
+                  <div className="text-center p-2 rounded bg-card border border-border">
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Asking</p>
+                    <p className="text-xs font-bold text-foreground">
+                      {ext.askingPrice >= 1_000_000 ? `$${(ext.askingPrice / 1_000_000).toFixed(2)}M` : `$${(ext.askingPrice / 1000).toFixed(0)}k`}
+                    </p>
+                  </div>
+                )}
+                {ext.capRate && (
+                  <div className="text-center p-2 rounded bg-card border border-border">
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Cap Rate</p>
+                    <p className="text-xs font-bold text-foreground">{(ext.capRate * 100).toFixed(2)}%</p>
+                  </div>
+                )}
+                {result.score != null && (
+                  <div className="text-center p-2 rounded bg-card border border-border">
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide">AI Score</p>
+                    <p className={cn("text-xs font-bold", scoreColor)}>{parseFloat(String(result.score)).toFixed(3)}</p>
+                  </div>
+                )}
+              </div>
+              {result.summary && (
+                <p className="text-[10px] text-muted-foreground italic leading-relaxed mt-1">{result.summary}</p>
+              )}
+              {ext.highlights?.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {ext.highlights.slice(0, 4).map((h: string, i: number) => (
+                    <span key={i} className="px-1.5 py-0.5 rounded text-[9px] bg-primary/10 text-primary border border-primary/20">{h}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          {step === "input" && (
+            <>
+              <Button variant="outline" size="sm" onClick={onClose} className="border-border">Cancel</Button>
+              <Button size="sm" onClick={handleImport} disabled={!url.trim()}>
+                <Sparkles className="w-3 h-3 mr-1.5" />
+                Analyze & Import
+              </Button>
+            </>
+          )}
+          {step === "importing" && (
+            <Button size="sm" disabled>
+              <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+              Importing...
+            </Button>
+          )}
+          {step === "done" && (
+            <Button size="sm" onClick={handleDone}>
+              <CheckCircle2 className="w-3 h-3 mr-1.5" />
+              View in Scout
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // ─── Add Asset Dialog ─────────────────────────────────────────────────────────
@@ -372,6 +549,7 @@ export default function Scout() {
   const [sortBy, setSortBy] = useState<"capRate" | "askingPrice" | "aiScore" | "createdAt">("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [autoScoringId, setAutoScoringId] = useState<number | null>(null);
 
   const autoScore = trpc.scout.scoreAsset.useMutation({
@@ -442,6 +620,9 @@ export default function Scout() {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="h-8 border-border" onClick={() => refetch()}>
             <RefreshCw className="w-3 h-3 mr-1.5" />Refresh
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 border-border" onClick={() => setImportOpen(true)}>
+            <Link2 className="w-3 h-3 mr-1.5" />Import URL
           </Button>
           <Button size="sm" className="h-8" onClick={() => setAddOpen(true)}>
             <Plus className="w-3 h-3 mr-1.5" />Add Asset
@@ -609,6 +790,16 @@ export default function Scout() {
           refetch();
           // Auto-trigger AI scoring on the newly created asset
           autoScore.mutate({ id });
+        }}
+      />
+
+      <ImportFromUrlDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={(id) => {
+          setAutoScoringId(id);
+          refetch();
+          toast.success("Asset imported and scored — check Scout for results");
         }}
       />
     </EditorialTopNav>
