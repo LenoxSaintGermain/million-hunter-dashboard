@@ -11,7 +11,8 @@
  * - No fabricated testimonials, metrics, or logos
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1000,16 +1001,41 @@ function StepContent({ step }: { step: StepId }) {
   }
 }
 
+// ─── Transition variants ─────────────────────────────────────────────────────
+const SLIDE_VARIANTS = {
+  enter: (dir: number) => ({
+    opacity: 0,
+    x: dir > 0 ? 40 : -40,
+    y: 0,
+  }),
+  center: {
+    opacity: 1,
+    x: 0,
+    y: 0,
+    transition: { duration: 0.38, ease: "easeOut" as const },
+  },
+  exit: (dir: number) => ({
+    opacity: 0,
+    x: dir > 0 ? -40 : 40,
+    transition: { duration: 0.22, ease: "easeIn" as const },
+  }),
+};
+
 // ─── Main Walkthrough Page ────────────────────────────────────────────────────
 export default function Walkthrough() {
   const [currentStep, setCurrentStep] = useState<StepId>(1);
+  const [direction, setDirection] = useState<number>(1); // 1 = forward, -1 = back
   const contentRef = useRef<HTMLDivElement>(null);
 
   const progress = ((currentStep - 1) / (STEPS.length - 1)) * 100;
 
   function goTo(step: StepId) {
+    setDirection(step > currentStep ? 1 : -1);
     setCurrentStep(step);
-    contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Slight delay so the exit animation completes before scroll
+    setTimeout(() => {
+      contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
   }
 
   function next() {
@@ -1065,21 +1091,49 @@ export default function Walkthrough() {
 
       {/* ── Main Content ── */}
       <main ref={contentRef} className="max-w-3xl mx-auto px-4 py-10">
-        <div className="mb-2">
-          <span className="text-xs font-semibold text-[var(--sh-fg-muted)] uppercase tracking-widest">
-            Step {currentStep} — {currentStepDef.label}
-          </span>
+        {/* Step label — animates with the content */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={`label-${currentStep}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { delay: 0.15, duration: 0.25 } }}
+            exit={{ opacity: 0, transition: { duration: 0.15 } }}
+            className="mb-2"
+          >
+            <span className="text-xs font-semibold text-[var(--sh-fg-muted)] uppercase tracking-widest">
+              Step {currentStep} — {currentStepDef.label}
+            </span>
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Step content — direction-aware slide + fade */}
+        <div className="overflow-hidden">
+          <AnimatePresence mode="wait" initial={false} custom={direction}>
+            <motion.div
+              key={currentStep}
+              custom={direction}
+              variants={SLIDE_VARIANTS}
+              initial="enter"
+              animate="center"
+              exit="exit"
+            >
+              <StepContent step={currentStep} />
+            </motion.div>
+          </AnimatePresence>
         </div>
 
-        <StepContent step={currentStep} />
-
         {/* ── Navigation ── */}
-        <div className="flex items-center justify-between mt-12 pt-6 border-t border-[var(--sh-border-1)]">
+        <motion.div
+          className="flex items-center justify-between mt-12 pt-6 border-t border-[var(--sh-border-1)]"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0, transition: { delay: 0.3, duration: 0.3 } }}
+          key={`nav-${currentStep}`}
+        >
           <Button
             variant="outline"
             onClick={prev}
             disabled={currentStep === 1}
-            className="border-[var(--sh-border-1)] text-[var(--sh-fg-muted)]"
+            className="border-[var(--sh-border-1)] text-[var(--sh-fg-muted)] transition-all duration-200 disabled:opacity-30"
           >
             ← Back
           </Button>
@@ -1091,7 +1145,7 @@ export default function Walkthrough() {
           {currentStep < 8 ? (
             <Button
               onClick={next}
-              className="bg-[var(--sh-text-primary)] text-[var(--sh-bg)] hover:opacity-90"
+              className="bg-[var(--sh-text-primary)] text-[var(--sh-bg)] hover:opacity-90 transition-all duration-200"
             >
               Next <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
@@ -1103,7 +1157,7 @@ export default function Walkthrough() {
               Log in to the live app <ExternalLink className="w-3.5 h-3.5" />
             </a>
           )}
-        </div>
+        </motion.div>
       </main>
 
       {/* ── Footer ── */}
