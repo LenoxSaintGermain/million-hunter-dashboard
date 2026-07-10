@@ -2,8 +2,11 @@
  * Signal Hunter — AI Model Registry
  *
  * Single source of truth for all available models across providers.
- * Includes experimental models (Gemini 3.1 Pro, etc.) — use them freely,
- * Google is generous with rate limits on experimental tiers.
+ *
+ * MODEL POLICY (Sprint 46+): only two Gemini variants are valid on the
+ * production GEMINI_API_KEY — gemini-3.1-pro-preview and gemini-3.1-flash-lite.
+ * Any other Gemini ID fails at the API and surfaces as "Generation failed".
+ * Do not add Gemini entries here without validating them live on the key.
  */
 
 export type ModelProvider = "google" | "poe" | "perplexity";
@@ -39,7 +42,7 @@ export interface ModuleModelConfig {
 // ─── Model Catalog ────────────────────────────────────────────────────────────
 
 export const MODEL_CATALOG: ModelDefinition[] = [
-  // ── Google Gemini 3.1 (Preview — direct API) ───────────────────────────────
+  // ── Google Gemini (direct API — only key-validated variants) ──────────────
   {
     id: "gemini-3.1-pro-preview",
     label: "Gemini 3.1 Pro (Preview)",
@@ -52,92 +55,15 @@ export const MODEL_CATALOG: ModelDefinition[] = [
     notes: "Frontier reasoning model. Best for Red Team, Investment Memo, deep analysis.",
   },
   {
-    id: "gemini-3-flash-preview",
-    label: "Gemini 3 Flash (Preview)",
-    provider: "google",
-    tier: "preview",
-    contextWindow: 1000000,
-    outputLimit: 32768,
-    supportsJson: true,
-    supportsGrounding: true,
-    notes: "Fast frontier model. Best for Capital Stack, Consensus scoring.",
-  },
-  {
-    id: "gemini-3.1-flash-lite-preview",
-    label: "Gemini 3.1 Flash-Lite (Preview)",
+    id: "gemini-3.1-flash-lite",
+    label: "Gemini 3.1 Flash-Lite",
     provider: "google",
     tier: "lite",
     contextWindow: 1000000,
     outputLimit: 16384,
     supportsJson: true,
     supportsGrounding: false,
-    notes: "Fastest/cheapest Gemini 3.x. Best for Deal Scoring, Market Scan.",
-  },
-  // ── Google Gemini — Stable ────────────────────────────────────────────────
-  {
-    id: "gemini-2.5-pro",
-    label: "Gemini 2.5 Pro",
-    provider: "google",
-    tier: "stable",
-    contextWindow: 1000000,
-    outputLimit: 65536,
-    supportsJson: true,
-    supportsGrounding: true,
-    notes: "Best reasoning + long context. Recommended for memos and red team.",
-  },
-  {
-    id: "gemini-2.5-flash",
-    label: "Gemini 2.5 Flash",
-    provider: "google",
-    tier: "fast",
-    contextWindow: 1000000,
-    outputLimit: 32768,
-    supportsJson: true,
-    supportsGrounding: true,
-    notes: "Best price/performance. Recommended for scoring and capital stack.",
-  },
-  {
-    id: "gemini-2.5-flash-lite",
-    label: "Gemini 2.5 Flash-Lite",
-    provider: "google",
-    tier: "lite",
-    contextWindow: 1000000,
-    outputLimit: 16384,
-    supportsJson: true,
-    supportsGrounding: false,
-    notes: "Cheapest/fastest. High-volume extraction tasks.",
-  },
-  {
-    id: "gemini-2.0-flash",
-    label: "Gemini 2.0 Flash",
-    provider: "google",
-    tier: "fast",
-    contextWindow: 1000000,
-    outputLimit: 8192,
-    supportsJson: true,
-    supportsGrounding: true,
-    notes: "Previous gen fast model. Use 2.5 Flash instead.",
-  },
-  {
-    id: "gemini-2.0-flash-lite",
-    label: "Gemini 2.0 Flash-Lite",
-    provider: "google",
-    tier: "lite",
-    contextWindow: 1000000,
-    outputLimit: 8192,
-    supportsJson: false,
-    supportsGrounding: false,
-  },
-  {
-    id: "gemini-1.5-pro",
-    label: "Gemini 1.5 Pro",
-    provider: "google",
-    tier: "stable",
-    contextWindow: 2000000,
-    outputLimit: 8192,
-    supportsJson: true,
-    supportsGrounding: false,
-    notes: "Legacy. Use 2.5 Pro instead.",
+    notes: "Fast/cheap Gemini 3.1. Best for Capital Stack, Deal Scoring, Market Scan, consensus support.",
   },
   // ── Claude via Poe API ────────────────────────────────────────────────────────────────────
   {
@@ -231,16 +157,29 @@ export const MODEL_CATALOG: ModelDefinition[] = [
   },
 ];
 
+// ─── Production Gemini model policy ───────────────────────────────────────────
+// The only Gemini IDs valid on the production GEMINI_API_KEY (validated live).
+// Direct-API call sites must resolve to one of these; anything else read from
+// config (e.g. a stale model_configs row) must fall back to a valid default.
+
+export const GEMINI_STRONG = "gemini-3.1-pro-preview";
+export const GEMINI_FAST = "gemini-3.1-flash-lite";
+export const VALID_GEMINI_IDS = new Set<string>([GEMINI_STRONG, GEMINI_FAST]);
+
+export function toValidGeminiId(id: string | null | undefined, fallback: string): string {
+  return id && VALID_GEMINI_IDS.has(id) ? id : fallback;
+}
+
 // ─── Default Module → Model Assignments ──────────────────────────────────────
 
 export const DEFAULT_MODULE_MODELS: Record<AnalysisModule, string> = {
   ownerPsychology: "Claude-Opus-4.7",
   digitalAudit: "sonar-pro",
-  redTeam: "gemini-3.1-pro-preview",
-  capitalStack: "gemini-3-flash-preview",
-  investmentMemo: "gemini-3.1-pro-preview",
-  dealScoring: "gemini-3.1-flash-lite-preview",
-  marketScan: "gemini-3.1-flash-lite-preview",
+  redTeam: GEMINI_STRONG,
+  capitalStack: GEMINI_FAST,
+  investmentMemo: GEMINI_STRONG,
+  dealScoring: GEMINI_FAST,
+  marketScan: GEMINI_FAST,
 };
 
 export const MODULE_LABELS: Record<AnalysisModule, string> = {

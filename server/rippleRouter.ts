@@ -364,7 +364,7 @@ Focus on businesses acquirable or startable with $100K-$2M. No explanation outsi
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${forgeKey}` },
       body: JSON.stringify({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
         max_tokens: 1500,
@@ -517,7 +517,7 @@ Return JSON: { "verdict": "approve" | "pass" | "review", "score": 0.0-1.0, "rati
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${forgeKey}` },
           body: JSON.stringify({
-            model: "gemini-2.5-flash",
+            model: "gemini-3.1-flash",
             messages: [{ role: "user", content: icPrompt }],
             response_format: { type: "json_object" },
             max_tokens: 512,

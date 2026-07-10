@@ -17,7 +17,7 @@ import {
   getModelConfig, getAllModelConfigs, upsertModelConfig,
   getDealIdByNameSource,
 } from "./db";
-import { MODEL_CATALOG, DEFAULT_MODULE_MODELS, type AnalysisModule } from "../shared/models";
+import { MODEL_CATALOG, DEFAULT_MODULE_MODELS, GEMINI_STRONG, GEMINI_FAST, VALID_GEMINI_IDS, toValidGeminiId, type AnalysisModule } from "../shared/models";
 import {
   analyzeOwnerPsychology, runDigitalAudit, runRedTeamAnalysis,
   buildCapitalStack, generateInvestmentMemo, scoreDeal,
@@ -502,7 +502,7 @@ export const appRouter = router({
             cashOnCashReturn: capital.cashOnCashReturn,
             capitalStackSummary: capital.summary,
           }),
-          modelVersions: { psychology: "claude-opus-4", digital: "claude-opus-4", redteam: "gemini-3.1-pro-preview", capital: "gemini-3.1-flash-lite" },
+          modelVersions: { psychology: "claude-opus-4", digital: "claude-opus-4", redteam: GEMINI_STRONG, capital: GEMINI_FAST },
         };
         await upsertSignal(signalData);
         await logActivity({
@@ -530,10 +530,15 @@ export const appRouter = router({
         const deal = await getDealById(input.dealId);
         if (!deal) throw new Error("Deal not found");
 
-        // Cache-first: return existing memo unless force=true
+        // Cache-first: return existing memo unless force=true.
+        // A previous bug persisted failed generations as memos ("Generation
+        // failed" content) — treat those as absent so regeneration self-heals.
         if (!input.force) {
           const existingMemo = await getMemoByDealId(input.dealId);
-          if (existingMemo) {
+          const isPoisoned =
+            existingMemo?.content?.includes("Memo generation failed") ||
+            existingMemo?.executiveSummary === "Generation failed.";
+          if (existingMemo && !isPoisoned) {
             return { success: true, cached: true, memo: existingMemo };
           }
         }
@@ -554,7 +559,7 @@ export const appRouter = router({
           investmentThesis: memo.investmentThesis,
           riskFactors: memo.riskFactors,
           aiOptimizationOpportunities: memo.aiOptimizationOpportunities,
-          generatedBy: "gemini-3.1-pro-preview",
+          generatedBy: GEMINI_STRONG,
           version: (existingMemo?.version ?? 0) + 1,
         });
         await logActivity({ dealId: input.dealId, type: "memo_generated", title: `Investment memo generated for ${deal.name}` });
@@ -707,9 +712,9 @@ export const appRouter = router({
         await upsertModelConfig(module as AnalysisModule, modelId, true);
       }
       // Reset consensus models to defaults
-      await upsertModelConfig("consensus_model_1" as AnalysisModule, "gemini-3.1-pro-preview", true);
-      await upsertModelConfig("consensus_model_2" as AnalysisModule, "gemini-3.1-flash-lite", true);
-      await upsertModelConfig("consensus_model_3" as AnalysisModule, "gemini-3.1-flash-lite", true);
+      await upsertModelConfig("consensus_model_1" as AnalysisModule, GEMINI_STRONG, true);
+      await upsertModelConfig("consensus_model_2" as AnalysisModule, GEMINI_FAST, true);
+      await upsertModelConfig("consensus_model_3" as AnalysisModule, GEMINI_FAST, true);
       return { success: true };
     }),
 
@@ -717,23 +722,25 @@ export const appRouter = router({
     consensusConfig: publicProcedure.query(async () => {
       const saved = await getAllModelConfigs();
       const defaults = {
-        consensus_model_1: "gemini-3.1-pro-preview",
-        consensus_model_2: "gemini-3.1-flash-lite",
-        consensus_model_3: "gemini-3.1-flash-lite",
+        consensus_model_1: GEMINI_STRONG,
+        consensus_model_2: GEMINI_FAST,
+        consensus_model_3: GEMINI_FAST,
       };
       const result: Record<string, string> = {};
       for (const [key, defaultModel] of Object.entries(defaults)) {
         const entry = saved.find((r) => r.module === key);
-        result[key] = entry?.modelId ?? defaultModel;
+        // Coerce stale pre-policy IDs (e.g. gemini-2.5-pro) to the default so
+        // the Settings UI never shows a model the key can't actually run.
+        result[key] = toValidGeminiId(entry?.modelId, defaultModel);
       }
       return result;
     }),
 
     updateConsensus: protectedProcedure
       .input(z.object({
-        model1: z.string(),
-        model2: z.string(),
-        model3: z.string(),
+        model1: z.string().refine((m) => VALID_GEMINI_IDS.has(m), { message: "Model not valid on the production key" }),
+        model2: z.string().refine((m) => VALID_GEMINI_IDS.has(m), { message: "Model not valid on the production key" }),
+        model3: z.string().refine((m) => VALID_GEMINI_IDS.has(m), { message: "Model not valid on the production key" }),
       }))
       .mutation(async ({ input }) => {
         await upsertModelConfig("consensus_model_1" as AnalysisModule, input.model1, true);

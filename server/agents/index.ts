@@ -31,12 +31,14 @@ import {
 } from "../gemini";
 import { getDb } from "../db";
 import { dealTrajectory } from "../../drizzle/schema";
+import { GEMINI_STRONG, GEMINI_FAST, toValidGeminiId } from "../../shared/models";
 
 // ─── Model Tiers ─────────────────────────────────────────────────────────────
-// Gemini 3.1 — called directly via Google Generative AI API
-const MODEL_STRONG = "gemini-3.1-pro-preview";
-const MODEL_FAST = "gemini-3.1-flash-lite";
-const MODEL_LITE = "gemini-3.1-flash-lite";
+// Gemini — called directly via Google Generative AI API.
+// Single source of truth: shared/models.ts (only key-validated IDs).
+const MODEL_STRONG = GEMINI_STRONG;
+const MODEL_FAST = GEMINI_FAST;
+const MODEL_LITE = GEMINI_FAST;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface AgentRunResult {
@@ -205,9 +207,12 @@ export async function getConsensusModelIds(): Promise<[string, string, string]> 
   try {
     const { getAllModelConfigs } = await import("../db");
     const saved = await getAllModelConfigs();
-    const m1 = saved.find((r) => r.module === "consensus_model_1")?.modelId ?? MODEL_STRONG;
-    const m2 = saved.find((r) => r.module === "consensus_model_2")?.modelId ?? MODEL_FAST;
-    const m3 = saved.find((r) => r.module === "consensus_model_3")?.modelId ?? MODEL_LITE;
+    // model_configs rows can hold stale IDs from before the model policy
+    // (e.g. gemini-2.5-pro) — those fail at the API, so coerce anything
+    // outside the key-validated set back to the tier default.
+    const m1 = toValidGeminiId(saved.find((r) => r.module === "consensus_model_1")?.modelId, MODEL_STRONG);
+    const m2 = toValidGeminiId(saved.find((r) => r.module === "consensus_model_2")?.modelId, MODEL_FAST);
+    const m3 = toValidGeminiId(saved.find((r) => r.module === "consensus_model_3")?.modelId, MODEL_LITE);
     return [m1, m2, m3];
   } catch {
     return [MODEL_STRONG, MODEL_FAST, MODEL_LITE];

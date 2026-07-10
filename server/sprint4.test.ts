@@ -143,30 +143,30 @@ describe("OZ/TAD Enrichment Schema", () => {
 describe("Consensus Model Config", () => {
   it("can write and read consensus model IDs from model_configs", async () => {
     // Write test values
-    await upsertModelConfig("consensus_model_1" as any, "gemini-2.5-pro", true);
-    await upsertModelConfig("consensus_model_2" as any, "gemini-2.5-flash", true);
-    await upsertModelConfig("consensus_model_3" as any, "gemini-2.5-flash-lite", true);
+    await upsertModelConfig("consensus_model_1" as any, "gemini-3.1-pro-preview", true);
+    await upsertModelConfig("consensus_model_2" as any, "gemini-3.1-flash-lite", true);
+    await upsertModelConfig("consensus_model_3" as any, "gemini-3.1-flash-lite", true);
 
     const configs = await getAllModelConfigs();
     const m1 = configs.find((c) => c.module === "consensus_model_1");
     const m2 = configs.find((c) => c.module === "consensus_model_2");
     const m3 = configs.find((c) => c.module === "consensus_model_3");
 
-    expect(m1?.modelId).toBe("gemini-2.5-pro");
-    expect(m2?.modelId).toBe("gemini-2.5-flash");
-    expect(m3?.modelId).toBe("gemini-2.5-flash-lite");
+    expect(m1?.modelId).toBe("gemini-3.1-pro-preview");
+    expect(m2?.modelId).toBe("gemini-3.1-flash-lite");
+    expect(m3?.modelId).toBe("gemini-3.1-flash-lite");
   });
 
   it("consensus model IDs can be changed and persisted", async () => {
-    await upsertModelConfig("consensus_model_1" as any, "gemini-3.1-pro-exp", true);
+    await upsertModelConfig("consensus_model_1" as any, "gemini-3.1-flash-lite", true);
     const configs = await getAllModelConfigs();
     const m1 = configs.find((c) => c.module === "consensus_model_1");
-    expect(m1?.modelId).toBe("gemini-3.1-pro-exp");
+    expect(m1?.modelId).toBe("gemini-3.1-flash-lite");
 
     // Reset to default
-    await upsertModelConfig("consensus_model_1" as any, "gemini-2.5-pro", true);
+    await upsertModelConfig("consensus_model_1" as any, "gemini-3.1-pro-preview", true);
     const reset = await getAllModelConfigs();
     const m1Reset = reset.find((c) => c.module === "consensus_model_1");
-    expect(m1Reset?.modelId).toBe("gemini-2.5-pro");
+    expect(m1Reset?.modelId).toBe("gemini-3.1-pro-preview");
   });
 });

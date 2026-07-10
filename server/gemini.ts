@@ -2,10 +2,11 @@
  * AI Service Layer — Signal Hunter
  *
  * Model routing:
- *   Google Gemini (direct API) — all Gemini tasks:
- *     gemini-3.1-pro    → Deep reasoning: Red Team, investment memo synthesis
- *     gemini-3.1-flash    → Fast structured extraction, capital stack math
- *     gemini-3.1-flash → High-volume scoring, market scan
+ *   Google Gemini (direct API) — all Gemini tasks. Only two IDs are valid on
+ *   the production key (see shared/models.ts model policy):
+ *     gemini-3.1-pro-preview → Deep reasoning: Red Team, investment memo synthesis
+ *     gemini-3.1-flash-lite  → Fast structured extraction, capital stack math,
+ *                              high-volume scoring, market scan
  *
  *   Poe API (OpenAI-compatible gateway) — non-Gemini models:
  *     Claude-Opus-4           → Owner Psychology profiling (nuanced language analysis)
@@ -16,14 +17,15 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { poeJSON, POE_MODELS } from "./poe";
+import { GEMINI_STRONG, GEMINI_FAST } from "../shared/models";
 import type { Deal } from "../drizzle/schema";
 
 const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-// ─── Gemini model IDs ─────────────────────────────────────────────────────────
-const GEMINI_PRO    = "gemini-3.1-pro-preview";
-const GEMINI_FLASH  = "gemini-3.1-flash-lite";
-const GEMINI_LITE   = "gemini-3.1-flash-lite";
+// ─── Gemini model IDs (single source of truth: shared/models.ts) ─────────────
+const GEMINI_PRO    = GEMINI_STRONG;
+const GEMINI_FLASH  = GEMINI_FAST;
+const GEMINI_LITE   = GEMINI_FAST;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface OwnerPsychologyResult {
@@ -337,15 +339,12 @@ Return ONLY valid JSON.`;
       riskFactors: Array.isArray(parsed.riskFactors) ? parsed.riskFactors : [],
       aiOptimizationOpportunities: Array.isArray(parsed.aiOptimizationOpportunities) ? parsed.aiOptimizationOpportunities : [],
     };
-  } catch (e) {
-    return {
-      title: `Investment Memo: ${deal.name}`,
-      content: `# Investment Memo: ${deal.name}\n\nMemo generation failed. Please retry.`,
-      executiveSummary: "Generation failed.",
-      investmentThesis: "Generation failed.",
-      riskFactors: [],
-      aiOptimizationOpportunities: [],
-    };
+  } catch (e: any) {
+    // Throw instead of returning a fake memo: the route must not persist a
+    // "Generation failed" document as if it were a real memo (cache-first
+    // reads would then serve the failure forever).
+    console.error(`[InvestmentMemo] Generation failed for "${deal.name}" (model ${GEMINI_PRO}):`, e?.message ?? e);
+    throw new Error(`Memo generation failed for ${deal.name}: ${e?.message ?? "unknown error"}`);
   }
 }
 
