@@ -7,7 +7,7 @@ Source-of-truth build specs for Signal Hunter OS. When a spec conflicts with a `
 ### TSL-BUILD-2026-004 — Fix-It + Investor Brief
 - **A-1 fabricated testimonials:** ✅ removed (`6de766d`, verified in `LandingPage.tsx`)
 - **A-2 demote Market Scan/Radar, kill "Live" badge:** ✅ shipped; Radar later returned to primary nav under 005 WP-DR2's sanctioned reversal (real cited sonar-pro data)
-- **A-3 rigor gate hardening:** ⬜ OPEN — run gate cold on GT-002 (fake growth) + GT-003 (contract cliff), append raw Red Team output to `rigor_gate_test`; document misses honestly. **Next in queue.**
+- **A-3 rigor gate hardening:** ✅ shipped 2026-07-10 — GT-001/002/003 run cold through production Red Team (`scripts/rigor-gate-cold.ts`); raw output + honest gap notes in `ground-truth-deals.json` → `rigor_gate_test.results`. All 3 passed; contract-term extraction remains the flagged enhancement.
 - **A-4 IC labeling:** ✅ persona labels shipped (`28644ba`)
 - **Part B investor brief:** ✅ `/brief` shipped (`6de766d`) — absorbed into 006
 

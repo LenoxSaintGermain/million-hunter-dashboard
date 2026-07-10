@@ -114,12 +114,30 @@
       "actual_outcome": {
         "scenario": "Post-close failure within 18 months",
         "timeline": [
-          { "month": 1, "event": "Owner transitions out per agreement. Buyer takes over client relationships." },
-          { "month": 3, "event": "Client B (office park, $484k/yr) gives 30-day notice. Property manager 'decided to go with someone my cousin recommended.' No contract to enforce." },
-          { "month": 6, "event": "Revenue drops to $1.37M annualized. Debt service requires $1.5M+ revenue at current margins." },
-          { "month": 9, "event": "Hospital contract rebid opens. Buyer submits competitive bid. Loses to lower-cost competitor — hospital procurement team has no relationship with new owner." },
-          { "month": 14, "event": "Revenue at $890k. Business cannot service SBA debt. Buyer approaches SBA about workout." },
-          { "month": 18, "event": "Business sold at distressed price of $340k. Buyer loss: ~$1.76M including equity, personal guarantee exposure, and working capital consumed." }
+          {
+            "month": 1,
+            "event": "Owner transitions out per agreement. Buyer takes over client relationships."
+          },
+          {
+            "month": 3,
+            "event": "Client B (office park, $484k/yr) gives 30-day notice. Property manager 'decided to go with someone my cousin recommended.' No contract to enforce."
+          },
+          {
+            "month": 6,
+            "event": "Revenue drops to $1.37M annualized. Debt service requires $1.5M+ revenue at current margins."
+          },
+          {
+            "month": 9,
+            "event": "Hospital contract rebid opens. Buyer submits competitive bid. Loses to lower-cost competitor — hospital procurement team has no relationship with new owner."
+          },
+          {
+            "month": 14,
+            "event": "Revenue at $890k. Business cannot service SBA debt. Buyer approaches SBA about workout."
+          },
+          {
+            "month": 18,
+            "event": "Business sold at distressed price of $340k. Buyer loss: ~$1.76M including equity, personal guarantee exposure, and working capital consumed."
+          }
         ],
         "total_buyer_loss_estimate": 1760000,
         "failure_mode_primary": "customer_concentration_owner_personal",
@@ -218,10 +236,22 @@
       "actual_outcome": {
         "scenario": "Partial failure — business survives but buyer significantly overpaid",
         "timeline": [
-          { "month": 2, "event": "Lead technician gives notice. Buyer scrambles to find licensed replacement." },
-          { "month": 4, "event": "Service quality drops during transition. 140 accounts churn in 60 days — 3x normal rate." },
-          { "month": 8, "event": "Replacement technician hired at $72k. True SDE now ~$480k vs. stated $650k." },
-          { "month": 12, "event": "Business stabilized but buyer paid $2.27M for a $480k SDE business — effective multiple of 4.7x." }
+          {
+            "month": 2,
+            "event": "Lead technician gives notice. Buyer scrambles to find licensed replacement."
+          },
+          {
+            "month": 4,
+            "event": "Service quality drops during transition. 140 accounts churn in 60 days — 3x normal rate."
+          },
+          {
+            "month": 8,
+            "event": "Replacement technician hired at $72k. True SDE now ~$480k vs. stated $650k."
+          },
+          {
+            "month": 12,
+            "event": "Business stabilized but buyer paid $2.27M for a $480k SDE business — effective multiple of 4.7x."
+          }
         ],
         "total_buyer_loss_estimate": 820000,
         "failure_mode_primary": "undisclosed_key_employee_departure",
@@ -288,9 +318,18 @@
       "actual_outcome": {
         "scenario": "Deal did not close — buyer walked after diligence",
         "timeline": [
-          { "month": 0, "event": "LOI signed at $7.6M." },
-          { "month": 2, "event": "QoE reveals government contract expiration. Buyer requests price reduction." },
-          { "month": 3, "event": "Seller refuses price reduction. Buyer walks. Deal dead." }
+          {
+            "month": 0,
+            "event": "LOI signed at $7.6M."
+          },
+          {
+            "month": 2,
+            "event": "QoE reveals government contract expiration. Buyer requests price reduction."
+          },
+          {
+            "month": 3,
+            "event": "Seller refuses price reduction. Buyer walks. Deal dead."
+          }
         ],
         "total_buyer_loss_estimate": 45000,
         "failure_mode_primary": "deal_did_not_close_diligence_kill",
@@ -316,22 +355,114 @@
     }
   ],
   "rigor_gate_test": {
-    "test_date": "2026-06-27",
-    "test_deal": "GT-001",
-    "methodology": "Fed pre-acquisition broker sheet signals only (no outcome data) to Red Team. Verified Red Team surfaces the correct failure modes.",
-    "input_signals": [
-      "Revenue: $1.85M, SDE: $720k, Asking: $2.1M, Multiple: 2.9x",
-      "Industry: Commercial Cleaning, Geography: Charlotte NC",
-      "Years in business: 11, Employees: 14",
-      "Broker notes: 'Consistent revenue growth, recurring contract base, owner retiring, SBA pre-qualified'",
-      "Add-backs provided: $223k total (owner salary differential, vehicle fleet, family consulting, equipment write-off)",
-      "Top 2 clients: 54% of revenue (hospital system + office park management)",
-      "Owner works 55-60 hours/week",
-      "No operations manager on staff"
-    ],
-    "red_team_output_summary": "Red Team correctly identified: (1) add-back inflation as primary financial concern, (2) customer concentration as structural defect, (3) owner dependence as management risk, (4) recommended QoE as immediate next step, (5) recommended contract review for top 2 clients. All 5 correct failure modes surfaced from pre-acquisition signals only.",
-    "rigor_gate_passed": true,
-    "rigor_gate_confidence": 0.94,
-    "notes": "Red Team did not have access to outcome data. It identified the hospital contract rebid risk only after being prompted to check contract terms — this is a gap. A future enhancement should include automated contract term extraction as a standard diligence step."
+    "scope_note": "The gate tests whether the Red Team correctly interprets and severity-ranks standard pre-close diligence data — it does not claim to conjure signals absent from the input documents. Public claims must be scoped to failure modes it catches cold from this document set: SDE/add-back inflation, customer concentration, key-man/owner dependence, fake growth, contract cliffs (when contract dates are in the data), structural capacity constraints.",
+    "results": [
+      {
+        "test_date": "2026-06-27",
+        "test_deal": "GT-001",
+        "methodology": "Fed pre-acquisition broker sheet signals only (no outcome data) to Red Team. Verified Red Team surfaces the correct failure modes.",
+        "input_signals": [
+          "Revenue: $1.85M, SDE: $720k, Asking: $2.1M, Multiple: 2.9x",
+          "Industry: Commercial Cleaning, Geography: Charlotte NC",
+          "Years in business: 11, Employees: 14",
+          "Broker notes: 'Consistent revenue growth, recurring contract base, owner retiring, SBA pre-qualified'",
+          "Add-backs provided: $223k total (owner salary differential, vehicle fleet, family consulting, equipment write-off)",
+          "Top 2 clients: 54% of revenue (hospital system + office park management)",
+          "Owner works 55-60 hours/week",
+          "No operations manager on staff"
+        ],
+        "red_team_output_summary": "Red Team correctly identified: (1) add-back inflation as primary financial concern, (2) customer concentration as structural defect, (3) owner dependence as management risk, (4) recommended QoE as immediate next step, (5) recommended contract review for top 2 clients. All 5 correct failure modes surfaced from pre-acquisition signals only.",
+        "rigor_gate_passed": true,
+        "rigor_gate_confidence": 0.94,
+        "notes": "Red Team did not have access to outcome data. It identified the hospital contract rebid risk only after being prompted to check contract terms — this is a gap. A future enhancement should include automated contract term extraction as a standard diligence step. [2026-07-10: raw output was not preserved for this original run; superseded by the cold re-run below.]",
+        "result_type": "legacy_summary_only"
+      },
+      {
+        "test_date": "2026-07-10",
+        "test_deal": "GT-001",
+        "result_type": "cold_run_raw",
+        "methodology": "Single-shot cold run through the production runRedTeamAnalysis path (server/gemini.ts, gemini-3.1-pro-preview). Input = broker sheet + neutrally-phrased knowable-before-close diligence facts (standard document-request data: revenue-by-customer schedule, account cohorts, add-back schedule, staff roster, public contract dates). No outcome data, no severity labels, no follow-up prompting. Runner: scripts/rigor-gate-cold.ts (reproducible).",
+        "input_description": "Broker: Established commercial cleaning company with 11-year track record. Consistent revenue growth. Owner retiring. Strong recurring contract base. SBA pre-qualified.\nDiligence data points from standard document requests:\n- Add-back schedule totals $223k: $85k owner salary above market replacement, $62k personal vehicle fleet, $41k consulting payments to family members, $35k one-time equipment write-off.\n- Revenue by customer: top 2 clients = 54% of revenue (regional hospital system $512k/yr = 28%; office park management co $484k/yr = 26%).\n- Revenue grew 18% over 3 years; contract count constant at 23; no new client logos in 24 months.\n- Owner works 55-60 hours/week; no operations manager on staff.\n- Equipment schedule: 6 of 9 floor machines are 7+ years old (industry replacement cycle: 5 years).",
+        "expected_failure_modes": [
+          "add-back / SDE inflation",
+          "customer concentration (top-2 54%)",
+          "owner dependence / key-man risk"
+        ],
+        "raw_red_team_output": {
+          "killProbability": 0.95,
+          "redFlags": [
+            "Severe Customer Concentration: Top 2 clients dictate 54% of total revenue ($996k), meaning the loss of a single contract instantly destroys the firm's debt service capabilities and equity value.",
+            "Critical Key-Man Dependency: The owner is operating as a 60-hour/week general manager with zero middle management in place, guaranteeing severe operational disruption upon retirement.",
+            "Non-Existent Sales Engine: Flat contract volume and zero new logos in 24 months prove the 18% revenue growth is an illusion driven entirely by price hikes or scope creep on a tapped-out existing base.",
+            "Deferred CapEx Timebomb: 67% of the core floor equipment is 2+ years past its useful industry life, meaning the buyer is inheriting an immediate, unmodeled capital expenditure burden post-close.",
+            "Deceptive Cash Flow Adjustments: Categorizing a $35k equipment write-off as a one-time add-back is intellectually dishonest in an asset-heavy cleaning business requiring continuous fleet rotation.",
+            "Under-Calculated Replacement Costs: The $85k owner salary add-back severely underestimates the true cost of hiring a competent GM and an operations manager to replace the retiring owner's 60 hours of weekly labor."
+          ],
+          "summary": "This is not a scalable commercial cleaning platform; it is a highly concentrated, owner-operated job carrying catastrophic downside risk. With over half the revenue precariously tied to just two clients, zero organic customer acquisition in two years, and a heavily depreciated equipment fleet, an acquisition is a near-guaranteed path to immediate cash flow collapse. Kill this deal immediately unless it is a purely synergistic add-on for an existing Charlotte operator with the entire purchase price structured as an earn-out."
+        },
+        "duration_ms": 16420,
+        "model": "gemini-3.1-pro-preview",
+        "rigor_gate_passed": true,
+        "evaluation": "All 3 documented failure modes surfaced cold: (1) customer concentration flagged as severe with debt-service framing, (2) owner dependence / key-man flagged critical, (3) add-back inflation flagged twice (write-off dishonesty + under-priced owner replacement). Bonus catches: fake growth (price-hike-only), deferred capex timebomb.",
+        "honest_gaps": "The hospital contract rebid-in-14-months risk was NOT surfaced — but that data point was not in the cold input (contract terms are not part of the standard document set fed to the gate). Consistent with the original 2026-06-27 note: automated contract-term extraction remains the flagged enhancement."
+      },
+      {
+        "test_date": "2026-07-10",
+        "test_deal": "GT-002",
+        "result_type": "cold_run_raw",
+        "methodology": "Single-shot cold run through the production runRedTeamAnalysis path (server/gemini.ts, gemini-3.1-pro-preview). Input = broker sheet + neutrally-phrased knowable-before-close diligence facts (standard document-request data: revenue-by-customer schedule, account cohorts, add-back schedule, staff roster, public contract dates). No outcome data, no severity labels, no follow-up prompting. Runner: scripts/rigor-gate-cold.ts (reproducible).",
+        "input_description": "Broker: Established residential pest control route with 1,200 recurring accounts. Owner-operated. Strong recurring revenue. Priced to sell.\nDiligence data points from standard document requests:\n- Account cohort data: account count 1,180 → 1,200 over 3 years (+1.7%); revenue +34% over the same period; annual account churn 22%.\n- Add-back schedule includes $95k 'owner discretionary'. Owner time audit shows the owner personally performs ~30% of service routes. Market rate for a licensed pest control technician: $65-75k fully loaded.\n- Revenue by customer: 1,200 residential accounts, largest is $4,200/yr (<3% of revenue).\n- Staff roster: lead technician (8 years tenure) holds the state applicator license that covers 60% of the service territory. Employee reference checks indicate he has been interviewing elsewhere.",
+        "expected_failure_modes": [
+          "growth is price increases on flat account base (with high churn), not organic volume",
+          "add-back overstatement: 'owner discretionary' is actually replacement labor cost",
+          "key-employee departure risk tied to the applicator license / service authorization"
+        ],
+        "raw_red_team_output": {
+          "killProbability": 0.95,
+          "redFlags": [
+            "Existential Key Man Risk: The lead technician holds the state applicator license for 60% of the territory and is actively interviewing elsewhere. His departure will instantly halt the majority of operations.",
+            "Illusion of Growth: Revenue grew 34% over 3 years, but account volume only grew 1.7% (1,180 to 1,200). Growth is driven entirely by aggressive price hikes rather than organic market penetration.",
+            "Toxic Churn Rate: Annual account churn is sitting at 22%, which is dangerously high for route-based residential pest control (industry standard is 10-15%). The aggressive pricing strategy is likely cannibalizing the customer base.",
+            "Inflated Cash Flow: The $650k cash flow figure is deceptive. The owner performs 30% of routes, meaning true adjusted EBITDA must be reduced by at least $75k for a replacement tech, plus a GM salary, rendering the 3.5x multiple a fiction.",
+            "Regulatory Exposure: Relying on a single, non-equity employee for regulatory compliance across 60% of the footprint creates an unacceptable structural vulnerability for a PE sponsor."
+          ],
+          "summary": "This deal is a collapsing house of cards disguised as a high-margin cash cow. The purported revenue growth is a mirage built on aggressive price hikes that are driving a toxic 22% churn rate on a stagnant customer base, while actual EBITDA is heavily inflated by unreplaced owner labor. Most decisively, the business faces immediate existential ruin because the flight-risk lead technician holds the regulatory keys to 60% of the operating territory."
+        },
+        "duration_ms": 13149,
+        "model": "gemini-3.1-pro-preview",
+        "rigor_gate_passed": true,
+        "evaluation": "All 3 documented failure modes surfaced cold: (1) growth-is-price-hikes-on-flat-accounts flagged explicitly (34% revenue vs 1.7% account growth) plus the 22% churn called toxic, (2) add-back overstatement caught and re-priced ('true adjusted EBITDA must be reduced... rendering the 3.5x multiple a fiction' — matches the fixture's 4.7x effective-multiple outcome), (3) lead-tech/applicator-license risk ranked as the #1 existential flag with the license→60%-territory linkage made unprompted.",
+        "honest_gaps": "The 'interviewing elsewhere' fact was in the input (knowable via employee reference checks per the fixture); the gate's contribution is severity ranking and the license/service-authorization linkage, not discovering the departure."
+      },
+      {
+        "test_date": "2026-07-10",
+        "test_deal": "GT-003",
+        "result_type": "cold_run_raw",
+        "methodology": "Single-shot cold run through the production runRedTeamAnalysis path (server/gemini.ts, gemini-3.1-pro-preview). Input = broker sheet + neutrally-phrased knowable-before-close diligence facts (standard document-request data: revenue-by-customer schedule, account cohorts, add-back schedule, staff roster, public contract dates). No outcome data, no severity labels, no follow-up prompting. Runner: scripts/rigor-gate-cold.ts (reproducible).",
+        "input_description": "Broker: Established logistics and delivery company serving commercial and government clients. Long-term contracts. Strong management team. Owner stepping back.\nDiligence data points from standard document requests:\n- Revenue by customer: one federal GSA-schedule delivery contract = $3.05M/yr (47% of revenue); top 3 commercial clients = additional 31% (top-4 total: 78%).\n- The GSA contract's expiration date (public on SAM.gov) is 18 months out; it goes to re-compete at that time.\n- Operations data: company runs at 78% of contracted route capacity due to CDL driver availability; contracted capacity implies $8.3M revenue.",
+        "expected_failure_modes": [
+          "contract cliff: 47%-of-revenue government contract expiring / re-competing in 18 months",
+          "extreme customer concentration (top-4 = 78%)",
+          "structural driver shortage capping capacity (and paying 4.0x on cliff-exposed earnings)"
+        ],
+        "raw_red_team_output": {
+          "killProbability": 0.92,
+          "redFlags": [
+            "Catastrophic Customer Concentration: A single GSA contract represents 47% of revenue, and the top 4 clients make up 78%. The loss of just the top account would instantly wipe out the entire $1.9M cash flow.",
+            "Imminent Existential Threat: The massive GSA contract expires and goes to open re-compete in exactly 18 months, meaning we are paying a 4x multiple for cash flows that have a high probability of evaporating almost immediately post-close.",
+            "Systemic Labor Bottleneck: The business is operating at only 78% of contracted capacity due to an inability to hire and retain CDL drivers, exposing the firm to breach-of-contract risks for under-delivery.",
+            "Margin Compression Inevitability: To solve the 22% capacity shortfall and retain existing CDL drivers in the highly competitive Charlotte logistics hub, a buyer will be forced to aggressively hike driver wages, severely eroding the projected cash flow.",
+            "Owner Transition Risk on Re-compete: The departing owner likely holds the pivotal relationships and institutional knowledge required to win the GSA contract renewal; their exit precisely when a re-compete is looming is highly suspicious.",
+            "Absurd Valuation Disconnect: A $7.6M asking price (4x cash flow) completely prices in long-term stability and ignores the near-term risk of a 47% revenue haircut and ongoing labor constraints."
+          ],
+          "summary": "This deal is a ticking time bomb masquerading as a stable cash cow, with 47% of its revenue tied to a single government contract that expires in 18 months. Furthermore, systemic CDL driver shortages are already crippling their ability to fulfill existing contracts, meaning any attempt to grow will cannibalize margins through wage inflation. We are being asked to pay a premium 4x multiple to hold the bag on a business that could easily lose half its revenue and all of its profit by year two."
+        },
+        "duration_ms": 13902,
+        "model": "gemini-3.1-pro-preview",
+        "rigor_gate_passed": true,
+        "evaluation": "All 3 documented failure modes surfaced cold: (1) the contract cliff called an 'imminent existential threat' with the exact economic framing that killed the real deal (paying 4x for cash flows that may evaporate post-close), (2) top-4 78% concentration flagged catastrophic, (3) structural CDL driver shortage flagged including breach-of-contract and wage-compression second-order effects. Bonus catch: owner exiting precisely before the re-compete flagged as suspicious. The real-world buyer discovered the cliff only at QoE (month 2, $45k spent); the gate surfaced it in 14 seconds from listing-level + public SAM.gov data.",
+        "honest_gaps": "None material for this deal."
+      }
+    ]
   }
 }

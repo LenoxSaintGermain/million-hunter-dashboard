@@ -57,10 +57,15 @@ Execute against these; they are the source of truth for scope. When a spec confl
 
 ## CURRENT PRIORITY QUEUE (reconcile with live code first)
 
-1. **Fix the Memos "Generation failed" bug** — standardize every generation path on the two valid model IDs (see Model policy); guard against stale DB `model_configs`; verify failed cards (e.g. "LA Coastal HVAC," "Southeast Plumbing Group") regenerate cleanly.
-2. **Harden the rigor gate** (004 A-3) — run GT-002/GT-003 cold, save raw output.
+1. ✅ **Memos "Generation failed" fix** — shipped `1fed7ce`: model policy enforced, stale DB config coerced, failures no longer persisted/cached. Remaining: verify failed cards regenerate in the deployed app.
+2. ✅ **Rigor gate hardening** (004 A-3) — shipped: GT-001/002/003 run cold through production Red Team, raw output in `server/fixtures/ground-truth-deals.json` → `rigor_gate_test.results`; runner at `scripts/rigor-gate-cold.ts`. All 3 passed; gaps documented honestly (contract-term extraction still the flagged enhancement).
 3. **006 walkthrough hardening** — drive `/walkthrough` end-to-end against the acceptance list: zero API calls, no login walls, no dead ends, no unexplained buttons.
 4. **007 / 005 remainder** — when their inputs / phase are ready.
+
+## ⚠️ Local environment hazards
+
+- **`.env` points at the PRODUCTION TiDB database.** `server/_core/index.ts` and `sprint8.test.ts` import `dotenv/config`, so `pnpm test` WILL write test data into prod (this caused the Sprint 45 cleanup). **Always run tests as `DATABASE_URL= pnpm test`** (empty override wins — dotenv does not overwrite existing vars). Same caution for `pnpm dev` mutations.
+- Node ≥22 required; default shell resolves Node 18. Prefix: `export PATH="/opt/homebrew/opt/node@26/bin:/opt/homebrew/bin:$PATH"`.
 
 ---
 
