@@ -44,6 +44,7 @@ import DemoScenario from "./pages/DemoScenario";
 import DemoTour from "./pages/DemoTour";
 import RippleEffect from "./pages/RippleEffect";
 import InvestorBrief from "./pages/InvestorBrief";
+import Walkthrough from "./pages/Walkthrough";
 import { getLoginUrl } from "./const";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ function OnboardingGuard() {
   const alreadyChecked = typeof window !== "undefined" &&
     sessionStorage.getItem("onboarding_checked") === "done";
 
-  const isPublicPage = location === "/lobby" || location === "/404" || location.startsWith("/deal-share") || location.startsWith("/invite") || location === "/brief" || location === "/explore" || location === "/demo" || location === "/demo-tour";
+  const isPublicPage = location === "/lobby" || location === "/404" || location.startsWith("/deal-share") || location.startsWith("/invite") || location === "/brief" || location === "/explore" || location === "/demo" || location === "/demo-tour" || location === "/walkthrough";
   const isInvestorArea = location.startsWith("/investor");
 
   // Operator onboarding check
@@ -162,6 +163,7 @@ function Router() {
         <Route path="/demo" component={DemoScenario} />
         <Route path="/demo-tour" component={DemoTour} />
         <Route path="/brief" component={InvestorBrief} />
+        <Route path="/walkthrough" component={Walkthrough} />
 
         {/* ── Root: Landing for unauth, Command Center for auth ── */}
         <Route path="/" component={RootRoute} />

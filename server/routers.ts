@@ -1624,27 +1624,26 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         const { createCommercialAsset, updateCommercialAssetAiScore } = await import("./db");
         const { invokeLLM } = await import("./_core/llm");
 
-        // 1. Scrape the listing page
+        // 1. Scrape the listing page (best-effort; falls back to URL-only mode)
         const scraped = await scrapeListing(input.url);
 
-        // 2. AI extraction — pull all structured fields from raw text
-        const urlOnlyNote = scraped.hints.urlOnlyMode
-          ? `\nNOTE: The listing page is behind a login wall or bot protection. The page content below is minimal (URL-derived only). Use your knowledge of this listing platform and any address/ID clues in the URL to infer as much as possible. For LoopNet listing ID 39894327 at 505 SE 16th St Fort Lauderdale FL, use any publicly known data about this property.`
-          : "";
+        // 2. Use Perplexity sonar-pro for live web search extraction
+        //    sonar-pro searches the web in real-time, so even if the page is behind a login
+        //    wall it can find the listing data from broker sites, public records, and news.
+        const SONAR_API_URL = "https://api.perplexity.ai/chat/completions";
+        const sonarKey = process.env.SONAR_API_KEY;
+        if (!sonarKey) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "SONAR_API_KEY not configured" });
 
-        const extractionPrompt = `You are a commercial real estate data extraction specialist.
-
-Extract all available property information from the following listing page content.
-Return a JSON object with ONLY the fields you can confidently extract — omit fields you cannot determine.${urlOnlyNote}
+        const sonarQuery = `Research this commercial real estate listing and extract all available property data.
 
 Listing URL: ${scraped.url}
-Page Title: ${scraped.title}
-Meta hints: ${JSON.stringify(scraped.hints)}
+Page title: ${scraped.title}
+Scraped content: ${scraped.rawText.slice(0, 3000)}
 
-Page Content:
-${scraped.rawText}
+Search the web for this listing and any related public records, broker databases, or news coverage.
+Return a JSON object with ONLY the fields you can confidently source — omit fields you cannot verify.
 
-Extract into this schema (all fields optional except name):
+Required JSON schema:
 {
   "name": string,           // property/business name
   "address": string,        // street address
@@ -1663,45 +1662,48 @@ Extract into this schema (all fields optional except name):
   "highlights": [string]    // key selling points (max 5)
 }
 
-IMPORTANT: Return ONLY valid JSON. No markdown, no explanation.`;
-
-        const extractRes = await invokeLLM({
-          messages: [{ role: "user", content: extractionPrompt }],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "listing_extraction",
-              strict: false,
-              schema: {
-                type: "object",
-                properties: {
-                  name: { type: "string" },
-                  address: { type: "string" },
-                  city: { type: "string" },
-                  state: { type: "string" },
-                  zip: { type: "string" },
-                  propertyType: { type: "string" },
-                  squareFootage: { type: "number" },
-                  askingPrice: { type: "number" },
-                  capRate: { type: "number" },
-                  noi: { type: "number" },
-                  leaseType: { type: "string" },
-                  zoning: { type: "string" },
-                  opportunityZone: { type: "boolean" },
-                  description: { type: "string" },
-                  highlights: { type: "array", items: { type: "string" } },
-                },
-                required: ["name"],
-                additionalProperties: true,
-              },
-            },
-          },
-        });
+Return ONLY valid JSON. No markdown fences, no explanation.`;
 
         let extracted: any = {};
+        let citations: string[] = [];
         try {
-          extracted = JSON.parse(extractRes.choices[0].message.content as string);
-        } catch {
+          const sonarRes = await fetch(SONAR_API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${sonarKey}`,
+            },
+            body: JSON.stringify({
+              model: "sonar-pro",
+              messages: [
+                {
+                  role: "system",
+                  content: "You are a commercial real estate data specialist. Search the web for the listing and extract structured property data. Return only valid JSON matching the requested schema.",
+                },
+                { role: "user", content: sonarQuery },
+              ],
+            }),
+          });
+
+          if (!sonarRes.ok) {
+            const errText = await sonarRes.text();
+            console.warn(`[Scout] sonar-pro extraction failed (${sonarRes.status}): ${errText}`);
+            // Fall back to static LLM extraction
+            const { invokeLLM } = await import("./_core/llm");
+            const fallbackRes = await invokeLLM({
+              messages: [{ role: "user", content: sonarQuery }],
+            });
+            extracted = JSON.parse(fallbackRes.choices[0].message.content as string);
+          } else {
+            const sonarData = await sonarRes.json() as any;
+            citations = sonarData.citations ?? [];
+            const rawContent = sonarData.choices?.[0]?.message?.content ?? "{}";
+            // Strip markdown fences if present
+            const jsonStr = rawContent.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+            extracted = JSON.parse(jsonStr);
+          }
+        } catch (extractErr) {
+          console.warn("[Scout] Extraction parse failed, using title fallback:", extractErr);
           extracted = { name: scraped.title };
         }
 
@@ -1781,6 +1783,7 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
           extracted,
           score,
           summary,
+          citations,
           message: `Asset imported from ${new URL(input.url).hostname}`,
         };
       }),

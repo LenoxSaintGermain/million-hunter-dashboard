@@ -1001,3 +1001,28 @@
 - [x] Support LoopNet, BizBuySell, CoStar, Crexi, and generic listing URLs
 - [x] Auto-trigger AI scoring after import
 - [x] Write vitest for importFromUrl procedure
+
+## TSL-BUILD-2026-006 — Sonar-Pro URL Import + Solo Walkthrough
+
+### Phase 1: Sonar-Pro URL Import
+- [x] Swap importFromUrl to use Perplexity sonar-pro for live web search extraction
+- [x] Pass scraped text + URL to sonar-pro with a structured extraction prompt
+- [x] Include citations in the created asset record (sourceUrl + citationUrls)
+- [x] Update urlImport.test.ts to reflect sonar-pro integration
+
+### Phase 2-4: Bulletproof Solo Walkthrough (/walkthrough)
+- [x] Create /walkthrough public route (no auth, no redirect, no token gate)
+- [x] 8-step on-rails structure with persistent progress indicator
+- [x] Step 1: The problem — bad acquisition costs $40-50K in QoE
+- [x] Step 2: What this is — one-line diligence engine pitch
+- [x] Step 3: THE GET-IT MOMENT — landmine catch deterministic sim (pre-baked, zero API)
+- [x] Step 4: Engine tour — Thesis, IC Review, Red Team, Capital Stack, Memo/LOI (inline demos)
+- [x] Step 5: Data sourcing — off-market signals framing, not commodity scraper framing
+- [x] Step 6: Backtest — real rigor-gate results labeled, no fabrication
+- [x] Step 7: Value / who it's for — family offices, pre-QoE filter
+- [x] Step 8: CTA — "Want to run your own deals? Log into the live app →" (door not wall)
+- [x] All simulators labeled "Interactive Demo — sample composite deal"
+- [x] Zero live API calls (verify in network tab)
+- [x] Fully responsive (mobile + laptop)
+- [x] No fabricated testimonials, metrics, or logos
+- [x] Register in App.tsx as public route (no auth wrapper)
