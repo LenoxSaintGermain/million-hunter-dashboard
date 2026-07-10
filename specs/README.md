@@ -20,7 +20,12 @@ Source-of-truth build specs for Signal Hunter OS. When a spec conflicts with a `
 
 ### TSL-BUILD-2026-006 — Bulletproof Solo Walkthrough
 - ✅ `/walkthrough` shipped (`6c1e0b2`, 8 steps, zero-auth, zero-API, framer-motion polish)
-- ⬜ OPEN: the §6 "MUST NOT HAPPEN" acceptance pass — run end-to-end logged out on a fresh browser: no login redirects, no role/token gates, zero API calls (network tab), every control self-explains, progress indicator, mobile + laptop.
+- ✅ §6 acceptance pass run 2026-07-10 (logged out, local dev server, DB disabled):
+  - All 8 steps traversed; persistent progress indicator + step chips; Back/Next + chip navigation work.
+  - Zero LLM/data API calls across the full flow (network tab) — only Google Fonts static assets + one app-shell `auth.me` (200 logged-out, gates nothing; fired by the app shell at `/`, not by the walkthrough — `Walkthrough.tsx` imports no auth/tRPC code).
+  - No login redirects, no role/token gates; landmine sim + all 5 engine-stage demos run deterministically; every demo labeled "INTERACTIVE DEMO — SAMPLE COMPOSITE DEAL"; backtest step shows an honest documented miss ("3 of 4"); data-source step uses the off-market framing; single end CTA labeled "door, not a wall".
+  - Mobile 375px: no horizontal scroll, controls in viewport. Cosmetic: header "Step N of 8" sits tight against the walkthrough chip at 375px.
+  - **Fixed during the pass:** `getLoginUrl()` threw `Invalid URL` when OAuth env vars are missing/malformed, crash-looping every route (incl. the landing page the walkthrough's end CTA points to) into the ErrorBoundary. Now non-throwing (`client/src/const.ts`), and `useAuth` only builds the login URL when a redirect can actually fire.
 
 ### TSL-BUILD-2026-007 — Wingate Bespoke Demo Rails
 - ⬜ BLOCKED on operator inputs (§1): confirmed Wingate thesis, selected real deal with a blind-spot signal, captured live-run fixture. Shell + flagged placeholders allowed; never invent deal data. Builds after 006 acceptance passes.

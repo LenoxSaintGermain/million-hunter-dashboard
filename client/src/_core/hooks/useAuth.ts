@@ -9,8 +9,10 @@ type UseAuthOptions = {
 };
 
 export function useAuth(options?: UseAuthOptions) {
-  const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
-    options ?? {};
+  // Lazy default: only build the login URL when a redirect can actually fire —
+  // getLoginUrl must not run on every hook call on public pages.
+  const { redirectOnUnauthenticated = false } = options ?? {};
+  const redirectPath = options?.redirectPath ?? (redirectOnUnauthenticated ? getLoginUrl() : "");
   const utils = trpc.useUtils();
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
