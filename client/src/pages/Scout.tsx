@@ -17,7 +17,7 @@ import {
   Building2, MapPin, DollarSign, TrendingUp, Zap, Plus, Search,
   Filter, SlidersHorizontal, RefreshCw, ChevronDown, ChevronUp,
   Loader2, BarChart3, CheckCircle2, ArrowRight, Link2, Sparkles,
-  ExternalLink, CheckCircle,
+  ExternalLink, CheckCircle, Trash2,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -372,6 +372,16 @@ function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
 // ─── Asset Card ──────────────────────────────────────────────────────────────────────────────────
 function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: any; onStatusChange: () => void; isAutoScoring?: boolean }) {
   const [, navigate] = useLocation();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const deleteAsset = trpc.scout.deleteAsset.useMutation({
+    onSuccess: () => {
+      toast.success("Asset removed from Scout");
+      onStatusChange();
+    },
+    onError: (e) => toast.error(`Delete failed: ${e.message}`),
+  });
+
   const scoreAsset = trpc.scout.scoreAsset.useMutation({
     onSuccess: (r) => {
       toast.success(`AI Score: ${r.score.toFixed(3)} — ${r.summary?.slice(0, 80)}...`);
@@ -534,6 +544,33 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
               : <TrendingUp className="w-2.5 h-2.5 mr-1.5" />}
             {convertToDeal.isPending ? "Converting..." : "Convert to Deal → War Room"}
           </Button>
+        )}
+
+        {/* Delete asset */}
+        {!confirmDelete ? (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="w-full flex items-center justify-center gap-1 text-[10px] text-muted-foreground/50 hover:text-red-500 transition-colors py-1 mt-0.5"
+          >
+            <Trash2 className="w-2.5 h-2.5" /> Remove asset
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[10px] text-red-600 flex-1">Remove this asset?</span>
+            <button
+              onClick={() => deleteAsset.mutate({ id: asset.id })}
+              disabled={deleteAsset.isPending}
+              className="text-[10px] font-medium text-red-600 hover:text-red-700 px-2 py-0.5 rounded border border-red-200 hover:bg-red-50 transition-colors"
+            >
+              {deleteAsset.isPending ? "Removing..." : "Yes, remove"}
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="text-[10px] text-muted-foreground hover:text-foreground px-2 py-0.5 rounded border border-border hover:bg-muted/30 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
         )}
        </div>
     </div>

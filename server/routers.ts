@@ -1623,6 +1623,21 @@ Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], 
         return { score, summary: parsed.summary, strengths: parsed.strengths, risks: parsed.risks };
       }),
 
+    // Delete a commercial asset from Scout
+    deleteAsset: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ input }) => {
+        const { getDb } = await import("./db");
+        const { commercialAssets } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const existing = await db.select({ id: commercialAssets.id }).from(commercialAssets).where(eq(commercialAssets.id, input.id)).limit(1);
+        if (!existing.length) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+        await db.delete(commercialAssets).where(eq(commercialAssets.id, input.id));
+        return { success: true, deletedId: input.id };
+      }),
+
     // Import a commercial asset from a listing URL (LoopNet, BizBuySell, CoStar, Crexi, etc.)
     importFromUrl: protectedProcedure
       .input(z.object({ url: z.string().url() }))

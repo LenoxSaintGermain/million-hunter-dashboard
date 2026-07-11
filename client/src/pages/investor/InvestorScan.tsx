@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
-import { Search, MapPin, Building2, TrendingUp, Clock, Lock, Send, CheckCircle, AlertCircle, Loader2, Filter } from "lucide-react";
+import { Search, MapPin, Building2, TrendingUp, Clock, Lock, Send, CheckCircle, Loader2, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
+import InvestorLayout from "@/components/InvestorLayout";
 
 const INDUSTRY_OPTIONS = [
   "Commercial Cleaning", "Logistics & Delivery", "Healthcare Staffing",
@@ -28,8 +27,6 @@ function scoreColor(score: number) {
 }
 
 export default function InvestorScan() {
-  const { user } = useAuth();
-  const { toast } = useToast();
   const [locations, setLocations] = useState(["Miami, FL", "Fort Lauderdale, FL"]);
   const [locationInput, setLocationInput] = useState("");
   const [industries, setIndustries] = useState<string[]>([]);
@@ -46,11 +43,9 @@ export default function InvestorScan() {
   const expressInterest = trpc.investor.expressInterest.useMutation({
     onSuccess: (_, vars) => {
       setRequestedInterest(prev => { const next = new Set(Array.from(prev)); next.add(vars.dealId); return next; });
-      toast({
-        title: "Interest Submitted",
-        description: "The operator will run AI analysis and share results with you.",
-      });
+      toast.success("Interest submitted — the operator will run AI analysis and share results with you.");
     },
+    onError: (e) => toast.error(`Failed to submit interest: ${e.message}`),
   });
 
   const deals = (dealsData as any[]) ?? [];
@@ -62,6 +57,7 @@ export default function InvestorScan() {
   });
 
   return (
+    <InvestorLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -285,5 +281,6 @@ export default function InvestorScan() {
         </div>
       )}
     </div>
+    </InvestorLayout>
   );
 }

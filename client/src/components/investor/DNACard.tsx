@@ -31,26 +31,33 @@ const ARCHETYPES: Record<string, { label: string; tagline: string; color: string
     accent: "oklch(0.72 0.19 142 / 0.15)",
     glyph: "⚡",
   },
-  "ANCHOR-3": {
+  "ANCHOR-1": {
     label: "Steady Anchor",
     tagline: "Cash flow first. Capital preservation always.",
     color: "oklch(0.72 0.19 230)",
     accent: "oklch(0.72 0.19 230 / 0.15)",
     glyph: "⚓",
   },
-  "COMPOUNDER-5": {
+  "COMPOUNDER-9": {
     label: "Long Compounder",
     tagline: "Patient capital. Generational wealth.",
     color: "oklch(0.78 0.18 75)",
     accent: "oklch(0.78 0.18 75 / 0.15)",
     glyph: "🌱",
   },
-  "CATALYST-9": {
-    label: "Deal Catalyst",
-    tagline: "Operational alpha. Value creation through action.",
+  "SPRINT-3": {
+    label: "Sprint Allocator",
+    tagline: "Fast in, faster out. Velocity is the edge.",
+    color: "oklch(0.72 0.19 30)",
+    accent: "oklch(0.72 0.19 30 / 0.15)",
+    glyph: "🚀",
+  },
+  "IMPACT-4": {
+    label: "Impact Allocator",
+    tagline: "Returns with a reason. Risks with a cost.",
     color: "oklch(0.72 0.19 300)",
     accent: "oklch(0.72 0.19 300 / 0.15)",
-    glyph: "🔥",
+    glyph: "🌿",
   },
 };
 

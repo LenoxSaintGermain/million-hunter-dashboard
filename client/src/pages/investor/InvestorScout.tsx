@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Building2, MapPin, TrendingUp, Lock, Send, CheckCircle, Loader2, Filter, DollarSign } from "lucide-react";
+import { Building2, MapPin, Lock, Send, CheckCircle, Loader2, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
+import InvestorLayout from "@/components/InvestorLayout";
 
 const PROPERTY_TYPES = ["Retail", "Industrial", "Office", "Mixed Use", "Multifamily", "Land"];
 
@@ -14,7 +14,6 @@ function capRateColor(rate: number) {
 }
 
 export default function InvestorScout() {
-  const { toast } = useToast();
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [ozOnly, setOzOnly] = useState(false);
   const [requestedInterest, setRequestedInterest] = useState<Set<number>>(new Set<number>());
@@ -24,8 +23,9 @@ export default function InvestorScout() {
   const expressInterest = trpc.investor.expressInterest.useMutation({
     onSuccess: (_, vars) => {
       setRequestedInterest(prev => { const next = new Set(Array.from(prev)); next.add(vars.dealId); return next; });
-      toast({ title: "Interest Submitted", description: "The operator will review and share analysis with you." });
+      toast.success("Interest submitted — the operator will review and share analysis with you.");
     },
+    onError: (e) => toast.error(`Failed to submit interest: ${e.message}`),
   });
 
   const filtered = (assets ?? []).filter((a: any) => {
@@ -35,6 +35,7 @@ export default function InvestorScout() {
   });
 
   return (
+    <InvestorLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -116,7 +117,7 @@ export default function InvestorScout() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-xs" style={{ color: "var(--sh-fg-3)" }}>
-                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{asset.location ?? "South Florida"}</span>
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{asset.city && asset.state ? `${asset.city}, ${asset.state}` : (asset.city ?? asset.state ?? "Location TBD")}</span>
                       {asset.propertyType && (
                         <span className="px-1.5 py-0.5 rounded" style={{ background: "var(--sh-surface-2)" }}>{asset.propertyType}</span>
                       )}
@@ -135,7 +136,7 @@ export default function InvestorScout() {
                   {[
                     { label: "Asking", value: asset.askingPrice ? `$${(Number(asset.askingPrice) / 1000000).toFixed(1)}M` : "—" },
                     { label: "NOI", value: asset.noi ? `$${(Number(asset.noi) / 1000).toFixed(0)}K` : "—" },
-                    { label: "Sq Ft", value: asset.sqft ? `${(Number(asset.sqft) / 1000).toFixed(0)}K` : "—" },
+                    { label: "Sq Ft", value: asset.squareFootage ? `${(Number(asset.squareFootage) / 1000).toFixed(0)}K` : "—" },
                   ].map(({ label, value }) => (
                     <div key={label} className="rounded-xl p-2.5 text-center" style={{ background: "var(--sh-surface-2)" }}>
                       <p className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: "var(--sh-fg-4)" }}>{label}</p>
@@ -170,5 +171,6 @@ export default function InvestorScout() {
         </div>
       )}
     </div>
+    </InvestorLayout>
   );
 }
