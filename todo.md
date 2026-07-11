@@ -1026,3 +1026,12 @@
 - [x] Fully responsive (mobile + laptop)
 - [x] No fabricated testimonials, metrics, or logos
 - [x] Register in App.tsx as public route (no auth wrapper)
+
+## Bug Fixes & Refinements — 2026-07-09
+
+- [ ] Dossier: replace model names (claude-3-5-sonnet, gemini-pro, etc.) with agent names (Claude, Gemini, Sonar) everywhere they appear in the UI
+- [ ] Labs nav: update "not live data" labels — Market Scan and Opportunity Radar now use Sonar for real signals; update badge copy accordingly
+- [ ] Scout: delete all sprint test data rows from DB (Sprint11 Scout Prefill Test, Sprint11 Share Test Deal, etc.)
+- [ ] Scout: wire delete button in asset cards so users can remove assets from the UI
+- [ ] Investor onboarding (/investor/onboarding): refine copy, flow, and UX — feels generic, needs to match Signal Hunter brand voice and be more purposeful
+- [ ] Investor account views (/investor/dna, /investor/scan, /investor/scout): polish layout, consistency, and copy to match operator-side quality

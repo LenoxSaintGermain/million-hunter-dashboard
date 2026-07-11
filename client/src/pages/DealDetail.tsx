@@ -790,7 +790,15 @@ export default function DealDetail() {
                         {consensusData.divergenceFlag ? (
                           <>
                             <div className="shrink-0 text-center w-16">
-                              <p className="text-xs font-mono text-muted-foreground">{m.name?.split("-").slice(-2).join("-")}</p>
+                              <p className={cn("text-xs font-semibold mb-1",
+                                m.name?.toLowerCase().includes("claude") ? "text-amber-600" :
+                                m.name?.toLowerCase().includes("gemini") ? "text-blue-600" :
+                                "text-purple-600"
+                              )}>
+                                {m.name?.toLowerCase().includes("claude") ? "The Structuralist" :
+                                 m.name?.toLowerCase().includes("gemini") ? "The Restructurer" :
+                                 "The Market Analyst"}
+                              </p>
                               <p className="text-2xl font-bold mt-1">{(toNum(m.score) ?? 0).toFixed(3)}</p>
                             </div>
                             <div className="flex-1 min-w-0">
@@ -804,7 +812,15 @@ export default function DealDetail() {
                           </>
                         ) : (
                           <>
-                            <p className="text-xs font-mono text-muted-foreground truncate">{m.name?.split("-").slice(-2).join("-")}</p>
+                            <p className={cn("text-xs font-semibold truncate",
+                              m.name?.toLowerCase().includes("claude") ? "text-amber-600" :
+                              m.name?.toLowerCase().includes("gemini") ? "text-blue-600" :
+                              "text-purple-600"
+                            )}>
+                              {m.name?.toLowerCase().includes("claude") ? "The Structuralist" :
+                               m.name?.toLowerCase().includes("gemini") ? "The Restructurer" :
+                               "The Market Analyst"}
+                            </p>
                             <p className="text-xl font-bold mt-1">{(toNum(m.score) ?? 0).toFixed(3)}</p>
                             {m.rationale && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{m.rationale}</p>}
                           </>
@@ -938,7 +954,17 @@ export default function DealDetail() {
                           <div className="flex items-center justify-between mb-1">
                             <p className="text-xs font-semibold text-foreground">{step.agentName}</p>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono text-muted-foreground">{step.model?.split("-").slice(-2).join("-")}</span>
+                              <span className={cn("text-xs font-semibold",
+                                step.model?.toLowerCase().includes("claude") ? "text-amber-600" :
+                                step.model?.toLowerCase().includes("gemini") ? "text-blue-600" :
+                                step.model?.toLowerCase().includes("sonar") ? "text-purple-600" :
+                                "text-muted-foreground"
+                              )}>
+                                {step.model?.toLowerCase().includes("claude") ? "The Structuralist" :
+                                 step.model?.toLowerCase().includes("gemini") ? "The Restructurer" :
+                                 step.model?.toLowerCase().includes("sonar") ? "The Market Analyst" :
+                                 step.model ?? "Agent"}
+                              </span>
                               {step.durationMs && <span className="text-xs text-muted-foreground">{step.durationMs}ms</span>}
                             </div>
                           </div>

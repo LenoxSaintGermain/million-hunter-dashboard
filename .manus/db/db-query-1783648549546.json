@@ -1,0 +1,9 @@
+{
+  "query": "DELETE FROM deal_agent_runs WHERE deal_id IN (2130007, 2130008);\nDELETE FROM deal_trajectory WHERE dealId IN (2130007, 2130008);\nDELETE FROM deals WHERE id IN (2130007, 2130008);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute DELETE FROM deal_agent_runs WHERE deal_id IN (2130007, 2130008);\nDELETE FROM deal_trajectory WHERE dealId IN (2130007, 2130008);\nDELETE FROM deals WHERE id IN (2130007, 2130008);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 283
+}

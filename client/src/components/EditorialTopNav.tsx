@@ -60,10 +60,10 @@ const MORE_NAV = [
   { label: "RippleEffect", href: "/ripple", icon: Waves },
 ];
 
-// Labs (Experimental) — synthesized data, not live feeds
+// Labs — Sonar-powered live research
 const LABS_NAV = [
-  { label: "Market Scan", href: "/scan", icon: Scan },
-  { label: "Opportunity Radar", href: "/opportunity-radar", icon: Radar },
+  { label: "Market Scan", href: "/scan", icon: Scan, badge: "Sonar" },
+  { label: "Opportunity Radar", href: "/opportunity-radar", icon: Radar, badge: "Live" },
 ];
 
 /* ── NavLink ────────────────────────────────────────────────────────────────── */
@@ -206,7 +206,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                 })}
                 <DropdownMenuSeparator className="bg-[var(--rule)]" />
                 <div className="px-3 py-1">
-                  <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium">Labs (Experimental)</p>
+                  <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium">Labs</p>
                 </div>
                 {LABS_NAV.map((item) => {
                   const Icon = item.icon;
@@ -223,7 +223,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                         >
                           <Icon className="w-3.5 h-3.5 shrink-0" />
                           {item.label}
-                          <span className="ml-auto text-[10px] text-[var(--sh-fg-4)] italic">not live data</span>
+                          <span className="ml-auto text-[10px] font-medium text-amber-600">{item.badge}</span>
                         </span>
                       </Link>
                     </DropdownMenuItem>

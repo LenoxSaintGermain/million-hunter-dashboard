@@ -1,0 +1,102 @@
+{
+  "query": "SELECT id, name FROM commercial_assets ORDER BY id DESC LIMIT 20;\nSELECT id, name FROM deals WHERE name LIKE '%Sprint%' OR name LIKE '%Prefill%' OR name LIKE '%Share Test%' ORDER BY id DESC LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT id, name FROM commercial_assets ORDER BY id DESC LIMIT 20;\nSELECT id, name FROM deals WHERE name LIKE '%Sprint%' OR name LIKE '%Prefill%' OR name LIKE '%Share Test%' ORDER BY id DESC LIMIT 20;",
+  "rows": [
+    {
+      "id": "2190001",
+      "name": "The Lauderdale"
+    },
+    {
+      "id": "1710010",
+      "name": "Metro Atlanta Fire & Safety Systems"
+    },
+    {
+      "id": "1710008",
+      "name": "Lauderdale Precision Machine Works"
+    },
+    {
+      "id": "1710007",
+      "name": "Peachtree Commercial Cleaning Solutions"
+    },
+    {
+      "id": "1710005",
+      "name": "Dogwood Property Management Group"
+    },
+    {
+      "id": "1710004",
+      "name": "Metro Atlanta Powder Coating"
+    },
+    {
+      "id": "1710003",
+      "name": "Southern Comfort Senior Care"
+    },
+    {
+      "id": "1710002",
+      "name": "Buckhead Executive Suites"
+    },
+    {
+      "id": "1620010",
+      "name": "Gulfstream Property Services"
+    },
+    {
+      "id": "1620009",
+      "name": "Atlantic Dental Lab Associates"
+    },
+    {
+      "id": "1620005",
+      "name": "Atlantic Pest Defense"
+    },
+    {
+      "id": "1620004",
+      "name": "Coral Gables Executive Landscaping"
+    },
+    {
+      "id": "1620003",
+      "name": "Sunshine State Pool Pros"
+    },
+    {
+      "id": "1620002",
+      "name": "Tropical Breeze HVAC Solutions"
+    },
+    {
+      "id": "1620001",
+      "name": "Biscayne Bay Marine Services"
+    },
+    {
+      "id": "1440005",
+      "name": "Biscayne Medical Transport Services"
+    },
+    {
+      "id": "1440004",
+      "name": "Metroplex Fire & Safety Solutions"
+    },
+    {
+      "id": "1440003",
+      "name": "Queen City Precision Machine Works"
+    },
+    {
+      "id": "1440002",
+      "name": "Bayou City Industrial Cleaning LLC"
+    },
+    {
+      "id": "1440001",
+      "name": "Peachtree Commercial HVAC Services"
+    },
+    {
+      "id": "id",
+      "name": "name"
+    },
+    {
+      "id": "2130008",
+      "name": "Sprint11 Scout Prefill Test"
+    },
+    {
+      "id": "2130007",
+      "name": "Sprint11 Share Test Deal"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\n2190001\tThe Lauderdale\n1710010\tMetro Atlanta Fire & Safety Systems\n1710008\tLauderdale Precision Machine Works\n1710007\tPeachtree Commercial Cleaning Solutions\n1710005\tDogwood Property Management Group\n1710004\tMetro Atlanta Powder Coating\n1710003\tSouthern Comfort Senior Care\n1710002\tBuckhead Executive Suites\n1620010\tGulfstream Property Services\n1620009\tAtlantic Dental Lab Associates\n1620005\tAtlantic Pest Defense\n1620004\tCoral Gables Executive Landscaping\n1620003\tSunshine State Pool Pros\n1620002\tTropical Breeze HVAC Solutions\n1620001\tBiscayne Bay Marine Services\n1440005\tBiscayne Medical Transport Services\n1440004\tMetroplex Fire & Safety Solutions\n1440003\tQueen City Precision Machine Works\n1440002\tBayou City Industrial Cleaning LLC\n1440001\tPeachtree Commercial HVAC Services\nid\tname\n2130008\tSprint11 Scout Prefill Test\n2130007\tSprint11 Share Test Deal\n",
+  "stderr": "",
+  "execution_time_ms": 330
+}

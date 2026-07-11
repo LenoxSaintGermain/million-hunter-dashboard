@@ -182,8 +182,8 @@ export default function Scan() {
             {(deals ?? []).length} deal{(deals ?? []).length !== 1 ? "s" : ""} in pipeline
           </p>
           <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3" />
-            Experimental — listings are AI-synthesized, not sourced from live marketplaces
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Sonar-powered — live web research via Perplexity sonar-pro
           </p>
         </div>
         <div className="flex gap-2">

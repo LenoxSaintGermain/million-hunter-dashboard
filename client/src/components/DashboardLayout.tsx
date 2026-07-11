@@ -55,9 +55,9 @@ const navSections = [
     ],
   },
   {
-    label: "Labs (Experimental)",
+    label: "Labs",
     items: [
-      { href: "/scan", icon: Search, label: "Market Scan", badge: { label: "Experimental", color: "muted" } },
+      { href: "/scan", icon: Search, label: "Market Scan", badge: { label: "Sonar", color: "amber" } },
     ],
   },
   {

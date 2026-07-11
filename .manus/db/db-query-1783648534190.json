@@ -1,0 +1,18 @@
+{
+  "query": "SELECT id, name FROM deals WHERE name LIKE '%Sprint%' OR name LIKE '%Prefill%' OR name LIKE '%Share Test%' OR name LIKE '%sprint%' ORDER BY id DESC LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3v1wvYFABP51Dvh.c007ac915537 --database GeCPeFFiEBRZFpk6xckkAz --execute SELECT id, name FROM deals WHERE name LIKE '%Sprint%' OR name LIKE '%Prefill%' OR name LIKE '%Share Test%' OR name LIKE '%sprint%' ORDER BY id DESC LIMIT 20;",
+  "rows": [
+    {
+      "id": "2130008",
+      "name": "Sprint11 Scout Prefill Test"
+    },
+    {
+      "id": "2130007",
+      "name": "Sprint11 Share Test Deal"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\n2130008\tSprint11 Scout Prefill Test\n2130007\tSprint11 Share Test Deal\n",
+  "stderr": "",
+  "execution_time_ms": 312
+}
