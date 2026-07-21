@@ -27,5 +27,10 @@ Source-of-truth build specs for Signal Hunter OS. When a spec conflicts with a `
   - Mobile 375px: no horizontal scroll, controls in viewport. Cosmetic: header "Step N of 8" sits tight against the walkthrough chip at 375px.
   - **Fixed during the pass:** `getLoginUrl()` threw `Invalid URL` when OAuth env vars are missing/malformed, crash-looping every route (incl. the landing page the walkthrough's end CTA points to) into the ErrorBoundary. Now non-throwing (`client/src/const.ts`), and `useAuth` only builds the login URL when a redirect can actually fire.
 
+### HUNTER_AGENT_PROMPT_v2.md — Hunter sourcing agent
+- Standalone system prompt for **Hunter**, the Google Workspace sourcing/screening agent (separate from this app). v2.0 rewrites Manus's v1.0: fixes triple-counted scoring, adds a mandatory Red Team gate, and **delegates deep diligence to Signal Hunter OS** rather than reimplementing it in Docs.
+- Integration point: Hunter hands candidates scoring ≥0.80 to this app (Scout → Import from URL, then Red Team + IC Consensus) and gates outreach on `killProbability`. Red-flag list is derived from `server/fixtures/ground-truth-deals.json`.
+- Open items require Lenox's input — see §13 (SBA figure/wording, policy-loan equity treatment, CAN-SPAM footer, OZ lookup source).
+
 ### TSL-BUILD-2026-007 — Wingate Bespoke Demo Rails
 - ⬜ BLOCKED on operator inputs (§1): confirmed Wingate thesis, selected real deal with a blind-spot signal, captured live-run fixture. Shell + flagged placeholders allowed; never invent deal data. Builds after 006 acceptance passes.
