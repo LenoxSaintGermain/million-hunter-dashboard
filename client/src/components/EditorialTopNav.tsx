@@ -60,9 +60,12 @@ const MORE_NAV = [
   { label: "RippleEffect", href: "/ripple", icon: Waves },
 ];
 
-// Labs — Sonar-powered live research
+// Labs (Experimental).
+// Market Scan = LLM-generated listings (runScanPipeline), NOT live marketplace
+// data — it must never carry a "Sonar"/"Live" badge. Opportunity Radar IS
+// genuinely sonar-pro backed with citations (005 WP-DR2), so "Live" is honest there.
 const LABS_NAV = [
-  { label: "Market Scan", href: "/scan", icon: Scan, badge: "Sonar" },
+  { label: "Market Scan", href: "/scan", icon: Scan, badge: "Synthetic" },
   { label: "Opportunity Radar", href: "/opportunity-radar", icon: Radar, badge: "Live" },
 ];
 
@@ -206,7 +209,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                 })}
                 <DropdownMenuSeparator className="bg-[var(--rule)]" />
                 <div className="px-3 py-1">
-                  <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium">Labs</p>
+                  <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium">Labs (Experimental)</p>
                 </div>
                 {LABS_NAV.map((item) => {
                   const Icon = item.icon;

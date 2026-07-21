@@ -55,9 +55,11 @@ const navSections = [
     ],
   },
   {
-    label: "Labs",
+    label: "Labs (Experimental)",
     items: [
-      { href: "/scan", icon: Search, label: "Market Scan", badge: { label: "Sonar", color: "amber" } },
+      // Market Scan generates listings via LLM (see runScanPipeline) — it is NOT
+      // sourced from live marketplaces. Label must say so (prime directive 3).
+      { href: "/scan", icon: Search, label: "Market Scan", badge: { label: "Synthetic", color: "muted" } },
     ],
   },
   {
