@@ -621,37 +621,6 @@ export default function Pricing() {
           </div>
         </div>
 
-        {/* Why the $199 framing is wrong */}
-        <div className="bg-[var(--sh-card)] border border-[var(--sh-border)] rounded-2xl p-8 md:p-12">
-          <div className="max-w-3xl mx-auto space-y-6">
-            <h2 className="text-2xl font-bold text-[var(--sh-text)]">Why we don't price this at $199/year</h2>
-            <p className="text-[var(--sh-muted)] leading-relaxed">
-              The FiSystems template — $199/year individual, $890/team/year — is the right structure for a productivity tool.
-              Signal Hunter is not a productivity tool. It is infrastructure for capital deployment decisions.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                {
-                  title: "Price anchoring",
-                  body: "$199/year signals 'slightly smarter spreadsheet.' Signal Hunter needs to signal 'infrastructure investment.' The gap between $199 and $2,970 is not just price — it is category.",
-                },
-                {
-                  title: "Team pricing floor",
-                  body: "$890/team/year for a family office is noise. They spend more than that on Bloomberg terminal fees per month. The correct team price is $25,000/year minimum.",
-                },
-                {
-                  title: "The right anchor",
-                  body: "The correct pricing anchor is not 'what does comparable software cost?' — it is 'what does a bad acquisition cost?' That reframe changes everything.",
-                },
-              ].map((item, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="text-sm font-semibold text-[var(--sh-text)]">{item.title}</div>
-                  <p className="text-sm text-[var(--sh-muted)] leading-relaxed">{item.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
 
         {/* CTA */}
         <motion.div
