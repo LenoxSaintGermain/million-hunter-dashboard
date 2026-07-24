@@ -1021,7 +1021,7 @@ Citations available: ${(research.citations as string[]).slice(0, 5).join(", ")}
 Return JSON array:
 [
   {
-    "signalType": "permit_filed" | "tad_boundary" | "zoning_change" | "world_event" | "land_play" | "gas_station_hold" | "parking_arbitrage" | "lot_prep" | "microloan" | "market_shift",
+    "signalType": "permit_filed" | "tad_boundary" | "zoning_change" | "world_event" | "land_play" | "gas_station_hold" | "parking_arbitrage" | "lot_prep" | "microloan" | "historic_stabilized" | "market_shift",
     "title": "Specific, factual signal title",
     "location": "Specific area within ${location}",
     "description": "What was found and why it matters — cite the source",
@@ -1104,6 +1104,7 @@ Return JSON array:
         blueprintId: z.number().optional(),
         title: z.string(),
         investorPersona: z.enum(["passive", "active", "institutional", "family_office", "syndicate"]).default("passive"),
+        analysisMode: z.enum(["standard", "historic_building"]).default("standard"),
         dealContext: z.object({
           name: z.string(),
           industry: z.string().optional(),
@@ -1111,6 +1112,17 @@ Return JSON array:
           cashFlow: z.number().optional(),
           revenue: z.number().optional(),
           location: z.string().optional(),
+          // Historic Building fields (Wingate preset)
+          yearBuilt: z.number().optional(),
+          isHistoric: z.boolean().optional(),
+          historicRegisterEligible: z.boolean().optional(),
+          isStabilized: z.boolean().optional(),
+          occupancyRate: z.number().optional(),
+          hasAirRights: z.boolean().optional(),
+          capRate: z.number().optional(),
+          noi: z.number().optional(),
+          squareFootage: z.number().optional(),
+          higherAndBetterUseNotes: z.string().optional(),
         }).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -1123,14 +1135,33 @@ Return JSON array:
           syndicate: "a syndicate lead evaluating deal structure and co-investor appeal",
         };
         const context = input.dealContext;
-        const prompt = `You are a bespoke investment pitch AI. Generate a sophisticated investor dossier for ${personaDescriptions[input.investorPersona]}.
+        const isHistoricMode = input.analysisMode === "historic_building";
+
+        // Build historic building context block if in Wingate mode
+        const historicBlock = isHistoricMode && context ? `
+
+=== WINGATE HISTORIC BUILDING ANALYSIS MODE ===
+Year Built: ${context.yearBuilt ?? 'Unknown'}
+National Register Listed: ${context.isHistoric ? 'YES' : 'No'}
+NR Eligible: ${context.historicRegisterEligible ? 'YES — qualifies for 20% federal Historic Tax Credit' : 'No'}
+Stabilized/Leased-Up: ${context.isStabilized ? 'YES — cash flow on Day 1, no renovation risk' : 'No'}
+Occupancy Rate: ${context.occupancyRate != null ? (context.occupancyRate * 100).toFixed(0) + '%' : 'Unknown'}
+Cap Rate: ${context.capRate != null ? (context.capRate * 100).toFixed(2) + '%' : 'Unknown'}
+NOI: ${context.noi ? '$' + context.noi.toLocaleString() + '/yr' : 'Unknown'}
+Sq Ft: ${context.squareFootage ? context.squareFootage.toLocaleString() : 'Unknown'}
+Air Rights Available: ${context.hasAirRights ? 'YES — vertical expansion optionality' : 'No'}
+H&BU Notes: ${context.higherAndBetterUseNotes ?? 'None'}
+
+WINGATE SCORING LENS: Focus on (1) Historic Tax Credit arbitrage — 20% federal + state credits, (2) Title risk — deed restrictions, easements, air rights encumbrances, (3) Lease stability — NNN vs gross, tenant mix, WALT, (4) NR status verification — SHPO determination letter, (5) Zoning overlay — historic district restrictions on modifications, (6) Phase I ESA — environmental risk for pre-1945 construction. Capital stack should feature HTC equity bridge + conventional debt. Recommend only if stabilized + NR eligible + cap rate ≥ 6%.` : '';
+
+        const prompt = `You are a bespoke investment pitch AI specializing in ${isHistoricMode ? 'historic commercial real estate acquisitions (Wingate Thesis)' : 'business acquisitions'}. Generate a sophisticated investor dossier for ${personaDescriptions[input.investorPersona]}.
 
 Deal: ${context?.name ?? input.title}
-Industry: ${context?.industry ?? "Business Acquisition"}
+Industry: ${context?.industry ?? (isHistoricMode ? 'Historic Commercial Real Estate' : 'Business Acquisition')}
 Asking Price: $${(context?.askingPrice ?? 0).toLocaleString()}
 Annual Cash Flow: $${(context?.cashFlow ?? 0).toLocaleString()}
 Revenue: $${(context?.revenue ?? 0).toLocaleString()}
-Location: ${context?.location ?? "Southeast US"}
+Location: ${context?.location ?? "Southeast US"}${historicBlock}
 
 Generate a JSON dossier:
 {

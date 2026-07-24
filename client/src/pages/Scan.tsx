@@ -27,6 +27,7 @@ const LOCATION_PRESETS = [
   { label: "South Florida", cities: ["Miami, FL", "Fort Lauderdale, FL", "West Palm Beach, FL", "Naples, FL", "Fort Myers, FL"] },
   { label: "Florida", cities: ["Miami, FL", "Fort Lauderdale, FL", "Tampa, FL", "Orlando, FL", "Jacksonville, FL"] },
   { label: "Sun Belt", cities: ["Miami, FL", "Dallas, TX", "Houston, TX", "Atlanta, GA", "Charlotte, NC"] },
+  { label: "\uD83C\uDFDB\uFE0F Wingate Corridor", cities: ["Chicago, IL", "Indianapolis, IN", "Columbus, OH", "Louisville, KY", "Nashville, TN", "Charlotte, NC", "Atlanta, GA"] },
   { label: "National", cities: [] }, // empty = no location filter
 ];
 

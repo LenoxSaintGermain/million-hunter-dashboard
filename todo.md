@@ -1057,3 +1057,27 @@
 - [x] Update model_config DB defaults — push new model IDs to model_config table
 - [x] Update Settings UI model selector — show Gemini 3.x catalog, remove deprecated options
 - [x] Run tests and save checkpoint
+
+## Wingate Dashboard — Full Roadmap Completion (Jul 24 2026)
+
+### Wingate Dedicated Dashboard (/wingate)
+- [x] Create /wingate page — single-screen command center for Historic Building thesis
+- [x] Wingate dashboard: Thesis brief header (pre-1945, stabilized, NR eligible, H&BU, Midwest-SE)
+- [x] Wingate dashboard: Pipeline KPI strip (total assets, qualified, avg cap rate, pipeline value)
+- [x] Wingate dashboard: Asset grid filtered to historic/stabilized assets with Wingate scoring
+- [x] Wingate dashboard: Quick-add asset form pre-filled for Wingate criteria
+- [x] Wingate dashboard: Wingate scoring breakdown panel (6 dimensions with weights)
+- [x] Wingate dashboard: Geography target states panel (IL, IN, OH, KY, TN, NC, SC, GA)
+- [x] Wingate dashboard: Criteria checklist (auto-disqualifiers + evidence requirements)
+- [x] Register /wingate route in App.tsx
+- [x] Add Wingate nav entry in DashboardLayout sidebar
+
+### Roadmap Completion
+- [x] Dossier agent: add Historic Building analysis mode (title risk, lease stability, NR verification, air rights, zoning overlay)
+- [x] OpportunityRadar: add historic_stabilized as a signal category
+- [x] Scan page: add 🏛️ Wingate Corridor preset (Chicago/Indy/Columbus/Louisville/Nashville/Charlotte/Atlanta)
+
+### Remaining (Next Session)
+- [ ] Rewrite prospectus: stabilized/leased-up only, no renovation budget, operator-acquirer lens
+- [ ] Dossier UI: add Historic Building mode toggle to InvestorDossier page
+- [ ] Wingate deal page: generate shareable deal page for prime Wingate assets

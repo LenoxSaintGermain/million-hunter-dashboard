@@ -46,6 +46,7 @@ import RippleEffect from "./pages/RippleEffect";
 import InvestorBrief from "./pages/InvestorBrief";
 import Walkthrough from "./pages/Walkthrough";
 import Pricing from "./pages/Pricing";
+import Wingate from "./pages/Wingate";
 import { getLoginUrl } from "./const";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
@@ -191,6 +192,7 @@ function Router() {
         <Route path="/admin">{() => <ProtectedRoute component={AdminPanel} />}</Route>
         <Route path="/operator-registry">{() => <ProtectedRoute component={OperatorRegistry} />}</Route>
         <Route path="/profile">{() => <ProtectedRoute component={OperatorIdentity} />}</Route>
+        <Route path="/wingate">{() => <ProtectedRoute component={Wingate} />}</Route>
 
         {/* Invite accept — role assignment on first login */}
         <Route path="/invite/:token" component={InviteAccept} />

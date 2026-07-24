@@ -25,6 +25,7 @@ const SIGNAL_CONFIG: Record<string, { icon: any; color: string; bg: string; labe
   parking_arbitrage: { icon: ParkingCircle, color: "text-[var(--sage)]", bg: "bg-emerald-500/10 border-emerald-500/20", label: "Parking Arb", description: "Surface lots in density corridors" },
   lot_prep: { icon: Target, color: "text-teal-400", bg: "bg-teal-500/10 border-teal-500/20", label: "Lot Prep", description: "Prep for acquisition by major developer" },
   microloan: { icon: Coins, color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20", label: "Microloan", description: "CDFI capital arbitrage" },
+  historic_stabilized: { icon: Landmark, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20", label: "Historic Stabilized", description: "Pre-1945 NR-eligible stabilized buildings — Wingate Thesis" },
   other: { icon: Zap, color: "text-[var(--sh-fg-muted)]", bg: "bg-[var(--sh-surface-2)] border-[var(--sh-border-1)]", label: "Signal", description: "Creative opportunity" },
 };
 
