@@ -1572,6 +1572,16 @@ Produce concrete remediation plan. Give go/no-go recommendation.`;
         ozTractId: z.string().optional(),
         tadDistrict: z.string().optional(),
         sourceUrl: z.string().optional(),
+        // Historic Building Thesis fields (Wingate preset)
+        yearBuilt: z.number().int().optional(),
+        stories: z.number().int().optional(),
+        isHistoric: z.boolean().default(false),
+        historicRegisterEligible: z.boolean().default(false),
+        isStabilized: z.boolean().default(false),
+        occupancyRate: z.number().min(0).max(1).optional(),
+        hasAirRights: z.boolean().default(false),
+        lotSqFt: z.number().int().optional(),
+        higherAndBetterUseNotes: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
         const { createCommercialAsset } = await import("./db");
@@ -1596,6 +1606,18 @@ Produce concrete remediation plan. Give go/no-go recommendation.`;
         if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
 
         const { invokeLLM } = await import("./_core/llm");
+        // Build scoring context — include historic building fields if present
+        const historicContext = (asset as any).isHistoric || (asset as any).yearBuilt ? `
+Year Built: ${(asset as any).yearBuilt ?? 'Unknown'}
+Stories: ${(asset as any).stories ?? 'Unknown'}
+Is Historic: ${(asset as any).isHistoric ? 'YES' : 'No'}
+Historic Register Eligible: ${(asset as any).historicRegisterEligible ? 'YES (qualifies for historic tax credits)' : 'No'}
+Stabilized/Leased-Up: ${(asset as any).isStabilized ? 'YES' : 'No'}
+Occupancy Rate: ${(asset as any).occupancyRate != null ? ((asset as any).occupancyRate * 100).toFixed(0) + '%' : 'Unknown'}
+Air Rights Available: ${(asset as any).hasAirRights ? 'YES' : 'No'}
+Lot Size: ${(asset as any).lotSqFt ? (asset as any).lotSqFt.toLocaleString() + ' sqft' : 'Unknown'}
+Higher-and-Better-Use Notes: ${(asset as any).higherAndBetterUseNotes ?? 'None'}` : '';
+
         const prompt = `You are a commercial real estate investment analyst. Score this property on a 0.000–1.000 scale for acquisition potential.
 
 Property: ${asset.name}
@@ -1608,9 +1630,9 @@ SqFt: ${asset.squareFootage ?? 'Unknown'}
 Zoning: ${asset.zoning ?? 'Unknown'}
 Lease Type: ${asset.leaseType ?? 'Unknown'}
 Opportunity Zone: ${asset.opportunityZone ? 'YES — tax advantage' : 'No'}
-TAD District: ${asset.tadDistrict ?? 'None'}
+TAD District: ${asset.tadDistrict ?? 'None'}${historicContext}
 
-Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], "risks": ["..."] }`;
+${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORING NOTE: For historic stabilized buildings, weight heavily: (1) Historic Register eligibility (tax credit arbitrage), (2) Stabilized/leased-up status (no renovation risk), (3) Higher-and-better-use potential (air rights or lot expansion), (4) Cap rate quality vs. market, (5) Geography fit (Midwest-Southeast corridor). A pre-1945 building that is stabilized, historic-register eligible, and has air rights or lot space should score 0.80+.\n' : ''}Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], "risks": ["..."] }`;
 
         const res = await invokeLLM({
           messages: [{ role: "user", content: prompt }],
@@ -1681,7 +1703,16 @@ Required JSON schema:
   "zoning": string,
   "opportunityZone": boolean,
   "description": string,    // 2-3 sentence summary of the property
-  "highlights": [string]    // key selling points (max 5)
+  "highlights": [string],   // key selling points (max 5)
+  "yearBuilt": number,      // year building was constructed (integer)
+  "stories": number,        // number of stories/floors (integer)
+  "isHistoric": boolean,    // true if listed on or eligible for historic register
+  "historicRegisterEligible": boolean, // true if qualifies for National/state/local historic register
+  "isStabilized": boolean,  // true if building is fully leased-up (no renovation needed)
+  "occupancyRate": number,  // occupancy as decimal e.g. 0.95 for 95%
+  "hasAirRights": boolean,  // true if air rights are available above the building
+  "lotSqFt": number,        // total lot size in square feet
+  "higherAndBetterUseNotes": string // notes on development potential, air rights, or lot expansion
 }
 
 Return ONLY valid JSON. No markdown fences, no explanation.`;
@@ -1763,12 +1794,33 @@ Return ONLY valid JSON. No markdown fences, no explanation.`;
           source: "url_import" as const,
           createdAt: now,
           updatedAt: now,
+          // Historic Building Thesis fields
+          yearBuilt: extracted.yearBuilt ? Math.round(extracted.yearBuilt) : undefined,
+          stories: extracted.stories ? Math.round(extracted.stories) : undefined,
+          isHistoric: extracted.isHistoric ?? false,
+          historicRegisterEligible: extracted.historicRegisterEligible ?? false,
+          isStabilized: extracted.isStabilized ?? false,
+          occupancyRate: extracted.occupancyRate ? Math.min(1, Math.max(0, parseFloat(String(extracted.occupancyRate)))) : undefined,
+          hasAirRights: extracted.hasAirRights ?? false,
+          lotSqFt: extracted.lotSqFt ? Math.round(extracted.lotSqFt) : undefined,
+          higherAndBetterUseNotes: extracted.higherAndBetterUseNotes || undefined,
         };
 
         const res = await createCommercialAsset(assetData) as any;
         const assetId: number = res[0].insertId;
 
         // 4. Auto-score the newly created asset
+        const historicScoreContext = assetData.isHistoric || assetData.yearBuilt ? `
+Year Built: ${assetData.yearBuilt ?? 'Unknown'}
+Stories: ${assetData.stories ?? 'Unknown'}
+Is Historic: ${assetData.isHistoric ? 'YES' : 'No'}
+Historic Register Eligible: ${assetData.historicRegisterEligible ? 'YES (qualifies for historic tax credits)' : 'No'}
+Stabilized/Leased-Up: ${assetData.isStabilized ? 'YES' : 'No'}
+Occupancy Rate: ${assetData.occupancyRate != null ? (assetData.occupancyRate * 100).toFixed(0) + '%' : 'Unknown'}
+Air Rights Available: ${assetData.hasAirRights ? 'YES' : 'No'}
+Lot Size: ${assetData.lotSqFt ? assetData.lotSqFt.toLocaleString() + ' sqft' : 'Unknown'}
+Higher-and-Better-Use: ${assetData.higherAndBetterUseNotes ?? 'None'}` : '';
+
         const scorePrompt = `You are a commercial real estate investment analyst. Score this property on a 0.000–1.000 scale for acquisition potential.
 
 Property: ${assetData.name}
@@ -1781,9 +1833,9 @@ SqFt: ${assetData.squareFootage ?? 'Unknown'}
 Lease Type: ${assetData.leaseType ?? 'Unknown'}
 Opportunity Zone: ${assetData.opportunityZone ? 'YES' : 'No'}
 Description: ${extracted.description ?? 'N/A'}
-Highlights: ${(extracted.highlights ?? []).join('; ')}
+Highlights: ${(extracted.highlights ?? []).join('; ')}${historicScoreContext}
 
-Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], "risks": ["..."] }`;
+${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: For historic stabilized buildings, weight heavily: (1) Historic Register eligibility (tax credit arbitrage), (2) Stabilized/leased-up status (no renovation risk), (3) Higher-and-better-use potential (air rights or lot expansion), (4) Cap rate quality, (5) Geography fit (Midwest-Southeast corridor). A pre-1945 building that is stabilized, historic-register eligible, and has air rights or lot space should score 0.80+.\n' : ''}Return JSON: { "score": 0.000, "summary": "one sentence", "strengths": ["..."], "risks": ["..."] }`;
 
         let score = 0.5;
         let summary = "AI scoring pending";

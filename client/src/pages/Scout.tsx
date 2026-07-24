@@ -243,6 +243,10 @@ function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
     squareFootage: "", askingPrice: "", capRate: "", noi: "",
     leaseType: "" as "nnn" | "gross" | "modified_gross" | "vacant" | "",
     zoning: "", opportunityZone: false, tadDistrict: "", sourceUrl: "",
+    // Historic Building Thesis fields
+    yearBuilt: "", stories: "", isHistoric: false, historicRegisterEligible: false,
+    isStabilized: false, occupancyRate: "", hasAirRights: false, lotSqFt: "",
+    higherAndBetterUseNotes: "",
   });
 
   const create = trpc.scout.create.useMutation({
@@ -250,7 +254,7 @@ function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
       toast.success("Asset added — AI scoring in progress...");
       onCreated(newAsset.id);
       onClose();
-      setForm({ name: "", address: "", city: "Miami", state: "FL", zip: "", propertyType: "retail", squareFootage: "", askingPrice: "", capRate: "", noi: "", leaseType: "", zoning: "", opportunityZone: false, tadDistrict: "", sourceUrl: "" });
+      setForm({ name: "", address: "", city: "Miami", state: "FL", zip: "", propertyType: "retail", squareFootage: "", askingPrice: "", capRate: "", noi: "", leaseType: "", zoning: "", opportunityZone: false, tadDistrict: "", sourceUrl: "", yearBuilt: "", stories: "", isHistoric: false, historicRegisterEligible: false, isStabilized: false, occupancyRate: "", hasAirRights: false, lotSqFt: "", higherAndBetterUseNotes: "" });
     },
     onError: (e) => toast.error(`Failed: ${e.message}`),
   });
@@ -273,6 +277,16 @@ function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
       opportunityZone: form.opportunityZone,
       tadDistrict: form.tadDistrict || undefined,
       sourceUrl: form.sourceUrl || undefined,
+      // Historic Building Thesis fields
+      yearBuilt: form.yearBuilt ? parseInt(form.yearBuilt) : undefined,
+      stories: form.stories ? parseInt(form.stories) : undefined,
+      isHistoric: form.isHistoric,
+      historicRegisterEligible: form.historicRegisterEligible,
+      isStabilized: form.isStabilized,
+      occupancyRate: form.occupancyRate ? parseFloat(form.occupancyRate) / 100 : undefined,
+      hasAirRights: form.hasAirRights,
+      lotSqFt: form.lotSqFt ? parseInt(form.lotSqFt) : undefined,
+      higherAndBetterUseNotes: form.higherAndBetterUseNotes || undefined,
     });
   };
 
@@ -354,6 +368,54 @@ function AddAssetDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
             <Label htmlFor="oz-check" className="text-sm cursor-pointer">
               Located in an <span className="text-[var(--sage)] font-semibold">Opportunity Zone</span>
             </Label>
+          </div>
+
+          {/* Historic Building Thesis Section */}
+          <div className="col-span-2 pt-2">
+            <p className="text-xs font-semibold text-amber-400 flex items-center gap-1.5 mb-2">
+              <span>🏛️</span> Historic Building Thesis (Wingate Preset)
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Year Built</Label>
+                <Input className="h-8 text-sm bg-muted/30 border-border" placeholder="e.g. 1928" value={form.yearBuilt} onChange={(e) => setForm((p) => ({ ...p, yearBuilt: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Stories</Label>
+                <Input className="h-8 text-sm bg-muted/30 border-border" placeholder="e.g. 3" value={form.stories} onChange={(e) => setForm((p) => ({ ...p, stories: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Occupancy Rate (%)</Label>
+                <Input className="h-8 text-sm bg-muted/30 border-border" placeholder="e.g. 92" value={form.occupancyRate} onChange={(e) => setForm((p) => ({ ...p, occupancyRate: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Lot Size (sqft)</Label>
+                <Input className="h-8 text-sm bg-muted/30 border-border" placeholder="e.g. 12000" value={form.lotSqFt} onChange={(e) => setForm((p) => ({ ...p, lotSqFt: e.target.value }))} />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs text-muted-foreground">Higher-and-Better-Use Notes</Label>
+                <Input className="h-8 text-sm bg-muted/30 border-border" placeholder="e.g. Air rights available, adjacent lot for expansion" value={form.higherAndBetterUseNotes} onChange={(e) => setForm((p) => ({ ...p, higherAndBetterUseNotes: e.target.value }))} />
+              </div>
+              <div className="col-span-2 flex flex-wrap gap-4">
+                {([
+                  { key: "isHistoric", label: "Historic Register Listed", color: "accent-amber-500" },
+                  { key: "historicRegisterEligible", label: "Historic Register Eligible", color: "accent-amber-500" },
+                  { key: "isStabilized", label: "Stabilized / Leased-Up", color: "accent-violet-500" },
+                  { key: "hasAirRights", label: "Air Rights Available", color: "accent-sky-500" },
+                ] as const).map(({ key, label }) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id={`hb-${key}`}
+                      checked={(form as any)[key]}
+                      onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.checked }))}
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <Label htmlFor={`hb-${key}`} className="text-xs cursor-pointer">{label}</Label>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -444,6 +506,18 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
               {asset.tadDistrict && (
                 <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">TAD</span>
               )}
+              {(asset as any).isHistoric && (
+                <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">🏛️ Historic</span>
+              )}
+              {!(asset as any).isHistoric && (asset as any).historicRegisterEligible && (
+                <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-amber-500/10 text-amber-500/70 border border-amber-500/15">HR Eligible</span>
+              )}
+              {(asset as any).isStabilized && (
+                <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-violet-500/15 text-violet-400 border border-violet-500/20">Stabilized</span>
+              )}
+              {(asset as any).hasAirRights && (
+                <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0 h-4 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/20">Air Rights</span>
+              )}
             </div>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
@@ -485,6 +559,12 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
           )}
           {asset.leaseType && (
             <span className="uppercase font-medium text-[10px] px-1.5 py-0.5 rounded bg-muted/50">{asset.leaseType}</span>
+          )}
+          {(asset as any).yearBuilt && (
+            <span className="text-[10px] text-muted-foreground/70">Est. {(asset as any).yearBuilt}</span>
+          )}
+          {(asset as any).occupancyRate != null && (
+            <span className="text-[10px] font-medium text-violet-400">{((asset as any).occupancyRate * 100).toFixed(0)}% occ.</span>
           )}
         </div>
 
@@ -581,6 +661,8 @@ export default function Scout() {
   const [search, setSearch] = useState("");
   const [filterOZ, setFilterOZ] = useState(false);
   const [filterTAD, setFilterTAD] = useState(false);
+  const [filterHistoric, setFilterHistoric] = useState(false);
+  const [filterStabilized, setFilterStabilized] = useState(false);
   const [filterType, setFilterType] = useState<PropertyType | "all">("all");
   const [filterStatus, setFilterStatus] = useState<AssetStatus | "all">("all");
   const [sortBy, setSortBy] = useState<"capRate" | "askingPrice" | "aiScore" | "createdAt">("createdAt");
@@ -615,6 +697,8 @@ export default function Scout() {
     }
     if (filterOZ) list = list.filter((a) => a.opportunityZone);
     if (filterTAD) list = list.filter((a) => !!a.tadDistrict);
+    if (filterHistoric) list = list.filter((a) => (a as any).isHistoric || (a as any).historicRegisterEligible);
+    if (filterStabilized) list = list.filter((a) => (a as any).isStabilized);
     if (filterType !== "all") list = list.filter((a) => a.propertyType === filterType);
     if (filterStatus !== "all") list = list.filter((a) => a.status === filterStatus);
 
@@ -625,7 +709,7 @@ export default function Scout() {
     });
 
     return list;
-  }, [assets, search, filterOZ, filterTAD, filterType, filterStatus, sortBy, sortDir]);
+  }, [assets, search, filterOZ, filterTAD, filterHistoric, filterStabilized, filterType, filterStatus, sortBy, sortDir]);
 
   const stats = useMemo(() => {
     if (!assets) return null;
@@ -728,6 +812,30 @@ export default function Scout() {
             >
               <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
               TAD Only
+            </button>
+            <button
+              onClick={() => setFilterHistoric((v) => !v)}
+              className={cn(
+                "inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all",
+                filterHistoric
+                  ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                  : "bg-muted/30 text-muted-foreground border-border hover:border-amber-500/30"
+              )}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              Historic
+            </button>
+            <button
+              onClick={() => setFilterStabilized((v) => !v)}
+              className={cn(
+                "inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all",
+                filterStabilized
+                  ? "bg-violet-500/20 text-violet-400 border-violet-500/30"
+                  : "bg-muted/30 text-muted-foreground border-border hover:border-violet-500/30"
+              )}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+              Stabilized
             </button>
 
             {/* Property type */}

@@ -81,6 +81,16 @@ confidenceNotes: ["Revenue range estimated from EBITDA $2-10M at typical 15-25% 
 estimatedTargetsMin: 200, estimatedTargetsMax: 400, estimatedCostMin: 1500, estimatedCostMax: 2500
 suggestedName: "Recurring Revenue Specialist"
 
+WORKED EXAMPLE 4 — Wingate Historic Building Thesis:
+Input: "Historic commercial buildings built before 1945, max 4 stories, stabilized and leased-up, historic register eligible, higher-and-better-use potential, Midwest to Southeast, NOI $150K-$800K, cap rate 6%+"
+compiledFilters: { geographies: ["IL","IN","OH","KY","TN","NC","SC","GA"], exclusions: ["renovation plays","ground-up development","structural rehab required","PE-owned"] }
+scoringWeights: [{ dimension: "Historic Register Eligibility", weight: 25, isCustom: true }, { dimension: "Stabilized/Leased-Up Status", weight: 20, isCustom: true }, { dimension: "Higher-and-Better-Use Potential", weight: 20, isCustom: true }, { dimension: "Building Age & Authenticity", weight: 15, isCustom: true }, { dimension: "Geography Fit (Midwest-SE)", weight: 10, isCustom: true }, { dimension: "Cap Rate & NOI Quality", weight: 10, isCustom: true }]
+evidenceRequirements: ["Year built pre-1945 confirmed", "Max 4 stories verified", "Building 50+ years old", "Occupancy 85%+ (stabilized)", "Historic register listing or eligibility confirmed", "Air rights or adjacent lot space identified for higher-and-better-use", "No active renovation or structural work required"]
+autoDisqualifiers: ["Year built post-1945", "Requires structural rehabilitation", "Occupancy below 70%", "No historic register eligibility", "5+ stories", "Active renovation in progress"]
+confidenceNotes: ["'Stabilized' means 85%+ occupied with no renovation needed", "Historic register eligibility requires NPS Part 1 determination or state equivalent", "Air rights availability requires zoning verification", "Higher-and-better-use potential assessed via FAR analysis"]
+estimatedTargetsMin: 85, estimatedTargetsMax: 200, estimatedCostMin: 800, estimatedCostMax: 1500
+suggestedName: "Wingate Historic Stabilized"
+
 Return ONLY valid JSON matching the schema. No markdown, no explanation outside the JSON.`;
 
 // ── JSON Schema for structured output ────────────────────────────────────────
@@ -100,6 +110,16 @@ const COMPILATION_SCHEMA = {
         headcountMin: { type: "string" as const, description: "Integer string e.g. '10'" },
         headcountMax: { type: "string" as const, description: "Integer string e.g. '100'" },
         exclusions: { type: "array" as const, items: { type: "string" as const } },
+        // Historic Building Thesis fields (Wingate preset)
+        yearBuiltMax: { type: "string" as const, description: "Max year built as integer string e.g. '1945'" },
+        maxStories: { type: "string" as const, description: "Max number of stories as integer string e.g. '4'" },
+        minOccupancyRate: { type: "string" as const, description: "Min occupancy as decimal string e.g. '0.85'" },
+        requireHistoricRegister: { type: "string" as const, description: "'true' or 'false'" },
+        requireStabilized: { type: "string" as const, description: "'true' or 'false'" },
+        requireHigherAndBetterUse: { type: "string" as const, description: "'true' or 'false'" },
+        capRateMin: { type: "string" as const, description: "Min cap rate as decimal string e.g. '0.06'" },
+        noiMin: { type: "string" as const, description: "Min NOI in USD as integer string e.g. '150000'" },
+        noiMax: { type: "string" as const, description: "Max NOI in USD as integer string e.g. '800000'" },
       },
       required: [] as string[],
       additionalProperties: false,

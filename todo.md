@@ -1039,21 +1039,21 @@
 ## Historic Building Thesis — Stabilized Acquirer Update (Jul 24 2026)
 
 - [ ] Rewrite prospectus: stabilized/leased-up only, no renovation budget, operator-acquirer lens
-- [ ] Add "Wingate" thesis preset to thesis builder (historic, stabilized, mixed-use, Midwest-SE)
-- [ ] Update thesis builder UI — add historic building fields: NR status, occupancy %, lease type, air rights, lot coverage, building age, stories, significance criteria
-- [ ] Update Scout asset intake form — add historic-specific fields (NR listed, occupancy, lease structure, year built, stories, lot size, air rights flag)
-- [ ] Update Scout scoring model — weight occupancy, NR status, cap rate, lease stability over renovation upside
-- [ ] Update Scout filters — add historic building filter, occupancy filter, NR status filter
+- [x] Add "Wingate" thesis preset to thesis builder (historic, stabilized, mixed-use, Midwest-SE)
+- [x] Update thesis builder UI — add historic building fields: NR status, occupancy %, lease type, air rights, lot coverage, building age, stories, significance criteria
+- [x] Update Scout asset intake form — add historic-specific fields (NR listed, occupancy, lease structure, year built, stories, lot size, air rights flag)
+- [x] Update Scout scoring model — weight occupancy, NR status, cap rate, lease stability over renovation upside
+- [x] Update Scout filters — add historic building filter, occupancy filter, NR status filter
 - [ ] Update dossier agent config — add Historic Building analysis mode with right agent prompts (title risk, lease stability, NR status verification, air rights, zoning overlay)
 - [ ] Update OpportunityRadar — surface historic stabilized assets as a signal category
 - [ ] Update Scan page — add historic building as a market scan category
 
 ## Gemini 3.x Model Upgrade (Jul 24 2026)
 
-- [ ] Audit all gemini-2.0-flash / gemini-2.5-* model ID references across server files
-- [ ] Update shared/models.ts — replace all deprecated model IDs with Gemini 3.x equivalents
-- [ ] Update server/gemini.ts — fix gemini-2.0-flash (shut down) to gemini-3.5-flash
-- [ ] Update all agent files — upgrade consensus scoring, memo, red team, capital stack models
-- [ ] Update model_config DB defaults — push new model IDs to model_config table
-- [ ] Update Settings UI model selector — show Gemini 3.x catalog, remove deprecated options
-- [ ] Run tests and save checkpoint
+- [x] Audit all gemini-2.0-flash / gemini-2.5-* model ID references across server files
+- [x] Update shared/models.ts — replace all deprecated model IDs with Gemini 3.x equivalents
+- [x] Update server/gemini.ts — fix gemini-2.0-flash (shut down) to gemini-3.5-flash
+- [x] Update all agent files — upgrade consensus scoring, memo, red team, capital stack models
+- [x] Update model_config DB defaults — push new model IDs to model_config table
+- [x] Update Settings UI model selector — show Gemini 3.x catalog, remove deprecated options
+- [x] Run tests and save checkpoint

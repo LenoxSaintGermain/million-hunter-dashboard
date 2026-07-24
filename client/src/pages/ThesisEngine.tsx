@@ -60,6 +60,14 @@ const TEMPLATES = [
     text: "Family-owned businesses where the founder's children are not interested in taking over. $1–8M EBITDA, any geography, essential services (HVAC, plumbing, pest control, commercial cleaning). Business age 20+ years. Owner surname match across org chart.",
   },
   {
+    id: "wingate",
+    label: "Wingate",
+    icon: "🏛️",
+    badge: "Historic RE",
+    description: "Pre-1945 stabilized buildings · Historic register eligible · Higher-and-better-use upside",
+    text: "Historic commercial buildings built before 1945, maximum 4 stories, 50+ years old. Must be STABILIZED and LEASED-UP — no renovation thesis, no value-add plays. Must qualify or be eligible for the National Register of Historic Places or a state/local historic register. Must have higher-and-better-use potential (ideally air rights or adjacent lot space to triple current footprint). Prefer Midwest to Southeast geography (IL, IN, OH, KY, TN, NC, SC, GA). Target NOI $150K–$800K, asking price $1M–$6M, cap rate 6%+. Occupancy 85%+. Exclude ground-up development, heavy renovation plays, and any building requiring structural rehabilitation. Scoring weights: Historic Register Eligibility 25%, Stabilized/Leased-Up Status 20%, Higher-and-Better-Use Potential 20%, Building Age & Authenticity 15%, Geography (Midwest-Southeast corridor) 10%, Cap Rate & NOI Quality 10%.",
+  },
+  {
     id: "continental_keystone",
     label: "Continental Keystone",
     icon: "🏔️",
