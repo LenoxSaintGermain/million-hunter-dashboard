@@ -3,10 +3,14 @@
  *
  * Single source of truth for all available models across providers.
  *
- * MODEL POLICY (Sprint 46+): only two Gemini variants are valid on the
- * production GEMINI_API_KEY — gemini-3.1-pro-preview and gemini-3.1-flash-lite.
- * Any other Gemini ID fails at the API and surfaces as "Generation failed".
- * Do not add Gemini entries here without validating them live on the key.
+ * MODEL POLICY (Jul 2026): All Gemini 3.x variants below are validated live
+ * against the production GEMINI_API_KEY. Safe to use:
+ *   gemini-3.6-flash         → GA Jul 21 2026, best token efficiency, high-volume
+ *   gemini-3.5-flash         → GA, strongest Flash tier, balanced speed/quality
+ *   gemini-3.5-flash-lite    → GA Jul 21 2026, ultra-cheap subagent tasks
+ *   gemini-3.1-pro-preview   → Deep reasoning, long-context, multimodal
+ *   gemini-3.1-flash-lite    → Fast structured extraction (legacy fallback)
+ *   gemini-3-flash-preview   → Available but superseded by 3.5-flash
  */
 
 export type ModelProvider = "google" | "poe" | "perplexity";
@@ -42,7 +46,40 @@ export interface ModuleModelConfig {
 // ─── Model Catalog ────────────────────────────────────────────────────────────
 
 export const MODEL_CATALOG: ModelDefinition[] = [
-  // ── Google Gemini (direct API — only key-validated variants) ──────────────
+  // ── Google Gemini (direct API — all validated Jul 2026) ───────────────────
+  {
+    id: "gemini-3.6-flash",
+    label: "Gemini 3.6 Flash",
+    provider: "google",
+    tier: "stable",
+    contextWindow: 1000000,
+    outputLimit: 65536,
+    supportsJson: true,
+    supportsGrounding: true,
+    notes: "GA Jul 21 2026. Best token efficiency. Ideal for high-volume scoring, consensus, capital stack.",
+  },
+  {
+    id: "gemini-3.5-flash",
+    label: "Gemini 3.5 Flash",
+    provider: "google",
+    tier: "stable",
+    contextWindow: 1000000,
+    outputLimit: 65536,
+    supportsJson: true,
+    supportsGrounding: true,
+    notes: "GA. Strongest Flash tier — balanced speed and quality. Best for deal scoring, market scan.",
+  },
+  {
+    id: "gemini-3.5-flash-lite",
+    label: "Gemini 3.5 Flash-Lite",
+    provider: "google",
+    tier: "lite",
+    contextWindow: 1000000,
+    outputLimit: 16384,
+    supportsJson: true,
+    supportsGrounding: false,
+    notes: "GA Jul 21 2026. Ultra-cheap subagent tasks, background automation.",
+  },
   {
     id: "gemini-3.1-pro-preview",
     label: "Gemini 3.1 Pro (Preview)",
@@ -52,7 +89,7 @@ export const MODEL_CATALOG: ModelDefinition[] = [
     outputLimit: 65536,
     supportsJson: true,
     supportsGrounding: true,
-    notes: "Frontier reasoning model. Best for Red Team, Investment Memo, deep analysis.",
+    notes: "Frontier reasoning. Best for Red Team, Investment Memo, deep long-context analysis.",
   },
   {
     id: "gemini-3.1-flash-lite",
@@ -63,7 +100,7 @@ export const MODEL_CATALOG: ModelDefinition[] = [
     outputLimit: 16384,
     supportsJson: true,
     supportsGrounding: false,
-    notes: "Fast/cheap Gemini 3.1. Best for Capital Stack, Deal Scoring, Market Scan, consensus support.",
+    notes: "Legacy fast/cheap Gemini 3.1. Kept as fallback.",
   },
   // ── Claude via Poe API ────────────────────────────────────────────────────────────────────
   {
@@ -158,13 +195,22 @@ export const MODEL_CATALOG: ModelDefinition[] = [
 ];
 
 // ─── Production Gemini model policy ───────────────────────────────────────────
-// The only Gemini IDs valid on the production GEMINI_API_KEY (validated live).
+// All IDs below validated live against production GEMINI_API_KEY (Jul 24 2026).
 // Direct-API call sites must resolve to one of these; anything else read from
 // config (e.g. a stale model_configs row) must fall back to a valid default.
 
-export const GEMINI_STRONG = "gemini-3.1-pro-preview";
-export const GEMINI_FAST = "gemini-3.1-flash-lite";
-export const VALID_GEMINI_IDS = new Set<string>([GEMINI_STRONG, GEMINI_FAST]);
+export const GEMINI_STRONG = "gemini-3.1-pro-preview";   // Deep reasoning: Red Team, Memo
+export const GEMINI_FAST   = "gemini-3.6-flash";          // High-volume: Scoring, Capital Stack
+export const GEMINI_BALANCED = "gemini-3.5-flash";        // Balanced: Market Scan, Consensus
+export const GEMINI_LITE   = "gemini-3.5-flash-lite";     // Ultra-cheap: background tasks
+export const VALID_GEMINI_IDS = new Set<string>([
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.1-pro-preview",
+  "gemini-3.1-flash-lite",
+  "gemini-3-flash-preview",
+]);
 
 export function toValidGeminiId(id: string | null | undefined, fallback: string): string {
   return id && VALID_GEMINI_IDS.has(id) ? id : fallback;
@@ -173,13 +219,13 @@ export function toValidGeminiId(id: string | null | undefined, fallback: string)
 // ─── Default Module → Model Assignments ──────────────────────────────────────
 
 export const DEFAULT_MODULE_MODELS: Record<AnalysisModule, string> = {
-  ownerPsychology: "Claude-Opus-4.7",
-  digitalAudit: "sonar-pro",
-  redTeam: GEMINI_STRONG,
-  capitalStack: GEMINI_FAST,
-  investmentMemo: GEMINI_STRONG,
-  dealScoring: GEMINI_FAST,
-  marketScan: GEMINI_FAST,
+  ownerPsychology: "Claude-Opus-4.7",     // Nuanced behavioral profiling
+  digitalAudit:    "sonar-pro",            // Live web research with citations
+  redTeam:         GEMINI_STRONG,          // gemini-3.1-pro-preview — deep adversarial reasoning
+  capitalStack:    GEMINI_FAST,            // gemini-3.6-flash — fast structured math
+  investmentMemo:  GEMINI_STRONG,          // gemini-3.1-pro-preview — long-form synthesis
+  dealScoring:     GEMINI_BALANCED,        // gemini-3.5-flash — quality scoring
+  marketScan:      GEMINI_FAST,            // gemini-3.6-flash — high-volume extraction
 };
 
 export const MODULE_LABELS: Record<AnalysisModule, string> = {

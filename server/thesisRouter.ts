@@ -176,7 +176,7 @@ export const thesisRouter = router({
             authorization: `Bearer ${ENV.forgeApiKey}`,
           },
           body: JSON.stringify({
-            model: "gemini-3.1-flash",
+            model: "gemini-3.6-flash",
             messages: [
               { role: "system", content: STRATEGIST_SYSTEM_PROMPT },
               { role: "user", content: `Compile this investment thesis into a JSON object with these exact keys: compiledFilters (object with revenueMin, revenueMax, geographies, businessAgeMin, headcountMin, headcountMax, exclusions), scoringWeights (array of {dimension, weight, isCustom}), evidenceRequirements (array), autoDisqualifiers (array), confidenceNotes (array), estimatedTargetsMin, estimatedTargetsMax, estimatedCostMin, estimatedCostMax, suggestedName.\n\nIMPORTANT: All numeric values MUST be plain integers with NO decimal points (e.g. 2000000 not 2000000.0).\n\nThesis: ${input.thesisText}` },

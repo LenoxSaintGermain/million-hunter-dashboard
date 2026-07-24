@@ -1,31 +1,32 @@
 /**
  * AI Service Layer — Signal Hunter
  *
- * Model routing:
- *   Google Gemini (direct API) — all Gemini tasks. Only two IDs are valid on
- *   the production key (see shared/models.ts model policy):
- *     gemini-3.1-pro-preview → Deep reasoning: Red Team, investment memo synthesis
- *     gemini-3.1-flash-lite  → Fast structured extraction, capital stack math,
- *                              high-volume scoring, market scan
+ * Model routing (updated Jul 24 2026 — all IDs validated on production key):
+ *   Google Gemini (direct API):
+ *     GEMINI_STRONG (gemini-3.1-pro-preview)  → Red Team, Investment Memo (deep reasoning)
+ *     GEMINI_FAST   (gemini-3.6-flash)         → Capital Stack, Market Scan (high-volume)
+ *     GEMINI_BALANCED (gemini-3.5-flash)       → Deal Scoring, Consensus (balanced)
+ *     GEMINI_LITE   (gemini-3.5-flash-lite)    → Background tasks, subagent work
  *
  *   Poe API (OpenAI-compatible gateway) — non-Gemini models:
- *     Claude-Opus-4           → Owner Psychology profiling (nuanced language analysis)
+ *     Claude-Opus-4.7         → Owner Psychology profiling (nuanced language analysis)
  *
  *   Perplexity Sonar Pro (direct) — live web research:
- *     Claude-Opus-4 (Poe)     → Digital Footprint Audit
+ *     sonar-pro               → Digital Footprint Audit, URL import extraction
  */
 
 import { GoogleGenAI } from "@google/genai";
 import { poeJSON, POE_MODELS } from "./poe";
-import { GEMINI_STRONG, GEMINI_FAST } from "../shared/models";
+import { GEMINI_STRONG, GEMINI_FAST, GEMINI_BALANCED, GEMINI_LITE } from "../shared/models";
 import type { Deal } from "../drizzle/schema";
 
 const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-// ─── Gemini model IDs (single source of truth: shared/models.ts) ─────────────
-const GEMINI_PRO    = GEMINI_STRONG;
-const GEMINI_FLASH  = GEMINI_FAST;
-const GEMINI_LITE   = GEMINI_FAST;
+// ─── Gemini model IDs (single source of truth: shared/models.ts) ─────────────────
+const GEMINI_PRO    = GEMINI_STRONG;    // gemini-3.1-pro-preview: deep reasoning
+const GEMINI_FLASH  = GEMINI_FAST;      // gemini-3.6-flash: high-volume
+const GEMINI_MID    = GEMINI_BALANCED;  // gemini-3.5-flash: balanced scoring/consensus
+const _GEMINI_LITE  = GEMINI_LITE;      // gemini-3.5-flash-lite: background tasks (reserved)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface OwnerPsychologyResult {

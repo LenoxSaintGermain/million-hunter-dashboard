@@ -1035,3 +1035,25 @@
 - [x] Scout: wire delete button in asset cards so users can remove assets from the UI
 - [x] Investor onboarding (/investor/onboarding): refine copy, flow, and UX — framer-motion transitions, brand-voice copy, polished archetype reveal
 - [x] Investor account views (/investor/dna, /investor/scan, /investor/scout): added InvestorLayout to Scan + Scout, aligned archetype codes, fixed field names
+
+## Historic Building Thesis — Stabilized Acquirer Update (Jul 24 2026)
+
+- [ ] Rewrite prospectus: stabilized/leased-up only, no renovation budget, operator-acquirer lens
+- [ ] Add "Wingate" thesis preset to thesis builder (historic, stabilized, mixed-use, Midwest-SE)
+- [ ] Update thesis builder UI — add historic building fields: NR status, occupancy %, lease type, air rights, lot coverage, building age, stories, significance criteria
+- [ ] Update Scout asset intake form — add historic-specific fields (NR listed, occupancy, lease structure, year built, stories, lot size, air rights flag)
+- [ ] Update Scout scoring model — weight occupancy, NR status, cap rate, lease stability over renovation upside
+- [ ] Update Scout filters — add historic building filter, occupancy filter, NR status filter
+- [ ] Update dossier agent config — add Historic Building analysis mode with right agent prompts (title risk, lease stability, NR status verification, air rights, zoning overlay)
+- [ ] Update OpportunityRadar — surface historic stabilized assets as a signal category
+- [ ] Update Scan page — add historic building as a market scan category
+
+## Gemini 3.x Model Upgrade (Jul 24 2026)
+
+- [ ] Audit all gemini-2.0-flash / gemini-2.5-* model ID references across server files
+- [ ] Update shared/models.ts — replace all deprecated model IDs with Gemini 3.x equivalents
+- [ ] Update server/gemini.ts — fix gemini-2.0-flash (shut down) to gemini-3.5-flash
+- [ ] Update all agent files — upgrade consensus scoring, memo, red team, capital stack models
+- [ ] Update model_config DB defaults — push new model IDs to model_config table
+- [ ] Update Settings UI model selector — show Gemini 3.x catalog, remove deprecated options
+- [ ] Run tests and save checkpoint
