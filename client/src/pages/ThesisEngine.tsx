@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
-  Sparkles, ChevronRight, Loader2, Trash2, Lock,
+  Sparkles, ChevronRight, Loader2, Trash2, Lock, Play, Pencil, Check, X,
   AlertTriangle, CheckCircle2, Target, Scale, FileSearch,
   XCircle, MessageSquareWarning, TrendingUp, RotateCcw,
 } from "lucide-react";
@@ -125,6 +125,15 @@ export default function ThesisEngine() {
   const deleteMutation = trpc.thesis.delete.useMutation({
     onSuccess: () => { toast.success("Thesis deleted"); refetchList(); },
   });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const renameMutation = trpc.thesis.rename.useMutation({
+    onSuccess: () => { toast.success("Renamed"); setEditingId(null); refetchList(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const isHistoricThesisRow = (t: any) =>
+    t.templateUsed === "wingate" || t.compiledFilters?.yearBuiltMax != null ||
+    t.compiledFilters?.requireHistoricRegister != null || t.compiledFilters?.maxStories != null;
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const triggerScan = trpc.scan.trigger.useMutation({
@@ -309,39 +318,67 @@ export default function ThesisEngine() {
                   {savedTheses.map((t: any) => (
                     <div key={t.id}
                       className="flex items-center justify-between px-3 py-2 rounded-md border border-border hover:bg-muted/20 transition-colors group">
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         <div className={cn(
                           "w-1.5 h-1.5 rounded-full shrink-0",
                           t.status === "approved" ? "bg-emerald-500" :
                           t.status === "review" ? "bg-amber-500" : "bg-muted-foreground"
                         )} />
-                        <button
-                          className="text-sm text-foreground hover:text-primary truncate text-left"
-                          onClick={() => {
-                            setThesisText(t.thesisText);
-                            setCompilationResult({
-                              compiledFilters: t.compiledFilters,
-                              scoringWeights: t.scoringWeights,
-                              evidenceRequirements: t.evidenceRequirements,
-                              autoDisqualifiers: t.autoDisqualifiers,
-                              confidenceNotes: t.confidenceNotes,
-                              estimatedTargetsMin: t.estimatedTargetsMin,
-                              estimatedTargetsMax: t.estimatedTargetsMax,
-                              estimatedCostMin: t.estimatedCostMin,
-                              estimatedCostMax: t.estimatedCostMax,
-                            });
-                            setCompilationId(t.id);
-                          }}
-                        >
-                          {t.name ?? "Untitled Thesis"}
-                        </button>
+                        {editingId === t.id ? (
+                          <div className="flex items-center gap-1 flex-1">
+                            <input
+                              autoFocus
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter" && editingName.trim()) renameMutation.mutate({ id: t.id, name: editingName.trim() }); if (e.key === "Escape") setEditingId(null); }}
+                              className="flex-1 text-sm bg-muted/30 border border-border rounded px-1.5 py-0.5 text-foreground"
+                            />
+                            <button onClick={() => editingName.trim() && renameMutation.mutate({ id: t.id, name: editingName.trim() })} className="text-emerald-500 hover:text-emerald-400"><Check className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => setEditingId(null)} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+                          </div>
+                        ) : (
+                          <button
+                            className="text-sm text-foreground hover:text-primary truncate text-left flex-1"
+                            onClick={() => {
+                              setThesisText(t.thesisText);
+                              setCompilationResult({
+                                compiledFilters: t.compiledFilters,
+                                scoringWeights: t.scoringWeights,
+                                evidenceRequirements: t.evidenceRequirements,
+                                autoDisqualifiers: t.autoDisqualifiers,
+                                confidenceNotes: t.confidenceNotes,
+                                estimatedTargetsMin: t.estimatedTargetsMin,
+                                estimatedTargetsMax: t.estimatedTargetsMax,
+                                estimatedCostMin: t.estimatedCostMin,
+                                estimatedCostMax: t.estimatedCostMax,
+                              });
+                              setCompilationId(t.id);
+                            }}
+                          >
+                            {t.name ?? "Untitled Thesis"}
+                            {isHistoricThesisRow(t) && <span className="ml-1.5 text-[9px] text-amber-500 font-semibold">HISTORIC</span>}
+                          </button>
+                        )}
                       </div>
-                      <button
-                        onClick={() => deleteMutation.mutate({ id: t.id })}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all ml-2 shrink-0"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {editingId !== t.id && (
+                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all ml-2 shrink-0">
+                          <button
+                            title="Run this thesis"
+                            onClick={() => isHistoricThesisRow(t)
+                              ? navigate(`/wingate?thesis=${t.id}`)
+                              : (() => { setCompilationId(t.id); setCompilationResult({ compiledFilters: t.compiledFilters }); toast.info("Loaded — click Approve & Run"); })()}
+                            className="text-muted-foreground hover:text-amber-500"
+                          >
+                            <Play className="h-3.5 w-3.5" />
+                          </button>
+                          <button title="Rename" onClick={() => { setEditingId(t.id); setEditingName(t.name ?? ""); }} className="text-muted-foreground hover:text-primary">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button title="Delete" onClick={() => deleteMutation.mutate({ id: t.id })} className="text-muted-foreground hover:text-destructive">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

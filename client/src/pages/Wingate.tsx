@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 import {
   Landmark, MapPin, Plus, Play, Trash2, Zap, CheckCircle2, XCircle,
-  AlertTriangle, ShieldCheck, Gauge, Building2, Star, Filter, Loader2,
+  AlertTriangle, ShieldCheck, Gauge, Building2, Star, Filter, Loader2, Search, FileText,
 } from "lucide-react";
 
 // ─── Types (mirror server/scoring/historicScore.ts) ──────────────────────────
@@ -115,6 +115,10 @@ function RankedCard({ rank, asset, onSelect }: { rank: number; asset: ScoredAsse
         <div><p className="text-[8px] text-muted-foreground uppercase">Cap</p><p className="text-[11px] font-semibold">{asset.capRate ? `${(asset.capRate * 100).toFixed(1)}%` : "—"}</p></div>
         <div><p className="text-[8px] text-muted-foreground uppercase">Built</p><p className="text-[11px] font-semibold">{asset.yearBuilt ?? "—"}</p></div>
         <div><p className="text-[8px] text-muted-foreground uppercase">Not gated</p><p className={cn("text-[11px] font-semibold", gatesPass ? "text-emerald-400" : "text-rose-400")}>{gatesPass ? "pass" : "fail"}</p></div>
+      </div>
+
+      <div className="flex items-center justify-end gap-1 text-[10px] font-medium text-amber-400/70 group-hover:text-amber-400 transition-colors">
+        <FileText className="w-3 h-3" /> Full A–G dossier →
       </div>
     </div>
   );
@@ -320,6 +324,7 @@ export default function Wingate() {
   const [clearOpen, setClearOpen] = useState(false);
   const [filterState, setFilterState] = useState("all");
   const [filterTier, setFilterTier] = useState<"all" | "tier1" | "tier2" | "tier3">("all");
+  const [searchText, setSearchText] = useState("");
 
   const theses = trpc.thesis.list.useQuery();
   const search = trpc.scout.search.useQuery(
@@ -345,8 +350,9 @@ export default function Wingate() {
   const filtered = useMemo(() => results.filter(a => {
     if (filterState !== "all" && a.state !== filterState) return false;
     if (filterTier !== "all" && a.historicScore.assetTier !== filterTier && !(filterTier === "tier1" && a.historicScore.assetTier === "fasttrack")) return false;
+    if (searchText.trim() && !`${a.name} ${a.city} ${a.state} ${a.address ?? ""}`.toLowerCase().includes(searchText.trim().toLowerCase())) return false;
     return true;
-  }), [results, filterState, filterTier]);
+  }), [results, filterState, filterTier, searchText]);
 
   const stats = useMemo(() => {
     const tier1 = results.filter(a => a.historicScore.assetTier === "tier1" || a.historicScore.assetTier === "fasttrack").length;
@@ -424,6 +430,17 @@ export default function Wingate() {
           </div>
         </div>
       )}
+
+      {/* Search */}
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          placeholder="Search assets by name, city, state, or address…"
+          className="pl-9 h-9 bg-muted/20 border-border text-sm"
+        />
+      </div>
 
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap mb-4">

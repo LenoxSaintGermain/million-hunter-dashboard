@@ -70,17 +70,23 @@ function SignalStream() {
     { limit: 12 },
     { enabled: isAuthenticated }
   );
-  const seed = trpc.sentinel.seed.useMutation({ onSuccess: () => { refetch().catch(console.error); } });
-  const seedSignals = () => seed.mutate(undefined as any);
   const deleteSignal = trpc.sentinel.delete.useMutation({ onSuccess: () => refetch() });
+  const refresh = trpc.sentinel.aiRefresh.useMutation({
+    onSuccess: (r: any) => { toast.success(r?.message ?? "Live signals refreshed"); refetch(); },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   return (
     <div className="sticky top-28">
       <div className="flex justify-between items-end mb-8 border-b border-rule pb-4">
         <span className="font-eyebrow text-eyebrow text-ink uppercase tracking-widest">Sentinel Signals</span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <button onClick={() => refresh.mutate({ thesis: "historic" })} disabled={refresh.isPending}
+            className="font-eyebrow text-eyebrow text-amber hover:underline uppercase tracking-widest disabled:opacity-50">
+            {refresh.isPending ? "Researching…" : "Refresh"}
+          </button>
           <span className="w-2 h-2 rounded-full bg-amber animate-pulse" />
-          <span className="font-data-mono text-data-mono text-muted-foreground">LIVE</span>
+          <span className="font-data-mono text-data-mono text-muted-foreground">SONAR</span>
         </div>
       </div>
       <div className="space-y-4">
@@ -94,10 +100,11 @@ function SignalStream() {
           ))
         ) : !signals || signals.length === 0 ? (
           <div className="border border-rule bg-paper p-6 text-center">
-            <p className="font-eyebrow text-eyebrow text-muted-foreground mb-4">NO SIGNALS ACTIVE</p>
-            <button onClick={() => seedSignals()} disabled={seed.isPending}
-              className="font-eyebrow text-eyebrow text-amber hover:underline uppercase tracking-widest">
-              {seed.isPending ? "Seeding…" : "Seed Intelligence"}
+            <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">NO LIVE SIGNALS</p>
+            <p className="font-body-base text-body-base text-muted-foreground mb-4">Pull current, source-cited market signals via Perplexity sonar-pro.</p>
+            <button onClick={() => refresh.mutate({ thesis: "historic" })} disabled={refresh.isPending}
+              className="font-eyebrow text-eyebrow text-amber hover:underline uppercase tracking-widest disabled:opacity-50">
+              {refresh.isPending ? "Researching…" : "Fetch Live Signals"}
             </button>
           </div>
         ) : (
@@ -241,6 +248,43 @@ function DealCard({ deal, rank, onDelete }: { deal: any; rank: number; onDelete:
   );
 }
 
+function HistoricPipeline() {
+  const { isAuthenticated } = useAuth();
+  const { data } = trpc.scout.search.useQuery({}, { enabled: isAuthenticated, refetchOnWindowFocus: false });
+  const results = ((data as any)?.results ?? []) as any[];
+  if (!results.length) return null;
+  const tierLabel: Record<string, string> = { tier1: "Tier 1", fasttrack: "Fast-Track", tier2: "Tier 2", tier3: "Tier 3", archive: "Archive" };
+  return (
+    <section className="mb-12 border border-rule bg-paper p-6">
+      <div className="flex items-center justify-between mb-4 border-b border-rule pb-3">
+        <span className="font-eyebrow text-eyebrow text-ink uppercase tracking-widest">Historic Pipeline · Wingate</span>
+        <Link href="/wingate">
+          <span className="flex items-center gap-1 font-eyebrow text-eyebrow text-amber hover:underline uppercase tracking-widest cursor-pointer">
+            Open Command <ArrowRight className="w-3 h-3" />
+          </span>
+        </Link>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {results.slice(0, 6).map((a: any) => {
+          const s = a.historicScore;
+          return (
+            <Link key={a.id} href="/wingate">
+              <div className="border border-rule p-4 hover:shadow-[0_8px_30px_-12px_rgba(15,20,40,0.12)] transition-shadow cursor-pointer h-full">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-data-mono text-data-mono text-amber font-bold">{Math.round(s.rankScore)}</span>
+                  <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase">{tierLabel[s.assetTier] ?? s.assetTier}</span>
+                </div>
+                <p className="font-card-title text-[15px] text-ink leading-tight truncate">{a.name}</p>
+                <p className="font-data-mono text-data-mono text-muted-foreground mt-0.5">{a.city}, {a.state} · C{s.compositeScore} · {Math.round(s.confidenceScore * 100)}%✓{s.verifyFields.length ? ` · ${s.verifyFields.length} verify` : ""}</p>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const [activeScanJobId, setActiveScanJobId] = useState<number | null>(null);
   const utils = trpc.useUtils();
@@ -333,6 +377,8 @@ export default function Home() {
             ))}
           </div>
         </header>
+
+        <HistoricPipeline />
 
         {activeScanJobId !== null && (
           <div className="mb-8">
