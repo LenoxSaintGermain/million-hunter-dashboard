@@ -1,4 +1,4 @@
-import { eq, desc, and, lt, isNotNull } from "drizzle-orm";
+import { eq, desc, and, or, lt, lte, gte, inArray, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -353,14 +353,101 @@ export async function getAllModelConfigs() {
 // ─── Commercial Assets (Scout) ────────────────────────────────────────────────
 import { commercialAssets, type InsertCommercialAsset } from "../drizzle/schema";
 
-export async function getCommercialAssets(opts?: { limit?: number; offset?: number; status?: string }) {
+export interface AssetFilters {
+  limit?: number;
+  offset?: number;
+  status?: string;
+  includeArchived?: boolean;
+  thesisCompilationId?: number;
+  states?: string[];
+  yearBuiltMax?: number;
+  maxStories?: number;
+  minOccupancyRate?: number;
+  requireHistoricRegister?: boolean;
+  requireStabilized?: boolean;
+  requireAirRights?: boolean;
+  capRateMin?: number;
+  noiMin?: number;
+  noiMax?: number;
+}
+
+export async function getCommercialAssets(opts?: AssetFilters) {
   const db = await getDb();
   if (!db) return [];
-  const query = db.select().from(commercialAssets)
+  const conds: any[] = [];
+  // Exclude archived by default (soft-delete for bulk-clear).
+  if (!opts?.includeArchived) conds.push(eq(commercialAssets.isArchived, false));
+  if (opts?.status) conds.push(eq(commercialAssets.status, opts.status as any));
+  if (opts?.thesisCompilationId != null) conds.push(eq(commercialAssets.thesisCompilationId, opts.thesisCompilationId));
+  if (opts?.states?.length) conds.push(inArray(commercialAssets.state, opts.states));
+  if (opts?.yearBuiltMax != null) conds.push(lte(commercialAssets.yearBuilt, opts.yearBuiltMax));
+  if (opts?.maxStories != null) conds.push(lte(commercialAssets.stories, opts.maxStories));
+  if (opts?.minOccupancyRate != null) conds.push(gte(commercialAssets.occupancyRate, opts.minOccupancyRate));
+  if (opts?.requireHistoricRegister) conds.push(or(eq(commercialAssets.isHistoric, true), eq(commercialAssets.historicRegisterEligible, true)));
+  if (opts?.requireStabilized) conds.push(eq(commercialAssets.isStabilized, true));
+  if (opts?.requireAirRights) conds.push(eq(commercialAssets.hasAirRights, true));
+  if (opts?.capRateMin != null) conds.push(gte(commercialAssets.capRate, opts.capRateMin));
+  if (opts?.noiMin != null) conds.push(gte(commercialAssets.noi, opts.noiMin));
+  if (opts?.noiMax != null) conds.push(lte(commercialAssets.noi, opts.noiMax));
+
+  const base = db.select().from(commercialAssets);
+  const filtered = conds.length ? base.where(and(...conds)) : base;
+  const rows = await filtered
     .orderBy(desc(commercialAssets.createdAt))
-    .limit(opts?.limit ?? 50)
+    .limit(opts?.limit ?? 200)
     .offset(opts?.offset ?? 0);
-  return coerceRows(await query);
+  return coerceRows(rows);
+}
+
+/** Persist the A–G scorer output onto an asset row. Also mirrors composite into
+ *  aiScore (0–1) so legacy card displays stay consistent. */
+export async function persistHistoricScore(
+  id: number,
+  s: {
+    dimA: number; dimB: number; dimC: number; dimD: number; dimE: number; dimF: number; dimG: number;
+    compositeScore: number; penalties: number; bonuses: number; confidenceScore: number; rankScore: number;
+    assetTier: string; marketTier: string; dispositionCode: string | null; verifyFields: string[]; scorecard: unknown;
+  },
+  thesisCompilationId?: number,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(commercialAssets).set({
+    dimA: s.dimA, dimB: s.dimB, dimC: s.dimC, dimD: s.dimD, dimE: s.dimE, dimF: s.dimF, dimG: s.dimG,
+    compositeScore: s.compositeScore, penalties: s.penalties, bonuses: s.bonuses,
+    confidenceScore: s.confidenceScore, rankScore: s.rankScore,
+    assetTier: s.assetTier, marketTier: s.marketTier, dispositionCode: s.dispositionCode,
+    verifyFields: s.verifyFields as any, scorecard: s.scorecard as any,
+    aiScore: s.compositeScore / 100,
+    ...(thesisCompilationId != null ? { thesisCompilationId } : {}),
+    updatedAt: Date.now(),
+  }).where(eq(commercialAssets.id, id));
+}
+
+export async function bulkDeleteCommercialAssets(opts: { ids?: number[]; all?: boolean }): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  if (opts.all) { const r: any = await db.delete(commercialAssets); return r?.[0]?.affectedRows ?? 0; }
+  if (opts.ids?.length) { const r: any = await db.delete(commercialAssets).where(inArray(commercialAssets.id, opts.ids)); return r?.[0]?.affectedRows ?? 0; }
+  return 0;
+}
+
+export async function bulkArchiveCommercialAssets(opts: { ids?: number[]; all?: boolean }): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const set = { isArchived: true, archivedAt: Date.now(), updatedAt: Date.now() };
+  if (opts.all) { const r: any = await db.update(commercialAssets).set(set).where(eq(commercialAssets.isArchived, false)); return r?.[0]?.affectedRows ?? 0; }
+  if (opts.ids?.length) { const r: any = await db.update(commercialAssets).set(set).where(inArray(commercialAssets.id, opts.ids)); return r?.[0]?.affectedRows ?? 0; }
+  return 0;
+}
+
+export async function bulkDeleteDeals(opts: { ids?: number[]; all?: boolean; syntheticOnly?: boolean }): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  if (opts.syntheticOnly) { const r: any = await db.delete(deals).where(eq(deals.isSynthetic, true)); return r?.[0]?.affectedRows ?? 0; }
+  if (opts.all) { const r: any = await db.delete(deals); return r?.[0]?.affectedRows ?? 0; }
+  if (opts.ids?.length) { const r: any = await db.delete(deals).where(inArray(deals.id, opts.ids)); return r?.[0]?.affectedRows ?? 0; }
+  return 0;
 }
 
 export async function getCommercialAssetById(id: number) {

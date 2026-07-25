@@ -228,6 +228,15 @@ export const appRouter = router({
         await logActivity({ type: "deal_added", title: `Deal #${input.id} deleted by operator` });
         return { success: true };
       }),
+    // Bulk-clear deals: purge synthetic Market Scan rows, specific ids, or all.
+    bulkDelete: protectedProcedure
+      .input(z.object({ ids: z.array(z.number().int()).optional(), all: z.boolean().optional(), syntheticOnly: z.boolean().optional(), confirm: z.boolean().optional() }))
+      .mutation(async ({ input }) => {
+        if (input.all && !input.confirm) throw new TRPCError({ code: "BAD_REQUEST", message: "Deleting all deals requires confirm:true" });
+        const { bulkDeleteDeals } = await import("./db");
+        const n = await bulkDeleteDeals({ ids: input.ids, all: input.all, syntheticOnly: input.syntheticOnly });
+        return { deleted: n };
+      }),
 
     velocity: publicProcedure
       .query(async () => {
@@ -1691,6 +1700,95 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         return { success: true, deletedId: input.id };
       }),
 
+    // ─── Historic A–G scoring: run the deterministic scorer + persist ─────────
+    scoreHistoric: protectedProcedure
+      .input(z.object({ id: z.number().int().optional(), all: z.boolean().optional(), compilationId: z.number().int().optional() }))
+      .mutation(async ({ input }) => {
+        const { getCommercialAssetById, getCommercialAssets, persistHistoricScore } = await import("./db");
+        const { scoreHistoricAsset } = await import("./scoring/historicScore");
+        let targets: any[] = [];
+        if (input.id != null) {
+          const a = await getCommercialAssetById(input.id);
+          if (!a) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+          targets = [a];
+        } else if (input.all) {
+          targets = await getCommercialAssets({ limit: 1000 });
+        } else {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Provide id or all" });
+        }
+        let scored = 0;
+        for (const a of targets) {
+          const s = scoreHistoricAsset(a);
+          await persistHistoricScore(a.id, s, input.compilationId);
+          scored++;
+        }
+        return { scored };
+      }),
+
+    // ─── Search commercial_assets BY a compiled thesis, scored + ranked ───────
+    search: protectedProcedure
+      .input(z.object({ compilationId: z.number().int().optional(), persist: z.boolean().optional() }))
+      .query(async ({ input }) => {
+        const { getCommercialAssets, persistHistoricScore } = await import("./db");
+        const { scoreHistoricAsset } = await import("./scoring/historicScore");
+        const { getDb } = await import("./db");
+        const { thesisCompilations } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+
+        const filters: any = { limit: 1000 };
+        if (input.compilationId != null) {
+          const db = await getDb();
+          const rows = db ? await db.select().from(thesisCompilations).where(eq(thesisCompilations.id, input.compilationId)).limit(1) : [];
+          const cf: any = rows[0]?.compiledFilters
+            ? (typeof rows[0].compiledFilters === "string" ? JSON.parse(rows[0].compiledFilters as any) : rows[0].compiledFilters)
+            : {};
+          const num = (v: any) => (v == null || v === "" ? undefined : Number(v));
+          const bool = (v: any) => v === true || v === "true";
+          filters.yearBuiltMax = num(cf.yearBuiltMax);
+          filters.maxStories = num(cf.maxStories);
+          filters.minOccupancyRate = num(cf.minOccupancyRate);
+          filters.requireHistoricRegister = bool(cf.requireHistoricRegister) || undefined;
+          filters.requireStabilized = bool(cf.requireStabilized) || undefined;
+          filters.capRateMin = num(cf.capRateMin);
+          filters.noiMin = num(cf.noiMin);
+          filters.noiMax = num(cf.noiMax);
+          // geographies: keep only 2-letter state codes as a hard state filter.
+          const geos: string[] = Array.isArray(cf.geographies) ? cf.geographies : [];
+          const states = geos.map((g) => String(g).trim().toUpperCase()).filter((g) => /^[A-Z]{2}$/.test(g));
+          if (states.length) filters.states = states;
+        }
+
+        const assets = await getCommercialAssets(filters);
+        const scored = assets.map((a: any) => ({ asset: a, score: scoreHistoricAsset(a) }));
+        scored.sort((x, y) => y.score.rankScore - x.score.rankScore);
+
+        if (input.persist && input.compilationId != null) {
+          for (const s of scored) await persistHistoricScore(s.asset.id, s.score, input.compilationId);
+        }
+        return {
+          count: scored.length,
+          results: scored.map((s) => ({ ...s.asset, historicScore: s.score })),
+        };
+      }),
+
+    // ─── Bulk-clear: archive (soft) or delete (hard) many assets at once ──────
+    bulkArchive: protectedProcedure
+      .input(z.object({ ids: z.array(z.number().int()).optional(), all: z.boolean().optional() }))
+      .mutation(async ({ input }) => {
+        const { bulkArchiveCommercialAssets } = await import("./db");
+        const n = await bulkArchiveCommercialAssets({ ids: input.ids, all: input.all });
+        return { archived: n };
+      }),
+
+    bulkDelete: protectedProcedure
+      .input(z.object({ ids: z.array(z.number().int()).optional(), all: z.boolean().optional(), confirm: z.boolean().optional() }))
+      .mutation(async ({ input }) => {
+        if (input.all && !input.confirm) throw new TRPCError({ code: "BAD_REQUEST", message: "Deleting all assets requires confirm:true" });
+        const { bulkDeleteCommercialAssets } = await import("./db");
+        const n = await bulkDeleteCommercialAssets({ ids: input.ids, all: input.all });
+        return { deleted: n };
+      }),
+
     // Import a commercial asset from a listing URL (LoopNet, BizBuySell, CoStar, Crexi, etc.)
     importFromUrl: protectedProcedure
       .input(z.object({ url: z.string().url() }))
@@ -2810,7 +2908,9 @@ Return a JSON array with this exact schema:
     if (existingId) {
       dealId = existingId;
     } else {
-      const res = await createDeal({ ...listing, stage: "new" }) as any;
+      // Market Scan listings are LLM-generated — flag synthetic so they are
+      // distinguishable and bulk-purgeable (deals.bulkDelete syntheticOnly).
+      const res = await createDeal({ ...listing, stage: "new", isSynthetic: true }) as any;
       // ON DUPLICATE KEY UPDATE returns insertId=0 for updates — re-fetch if needed
       dealId = res[0].insertId || (await getDealIdByNameSource(listing.name, listing.source ?? null)) || 0;
     }
