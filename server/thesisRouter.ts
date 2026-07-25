@@ -337,4 +337,16 @@ export const thesisRouter = router({
       );
       return { success: true };
     }),
+
+  /** Rename a saved thesis compilation */
+  rename: protectedProcedure
+    .input(z.object({ id: z.number(), name: z.string().min(1).max(120) }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      await db.execute(
+        sql`UPDATE thesis_compilations SET name = ${input.name} WHERE id = ${input.id} AND user_id = ${ctx.user.id}`
+      );
+      return { success: true, name: input.name };
+    }),
 });

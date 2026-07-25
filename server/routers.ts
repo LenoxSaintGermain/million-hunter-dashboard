@@ -2092,45 +2092,63 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
       }),
 
     // AI Refresh: use Claude-Opus-4 via Poe to generate 3 real-time macro signals
+    // Fetch REAL, source-cited market signals via Perplexity sonar-pro (live web
+    // research), not LLM-generated guesses. Each signal carries a real source URL.
     aiRefresh: protectedProcedure
-      .mutation(async () => {
-        const { insertMacroSignal } = await import("./db");
-        const { poeJSON, POE_MODELS } = await import("./poe");
-        const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        const signals = await poeJSON<Array<{
-          signalType: string;
-          title: string;
-          summary: string;
-          roryPitch?: string;
-          impactedAssetClasses: string[];
-          recommendedAction?: string;
-          confidenceScore: number;
-        }>>({
-          model: POE_MODELS.CLAUDE_OPUS,
-          systemPrompt: "You are a macro intelligence analyst for a Main Street business acquisition fund. Generate exactly 3 actionable market signals relevant to acquiring cash-flowing SMBs (HVAC, cleaning, logistics, pest control, plumbing, pool services, roofing) across the US Sun Belt and South Florida markets. Return valid JSON only.",
-          userPrompt: `Today is ${today}. Generate 3 macro signals for a business acquisition fund. Return a JSON array with exactly 3 objects, each with: signalType (one of: institutional, government, seasonal, event, macro_momentum), title (max 80 chars), summary (2-3 sentences), roryPitch (1 sentence Rory Sutherland-style insight), impactedAssetClasses (array of strings), recommendedAction (1 sentence), confidenceScore (0.0-1.0). Format: [{...}, {...}, {...}]`,
-          maxTokens: 1500,
+      .input(z.object({ thesis: z.enum(["historic", "smb"]).default("historic") }).optional())
+      .mutation(async ({ input }) => {
+        const { insertMacroSignal, getDb } = await import("./db");
+        const key = process.env.SONAR_API_KEY;
+        if (!key) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "SONAR_API_KEY not configured — live signals unavailable" });
+        const today = new Date().toISOString().slice(0, 10);
+        const focus = (input?.thesis ?? "historic") === "historic"
+          ? "historic adaptive-reuse real estate acquisition in US Midwest & Southeast secondary markets — federal/state Historic Tax Credit and Opportunity Zone policy changes, adaptive-reuse incentives, downtown multifamily demand, distressed/vacant historic building supply, capital-market conditions for HTC deals"
+          : "small-business acquisition (HVAC, plumbing, cleaning, logistics, home services) in the US Sun Belt — SBA lending changes, seller financing conditions, labor markets, sector consolidation";
+        const res = await fetch("https://api.perplexity.ai/v1/sonar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+          body: JSON.stringify({
+            model: "sonar-pro",
+            messages: [
+              { role: "system", content: "You are a market intelligence analyst. Report only real, currently-sourced developments with citations. Never fabricate. Output ONLY a JSON array, no prose." },
+              { role: "user", content: `As of ${today}, identify the 3 most important CURRENT market signals affecting ${focus}. Return ONLY a JSON array of exactly 3 objects, each: {"signalType":"institutional|government|seasonal|event|macro_momentum","title":"<=80 chars","summary":"2-3 sentences stating the concrete, recent, sourced fact","direction":"tailwind|headwind|neutral","recommendedAction":"1 sentence","confidenceScore":0.0-1.0}. No text outside the JSON array.` },
+            ],
+          }),
         });
-        if (!Array.isArray(signals)) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to parse signals as JSON array" });
+        if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Sonar API error ${res.status}` });
+        const data: any = await res.json();
+        const content: string = data.choices?.[0]?.message?.content ?? "";
+        const citations: string[] = Array.isArray(data.citations) ? data.citations : [];
+        const match = content.match(/\[[\s\S]*\]/);
+        let signals: any[] = [];
+        try { signals = match ? JSON.parse(match[0]) : []; } catch { signals = []; }
+        if (!signals.length) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Sonar returned no parseable signals — try again" });
+
+        // Retire the previous batch so the board reflects the latest research.
+        const _db = await getDb();
+        if (_db) {
+          const { macroSignals } = await import("../drizzle/schema");
+          const { eq } = await import("drizzle-orm");
+          await _db.update(macroSignals).set({ archived: true }).where(eq(macroSignals.archived, false));
         }
         const validTypes = ["institutional", "government", "seasonal", "event", "macro_momentum"] as const;
+        const validDir = ["tailwind", "headwind", "neutral"] as const;
         let inserted = 0;
         for (const sig of signals.slice(0, 3)) {
-          const signalType = validTypes.includes(sig.signalType as any) ? sig.signalType as typeof validTypes[number] : "macro_momentum";
           await insertMacroSignal({
-            signalType,
+            signalType: (validTypes.includes(sig.signalType) ? sig.signalType : "macro_momentum") as typeof validTypes[number],
             title: String(sig.title ?? "").slice(0, 255),
             summary: String(sig.summary ?? ""),
-            roryPitch: sig.roryPitch ? String(sig.roryPitch) : undefined,
-            impactedAssetClasses: Array.isArray(sig.impactedAssetClasses) ? sig.impactedAssetClasses : [],
+            direction: (validDir.includes(sig.direction) ? sig.direction : "neutral") as typeof validDir[number],
+            impactedAssetClasses: [],
             recommendedAction: sig.recommendedAction ? String(sig.recommendedAction) : undefined,
-            confidenceScore: typeof sig.confidenceScore === "number" ? Math.min(1, Math.max(0, sig.confidenceScore)) : 0.75,
+            confidenceScore: typeof sig.confidenceScore === "number" ? Math.min(1, Math.max(0, sig.confidenceScore)) : 0.7,
+            sourceUrl: citations[0] ?? undefined,
             createdAt: Date.now(),
           });
           inserted++;
         }
-        return { inserted, message: `${inserted} new signals generated via Claude-Opus-4` };
+        return { inserted, citations: citations.slice(0, 5), message: `${inserted} live signals via Perplexity sonar-pro` };
       }),
     // Archive a single signal manually
     archive: protectedProcedure
