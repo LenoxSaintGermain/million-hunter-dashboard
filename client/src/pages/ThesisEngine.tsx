@@ -142,6 +142,17 @@ export default function ThesisEngine() {
   function handleApproveAndRun() {
     if (!compilationResult) return;
     const f = compilationResult.compiledFilters ?? {};
+    // Real-estate / historic theses run against commercial_assets on the Wingate
+    // command page (the A–G scorer) — NOT the SMB business scraper. Detect by the
+    // Wingate template or the presence of historic filter fields.
+    const isHistoricThesis =
+      activeTemplate === "wingate" ||
+      f.yearBuiltMax != null || f.requireHistoricRegister != null || f.maxStories != null || f.minOccupancyRate != null;
+    if (isHistoricThesis) {
+      toast.success("Thesis approved — opening Wingate command", { duration: 2500 });
+      navigate(compilationId != null ? `/wingate?thesis=${compilationId}` : "/wingate");
+      return;
+    }
     const targetLocations: string[] = f.geographies ?? [];
     const minCashFlow = f.cashFlowMin ?? (f.revenueMin ? Math.round(f.revenueMin * 0.35) : 500000);
     const maxMultiple = f.multipleMax ?? 5;

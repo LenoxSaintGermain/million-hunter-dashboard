@@ -24,6 +24,7 @@ import {
   ChevronDown,
   Scan,
   LayoutDashboard,
+  Landmark,
   FileText,
   Mail,
   TrendingUp,
@@ -44,6 +45,7 @@ import {
 /* ── Nav items ─────────────────────────────────────────────────────────────── */
 const PRIMARY_NAV = [
   { label: "Command Center", href: "/", icon: LayoutDashboard },
+  { label: "Wingate", href: "/wingate", icon: Landmark },
   { label: "TIDE", href: "/tide", icon: Zap },
   { label: "Memos", href: "/memos", icon: FileText },
   { label: "Outreach", href: "/outreach", icon: Mail },
