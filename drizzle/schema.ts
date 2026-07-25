@@ -60,6 +60,8 @@ export const deals = mysqlTable("deals", {
   score: float("score"),
   redFlagCount: int("redFlagCount").default(0),
   isArchived: boolean("isArchived").default(false),
+  // Flags LLM-generated Market Scan rows so synthetic data is distinguishable/purgeable.
+  isSynthetic: boolean("is_synthetic").notNull().default(false),
   // OZ / TAD enrichment fields
   opportunityZone: boolean("opportunity_zone").default(false),
   ozTractId: varchar("oz_tract_id", { length: 32 }),
@@ -391,6 +393,28 @@ export const commercialAssets = mysqlTable("commercial_assets", {
   sourceUrl: text("source_url"),
   aiScore: float("ai_score"),
   aiAnalysis: text("ai_analysis"),
+  // ─── Historic Adaptive Reuse scoring (Wingate A–G protocol) ───────────────
+  thesisCompilationId: int("thesis_compilation_id"),
+  dimA: int("dim_a"),
+  dimB: int("dim_b"),
+  dimC: int("dim_c"),
+  dimD: int("dim_d"),
+  dimE: int("dim_e"),
+  dimF: int("dim_f"),
+  dimG: int("dim_g"),
+  compositeScore: int("composite_score"),
+  penalties: int("penalties"),
+  bonuses: int("bonuses"),
+  confidenceScore: float("confidence_score"),
+  rankScore: float("rank_score"),
+  assetTier: varchar("asset_tier", { length: 16 }),      // tier1 | tier2 | tier3 | archive | fasttrack
+  marketTier: varchar("market_tier", { length: 4 }),     // A | B | C
+  dispositionCode: varchar("disposition_code", { length: 8 }), // R1..R10
+  verifyFields: json("verify_fields"),                   // unverified mandatory-critical fields
+  historicInputs: json("historic_inputs"),               // qualitative spec inputs not in columns
+  scorecard: json("scorecard"),                          // full computed A–G breakdown
+  isArchived: boolean("is_archived").notNull().default(false),
+  archivedAt: bigint("archived_at", { mode: "number" }),
   status: mysqlEnum("status", ["new", "reviewing", "qualified", "rejected", "acquired"]).notNull().default("new"),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
