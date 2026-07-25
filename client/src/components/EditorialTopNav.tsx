@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { useState, useEffect, useRef } from "react";
+import { Link, useLocation, useLocation as useNav } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +41,11 @@ import {
   Users,
   ShieldCheck,
   Waves,
+  Search,
+  X,
+  ArrowRight,
+  MapPin,
+  Tag,
 } from "lucide-react";
 
 /* ── Nav items ─────────────────────────────────────────────────────────────── */
@@ -100,6 +106,181 @@ function NavLink({
   );
 }
 
+/* ── Global Market Search Palette ──────────────────────────────────────────── */
+function GlobalSearchPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [query, setQuery] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [, navigate] = useNav();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(query), 280);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+      setQuery("");
+      setDebouncedQ("");
+    }
+  }, [open]);
+
+  const { data, isLoading } = trpc.publicDeals.search.useQuery(
+    { q: debouncedQ || undefined, limit: 6 },
+    { enabled: open, staleTime: 30_000 }
+  );
+
+  const results = data?.results ?? [];
+  const total = data?.total ?? 0;
+
+  const handleSelect = (href: string) => {
+    navigate(href);
+    onClose();
+  };
+
+  const handleViewAll = () => {
+    const params = query ? `?q=${encodeURIComponent(query)}` : "";
+    navigate(`/explore${params}`);
+    onClose();
+  };
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-start justify-center pt-[80px] px-4"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm" />
+
+      {/* Palette panel */}
+      <div
+        className="relative w-full max-w-[620px] bg-[var(--paper)] border border-[var(--rule)] shadow-2xl rounded-sm overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Search input row */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--rule)]">
+          <Search className="w-4 h-4 text-[var(--sh-fg-3)] shrink-0" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") onClose();
+              if (e.key === "Enter") handleViewAll();
+            }}
+            placeholder="Search market — industry, location, business name..."
+            className="flex-1 bg-transparent text-[14px] text-[var(--ink)] placeholder:text-[var(--sh-fg-4)] outline-none"
+          />
+          <div className="flex items-center gap-1.5">
+            <kbd className="text-[10px] font-mono px-1.5 py-0.5 bg-[var(--bone)] border border-[var(--rule)] rounded text-[var(--sh-fg-3)]">ESC</kbd>
+            <button onClick={onClose} className="text-[var(--sh-fg-3)] hover:text-[var(--ink)] transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Results */}
+        <div className="max-h-[400px] overflow-y-auto">
+          {isLoading && debouncedQ && (
+            <div className="px-4 py-8 text-center">
+              <div className="inline-block w-4 h-4 border-2 border-[var(--sh-fg-3)] border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+
+          {!isLoading && results.length > 0 && (
+            <div>
+              <div className="px-4 py-2 border-b border-[var(--rule)]">
+                <p className="text-[10px] tracking-[0.14em] uppercase text-[var(--sh-fg-4)] font-medium">
+                  {debouncedQ ? `${total} result${total !== 1 ? "s" : ""} for "${debouncedQ}"` : `${total} active market listings`}
+                </p>
+              </div>
+              {results.map((deal: any) => (
+                <button
+                  key={deal.id}
+                  onClick={() => handleSelect(`/explore`)}
+                  className="w-full flex items-center gap-4 px-4 py-3 hover:bg-[var(--bone)] transition-colors text-left border-b border-[var(--rule)] last:border-0 group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium text-[var(--ink)] truncate group-hover:text-[var(--sh-accent)] transition-colors">
+                      {deal.name}
+                    </p>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      {deal.industry && (
+                        <span className="flex items-center gap-1 text-[11px] text-[var(--sh-fg-3)]">
+                          <Tag className="w-2.5 h-2.5" />
+                          {deal.industry}
+                        </span>
+                      )}
+                      {deal.location && (
+                        <span className="flex items-center gap-1 text-[11px] text-[var(--sh-fg-3)]">
+                          <MapPin className="w-2.5 h-2.5" />
+                          {deal.location}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {deal.scoreBlurred !== null && (
+                    <span
+                      className="text-[12px] font-mono font-bold shrink-0"
+                      style={{
+                        color: deal.scoreBlurred >= 0.8 ? "#16a34a" : deal.scoreBlurred >= 0.65 ? "#d97706" : "#6b7280"
+                      }}
+                    >
+                      {deal.scoreBlurred.toFixed(2)}
+                    </span>
+                  )}
+                  <ArrowRight className="w-3.5 h-3.5 text-[var(--sh-fg-4)] group-hover:text-[var(--sh-fg-2)] shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!isLoading && results.length === 0 && debouncedQ && (
+            <div className="px-4 py-8 text-center">
+              <p className="text-[13px] text-[var(--sh-fg-3)]">No results for <span className="font-medium text-[var(--ink)]">"{debouncedQ}"</span></p>
+              <p className="text-[11px] text-[var(--sh-fg-4)] mt-1">Try a different industry, city, or business type</p>
+            </div>
+          )}
+
+          {!isLoading && results.length === 0 && !debouncedQ && (
+            <div className="px-4 py-6">
+              <p className="text-[10px] tracking-[0.14em] uppercase text-[var(--sh-fg-4)] font-medium mb-3">Quick searches</p>
+              <div className="flex flex-wrap gap-2">
+                {["Commercial cleaning", "HVAC", "Logistics", "Atlanta, GA", "Chicago, IL", "Historic building"].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setQuery(s)}
+                    className="text-[12px] px-3 py-1.5 bg-[var(--bone)] hover:bg-[var(--rule)] border border-[var(--rule)] rounded-sm text-[var(--sh-fg-2)] transition-colors"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-2.5 border-t border-[var(--rule)] flex items-center justify-between bg-[var(--bone)]/50">
+          <p className="text-[11px] text-[var(--sh-fg-4)]">
+            Press <kbd className="font-mono">↵</kbd> to view all results
+          </p>
+          <button
+            onClick={handleViewAll}
+            className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--sh-fg-2)] hover:text-[var(--ink)] transition-colors"
+          >
+            Browse market
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main Component ─────────────────────────────────────────────────────────── */
 export default function EditorialTopNav({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -108,11 +289,24 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
   const isAdmin = userRole === "admin";
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   /* Scroll detection for header blur */
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 12);
     window.addEventListener("scroll", handler, { passive: true });
     return () => window.removeEventListener("scroll", handler);
+  }, []);
+
+  /* cmd-K / ctrl-K global shortcut */
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, []);
 
   const isActive = (href: string) =>
@@ -240,6 +434,16 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
 
           {/* Right actions */}
           <div className="flex items-center gap-3">
+            {/* Global market search trigger */}
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="hidden sm:flex items-center gap-2 h-8 px-3 bg-[var(--bone)] border border-[var(--rule)] rounded-sm text-[var(--sh-fg-3)] hover:text-[var(--ink)] hover:border-[var(--sh-fg-3)] transition-all text-[12px] group"
+              title="Search market (⌘K)"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span className="text-[12px] hidden lg:inline">Search market</span>
+              <kbd className="hidden lg:inline text-[10px] font-mono px-1 py-0.5 bg-[var(--paper)] border border-[var(--rule)] rounded text-[var(--sh-fg-4)] ml-1">⌘K</kbd>
+            </button>
 
             {isAuthenticated ? (
               <DropdownMenu>
@@ -397,6 +601,9 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
+
+      {/* ── Global Search Palette ────────────────────────────────────────────── */}
+      <GlobalSearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       {/* ── Page Content ────────────────────────────────────────────────────── */}
       <main style={{ paddingTop: "56px" }}>
