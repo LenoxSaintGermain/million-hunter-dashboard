@@ -4,6 +4,8 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import ScanProgress from "@/components/ScanProgress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import {
@@ -252,35 +254,114 @@ function HistoricPipeline() {
   const { isAuthenticated } = useAuth();
   const { data } = trpc.scout.search.useQuery({}, { enabled: isAuthenticated, refetchOnWindowFocus: false });
   const results = ((data as any)?.results ?? []) as any[];
+  const [sortBy, setSortBy] = useState<"rank" | "composite" | "asking" | "confidence">("rank");
   if (!results.length) return null;
   const tierLabel: Record<string, string> = { tier1: "Tier 1", fasttrack: "Fast-Track", tier2: "Tier 2", tier3: "Tier 3", archive: "Archive" };
+  const tierColor: Record<string, string> = {
+    tier1: "text-amber",
+    fasttrack: "text-amber",
+    tier2: "text-violet-500",
+    tier3: "text-sky-500",
+    archive: "text-muted-foreground",
+  };
+  const tierBarColor: Record<string, string> = {
+    amber: "bg-amber",
+    violet: "bg-violet-500",
+    sky: "bg-sky-500",
+    muted: "bg-muted-foreground",
+  };
+  const pipelineBuckets = [
+    { key: "amber", label: "Tier 1 + Fast-Track", value: results.reduce((sum, a) => sum + (a.historicScore.assetTier === "tier1" || a.historicScore.assetTier === "fasttrack" ? (a.askingPrice ?? 0) : 0), 0) },
+    { key: "violet", label: "Tier 2", value: results.reduce((sum, a) => sum + (a.historicScore.assetTier === "tier2" ? (a.askingPrice ?? 0) : 0), 0) },
+    { key: "sky", label: "Tier 3", value: results.reduce((sum, a) => sum + (a.historicScore.assetTier === "tier3" ? (a.askingPrice ?? 0) : 0), 0) },
+    { key: "muted", label: "Archive", value: results.reduce((sum, a) => sum + (a.historicScore.assetTier === "archive" ? (a.askingPrice ?? 0) : 0), 0) },
+  ];
+  const pipelineTotal = pipelineBuckets.reduce((sum, bucket) => sum + bucket.value, 0);
+  const sortedResults = [...results].sort((a, b) => {
+    if (sortBy === "asking") {
+      if (a.askingPrice == null) return b.askingPrice == null ? 0 : 1;
+      if (b.askingPrice == null) return -1;
+      return b.askingPrice - a.askingPrice;
+    }
+    const aScore = a.historicScore;
+    const bScore = b.historicScore;
+    if (sortBy === "composite") return bScore.compositeScore - aScore.compositeScore;
+    if (sortBy === "confidence") return bScore.confidenceScore - aScore.confidenceScore;
+    return bScore.rankScore - aScore.rankScore;
+  });
   return (
     <section className="mb-12 border border-rule bg-paper p-6">
-      <div className="flex items-center justify-between mb-4 border-b border-rule pb-3">
+      <div className="flex items-center justify-between gap-4 mb-4 border-b border-rule pb-3">
         <span className="font-eyebrow text-eyebrow text-ink uppercase tracking-widest">Historic Pipeline · Wingate</span>
-        <Link href="/wingate">
-          <span className="flex items-center gap-1 font-eyebrow text-eyebrow text-amber hover:underline uppercase tracking-widest cursor-pointer">
-            Open Command <ArrowRight className="w-3 h-3" />
-          </span>
-        </Link>
+        <div className="flex items-center gap-4 shrink-0">
+          <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
+            <SelectTrigger className="h-7 w-[108px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="rank">Rank</SelectItem>
+              <SelectItem value="composite">Composite</SelectItem>
+              <SelectItem value="asking">Asking</SelectItem>
+              <SelectItem value="confidence">Confidence</SelectItem>
+            </SelectContent>
+          </Select>
+          <Link href="/wingate">
+            <span className="flex items-center gap-1 font-eyebrow text-eyebrow text-amber hover:underline uppercase tracking-widest cursor-pointer">
+              Open Command <ArrowRight className="w-3 h-3" />
+            </span>
+          </Link>
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {results.slice(0, 6).map((a: any) => {
-          const s = a.historicScore;
-          return (
-            <Link key={a.id} href="/wingate">
-              <div className="border border-rule p-4 hover:shadow-[0_8px_30px_-12px_rgba(15,20,40,0.12)] transition-shadow cursor-pointer h-full">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-data-mono text-data-mono text-amber font-bold">{Math.round(s.rankScore)}</span>
-                  <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase">{tierLabel[s.assetTier] ?? s.assetTier}</span>
-                </div>
-                <p className="font-card-title text-[15px] text-ink leading-tight truncate">{a.name}</p>
-                <p className="font-data-mono text-data-mono text-muted-foreground mt-0.5">{a.city}, {a.state} · C{s.compositeScore} · {Math.round(s.confidenceScore * 100)}%✓{s.verifyFields.length ? ` · ${s.verifyFields.length} verify` : ""}</p>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+      {pipelineTotal > 0 && (
+        <div className="mb-5">
+          <div className="flex h-2 overflow-hidden rounded bg-rule">
+            {pipelineBuckets.map((bucket) => (
+              <div key={bucket.key} className={tierBarColor[bucket.key]} style={{ width: `${(bucket.value / pipelineTotal) * 100}%` }} />
+            ))}
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
+              {pipelineBuckets.map((bucket) => (
+                <span key={bucket.key} className="flex items-center gap-1 font-data-mono text-data-mono text-muted-foreground">
+                  <span className={`w-1.5 h-1.5 rounded-full ${tierBarColor[bucket.key]}`} />
+                  {bucket.label} {fmt(bucket.value)}
+                </span>
+              ))}
+            </div>
+            <span className="font-data-mono text-data-mono text-ink">Total {fmt(pipelineTotal)}</span>
+          </div>
+        </div>
+      )}
+      <TooltipProvider>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {sortedResults.slice(0, 6).map((a: any) => {
+            const s = a.historicScore;
+            const tier = tierLabel[s.assetTier] ?? s.assetTier;
+            return (
+              <Link key={a.id} href="/wingate">
+                <Tooltip>
+                <TooltipTrigger asChild>
+                    <div className="border border-rule p-4 hover:shadow-[0_8px_30px_-12px_rgba(15,20,40,0.12)] transition-shadow cursor-pointer h-full">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className={`font-data-mono text-data-mono font-bold ${tierColor[s.assetTier] ?? "text-muted-foreground"}`}>{Math.round(s.rankScore)}</span>
+                        <span className={`font-eyebrow text-eyebrow uppercase ${tierColor[s.assetTier] ?? "text-muted-foreground"}`}>{tier}</span>
+                      </div>
+                      <p className="font-card-title text-[15px] text-ink leading-tight truncate">{a.name}</p>
+                      <p className="font-data-mono text-data-mono text-muted-foreground mt-0.5">{a.city}, {a.state} · C{s.compositeScore} · {Math.round(s.confidenceScore * 100)}%✓{s.verifyFields.length ? ` · ${s.verifyFields.length} verify` : ""}</p>
+                    </div>
+                </TooltipTrigger>
+                <TooltipContent className="space-y-1">
+                  <p className="font-eyebrow text-eyebrow">{tier} · rank {String(Math.round(s.rankScore)).padStart(2, "0")} · {a.city}, {a.state}</p>
+                  <p className="font-data-mono text-data-mono">Composite {s.compositeScore} · Confidence {Math.round(s.confidenceScore * 100)}%</p>
+                  <p className="font-data-mono text-data-mono">Cap rate {a.capRate == null ? "—" : `${(a.capRate * 100).toFixed(1)}%`} · Year built {a.yearBuilt ?? "—"}</p>
+                  <p className="font-data-mono text-data-mono">{s.verifyFields.length} fields to verify</p>
+                </TooltipContent>
+                </Tooltip>
+              </Link>
+            );
+          })}
+        </div>
+      </TooltipProvider>
     </section>
   );
 }
