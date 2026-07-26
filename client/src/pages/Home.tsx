@@ -256,7 +256,9 @@ function DealCard({ deal, rank, onDelete }: { deal: any; rank: number; onDelete:
 function HistoricPipeline() {
   const { isAuthenticated } = useAuth();
   const { data } = trpc.scout.search.useQuery({}, { enabled: isAuthenticated, refetchOnWindowFocus: false });
-  const results = ((data as any)?.results ?? []) as any[];
+  // Filter to only show genuine historic/Wingate-eligible assets on the home dashboard
+  const allResults = ((data as any)?.results ?? []) as any[];
+  const results = allResults.filter((a: any) => a.isHistoric || a.historicRegisterEligible || a.isStabilized);
   const [sortBy, setSortBy] = useState<"rank" | "composite" | "asking" | "confidence">("rank");
   if (!results.length) return null;
   const tierLabel: Record<string, string> = { tier1: "Tier 1", fasttrack: "Fast-Track", tier2: "Tier 2", tier3: "Tier 3", archive: "Archive" };

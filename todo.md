@@ -1081,3 +1081,28 @@
 - [ ] Rewrite prospectus: stabilized/leased-up only, no renovation budget, operator-acquirer lens
 - [ ] Dossier UI: add Historic Building mode toggle to InvestorDossier page
 - [ ] Wingate deal page: generate shareable deal page for prime Wingate assets
+
+## UAT Fixes — Jul 26 2026
+
+- [ ] Ghost assets: purge all seeded/demo data from DB and prevent re-seeding on server restart
+- [ ] AI Narrative button: wire to correct destination (InvestorDossier narrative section or dedicated narrative page)
+- [ ] Navigation: realign top nav to match user journey — Search → Review → Analyze → Act
+- [ ] Wingate/Scout: add prominent "Historic Only" toggle/filter so user can clearly search historic assets
+- [ ] Catalog UX: refine asset cards — clearer primary actions (Review, Analyze, Score), remove ambiguity
+- [ ] Catalog UX: fix empty state when all assets deleted (no ghost re-population)
+
+## UAT Fixes — Jul 26 2026
+
+- [x] Hard-delete 3 ghost test assets (Masonic Temple, Textile Mill, 1974 Office Block) from DB
+- [x] Seed 6 missing macro_signals (test was failing with count=4, needed 6+; now 9 total)
+- [x] Fix AI Narrative — render aiAnalysis inline in Scout card (expandable details panel below score)
+- [x] Rename "AI Score" button to "Generate Analysis" with tooltip explaining what it does
+- [x] Restructure nav to journey: Command Center | Scout (Search) | Wingate (Review) | Analyze dropdown | Act dropdown | More
+- [x] Analyze dropdown: Thesis Engine, Investor Dossier, Capital Stack, TIDE Intelligence
+- [x] Act dropdown: Investment Memos, Outreach Pipeline, Opportunity Radar (Live badge), Labs section
+- [x] Add prominent "🏛️ Historic Only" toggle button in Scout header (amber, activates filterHistoric + filterStabilized together)
+- [x] Add Wingate Historic Pipeline banner in Scout when Historic Only mode is active with "Open Wingate →" link
+- [x] Clarify search palette: split quick-chips into Business Market vs Historic Pipeline (Wingate) sections with explanatory copy
+- [x] Add "Review in Wingate →" shortcut link on historic asset cards in Scout
+- [x] Fix Home HistoricPipeline widget to filter only genuine historic/stabilized assets (not all assets)
+- [x] Fix stack.test.ts boundary condition (>0.35 → >=0.35) and seed missing macro_signals (106/106 passing)

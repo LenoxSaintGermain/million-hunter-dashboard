@@ -49,21 +49,31 @@ import {
 } from "lucide-react";
 
 /* ── Nav items ─────────────────────────────────────────────────────────────── */
+// Journey-aligned nav: Search → Review → Analyze → Act
 const PRIMARY_NAV = [
   { label: "Command Center", href: "/", icon: LayoutDashboard },
-  { label: "Wingate", href: "/wingate", icon: Landmark },
-  { label: "TIDE", href: "/tide", icon: Zap },
-  { label: "Memos", href: "/memos", icon: FileText },
-  { label: "Outreach", href: "/outreach", icon: Mail },
+  { label: "Scout", href: "/scout", icon: Target },          // SEARCH
+  { label: "Wingate", href: "/wingate", icon: Landmark },    // REVIEW
+];
+
+// Analyze dropdown items
+const ANALYZE_NAV = [
+  { label: "Thesis Engine", href: "/thesis", icon: BookOpen },
+  { label: "Investor Dossier", href: "/investor-dossier", icon: Building2 },
+  { label: "Capital Stack", href: "/stack", icon: BarChart3 },
+  { label: "TIDE Intelligence", href: "/tide", icon: Zap },
+];
+
+// Act dropdown items
+const ACT_NAV = [
+  { label: "Investment Memos", href: "/memos", icon: FileText },
+  { label: "Outreach Pipeline", href: "/outreach", icon: Mail },
+  { label: "Opportunity Radar", href: "/opportunity-radar", icon: Radar, badge: "Live" },
 ];
 
 const MORE_NAV = [
   { label: "Freedom Map", href: "/freedom-map", icon: Map },
   { label: "Strategy Blender", href: "/strategy-blender", icon: Layers },
-  { label: "Scout", href: "/scout", icon: Target },
-  { label: "Thesis Engine", href: "/thesis", icon: BookOpen },
-  { label: "Capital Stack", href: "/stack", icon: BarChart3 },
-  { label: "Investor Dossier", href: "/investor-dossier", icon: Building2 },
   { label: "Insurance Prospector", href: "/insurance-prospector", icon: Shield },
   { label: "RippleEffect", href: "/ripple", icon: Waves },
 ];
@@ -249,19 +259,31 @@ function GlobalSearchPalette({ open, onClose }: { open: boolean; onClose: () => 
             <div className="px-4 py-6">
               <p className="text-[10px] tracking-[0.14em] uppercase text-[var(--sh-fg-4)] font-medium mb-3">Quick searches</p>
               <div className="flex flex-wrap gap-2">
-                {["Commercial cleaning", "HVAC", "Logistics", "Atlanta, GA", "Chicago, IL", "Historic building"].map((s) => (
+                <div className="mb-2">
+                  <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium mb-2">Business Market</p>
+                  <div className="flex flex-wrap gap-2">
+                    {["Commercial cleaning", "HVAC", "Logistics", "Atlanta, GA", "Chicago, IL"].map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setQuery(s)}
+                        className="text-[12px] px-3 py-1.5 bg-[var(--bone)] hover:bg-[var(--rule)] border border-[var(--rule)] rounded-sm text-[var(--sh-fg-2)] transition-colors"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-[var(--rule)]">
+                  <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium mb-2">Historic Pipeline (Wingate)</p>
                   <button
-                    key={s}
-                    onClick={() => {
-                      // Historic assets live in Wingate (commercial_assets), not the deal market.
-                      if (s === "Historic building") { navigate("/wingate"); onClose(); }
-                      else setQuery(s);
-                    }}
-                    className="text-[12px] px-3 py-1.5 bg-[var(--bone)] hover:bg-[var(--rule)] border border-[var(--rule)] rounded-sm text-[var(--sh-fg-2)] transition-colors"
+                    onClick={() => { navigate("/wingate"); onClose(); }}
+                    className="text-[12px] px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-sm text-amber-600 transition-colors flex items-center gap-1.5"
                   >
-                    {s}
+                    <span>🏛️</span>
+                    Historic Assets — Open Wingate Pipeline
                   </button>
-                ))}
+                  <p className="text-[10px] text-[var(--sh-fg-4)] mt-1.5">Historic commercial assets are tracked in the Wingate thesis pipeline, separate from the business-for-sale market.</p>
+                </div>
               </div>
             </div>
           )}
@@ -325,6 +347,8 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
     href === "/" ? location === "/" : location.startsWith(href);
 
   const hasMoreActive = MORE_NAV.some((n) => isActive(n.href));
+  const hasAnalyzeActive = ANALYZE_NAV.some((n) => isActive(n.href));
+  const hasActActive = ACT_NAV.some((n) => isActive(n.href));
 
   return (
     <div className="min-h-screen bg-[var(--bone)]">
@@ -365,8 +389,8 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
             </div>
           </Link>
 
-          {/* Primary Nav — desktop */}
-          <nav className="hidden md:flex items-center gap-7">
+          {/* Primary Nav — desktop (Search → Review → Analyze → Act) */}
+          <nav className="hidden md:flex items-center gap-6">
             {PRIMARY_NAV.map((item) => (
               <NavLink
                 key={item.href}
@@ -375,6 +399,110 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                 active={isActive(item.href)}
               />
             ))}
+
+            {/* Analyze dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={cn(
+                    "flex items-center gap-1 text-[13px] font-medium tracking-wide transition-colors duration-200 outline-none",
+                    hasAnalyzeActive
+                      ? "text-[var(--ink)] border-b border-[var(--ink)]"
+                      : "text-[var(--sh-fg-3)] hover:text-[var(--ink)]"
+                  )}
+                >
+                  Analyze
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-52 bg-[var(--paper)] border-[var(--rule)] shadow-lg"
+              >
+                <div className="px-3 py-1.5">
+                  <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium">Analysis Tools</p>
+                </div>
+                {ANALYZE_NAV.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <DropdownMenuItem key={item.href} asChild>
+                      <Link href={item.href}>
+                        <span className={cn(
+                          "flex items-center gap-2.5 w-full text-[13px] cursor-pointer",
+                          isActive(item.href) ? "text-[var(--ink)] font-medium" : "text-[var(--sh-fg-2)]"
+                        )}>
+                          <Icon className="w-3.5 h-3.5 shrink-0" />
+                          {item.label}
+                        </span>
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Act dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={cn(
+                    "flex items-center gap-1 text-[13px] font-medium tracking-wide transition-colors duration-200 outline-none",
+                    hasActActive
+                      ? "text-[var(--ink)] border-b border-[var(--ink)]"
+                      : "text-[var(--sh-fg-3)] hover:text-[var(--ink)]"
+                  )}
+                >
+                  Act
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-52 bg-[var(--paper)] border-[var(--rule)] shadow-lg"
+              >
+                <div className="px-3 py-1.5">
+                  <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium">Execute</p>
+                </div>
+                {ACT_NAV.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <DropdownMenuItem key={item.href} asChild>
+                      <Link href={item.href}>
+                        <span className={cn(
+                          "flex items-center gap-2.5 w-full text-[13px] cursor-pointer",
+                          isActive(item.href) ? "text-[var(--ink)] font-medium" : "text-[var(--sh-fg-2)]"
+                        )}>
+                          <Icon className="w-3.5 h-3.5 shrink-0" />
+                          {item.label}
+                          {(item as any).badge && <span className="ml-auto text-[10px] font-medium text-amber-600">{(item as any).badge}</span>}
+                        </span>
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuSeparator className="bg-[var(--rule)]" />
+                <div className="px-3 py-1.5">
+                  <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium">Labs</p>
+                </div>
+                {LABS_NAV.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <DropdownMenuItem key={item.href} asChild>
+                      <Link href={item.href}>
+                        <span className={cn(
+                          "flex items-center gap-2.5 w-full text-[13px] cursor-pointer",
+                          isActive(item.href) ? "text-[var(--ink)] font-medium" : "text-[var(--sh-fg-4)]"
+                        )}>
+                          <Icon className="w-3.5 h-3.5 shrink-0" />
+                          {item.label}
+                          <span className="ml-auto text-[10px] font-medium text-amber-600">{item.badge}</span>
+                        </span>
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* More dropdown */}
             <DropdownMenu>
@@ -400,41 +528,12 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                   return (
                     <DropdownMenuItem key={item.href} asChild>
                       <Link href={item.href}>
-                        <span
-                          className={cn(
-                            "flex items-center gap-2.5 w-full text-[13px] cursor-pointer",
-                            isActive(item.href)
-                              ? "text-[var(--ink)] font-medium"
-                              : "text-[var(--sh-fg-2)]"
-                          )}
-                        >
+                        <span className={cn(
+                          "flex items-center gap-2.5 w-full text-[13px] cursor-pointer",
+                          isActive(item.href) ? "text-[var(--ink)] font-medium" : "text-[var(--sh-fg-2)]"
+                        )}>
                           <Icon className="w-3.5 h-3.5 shrink-0" />
                           {item.label}
-                        </span>
-                      </Link>
-                    </DropdownMenuItem>
-                  );
-                })}
-                <DropdownMenuSeparator className="bg-[var(--rule)]" />
-                <div className="px-3 py-1">
-                  <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium">Labs (Experimental)</p>
-                </div>
-                {LABS_NAV.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <DropdownMenuItem key={item.href} asChild>
-                      <Link href={item.href}>
-                        <span
-                          className={cn(
-                            "flex items-center gap-2.5 w-full text-[13px] cursor-pointer",
-                            isActive(item.href)
-                              ? "text-[var(--ink)] font-medium"
-                              : "text-[var(--sh-fg-4)]"
-                          )}
-                        >
-                          <Icon className="w-3.5 h-3.5 shrink-0" />
-                          {item.label}
-                          <span className="ml-auto text-[10px] font-medium text-amber-600">{item.badge}</span>
                         </span>
                       </Link>
                     </DropdownMenuItem>

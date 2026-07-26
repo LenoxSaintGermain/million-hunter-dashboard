@@ -17,7 +17,7 @@ import {
   Building2, MapPin, DollarSign, TrendingUp, Zap, Plus, Search,
   Filter, SlidersHorizontal, RefreshCw, ChevronDown, ChevronUp,
   Loader2, BarChart3, CheckCircle2, ArrowRight, Link2, Sparkles,
-  ExternalLink, CheckCircle, Trash2,
+  ExternalLink, CheckCircle, Trash2, FileText,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -568,17 +568,31 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
           )}
         </div>
 
-        {/* AI Score display */}
+        {/* AI Score + Narrative display */}
         {asset.aiScore != null && (() => { const score = parseFloat(String(asset.aiScore)); return (
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/15">
-            <BarChart3 className="w-3 h-3 text-primary shrink-0" />
-            <div className="flex-1 min-w-0">
-              <span className="text-xs text-muted-foreground">AI Score: </span>
-              <span className={cn("text-sm font-bold", score >= 0.75 ? "text-[var(--sage)]" : score >= 0.6 ? "text-[var(--amber)]" : "text-muted-foreground")}>
-                {score.toFixed(3)}
-              </span>
+          <div className="rounded-lg bg-primary/5 border border-primary/15 overflow-hidden">
+            <div className="flex items-center gap-2 p-2">
+              <BarChart3 className="w-3 h-3 text-primary shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-xs text-muted-foreground">AI Score: </span>
+                <span className={cn("text-sm font-bold", score >= 0.75 ? "text-[var(--sage)]" : score >= 0.6 ? "text-[var(--amber)]" : "text-muted-foreground")}>
+                  {score.toFixed(3)}
+                </span>
+              </div>
+              <CheckCircle2 className="w-3 h-3 text-[var(--sage)] shrink-0" />
             </div>
-            <CheckCircle2 className="w-3 h-3 text-[var(--sage)] shrink-0" />
+            {(asset as any).aiAnalysis && (
+              <details className="group">
+                <summary className="flex items-center gap-1.5 px-2 pb-2 cursor-pointer list-none text-[10px] text-primary/70 hover:text-primary transition-colors">
+                  <FileText className="w-2.5 h-2.5" />
+                  <span>AI Narrative</span>
+                  <ChevronDown className="w-2.5 h-2.5 ml-auto group-open:rotate-180 transition-transform" />
+                </summary>
+                <div className="px-2 pb-2 pt-0 border-t border-primary/10">
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">{(asset as any).aiAnalysis}</p>
+                </div>
+              </details>
+            )}
           </div>
         ); })()}
 
@@ -590,9 +604,10 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
             className="flex-1 h-7 text-[11px] border-border"
             onClick={() => scoreAsset.mutate({ id: asset.id })}
             disabled={scoreAsset.isPending}
+            title="Run AI analysis — scores the asset and generates a narrative"
           >
             {scoreAsset.isPending ? <Loader2 className="w-2.5 h-2.5 mr-1 animate-spin" /> : <Zap className="w-2.5 h-2.5 mr-1" />}
-            AI Score
+            {scoreAsset.isPending ? "Analyzing..." : "Generate Analysis"}
           </Button>
           <Select
             value={asset.status}
@@ -610,6 +625,17 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
             </SelectContent>
           </Select>
         </div>
+
+        {/* Review in Wingate — shown for historic assets */}
+        {((asset as any).isHistoric || (asset as any).historicRegisterEligible) && (
+          <a
+            href="/wingate"
+            className="w-full flex items-center justify-center gap-1.5 h-7 text-[11px] font-medium rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 transition-colors mt-1"
+          >
+            <span className="text-[10px]">🏛️</span>
+            Review in Wingate →
+          </a>
+        )}
 
         {/* Convert to Deal — shown for qualified assets */}
         {(asset.status === "qualified" || (asset.aiScore != null && parseFloat(String(asset.aiScore)) >= 0.70)) && (
@@ -739,7 +765,28 @@ Asset Scout
             Commercial real estate pipeline — OZ/TAD-aware, AI-scored
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Historic-Only mode toggle — prominent CTA for Wingate workflow */}
+          <Button
+            variant={filterHistoric ? "default" : "outline"}
+            size="sm"
+            className={cn(
+              "h-8 border-border font-medium",
+              filterHistoric
+                ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500"
+                : "text-amber-600 border-amber-500/40 hover:bg-amber-500/10 hover:border-amber-500"
+            )}
+            onClick={() => {
+              const next = !filterHistoric;
+              setFilterHistoric(next);
+              if (next) setFilterStabilized(true);
+              else setFilterStabilized(false);
+            }}
+            title="Show only Wingate-eligible historic assets"
+          >
+            <span className="mr-1.5">🏛️</span>
+            {filterHistoric ? "Historic Only (Active)" : "Historic Only"}
+          </Button>
           <Button variant="outline" size="sm" className="h-8 border-border" onClick={() => refetch()}>
             <RefreshCw className="w-3 h-3 mr-1.5" />Refresh
           </Button>
@@ -771,6 +818,18 @@ Asset Scout
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Historic-Only mode banner */}
+      {filterHistoric && (
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+          <span className="text-base">🏛️</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-600">Wingate Historic Pipeline — Active</p>
+            <p className="text-xs text-amber-600/70">Showing only historic and stabilized assets eligible for the Wingate thesis. <button className="underline hover:no-underline" onClick={() => { setFilterHistoric(false); setFilterStabilized(false); }}>Clear filter</button></p>
+          </div>
+          <a href="/wingate" className="text-xs font-medium text-amber-600 hover:underline shrink-0">Open Wingate →</a>
         </div>
       )}
 
