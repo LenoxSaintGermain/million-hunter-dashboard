@@ -42,12 +42,18 @@
 
 ---
 
-## Acceptance criteria (end-to-end)
+## Acceptance criteria (end-to-end) — validated 2026-07-26
 
-- [ ] A fresh `investor` user is asked which asset class they acquire, before any risk questions.
-- [ ] The class list is generated from the registry (adding a class in `assetClasses.ts` makes it appear with no page edits).
-- [ ] The choice persists to `investor_dna.asset_class` and survives reload.
-- [ ] After intake the client lands on their thesis command page with assets **of that class only**, ranked by the correct scorer.
-- [ ] The investor nav exposes the thesis surface; the client never has to type a URL.
-- [ ] Search, filter, and the full A–G dossier are reachable from that page without operator tools.
-- [ ] No fabricated data anywhere on the client-visible path (prime directive 1 & 3).
+- [x] A fresh `investor` user is asked which asset class they acquire, before any risk questions.
+- [x] The class list is generated from the registry (adding a class in `assetClasses.ts` makes it appear with no page edits).
+- [x] The choice persists to `investor_dna.asset_class` and survives reload. *(verified over HTTP: saveDna → getDnaStatus returns `assetClass`)*
+- [x] After intake the client lands on their thesis command page with assets **of that class only**, ranked by the correct scorer. *(verified: `scout.search` isolates by class)*
+- [x] The investor nav exposes the thesis surface ("My Thesis", first entry); the client never has to type a URL.
+- [x] Search, filter, and the full A–G dossier are reachable from that page without operator tools. *(`/wingate` renders the investor shell for investor role; operator-only actions hidden)*
+- [x] No fabricated data anywhere on the client-visible path. *(`scout.researchAssets` sources real, cited listings; conservative scoring + VERIFY on anything unstated)*
+
+## Known state / operator prerequisite before sharing
+
+The pipeline was emptied during the Jul 26 UAT session (`commercial_assets` = 0). A client landing on an empty grid is a poor first impression, so **before sharing the link an operator should populate the pipeline**: open `/wingate` → **Source real** (sonar-pro research), and/or add known targets manually, then **Run & Save** to score them.
+
+Expect sourced assets to arrive **low-confidence / archive tier**: public listings rarely publish year-built verification, FAR, lot coverage, or incentive status. That is the system working as designed — it refuses to inflate confidence it hasn't earned. Raise a candidate by filling the VERIFY fields (intake or Scout) and re-running the score.
