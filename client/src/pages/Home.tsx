@@ -241,10 +241,13 @@ function DealCard({ deal, rank, onDelete }: { deal: any; rank: number; onDelete:
           </div>
         </div>
       </Link>
-      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(deal.id, deal.name); }}
-        className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 border border-rule bg-paper text-muted-foreground hover:text-clay hover:border-clay/40 rounded-sm transition-all"
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(deal.id, deal.name); }}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="absolute right-0 top-4 z-20 opacity-0 group-hover:opacity-100 p-2 border border-rule bg-paper text-muted-foreground hover:text-clay hover:border-clay/40 hover:bg-clay/5 rounded-sm transition-all shadow-sm"
         title="Remove deal">
-        <Trash2 className="w-3 h-3" />
+        <Trash2 className="w-3.5 h-3.5" />
       </button>
     </motion.div>
   );

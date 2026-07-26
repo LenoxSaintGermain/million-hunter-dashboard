@@ -26,6 +26,22 @@ const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 const GEMINI_PRO    = GEMINI_STRONG;    // gemini-3.1-pro-preview: deep reasoning
 const GEMINI_FLASH  = GEMINI_FAST;      // gemini-3.6-flash: high-volume
 const GEMINI_MID    = GEMINI_BALANCED;  // gemini-3.5-flash: balanced scoring/consensus
+
+// Tolerant JSON parse: models occasionally append trailing prose or wrap output
+// in markdown fences even with responseMimeType=json ("Unexpected non-whitespace
+// character after JSON at position N"). Recover the JSON span instead of throwing.
+function looseJsonParse(raw: string | null | undefined): any {
+  const s = (raw ?? "").trim();
+  try { return JSON.parse(s); } catch {}
+  const cleaned = s.replace(/```json/gi, "").replace(/```/g, "").trim();
+  try { return JSON.parse(cleaned); } catch {}
+  const start = cleaned.search(/[[{]/);
+  const end = Math.max(cleaned.lastIndexOf("}"), cleaned.lastIndexOf("]"));
+  if (start >= 0 && end > start) {
+    try { return JSON.parse(cleaned.slice(start, end + 1)); } catch {}
+  }
+  throw new Error("Model did not return parseable JSON");
+}
 const _GEMINI_LITE  = GEMINI_LITE;      // gemini-3.5-flash-lite: background tasks (reserved)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -112,7 +128,7 @@ Analyze and return a JSON object with:
         contents: prompt,
         config: { responseMimeType: "application/json" },
       });
-      const parsed = JSON.parse(fallbackResponse.text ?? "{}");
+      const parsed = looseJsonParse(fallbackResponse.text);
       return {
         distressScore: Math.min(1, Math.max(0, parsed.distressScore ?? 0.5)),
         retirementSignal: parsed.retirementSignal ?? false,
@@ -196,7 +212,7 @@ Return ONLY valid JSON.`;
       config: { responseMimeType: "application/json" },
     });
     const text = response.text ?? "{}";
-    const parsed = JSON.parse(text);
+    const parsed = looseJsonParse(text);
     return {
       killProbability: Math.min(1, Math.max(0, parsed.killProbability ?? 0.3)),
       redFlags: Array.isArray(parsed.redFlags) ? parsed.redFlags.slice(0, 6) : [],
@@ -252,7 +268,7 @@ Return ONLY valid JSON.`;
       config: { responseMimeType: "application/json" },
     });
     const text = response.text ?? "{}";
-    const parsed = JSON.parse(text);
+    const parsed = looseJsonParse(text);
     return {
       sbaEligible: parsed.sbaEligible ?? true,
       sbaAmount: parsed.sbaAmount ?? Math.min(10000000, askingPrice * 0.8),
@@ -331,7 +347,7 @@ Return ONLY valid JSON.`;
       config: { responseMimeType: "application/json" },
     });
     const text = response.text ?? "{}";
-    const parsed = JSON.parse(text);
+    const parsed = looseJsonParse(text);
     return {
       title: parsed.title ?? `Investment Memo: ${deal.name}`,
       content: parsed.content ?? "# Investment Memo\n\nGeneration failed.",
