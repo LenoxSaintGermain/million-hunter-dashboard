@@ -480,7 +480,7 @@ export default function Wingate() {
         <Input
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          placeholder="Search assets by name, city, state, or address…"
+        placeholder="Filter this pipeline — name, city, state…"
           className="pl-9 h-9 bg-muted/20 border-border text-sm"
         />
       </div>

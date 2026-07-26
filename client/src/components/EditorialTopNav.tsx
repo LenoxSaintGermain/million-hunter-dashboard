@@ -252,7 +252,11 @@ function GlobalSearchPalette({ open, onClose }: { open: boolean; onClose: () => 
                 {["Commercial cleaning", "HVAC", "Logistics", "Atlanta, GA", "Chicago, IL", "Historic building"].map((s) => (
                   <button
                     key={s}
-                    onClick={() => setQuery(s)}
+                    onClick={() => {
+                      // Historic assets live in Wingate (commercial_assets), not the deal market.
+                      if (s === "Historic building") { navigate("/wingate"); onClose(); }
+                      else setQuery(s);
+                    }}
                     className="text-[12px] px-3 py-1.5 bg-[var(--bone)] hover:bg-[var(--rule)] border border-[var(--rule)] rounded-sm text-[var(--sh-fg-2)] transition-colors"
                   >
                     {s}
@@ -265,9 +269,17 @@ function GlobalSearchPalette({ open, onClose }: { open: boolean; onClose: () => 
 
         {/* Footer */}
         <div className="px-4 py-2.5 border-t border-[var(--rule)] flex items-center justify-between bg-[var(--bone)]/50">
-          <p className="text-[11px] text-[var(--sh-fg-4)]">
-            Press <kbd className="font-mono">↵</kbd> to view all results
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-[11px] text-[var(--sh-fg-4)]">
+              Deal market · <kbd className="font-mono">↵</kbd> for all
+            </p>
+            <button
+              onClick={() => { navigate("/wingate"); onClose(); }}
+              className="text-[11px] font-medium text-[var(--amber)] hover:underline"
+            >
+              Historic assets → Wingate
+            </button>
+          </div>
           <button
             onClick={handleViewAll}
             className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--sh-fg-2)] hover:text-[var(--ink)] transition-colors"

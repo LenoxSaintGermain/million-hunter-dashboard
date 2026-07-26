@@ -150,7 +150,8 @@ export default function PublicSearch() {
           </div>
           <h1 className="font-['Fraunces',_serif] text-4xl lg:text-5xl font-black text-[#faf8f5] mb-4 leading-tight">
             Browse Active Deals
-          </h1>
+</h1>
+<p className="text-sm text-muted-foreground mt-1">Public business-for-sale deal market — separate from your historic-asset pipeline.</p>
           <p className="text-[#8b7355] mb-8 max-w-lg mx-auto">
             {total > 0 ? `${total} deals in the pipeline.` : "Deals loading..."} Sign in to unlock financials, AI scores, and full intelligence dossiers.
           </p>

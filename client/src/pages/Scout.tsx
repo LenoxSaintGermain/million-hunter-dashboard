@@ -732,8 +732,9 @@ export default function Scout() {
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <Building2 className="w-5 h-5 text-primary" />
-            Asset Scout
-          </h1>
+Asset Scout
+</h1>
+<p className="text-sm text-muted-foreground mt-1">Asset inventory &amp; intake — every historic and commercial property you've added or imported. Score them against a thesis in Wingate.</p>
           <p className="text-sm text-muted-foreground mt-0.5">
             Commercial real estate pipeline — OZ/TAD-aware, AI-scored
           </p>
