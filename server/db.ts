@@ -358,6 +358,7 @@ export interface AssetFilters {
   offset?: number;
   status?: string;
   includeArchived?: boolean;
+  assetClass?: string;
   thesisCompilationId?: number;
   states?: string[];
   yearBuiltMax?: number;
@@ -378,6 +379,7 @@ export async function getCommercialAssets(opts?: AssetFilters) {
   // Exclude archived by default (soft-delete for bulk-clear).
   if (!opts?.includeArchived) conds.push(eq(commercialAssets.isArchived, false));
   if (opts?.status) conds.push(eq(commercialAssets.status, opts.status as any));
+  if (opts?.assetClass) conds.push(eq(commercialAssets.assetClass, opts.assetClass));
   if (opts?.thesisCompilationId != null) conds.push(eq(commercialAssets.thesisCompilationId, opts.thesisCompilationId));
   if (opts?.states?.length) conds.push(inArray(commercialAssets.state, opts.states));
   if (opts?.yearBuiltMax != null) conds.push(lte(commercialAssets.yearBuilt, opts.yearBuiltMax));

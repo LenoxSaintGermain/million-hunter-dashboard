@@ -1730,7 +1730,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
 
     // ─── Search commercial_assets BY a compiled thesis, scored + ranked ───────
     search: protectedProcedure
-      .input(z.object({ compilationId: z.number().int().optional(), persist: z.boolean().optional() }))
+      .input(z.object({ compilationId: z.number().int().optional(), persist: z.boolean().optional(), assetClass: z.string().optional() }))
       .query(async ({ input }) => {
         const { getCommercialAssets, persistHistoricScore } = await import("./db");
         const { scoreAssetByClass } = await import("./scoring");
@@ -1739,6 +1739,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         const { eq } = await import("drizzle-orm");
 
         const filters: any = { limit: 1000 };
+        if (input.assetClass) filters.assetClass = input.assetClass;
         if (input.compilationId != null) {
           const db = await getDb();
           const rows = db ? await db.select().from(thesisCompilations).where(eq(thesisCompilations.id, input.compilationId)).limit(1) : [];
