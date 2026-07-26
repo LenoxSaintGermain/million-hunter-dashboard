@@ -1,7 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+import { getAssetClass, listAssetClasses } from "@shared/assetClasses";
+import type { AssetClass, FieldDef } from "@shared/assetClasses";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +16,51 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  Landmark, MapPin, Plus, Play, Trash2, Zap, CheckCircle2, XCircle,
+  Landmark, Boxes, MapPin, Plus, Play, Trash2, Zap, CheckCircle2, XCircle,
   AlertTriangle, ShieldCheck, Gauge, Building2, Star, Filter, Loader2, Search, FileText,
 } from "lucide-react";
+
+const ASSET_CLASS_ICONS: Record<string, typeof Landmark> = { Landmark, Boxes };
+type IntakeValue = string | boolean;
+type ParsedIntakeValue = string | number | boolean | undefined;
+
+function initialIntakeForm(assetClass: AssetClass): Record<string, IntakeValue> {
+  const values: Record<string, IntakeValue> = { name: "", address: "", city: "", state: "OH" };
+  assetClass.fields.forEach((field) => {
+    values[field.key] = field.type === "boolean" ? field.key === "isStabilized" : "";
+  });
+  return values;
+}
+
+function parseIntakeValue(field: FieldDef, value: IntakeValue): ParsedIntakeValue {
+  if (field.type === "boolean") return value === true;
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  if (field.type === "number" || field.type === "currency") {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  if (field.type === "year") {
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  if (field.type === "percent") {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed / 100 : undefined;
+  }
+  return value;
+}
+
+function asOptionalNumber(value: ParsedIntakeValue): number | undefined {
+  return typeof value === "number" ? value : undefined;
+}
+
+function asOptionalString(value: ParsedIntakeValue): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function asBoolean(value: ParsedIntakeValue): boolean {
+  return value === true;
+}
 
 // ─── Types (mirror server/scoring/historicScore.ts) ──────────────────────────
 type Factor = { label: string; points: number; max: number; note?: string; verify?: boolean };
@@ -284,58 +328,98 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
 }
 
 // ─── Quick-add intake (scores on create) ──────────────────────────────────────
-function QuickAdd({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({ name: "", address: "", city: "", state: "OH", askingPrice: "", capRate: "", squareFootage: "", yearBuilt: "", stories: "", occupancyRate: "", lotSqFt: "", higherAndBetterUseNotes: "", isHistoric: false, historicRegisterEligible: false, isStabilized: true, hasAirRights: false });
+function QuickAdd({ open, onClose, onCreated, assetClass }: { open: boolean; onClose: () => void; onCreated: () => void; assetClass: string }) {
+  const selectedClass = getAssetClass(assetClass);
+  const [form, setForm] = useState<Record<string, IntakeValue>>(() => initialIntakeForm(selectedClass));
   const score = trpc.scout.scoreHistoric.useMutation();
   const create = trpc.scout.create.useMutation({
     onSuccess: async (r) => { try { await score.mutateAsync({ id: r.id }); } catch { /* non-fatal */ } toast.success("Asset added + scored"); onCreated(); onClose(); },
     onError: (e) => toast.error(e.message),
   });
-  const STATES = ["OH", "IN", "KY", "TN", "GA", "SC", "NC", "AL", "MO", "IL", "KS"];
-  const submit = () => {
-    if (!form.name || !form.address || !form.city) return toast.error("Name, address, city required");
-    create.mutate({
-      name: form.name, address: form.address, city: form.city, state: form.state, propertyType: "mixed_use",
-      askingPrice: form.askingPrice ? parseFloat(form.askingPrice) : undefined,
-      capRate: form.capRate ? parseFloat(form.capRate) / 100 : undefined,
-      squareFootage: form.squareFootage ? parseInt(form.squareFootage) : undefined,
-      yearBuilt: form.yearBuilt ? parseInt(form.yearBuilt) : undefined,
-      stories: form.stories ? parseInt(form.stories) : undefined,
-      occupancyRate: form.occupancyRate ? parseFloat(form.occupancyRate) / 100 : undefined,
-      lotSqFt: form.lotSqFt ? parseInt(form.lotSqFt) : undefined,
-      higherAndBetterUseNotes: form.higherAndBetterUseNotes || undefined,
-      isHistoric: form.isHistoric, historicRegisterEligible: form.historicRegisterEligible, isStabilized: form.isStabilized, hasAirRights: form.hasAirRights,
+  useEffect(() => {
+    setForm(initialIntakeForm(selectedClass));
+  }, [selectedClass]);
+  const STATES = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"];
+  const groups = useMemo(() => {
+    const grouped = new Map<string, FieldDef[]>();
+    selectedClass.fields.forEach((field) => {
+      const group = field.group ?? "Details";
+      grouped.set(group, [...(grouped.get(group) ?? []), field]);
     });
+    return Array.from(grouped, ([label, fields]) => ({ label, fields }));
+  }, [selectedClass]);
+  const valueFor = (key: string): IntakeValue => form[key] ?? "";
+  const textValueFor = (key: string): string => {
+    const value = valueFor(key);
+    return typeof value === "string" ? value : "";
+  };
+  const submit = () => {
+    const name = valueFor("name");
+    const address = valueFor("address");
+    const city = valueFor("city");
+    const state = valueFor("state");
+    if (typeof name !== "string" || !name || typeof address !== "string" || !address || typeof city !== "string" || !city) {
+      return toast.error("Name, address, city required");
+    }
+
+    const parsedFields: Record<string, ParsedIntakeValue> = {};
+    selectedClass.fields.forEach((field) => {
+      parsedFields[field.key] = parseIntakeValue(field, valueFor(field.key));
+    });
+
+    const baseInput = {
+      name,
+      address,
+      city,
+      state: typeof state === "string" ? state : "",
+      propertyType: "mixed_use" as const,
+      assetClass: selectedClass.id,
+    };
+
+    if (selectedClass.id === "historic") {
+      create.mutate({
+        ...baseInput,
+        askingPrice: asOptionalNumber(parsedFields.askingPrice),
+        capRate: asOptionalNumber(parsedFields.capRate),
+        squareFootage: asOptionalNumber(parsedFields.squareFootage),
+        yearBuilt: asOptionalNumber(parsedFields.yearBuilt),
+        stories: asOptionalNumber(parsedFields.stories),
+        occupancyRate: asOptionalNumber(parsedFields.occupancyRate),
+        lotSqFt: asOptionalNumber(parsedFields.lotSqFt),
+        higherAndBetterUseNotes: asOptionalString(parsedFields.higherAndBetterUseNotes),
+        isHistoric: asBoolean(parsedFields.isHistoric),
+        historicRegisterEligible: asBoolean(parsedFields.historicRegisterEligible),
+        isStabilized: asBoolean(parsedFields.isStabilized),
+        hasAirRights: asBoolean(parsedFields.hasAirRights),
+      });
+    } else {
+      create.mutate({ ...baseInput, classMetadata: parsedFields });
+    }
   };
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg bg-card border-border">
-        <DialogHeader><DialogTitle className="flex items-center gap-2">🏛 Add Historic Asset</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="flex items-center gap-2">Add {selectedClass.label}</DialogTitle></DialogHeader>
         <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto py-2">
-          <Field className="col-span-2" label="Property Name *" v={form.name} on={(v) => setForm(p => ({ ...p, name: v }))} ph="1908 Masonic Temple" />
-          <Field className="col-span-2" label="Address *" v={form.address} on={(v) => setForm(p => ({ ...p, address: v }))} ph="123 Main St" />
-          <Field label="City *" v={form.city} on={(v) => setForm(p => ({ ...p, city: v }))} ph="Columbus" />
+          <Field className="col-span-2" label="Property Name *" v={textValueFor("name")} on={(v) => setForm(p => ({ ...p, name: v }))} ph="Property name" />
+          <Field className="col-span-2" label="Address *" v={textValueFor("address")} on={(v) => setForm(p => ({ ...p, address: v }))} ph="123 Main St" />
+          <Field label="City *" v={textValueFor("city")} on={(v) => setForm(p => ({ ...p, city: v }))} ph="City" />
           <div className="space-y-1"><Label className="text-xs">State</Label>
-            <Select value={form.state} onValueChange={(v) => setForm(p => ({ ...p, state: v }))}>
+            <Select value={textValueFor("state") || "OH"} onValueChange={(v) => setForm(p => ({ ...p, state: v }))}>
               <SelectTrigger className="h-8 text-sm bg-muted/30 border-border"><SelectValue /></SelectTrigger>
               <SelectContent>{STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <Field label="Asking Price ($)" v={form.askingPrice} on={(v) => setForm(p => ({ ...p, askingPrice: v }))} ph="630000" />
-          <Field label="Cap Rate (%)" v={form.capRate} on={(v) => setForm(p => ({ ...p, capRate: v }))} ph="6.5" />
-          <Field label="Sq Ft" v={form.squareFootage} on={(v) => setForm(p => ({ ...p, squareFootage: v }))} ph="18000" />
-          <Field label="Lot Sq Ft" v={form.lotSqFt} on={(v) => setForm(p => ({ ...p, lotSqFt: v }))} ph="30000" />
-          <Field label="Year Built" v={form.yearBuilt} on={(v) => setForm(p => ({ ...p, yearBuilt: v }))} ph="1908" />
-          <Field label="Stories" v={form.stories} on={(v) => setForm(p => ({ ...p, stories: v }))} ph="3" />
-          <Field label="Occupancy (%)" v={form.occupancyRate} on={(v) => setForm(p => ({ ...p, occupancyRate: v }))} ph="0 (vacant)" />
-          <Field className="col-span-2" label="H&BU Notes" v={form.higherAndBetterUseNotes} on={(v) => setForm(p => ({ ...p, higherAndBetterUseNotes: v }))} ph="Air rights, corner lot, OZ tract…" />
-          <div className="col-span-2 flex flex-wrap gap-4 pt-1">
-            {([["isHistoric", "NR Listed"], ["historicRegisterEligible", "NR Eligible"], ["isStabilized", "Stabilized"], ["hasAirRights", "Air Rights"]] as const).map(([k, l]) => (
-              <label key={k} className="flex items-center gap-2 text-xs cursor-pointer">
-                <input type="checkbox" checked={(form as any)[k]} onChange={(e) => setForm(p => ({ ...p, [k]: e.target.checked }))} className="w-4 h-4 accent-amber-500" />{l}
-              </label>
-            ))}
-          </div>
+          {groups.map(({ label, fields }) => (
+            <div key={label} className="col-span-2 space-y-2 pt-2 first:pt-0">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
+              <div className="grid grid-cols-2 gap-3">
+                {fields.map((field) => (
+                  <IntakeField key={field.key} field={field} value={valueFor(field.key)} onChange={(value) => setForm(p => ({ ...p, [field.key]: value }))} />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
         <DialogFooter className="gap-2">
           <Button variant="outline" size="sm" onClick={onClose} className="border-border">Cancel</Button>
@@ -347,6 +431,42 @@ function QuickAdd({ open, onClose, onCreated }: { open: boolean; onClose: () => 
     </Dialog>
   );
 }
+function IntakeField({ field, value, onChange }: { field: FieldDef; value: IntakeValue; onChange: (value: IntakeValue) => void }) {
+  if (field.type === "boolean") {
+    return (
+      <label className="flex items-center gap-2 text-xs cursor-pointer self-end min-h-8">
+        <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} className="w-4 h-4 accent-amber-500" />
+        {field.label}
+      </label>
+    );
+  }
+
+  if (field.type === "select") {
+    return (
+      <div className="space-y-1">
+        <Label className="text-xs">{field.label}</Label>
+        <Select value={typeof value === "string" ? value : ""} onValueChange={onChange}>
+          <SelectTrigger className="h-8 text-sm bg-muted/30 border-border"><SelectValue placeholder={field.placeholder ?? `Select ${field.label.toLowerCase()}`} /></SelectTrigger>
+          <SelectContent>{(field.options ?? []).map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{field.label}</Label>
+      <Input
+        className="h-8 text-sm bg-muted/30 border-border"
+        type={field.type === "number" || field.type === "currency" || field.type === "percent" || field.type === "year" ? "number" : "text"}
+        step={field.type === "percent" || field.type === "currency" || field.type === "number" ? "any" : undefined}
+        placeholder={field.placeholder}
+        value={typeof value === "string" ? value : ""}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
 function Field({ label, v, on, ph, className }: { label: string; v: string; on: (v: string) => void; ph?: string; className?: string }) {
   return <div className={cn("space-y-1", className)}><Label className="text-xs">{label}</Label><Input className="h-8 text-sm bg-muted/30 border-border" placeholder={ph} value={v} onChange={(e) => on(e.target.value)} /></div>;
 }
@@ -354,6 +474,10 @@ function Field({ label, v, on, ph, className }: { label: string; v: string; on: 
 // ─── Main command page ────────────────────────────────────────────────────────
 export default function Wingate() {
   const urlThesis = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("thesis") : null;
+  const [assetClass, setAssetClass] = useState(() => {
+    const urlClass = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("class") : null;
+    return getAssetClass(urlClass).id;
+  });
   const [compilationId, setCompilationId] = useState<number | null>(urlThesis ? Number(urlThesis) : null);
   const [selected, setSelected] = useState<ScoredAsset | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -364,7 +488,7 @@ export default function Wingate() {
 
   const theses = trpc.thesis.list.useQuery();
   const search = trpc.scout.search.useQuery(
-    { compilationId: compilationId ?? undefined },
+    { compilationId: compilationId ?? undefined, assetClass },
     { refetchOnWindowFocus: false },
   );
   const utils = trpc.useUtils();
@@ -400,6 +524,8 @@ export default function Wingate() {
 
   const activeThesis = theses.data?.find((t: any) => t.id === compilationId);
   const escalations = results.filter(a => a.historicScore.assetTier === "fasttrack");
+  const selectedClass = getAssetClass(assetClass);
+  const AssetIcon = ASSET_CLASS_ICONS[selectedClass.icon] ?? Landmark;
 
   return (
     <EditorialTopNav>
@@ -407,13 +533,21 @@ export default function Wingate() {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-5">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Landmark className="w-5 h-5 text-amber-400" />
-            <span className="text-xs font-bold text-amber-400 tracking-widest uppercase">Wingate · Historic Adaptive Reuse</span>
+            <AssetIcon className="w-5 h-5 text-amber-400" />
+            <span className="text-xs font-bold text-amber-400 tracking-widest uppercase">Wingate · {selectedClass.shortLabel}</span>
           </div>
-          <h1 className="text-2xl font-black text-foreground tracking-tight">Thesis Command</h1>
-          <p className="text-xs text-muted-foreground mt-1">Select a thesis → run → ranked assets by the A–G protocol (gates · confidence · rank score).</p>
+          <h1 className="text-2xl font-black text-foreground tracking-tight">{selectedClass.label} — Thesis Command</h1>
+          <p className="text-xs text-muted-foreground mt-1">{selectedClass.description}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Select value={assetClass} onValueChange={setAssetClass}>
+            <SelectTrigger className="h-9 w-52 text-xs bg-muted/30 border-border"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {listAssetClasses().map((classConfig) => (
+                <SelectItem key={classConfig.id} value={classConfig.id}>{classConfig.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={compilationId ? String(compilationId) : "none"} onValueChange={(v) => setCompilationId(v === "none" ? null : Number(v))}>
             <SelectTrigger className="h-9 w-56 text-xs bg-muted/30 border-border"><SelectValue placeholder="All assets (no thesis)" /></SelectTrigger>
             <SelectContent>
@@ -506,9 +640,9 @@ export default function Wingate() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{[...Array(4)].map((_, i) => <div key={i} className="h-40 rounded-xl bg-muted/20 animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Landmark className="w-10 h-10 text-amber-400/30 mb-3" />
-          <p className="text-sm font-semibold text-muted-foreground">No historic assets in the pipeline yet</p>
-          <p className="text-xs text-muted-foreground/60 mt-1 max-w-xs">Add a pre-1945 building, or import one in Scout. It scores against the A–G protocol on entry.</p>
+          <AssetIcon className="w-10 h-10 text-amber-400/30 mb-3" />
+          <p className="text-sm font-semibold text-muted-foreground">No {selectedClass.shortLabel.toLowerCase()} assets in the pipeline yet</p>
+          <p className="text-xs text-muted-foreground/60 mt-1 max-w-xs">Add an asset, or import one in Scout. It scores against the active thesis on entry.</p>
           <Button size="sm" className="mt-4 bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={() => setAddOpen(true)}><Plus className="w-3.5 h-3.5 mr-1.5" />Add First Asset</Button>
         </div>
       ) : (
@@ -519,7 +653,7 @@ export default function Wingate() {
 
       {/* Modals */}
       {selected && <ScorecardDrawer asset={selected} onClose={() => setSelected(null)} onRescored={() => search.refetch()} />}
-      <QuickAdd open={addOpen} onClose={() => setAddOpen(false)} onCreated={() => search.refetch()} />
+      <QuickAdd assetClass={assetClass} open={addOpen} onClose={() => setAddOpen(false)} onCreated={() => search.refetch()} />
       <Dialog open={clearOpen} onOpenChange={(v) => !v && setClearOpen(false)}>
         <DialogContent className="max-w-md bg-card border-border">
           <DialogHeader><DialogTitle className="text-rose-400">Clear the asset pipeline?</DialogTitle></DialogHeader>
