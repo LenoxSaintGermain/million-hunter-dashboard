@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import EditorialTopNav from "@/components/EditorialTopNav";
@@ -36,6 +37,9 @@ const TIER_META: Record<HistoricScore["assetTier"], { label: string; cls: string
   tier3:     { label: "Tier 3",     cls: "text-sky-400 border-sky-400/40 bg-sky-400/10" },
   archive:   { label: "Archive",    cls: "text-muted-foreground border-border bg-muted/20" },
 };
+
+const ASSET_STATUSES = ["new", "reviewing", "qualified", "rejected", "acquired"] as const;
+type AssetStatus = typeof ASSET_STATUSES[number];
 
 const fmtMoney = (n?: number | null) =>
   n == null ? "—" : n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(0)}k` : `$${n}`;
@@ -128,8 +132,21 @@ function RankedCard({ rank, asset, onSelect }: { rank: number; asset: ScoredAsse
 function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; onClose: () => void; onRescored: () => void }) {
   const s = asset.historicScore;
   const tier = TIER_META[s.assetTier];
+  const [, navigate] = useLocation();
+  const [status, setStatus] = useState<AssetStatus>((asset.status as AssetStatus) ?? "new");
   const aiScore = trpc.scout.scoreAsset.useMutation({
     onSuccess: (r) => toast.success(`AI narrative: ${r.summary}`),
+    onError: (e) => toast.error(e.message),
+  });
+  const convertToDeal = trpc.scout.convertToDeal.useMutation({
+    onSuccess: (r) => {
+      toast.success("Promoted to Deal Room");
+      navigate(r.dealId ? `/deal/${r.dealId}` : "/memos");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateStatus = trpc.scout.updateStatus.useMutation({
+    onSuccess: () => toast.success("Asset status updated"),
     onError: (e) => toast.error(e.message),
   });
   return (
@@ -233,13 +250,32 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
 
           <p className="text-[10px] text-muted-foreground/60 italic">{s.scorecard.marketNote} · {s.scorecard.sourceNote}</p>
 
-          <div className="flex gap-2 pt-1">
-            <Button size="sm" variant="outline" className="flex-1 border-amber-500/30 text-amber-400" onClick={() => aiScore.mutate({ id: asset.id })} disabled={aiScore.isPending}>
-              <Zap className="w-3.5 h-3.5 mr-1.5" />{aiScore.isPending ? "Generating…" : "AI narrative"}
-            </Button>
-            <Button size="sm" className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={() => { onRescored(); onClose(); }}>
-              Done
-            </Button>
+          <div className="space-y-2 pt-1">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Next actions</p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" className="flex-1 min-w-[145px] border-amber-500/30 text-amber-400" onClick={() => aiScore.mutate({ id: asset.id })} disabled={aiScore.isPending}>
+                <Zap className="w-3.5 h-3.5 mr-1.5" />{aiScore.isPending ? "Generating…" : "AI narrative"}
+              </Button>
+              <Button size="sm" variant="outline" className="flex-1 min-w-[165px] border-amber-500/30 text-amber-400" onClick={() => convertToDeal.mutate({ id: asset.id })} disabled={convertToDeal.isPending}>
+                {convertToDeal.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Landmark className="w-3.5 h-3.5 mr-1.5" />}
+                {convertToDeal.isPending ? "Promoting…" : "Promote to Deal Room"}
+              </Button>
+              <Select
+                value={status}
+                onValueChange={(nextStatus) => { const next = nextStatus as AssetStatus; setStatus(next); updateStatus.mutate({ id: asset.id, status: next }); }}
+                disabled={updateStatus.isPending}
+              >
+                <SelectTrigger className="h-9 min-w-[130px] flex-1 text-xs border-amber-500/30 bg-transparent text-amber-400">
+                  <SelectValue placeholder="Set status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ASSET_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button size="sm" className="flex-1 min-w-[70px] bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={() => { onRescored(); onClose(); }}>
+                Done
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -390,6 +426,13 @@ export default function Wingate() {
           <Button size="sm" className="h-9 bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={() => rescoreSave.mutate({ all: true, compilationId: compilationId ?? undefined })} disabled={rescoreSave.isPending}>
             {rescoreSave.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Play className="w-4 h-4 mr-1.5" />}Run &amp; Save
           </Button>
+          {search.isError ? (
+            <span className="text-xs text-rose-400 max-w-[220px] truncate" title={search.error.message}>{search.error.message}</span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+              {search.isFetching || rescoreSave.isPending ? <><Loader2 className="w-3 h-3 animate-spin" />Ranking…</> : <>{search.data?.count ?? 0} assets ranked{activeThesis ? ` · ${activeThesis.name || activeThesis.templateUsed}` : ""}</>}
+            </span>
+          )}
           <Button size="sm" variant="outline" className="h-9 border-border" onClick={() => setAddOpen(true)}><Plus className="w-4 h-4 mr-1.5" />Add</Button>
           <Button size="sm" variant="outline" className="h-9 border-rose-500/30 text-rose-400 hover:bg-rose-500/10" onClick={() => setClearOpen(true)}><Trash2 className="w-4 h-4 mr-1.5" />Clear</Button>
         </div>
