@@ -393,7 +393,10 @@ export const commercialAssets = mysqlTable("commercial_assets", {
   sourceUrl: text("source_url"),
   aiScore: float("ai_score"),
   aiAnalysis: text("ai_analysis"),
-  // ─── Historic Adaptive Reuse scoring (Wingate A–G protocol) ───────────────
+  // ─── Adaptive Asset-Class framework (shared/assetClasses.ts) ──────────────
+  assetClass: varchar("asset_class", { length: 64 }).default("historic"),
+  classMetadata: json("class_metadata"), // class-specific fields for non-native classes
+  // ─── Scoring (A–G for historic; generic engine maps dims onto A..G) ────────
   thesisCompilationId: int("thesis_compilation_id"),
   dimA: int("dim_a"),
   dimB: int("dim_b"),

@@ -1622,6 +1622,9 @@ Produce concrete remediation plan. Give go/no-go recommendation.`;
         hasAirRights: z.boolean().default(false),
         lotSqFt: z.number().int().optional(),
         higherAndBetterUseNotes: z.string().optional(),
+        // Adaptive framework: any asset class + its class-specific metadata.
+        assetClass: z.string().optional(),
+        classMetadata: z.record(z.string(), z.any()).optional(),
       }))
       .mutation(async ({ input }) => {
         const { createCommercialAsset } = await import("./db");
@@ -1705,7 +1708,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
       .input(z.object({ id: z.number().int().optional(), all: z.boolean().optional(), compilationId: z.number().int().optional() }))
       .mutation(async ({ input }) => {
         const { getCommercialAssetById, getCommercialAssets, persistHistoricScore } = await import("./db");
-        const { scoreHistoricAsset } = await import("./scoring/historicScore");
+        const { scoreAssetByClass } = await import("./scoring");
         let targets: any[] = [];
         if (input.id != null) {
           const a = await getCommercialAssetById(input.id);
@@ -1718,7 +1721,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         }
         let scored = 0;
         for (const a of targets) {
-          const s = scoreHistoricAsset(a);
+          const s = scoreAssetByClass(a);
           await persistHistoricScore(a.id, s, input.compilationId);
           scored++;
         }
@@ -1730,7 +1733,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
       .input(z.object({ compilationId: z.number().int().optional(), persist: z.boolean().optional() }))
       .query(async ({ input }) => {
         const { getCommercialAssets, persistHistoricScore } = await import("./db");
-        const { scoreHistoricAsset } = await import("./scoring/historicScore");
+        const { scoreAssetByClass } = await import("./scoring");
         const { getDb } = await import("./db");
         const { thesisCompilations } = await import("../drizzle/schema");
         const { eq } = await import("drizzle-orm");
@@ -1759,7 +1762,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         }
 
         const assets = await getCommercialAssets(filters);
-        const scored = assets.map((a: any) => ({ asset: a, score: scoreHistoricAsset(a) }));
+        const scored = assets.map((a: any) => ({ asset: a, score: scoreAssetByClass(a) }));
         scored.sort((x, y) => y.score.rankScore - x.score.rankScore);
 
         if (input.persist && input.compilationId != null) {
