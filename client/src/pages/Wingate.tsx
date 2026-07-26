@@ -509,6 +509,10 @@ export default function Wingate() {
     onSuccess: (r) => { toast.success(`Scored + saved ${r.scored} assets`); search.refetch(); },
     onError: (e) => toast.error(e.message),
   });
+  const research = trpc.scout.researchAssets.useMutation({
+    onSuccess: (r: any) => { toast.success(r?.message ?? "Sourced real assets"); search.refetch(); },
+    onError: (e: any) => toast.error(e.message),
+  });
   const bulkArchive = trpc.scout.bulkArchive.useMutation({
     onSuccess: (r) => { toast.success(`Archived ${r.archived} assets`); setClearOpen(false); search.refetch(); },
     onError: (e) => toast.error(e.message),
@@ -579,6 +583,12 @@ export default function Wingate() {
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
               {search.isFetching || rescoreSave.isPending ? <><Loader2 className="w-3 h-3 animate-spin" />Ranking…</> : <>{search.data?.count ?? 0} assets ranked{activeThesis ? ` · ${activeThesis.name || activeThesis.templateUsed}` : ""}</>}
             </span>
+          )}
+          {!isInvestor && (
+            <Button size="sm" variant="outline" className="h-9 border-border" onClick={() => research.mutate({ assetClass, limit: 6 })} disabled={research.isPending} title="Find real listings via sonar-pro">
+              {research.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Search className="w-4 h-4 mr-1.5" />}
+              {research.isPending ? "Sourcing…" : "Source real"}
+            </Button>
           )}
           <Button size="sm" variant="outline" className="h-9 border-border" onClick={() => setAddOpen(true)}><Plus className="w-4 h-4 mr-1.5" />Add</Button>
           <Button size="sm" variant="outline" className="h-9 border-rose-500/30 text-rose-400 hover:bg-rose-500/10" onClick={() => setClearOpen(true)}><Trash2 className="w-4 h-4 mr-1.5" />Clear</Button>
@@ -654,9 +664,29 @@ export default function Wingate() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <AssetIcon className="w-10 h-10 text-amber-400/30 mb-3" />
-          <p className="text-sm font-semibold text-muted-foreground">No {selectedClass.shortLabel.toLowerCase()} assets in the pipeline yet</p>
-          <p className="text-xs text-muted-foreground/60 mt-1 max-w-xs">Add an asset, or import one in Scout. It scores against the active thesis on entry.</p>
-          <Button size="sm" className="mt-4 bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={() => setAddOpen(true)}><Plus className="w-3.5 h-3.5 mr-1.5" />Add First Asset</Button>
+          {isInvestor ? (
+            <>
+              <p className="text-sm font-semibold text-foreground">Your {selectedClass.label} pipeline is being assembled</p>
+              <p className="text-xs text-muted-foreground mt-2 max-w-sm leading-relaxed">
+                {selectedClass.description}
+              </p>
+              <p className="text-xs text-muted-foreground/70 mt-3 max-w-sm">
+                Your operator is sourcing and verifying properties against this thesis. Every asset that appears here has been scored, gated, and confidence-rated — nothing is shown until it has been checked.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-muted-foreground">No {selectedClass.shortLabel.toLowerCase()} assets in the pipeline yet</p>
+              <p className="text-xs text-muted-foreground/60 mt-1 max-w-xs">Source real listings via research, add one manually, or import in Scout. Everything scores against the active thesis on entry.</p>
+              <div className="flex gap-2 mt-4">
+                <Button size="sm" variant="outline" className="border-border" onClick={() => research.mutate({ assetClass, limit: 6 })} disabled={research.isPending}>
+                  {research.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Search className="w-3.5 h-3.5 mr-1.5" />}
+                  {research.isPending ? "Sourcing…" : "Source real listings"}
+                </Button>
+                <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={() => setAddOpen(true)}><Plus className="w-3.5 h-3.5 mr-1.5" />Add manually</Button>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

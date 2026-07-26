@@ -1775,6 +1775,111 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         };
       }),
 
+    // ─── Source REAL listings for ANY asset class via sonar-pro ───────────────
+    // Adaptive: the research query is built from the class config, so a new
+    // bespoke thesis can source its own real, cited inventory with no new code.
+    researchAssets: protectedProcedure
+      .input(z.object({ assetClass: z.string().default("historic"), markets: z.array(z.string()).optional(), limit: z.number().int().min(1).max(12).default(6) }))
+      .mutation(async ({ input }) => {
+        const { getAssetClass } = await import("../shared/assetClasses");
+        const { createCommercialAsset, getCommercialAssets, persistHistoricScore } = await import("./db");
+        const { scoreAssetByClass } = await import("./scoring");
+        const cls = getAssetClass(input.assetClass);
+        const key = process.env.SONAR_API_KEY;
+        if (!key) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "SONAR_API_KEY not configured — live sourcing unavailable" });
+
+        const markets = (input.markets?.length ? input.markets : (cls.markets ?? []).slice(0, 4)).join(", ");
+        const fieldList = cls.fields.slice(0, 8).map((f) => `"${f.key}"`).join(", ");
+        const res = await fetch("https://api.perplexity.ai/v1/sonar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+          body: JSON.stringify({
+            model: "sonar-pro",
+            messages: [
+              { role: "system", content: "You are a commercial real-estate acquisition researcher. Report ONLY real properties you can find and cite that are currently listed for sale or publicly known to be available. NEVER invent properties, addresses, or figures. If a figure isn't stated in the source, omit it. Output ONLY a JSON array." },
+              { role: "user", content: `Find up to ${input.limit} REAL ${cls.label} properties currently listed for sale in: ${markets || "the United States"}. Thesis: ${cls.description}\n\nReturn ONLY a JSON array. Each object: "name", "address", "city", "state", "sourceUrl", plus whichever of these you can source: ${fieldList}. Omit anything not stated in the source — never guess.` },
+            ],
+          }),
+        });
+        if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Sonar API error ${res.status}` });
+        const data: any = await res.json();
+        const content: string = data.choices?.[0]?.message?.content ?? "";
+        const citations: string[] = Array.isArray(data.citations) ? data.citations : [];
+        let found: any[] = [];
+        const cleaned = content.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const tryParse = (t: string) => { try { return JSON.parse(t); } catch { return null; } };
+        let parsed: any = tryParse(cleaned);
+        if (!parsed) {
+          const a = cleaned.indexOf("["), b = cleaned.lastIndexOf("]");
+          if (a >= 0 && b > a) parsed = tryParse(cleaned.slice(a, b + 1));
+        }
+        if (!parsed) {
+          const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
+          if (a >= 0 && b > a) parsed = tryParse(cleaned.slice(a, b + 1));
+        }
+        if (Array.isArray(parsed)) found = parsed;
+        else if (parsed && typeof parsed === "object") {
+          const arr = Object.values(parsed).find((v) => Array.isArray(v));
+          if (Array.isArray(arr)) found = arr as any[];
+        }
+        if (!found.length) {
+          console.warn("[researchAssets] unparseable sonar content:", cleaned.slice(0, 500));
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Research returned no parseable properties — try again or narrow the markets" });
+        }
+
+        // Dedupe against what's already in the pipeline for this class.
+        const existing = await getCommercialAssets({ limit: 1000, assetClass: cls.id });
+        const seen = new Set(existing.map((a: any) => `${String(a.name).toLowerCase().trim()}|${String(a.city).toLowerCase().trim()}`));
+
+        const nativeKeys = new Set(["yearBuilt","stories","squareFootage","lotSqFt","occupancyRate","capRate","askingPrice","isHistoric","historicRegisterEligible","isStabilized","hasAirRights","higherAndBetterUseNotes","noi"]);
+        let created = 0;
+        const candidates = found.slice(0, input.limit);
+        for (let i = 0; i < candidates.length; i++) {
+          const p = candidates[i];
+          const name = String(p.name ?? "").trim();
+          const city = String(p.city ?? "").trim();
+          if (!name || seen.has(`${name.toLowerCase()}|${city.toLowerCase()}`)) continue;
+          const native: Record<string, any> = {};
+          const meta: Record<string, any> = {};
+          for (const f of cls.fields) {
+            const v = p[f.key];
+            if (v === undefined || v === null || v === "") continue;
+            // Sources report "$2,700,000" / "26,136 SF" / "92%" — strip to a number.
+            const toNum = (x: any) => { const n = parseFloat(String(x).replace(/[^0-9.\-]/g, "")); return Number.isFinite(n) ? n : NaN; };
+            let val: any;
+            if (f.type === "boolean") val = (v === true || v === "true");
+            else if (f.type === "percent") { const n = toNum(v); val = n > 1 ? n / 100 : n; }
+            else if (f.type === "number" || f.type === "currency" || f.type === "year") val = toNum(v);
+            else val = String(v);
+            if (typeof val === "number" && !Number.isFinite(val)) continue;
+            if (cls.scorer === "historic" && nativeKeys.has(f.key)) native[f.key] = val;
+            else meta[f.key] = val;
+          }
+          const now = Date.now();
+          await createCommercialAsset({
+            name: name.slice(0, 200),
+            address: String(p.address ?? city).slice(0, 500) || city,
+            city, state: String(p.state ?? "").slice(0, 50),
+            propertyType: "mixed_use",
+            assetClass: cls.id,
+            classMetadata: Object.keys(meta).length ? meta : undefined,
+            ...native,
+            source: "sonar-research",
+            sourceUrl: String(p.sourceUrl ?? citations[i] ?? citations[0] ?? ""),
+            createdAt: now, updatedAt: now,
+          } as any);
+          seen.add(`${name.toLowerCase()}|${city.toLowerCase()}`);
+          created++;
+        }
+
+        // Score everything freshly sourced so the client sees a ranked pipeline.
+        const all = await getCommercialAssets({ limit: 1000, assetClass: cls.id });
+        for (const a of all) {
+          if (a.compositeScore == null) await persistHistoricScore(a.id, scoreAssetByClass(a) as any);
+        }
+        return { created, researched: found.length, citations: citations.slice(0, 5), message: `Sourced ${created} real ${cls.shortLabel} propert${created === 1 ? "y" : "ies"} via sonar-pro` };
+      }),
+
     // ─── Bulk-clear: archive (soft) or delete (hard) many assets at once ──────
     bulkArchive: protectedProcedure
       .input(z.object({ ids: z.array(z.number().int()).optional(), all: z.boolean().optional() }))
