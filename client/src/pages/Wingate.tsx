@@ -19,7 +19,7 @@ import {
 import { toast } from "sonner";
 import {
   Landmark, Boxes, MapPin, Plus, Play, Trash2, Zap, CheckCircle2, XCircle,
-  AlertTriangle, ShieldCheck, Gauge, Building2, Star, Filter, Loader2, Search, FileText,
+  AlertTriangle, ShieldCheck, Gauge, Building2, Star, Filter, Loader2, Search, FileText, ExternalLink,
 } from "lucide-react";
 
 const ASSET_CLASS_ICONS: Record<string, typeof Landmark> = { Landmark, Boxes };
@@ -180,8 +180,19 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
   const tier = TIER_META[s.assetTier];
   const [, navigate] = useLocation();
   const [status, setStatus] = useState<AssetStatus>((asset.status as AssetStatus) ?? "new");
+  // Analyst narrative is rendered INLINE below (it used to vanish in a toast).
+  const [narrative, setNarrative] = useState<{ summary: string; strengths: string[]; risks: string[] } | null>(
+    asset.aiAnalysis ? { summary: String(asset.aiAnalysis), strengths: [], risks: [] } : null,
+  );
   const aiScore = trpc.scout.scoreAsset.useMutation({
-    onSuccess: (r) => toast.success(`AI narrative: ${r.summary}`),
+    onSuccess: (r: any) => { setNarrative({ summary: r.summary, strengths: r.strengths ?? [], risks: r.risks ?? [] }); toast.success("Analyst narrative ready"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const [verification, setVerification] = useState<any>(
+    asset.listingStatus ? { status: asset.listingStatus, note: asset.verificationNote, citations: asset.verificationSources ?? [] } : null,
+  );
+  const verify = trpc.scout.verifyListing.useMutation({
+    onSuccess: (r: any) => { setVerification(r); toast.success(`Listing checked: ${r.status}`); onRescored(); },
     onError: (e) => toast.error(e.message),
   });
   const convertToDeal = trpc.scout.convertToDeal.useMutation({
@@ -297,28 +308,103 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
           <p className="text-[10px] text-muted-foreground/60 italic">{s.scorecard.marketNote} · {s.scorecard.sourceNote}</p>
 
           <div className="space-y-2 pt-1">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Next actions</p>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" className="flex-1 min-w-[145px] border-amber-500/30 text-amber-400" onClick={() => aiScore.mutate({ id: asset.id })} disabled={aiScore.isPending}>
-                <Zap className="w-3.5 h-3.5 mr-1.5" />{aiScore.isPending ? "Generating…" : "AI narrative"}
-              </Button>
-              <Button size="sm" variant="outline" className="flex-1 min-w-[165px] border-amber-500/30 text-amber-400" onClick={() => convertToDeal.mutate({ id: asset.id })} disabled={convertToDeal.isPending}>
-                {convertToDeal.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Landmark className="w-3.5 h-3.5 mr-1.5" />}
-                {convertToDeal.isPending ? "Promoting…" : "Promote to Deal Room"}
-              </Button>
-              <Select
-                value={status}
-                onValueChange={(nextStatus) => { const next = nextStatus as AssetStatus; setStatus(next); updateStatus.mutate({ id: asset.id, status: next }); }}
-                disabled={updateStatus.isPending}
-              >
-                <SelectTrigger className="h-9 min-w-[130px] flex-1 text-xs border-amber-500/30 bg-transparent text-amber-400">
-                  <SelectValue placeholder="Set status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ASSET_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Button size="sm" className="flex-1 min-w-[70px] bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={() => { onRescored(); onClose(); }}>
+            {/* ── Provenance & freshness — click through and validate ────────── */}
+            <div className="rounded-lg border border-border bg-muted/10 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Source &amp; verification</p>
+                {(() => {
+                  const st = verification?.status ?? asset.listingStatus;
+                  const map: Record<string, string> = {
+                    active: "text-emerald-400 border-emerald-400/30 bg-emerald-400/10",
+                    stale: "text-amber-400 border-amber-400/30 bg-amber-400/10",
+                    withdrawn: "text-rose-400 border-rose-400/30 bg-rose-400/10",
+                    sold: "text-rose-400 border-rose-400/30 bg-rose-400/10",
+                    unknown: "text-muted-foreground border-border bg-muted/20",
+                  };
+                  return (
+                    <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full border", map[st] ?? "text-muted-foreground border-border bg-muted/20")}>
+                      {st ? String(st).toUpperCase() : "UNVERIFIED"}
+                    </span>
+                  );
+                })()}
+              </div>
+              {asset.sourceUrl ? (
+                <a href={asset.sourceUrl} target="_blank" rel="noopener noreferrer"
+                   className="flex items-center gap-1.5 text-[11px] text-amber-400 hover:underline break-all">
+                  <ExternalLink className="w-3 h-3 shrink-0" />{String(asset.sourceUrl).slice(0, 70)}
+                </a>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">No source URL on record — added manually.</p>
+              )}
+              <p className="text-[10px] text-muted-foreground">
+                {asset.lastVerifiedAt
+                  ? `Last checked ${Math.max(0, Math.round((Date.now() - Number(asset.lastVerifiedAt)) / 86400000))}d ago`
+                  : "Never checked against the live web"}
+                {asset.updatedAt ? ` · record updated ${new Date(Number(asset.updatedAt)).toLocaleDateString()}` : ""}
+              </p>
+              {(verification?.note ?? asset.verificationNote) && (
+                <p className="text-[11px] text-foreground/80 leading-relaxed border-l-2 border-amber-500/40 pl-2">
+                  {verification?.note ?? asset.verificationNote}
+                </p>
+              )}
+              {!!(verification?.citations?.length) && (
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {verification.citations.slice(0, 4).map((c: string, i: number) => (
+                    <a key={i} href={c} target="_blank" rel="noopener noreferrer"
+                       className="text-[9px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-amber-400 hover:border-amber-500/40">
+                      source {i + 1}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── Analyst narrative (rendered inline, not a toast) ───────────── */}
+            {narrative && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+                <p className="text-[10px] font-bold text-primary uppercase tracking-wide">Analyst narrative</p>
+                <p className="text-xs text-foreground/90 leading-relaxed">{narrative.summary}</p>
+                {(narrative.strengths.length > 0 || narrative.risks.length > 0) && (
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      {narrative.strengths.slice(0, 3).map((x, i) => <p key={i} className="text-[10px] text-emerald-400/90">✓ {x}</p>)}
+                    </div>
+                    <div>
+                      {narrative.risks.slice(0, 3).map((x, i) => <p key={i} className="text-[10px] text-rose-400/90">! {x}</p>)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Actions: verify → analyze → advance ────────────────────────── */}
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Next actions</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button size="sm" variant="outline" className="border-border justify-start" onClick={() => verify.mutate({ id: asset.id })} disabled={verify.isPending}>
+                  {verify.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5 mr-2 text-emerald-400" />}
+                  <span className="truncate">{verify.isPending ? "Checking…" : "Verify listing"}</span>
+                </Button>
+                <Button size="sm" variant="outline" className="border-border justify-start" onClick={() => aiScore.mutate({ id: asset.id })} disabled={aiScore.isPending}>
+                  {aiScore.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Zap className="w-3.5 h-3.5 mr-2 text-amber-400" />}
+                  <span className="truncate">{aiScore.isPending ? "Analyzing…" : "Analyst narrative"}</span>
+                </Button>
+                <Button size="sm" variant="outline" className="border-border justify-start" onClick={() => convertToDeal.mutate({ id: asset.id })} disabled={convertToDeal.isPending}>
+                  {convertToDeal.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Landmark className="w-3.5 h-3.5 mr-2 text-amber-400" />}
+                  <span className="truncate">{convertToDeal.isPending ? "Promoting…" : "Promote to Deal Room"}</span>
+                </Button>
+                <Select
+                  value={status}
+                  onValueChange={(nextStatus) => { const next = nextStatus as AssetStatus; setStatus(next); updateStatus.mutate({ id: asset.id, status: next }); }}
+                  disabled={updateStatus.isPending}
+                >
+                  <SelectTrigger className="h-9 text-xs border-border bg-transparent"><SelectValue placeholder="Set status" /></SelectTrigger>
+                  <SelectContent>
+                    {ASSET_STATUSES.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button size="sm" className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={() => { onRescored(); onClose(); }}>
                 Done
               </Button>
             </div>

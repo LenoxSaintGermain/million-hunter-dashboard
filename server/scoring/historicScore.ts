@@ -210,9 +210,23 @@ export function scoreHistoricAsset(a: ScorableAsset): HistoricScore {
   const E: Factor[] = [];
   const replCost = h.replacementCostPerSf ?? REPLACEMENT_COST_PER_SF;
   let basisRatio: number | null = null;
-  if (a.askingPrice && a.squareFootage) basisRatio = (a.askingPrice / a.squareFootage) / replCost;
+  // Guard against headline/auction prices ("$1 starting bid", $0 placeholders):
+  // a nominal number is NOT a real basis and must never earn deep-basis points.
+  const PLAUSIBLE_MIN_PRICE = 50_000;
+  const priceIsPlausible = !!a.askingPrice && a.askingPrice >= PLAUSIBLE_MIN_PRICE;
+  if (priceIsPlausible && a.squareFootage) basisRatio = (a.askingPrice! / a.squareFootage) / replCost;
+  const nominalPrice = !!a.askingPrice && a.askingPrice < PLAUSIBLE_MIN_PRICE;
   const basisPts = basisRatio == null ? 1 : basisRatio < 0.25 ? 5 : basisRatio <= 0.4 ? 3 : basisRatio <= 0.6 ? 1 : 0;
-  E.push({ label: "Basis ratio", points: basisPts, max: 5, note: basisRatio == null ? "unknown (need ask + GSF)" : `${basisRatio.toFixed(2)} ($/SF ÷ $${replCost})`, verify: basisRatio == null });
+  E.push({
+    label: "Basis ratio",
+    points: basisPts,
+    max: 5,
+    note: basisRatio != null ? `${basisRatio.toFixed(2)} ($/SF ÷ $${replCost})`
+      : nominalPrice ? `nominal/auction price ($${a.askingPrice!.toLocaleString()}) — not a basis; verify true clearing price`
+      : "unknown (need ask + GSF)",
+    verify: basisRatio == null,
+  });
+  if (nominalPrice) risks.push(`Headline price of $${a.askingPrice!.toLocaleString()} is nominal (auction/placeholder) — true acquisition basis unverified`);
   if (basisRatio != null && basisRatio < 0.25) strengths.push(`Deep basis: ${basisRatio.toFixed(2)}× replacement cost`);
   const sig2 = h.sellerMotivationSignals?.length ?? 0;
   E.push({ label: "Seller motivation", points: sig2 >= 2 ? 4 : sig2 === 1 ? 2 : 0, max: 4, note: sig2 ? `${sig2} signal(s)` : "none/unverified", verify: h.sellerMotivationSignals == null });

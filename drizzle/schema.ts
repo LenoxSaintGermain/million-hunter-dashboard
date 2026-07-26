@@ -418,6 +418,13 @@ export const commercialAssets = mysqlTable("commercial_assets", {
   scorecard: json("scorecard"),                          // full computed A–G breakdown
   isArchived: boolean("is_archived").notNull().default(false),
   archivedAt: bigint("archived_at", { mode: "number" }),
+  // ─── Provenance & freshness (premium trust layer) ─────────────────────────
+  // Listings go stale fast (auctions close, listings withdraw). Every asset
+  // carries when it was last checked, what the check found, and its sources.
+  lastVerifiedAt: bigint("last_verified_at", { mode: "number" }),
+  listingStatus: varchar("listing_status", { length: 24 }), // active | stale | withdrawn | unknown
+  verificationNote: text("verification_note"),
+  verificationSources: json("verification_sources"),
   status: mysqlEnum("status", ["new", "reviewing", "qualified", "rejected", "acquired"]).notNull().default("new"),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),

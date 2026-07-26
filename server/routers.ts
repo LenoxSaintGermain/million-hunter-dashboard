@@ -1907,6 +1907,63 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         return { created, researched: found.length, citations: citations.slice(0, 5), message: `Sourced ${created} real ${cls.shortLabel} propert${created === 1 ? "y" : "ies"} via sonar-pro` };
       }),
 
+    // ─── Freshness check: is this listing STILL real, and at what price? ──────
+    // Listings go stale fast (auctions close, listings withdraw, prices move).
+    // This re-checks the live web and records status + sources so a human can
+    // click through and validate. Never guesses — "unknown" is a valid answer.
+    verifyListing: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ input }) => {
+        const { getCommercialAssetById, getDb } = await import("./db");
+        const asset: any = await getCommercialAssetById(input.id);
+        if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+        const key = process.env.SONAR_API_KEY;
+        if (!key) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "SONAR_API_KEY not configured" });
+
+        const today = new Date().toISOString().slice(0, 10);
+        const res = await fetch("https://api.perplexity.ai/v1/sonar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+          body: JSON.stringify({
+            model: "sonar-pro",
+            messages: [
+              { role: "system", content: "You verify whether a commercial property is currently available. Use only sourced facts. If you cannot confirm current status, say unknown. Output ONLY a JSON object." },
+              { role: "user", content: `As of ${today}, what is the CURRENT status of this property?\n\nProperty: ${asset.name}\nAddress: ${asset.address}, ${asset.city}, ${asset.state}\nPreviously seen at: ${asset.sourceUrl || "unknown source"}\n\nReturn ONLY: {"status":"active|stale|withdrawn|sold|unknown","currentAskingPrice":number|null,"asOf":"YYYY-MM-DD or null","note":"1-2 sentences citing what the sources actually say — include any auction date that has already passed, withdrawal, or sale"}` },
+            ],
+          }),
+        });
+        if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Sonar API error ${res.status}` });
+        const data: any = await res.json();
+        const content: string = data.choices?.[0]?.message?.content ?? "";
+        const citations: string[] = Array.isArray(data.citations) ? data.citations : [];
+        const cleaned = content.replace(/```json/gi, "").replace(/```/g, "").trim();
+        let parsed: any = null;
+        try { parsed = JSON.parse(cleaned); } catch {
+          const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
+          if (a >= 0 && b > a) { try { parsed = JSON.parse(cleaned.slice(a, b + 1)); } catch { /* keep null */ } }
+        }
+        const allowed = ["active", "stale", "withdrawn", "sold", "unknown"];
+        const status: string = allowed.includes(parsed?.status) ? parsed.status : "unknown";
+        const note: string = String(parsed?.note ?? "Could not confirm current listing status from available sources.").slice(0, 1000);
+
+        const db = await getDb();
+        if (db) {
+          const { commercialAssets } = await import("../drizzle/schema");
+          const { eq } = await import("drizzle-orm");
+          const price = typeof parsed?.currentAskingPrice === "number" && parsed.currentAskingPrice > 0 ? parsed.currentAskingPrice : null;
+          await db.update(commercialAssets).set({
+            lastVerifiedAt: Date.now(),
+            listingStatus: status,
+            verificationNote: note,
+            verificationSources: citations.slice(0, 6) as any,
+            // Only correct the price when the check found a real one.
+            ...(price ? { askingPrice: price } : {}),
+            updatedAt: Date.now(),
+          }).where(eq(commercialAssets.id, input.id));
+        }
+        return { status, note, citations: citations.slice(0, 6), currentAskingPrice: parsed?.currentAskingPrice ?? null, asOf: parsed?.asOf ?? null };
+      }),
+
     // ─── Bulk-clear: archive (soft) or delete (hard) many assets at once ──────
     bulkArchive: protectedProcedure
       .input(z.object({ ids: z.array(z.number().int()).optional(), all: z.boolean().optional() }))
