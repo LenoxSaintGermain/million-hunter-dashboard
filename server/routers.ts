@@ -1788,21 +1788,44 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         const key = process.env.SONAR_API_KEY;
         if (!key) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "SONAR_API_KEY not configured — live sourcing unavailable" });
 
-        const markets = (input.markets?.length ? input.markets : (cls.markets ?? []).slice(0, 4)).join(", ");
+        // Map state abbreviations to city names for better sonar search quality
+        const STATE_CITIES: Record<string, string> = {
+          IL: "Chicago, IL", IN: "Indianapolis, IN", OH: "Columbus, OH",
+          KY: "Louisville, KY", TN: "Nashville, TN", GA: "Atlanta, GA",
+          SC: "Charleston, SC", NC: "Charlotte, NC", AL: "Birmingham, AL",
+          MO: "St. Louis, MO", KS: "Kansas City, KS", TX: "Dallas, TX",
+          FL: "Tampa, FL", VA: "Richmond, VA", MI: "Detroit, MI",
+        };
+        const rawMarkets = input.markets?.length ? input.markets : (cls.markets ?? []).slice(0, 4);
+        const markets = rawMarkets.map((m: string) => STATE_CITIES[m.toUpperCase()] ?? m).join(", ");
         const fieldList = cls.fields.slice(0, 8).map((f) => `"${f.key}"`).join(", ");
-        const res = await fetch("https://api.perplexity.ai/v1/sonar", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-          body: JSON.stringify({
-            model: "sonar-pro",
-            messages: [
-              { role: "system", content: "You are a commercial real-estate acquisition researcher. Report ONLY real properties you can find and cite that are currently listed for sale or publicly known to be available. NEVER invent properties, addresses, or figures. If a figure isn't stated in the source, omit it. Output ONLY a JSON array." },
-              { role: "user", content: `Find up to ${input.limit} REAL ${cls.label} properties currently listed for sale in: ${markets || "the United States"}. Thesis: ${cls.description}\n\nReturn ONLY a JSON array. Each object: "name", "address", "city", "state", "sourceUrl", plus whichever of these you can source: ${fieldList}. Omit anything not stated in the source — never guess.` },
-            ],
-          }),
-        });
-        if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Sonar API error ${res.status}` });
-        const data: any = await res.json();
+
+        const sonarPrompt = `Find up to ${input.limit} REAL ${cls.label} properties currently listed for sale in: ${markets || "the United States"}. Thesis: ${cls.description}\n\nReturn ONLY a JSON array — no prose, no explanation. Each object: "name", "address", "city", "state", "sourceUrl", plus whichever of these you can source: ${fieldList}. Omit anything not stated in the source — never guess.`;
+
+        const callSonar = async (endpoint: string) => {
+          const r = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+            body: JSON.stringify({
+              model: "sonar-pro",
+              messages: [
+                { role: "system", content: "You are a commercial real-estate acquisition researcher. Output ONLY a valid JSON array. No prose, no markdown fences, no explanation. Start your response with [ and end with ]." },
+                { role: "user", content: sonarPrompt },
+              ],
+            }),
+          });
+          if (!r.ok) throw new Error(`Sonar ${r.status}`);
+          return r.json();
+        };
+
+        let data: any;
+        try {
+          data = await callSonar("https://api.perplexity.ai/v1/sonar");
+        } catch {
+          // Fallback to /chat/completions endpoint
+          data = await callSonar("https://api.perplexity.ai/chat/completions");
+        }
+
         const content: string = data.choices?.[0]?.message?.content ?? "";
         const citations: string[] = Array.isArray(data.citations) ? data.citations : [];
         let found: any[] = [];
@@ -1817,14 +1840,18 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
           const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
           if (a >= 0 && b > a) parsed = tryParse(cleaned.slice(a, b + 1));
         }
-        if (Array.isArray(parsed)) found = parsed;
-        else if (parsed && typeof parsed === "object") {
+        // Handle case where sonar returns a single object instead of array
+        if (!Array.isArray(parsed) && parsed && typeof parsed === "object") {
           const arr = Object.values(parsed).find((v) => Array.isArray(v));
           if (Array.isArray(arr)) found = arr as any[];
+          else if (parsed.name) found = [parsed]; // single property object
+        } else if (Array.isArray(parsed)) {
+          found = parsed;
         }
         if (!found.length) {
           console.warn("[researchAssets] unparseable sonar content:", cleaned.slice(0, 500));
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Research returned no parseable properties — try again or narrow the markets" });
+          // Return graceful empty result instead of throwing — user can retry
+          return { created: 0, researched: 0, citations: [], message: `Sonar returned no parseable listings for ${markets} — try again or adjust markets` };
         }
 
         // Dedupe against what's already in the pipeline for this class.

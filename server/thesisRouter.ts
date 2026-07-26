@@ -209,18 +209,36 @@ export const thesisRouter = router({
                 schema: COMPILATION_SCHEMA,
               },
             },
-            max_tokens: 2048,
+            max_tokens: 4096,
           }),
-          signal: AbortSignal.timeout(55000),
+          signal: AbortSignal.timeout(60000),
         });
         if (!forgeRes.ok) {
           const errText = await forgeRes.text();
           throw new Error(`Forge API error ${forgeRes.status}: ${errText.slice(0, 200)}`);
         }
         const forgeJson = await forgeRes.json() as any;
-        const rawContent = forgeJson.choices?.[0]?.message?.content;
-        if (!rawContent) {
-          throw new Error(`Empty response from STRATEGIST — finish_reason: ${forgeJson.choices?.[0]?.finish_reason}`);
+        let rawContent = forgeJson.choices?.[0]?.message?.content;
+        const finishReason = forgeJson.choices?.[0]?.finish_reason;
+        // If truncated (finish_reason=length), retry without json_schema constraint
+        if (!rawContent || finishReason === "length") {
+          const retryRes = await fetch(forgeUrl, {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: `Bearer ${ENV.forgeApiKey}` },
+            body: JSON.stringify({
+              model: "gemini-3.6-flash",
+              messages: [
+                { role: "system", content: "You are STRATEGIST, a deal thesis compiler. Return ONLY a JSON object, no markdown, no explanation." },
+                { role: "user", content: `Compile this investment thesis into a JSON object with EXACTLY these keys:\n- compiledFilters: {revenueMin, revenueMax, geographies (state abbrevs array), businessAgeMin, headcountMin, headcountMax, exclusions (array)}\n- scoringWeights: array of {dimension, weight (integer 1-100), isCustom (bool)}, weights sum to 100\n- evidenceRequirements: string array\n- autoDisqualifiers: string array\n- confidenceNotes: string array\n- estimatedTargetsMin, estimatedTargetsMax (integers)\n- estimatedCostMin, estimatedCostMax (integers, USD thousands)\n- suggestedName (3-6 words)\n\nAll numbers as plain integers. Return ONLY the JSON object.\n\nThesis: ${input.thesisText}` },
+              ],
+              max_tokens: 4096,
+            }),
+            signal: AbortSignal.timeout(60000),
+          });
+          if (!retryRes.ok) throw new Error(`Retry Forge error ${retryRes.status}`);
+          const retryJson = await retryRes.json() as any;
+          rawContent = retryJson.choices?.[0]?.message?.content;
+          if (!rawContent) throw new Error(`Empty response on retry — finish_reason: ${retryJson.choices?.[0]?.finish_reason}`);
         }
         // Strip markdown code fences if present
         const stripped = rawContent.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
