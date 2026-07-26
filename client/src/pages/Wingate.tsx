@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import { getAssetClass, listAssetClasses } from "@shared/assetClasses";
 import type { AssetClass, FieldDef } from "@shared/assetClasses";
 import EditorialTopNav from "@/components/EditorialTopNav";
+import InvestorLayout from "@/components/InvestorLayout";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -492,6 +494,17 @@ export default function Wingate() {
     { refetchOnWindowFocus: false },
   );
   const utils = trpc.useUtils();
+  // Client (investor) view: render inside the investor shell — never expose
+  // operator tooling — and default to the thesis they chose during intake.
+  const { user } = useAuth();
+  const isInvestor = (user as any)?.role === "investor";
+  const Shell = isInvestor ? InvestorLayout : EditorialTopNav;
+  const dna = trpc.investor.getDnaStatus.useQuery(undefined, { enabled: isInvestor });
+  useEffect(() => {
+    const urlClass = new URLSearchParams(window.location.search).get("class");
+    const saved = (dna.data as any)?.assetClass;
+    if (!urlClass && saved && saved !== assetClass) setAssetClass(getAssetClass(saved).id);
+  }, [dna.data]);
   const rescoreSave = trpc.scout.scoreHistoric.useMutation({
     onSuccess: (r) => { toast.success(`Scored + saved ${r.scored} assets`); search.refetch(); },
     onError: (e) => toast.error(e.message),
@@ -528,7 +541,7 @@ export default function Wingate() {
   const AssetIcon = ASSET_CLASS_ICONS[selectedClass.icon] ?? Landmark;
 
   return (
-    <EditorialTopNav>
+    <Shell>
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-5">
         <div>
@@ -665,6 +678,6 @@ export default function Wingate() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </EditorialTopNav>
+    </Shell>
   );
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `investor_dna` ADD `asset_class` varchar(64) DEFAULT 'historic';

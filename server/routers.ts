@@ -2428,10 +2428,10 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
     // Get investor DNA status (quiz completed? archetype?)
     getDnaStatus: protectedProcedure.query(async ({ ctx }) => {
       const db = await getDb();
-      if (!db) return { quizCompleted: false, archetypeCode: null, archetypeLabel: null };
+      if (!db) return { quizCompleted: false, archetypeCode: null, archetypeLabel: null, assetClass: "historic" };
       const { investorDna } = await import("../drizzle/schema");
       const result = await db.select().from(investorDna).where(eq(investorDna.userId, ctx.user.id)).limit(1);
-      if (!result[0]) return { quizCompleted: false, archetypeCode: null, archetypeLabel: null };
+      if (!result[0]) return { quizCompleted: false, archetypeCode: null, archetypeLabel: null, assetClass: "historic" };
       return {
         quizCompleted: result[0].quizCompleted,
         archetypeCode: result[0].archetypeCode,
@@ -2441,6 +2441,7 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
         liquidityNeed: result[0].liquidityNeed,
         esgConviction: result[0].esgConviction,
         sectorAffinity: result[0].sectorAffinity ?? [],
+        assetClass: result[0].assetClass ?? "historic",
       };
     }),
 
@@ -2451,6 +2452,7 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
       liquidityNeed: z.number().min(0).max(1),
       esgConviction: z.number().min(0).max(1),
       sectorAffinity: z.array(z.string()),
+      assetClass: z.string().optional(),
     })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
@@ -2483,6 +2485,7 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
           sectorAffinity: input.sectorAffinity,
           archetypeCode,
           archetypeLabel,
+          ...(input.assetClass ? { assetClass: input.assetClass } : {}),
           quizCompleted: true,
         }).where(eq(investorDna.userId, ctx.user.id));
       } else {
@@ -2495,6 +2498,7 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
           sectorAffinity: input.sectorAffinity,
           archetypeCode,
           archetypeLabel,
+          assetClass: input.assetClass ?? "historic",
           quizCompleted: true,
         });
       }

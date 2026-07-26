@@ -531,6 +531,9 @@ export const investorDna = mysqlTable("investor_dna", {
   archetypeCode: varchar("archetype_code", { length: 32 }),
   archetypeLabel: varchar("archetype_label", { length: 128 }),
   // Whether onboarding quiz is complete
+  // Which bespoke thesis this investor acquires (shared/assetClasses.ts id).
+  // Drives their landing surface, pipeline, and scoring model.
+  assetClass: varchar("asset_class", { length: 64 }).default("historic"),
   quizCompleted: boolean("quiz_completed").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

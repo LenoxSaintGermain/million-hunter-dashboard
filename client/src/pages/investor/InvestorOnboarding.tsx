@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { listAssetClasses, getAssetClass } from "@shared/assetClasses";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -169,6 +170,7 @@ export default function InvestorOnboarding() {
   const [direction, setDirection] = useState(1);
   const [quiz, setQuiz] = useState<QuizState>(INITIAL_STATE);
   const [archetype, setArchetype] = useState<{ code: string; label: string } | null>(null);
+  const [assetClass, setAssetClass] = useState<string>("historic");
 
   const utils = trpc.useUtils();
   const markComplete = trpc.user.markOnboardingComplete.useMutation();
@@ -191,7 +193,7 @@ export default function InvestorOnboarding() {
 
   const goNext = () => {
     if (isLastQuizStep) {
-      saveDna.mutate(quiz);
+      saveDna.mutate({ ...quiz, assetClass });
     } else {
       setDirection(1);
       setStep((s) => s + 1);
@@ -223,23 +225,38 @@ export default function InvestorOnboarding() {
           which risks to weight, which sectors to flag, and which deal structures to reject before you've spent a dollar.
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        {[
-          { icon: "⚡", label: "5 questions", sub: "Takes 2 minutes" },
-          { icon: "🛡", label: "Risk-weighted lens", sub: "Flags your failure modes first" },
-          { icon: "🔒", label: "Operator-controlled", sub: "Every analysis on demand" },
-          { icon: "⚠️", label: "Landmine detection", sub: "Before you commission diligence" },
-        ].map((item) => (
-          <div
-            key={item.label}
-            className="rounded-xl p-4 text-left"
-            style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border)" }}
-          >
-            <div className="text-2xl mb-2">{item.icon}</div>
-            <div className="font-medium" style={{ color: "var(--sh-text-primary)" }}>{item.label}</div>
-            <div className="text-xs mt-0.5" style={{ color: "var(--sh-text-secondary)" }}>{item.sub}</div>
-          </div>
-        ))}
+      {/* Thesis selection — generated from the asset-class registry, so a new
+          bespoke thesis appears here automatically with no code changes. */}
+      <div className="text-left space-y-3">
+        <p className="text-xs font-medium" style={{ color: "var(--sh-text-secondary)", fontFamily: "var(--font-mono)", letterSpacing: "0.1em" }}>
+          FIRST — WHAT DO YOU ACQUIRE?
+        </p>
+        <div className="grid grid-cols-1 gap-2">
+          {listAssetClasses().map((cls) => {
+            const active = assetClass === cls.id;
+            return (
+              <button
+                key={cls.id}
+                type="button"
+                onClick={() => setAssetClass(cls.id)}
+                className="rounded-xl p-4 text-left transition-all"
+                style={{
+                  background: active ? "var(--sh-primary-10, rgba(255,186,32,0.10))" : "var(--sh-surface-2)",
+                  border: `1px solid ${active ? "var(--sh-signal)" : "var(--sh-border)"}`,
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-medium" style={{ color: "var(--sh-text-primary)" }}>{cls.label}</div>
+                  {active && <span className="text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>SELECTED</span>}
+                </div>
+                <div className="text-xs mt-1" style={{ color: "var(--sh-text-secondary)", lineHeight: 1.6 }}>{cls.description}</div>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs" style={{ color: "var(--sh-text-secondary)" }}>
+          Your pipeline, scoring model, and diligence checks are configured for this thesis.
+        </p>
       </div>
     </div>,
 
@@ -542,11 +559,11 @@ export default function InvestorOnboarding() {
             </button>
           ) : (
             <button
-              onClick={() => navigate("/investor")}
+              onClick={() => navigate(`/wingate?class=${assetClass}`)}
               className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium text-sm"
               style={{ background: "var(--sh-signal)", color: "var(--sh-bg)", fontFamily: "var(--font-display)" }}
             >
-              Enter the Deal Room
+              Enter Your Thesis Command
               <ChevronRight className="w-4 h-4" />
             </button>
           )}
