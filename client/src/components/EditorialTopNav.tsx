@@ -73,7 +73,7 @@ const MORE_NAV = [
 // data — it must never carry a "Sonar"/"Live" badge. Opportunity Radar IS
 // genuinely sonar-pro backed with citations (005 WP-DR2), so "Live" is honest there.
 const LABS_NAV = [
-  { label: "Market Scan", href: "/scan", icon: Scan, badge: "Synthetic" },
+  { label: "Market Scan", href: "/scan", icon: Scan, badge: "Sonar" },
   { label: "Opportunity Radar", href: "/opportunity-radar", icon: Radar, badge: "Live" },
 ];
 

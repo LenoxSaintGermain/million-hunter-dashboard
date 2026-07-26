@@ -2831,79 +2831,49 @@ async function runScanPipeline(
   await phase("Scanning marketplaces", `Fetching listings from ${sources.join(", ")}`, 10);
   await new Promise((r) => setTimeout(r, 1500));
 
-  // Generate fresh, unique listings via LLM — no static seed data ever touches the DB
-  const { invokeLLM } = await import("./_core/llm");
+  // Fetch REAL, currently-listed businesses for sale via Perplexity sonar-pro
+  // (live web research with citations) — never fabricate listings or financials.
   const locationHint = targetLocations.length > 0
-    ? `Focus listings in these markets: ${targetLocations.join(", ")}.`
-    : "Use a mix of Southeast US markets (Atlanta, Charlotte, Raleigh, Tampa, Nashville, Birmingham, Houston).";
+    ? `Focus on these markets: ${targetLocations.join(", ")}.`
+    : "Focus on Southeast/Sun Belt US markets (Atlanta, Charlotte, Raleigh, Tampa, Nashville, Birmingham, Houston).";
   const sourceHint = sources.join(", ");
 
-  let listings: Array<{ name: string; industry: string; location: string; revenue: number; cashFlow: number; askingPrice: number; multiple: number; employees: number; yearEstablished: number; source: string }> = [];
+  let listings: Array<{ name: string; industry: string; location: string; revenue: number; cashFlow: number; askingPrice: number; multiple: number; employees: number; yearEstablished: number; source: string; listingUrl?: string }> = [];
   try {
-    const llmRes = await invokeLLM({
-      messages: [
-        {
-          role: "system",
-          content: `You are a business acquisition research assistant. Generate realistic small-to-mid-market business listings for sale that would appear on ${sourceHint}. Each listing must be unique — never repeat business names across sessions. Return ONLY valid JSON, no markdown fences.`,
-        },
-        {
-          role: "user",
-          content: `Generate ${4 + sources.length} realistic business-for-sale listings. ${locationHint}
-
-Rules:
-- Industries: HVAC, Commercial Cleaning, Plumbing, Electrical, Pest Control, Landscaping, Logistics, Pool Services, Medical Staffing, Roofing, or similar recession-resistant service businesses
-- Revenue: $1M–$10M range
-- Cash flow: 25%–35% of revenue
-- Asking price: 3x–4.5x cash flow multiple
-- Employees: 10–60
-- Year established: 2005–2020
-- Names must be realistic and location-specific (include city/region in name)
-- Source must be one of: ${sourceHint.split(", ").map(s => `"${s}"`).join(", ")}
-
-Return a JSON array with this exact schema:
-[{ "name": string, "industry": string, "location": string, "revenue": number, "cashFlow": number, "askingPrice": number, "multiple": number, "employees": number, "yearEstablished": number, "source": string }]`,
-        },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "listings",
-          strict: true,
-          schema: {
-            type: "object",
-            properties: {
-              listings: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string" },
-                    industry: { type: "string" },
-                    location: { type: "string" },
-                    revenue: { type: "number" },
-                    cashFlow: { type: "number" },
-                    askingPrice: { type: "number" },
-                    multiple: { type: "number" },
-                    employees: { type: "number" },
-                    yearEstablished: { type: "number" },
-                    source: { type: "string" },
-                  },
-                  required: ["name", "industry", "location", "revenue", "cashFlow", "askingPrice", "multiple", "employees", "yearEstablished", "source"],
-                  additionalProperties: false,
-                },
-              },
-            },
-            required: ["listings"],
-            additionalProperties: false,
-          },
-        },
-      },
+    const key = process.env.SONAR_API_KEY;
+    if (!key) throw new Error("SONAR_API_KEY not configured");
+    const res = await fetch("https://api.perplexity.ai/v1/sonar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: "sonar-pro",
+        messages: [
+          { role: "system", content: "You are a business-acquisition research analyst. Report ONLY real businesses currently listed for sale that you can find and cite. Never invent listings, names, or financials. If a figure is not stated in the source, use 0. Always include the real listing-page URL. Output ONLY a JSON array." },
+          { role: "user", content: `Find up to ${4 + sources.length} REAL businesses currently for sale on ${sourceHint}. ${locationHint} Prefer recession-resistant service businesses (HVAC, commercial cleaning, plumbing, electrical, pest control, logistics, roofing) with cash flow around or above $${Math.round(minCashFlow / 1000)}k. For each real listing return an object: {"name","industry","location","revenue","cashFlow","askingPrice","multiple","employees","yearEstablished","source","listingUrl"}. Use 0 for any figure not stated in the source. "listingUrl" MUST be the real listing page. Return ONLY a JSON array — no prose.` },
+        ],
+      }),
     });
-    const raw = llmRes?.choices?.[0]?.message?.content;
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    listings = Array.isArray(parsed) ? parsed : (parsed?.listings ?? []);
+    if (!res.ok) throw new Error(`Sonar API error ${res.status}`);
+    const data: any = await res.json();
+    const content: string = data.choices?.[0]?.message?.content ?? "";
+    const citations: string[] = Array.isArray(data.citations) ? data.citations : [];
+    const match = content.match(/\[[\s\S]*\]/);
+    const arr: any[] = match ? JSON.parse(match[0]) : [];
+    listings = (Array.isArray(arr) ? arr : []).map((l: any, i: number) => ({
+      name: String(l.name ?? "").slice(0, 200),
+      industry: String(l.industry ?? "Service Business"),
+      location: String(l.location ?? targetLocations[0] ?? ""),
+      revenue: Number(l.revenue) || 0,
+      cashFlow: Number(l.cashFlow) || 0,
+      askingPrice: Number(l.askingPrice) || 0,
+      multiple: Number(l.multiple) || 0,
+      employees: Number(l.employees) || 0,
+      yearEstablished: Number(l.yearEstablished) || 0,
+      source: String(l.source ?? sources[0] ?? "market-research"),
+      listingUrl: String(l.listingUrl ?? citations[i] ?? citations[0] ?? ""),
+    })).filter((l) => l.name);
   } catch (e) {
-    console.warn("[Scan] LLM listing generation failed, scan will complete with 0 listings:", e);
+    console.warn("[Scan] Sonar listing research failed, scan completes with 0 listings:", e);
     listings = [];
   }
 
@@ -2930,9 +2900,9 @@ Return a JSON array with this exact schema:
     if (existingId) {
       dealId = existingId;
     } else {
-      // Market Scan listings are LLM-generated — flag synthetic so they are
-      // distinguishable and bulk-purgeable (deals.bulkDelete syntheticOnly).
-      const res = await createDeal({ ...listing, stage: "new", isSynthetic: true }) as any;
+      // Market Scan now pulls REAL sonar-sourced listings with real listingUrls —
+      // no longer synthetic.
+      const res = await createDeal({ ...listing, stage: "new", isSynthetic: false }) as any;
       // ON DUPLICATE KEY UPDATE returns insertId=0 for updates — re-fetch if needed
       dealId = res[0].insertId || (await getDealIdByNameSource(listing.name, listing.source ?? null)) || 0;
     }

@@ -182,11 +182,11 @@ export default function Scan() {
           <p className="text-sm text-muted-foreground mt-0.5">
             {(deals ?? []).length} deal{(deals ?? []).length !== 1 ? "s" : ""} in pipeline
           </p>
-          {/* Honest label required: runScanPipeline generates these listings with an
-              LLM — they are illustrative, not real listings from live marketplaces. */}
+          {/* runScanPipeline now fetches REAL listings via Perplexity sonar-pro with
+              real listing URLs — verify financials against each source before acting. */}
           <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3" />
-            Experimental — listings are AI-synthesized, not sourced from live marketplaces
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Sonar-sourced — real current listings via Perplexity sonar-pro; verify financials against each listing
           </p>
         </div>
         <div className="flex gap-2">
