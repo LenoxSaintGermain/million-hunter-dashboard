@@ -108,9 +108,20 @@ export function computeEconomics(
   const gate = getMarketGate(a.city, a.state);
   const metrics: EconMetric[] = [];
 
-  const gsf = a.squareFootage ?? null;
-  const askPlausible = !!a.askingPrice && a.askingPrice >= PLAUSIBLE_MIN_PRICE;
-  const ask = askPlausible ? a.askingPrice! : null;
+  // MySQL returns DECIMAL/BIGINT columns as STRINGS. Without coercion "630000.00"
+  // + 4140000 concatenates into "630000.004140000" instead of summing. Coerce
+  // every numeric input at the boundary.
+  const num = (v: unknown): number | null => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = typeof v === "number" ? v : parseFloat(String(v));
+    return Number.isFinite(n) ? n : null;
+  };
+  const gsf = num(a.squareFootage);
+  const askRaw = num(a.askingPrice);
+  const noi = num(a.noi);
+  const capRate = num(a.capRate);
+  const askPlausible = askRaw != null && askRaw >= PLAUSIBLE_MIN_PRICE;
+  const ask = askPlausible ? askRaw : null;
 
   // ── Archetype → rehab cost band (§10) ──────────────────────────────────────
   const archetype = inferArchetype(a);
@@ -129,7 +140,7 @@ export function computeEconomics(
     status: basisRatio == null ? "unknown" : basisRatio < 0.25 ? "pass" : basisRatio <= 0.4 ? "watch" : "fail",
     basis: basisRatio == null ? "unknown" : "modeled",
     assumption: basisRatio != null ? `replacement cost $${A.replacementCostPerSf}/SF` : undefined,
-    note: !askPlausible && a.askingPrice ? `headline price $${a.askingPrice.toLocaleString()} is nominal — not a basis` : gsf == null ? "needs GSF" : undefined,
+    note: !askPlausible && askRaw != null ? `headline price $${askRaw.toLocaleString()} is nominal — not a basis` : gsf == null ? "needs GSF" : undefined,
   });
 
   // ── Tripling headroom (§9) — max buildable ÷ existing ──────────────────────
@@ -208,16 +219,16 @@ export function computeEconomics(
   });
 
   // ── Yield on cost (§9) — needs stabilized NOI ──────────────────────────────
-  const yoc = a.noi && totalCost ? a.noi / totalCost : null;
-  const targetYoc = (opts.marketCapRate ?? a.capRate ?? null) != null
-    ? (opts.marketCapRate ?? a.capRate!) + A.targetSpreadBps / 10000 : null;
+  const yoc = noi != null && totalCost ? noi / totalCost : null;
+  const mktCap = opts.marketCapRate ?? capRate;
+  const targetYoc = mktCap != null ? mktCap + A.targetSpreadBps / 10000 : null;
   metrics.push({
     key: "yieldOnCost", label: "Yield on cost", value: yoc,
     display: yoc != null ? `${(yoc * 100).toFixed(1)}%` : "—",
     target: targetYoc != null ? `≥ ${(targetYoc * 100).toFixed(1)}% (mkt cap +${A.targetSpreadBps}bps)` : `mkt cap +${A.targetSpreadBps}bps`,
     status: yoc == null || targetYoc == null ? "unknown" : yoc >= targetYoc ? "pass" : "fail",
     basis: yoc == null ? "unknown" : "modeled",
-    note: a.noi == null ? "needs stabilized NOI projection" : undefined,
+    note: noi == null ? "needs stabilized NOI projection" : undefined,
   });
 
   // ── Time to income (§9) — months to first CO ───────────────────────────────
