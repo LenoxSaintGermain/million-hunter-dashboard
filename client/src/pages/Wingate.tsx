@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
-import { getAssetClass, listAssetClasses } from "@shared/assetClasses";
+import { getAssetClass, listAssetClasses, classSupportsModule } from "@shared/assetClasses";
 import type { AssetClass, FieldDef } from "@shared/assetClasses";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import InvestorLayout from "@/components/InvestorLayout";
@@ -194,6 +194,10 @@ function RankedCard({ rank, asset, onSelect }: { rank: number; asset: ScoredAsse
 // ─── Full A–G scorecard drawer ────────────────────────────────────────────────
 function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; onClose: () => void; onRescored: () => void }) {
   const s = asset.historicScore;
+  // The dossier renders exactly the modules this asset's class declares, so a new
+  // thesis changes its diligence surface from config alone (no page fork).
+  const cls = getAssetClass(asset.assetClass);
+  const has = (m: Parameters<typeof classSupportsModule>[1]) => classSupportsModule(cls, m);
   const tier = TIER_META[s.assetTier];
   const [, navigate] = useLocation();
   const [status, setStatus] = useState<AssetStatus>((asset.status as AssetStatus) ?? "new");
@@ -263,7 +267,7 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
           )}
 
           {/* ── Deal economics (spec §9) — "what would I make?" ─────────────── */}
-          {asset.economics && (
+          {has("economics") && asset.economics && (
             <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.03] p-3 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Deal economics</p>
@@ -322,6 +326,7 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
             </div>
           )}
 
+          {(has("agScorecard") || has("classScorecard")) && (<>
           {/* A–G dimensions */}
           <div className="space-y-2">
             {s.scorecard.dimensions.map((d) => {
@@ -383,9 +388,56 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
           </div>
 
           <p className="text-[10px] text-muted-foreground/60 italic">{s.scorecard.marketNote} · {s.scorecard.sourceNote}</p>
+          </>)}
+
+          {/* ── Diligence modules declared by this asset class ───────────────── */}
+          {(() => {
+            const items: { m: any; label: string; done: boolean; detail: string }[] = [];
+            const hi = (asset.historicInputs ?? {}) as any;
+            if (has("incentiveStack")) items.push({
+              m: "incentiveStack", label: "Incentive stack confirmed",
+              done: !!(hi.abatementAvailable != null || hi.nmtcTract != null || hi.tifDistrict != null),
+              detail: [asset.opportunityZone ? "OZ" : null, hi.nmtcTract ? "NMTC" : null, hi.tifDistrict ? "TIF" : null, hi.abatementAvailable ? "abatement" : null].filter(Boolean).join(" · ") || "OZ/NMTC/TIF/abatement status not yet confirmed",
+            });
+            if (has("envelope")) items.push({
+              m: "envelope", label: "Development envelope",
+              done: hi.farUtilization != null,
+              detail: hi.farUtilization != null ? `FAR utilization ${hi.farUtilization} · headroom ${(1 / hi.farUtilization).toFixed(1)}×` : "needs zoning max FAR vs. existing GSF",
+            });
+            if (has("environmental")) items.push({
+              m: "environmental", label: "Phase I ESA / prior use",
+              done: hi.highRiskPriorUse != null || !!hi.priorUse,
+              detail: hi.highRiskPriorUse ? `high-risk prior use: ${hi.priorUse ?? "flagged"}` : hi.priorUse ? `prior use: ${hi.priorUse}` : "prior-use history not researched",
+            });
+            if (has("titleEasements")) items.push({
+              m: "titleEasements", label: "Title, easements & covenants",
+              done: hi.ownershipVerified === true,
+              detail: hi.facadeEasement ? "facade easement recorded — restricts vertical addition" : hi.ownershipVerified ? "ownership verified" : "ownership entity & title unverified",
+            });
+            if (!items.length) return null;
+            return (
+              <div className="rounded-lg border border-border bg-muted/10 p-3 space-y-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
+                  {cls.shortLabel} diligence · {items.filter(i => i.done).length}/{items.length} resolved
+                </p>
+                {items.map((i) => (
+                  <div key={i.m} className="flex items-start gap-2 text-[11px]">
+                    {i.done
+                      ? <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
+                      : <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />}
+                    <div className="flex-1 min-w-0">
+                      <p className={cn("font-medium", i.done ? "text-foreground/80" : "text-amber-400/90")}>{i.label}</p>
+                      <p className="text-[10px] text-muted-foreground">{i.detail}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           <div className="space-y-2 pt-1">
             {/* ── Provenance & freshness — click through and validate ────────── */}
+            {has("provenance") && (
             <div className="rounded-lg border border-border bg-muted/10 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Source &amp; verification</p>
@@ -435,6 +487,7 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
                 </div>
               )}
             </div>
+            )}
 
             {/* ── Analyst narrative (rendered inline, not a toast) ───────────── */}
             {narrative && (
