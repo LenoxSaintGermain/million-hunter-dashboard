@@ -2200,9 +2200,14 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
         // Build a deal record pre-populated from the asset's financials
         const dealName = asset.name;
         const askingPrice = asset.askingPrice ?? 0;
-        // Estimate annual revenue from NOI + 30% overhead, or just use NOI * 1.3
-        const estimatedRevenue = asset.noi ? Math.round(asset.noi * 1.3) : askingPrice * 0.12;
-        const estimatedCashFlow = asset.noi ?? Math.round(askingPrice * 0.08);
+        // HONESTY (prime directive 1): do NOT invent financials. Previously this
+        // derived revenue = NOI x 1.3 and cashFlow = ask x 0.08 and stored them as
+        // facts, so the deal page rendered fabricated REVENUE / CASH FLOW figures
+        // nobody sourced. Real estate NOI is not business revenue. Carry across
+        // only what the asset actually has; leave the rest null so the UI shows
+        // an honest blank instead of a manufactured number.
+        const estimatedRevenue = null;
+        const estimatedCashFlow = asset.noi ?? null;
         const res = await createDeal({
           name: dealName,
           source: "scout",

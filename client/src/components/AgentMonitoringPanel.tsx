@@ -40,10 +40,13 @@ const ANALYSIS_TYPES: { id: AnalysisType; label: string; icon: LucideIcon; descr
   { id: "digital_alpha", label: "Digital Alpha",  icon: Zap,         description: "AI leverage & tech audit" },
 ];
 
+// 004 A-4 / prime directive: the IC panel is surfaced by PERSONA, never by
+// vendor name. Showing "Claude / Gemini / Sonar" both leaks the stack and
+// implies a multi-vendor claim the product doesn't make.
 const MODEL_LABELS = [
-  { key: "claudeOutput", label: "Claude", color: "text-amber-600" },
-  { key: "geminiOutput", label: "Gemini", color: "text-blue-600" },
-  { key: "sonarOutput",  label: "Sonar",  color: "text-purple-600" },
+  { key: "claudeOutput", label: "The Structuralist", color: "text-amber-600" },
+  { key: "geminiOutput", label: "The Restructurer",  color: "text-blue-600" },
+  { key: "sonarOutput",  label: "The Market Analyst", color: "text-purple-600" },
 ];
 
 function VerdictBadge({ verdict }: { verdict?: string }) {
