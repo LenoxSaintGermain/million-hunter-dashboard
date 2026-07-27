@@ -167,8 +167,25 @@ function RankedCard({ rank, asset, onSelect }: { rank: number; asset: ScoredAsse
         <div><p className="text-[8px] text-muted-foreground uppercase">Not gated</p><p className={cn("text-[11px] font-semibold", gatesPass ? "text-emerald-400" : "text-rose-400")}>{gatesPass ? "pass" : "fail"}</p></div>
       </div>
 
+      {/* Economics teaser — the money math, visible before opening the dossier */}
+      {asset.economics?.headline?.incentiveEquity != null && (
+        <div className="flex items-center gap-3 pt-1 border-t border-border/50 text-[10px]">
+          <span className="text-muted-foreground">Incentives <span className="font-mono font-bold text-emerald-400">{fmtMoney(asset.economics.headline.incentiveEquity)}</span></span>
+          {(() => {
+            const cov = asset.economics.metrics?.find((m: any) => m.key === "incentiveCoverage");
+            return cov?.value != null ? (
+              <span className="text-muted-foreground">Coverage <span className={cn("font-mono font-bold", cov.value >= 0.4 ? "text-emerald-400" : "text-amber-400")}>{Math.round(cov.value * 100)}%</span></span>
+            ) : null;
+          })()}
+          {(() => {
+            const u = asset.economics.metrics?.find((m: any) => m.key === "unitYield");
+            return u?.value != null ? <span className="text-muted-foreground">~{u.value} units</span> : null;
+          })()}
+        </div>
+      )}
+
       <div className="flex items-center justify-end gap-1 text-[10px] font-medium text-amber-400/70 group-hover:text-amber-400 transition-colors">
-        <FileText className="w-3 h-3" /> Full A–G dossier →
+        <FileText className="w-3 h-3" /> Full A–G dossier + economics →
       </div>
     </div>
   );
@@ -242,6 +259,66 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
             <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-start gap-2">
               <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <div><p className="text-xs font-semibold text-rose-400">Hard stop{s.dispositionCode ? ` · ${s.dispositionCode}` : ""}</p><p className="text-[11px] text-muted-foreground">{s.hardStopFailed}</p></div>
+            </div>
+          )}
+
+          {/* ── Deal economics (spec §9) — "what would I make?" ─────────────── */}
+          {asset.economics && (
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.03] p-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Deal economics</p>
+                {asset.economics.archetype && (
+                  <span className="text-[9px] text-muted-foreground">archetype: {asset.economics.archetype}</span>
+                )}
+              </div>
+
+              {/* Headline */}
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: "Project cost", v: asset.economics.headline.totalProjectCost, fmt: (n: number) => fmtMoney(n) },
+                  { label: "Incentive equity", v: asset.economics.headline.incentiveEquity, fmt: (n: number) => fmtMoney(n) },
+                  { label: "Equity gap", v: asset.economics.headline.equityGapPct, fmt: (n: number) => `${Math.round(n * 100)}%` },
+                ].map((x) => (
+                  <div key={x.label} className="p-2 rounded bg-muted/20 border border-border text-center">
+                    <p className="text-sm font-black font-mono text-foreground">{x.v == null ? "—" : x.fmt(x.v as number)}</p>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide mt-0.5">{x.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Metrics */}
+              <div className="space-y-1">
+                {asset.economics.metrics.map((m: any) => {
+                  const statusCls =
+                    m.status === "pass" ? "text-emerald-400" :
+                    m.status === "watch" ? "text-amber-400" :
+                    m.status === "fail" ? "text-rose-400" : "text-muted-foreground";
+                  return (
+                    <div key={m.key} className="flex items-start gap-2 text-[11px] py-0.5">
+                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0 mt-1.5",
+                        m.status === "pass" ? "bg-emerald-400" : m.status === "watch" ? "bg-amber-400" :
+                        m.status === "fail" ? "bg-rose-400" : "bg-muted-foreground/40")} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-muted-foreground">{m.label}</span>
+                          <span className="flex items-center gap-1.5 shrink-0">
+                            {m.basis === "modeled" && <span className="text-[8px] px-1 rounded border border-amber-500/30 text-amber-400/80 uppercase">est</span>}
+                            {m.basis === "verified" && <span className="text-[8px] px-1 rounded border border-emerald-500/30 text-emerald-400/80 uppercase">verified</span>}
+                            <span className={cn("font-mono font-bold", statusCls)}>{m.display}</span>
+                          </span>
+                        </div>
+                        {m.target && <p className="text-[9px] text-muted-foreground/60">target {m.target}</p>}
+                        {m.assumption && <p className="text-[9px] text-amber-400/60 italic">↳ {m.assumption}</p>}
+                        {m.note && <p className="text-[9px] text-muted-foreground/60">· {m.note}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-[9px] text-muted-foreground/70 italic border-t border-border pt-2 leading-relaxed">
+                {asset.economics.disclaimer}
+              </p>
             </div>
           )}
 

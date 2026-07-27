@@ -1769,9 +1769,15 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         if (input.persist && input.compilationId != null) {
           for (const s of scored) await persistHistoricScore(s.asset.id, s.score, input.compilationId);
         }
+        // Deal economics (§9) — only meaningful for the historic thesis.
+        const { computeEconomics } = await import("./scoring/economics");
         return {
           count: scored.length,
-          results: scored.map((s) => ({ ...s.asset, historicScore: s.score })),
+          results: scored.map((s) => ({
+            ...s.asset,
+            historicScore: s.score,
+            economics: (s.asset.assetClass ?? "historic") === "historic" ? computeEconomics(s.asset) : null,
+          })),
         };
       }),
 
