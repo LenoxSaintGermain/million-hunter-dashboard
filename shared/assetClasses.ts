@@ -57,6 +57,23 @@ export interface ScoringModel {
   derive?: (get: (k: string) => number | undefined) => Record<string, number | undefined>;
 }
 
+/** Analysis modules a class supports. The dossier renders exactly these, so a
+ *  new thesis declares its diligence surface instead of forking a page. */
+export type AnalysisModule =
+  | "agScorecard"      // 7-dimension historic scorecard
+  | "classScorecard"   // generic config-driven scorecard
+  | "economics"        // §9 underwriting math
+  | "provenance"       // source + freshness verification
+  | "incentiveStack"   // HTC / OZ / NMTC / abatements
+  | "envelope"         // FAR, coverage, tripling path
+  | "environmental"    // Phase I ESA / prior-use risk
+  | "titleEasements"   // ownership, easements, covenants
+  | "ownerPsychology"  // BUSINESS-only: seller negotiation profile
+  | "digitalAudit"     // BUSINESS-only: web/tech footprint
+  | "sbaCapitalStack"  // BUSINESS-only: SBA 7(a) structuring
+  | "icConsensus"      // 3-agent committee vote
+  | "redTeam";         // adversarial risk pass
+
 export interface AssetClass {
   id: string;                  // stored in commercial_assets.asset_class
   label: string;               // "Historic Adaptive Reuse"
@@ -68,6 +85,12 @@ export interface AssetClass {
   fields: FieldDef[];
   scoring?: ScoringModel;      // required for scorer:"generic"; historic uses its bespoke engine
   markets?: string[];          // optional priority markets (states/cities)
+  /** Diligence modules this class supports — the dossier renders these only. */
+  analysisModules: AnalysisModule[];
+  /** True only for operating-business classes. Property classes must NEVER be
+   *  copied into the business `deals` table: the business agents then judge a
+   *  building on revenue/EBITDA and confidently recommend archiving it. */
+  promotesToBusinessDeals: boolean;
 }
 
 // ─── Historic Adaptive Reuse (existing, bespoke A–G scorer) ───────────────────
@@ -80,6 +103,8 @@ const HISTORIC: AssetClass = {
   description: "Pre-1945 commercial buildings, triplable GSF, NR-eligible, stackable incentives (HTC + OZ + abatements).",
   scorer: "historic",
   markets: ["OH", "IN", "KY", "TN", "GA", "SC", "NC", "AL", "MO", "IL", "KS"],
+  analysisModules: ["agScorecard", "economics", "provenance", "incentiveStack", "envelope", "environmental", "titleEasements", "redTeam"],
+  promotesToBusinessDeals: false,
   // These map to NATIVE commercial_assets columns (not class_metadata) for back-compat.
   fields: [
     { key: "yearBuilt", label: "Year Built", type: "year", group: "Building", critical: true, placeholder: "1908" },
@@ -109,6 +134,8 @@ const SELF_STORAGE: AssetClass = {
   description: "Stabilized self-storage in growth submarkets — occupancy, rate-per-SF, expansion land, and low supply overhang.",
   scorer: "generic",
   markets: ["TX", "FL", "GA", "NC", "SC", "TN", "AZ", "NV"],
+  analysisModules: ["classScorecard", "provenance", "redTeam"],
+  promotesToBusinessDeals: false,
   fields: [
     { key: "netRentableSqFt", label: "Net Rentable Sq Ft", type: "number", group: "Facility", critical: true, placeholder: "55000" },
     { key: "units", label: "Unit Count", type: "number", group: "Facility", placeholder: "420" },
@@ -180,6 +207,11 @@ export function getAssetClass(id?: string | null): AssetClass {
 
 export function listAssetClasses(): AssetClass[] {
   return ASSET_CLASSES;
+}
+
+/** Does this class support a given diligence module? Surfaces + agents gate on this. */
+export function classSupportsModule(cls: AssetClass, m: AnalysisModule): boolean {
+  return cls.analysisModules.includes(m);
 }
 
 /** Critical field keys for a class (drives the confidence score). */

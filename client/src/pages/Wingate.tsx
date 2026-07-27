@@ -466,10 +466,22 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
                   {aiScore.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Zap className="w-3.5 h-3.5 mr-2 text-amber-400" />}
                   <span className="truncate">{aiScore.isPending ? "Analyzing…" : "Analyst narrative"}</span>
                 </Button>
-                <Button size="sm" variant="outline" className="border-border justify-start" onClick={() => convertToDeal.mutate({ id: asset.id })} disabled={convertToDeal.isPending}>
-                  {convertToDeal.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Landmark className="w-3.5 h-3.5 mr-2 text-amber-400" />}
-                  <span className="truncate">{convertToDeal.isPending ? "Promoting…" : "Promote to Deal Room"}</span>
-                </Button>
+                {getAssetClass(asset.assetClass).promotesToBusinessDeals ? (
+                  <Button size="sm" variant="outline" className="border-border justify-start" onClick={() => convertToDeal.mutate({ id: asset.id })} disabled={convertToDeal.isPending}>
+                    {convertToDeal.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Landmark className="w-3.5 h-3.5 mr-2 text-amber-400" />}
+                    <span className="truncate">{convertToDeal.isPending ? "Promoting…" : "Promote to Deal Room"}</span>
+                  </Button>
+                ) : (
+                  /* Property classes advance IN PLACE — the dossier (scorecard,
+                     economics, provenance) is the deal record; copying into the
+                     business deals model would strip it and misjudge the asset. */
+                  <Button size="sm" variant="outline" className="border-border justify-start"
+                    onClick={() => { setStatus("qualified"); updateStatus.mutate({ id: asset.id, status: "qualified" }); }}
+                    disabled={updateStatus.isPending || status === "qualified"}>
+                    {updateStatus.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 mr-2 text-emerald-400" />}
+                    <span className="truncate">{status === "qualified" ? "Qualified ✓" : "Advance to diligence"}</span>
+                  </Button>
+                )}
                 <Select
                   value={status}
                   onValueChange={(nextStatus) => { const next = nextStatus as AssetStatus; setStatus(next); updateStatus.mutate({ id: asset.id, status: next }); }}

@@ -2195,8 +2195,19 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ input }) => {
         const { getCommercialAssetById, createDeal, upsertSignal } = await import("./db");
+        const { getAssetClass } = await import("../shared/assetClasses");
         const asset = await getCommercialAssetById(input.id);
         if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+        // A property must never be copied into the business `deals` model. The
+        // business agents then judge a building on revenue/EBITDA and confidently
+        // recommend archiving it. Property classes advance stage in place instead.
+        const assetCls = getAssetClass((asset as any).assetClass);
+        if (!assetCls.promotesToBusinessDeals) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `${assetCls.label} assets stay in their own dossier — advance the stage instead of promoting to the business Deal Room.`,
+          });
+        }
         // Build a deal record pre-populated from the asset's financials
         const dealName = asset.name;
         const askingPrice = asset.askingPrice ?? 0;
