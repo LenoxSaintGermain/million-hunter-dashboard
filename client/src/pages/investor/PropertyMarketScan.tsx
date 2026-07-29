@@ -18,7 +18,8 @@ import { getAssetClass } from "@shared/assetClasses";
 import { Loader2, MapPin, ArrowRight, Search, GraduationCap } from "lucide-react";
 import { isTutorialAsset } from "@shared/tutorial";
 import { Input } from "@/components/ui/input";
-import { TIER_META, fmtMoney, type ScoredAsset } from "@/components/AssetDossierSections";
+import { TIER_META, type ScoredAsset } from "@/components/AssetDossierSections";
+import { formatAskingPrice } from "@shared/pricing";
 
 export default function PropertyMarketScan({ assetClass }: { assetClass: string }) {
   const cls = getAssetClass(assetClass);
@@ -132,7 +133,7 @@ export default function PropertyMarketScan({ assetClass }: { assetClass: string 
                           </p>
                           <div className="grid grid-cols-3 gap-3 border-t border-rule pt-3">
                             {[
-                              { label: "Asking", value: fmtMoney(a.askingPrice == null ? null : Number(a.askingPrice)) },
+                              { label: "Asking", value: formatAskingPrice(a.askingPrice == null ? null : Number(a.askingPrice)).display },
                               { label: "Composite", value: String(sc.compositeScore) },
                               { label: "Confidence", value: `${Math.round(sc.confidenceScore * 100)}%` },
                             ].map((x) => (

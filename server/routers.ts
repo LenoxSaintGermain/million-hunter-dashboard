@@ -1602,13 +1602,13 @@ Produce concrete remediation plan. Give go/no-go recommendation.`;
       .query(async ({ input }) => {
         const { getCommercialAssetById } = await import("./db");
         const { scoreAssetByClass } = await import("./scoring");
-        const { computeEconomics } = await import("./scoring/economics");
+        const { computeEconomicsByClass } = await import("./scoring/economicsByClass");
         const asset = await getCommercialAssetById(input.id);
         if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
         return {
           ...asset,
           historicScore: scoreAssetByClass(asset as any),
-          economics: ((asset as any).assetClass ?? "historic") === "historic" ? computeEconomics(asset as any) : null,
+          economics: computeEconomicsByClass(asset as any),
         };
       }),
 
@@ -1788,13 +1788,13 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
           for (const s of scored) await persistHistoricScore(s.asset.id, s.score, input.compilationId);
         }
         // Deal economics (§9) — only meaningful for the historic thesis.
-        const { computeEconomics } = await import("./scoring/economics");
+        const { computeEconomicsByClass } = await import("./scoring/economicsByClass");
         return {
           count: scored.length,
           results: scored.map((s) => ({
             ...s.asset,
             historicScore: s.score,
-            economics: (s.asset.assetClass ?? "historic") === "historic" ? computeEconomics(s.asset) : null,
+            economics: computeEconomicsByClass(s.asset),
           })),
         };
       }),
@@ -1986,6 +1986,152 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
           }).where(eq(commercialAssets.id, input.id));
         }
         return { status, note, citations: citations.slice(0, 6), currentAskingPrice: parsed?.currentAskingPrice ?? null, asOf: parsed?.asOf ?? null };
+      }),
+
+    // ─── Verification queue ───────────────────────────────────────────────────
+    // Confidence caps every tier, so unverified fields are the real work queue.
+    // This pools them across the pipeline and ranks by how much rank each asset
+    // would gain if its outstanding fields were confirmed.
+    verificationQueue: operatorProcedure
+      .input(z.object({ assetClass: z.string().optional() }).optional())
+      .query(async ({ input }) => {
+        const { getCommercialAssets } = await import("./db");
+        const { scoreAssetByClass } = await import("./scoring");
+        const { getFieldSpec } = await import("./scoring/verificationFields");
+
+        const filters: any = { limit: 1000 };
+        if (input?.assetClass) filters.assetClass = input.assetClass;
+        const assets = await getCommercialAssets(filters);
+
+        const rows = assets.map((a: any) => {
+          const score = scoreAssetByClass(a);
+          // Rank if every outstanding field were confirmed (confidence → 1.0).
+          const potentialRank = Math.round(score.compositeScore * 10) / 10;
+          return {
+            id: Number(a.id),
+            name: String(a.name ?? ""),
+            city: String(a.city ?? ""),
+            state: String(a.state ?? ""),
+            assetClass: a.assetClass ?? "historic",
+            source: a.source ?? null,
+            currentRank: Math.round(score.rankScore * 10) / 10,
+            potentialRank,
+            rankUpside: Math.round((potentialRank - score.rankScore) * 10) / 10,
+            confidenceScore: score.confidenceScore,
+            assetTier: score.assetTier,
+            fields: score.verifyFields.map((k: string) => ({ key: k, short: getFieldSpec(k)?.short ?? k })),
+          };
+        }).filter((r) => r.fields.length > 0);
+
+        rows.sort((x, y) => y.rankUpside - x.rankUpside);
+        return {
+          assets: rows,
+          totalOpenFields: rows.reduce((n, r) => n + r.fields.length, 0),
+          totalRankUpside: Math.round(rows.reduce((n, r) => n + r.rankUpside, 0) * 10) / 10,
+        };
+      }),
+
+    // Research ONE field. Returns a proposal with citations; writes nothing —
+    // an operator accepts it explicitly so nothing enters the record unreviewed.
+    researchField: operatorProcedure
+      .input(z.object({ id: z.number().int(), field: z.string() }))
+      .mutation(async ({ input }) => {
+        const { getCommercialAssetById } = await import("./db");
+        const { getFieldSpec, fillPrompt } = await import("./scoring/verificationFields");
+        const asset: any = await getCommercialAssetById(input.id);
+        if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+        const spec = getFieldSpec(input.field);
+        if (!spec) throw new TRPCError({ code: "BAD_REQUEST", message: `Unknown field: ${input.field}` });
+        const key = process.env.SONAR_API_KEY;
+        if (!key) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "SONAR_API_KEY not configured" });
+
+        const res = await fetch("https://api.perplexity.ai/v1/sonar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+          body: JSON.stringify({
+            model: "sonar-pro",
+            messages: [
+              { role: "system", content: "You are a property records researcher. Use only sourced facts from public records. Never guess. If you cannot confirm something, return null for that value and say why. Output ONLY a JSON object." },
+              { role: "user", content: `${fillPrompt(spec, asset)}\n\nReturn ONLY: ${spec.schema}` },
+            ],
+          }),
+        });
+        if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Sonar API error ${res.status}` });
+        const data: any = await res.json();
+        const content: string = data.choices?.[0]?.message?.content ?? "";
+        const citations: string[] = Array.isArray(data.citations) ? data.citations : [];
+        const cleaned = content.replace(/```json/gi, "").replace(/```/g, "").trim();
+        let parsed: any = null;
+        try { parsed = JSON.parse(cleaned); } catch {
+          const i = cleaned.indexOf("{"), j = cleaned.lastIndexOf("}");
+          if (i >= 0 && j > i) { try { parsed = JSON.parse(cleaned.slice(i, j + 1)); } catch { /* keep null */ } }
+        }
+        if (!parsed) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not parse the research result" });
+
+        const patch = spec.apply(parsed);
+        return {
+          field: input.field,
+          short: spec.short,
+          parsed,
+          summary: spec.summarize(parsed),
+          note: String(parsed?.note ?? ""),
+          citations: citations.slice(0, 6),
+          /** false when the answer was inconclusive — nothing to accept. */
+          applicable: !!patch,
+        };
+      }),
+
+    // Accept a researched value: write it, stamp provenance, and rescore.
+    acceptFieldValue: operatorProcedure
+      .input(z.object({
+        id: z.number().int(),
+        field: z.string(),
+        parsed: z.any(),
+        citations: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { getCommercialAssetById, getDb } = await import("./db");
+        const { getFieldSpec } = await import("./scoring/verificationFields");
+        const { scoreAssetByClass } = await import("./scoring");
+        const asset: any = await getCommercialAssetById(input.id);
+        if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+        const spec = getFieldSpec(input.field);
+        if (!spec) throw new TRPCError({ code: "BAD_REQUEST", message: `Unknown field: ${input.field}` });
+        const patch = spec.apply(input.parsed);
+        if (!patch) throw new TRPCError({ code: "BAD_REQUEST", message: "That research result is not conclusive enough to accept" });
+
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { commercialAssets } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+
+        // Historic keeps its bespoke inputs column; every other class stores its
+        // fields in class_metadata. Writing to the wrong blob would silently
+        // never reach the scorer.
+        const { getAssetClass } = await import("../shared/assetClasses");
+        const isHistoric = getAssetClass(asset.assetClass).id === "historic";
+        const blobKey = isHistoric ? "historicInputs" : "classMetadata";
+        const raw = isHistoric ? asset.historicInputs : asset.classMetadata;
+        const priorInputs = (typeof raw === "string" ? JSON.parse(raw || "{}") : (raw ?? {})) as Record<string, any>;
+        const mergedInputs = { ...priorInputs, ...(patch.meta ?? {}) };
+        const priorSources: string[] = Array.isArray(asset.verificationSources) ? asset.verificationSources : [];
+
+        await db.update(commercialAssets).set({
+          ...(patch.columns ?? {}),
+          [blobKey]: mergedInputs as any,
+          verificationSources: Array.from(new Set([...priorSources, ...(input.citations ?? [])])).slice(0, 12) as any,
+          lastVerifiedAt: Date.now(),
+          updatedAt: Date.now(),
+        } as any).where(eq(commercialAssets.id, input.id));
+
+        const updated: any = await getCommercialAssetById(input.id);
+        const score = scoreAssetByClass(updated);
+        return {
+          confidenceScore: score.confidenceScore,
+          rankScore: Math.round(score.rankScore * 10) / 10,
+          assetTier: score.assetTier,
+          remainingFields: score.verifyFields,
+        };
       }),
 
     // ─── Bulk-clear: archive (soft) or delete (hard) many assets at once ──────
@@ -2436,7 +2582,7 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
       .query(async ({ input, ctx }) => {
         const { getAssetShareToken, incrementAssetShareTokenViewCount, getCommercialAssetById } = await import("./db");
         const { scoreAssetByClass } = await import("./scoring");
-        const { computeEconomics } = await import("./scoring/economics");
+        const { computeEconomicsByClass } = await import("./scoring/economicsByClass");
         const { getAssetClass } = await import("../shared/assetClasses");
 
         const shareRow = await getAssetShareToken(input.token);
@@ -2451,7 +2597,7 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
 
         const score = scoreAssetByClass(asset);
         const cls = getAssetClass(asset.assetClass);
-        const econ = (asset.assetClass ?? "historic") === "historic" ? computeEconomics(asset) : null;
+        const econ = computeEconomicsByClass(asset);
 
         // Highlight card only — no source URL, no owner/seller notes, no raw
         // asking price detail beyond the headline the operator chose to share.
@@ -2475,14 +2621,7 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
               { key: "A", label: "Historic qualification", score: score.dimA, max: 20, pass: score.dimA >= 12 },
               { key: "B", label: "Development envelope", score: score.dimB, max: 20, pass: score.dimB >= 12 },
             ],
-            economics: econ
-              ? {
-                  totalProjectCost: econ.headline.totalProjectCost,
-                  incentiveEquity: econ.headline.incentiveEquity,
-                  equityGapPct: econ.headline.equityGapPct,
-                  disclaimer: econ.disclaimer,
-                }
-              : null,
+            economics: econ ? { headline: econ.headline, disclaimer: econ.disclaimer } : null,
             strengths: score.scorecard.strengths.slice(0, 3),
             risks: score.scorecard.risks.slice(0, 3),
             unverifiedCount: score.verifyFields.length,

@@ -34,8 +34,9 @@ export const TIER_META: Record<HistoricScore["assetTier"], { label: string; cls:
   archive:   { label: "Archive",    cls: "text-muted-foreground border-rule bg-paper" },
 };
 
-export const fmtMoney = (n?: number | null) =>
-  n == null ? "—" : n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(0)}k` : `$${n}`;
+export { formatAskingPrice } from "@shared/pricing";
+import { fmtMoneyRaw } from "@shared/pricing";
+export const fmtMoney = (n?: number | null) => fmtMoneyRaw(n);
 
 /** Section heading, shared by every module so the page reads as one document. */
 export function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -47,13 +48,15 @@ export function SectionLabel({ children, className }: { children: React.ReactNod
 }
 
 /** Rank / composite / confidence — the three numbers that decide everything. */
-export function ScoreHeadline({ s, dense, tutorial }: { s: HistoricScore; dense?: boolean; tutorial?: boolean }) {
+export function ScoreHeadline({ s, dense, tutorial, criticalTotal = 5 }:
+  { s: HistoricScore; dense?: boolean; tutorial?: boolean; criticalTotal?: number }) {
   const items = [
     { k: "rankScore", label: "Rank Score", value: String(Math.round(s.rankScore)), sub: "composite × confidence", accent: "text-amber" },
     { k: "compositeScore", label: "Composite", value: String(s.compositeScore), sub: `+${s.bonuses} bonus · −${s.penalties} penalty`, accent: "text-ink" },
     {
       k: "confidenceScore", label: "Confidence", value: `${Math.round(s.confidenceScore * 100)}%`,
-      sub: `${5 - s.verifyFields.length}/5 critical fields verified`,
+      // Field count is class-defined — historic has 5, self-storage has 3.
+      sub: `${Math.round(s.confidenceScore * criticalTotal)}/${criticalTotal} critical fields verified`,
       accent: s.confidenceScore >= 0.8 ? "text-sage" : "text-amber",
     },
   ];
@@ -97,11 +100,9 @@ export function HardStopBanner({ s }: { s: HistoricScore }) {
 /** §9 underwriting math. `dense` trims it to the three headline numbers. */
 export function EconomicsPanel({ economics, dense, tutorial }: { economics: any; dense?: boolean; tutorial?: boolean }) {
   if (!economics) return null;
-  const headline = [
-    { label: "Project cost", v: economics.headline.totalProjectCost, fmt: (n: number) => fmtMoney(n) },
-    { label: "Incentive equity", v: economics.headline.incentiveEquity, fmt: (n: number) => fmtMoney(n) },
-    { label: "Equity gap", v: economics.headline.equityGapPct, fmt: (n: number) => `${Math.round(n * 100)}%` },
-  ];
+  // Class-defined: historic leads with cost/incentives/gap, an income class with
+  // NOI/cap/price-per-SF. The panel just renders whatever the model named.
+  const headline: { label: string; display: string }[] = economics.headline ?? [];
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 mb-4">
@@ -116,9 +117,7 @@ export function EconomicsPanel({ economics, dense, tutorial }: { economics: any;
       <div className="grid grid-cols-3 gap-0 border border-rule divide-x divide-rule mb-6">
         {headline.map((x) => (
           <div key={x.label} className="px-4 py-4 bg-paper">
-            <p className="font-data-mono text-[22px] text-ink leading-none">
-              {x.v == null ? "—" : x.fmt(x.v as number)}
-            </p>
+            <p className="font-data-mono text-[22px] text-ink leading-none">{x.display}</p>
             <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mt-2">{x.label}</p>
           </div>
         ))}
@@ -255,7 +254,7 @@ export function VerifyList({ s }: { s: HistoricScore }) {
   return (
     <div className="border-l-2 border-amber pl-5 py-2">
       <p className="font-eyebrow text-eyebrow text-amber uppercase tracking-widest mb-2">
-        {s.verifyFields.length} of 5 critical fields unverified — capped below Tier 1 <Explain k="verifyFields" />
+        {s.verifyFields.length} critical field{s.verifyFields.length === 1 ? "" : "s"} unverified — capped below Tier 1 <Explain k="verifyFields" />
       </p>
       {s.verifyFields.map((v) => (
         <p key={v} className="font-body-base text-[13px] text-ink/80 leading-relaxed">· {v}</p>

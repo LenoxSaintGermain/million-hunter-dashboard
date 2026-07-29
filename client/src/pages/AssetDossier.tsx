@@ -14,7 +14,7 @@ import { useState } from "react";
 import { Link, useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
-import { getAssetClass, classSupportsModule } from "@shared/assetClasses";
+import { getAssetClass, classSupportsModule, criticalFields } from "@shared/assetClasses";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import InvestorLayout from "@/components/InvestorLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -25,13 +25,14 @@ import {
 import {
   ScoreHeadline, HardStopBanner, EconomicsPanel, DimensionsPanel, PenaltiesBonuses,
   VerifyList, StrengthsRisks, DiligencePanel, ProvenancePanel, NarrativePanel,
-  SectionLabel, buildDiligenceItems, TIER_META, fmtMoney,
+  SectionLabel, buildDiligenceItems, TIER_META,
   type ScoredAsset,
 } from "@/components/AssetDossierSections";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { isTutorialAsset, TUTORIAL_STEPS } from "@shared/tutorial";
+import { formatAskingPrice } from "@shared/pricing";
 import { Explain } from "@/components/Explain";
 import { GraduationCap, Trash2 } from "lucide-react";
 
@@ -187,15 +188,25 @@ export default function AssetDossier() {
                   : `${asset.address}, ${asset.city}, ${asset.state}`}
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-rule pt-8">
-                {[
-                  { label: "Asking Price", value: fmtMoney(asset.askingPrice == null ? null : Number(asset.askingPrice)) },
-                  { label: "Square Feet", value: asset.squareFootage ? Number(asset.squareFootage).toLocaleString() : "—" },
+                {([
+                  { label: "Asking Price", ...(() => { const f = formatAskingPrice(asset.askingPrice == null ? null : Number(asset.askingPrice)); return { value: f.display, hint: f.hint }; })() },
+                  (() => {
+                    // Each class measures itself differently — GSF for a building
+                    // you rehab, net rentable SF for one you lease.
+                    const meta = (asset.classMetadata ?? {}) as Record<string, any>;
+                    const nrsf = meta.netRentableSqFt;
+                    return nrsf != null
+                      ? { label: "Net Rentable SF", value: Number(nrsf).toLocaleString() }
+                      : { label: cls.id === "historic" ? "Square Feet" : "Net Rentable SF",
+                          value: asset.squareFootage ? Number(asset.squareFootage).toLocaleString() : "—" };
+                  })(),
                   { label: "Year Built", value: asset.yearBuilt ? String(asset.yearBuilt) : "—" },
                   { label: "Rank Score", value: String(Math.round(s.rankScore)), accent: true },
-                ].map((item) => (
+                ] as { label: string; value: string; accent?: boolean; hint?: string }[]).map((item) => (
                   <div key={item.label}>
                     <p className="font-eyebrow text-eyebrow text-muted-foreground mb-2 uppercase tracking-widest">{item.label}</p>
                     <p className={cn("font-data-mono text-section-h2 leading-none", item.accent ? "text-amber" : "text-ink")}>{item.value}</p>
+                    {(item as any).hint && <p className="font-body-base text-[11px] text-muted-foreground mt-2 leading-snug max-w-[200px]">{(item as any).hint}</p>}
                   </div>
                 ))}
               </div>
@@ -275,7 +286,7 @@ export default function AssetDossier() {
 
         {/* ── Enrichment strip ──────────────────────────────────────────────── */}
         <div className="mb-10">
-          <ScoreHeadline s={s} tutorial={isTutorial} />
+          <ScoreHeadline s={s} tutorial={isTutorial} criticalTotal={criticalFields(cls).length || 5} />
         </div>
 
         {s.hardStopFailed && <div className="mb-10"><HardStopBanner s={s} /></div>}

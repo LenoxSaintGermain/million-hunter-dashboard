@@ -13,8 +13,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "wouter";
-import { getAssetClass } from "@shared/assetClasses";
+import { getAssetClass, listAssetClasses } from "@shared/assetClasses";
 import { isTutorialAsset } from "@shared/tutorial";
+import { formatAskingPrice } from "@shared/pricing";
 import {
   Building2, MapPin, DollarSign, TrendingUp, Zap, Plus, Search,
   Filter, SlidersHorizontal, RefreshCw, ChevronDown, ChevronUp,
@@ -541,7 +542,7 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
         {/* Financials grid */}
         <div className="grid grid-cols-3 gap-2 text-center">
           {[
-            { label: "Asking", value: fmt(asset.askingPrice) },
+            { label: "Asking", value: formatAskingPrice(asset.askingPrice).display },
             { label: "Cap Rate", value: asset.capRate ? `${(asset.capRate * 100).toFixed(1)}%` : "—" },
             { label: "NOI", value: fmt(asset.noi) },
           ].map((f) => (
@@ -697,6 +698,9 @@ export default function Scout() {
   const [filterTAD, setFilterTAD] = useState(false);
   const [filterHistoric, setFilterHistoric] = useState(false);
   const [filterStabilized, setFilterStabilized] = useState(false);
+  // Class filter comes from the registry, so a new asset class appears here with
+  // no edit to this page.
+  const [filterClass, setFilterClass] = useState<string>("all");
   const [filterType, setFilterType] = useState<PropertyType | "all">("all");
   const [filterStatus, setFilterStatus] = useState<AssetStatus | "all">("all");
   const [sortBy, setSortBy] = useState<"capRate" | "askingPrice" | "aiScore" | "createdAt">("createdAt");
@@ -733,6 +737,7 @@ export default function Scout() {
     if (filterTAD) list = list.filter((a) => !!a.tadDistrict);
     if (filterHistoric) list = list.filter((a) => (a as any).isHistoric || (a as any).historicRegisterEligible);
     if (filterStabilized) list = list.filter((a) => (a as any).isStabilized);
+    if (filterClass !== "all") list = list.filter((a) => getAssetClass((a as any).assetClass).id === filterClass);
     if (filterType !== "all") list = list.filter((a) => a.propertyType === filterType);
     if (filterStatus !== "all") list = list.filter((a) => a.status === filterStatus);
 
@@ -743,7 +748,7 @@ export default function Scout() {
     });
 
     return list;
-  }, [assets, search, filterOZ, filterTAD, filterHistoric, filterStabilized, filterType, filterStatus, sortBy, sortDir]);
+  }, [assets, search, filterOZ, filterTAD, filterHistoric, filterStabilized, filterClass, filterType, filterStatus, sortBy, sortDir]);
 
   const stats = useMemo(() => {
     if (!assets) return null;
@@ -777,27 +782,18 @@ Asset Scout
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Historic-Only mode toggle — prominent CTA for Wingate workflow */}
-          <Button
-            variant={filterHistoric ? "default" : "outline"}
-            size="sm"
-            className={cn(
-              "h-8 border-border font-medium",
-              filterHistoric
-                ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500"
-                : "text-amber-600 border-amber-500/40 hover:bg-amber-500/10 hover:border-amber-500"
-            )}
-            onClick={() => {
-              const next = !filterHistoric;
-              setFilterHistoric(next);
-              if (next) setFilterStabilized(true);
-              else setFilterStabilized(false);
-            }}
-            title="Show only Wingate-eligible historic assets"
-          >
-            <span className="mr-1.5">🏛️</span>
-            {filterHistoric ? "Historic Only (Active)" : "Historic Only"}
-          </Button>
+          {/* Asset-class filter, driven by the registry */}
+          <Select value={filterClass} onValueChange={setFilterClass}>
+            <SelectTrigger className="h-8 w-[190px] text-xs border-border">
+              <SelectValue placeholder="All asset classes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All asset classes</SelectItem>
+              {listAssetClasses().map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" className="h-8 border-border" onClick={() => refetch()}>
             <RefreshCw className="w-3 h-3 mr-1.5" />Refresh
           </Button>

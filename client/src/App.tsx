@@ -49,6 +49,7 @@ import Pricing from "./pages/Pricing";
 import Wingate from "./pages/Wingate";
 import AssetDossier from "./pages/AssetDossier";
 import AssetShare from "./pages/AssetShare";
+import VerificationQueue from "./pages/VerificationQueue";
 import { getLoginUrl } from "./const";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
@@ -200,6 +201,8 @@ function Router() {
         <Route path="/wingate">{() => <ProtectedRoute component={Wingate} />}</Route>
         {/* Full-page asset dossier — the property-class equivalent of /deal/:id.
             Linked from Command Center, Scout, and the Wingate preview modal. */}
+        {/* Operator research queue — unverified critical fields across the pipeline. */}
+        <Route path="/verify">{() => <ProtectedRoute component={VerificationQueue} />}</Route>
         <Route path="/wingate/asset/:id">{() => <ProtectedRoute component={AssetDossier} />}</Route>
 
         {/* Invite accept — role assignment on first login */}

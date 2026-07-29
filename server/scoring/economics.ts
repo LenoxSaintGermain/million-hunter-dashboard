@@ -41,6 +41,8 @@ export function inferArchetype(a: ScorableAsset & { name?: string | null; proper
   return null;
 }
 
+import { NOMINAL_PRICE_FLOOR } from "../../shared/pricing";
+
 export interface EconomicsAssumptions {
   rehabCostPerSf?: number;
   replacementCostPerSf?: number;   // §9 default $275 masonry
@@ -82,13 +84,19 @@ export interface EconMetric {
   note?: string;
 }
 
+/** One of the (up to three) headline numbers a class chooses to lead with. */
+export interface EconHeadline {
+  label: string;
+  display: string;
+  /** Raw value where a consumer needs it (share card, exports). */
+  value: number | null;
+}
+
 export interface DealEconomics {
   metrics: EconMetric[];
-  headline: {
-    totalProjectCost: number | null;
-    incentiveEquity: number | null;   // fed + state HTC equity
-    equityGapPct: number | null;      // (cost − incentives) ÷ cost
-  };
+  /** Class-defined. Historic leads with cost / incentive equity / equity gap;
+   *  an income class leads with NOI / going-in cap / price per SF. */
+  headline: EconHeadline[];
   assumptionsUsed: Record<string, string>;
   archetype: string | null;
   disclaimer: string;
@@ -97,7 +105,7 @@ export interface DealEconomics {
 const money = (n: number | null) =>
   n == null ? "—" : n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(0)}k` : `$${Math.round(n)}`;
 
-const PLAUSIBLE_MIN_PRICE = 50_000; // auction/placeholder guard (matches the scorer)
+const PLAUSIBLE_MIN_PRICE = NOMINAL_PRICE_FLOOR; // shared with the scorer + UI
 
 export function computeEconomics(
   a: ScorableAsset & { name?: string | null; propertyType?: string | null },
@@ -269,7 +277,11 @@ export function computeEconomics(
 
   return {
     metrics,
-    headline: { totalProjectCost: totalCost, incentiveEquity, equityGapPct },
+    headline: [
+      { label: "Project cost", display: money(totalCost), value: totalCost },
+      { label: "Incentive equity", display: money(incentiveEquity), value: incentiveEquity },
+      { label: "Equity gap", display: equityGapPct == null ? "—" : `${Math.round(equityGapPct * 100)}%`, value: equityGapPct },
+    ],
     assumptionsUsed: {
       "Rehab $/SF": rehabAssumption,
       "Replacement cost": `$${A.replacementCostPerSf}/SF (§9 masonry default)`,

@@ -134,7 +134,7 @@ const SELF_STORAGE: AssetClass = {
   description: "Stabilized self-storage in growth submarkets — occupancy, rate-per-SF, expansion land, and low supply overhang.",
   scorer: "generic",
   markets: ["TX", "FL", "GA", "NC", "SC", "TN", "AZ", "NV"],
-  analysisModules: ["classScorecard", "provenance", "redTeam"],
+  analysisModules: ["classScorecard", "economics", "provenance", "redTeam"],
   promotesToBusinessDeals: false,
   fields: [
     { key: "netRentableSqFt", label: "Net Rentable Sq Ft", type: "number", group: "Facility", critical: true, placeholder: "55000" },

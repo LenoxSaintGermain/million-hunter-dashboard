@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { getAssetClass, listAssetClasses, classSupportsModule } from "@shared/assetClasses";
 import { isTutorialAsset } from "@shared/tutorial";
+import { formatAskingPrice } from "@shared/pricing";
 import { GraduationCap } from "lucide-react";
 import type { AssetClass, FieldDef } from "@shared/assetClasses";
 import EditorialTopNav from "@/components/EditorialTopNav";
@@ -153,7 +154,7 @@ function RankedCard({ rank, asset, onSelect }: { rank: number; asset: ScoredAsse
 
       {/* Metrics */}
       <div className="grid grid-cols-4 gap-2 pt-1 border-t border-border/50 text-center">
-        <div><p className="text-[8px] text-muted-foreground uppercase">Ask</p><p className="text-[11px] font-semibold">{fmtMoney(asset.askingPrice)}</p></div>
+        <div><p className="text-[8px] text-muted-foreground uppercase">Ask</p><p className="text-[11px] font-semibold">{formatAskingPrice(asset.askingPrice).display}</p></div>
         <div><p className="text-[8px] text-muted-foreground uppercase">Cap</p><p className="text-[11px] font-semibold">{asset.capRate ? `${(asset.capRate * 100).toFixed(1)}%` : "—"}</p></div>
         <div><p className="text-[8px] text-muted-foreground uppercase">Built</p><p className="text-[11px] font-semibold">{asset.yearBuilt ?? "—"}</p></div>
         <div><p className="text-[8px] text-muted-foreground uppercase">Not gated</p><p className={cn("text-[11px] font-semibold", gatesPass ? "text-emerald-400" : "text-rose-400")}>{gatesPass ? "pass" : "fail"}</p></div>

@@ -58,6 +58,7 @@ const PRIMARY_NAV = [
 
 // Analyze dropdown items
 const ANALYZE_NAV = [
+  { label: "Verification Queue", href: "/verify", icon: ShieldCheck },
   { label: "Thesis Engine", href: "/thesis", icon: BookOpen },
   { label: "Investor Dossier", href: "/investor-dossier", icon: Building2 },
   { label: "Capital Stack", href: "/stack", icon: BarChart3 },

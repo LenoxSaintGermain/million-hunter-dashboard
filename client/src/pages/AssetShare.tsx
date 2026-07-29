@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { Loader2, MapPin, ArrowRight, Lock, CheckCircle2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { fmtMoney } from "@/components/AssetDossierSections";
+import { formatAskingPrice } from "@shared/pricing";
 
 const TIER_LABEL: Record<string, string> = {
   tier1: "Tier 1", fasttrack: "Fast-Track", tier2: "Tier 2", tier3: "Tier 3", archive: "Archive",
@@ -165,13 +165,14 @@ export default function AssetShare() {
             {/* Asset facts */}
             <div className="grid grid-cols-3 gap-6 border-t border-b border-rule py-5">
               {[
-                { label: "Asking Price", value: fmtMoney(card.askingPrice) },
+                { label: "Asking Price", value: formatAskingPrice(card.askingPrice).display, hint: formatAskingPrice(card.askingPrice).hint },
                 { label: "Square Feet", value: card.squareFootage ? Number(card.squareFootage).toLocaleString() : "—" },
                 { label: "Year Built", value: card.yearBuilt ? String(card.yearBuilt) : "—" },
               ].map((x) => (
                 <div key={x.label}>
                   <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mb-2">{x.label}</p>
                   <p className="font-data-mono text-[20px] text-ink leading-none">{x.value}</p>
+                  {(x as any).hint && <p className="font-body-base text-[11px] text-muted-foreground mt-1 leading-snug">{(x as any).hint}</p>}
                 </div>
               ))}
             </div>
@@ -198,13 +199,9 @@ export default function AssetShare() {
               <div>
                 <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mb-3">Deal economics</p>
                 <div className="grid grid-cols-3 gap-0 border border-rule divide-x divide-rule">
-                  {[
-                    { label: "Project cost", v: card.economics.totalProjectCost == null ? "—" : fmtMoney(card.economics.totalProjectCost) },
-                    { label: "Incentive equity", v: card.economics.incentiveEquity == null ? "—" : fmtMoney(card.economics.incentiveEquity) },
-                    { label: "Equity gap", v: card.economics.equityGapPct == null ? "—" : `${Math.round(card.economics.equityGapPct * 100)}%` },
-                  ].map((x) => (
+                  {card.economics.headline.map((x: { label: string; display: string }) => (
                     <div key={x.label} className="px-4 py-4 bg-paper">
-                      <p className="font-data-mono text-[20px] text-ink leading-none">{x.v}</p>
+                      <p className="font-data-mono text-[20px] text-ink leading-none">{x.display}</p>
                       <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mt-2">{x.label}</p>
                     </div>
                   ))}
