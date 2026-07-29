@@ -5,7 +5,8 @@ import { consensusScores, sellerSimulations, dealTrajectory, deals } from "../dr
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, operatorProcedure,
+  protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import {
   getDeals, getDealById, createDeal, updateDealStage, updateDealScore, getDealStats,
@@ -1611,7 +1612,7 @@ Produce concrete remediation plan. Give go/no-go recommendation.`;
         };
       }),
 
-    create: protectedProcedure
+    create: operatorProcedure
       .input(z.object({
         name: z.string().min(1),
         address: z.string().min(1),
@@ -1650,7 +1651,7 @@ Produce concrete remediation plan. Give go/no-go recommendation.`;
         return { id: res[0].insertId, message: "Asset created" };
       }),
 
-    updateStatus: protectedProcedure
+    updateStatus: operatorProcedure
       .input(z.object({ id: z.number().int(), status: z.enum(["new", "reviewing", "qualified", "rejected", "acquired"]) }))
       .mutation(async ({ input }) => {
         const { updateCommercialAssetStatus } = await import("./db");
@@ -1658,7 +1659,7 @@ Produce concrete remediation plan. Give go/no-go recommendation.`;
         return { success: true };
       }),
 
-    scoreAsset: protectedProcedure
+    scoreAsset: operatorProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ input }) => {
         const { getCommercialAssetById, updateCommercialAssetAiScore } = await import("./db");
@@ -1706,7 +1707,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
       }),
 
     // Delete a commercial asset from Scout
-    deleteAsset: protectedProcedure
+    deleteAsset: operatorProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ input }) => {
         const { getDb } = await import("./db");
@@ -1721,7 +1722,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
       }),
 
     // ─── Historic A–G scoring: run the deterministic scorer + persist ─────────
-    scoreHistoric: protectedProcedure
+    scoreHistoric: operatorProcedure
       .input(z.object({ id: z.number().int().optional(), all: z.boolean().optional(), compilationId: z.number().int().optional() }))
       .mutation(async ({ input }) => {
         const { getCommercialAssetById, getCommercialAssets, persistHistoricScore } = await import("./db");
@@ -1801,7 +1802,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
     // ─── Source REAL listings for ANY asset class via sonar-pro ───────────────
     // Adaptive: the research query is built from the class config, so a new
     // bespoke thesis can source its own real, cited inventory with no new code.
-    researchAssets: protectedProcedure
+    researchAssets: operatorProcedure
       .input(z.object({ assetClass: z.string().default("historic"), markets: z.array(z.string()).optional(), limit: z.number().int().min(1).max(12).default(6) }))
       .mutation(async ({ input }) => {
         const { getAssetClass } = await import("../shared/assetClasses");
@@ -1934,7 +1935,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
     // Listings go stale fast (auctions close, listings withdraw, prices move).
     // This re-checks the live web and records status + sources so a human can
     // click through and validate. Never guesses — "unknown" is a valid answer.
-    verifyListing: protectedProcedure
+    verifyListing: operatorProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ input }) => {
         const { getCommercialAssetById, getDb } = await import("./db");
@@ -1988,7 +1989,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
       }),
 
     // ─── Bulk-clear: archive (soft) or delete (hard) many assets at once ──────
-    bulkArchive: protectedProcedure
+    bulkArchive: operatorProcedure
       .input(z.object({ ids: z.array(z.number().int()).optional(), all: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         const { bulkArchiveCommercialAssets } = await import("./db");
@@ -1996,7 +1997,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         return { archived: n };
       }),
 
-    bulkDelete: protectedProcedure
+    bulkDelete: operatorProcedure
       .input(z.object({ ids: z.array(z.number().int()).optional(), all: z.boolean().optional(), confirm: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         if (input.all && !input.confirm) throw new TRPCError({ code: "BAD_REQUEST", message: "Deleting all assets requires confirm:true" });
@@ -2006,7 +2007,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
       }),
 
     // Import a commercial asset from a listing URL (LoopNet, BizBuySell, CoStar, Crexi, etc.)
-    importFromUrl: protectedProcedure
+    importFromUrl: operatorProcedure
       .input(z.object({ url: z.string().url() }))
       .mutation(async ({ input }) => {
         const { scrapeListing } = await import("./listingScraper");
@@ -2208,7 +2209,7 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
       }),
 
     // Convert a qualified Scout asset into a Deal record and route to War Room
-    convertToDeal: protectedProcedure
+    convertToDeal: operatorProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ input }) => {
         const { getCommercialAssetById, createDeal, upsertSignal } = await import("./db");
@@ -2417,6 +2418,84 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
   }),
 
   // ─── Deal Share Tokens ─────────────────────────────────────────────────────
+  /** Link-sharing for a property dossier. The public payload is deliberately a
+   *  HIGHLIGHT CARD, not the dossier: headline scores, gates, economics summary.
+   *  Anything deeper requires signing in — the card's CTA routes registered users
+   *  to the full dossier and everyone else to a request-access form. */
+  assetShare: router({
+    createToken: operatorProcedure
+      .input(z.object({ assetId: z.number(), ttlDays: z.number().int().min(1).max(365).default(30) }))
+      .mutation(async ({ input }) => {
+        const { createAssetShareToken } = await import("./db");
+        const token = await createAssetShareToken(input.assetId, input.ttlDays);
+        return { token };
+      }),
+
+    getByToken: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input, ctx }) => {
+        const { getAssetShareToken, incrementAssetShareTokenViewCount, getCommercialAssetById } = await import("./db");
+        const { scoreAssetByClass } = await import("./scoring");
+        const { computeEconomics } = await import("./scoring/economics");
+        const { getAssetClass } = await import("../shared/assetClasses");
+
+        const shareRow = await getAssetShareToken(input.token);
+        if (!shareRow) throw new TRPCError({ code: "NOT_FOUND", message: "Share link not found" });
+        if (shareRow.expiresAt && shareRow.expiresAt < Date.now()) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "This share link has expired" });
+        }
+        incrementAssetShareTokenViewCount(input.token).catch(() => {});
+
+        const asset: any = await getCommercialAssetById(shareRow.assetId);
+        if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+
+        const score = scoreAssetByClass(asset);
+        const cls = getAssetClass(asset.assetClass);
+        const econ = (asset.assetClass ?? "historic") === "historic" ? computeEconomics(asset) : null;
+
+        // Highlight card only — no source URL, no owner/seller notes, no raw
+        // asking price detail beyond the headline the operator chose to share.
+        return {
+          card: {
+            id: Number(asset.id),
+            name: String(asset.name ?? ""),
+            city: String(asset.city ?? ""),
+            state: String(asset.state ?? ""),
+            className: cls.label,
+            classShort: cls.shortLabel,
+            yearBuilt: asset.yearBuilt ?? null,
+            squareFootage: asset.squareFootage ?? null,
+            askingPrice: asset.askingPrice == null ? null : Number(asset.askingPrice),
+            tier: score.assetTier,
+            marketTier: score.marketTier,
+            rankScore: Math.round(score.rankScore),
+            compositeScore: score.compositeScore,
+            confidenceScore: score.confidenceScore,
+            gates: [
+              { key: "A", label: "Historic qualification", score: score.dimA, max: 20, pass: score.dimA >= 12 },
+              { key: "B", label: "Development envelope", score: score.dimB, max: 20, pass: score.dimB >= 12 },
+            ],
+            economics: econ
+              ? {
+                  totalProjectCost: econ.headline.totalProjectCost,
+                  incentiveEquity: econ.headline.incentiveEquity,
+                  equityGapPct: econ.headline.equityGapPct,
+                  disclaimer: econ.disclaimer,
+                }
+              : null,
+            strengths: score.scorecard.strengths.slice(0, 3),
+            risks: score.scorecard.risks.slice(0, 3),
+            unverifiedCount: score.verifyFields.length,
+          },
+          // Drives the CTA: signed-in users go straight to the dossier, everyone
+          // else gets the request-access form.
+          viewer: { isAuthenticated: !!ctx.user },
+          viewCount: shareRow.viewCount,
+          expiresAt: shareRow.expiresAt,
+        };
+      }),
+  }),
+
   dealShare: router({
     // Create a share token for a deal (30-day TTL by default)
     createToken: protectedProcedure
@@ -2739,6 +2818,51 @@ Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRe
     }),
 
     // Express interest in a deal
+    /** Interest in a PROPERTY asset. Kept separate from expressInterest so a
+     *  commercial_assets.id can never be written into investor_interest.deal_id. */
+    expressAssetInterest: protectedProcedure.input(z.object({
+      assetId: z.number(),
+      allocationAmount: z.number().optional(),
+      investorNote: z.string().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const { investorInterest } = await import("../drizzle/schema");
+      const { and } = await import("drizzle-orm");
+
+      const existing = await db.select({ id: investorInterest.id }).from(investorInterest)
+        .where(and(eq(investorInterest.userId, ctx.user.id), eq(investorInterest.assetId, input.assetId))).limit(1);
+
+      if (existing[0]) {
+        await db.update(investorInterest).set({
+          allocationAmount: input.allocationAmount ?? null,
+          investorNote: input.investorNote ?? null,
+          status: "expressed",
+        }).where(eq(investorInterest.id, existing[0].id));
+      } else {
+        await db.insert(investorInterest).values({
+          userId: ctx.user.id,
+          dealId: null,
+          assetId: input.assetId,
+          allocationAmount: input.allocationAmount ?? null,
+          investorNote: input.investorNote ?? null,
+          status: "expressed",
+        });
+      }
+
+      try {
+        const { getCommercialAssetById } = await import("./db");
+        const asset: any = await getCommercialAssetById(input.assetId);
+        const { notifyOwner } = await import("./_core/notification");
+        await notifyOwner({
+          title: `Client interest — ${asset?.name ?? `asset ${input.assetId}`}`,
+          content: `${ctx.user.name ?? ctx.user.email ?? "A client"} flagged interest in ${asset?.name ?? "an asset"} (${asset?.city ?? "?"}, ${asset?.state ?? "?"}).\n\n${input.investorNote ?? ""}`,
+        });
+      } catch { /* notification is best-effort */ }
+
+      return { success: true } as const;
+    }),
+
     expressInterest: protectedProcedure.input(z.object({
       dealId: z.number(),
       allocationAmount: z.number().optional(),

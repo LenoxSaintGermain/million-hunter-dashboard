@@ -27,27 +27,25 @@ const fmtDate = (ts: number | null | undefined) => {
 function MetricPill({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
   return (
     <div className={cn(
-      "flex flex-col items-center justify-center rounded-2xl p-5 border",
-      accent
-        ? "bg-gradient-to-br from-emerald-950/60 to-emerald-900/30 border-emerald-500/30 shadow-[0_0_24px_-4px_rgba(16,185,129,0.2)]"
-        : "bg-white/[0.03] border-[var(--rule)]"
+      "flex flex-col items-center justify-center p-5 border bg-paper",
+      accent ? "border-sage/40" : "border-rule"
     )}>
-      <span className={cn("text-3xl font-bold font-mono tracking-tight", accent ? "text-[var(--sage)]" : "text-white")}>
+      <span className={cn("text-3xl font-bold font-mono tracking-tight", accent ? "text-sage" : "text-ink")}>
         {value}
       </span>
-      <span className="text-xs text-white/50 mt-1 text-center">{label}</span>
+      <span className="text-xs text-muted-foreground mt-1 text-center">{label}</span>
     </div>
   );
 }
 
 function Section({ title, icon: Icon, children, className }: { title: string; icon: React.ElementType; children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("rounded-2xl border border-[var(--rule)] bg-white/[0.03] p-6", className)}>
+    <div className={cn(" border border-rule bg-paper p-6", className)}>
       <div className="flex items-center gap-2.5 mb-5">
-        <div className="w-8 h-8 rounded-xl bg-[var(--bone)] flex items-center justify-center">
-          <Icon className="w-4 h-4 text-white/70" />
+        <div className="w-8 h-8 rounded-xl bg-paper flex items-center justify-center">
+          <Icon className="w-4 h-4 text-ink/75" />
         </div>
-        <h3 className="text-sm font-semibold text-white/80 uppercase tracking-widest">{title}</h3>
+        <h3 className="text-sm font-semibold text-ink/80 uppercase tracking-widest">{title}</h3>
       </div>
       {children}
     </div>
@@ -100,12 +98,12 @@ export default function DealShare() {
   // ── Loading ──────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#080A0F] flex items-center justify-center">
+      <div className="min-h-screen bg-bone flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[var(--bone)] border border-[var(--rule)] flex items-center justify-center animate-pulse">
-            <Building2 className="w-6 h-6 text-white/30" />
+          <div className="w-12 h-12  bg-paper border border-rule flex items-center justify-center animate-pulse">
+            <Building2 className="w-6 h-6 text-muted-foreground" />
           </div>
-          <p className="text-sm text-white/40">Loading deal briefing…</p>
+          <p className="text-sm text-muted-foreground">Loading deal briefing…</p>
         </div>
       </div>
     );
@@ -115,13 +113,13 @@ export default function DealShare() {
   if (error || !data) {
     const msg = (error as any)?.message ?? "This link is invalid or has expired.";
     return (
-      <div className="min-h-screen bg-[#080A0F] flex items-center justify-center px-4">
+      <div className="min-h-screen bg-bone flex items-center justify-center px-4">
         <div className="max-w-md text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-red-950/40 border border-red-500/20 flex items-center justify-center mx-auto">
+          <div className="w-16 h-16  bg-paper border border-clay/40 flex items-center justify-center mx-auto">
             <AlertTriangle className="w-8 h-8 text-[var(--clay)]" />
           </div>
-          <h1 className="text-xl font-bold text-white">Access Denied</h1>
-          <p className="text-sm text-white/50">{msg}</p>
+          <h1 className="text-xl font-bold text-ink">Access Denied</h1>
+          <p className="text-sm text-muted-foreground">{msg}</p>
         </div>
       </div>
     );
@@ -146,24 +144,19 @@ export default function DealShare() {
   const redFlags: string[] = Array.isArray(signal?.redFlags) ? signal!.redFlags as string[] : [];
 
   return (
-    <div className="min-h-screen bg-[#080A0F] text-white font-sans">
-      {/* ── Ambient background ─────────────────────────────────────────────── */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary/10 rounded-full blur-[120px] opacity-40" />
-        <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px]" />
-      </div>
+    <div className="min-h-screen bg-bone text-ink">
 
       <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-12 space-y-8">
 
         {/* ── Watermark / meta ───────────────────────────────────────────────── */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
-              <Zap className="w-3.5 h-3.5 text-primary" />
+            <div className="w-7 h-7 rounded-lg bg-amber/10 border border-amber/40 flex items-center justify-center">
+              <Zap className="w-3.5 h-3.5 text-amber" />
             </div>
-            <span className="text-xs font-semibold text-white/40 tracking-widest uppercase">Project Million · Confidential</span>
+            <span className="text-xs font-semibold text-muted-foreground tracking-widest uppercase">Project Million · Confidential</span>
           </div>
-          <div className="flex items-center gap-4 text-xs text-white/30">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
             {viewCount != null && (
               <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{viewCount} view{viewCount !== 1 ? "s" : ""}</span>
             )}
@@ -174,46 +167,45 @@ export default function DealShare() {
         </div>
 
         {/* ── Hero ───────────────────────────────────────────────────────────── */}
-        <div className="rounded-3xl border border-[var(--rule)] bg-gradient-to-br from-white/[0.05] via-white/[0.02] to-transparent p-8 sm:p-10 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
+        <div className="border border-rule bg-paper p-8 sm:p-10 relative overflow-hidden">
           <div className="relative">
             {/* Badges */}
             <div className="flex flex-wrap gap-2 mb-4">
-              {deal.industry && <Badge variant="secondary" className="text-xs bg-[var(--bone)] text-white/70 border-0">{deal.industry}</Badge>}
+              {deal.industry && <Badge variant="secondary" className="text-xs bg-paper text-ink/75 border-0">{deal.industry}</Badge>}
               {deal.opportunityZone && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-[var(--sage)] border border-emerald-500/25">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-sage/10 text-sage border border-sage/40">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sage" />
                   Opportunity Zone
                 </span>
               )}
               {deal.tadDistrict && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber/10 text-ink/75 border border-rule">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
                   {deal.tadDistrict}
                 </span>
               )}
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/15 text-primary border border-primary/20">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber/10 text-amber border border-amber/30">
                 {deal.stage.replace(/_/g, " ")}
               </span>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
               <div className="flex-1">
-                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-2 leading-tight">
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-ink mb-2 leading-tight">
                   {deal.name}
                 </h1>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-white/50">
+                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                   {deal.location && <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" />{deal.location}</span>}
                   {deal.employees && <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{deal.employees} employees</span>}
                   {deal.yearEstablished && <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Est. {deal.yearEstablished}</span>}
                   {deal.listingUrl && (
-                    <a href={deal.listingUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary/70 hover:text-primary transition-colors">
+                    <a href={deal.listingUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-amber hover:text-amber transition-colors">
                       <ExternalLink className="w-3.5 h-3.5" />View Listing
                     </a>
                   )}
                 </div>
                 {deal.description && (
-                  <p className="mt-4 text-sm text-white/60 leading-relaxed max-w-xl">{deal.description}</p>
+                  <p className="mt-4 text-sm text-muted-foreground leading-relaxed max-w-xl">{deal.description}</p>
                 )}
               </div>
               <div className="shrink-0">
@@ -236,16 +228,16 @@ export default function DealShare() {
           <Section title="Capital Stack" icon={DollarSign}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
               {capital.sbaAmount && (
-                <div className="rounded-xl bg-blue-950/30 border border-blue-500/20 p-4">
-                  <p className="text-xs text-blue-400/70 mb-1">SBA 7(a) Loan</p>
-                  <p className="text-2xl font-bold text-blue-300">{fmt(capital.sbaAmount)}</p>
-                  {capital.sbaEligible && <p className="text-xs text-blue-400/60 mt-1">SBA Eligible ✓</p>}
+                <div className="rounded-xl bg-paper border border-rule p-4">
+                  <p className="text-xs text-ink/75/70 mb-1">SBA 7(a) Loan</p>
+                  <p className="text-2xl font-bold text-muted-foreground">{fmt(capital.sbaAmount)}</p>
+                  {capital.sbaEligible && <p className="text-xs text-ink/75/60 mt-1">SBA Eligible ✓</p>}
                 </div>
               )}
               {capital.sellerNote && (
-                <div className="rounded-xl bg-amber-950/30 border border-amber-500/20 p-4">
+                <div className="rounded-xl bg-paper border border-amber-500/20 p-4">
                   <p className="text-xs text-[var(--amber)]/70 mb-1">Seller Note</p>
-                  <p className="text-2xl font-bold text-amber-300">{fmt(capital.sellerNote)}</p>
+                  <p className="text-2xl font-bold text-amber">{fmt(capital.sellerNote)}</p>
                 </div>
               )}
               {capital.equity && (
@@ -255,10 +247,10 @@ export default function DealShare() {
                 </div>
               )}
             </div>
-            <div className="flex flex-wrap gap-6 pt-4 border-t border-[var(--rule)]">
+            <div className="flex flex-wrap gap-6 pt-4 border-t border-rule">
               {capital.dscr != null && (
                 <div>
-                  <p className="text-xs text-white/40 mb-0.5">DSCR</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">DSCR</p>
                   <p className={cn("text-lg font-bold", (capital.dscr ?? 0) >= 1.15 ? "text-[var(--sage)]" : "text-[var(--amber)]")}>
                     {capital.dscr.toFixed(2)}x
                   </p>
@@ -266,14 +258,14 @@ export default function DealShare() {
               )}
               {capital.cashOnCash != null && (
                 <div>
-                  <p className="text-xs text-white/40 mb-0.5">Cash-on-Cash Return</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">Cash-on-Cash Return</p>
                   <p className="text-lg font-bold text-[var(--sage)]">{pct(capital.cashOnCash)}</p>
                 </div>
               )}
               {signal?.capitalStackSummary && (
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-white/40 mb-0.5">Analyst Note</p>
-                  <p className="text-xs text-white/60 leading-relaxed">{signal.capitalStackSummary}</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">Analyst Note</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{signal.capitalStackSummary}</p>
                 </div>
               )}
             </div>
@@ -285,12 +277,12 @@ export default function DealShare() {
           <Section title="Opportunity Zone & TAD Impact" icon={TrendingUp}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {deal.opportunityZone && (
-                <div className="rounded-xl bg-emerald-950/30 border border-emerald-500/20 p-5">
+                <div className="rounded-xl bg-paper border border-sage/30 p-5">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <p className="text-sm font-semibold text-emerald-300">Opportunity Zone</p>
+                    <span className="w-2 h-2 rounded-full bg-sage" />
+                    <p className="text-sm font-semibold text-sage">Opportunity Zone</p>
                   </div>
-                  <p className="text-xs text-white/50 leading-relaxed">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     Capital gains invested through a Qualified Opportunity Fund (QOF) may defer and reduce federal tax liability. 
                     10-year holds can eliminate capital gains on appreciation entirely — a structural advantage unavailable in non-OZ deals.
                   </p>
@@ -301,29 +293,29 @@ export default function DealShare() {
                 </div>
               )}
               {deal.tadDistrict && (
-                <div className="rounded-xl bg-blue-950/30 border border-blue-500/20 p-5">
+                <div className="rounded-xl bg-paper border border-rule p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="w-2 h-2 rounded-full bg-blue-400" />
-                    <p className="text-sm font-semibold text-blue-300">TAD District</p>
+                    <p className="text-sm font-semibold text-muted-foreground">TAD District</p>
                   </div>
-                  <p className="text-xs text-white/50 leading-relaxed">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     Tax Allocation District financing redirects incremental property tax revenue to fund public infrastructure improvements, 
                     creating a government-backed demand tailwind for assets in the corridor.
                   </p>
-                  <p className="text-xs text-blue-400/60 mt-2">{deal.tadDistrict}</p>
+                  <p className="text-xs text-ink/75/60 mt-2">{deal.tadDistrict}</p>
                 </div>
               )}
             </div>
             {(deal.eventRevenueLow || deal.eventRevenueHigh) && (
-              <div className="mt-4 rounded-xl bg-white/[0.03] border border-[var(--rule)] p-4 flex items-center gap-4">
-                <BarChart3 className="w-5 h-5 text-primary/60 shrink-0" />
+              <div className="mt-4 rounded-xl bg-paper border border-rule p-4 flex items-center gap-4">
+                <BarChart3 className="w-5 h-5 text-amber shrink-0" />
                 <div>
-                  <p className="text-xs text-white/40 mb-0.5">Event Revenue Proximity</p>
-                  <p className="text-sm font-semibold text-white">
+                  <p className="text-xs text-muted-foreground mb-0.5">Event Revenue Proximity</p>
+                  <p className="text-sm font-semibold text-ink">
                     {fmt(deal.eventRevenueLow)} – {fmt(deal.eventRevenueHigh)} incremental revenue potential
                   </p>
                   {deal.eventProximityMiles && (
-                    <p className="text-xs text-white/40">{deal.eventProximityMiles.toFixed(1)} mi from nearest major venue</p>
+                    <p className="text-xs text-muted-foreground">{deal.eventProximityMiles.toFixed(1)} mi from nearest major venue</p>
                   )}
                 </div>
               </div>
@@ -336,30 +328,30 @@ export default function DealShare() {
           <Section title="Third Signal Intelligence" icon={Brain}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
               {signal.ownerDistressScore != null && (
-                <div className="rounded-xl bg-white/[0.03] border border-[var(--rule)] p-4">
-                  <p className="text-xs text-white/40 mb-1">Owner Distress Score</p>
+                <div className="rounded-xl bg-paper border border-rule p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Owner Distress Score</p>
                   <p className={cn("text-2xl font-bold", toNum(signal.ownerDistressScore)! >= 0.6 ? "text-[var(--sage)]" : "text-[var(--amber)]")}>
                     {pct(signal.ownerDistressScore)}
                   </p>
                   {signal.ownerNegotiationStyle && (
-                    <p className="text-xs text-white/40 mt-1 capitalize">{signal.ownerNegotiationStyle} negotiator</p>
+                    <p className="text-xs text-muted-foreground mt-1 capitalize">{signal.ownerNegotiationStyle} negotiator</p>
                   )}
                 </div>
               )}
               {signal.reviewSentimentScore != null && (
-                <div className="rounded-xl bg-white/[0.03] border border-[var(--rule)] p-4">
-                  <p className="text-xs text-white/40 mb-1">Review Sentiment</p>
+                <div className="rounded-xl bg-paper border border-rule p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Review Sentiment</p>
                   <p className={cn("text-2xl font-bold", toNum(signal.reviewSentimentScore)! >= 0.6 ? "text-[var(--sage)]" : "text-[var(--amber)]")}>
                     {pct(signal.reviewSentimentScore)}
                   </p>
                   {signal.digitalGrowthTrend && (
-                    <p className="text-xs text-white/40 mt-1 capitalize">{signal.digitalGrowthTrend} digital trend</p>
+                    <p className="text-xs text-muted-foreground mt-1 capitalize">{signal.digitalGrowthTrend} digital trend</p>
                   )}
                 </div>
               )}
               {signal.killProbability != null && (
-                <div className="rounded-xl bg-white/[0.03] border border-[var(--rule)] p-4">
-                  <p className="text-xs text-white/40 mb-1">Kill Probability</p>
+                <div className="rounded-xl bg-paper border border-rule p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Kill Probability</p>
                   <p className={cn("text-2xl font-bold", toNum(signal.killProbability)! <= 0.3 ? "text-[var(--sage)]" : toNum(signal.killProbability)! <= 0.6 ? "text-[var(--amber)]" : "text-[var(--clay)]")}>
                     {pct(signal.killProbability)}
                   </p>
@@ -367,13 +359,13 @@ export default function DealShare() {
               )}
             </div>
             {signal.ownerProfileSummary && (
-              <div className="rounded-xl bg-white/[0.02] border border-[var(--rule)] p-4 mb-4">
-                <p className="text-xs text-white/40 mb-2 uppercase tracking-wider">Owner Psychology</p>
-                <p className="text-sm text-white/70 leading-relaxed">{signal.ownerProfileSummary}</p>
+              <div className="rounded-xl bg-paper border border-rule p-4 mb-4">
+                <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wider">Owner Psychology</p>
+                <p className="text-sm text-ink/75 leading-relaxed">{signal.ownerProfileSummary}</p>
               </div>
             )}
             {redFlags.length > 0 && (
-              <div className="rounded-xl bg-red-950/20 border border-red-500/15 p-4">
+              <div className="rounded-xl bg-paper border border-clay/30 p-4">
                 <p className="text-xs text-[var(--clay)]/70 mb-3 uppercase tracking-wider flex items-center gap-1.5">
                   <AlertTriangle className="w-3 h-3" />Red Flags ({redFlags.length})
                 </p>
@@ -381,7 +373,7 @@ export default function DealShare() {
                   {redFlags.map((flag, i) => (
                     <div key={i} className="flex items-start gap-2">
                       <XCircle className="w-3.5 h-3.5 text-[var(--clay)]/60 mt-0.5 shrink-0" />
-                      <p className="text-xs text-white/60">{flag}</p>
+                      <p className="text-xs text-muted-foreground">{flag}</p>
                     </div>
                   ))}
                 </div>
@@ -395,21 +387,21 @@ export default function DealShare() {
           <Section title="Investment Thesis" icon={Shield}>
             {memo.executiveSummary && (
               <div className="mb-4">
-                <p className="text-xs text-white/40 mb-2 uppercase tracking-wider">Executive Summary</p>
-                <p className="text-sm text-white/70 leading-relaxed">{memo.executiveSummary}</p>
+                <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wider">Executive Summary</p>
+                <p className="text-sm text-ink/75 leading-relaxed">{memo.executiveSummary}</p>
               </div>
             )}
             {memo.investmentThesis && (
-              <div className="rounded-xl bg-primary/5 border border-primary/15 p-4">
-                <p className="text-xs text-primary/60 mb-2 uppercase tracking-wider">Investment Thesis</p>
-                <p className="text-sm text-white/80 leading-relaxed italic">{memo.investmentThesis}</p>
+              <div className="rounded-xl bg-amber/5 border border-amber/30 p-4">
+                <p className="text-xs text-amber mb-2 uppercase tracking-wider">Investment Thesis</p>
+                <p className="text-sm text-ink/80 leading-relaxed italic">{memo.investmentThesis}</p>
               </div>
             )}
           </Section>
         )}
 
         {/* ── Footer ─────────────────────────────────────────────────────────── */}
-        <div className="pt-8 border-t border-[var(--rule)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/25">
+        <div className="pt-8 border-t border-rule flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <p>Generated by Project Million · Third Signal Intelligence Platform</p>
           <p>This document is confidential and intended solely for the recipient.</p>
         </div>

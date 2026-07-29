@@ -114,7 +114,7 @@ export function EconomicsPanel({ economics, dense }: { economics: any; dense?: b
 
       {!dense && (
         <>
-          <div className="divide-y divide-rule border-t border-b border-rule">
+          <div className="divide-y divide-rule border-t border-b border-rule max-w-[680px]">
             {economics.metrics.map((m: any) => {
               const valueCls =
                 m.status === "pass" ? "text-sage" :
@@ -158,14 +158,15 @@ export function EconomicsPanel({ economics, dense }: { economics: any; dense?: b
 /** A–G dimensions. On the page these are always open; in the modal, collapsed. */
 export function DimensionsPanel({ s, collapsible }: { s: HistoricScore; collapsible?: boolean }) {
   return (
-    <div className="border-t border-rule">
+    <div className="border-t border-rule max-w-[680px]">
       {s.scorecard.dimensions.map((d) => {
         const gated = d.key === "A" || d.key === "B";
         const gateOk = d.score >= 12;
         const header = (
           <div className="flex items-center gap-3 py-3">
             <span className="font-eyebrow text-eyebrow text-amber w-4">{d.key}</span>
-            <span className="font-card-title text-[17px] text-ink leading-none flex-1">{d.label}</span>
+            <span className="font-card-title text-[17px] text-ink leading-none">{d.label}</span>
+            <span className="flex-1 border-b border-dotted border-rule translate-y-[-2px]" aria-hidden />
             {gated && (
               <span className={cn("font-eyebrow text-eyebrow uppercase tracking-widest", gateOk ? "text-sage" : "text-clay")}>
                 {gateOk ? "gate pass" : "gate fail"}
@@ -181,9 +182,10 @@ export function DimensionsPanel({ s, collapsible }: { s: HistoricScore; collapsi
             {d.factors.map((f, i) => (
               <div key={i} className="flex items-baseline gap-3">
                 <span className={cn("w-1.5 h-1.5 rounded-full shrink-0 translate-y-[-2px]", f.points > 0 ? "bg-sage" : "bg-muted-foreground/30")} />
-                <span className="flex-1 font-body-base text-[13px] text-ink/75">
+                <span className="font-body-base text-[13px] text-ink/75">
                   {f.label}{f.note ? ` — ${f.note}` : ""}
                 </span>
+                <span className="flex-1 border-b border-dotted border-rule/60 translate-y-[-3px]" aria-hidden />
                 {f.verify && <AlertTriangle className="w-3 h-3 text-amber shrink-0" />}
                 <span className="font-data-mono text-[12px] text-muted-foreground shrink-0">{f.points}/{f.max}</span>
               </div>

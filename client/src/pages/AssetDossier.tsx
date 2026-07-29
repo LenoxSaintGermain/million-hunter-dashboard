@@ -39,7 +39,10 @@ export default function AssetDossier() {
   const [, params] = useRoute("/wingate/asset/:id");
   const assetId = Number(params?.id);
   const { user } = useAuth();
-  const Shell = (user as any)?.role === "investor" ? InvestorLayout : EditorialTopNav;
+  // Clients read the dossier; they never mutate the pipeline. The server enforces
+  // this too (operatorProcedure) — this just avoids showing controls that 403.
+  const isClient = (user as any)?.role === "investor" || (user as any)?.role === "insurance";
+  const Shell = isClient ? InvestorLayout : EditorialTopNav;
 
   const q = trpc.scout.getScoredById.useQuery({ id: assetId }, { enabled: Number.isFinite(assetId) });
   const asset = q.data as ScoredAsset | undefined;
@@ -47,6 +50,23 @@ export default function AssetDossier() {
   const [status, setStatus] = useState<AssetStatus | null>(null);
   const [verification, setVerification] = useState<any>(null);
   const [narrative, setNarrative] = useState<{ summary: string; strengths: string[]; risks: string[] } | null>(null);
+  const [interested, setInterested] = useState(false);
+
+  // Sharing mints a token so the recipient sees a public highlight card and a
+  // way to request access — not a bare URL that dead-ends at a login wall.
+  const createShare = trpc.assetShare.createToken.useMutation({
+    onSuccess: (r) => {
+      const url = `${window.location.origin}/asset-share/${r.token}`;
+      navigator.clipboard?.writeText(url);
+      toast.success("Share link copied — expires in 30 days");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const expressInterest = trpc.investor.expressAssetInterest.useMutation({
+    onSuccess: () => { setInterested(true); toast.success("Interest registered — your analyst has been notified."); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const verify = trpc.scout.verifyListing.useMutation({
     onSuccess: (r: any) => { setVerification(r); toast.success(`Listing checked: ${r.status}`); q.refetch(); },
@@ -159,19 +179,31 @@ export default function AssetDossier() {
             </div>
 
             <div className="flex flex-col items-stretch lg:items-end gap-3 shrink-0">
-              <button
-                onClick={() => {
-                  navigator.clipboard?.writeText(`${window.location.origin}/wingate/asset/${asset.id}`);
-                  toast.success("Dossier link copied");
-                }}
-                className="flex items-center justify-center gap-2 border border-rule bg-paper font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:border-amber/40 hover:text-amber transition-all uppercase tracking-widest">
-                <Share2 className="w-3 h-3" />Share Dossier
-              </button>
-              <button onClick={() => rescore.mutate({ id: asset.id })} disabled={rescore.isPending}
-                className="flex items-center justify-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:opacity-90 transition-all uppercase tracking-widest">
-                {rescore.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
-                Re-score
-              </button>
+              {isClient ? (
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`${window.location.origin}/wingate/asset/${asset.id}`);
+                    toast.success("Dossier link copied");
+                  }}
+                  className="flex items-center justify-center gap-2 border border-rule bg-paper font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:border-amber/40 hover:text-amber transition-all uppercase tracking-widest">
+                  <Share2 className="w-3 h-3" />Copy Link
+                </button>
+              ) : (
+                <button
+                  onClick={() => createShare.mutate({ assetId: asset.id })}
+                  disabled={createShare.isPending}
+                  className="flex items-center justify-center gap-2 border border-rule bg-paper font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:border-amber/40 hover:text-amber transition-all uppercase tracking-widest">
+                  {createShare.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Share2 className="w-3 h-3" />}
+                  Share Dossier
+                </button>
+              )}
+              {!isClient && (
+                <button onClick={() => rescore.mutate({ id: asset.id })} disabled={rescore.isPending}
+                  className="flex items-center justify-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:opacity-90 transition-all uppercase tracking-widest">
+                  {rescore.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                  Re-score
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -210,49 +242,66 @@ export default function AssetDossier() {
           {/* Action rail */}
           <aside className="lg:col-span-4 space-y-8 lg:sticky lg:top-6 self-start">
             <div className="border border-rule bg-paper p-6 space-y-4">
-              <SectionLabel>Next Actions</SectionLabel>
+              <SectionLabel>{isClient ? "Your Move" : "Next Actions"}</SectionLabel>
 
-              <button onClick={() => verify.mutate({ id: asset.id })} disabled={verify.isPending}
-                className="w-full flex items-center gap-2 border border-rule px-4 py-2.5 font-eyebrow text-eyebrow uppercase tracking-widest hover:border-amber/40 hover:text-amber transition-all">
-                {verify.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3 text-sage" />}
-                {verify.isPending ? "Checking…" : "Verify listing"}
-              </button>
+              {isClient ? (
+                <>
+                  <button onClick={() => expressInterest.mutate({ assetId: asset.id })}
+                    disabled={expressInterest.isPending || interested}
+                    className="w-full flex items-center gap-2 border border-rule px-4 py-2.5 font-eyebrow text-eyebrow uppercase tracking-widest hover:border-amber/40 hover:text-amber transition-all disabled:opacity-60">
+                    {expressInterest.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3 text-sage" />}
+                    {interested ? "Interest registered" : "Express interest"}
+                  </button>
+                  <p className="font-body-base text-[12px] text-muted-foreground leading-relaxed border-t border-rule pt-4">
+                    Stage: <span className="text-ink">{currentStatus}</span>. Your analyst maintains this
+                    dossier — flag interest and they will follow up with the underwriting pack.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => verify.mutate({ id: asset.id })} disabled={verify.isPending}
+                    className="w-full flex items-center gap-2 border border-rule px-4 py-2.5 font-eyebrow text-eyebrow uppercase tracking-widest hover:border-amber/40 hover:text-amber transition-all">
+                    {verify.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3 text-sage" />}
+                    {verify.isPending ? "Checking…" : "Verify listing"}
+                  </button>
 
-              <button onClick={() => aiScore.mutate({ id: asset.id })} disabled={aiScore.isPending}
-                className="w-full flex items-center gap-2 border border-rule px-4 py-2.5 font-eyebrow text-eyebrow uppercase tracking-widest hover:border-amber/40 hover:text-amber transition-all">
-                {aiScore.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3 text-amber" />}
-                {aiScore.isPending ? "Analyzing…" : "Analyst narrative"}
-              </button>
+                  <button onClick={() => aiScore.mutate({ id: asset.id })} disabled={aiScore.isPending}
+                    className="w-full flex items-center gap-2 border border-rule px-4 py-2.5 font-eyebrow text-eyebrow uppercase tracking-widest hover:border-amber/40 hover:text-amber transition-all">
+                    {aiScore.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3 text-amber" />}
+                    {aiScore.isPending ? "Analyzing…" : "Analyst narrative"}
+                  </button>
 
-              {!cls.promotesToBusinessDeals && (
-                <button
-                  onClick={() => { setStatus("qualified"); updateStatus.mutate({ id: asset.id, status: "qualified" }); }}
-                  disabled={updateStatus.isPending || currentStatus === "qualified"}
-                  className="w-full flex items-center gap-2 border border-rule px-4 py-2.5 font-eyebrow text-eyebrow uppercase tracking-widest hover:border-amber/40 hover:text-amber transition-all disabled:opacity-60">
-                  {updateStatus.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3 text-sage" />}
-                  {currentStatus === "qualified" ? "In diligence" : "Advance to diligence"}
-                </button>
-              )}
+                  {!cls.promotesToBusinessDeals && (
+                    <button
+                      onClick={() => { setStatus("qualified"); updateStatus.mutate({ id: asset.id, status: "qualified" }); }}
+                      disabled={updateStatus.isPending || currentStatus === "qualified"}
+                      className="w-full flex items-center gap-2 border border-rule px-4 py-2.5 font-eyebrow text-eyebrow uppercase tracking-widest hover:border-amber/40 hover:text-amber transition-all disabled:opacity-60">
+                      {updateStatus.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3 text-sage" />}
+                      {currentStatus === "qualified" ? "In diligence" : "Advance to diligence"}
+                    </button>
+                  )}
 
-              <div>
-                <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mb-2">Stage</p>
-                <Select
-                  value={currentStatus}
-                  onValueChange={(next) => { setStatus(next as AssetStatus); updateStatus.mutate({ id: asset.id, status: next as AssetStatus }); }}
-                  disabled={updateStatus.isPending}
-                >
-                  <SelectTrigger className="h-9 text-xs border-rule bg-transparent"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ASSET_STATUSES.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+                  <div>
+                    <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mb-2">Stage</p>
+                    <Select
+                      value={currentStatus}
+                      onValueChange={(next) => { setStatus(next as AssetStatus); updateStatus.mutate({ id: asset.id, status: next as AssetStatus }); }}
+                      disabled={updateStatus.isPending}
+                    >
+                      <SelectTrigger className="h-9 text-xs border-rule bg-transparent"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {ASSET_STATUSES.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              {!cls.promotesToBusinessDeals && (
-                <p className="font-body-base text-[12px] text-muted-foreground leading-relaxed border-t border-rule pt-4">
-                  {cls.label} assets advance in place. This dossier — scorecard, economics,
-                  provenance — is the deal record; there is no separate Deal Room entry.
-                </p>
+                  {!cls.promotesToBusinessDeals && (
+                    <p className="font-body-base text-[12px] text-muted-foreground leading-relaxed border-t border-rule pt-4">
+                      {cls.label} assets advance in place. This dossier — scorecard, economics,
+                      provenance — is the deal record; there is no separate Deal Room entry.
+                    </p>
+                  )}
+                </>
               )}
             </div>
 

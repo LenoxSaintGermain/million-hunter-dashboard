@@ -48,6 +48,7 @@ import Walkthrough from "./pages/Walkthrough";
 import Pricing from "./pages/Pricing";
 import Wingate from "./pages/Wingate";
 import AssetDossier from "./pages/AssetDossier";
+import AssetShare from "./pages/AssetShare";
 import { getLoginUrl } from "./const";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
@@ -85,7 +86,7 @@ function OnboardingGuard() {
   const alreadyChecked = typeof window !== "undefined" &&
     sessionStorage.getItem("onboarding_checked") === "done";
 
-  const isPublicPage = location === "/lobby" || location === "/404" || location.startsWith("/deal-share") || location.startsWith("/invite") || location === "/brief" || location === "/explore" || location === "/demo" || location === "/demo-tour" || location === "/walkthrough" || location === "/pricing";
+  const isPublicPage = location === "/lobby" || location === "/404" || location.startsWith("/deal-share") || location.startsWith("/asset-share") || location.startsWith("/invite") || location === "/brief" || location === "/explore" || location === "/demo" || location === "/demo-tour" || location === "/walkthrough" || location === "/pricing";
   const isInvestorArea = location.startsWith("/investor");
 
   // Operator onboarding check
@@ -104,9 +105,12 @@ function OnboardingGuard() {
   useEffect(() => {
     if (!authData) return;
 
-    // Role-based redirect: investor landing on operator root → send to investor portal
-    if (userRole === "investor" && (location === "/" || location === "")) {
-      navigate("/investor");
+    // Role-based redirect: a client landing on the operator root goes to THEIR
+    // THESIS, not the business Deal Room. Signal Hunter is thesis-driven — for a
+    // bespoke property mandate the operating-company pipeline is the wrong first
+    // screen. The Deal Room stays one click away in the client nav.
+    if ((userRole === "investor" || userRole === "insurance") && (location === "/" || location === "")) {
+      navigate("/wingate");
       return;
     }
 
@@ -203,6 +207,8 @@ function Router() {
 
         {/* Public deal share — no auth required */}
         <Route path="/deal-share/:token" component={DealShare} />
+        {/* Public highlight card for a property dossier — no auth required. */}
+        <Route path="/asset-share/:token" component={AssetShare} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

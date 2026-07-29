@@ -189,6 +189,13 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
   const tier = TIER_META[s.assetTier];
   const [, navigate] = useLocation();
   const dossierHref = `/wingate/asset/${asset.id}`;
+  const createShare = trpc.assetShare.createToken.useMutation({
+    onSuccess: (r) => {
+      navigator.clipboard?.writeText(`${window.location.origin}/asset-share/${r.token}`);
+      toast.success("Share link copied — expires in 30 days");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const gates = [
     { key: "A", label: "Historic qualification", score: s.dimA },
@@ -268,13 +275,11 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
             Open full dossier
           </button>
           <button
-            onClick={() => {
-              navigator.clipboard?.writeText(`${window.location.origin}${dossierHref}`);
-              toast.success("Dossier link copied");
-            }}
+            onClick={() => createShare.mutate({ assetId: asset.id })}
+            disabled={createShare.isPending}
             className="flex items-center gap-2 border border-rule font-eyebrow text-eyebrow px-4 py-2.5 rounded-full hover:border-amber/40 hover:text-amber transition-all uppercase tracking-widest">
-            <ExternalLink className="w-3 h-3" />
-            Copy link
+            {createShare.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
+            Share
           </button>
         </div>
       </div>

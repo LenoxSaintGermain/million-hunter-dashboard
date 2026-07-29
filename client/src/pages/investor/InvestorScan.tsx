@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import InvestorLayout from "@/components/InvestorLayout";
+import { Link } from "wouter";
+import { getAssetClass } from "@shared/assetClasses";
+import PropertyMarketScan from "./PropertyMarketScan";
 
 const INDUSTRY_OPTIONS = [
   "Commercial Cleaning", "Logistics & Delivery", "Healthcare Staffing",
@@ -27,6 +30,15 @@ function scoreColor(score: number) {
 }
 
 export default function InvestorScan() {
+  // A client on a bespoke PROPERTY thesis must not be shown the operating-company
+  // pipeline here — their market scan is over their own asset class.
+  const { data: dna } = trpc.investor.getDnaStatus.useQuery();
+  const cls = getAssetClass((dna as any)?.assetClass);
+  if (!cls.promotesToBusinessDeals) return <PropertyMarketScan assetClass={cls.id} />;
+  return <BusinessMarketScan />;
+}
+
+function BusinessMarketScan() {
   const [locations, setLocations] = useState(["Miami, FL", "Fort Lauderdale, FL"]);
   const [locationInput, setLocationInput] = useState("");
   const [industries, setIndustries] = useState<string[]>([]);

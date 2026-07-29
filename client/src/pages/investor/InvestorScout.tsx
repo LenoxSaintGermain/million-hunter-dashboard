@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Building2, MapPin, Lock, Send, CheckCircle, Loader2, Filter } from "lucide-react";
+import { Building2, MapPin, Lock, Send, CheckCircle, Loader2, Filter, ArrowRight } from "lucide-react";
+import { Link } from "wouter";
+import { getAssetClass } from "@shared/assetClasses";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import InvestorLayout from "@/components/InvestorLayout";
@@ -20,9 +22,11 @@ export default function InvestorScout() {
 
   const { data: assets, isLoading } = trpc.scout.list.useQuery({});
 
-  const expressInterest = trpc.investor.expressInterest.useMutation({
+  // expressAssetInterest — NOT expressInterest. These are commercial_assets rows;
+  // sending their ids as `dealId` wrote interest against a deal that doesn't exist.
+  const expressInterest = trpc.investor.expressAssetInterest.useMutation({
     onSuccess: (_, vars) => {
-      setRequestedInterest(prev => { const next = new Set(Array.from(prev)); next.add(vars.dealId); return next; });
+      setRequestedInterest(prev => { const next = new Set(Array.from(prev)); next.add(vars.assetId); return next; });
       toast.success("Interest submitted — the operator will review and share analysis with you.");
     },
     onError: (e) => toast.error(`Failed to submit interest: ${e.message}`),
@@ -145,6 +149,17 @@ export default function InvestorScout() {
                   ))}
                 </div>
 
+                {/* Dossier — the destination this page was missing entirely */}
+                <Link href={`/wingate/asset/${asset.id}`}>
+                  <span
+                    className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                    style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-2)" }}
+                  >
+                    Open {getAssetClass(asset.assetClass).shortLabel} dossier
+                    <ArrowRight className="w-3 h-3" />
+                  </span>
+                </Link>
+
                 {/* Action */}
                 {hasInterest ? (
                   <div
@@ -157,7 +172,7 @@ export default function InvestorScout() {
                 ) : (
                   <Button
                     className="w-full h-9 text-sm font-semibold"
-                    onClick={() => expressInterest.mutate({ dealId: asset.id, allocationAmount: 0, investorNote: "Requesting analysis on commercial asset" })}
+                    onClick={() => expressInterest.mutate({ assetId: asset.id, allocationAmount: 0, investorNote: "Requesting analysis on commercial asset" })}
                     disabled={expressInterest.isPending}
                     style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
                   >

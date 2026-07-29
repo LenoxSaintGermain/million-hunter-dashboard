@@ -454,6 +454,16 @@ export type MacroSignal = typeof macroSignals.$inferSelect;
 export type InsertMacroSignal = typeof macroSignals.$inferInsert;
 
 // ─── Deal Share Tokens (public investor one-pager links) ──────────────────────
+/** Link-sharing for a property dossier — mirrors dealShareTokens. */
+export const assetShareTokens = mysqlTable("asset_share_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  assetId: int("asset_id").notNull(),
+  expiresAt: bigint("expires_at", { mode: "number" }).notNull(),
+  viewCount: int("view_count").default(0).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+
 export const dealShareTokens = mysqlTable("deal_share_tokens", {
   id: int("id").autoincrement().primaryKey(),
   token: varchar("token", { length: 64 }).notNull().unique(),
@@ -554,7 +564,10 @@ export type InsertInvestorDna = typeof investorDna.$inferInsert;
 export const investorInterest = mysqlTable("investor_interest", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("user_id").notNull(),
-  dealId: int("deal_id").notNull(),
+  // Exactly one of dealId / assetId is set. Property classes never enter the
+  // business `deals` table, so their interest points at commercial_assets.
+  dealId: int("deal_id"),
+  assetId: int("asset_id"),
   // Investor's intended allocation amount
   allocationAmount: bigint("allocation_amount", { mode: "number" }),
   // Status: expressed → operator_reviewing → memo_shared → committed → passed

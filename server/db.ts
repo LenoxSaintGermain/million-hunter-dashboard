@@ -580,7 +580,7 @@ export async function seedMacroSignals() {
 }
 
 // ─── Sentinel Auto-Archive ────────────────────────────────────────────────────
-import { dealShareTokens, type InsertDealShareToken } from "../drizzle/schema";
+import { dealShareTokens, assetShareTokens, type InsertDealShareToken } from "../drizzle/schema";
 
 export async function archiveExpiredSignals(): Promise<number> {
   const db = await getDb();
@@ -614,6 +614,33 @@ export async function getMacroSignalsActive(limit = 20) {
 }
 
 // ─── Deal Share Tokens ────────────────────────────────────────────────────────
+/** Share tokens for a PROPERTY dossier — mirrors the deal-share helpers. */
+export async function createAssetShareToken(assetId: number, ttlDays = 30): Promise<string> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { randomBytes } = await import("crypto");
+  const token = randomBytes(24).toString("hex");
+  const now = Date.now();
+  const expiresAt = now + ttlDays * 24 * 60 * 60 * 1000;
+  await db.insert(assetShareTokens).values({ token, assetId, expiresAt, viewCount: 0, createdAt: now });
+  return token;
+}
+export async function getAssetShareToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(assetShareTokens).where(eq(assetShareTokens.token, token)).limit(1);
+  return result[0] ? coerceRow(result[0]) : undefined;
+}
+export async function incrementAssetShareTokenViewCount(token: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const row = await getAssetShareToken(token);
+  if (!row) return;
+  await db.update(assetShareTokens)
+    .set({ viewCount: row.viewCount + 1 })
+    .where(eq(assetShareTokens.token, token));
+}
+
 export async function createDealShareToken(dealId: number, ttlDays = 30): Promise<string> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
