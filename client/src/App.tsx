@@ -193,6 +193,9 @@ function Router() {
         <Route path="/operator-registry">{() => <ProtectedRoute component={OperatorRegistry} />}</Route>
         <Route path="/profile">{() => <ProtectedRoute component={OperatorIdentity} />}</Route>
         <Route path="/wingate">{() => <ProtectedRoute component={Wingate} />}</Route>
+        {/* Deep-linkable asset dossier — the destination for "view dossier" from
+            Command Center, Scout, and the ranked pipeline. */}
+        <Route path="/wingate/asset/:id">{() => <ProtectedRoute component={Wingate} />}</Route>
 
         {/* Invite accept — role assignment on first login */}
         <Route path="/invite/:token" component={InviteAccept} />

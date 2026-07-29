@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
+import { getAssetClass } from "@shared/assetClasses";
 import {
   Building2, MapPin, DollarSign, TrendingUp, Zap, Plus, Search,
   Filter, SlidersHorizontal, RefreshCw, ChevronDown, ChevronUp,
@@ -474,6 +475,11 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
     onError: (e) => toast.error(`Conversion failed: ${e.message}`),
   });
 
+  // Property classes (promotesToBusinessDeals: false) never enter the business
+  // Deal Room — their destination is their own A–G dossier.
+  const assetCls = getAssetClass((asset as any).assetClass);
+  const dossierHref = `/wingate/asset/${asset.id}`;
+
   const pt = asset.propertyType as PropertyType;
   const st = asset.status as AssetStatus;
 
@@ -626,19 +632,21 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
           </Select>
         </div>
 
-        {/* Review in Wingate — shown for historic assets */}
-        {((asset as any).isHistoric || (asset as any).historicRegisterEligible) && (
+        {/* Dossier — every property-class asset's real destination */}
+        {!assetCls.promotesToBusinessDeals && (
           <a
-            href="/wingate"
+            href={dossierHref}
             className="w-full flex items-center justify-center gap-1.5 h-7 text-[11px] font-medium rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 transition-colors mt-1"
           >
-            <span className="text-[10px]">🏛️</span>
-            Review in Wingate →
+            Open {assetCls.shortLabel} dossier →
           </a>
         )}
 
-        {/* Convert to Deal — shown for qualified assets */}
-        {(asset.status === "qualified" || (asset.aiScore != null && parseFloat(String(asset.aiScore)) >= 0.70)) && (
+        {/* Convert to Deal — operating businesses only. Copying a building into
+            the business `deals` table strips its scorecard and makes the IC
+            agents judge it on revenue it will never have. */}
+        {assetCls.promotesToBusinessDeals &&
+          (asset.status === "qualified" || (asset.aiScore != null && parseFloat(String(asset.aiScore)) >= 0.70)) && (
           <Button
             size="sm"
             className="w-full h-7 text-[11px] border-0 mt-1" style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}

@@ -343,7 +343,7 @@ function HistoricPipeline() {
             const s = a.historicScore;
             const tier = tierLabel[s.assetTier] ?? s.assetTier;
             return (
-              <Link key={a.id} href="/wingate">
+              <Link key={a.id} href={`/wingate/asset/${a.id}`}>
                 <Tooltip>
                 <TooltipTrigger asChild>
                     <div className="border border-rule p-4 hover:shadow-[0_8px_30px_-12px_rgba(15,20,40,0.12)] transition-shadow cursor-pointer h-full">

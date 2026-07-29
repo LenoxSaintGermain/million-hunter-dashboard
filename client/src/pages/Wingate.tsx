@@ -224,7 +224,12 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
     onError: (e) => toast.error(e.message),
   });
   const updateStatus = trpc.scout.updateStatus.useMutation({
-    onSuccess: () => toast.success("Asset status updated"),
+    onSuccess: (_r, vars: any) =>
+      toast.success(
+        vars?.status === "qualified"
+          ? "Moved to Diligence — this dossier is the deal record. Filter the pipeline by Qualified to find it."
+          : `Status set to ${vars?.status}`,
+      ),
     onError: (e) => toast.error(e.message),
   });
   return (
@@ -532,7 +537,7 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
                     onClick={() => { setStatus("qualified"); updateStatus.mutate({ id: asset.id, status: "qualified" }); }}
                     disabled={updateStatus.isPending || status === "qualified"}>
                     {updateStatus.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 mr-2 text-emerald-400" />}
-                    <span className="truncate">{status === "qualified" ? "Qualified ✓" : "Advance to diligence"}</span>
+                    <span className="truncate">{status === "qualified" ? "In diligence ✓" : "Advance to diligence"}</span>
                   </Button>
                 )}
                 <Select
@@ -546,9 +551,25 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
                   </SelectContent>
                 </Select>
               </div>
-              <Button size="sm" className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={() => { onRescored(); onClose(); }}>
-                Done
-              </Button>
+              {!getAssetClass(asset.assetClass).promotesToBusinessDeals && (
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  {getAssetClass(asset.assetClass).label} assets advance in place — this dossier
+                  (scorecard, economics, provenance) <em>is</em> the deal record. There is no
+                  separate Deal Room entry to open.
+                </p>
+              )}
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="border-border shrink-0"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`${window.location.origin}/wingate/asset/${asset.id}`);
+                    toast.success("Dossier link copied");
+                  }}>
+                  <ExternalLink className="w-3.5 h-3.5 mr-2" /> Copy link
+                </Button>
+                <Button size="sm" className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={() => { onRescored(); onClose(); }}>
+                  Done
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -710,6 +731,13 @@ export default function Wingate() {
   });
   const [compilationId, setCompilationId] = useState<number | null>(urlThesis ? Number(urlThesis) : null);
   const [selected, setSelected] = useState<ScoredAsset | null>(null);
+  // /wingate/asset/:id deep-link — the dossier is a real, shareable destination.
+  const routeAssetId = (() => {
+    const m = typeof window !== "undefined" ? window.location.pathname.match(/\/wingate\/asset\/(\d+)/) : null;
+    return m ? Number(m[1]) : null;
+  })();
+  const openDossier = (a: ScoredAsset) => { setSelected(a); window.history.pushState({}, "", `/wingate/asset/${a.id}`); };
+  const closeDossier = () => { setSelected(null); window.history.pushState({}, "", "/wingate"); };
   const [addOpen, setAddOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [filterState, setFilterState] = useState("all");
@@ -751,6 +779,19 @@ export default function Wingate() {
   });
 
   const results: ScoredAsset[] = (search.data?.results ?? []) as any;
+  // A shared dossier link may point at an asset in a different class than the one
+  // currently selected — walk the registry until we find its home class.
+  const [deeplinkTried, setDeeplinkTried] = useState<string[]>([]);
+  useEffect(() => {
+    if (!routeAssetId || selected || search.isLoading) return;
+    const hit = results.find((a) => Number(a.id) === routeAssetId);
+    if (hit) { setSelected(hit); return; }
+    const tried = deeplinkTried.includes(assetClass) ? deeplinkTried : [...deeplinkTried, assetClass];
+    if (tried !== deeplinkTried) setDeeplinkTried(tried);
+    const next = listAssetClasses().find((c) => !tried.includes(c.id));
+    if (next) setAssetClass(next.id);
+    else if (deeplinkTried.length) toast.error("That dossier is no longer in the pipeline.");
+  }, [routeAssetId, results, selected, search.isLoading, assetClass]);
   const states = useMemo(() => Array.from(new Set(results.map(a => a.state))).sort(), [results]);
   const filtered = useMemo(() => results.filter(a => {
     if (filterState !== "all" && a.state !== filterState) return false;
@@ -851,7 +892,7 @@ export default function Wingate() {
           <p className="text-[10px] font-bold text-rose-400 uppercase tracking-wide mb-2">⏱ Fast-Track escalations — 24h SLA</p>
           <div className="flex flex-wrap gap-2">
             {escalations.map(a => (
-              <button key={a.id} onClick={() => setSelected(a)} className="text-[11px] px-2 py-1 rounded-lg border border-rose-500/30 bg-card hover:border-rose-400 text-foreground">
+              <button key={a.id} onClick={() => openDossier(a)} className="text-[11px] px-2 py-1 rounded-lg border border-rose-500/30 bg-card hover:border-rose-400 text-foreground">
                 {a.name} <span className="text-muted-foreground">· rank {Math.round(a.historicScore.rankScore)}</span>
               </button>
             ))}
@@ -918,12 +959,12 @@ export default function Wingate() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {filtered.map((a, i) => <RankedCard key={a.id} rank={i + 1} asset={a} onSelect={setSelected} />)}
+          {filtered.map((a, i) => <RankedCard key={a.id} rank={i + 1} asset={a} onSelect={openDossier} />)}
         </div>
       )}
 
       {/* Modals */}
-      {selected && <ScorecardDrawer asset={selected} onClose={() => setSelected(null)} onRescored={() => search.refetch()} />}
+      {selected && <ScorecardDrawer asset={selected} onClose={closeDossier} onRescored={() => search.refetch()} />}
       <QuickAdd assetClass={assetClass} open={addOpen} onClose={() => setAddOpen(false)} onCreated={() => search.refetch()} />
       <Dialog open={clearOpen} onOpenChange={(v) => !v && setClearOpen(false)}>
         <DialogContent className="max-w-md bg-card border-border">
