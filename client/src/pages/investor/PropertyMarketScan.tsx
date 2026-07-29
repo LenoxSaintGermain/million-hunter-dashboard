@@ -15,7 +15,8 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import InvestorLayout from "@/components/InvestorLayout";
 import { getAssetClass } from "@shared/assetClasses";
-import { Loader2, MapPin, ArrowRight, Search } from "lucide-react";
+import { Loader2, MapPin, ArrowRight, Search, GraduationCap } from "lucide-react";
+import { isTutorialAsset } from "@shared/tutorial";
 import { Input } from "@/components/ui/input";
 import { TIER_META, fmtMoney, type ScoredAsset } from "@/components/AssetDossierSections";
 
@@ -115,9 +116,15 @@ export default function PropertyMarketScan({ assetClass }: { assetClass: string 
                             <span className="font-data-mono text-[22px] text-amber leading-none">
                               {Math.round(sc.rankScore)}
                             </span>
-                            <span className={cn("font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border uppercase tracking-widest", tier.cls)}>
-                              {tier.label}
-                            </span>
+                            {isTutorialAsset(a as any) ? (
+                              <span className="font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border border-amber/50 bg-amber/10 text-amber uppercase tracking-widest inline-flex items-center gap-1">
+                                <GraduationCap className="w-3 h-3" /> Tutorial
+                              </span>
+                            ) : (
+                              <span className={cn("font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border uppercase tracking-widest", tier.cls)}>
+                                {tier.label}
+                              </span>
+                            )}
                           </div>
                           <p className="font-card-title text-[17px] text-ink leading-tight mb-1">{a.name}</p>
                           <p className="font-body-base text-[12px] text-muted-foreground mb-4">

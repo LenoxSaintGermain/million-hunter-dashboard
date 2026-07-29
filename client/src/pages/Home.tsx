@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc";
+import { isTutorialAsset } from "@shared/tutorial";
 import { useAuth } from "@/_core/hooks/useAuth";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import ScanProgress from "@/components/ScanProgress";
@@ -275,14 +276,20 @@ function HistoricPipeline() {
     sky: "bg-sky-500",
     muted: "bg-muted-foreground",
   };
+  // Tutorial record excluded from the value bar — it is a worked example, not
+  // inventory — but still shown as a card, pinned first for first-run users.
+  const realResults = results.filter((a: any) => !isTutorialAsset(a));
   const pipelineBuckets = [
-    { key: "amber", label: "Tier 1 + Fast-Track", value: results.reduce((sum, a) => sum + (a.historicScore.assetTier === "tier1" || a.historicScore.assetTier === "fasttrack" ? (a.askingPrice ?? 0) : 0), 0) },
-    { key: "violet", label: "Tier 2", value: results.reduce((sum, a) => sum + (a.historicScore.assetTier === "tier2" ? (a.askingPrice ?? 0) : 0), 0) },
-    { key: "sky", label: "Tier 3", value: results.reduce((sum, a) => sum + (a.historicScore.assetTier === "tier3" ? (a.askingPrice ?? 0) : 0), 0) },
-    { key: "muted", label: "Archive", value: results.reduce((sum, a) => sum + (a.historicScore.assetTier === "archive" ? (a.askingPrice ?? 0) : 0), 0) },
+    { key: "amber", label: "Tier 1 + Fast-Track", value: realResults.reduce((sum, a) => sum + (a.historicScore.assetTier === "tier1" || a.historicScore.assetTier === "fasttrack" ? (a.askingPrice ?? 0) : 0), 0) },
+    { key: "violet", label: "Tier 2", value: realResults.reduce((sum, a) => sum + (a.historicScore.assetTier === "tier2" ? (a.askingPrice ?? 0) : 0), 0) },
+    { key: "sky", label: "Tier 3", value: realResults.reduce((sum, a) => sum + (a.historicScore.assetTier === "tier3" ? (a.askingPrice ?? 0) : 0), 0) },
+    { key: "muted", label: "Archive", value: realResults.reduce((sum, a) => sum + (a.historicScore.assetTier === "archive" ? (a.askingPrice ?? 0) : 0), 0) },
   ];
   const pipelineTotal = pipelineBuckets.reduce((sum, bucket) => sum + bucket.value, 0);
   const sortedResults = [...results].sort((a, b) => {
+    // Tutorial always leads — it is the first-run walkthrough.
+    const at = isTutorialAsset(a as any), bt = isTutorialAsset(b as any);
+    if (at !== bt) return at ? -1 : 1;
     if (sortBy === "asking") {
       if (a.askingPrice == null) return b.askingPrice == null ? 0 : 1;
       if (b.askingPrice == null) return -1;

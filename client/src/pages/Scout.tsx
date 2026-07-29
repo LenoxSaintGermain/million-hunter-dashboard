@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "wouter";
 import { getAssetClass } from "@shared/assetClasses";
+import { isTutorialAsset } from "@shared/tutorial";
 import {
   Building2, MapPin, DollarSign, TrendingUp, Zap, Plus, Search,
   Filter, SlidersHorizontal, RefreshCw, ChevronDown, ChevronUp,
@@ -746,11 +747,14 @@ export default function Scout() {
 
   const stats = useMemo(() => {
     if (!assets) return null;
-    const qualified = assets.filter((a) => a.status === "qualified").length;
-    const ozCount = assets.filter((a) => a.opportunityZone).length;
-    const totalValue = assets.reduce((s, a) => s + (a.askingPrice ?? 0), 0);
-    const avgCap = assets.filter((a) => a.capRate).reduce((s, a, _, arr) => s + (a.capRate ?? 0) / arr.length, 0);
-    return { total: assets.length, qualified, ozCount, totalValue, avgCap };
+    // The tutorial record is a composite teaching example. Counting it would
+    // overstate real inventory and pipeline value.
+    const real = assets.filter((a) => !isTutorialAsset(a as any));
+    const qualified = real.filter((a) => a.status === "qualified").length;
+    const ozCount = real.filter((a) => a.opportunityZone).length;
+    const totalValue = real.reduce((s, a) => s + (a.askingPrice ?? 0), 0);
+    const avgCap = real.filter((a) => a.capRate).reduce((s, a, _, arr) => s + (a.capRate ?? 0) / arr.length, 0);
+    return { total: real.length, qualified, ozCount, totalValue, avgCap };
   }, [assets]);
 
   const toggleSort = (field: typeof sortBy) => {

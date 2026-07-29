@@ -3,6 +3,8 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { getAssetClass, listAssetClasses, classSupportsModule } from "@shared/assetClasses";
+import { isTutorialAsset } from "@shared/tutorial";
+import { GraduationCap } from "lucide-react";
 import type { AssetClass, FieldDef } from "@shared/assetClasses";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import InvestorLayout from "@/components/InvestorLayout";
@@ -110,7 +112,13 @@ function RankedCard({ rank, asset, onSelect }: { rank: number; asset: ScoredAsse
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", tier.cls)}>{tier.label}</span>
+          {isTutorialAsset(asset as any) ? (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber/50 bg-amber/10 text-amber inline-flex items-center gap-1">
+              <GraduationCap className="w-2.5 h-2.5" /> Tutorial
+            </span>
+          ) : (
+            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", tier.cls)}>{tier.label}</span>
+          )}
           <div className="flex items-center gap-1.5 text-[10px] font-mono">
             <span className="text-muted-foreground">C<span className="text-foreground font-bold">{s.compositeScore}</span></span>
             <span className={cn(s.confidenceScore >= 0.8 ? "text-emerald-400" : s.confidenceScore >= 0.5 ? "text-amber-400" : "text-rose-400")}>
@@ -211,7 +219,13 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">Quick scan</span>
-                <span className={cn("font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border uppercase tracking-widest", tier.cls)}>{tier.label}</span>
+                {isTutorialAsset(asset as any) ? (
+                  <span className="font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border border-amber/50 bg-amber/10 text-amber uppercase tracking-widest inline-flex items-center gap-1">
+                    <GraduationCap className="w-3 h-3" /> Tutorial
+                  </span>
+                ) : (
+                  <span className={cn("font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border uppercase tracking-widest", tier.cls)}>{tier.label}</span>
+                )}
                 <span className="font-eyebrow text-eyebrow text-muted-foreground">Market {s.marketTier}</span>
               </div>
               <h2 className="font-card-title text-[26px] text-ink leading-tight">{asset.name}</h2>
@@ -226,6 +240,13 @@ function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; o
         </div>
 
         <div className="px-6 py-6 space-y-6">
+          {isTutorialAsset(asset as any) && (
+            <p className="font-body-base text-[12px] text-muted-foreground leading-relaxed border-l-2 border-amber/50 pl-3">
+              A worked example, not a real listing — open the full dossier for the guided tour of how
+              scoring, gates, and economics work.
+            </p>
+          )}
+
           <ScoreHeadline s={s} dense />
 
           <HardStopBanner s={s} />

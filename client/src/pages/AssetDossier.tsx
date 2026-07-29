@@ -11,7 +11,7 @@
  * new bespoke thesis changes its diligence surface from config alone.
  */
 import { useState } from "react";
-import { Link, useRoute } from "wouter";
+import { Link, useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { getAssetClass, classSupportsModule } from "@shared/assetClasses";
@@ -31,6 +31,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { isTutorialAsset, TUTORIAL_STEPS } from "@shared/tutorial";
+import { Explain } from "@/components/Explain";
+import { GraduationCap, Trash2 } from "lucide-react";
 
 const ASSET_STATUSES = ["new", "reviewing", "qualified", "rejected", "acquired"] as const;
 type AssetStatus = typeof ASSET_STATUSES[number];
@@ -44,6 +47,7 @@ export default function AssetDossier() {
   const isClient = (user as any)?.role === "investor" || (user as any)?.role === "insurance";
   const Shell = isClient ? InvestorLayout : EditorialTopNav;
 
+  const [, navigate] = useLocation();
   const q = trpc.scout.getScoredById.useQuery({ id: assetId }, { enabled: Number.isFinite(assetId) });
   const asset = q.data as ScoredAsset | undefined;
 
@@ -80,6 +84,16 @@ export default function AssetDossier() {
     onSuccess: () => { toast.success("Re-scored"); q.refetch(); },
     onError: (e) => toast.error(e.message),
   });
+  // Dismissing the tutorial is an ordinary delete. Nothing re-creates it, and
+  // the next-highest-ranked asset simply takes the top slot.
+  const dismissTutorial = trpc.scout.deleteAsset.useMutation({
+    onSuccess: () => {
+      toast.success("Tutorial dismissed — your highest-ranked asset now leads the pipeline.");
+      navigate("/wingate");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const updateStatus = trpc.scout.updateStatus.useMutation({
     onSuccess: (_r, vars: any) => {
       toast.success(vars?.status === "qualified"
@@ -124,6 +138,9 @@ export default function AssetDossier() {
   const tier = TIER_META[s.assetTier];
   const currentStatus = (status ?? (asset.status as AssetStatus) ?? "new");
   const diligence = buildDiligenceItems(asset, has);
+  // The worked-example record doubles as the first-run walkthrough: every module
+  // is populated, so each concept has something real to point at.
+  const isTutorial = isTutorialAsset(asset as any);
 
   return (
     <Shell>
@@ -143,9 +160,15 @@ export default function AssetDossier() {
               {cls.label} Dossier
             </span>
             <span className="w-8 h-px bg-rule" />
-            <span className={cn("font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border uppercase tracking-widest", tier.cls)}>
-              {tier.label}
-            </span>
+            {isTutorial ? (
+              <span className="font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border border-amber/50 bg-amber/10 text-amber uppercase tracking-widest inline-flex items-center gap-1">
+                <GraduationCap className="w-3 h-3" /> Tutorial
+              </span>
+            ) : (
+              <span className={cn("font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border uppercase tracking-widest", tier.cls)}>
+                {tier.label}
+              </span>
+            )}
             <span className="font-eyebrow text-eyebrow text-muted-foreground border border-rule px-2 py-0.5 rounded-sm uppercase tracking-widest">
               Market {s.marketTier}
             </span>
@@ -208,9 +231,51 @@ export default function AssetDossier() {
           </div>
         </div>
 
+        {/* ── Guided tour (tutorial record only) ────────────────────────────── */}
+        {isTutorial && (
+          <div className="border border-amber/40 bg-amber/5 p-6 mb-10">
+            <div className="flex items-start justify-between gap-6 flex-wrap">
+              <div className="max-w-2xl">
+                <p className="font-eyebrow text-eyebrow text-amber uppercase tracking-widest mb-2 inline-flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5" /> Guided tour
+                </p>
+                <p className="font-card-title text-[20px] text-ink leading-tight mb-2">
+                  This is a worked example, not a real listing.
+                </p>
+                <p className="font-body-base text-[13px] text-muted-foreground leading-relaxed">
+                  Its figures are composite, and every module is deliberately filled in so each part
+                  of the dossier has something to show. Read the notes below to learn how a real
+                  asset is scored — then dismiss it whenever you like.
+                </p>
+              </div>
+              {!isClient && (
+                <button
+                  onClick={() => dismissTutorial.mutate({ id: asset.id })}
+                  disabled={dismissTutorial.isPending}
+                  className="flex items-center gap-2 border border-rule bg-paper font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:border-clay/50 hover:text-clay transition-all uppercase tracking-widest shrink-0">
+                  {dismissTutorial.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                  Dismiss tutorial
+                </button>
+              )}
+            </div>
+
+            <ol className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+              {TUTORIAL_STEPS.map((step, i) => (
+                <li key={step.anchor} className="flex gap-3">
+                  <span className="font-data-mono text-[13px] text-amber shrink-0">{String(i + 1).padStart(2, "0")}</span>
+                  <div>
+                    <p className="font-body-base text-[13px] text-ink font-medium leading-snug">{step.title}</p>
+                    <p className="font-body-base text-[12px] text-muted-foreground leading-relaxed mt-0.5">{step.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
         {/* ── Enrichment strip ──────────────────────────────────────────────── */}
         <div className="mb-10">
-          <ScoreHeadline s={s} />
+          <ScoreHeadline s={s} tutorial={isTutorial} />
         </div>
 
         {s.hardStopFailed && <div className="mb-10"><HardStopBanner s={s} /></div>}
@@ -218,12 +283,12 @@ export default function AssetDossier() {
         {/* ── Body: content + action rail ───────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           <div className="lg:col-span-8 space-y-12">
-            {has("economics") && asset.economics && <EconomicsPanel economics={asset.economics} />}
+            {has("economics") && asset.economics && <EconomicsPanel economics={asset.economics} tutorial={isTutorial} />}
 
             {(has("agScorecard") || has("classScorecard")) && (
               <div>
                 <SectionLabel className="mb-4">Scorecard · {s.scorecard.dimensions.length} dimensions</SectionLabel>
-                <DimensionsPanel s={s} />
+                <DimensionsPanel s={s} tutorial={isTutorial} />
                 <p className="font-body-base text-[12px] text-muted-foreground mt-4 leading-relaxed">
                   {s.scorecard.marketNote} · {s.scorecard.sourceNote}
                 </p>
@@ -234,7 +299,7 @@ export default function AssetDossier() {
 
             <StrengthsRisks s={s} />
 
-            {diligence.length > 0 && <DiligencePanel items={diligence} classLabel={cls.shortLabel} />}
+            {diligence.length > 0 && <DiligencePanel items={diligence} classLabel={cls.shortLabel} tutorial={isTutorial} />}
 
             {narrative && <NarrativePanel narrative={narrative} />}
           </div>
@@ -282,7 +347,7 @@ export default function AssetDossier() {
                   )}
 
                   <div>
-                    <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mb-2">Stage</p>
+                    <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mb-2 inline-flex items-center gap-1">Stage<Explain k="stage" /></p>
                     <Select
                       value={currentStatus}
                       onValueChange={(next) => { setStatus(next as AssetStatus); updateStatus.mutate({ id: asset.id, status: next as AssetStatus }); }}
@@ -307,7 +372,7 @@ export default function AssetDossier() {
 
             {s.verifyFields.length > 0 && <VerifyList s={s} />}
 
-            {has("provenance") && <ProvenancePanel asset={asset} verification={verification} />}
+            {has("provenance") && <ProvenancePanel asset={asset} verification={verification} tutorial={isTutorial} />}
           </aside>
         </div>
       </div>

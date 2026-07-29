@@ -10,6 +10,7 @@
  */
 import { cn } from "@/lib/utils";
 import { AlertTriangle, CheckCircle2, ExternalLink, XCircle } from "lucide-react";
+import { Explain, ExplainBlock } from "@/components/Explain";
 
 export type Factor = { label: string; points: number; max: number; note?: string; verify?: boolean };
 export type Dimension = { key: string; label: string; score: number; max: number; factors: Factor[] };
@@ -46,26 +47,35 @@ export function SectionLabel({ children, className }: { children: React.ReactNod
 }
 
 /** Rank / composite / confidence — the three numbers that decide everything. */
-export function ScoreHeadline({ s, dense }: { s: HistoricScore; dense?: boolean }) {
+export function ScoreHeadline({ s, dense, tutorial }: { s: HistoricScore; dense?: boolean; tutorial?: boolean }) {
   const items = [
-    { label: "Rank Score", value: String(Math.round(s.rankScore)), sub: "composite × confidence", accent: "text-amber" },
-    { label: "Composite", value: String(s.compositeScore), sub: `+${s.bonuses} bonus · −${s.penalties} penalty`, accent: "text-ink" },
+    { k: "rankScore", label: "Rank Score", value: String(Math.round(s.rankScore)), sub: "composite × confidence", accent: "text-amber" },
+    { k: "compositeScore", label: "Composite", value: String(s.compositeScore), sub: `+${s.bonuses} bonus · −${s.penalties} penalty`, accent: "text-ink" },
     {
-      label: "Confidence", value: `${Math.round(s.confidenceScore * 100)}%`,
+      k: "confidenceScore", label: "Confidence", value: `${Math.round(s.confidenceScore * 100)}%`,
       sub: `${5 - s.verifyFields.length}/5 critical fields verified`,
       accent: s.confidenceScore >= 0.8 ? "text-sage" : "text-amber",
     },
   ];
   return (
-    <div className={cn("grid grid-cols-3 gap-0 border border-rule divide-x divide-rule", dense && "text-center")}>
-      {items.map((m) => (
-        <div key={m.label} className={cn("px-4 bg-paper", dense ? "py-3" : "py-5 px-6")}>
-          <p className={cn("font-data-mono leading-none", m.accent, dense ? "text-[22px]" : "text-section-h2")}>{m.value}</p>
-          <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mt-2">{m.label}</p>
-          <p className="font-body-base text-[11px] text-muted-foreground/80 mt-1 leading-snug">{m.sub}</p>
+    <>
+      <div className={cn("grid grid-cols-3 gap-0 border border-rule divide-x divide-rule", dense && "text-center")}>
+        {items.map((m) => (
+          <div key={m.label} className={cn("px-4 bg-paper", dense ? "py-3" : "py-5 px-6")}>
+            <p className={cn("font-data-mono leading-none", m.accent, dense ? "text-[22px]" : "text-section-h2")}>{m.value}</p>
+            <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mt-2 inline-flex items-center gap-1">
+              {m.label}<Explain k={m.k} />
+            </p>
+            <p className="font-body-base text-[11px] text-muted-foreground/80 mt-1 leading-snug">{m.sub}</p>
+          </div>
+        ))}
+      </div>
+      {tutorial && (
+        <div className="mt-4">
+          {items.map((m) => <ExplainBlock key={m.k} k={m.k} />)}
         </div>
-      ))}
-    </div>
+      )}
+    </>
   );
 }
 
@@ -85,7 +95,7 @@ export function HardStopBanner({ s }: { s: HistoricScore }) {
 }
 
 /** §9 underwriting math. `dense` trims it to the three headline numbers. */
-export function EconomicsPanel({ economics, dense }: { economics: any; dense?: boolean }) {
+export function EconomicsPanel({ economics, dense, tutorial }: { economics: any; dense?: boolean; tutorial?: boolean }) {
   if (!economics) return null;
   const headline = [
     { label: "Project cost", v: economics.headline.totalProjectCost, fmt: (n: number) => fmtMoney(n) },
@@ -95,11 +105,13 @@ export function EconomicsPanel({ economics, dense }: { economics: any; dense?: b
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 mb-4">
-        <SectionLabel>Deal Economics</SectionLabel>
+        <SectionLabel className="inline-flex items-center gap-1">Deal Economics<Explain k="economics" /></SectionLabel>
         {economics.archetype && (
           <span className="font-eyebrow text-eyebrow text-muted-foreground">archetype · {economics.archetype}</span>
         )}
       </div>
+
+      {tutorial && !dense && (<><ExplainBlock k="economics" /><ExplainBlock k="basisEst" /><ExplainBlock k="equityGap" /></>)}
 
       <div className="grid grid-cols-3 gap-0 border border-rule divide-x divide-rule mb-6">
         {headline.map((x) => (
@@ -130,7 +142,9 @@ export function EconomicsPanel({ economics, dense }: { economics: any; dense?: b
                       <span className="font-body-base text-body-base text-ink">{m.label}</span>
                       <span className="flex items-center gap-2 shrink-0">
                         {m.basis === "modeled" && (
-                          <span className="font-eyebrow text-[9px] px-1.5 py-0.5 rounded-sm border border-rule text-muted-foreground uppercase tracking-widest">est</span>
+                          <span className="font-eyebrow text-[9px] px-1.5 py-0.5 rounded-sm border border-rule text-muted-foreground uppercase tracking-widest inline-flex items-center gap-1">
+                            est<Explain k="basisEst" />
+                          </span>
                         )}
                         {m.basis === "verified" && (
                           <span className="font-eyebrow text-[9px] px-1.5 py-0.5 rounded-sm border border-sage/40 text-sage uppercase tracking-widest">verified</span>
@@ -156,8 +170,10 @@ export function EconomicsPanel({ economics, dense }: { economics: any; dense?: b
 }
 
 /** A–G dimensions. On the page these are always open; in the modal, collapsed. */
-export function DimensionsPanel({ s, collapsible }: { s: HistoricScore; collapsible?: boolean }) {
+export function DimensionsPanel({ s, collapsible, tutorial }: { s: HistoricScore; collapsible?: boolean; tutorial?: boolean }) {
   return (
+    <>
+    {tutorial && <ExplainBlock k="gates" />}
     <div className="border-t border-rule max-w-[680px]">
       {s.scorecard.dimensions.map((d) => {
         const gated = d.key === "A" || d.key === "B";
@@ -168,8 +184,8 @@ export function DimensionsPanel({ s, collapsible }: { s: HistoricScore; collapsi
             <span className="font-card-title text-[17px] text-ink leading-none">{d.label}</span>
             <span className="flex-1 border-b border-dotted border-rule translate-y-[-2px]" aria-hidden />
             {gated && (
-              <span className={cn("font-eyebrow text-eyebrow uppercase tracking-widest", gateOk ? "text-sage" : "text-clay")}>
-                {gateOk ? "gate pass" : "gate fail"}
+              <span className={cn("font-eyebrow text-eyebrow uppercase tracking-widest inline-flex items-center gap-1", gateOk ? "text-sage" : "text-clay")}>
+                {gateOk ? "gate pass" : "gate fail"}<Explain k="gates" />
               </span>
             )}
             <span className="font-data-mono text-data-mono text-ink">
@@ -202,6 +218,7 @@ export function DimensionsPanel({ s, collapsible }: { s: HistoricScore; collapsi
         );
       })}
     </div>
+    </>
   );
 }
 
@@ -210,7 +227,7 @@ export function PenaltiesBonuses({ s }: { s: HistoricScore }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="border border-rule bg-paper p-5">
-        <SectionLabel className="mb-3">Penalties</SectionLabel>
+        <SectionLabel className="mb-3 inline-flex items-center gap-1">Penalties<Explain k="penalties" /></SectionLabel>
         {s.scorecard.penalties.length
           ? s.scorecard.penalties.map((p, i) => (
               <p key={i} className="font-body-base text-[13px] text-ink/80 leading-relaxed">
@@ -220,7 +237,7 @@ export function PenaltiesBonuses({ s }: { s: HistoricScore }) {
           : <p className="font-body-base text-[13px] text-muted-foreground">None applied.</p>}
       </div>
       <div className="border border-rule bg-paper p-5">
-        <SectionLabel className="mb-3">Alpha Bonuses</SectionLabel>
+        <SectionLabel className="mb-3 inline-flex items-center gap-1">Alpha Bonuses<Explain k="bonuses" /></SectionLabel>
         {s.scorecard.bonuses.length
           ? s.scorecard.bonuses.map((b, i) => (
               <p key={i} className="font-body-base text-[13px] text-ink/80 leading-relaxed">
@@ -238,7 +255,7 @@ export function VerifyList({ s }: { s: HistoricScore }) {
   return (
     <div className="border-l-2 border-amber pl-5 py-2">
       <p className="font-eyebrow text-eyebrow text-amber uppercase tracking-widest mb-2">
-        {s.verifyFields.length} of 5 critical fields unverified — capped below Tier 1
+        {s.verifyFields.length} of 5 critical fields unverified — capped below Tier 1 <Explain k="verifyFields" />
       </p>
       {s.verifyFields.map((v) => (
         <p key={v} className="font-body-base text-[13px] text-ink/80 leading-relaxed">· {v}</p>
@@ -308,13 +325,15 @@ export function buildDiligenceItems(asset: ScoredAsset, has: (m: any) => boolean
   return items;
 }
 
-export function DiligencePanel({ items, classLabel }: { items: DiligenceItem[]; classLabel: string }) {
+export function DiligencePanel({ items, classLabel, tutorial }: { items: DiligenceItem[]; classLabel: string; tutorial?: boolean }) {
   if (!items.length) return null;
   return (
     <div>
-      <SectionLabel className="mb-4">
+      <SectionLabel className="mb-4 inline-flex items-center gap-1">
         {classLabel} diligence · {items.filter((i) => i.done).length}/{items.length} resolved
+        <Explain k="diligence" />
       </SectionLabel>
+      {tutorial && <ExplainBlock k="diligence" />}
       <div className="divide-y divide-rule border-t border-b border-rule">
         {items.map((i) => (
           <div key={i.m} className="py-3 flex items-start gap-3">
@@ -340,19 +359,20 @@ const LISTING_STATUS_CLS: Record<string, string> = {
   unknown: "text-muted-foreground border-rule",
 };
 
-export function ProvenancePanel({ asset, verification }: { asset: ScoredAsset; verification?: any }) {
+export function ProvenancePanel({ asset, verification, tutorial }: { asset: ScoredAsset; verification?: any; tutorial?: boolean }) {
   const st = verification?.status ?? asset.listingStatus;
   const note = verification?.note ?? asset.verificationNote;
   const citations: string[] = verification?.citations ?? asset.verificationSources ?? [];
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-4">
-        <SectionLabel>Source &amp; Verification</SectionLabel>
+        <SectionLabel className="inline-flex items-center gap-1">Source &amp; Verification<Explain k="provenance" /></SectionLabel>
         <span className={cn("font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border uppercase tracking-widest",
           LISTING_STATUS_CLS[st] ?? "text-muted-foreground border-rule")}>
           {st ? String(st) : "unverified"}
         </span>
       </div>
+      {tutorial && <ExplainBlock k="provenance" />}
       {asset.sourceUrl ? (
         <a href={asset.sourceUrl} target="_blank" rel="noopener noreferrer"
            className="inline-flex items-start gap-2 font-body-base text-[13px] text-amber hover:underline break-all mb-2">
