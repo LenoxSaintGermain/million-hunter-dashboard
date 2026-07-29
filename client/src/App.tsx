@@ -47,6 +47,7 @@ import InvestorBrief from "./pages/InvestorBrief";
 import Walkthrough from "./pages/Walkthrough";
 import Pricing from "./pages/Pricing";
 import Wingate from "./pages/Wingate";
+import AssetDossier from "./pages/AssetDossier";
 import { getLoginUrl } from "./const";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
@@ -193,9 +194,9 @@ function Router() {
         <Route path="/operator-registry">{() => <ProtectedRoute component={OperatorRegistry} />}</Route>
         <Route path="/profile">{() => <ProtectedRoute component={OperatorIdentity} />}</Route>
         <Route path="/wingate">{() => <ProtectedRoute component={Wingate} />}</Route>
-        {/* Deep-linkable asset dossier — the destination for "view dossier" from
-            Command Center, Scout, and the ranked pipeline. */}
-        <Route path="/wingate/asset/:id">{() => <ProtectedRoute component={Wingate} />}</Route>
+        {/* Full-page asset dossier — the property-class equivalent of /deal/:id.
+            Linked from Command Center, Scout, and the Wingate preview modal. */}
+        <Route path="/wingate/asset/:id">{() => <ProtectedRoute component={AssetDossier} />}</Route>
 
         {/* Invite accept — role assignment on first login */}
         <Route path="/invite/:token" component={InviteAccept} />

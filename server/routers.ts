@@ -1594,6 +1594,23 @@ Produce concrete remediation plan. Give go/no-go recommendation.`;
         return asset;
       }),
 
+    /** One asset with everything the full-page dossier renders — scorecard +
+     *  economics — so /wingate/asset/:id doesn't have to score the whole pipeline. */
+    getScoredById: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .query(async ({ input }) => {
+        const { getCommercialAssetById } = await import("./db");
+        const { scoreAssetByClass } = await import("./scoring");
+        const { computeEconomics } = await import("./scoring/economics");
+        const asset = await getCommercialAssetById(input.id);
+        if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+        return {
+          ...asset,
+          historicScore: scoreAssetByClass(asset as any),
+          economics: ((asset as any).assetClass ?? "historic") === "historic" ? computeEconomics(asset as any) : null,
+        };
+      }),
+
     create: protectedProcedure
       .input(z.object({
         name: z.string().min(1),

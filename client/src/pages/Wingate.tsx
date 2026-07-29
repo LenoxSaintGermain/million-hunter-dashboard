@@ -18,6 +18,10 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
+  ScoreHeadline, HardStopBanner, EconomicsPanel, SectionLabel, TIER_META,
+  type ScoredAsset, type HistoricScore,
+} from "@/components/AssetDossierSections";
+import {
   Landmark, Boxes, MapPin, Plus, Play, Trash2, Zap, CheckCircle2, XCircle,
   AlertTriangle, ShieldCheck, Gauge, Building2, Star, Filter, Loader2, Search, FileText, ExternalLink,
 } from "lucide-react";
@@ -63,26 +67,6 @@ function asOptionalString(value: ParsedIntakeValue): string | undefined {
 function asBoolean(value: ParsedIntakeValue): boolean {
   return value === true;
 }
-
-// ─── Types (mirror server/scoring/historicScore.ts) ──────────────────────────
-type Factor = { label: string; points: number; max: number; note?: string; verify?: boolean };
-type Dimension = { key: string; label: string; score: number; max: number; factors: Factor[] };
-type HistoricScore = {
-  dimA: number; dimB: number; dimC: number; dimD: number; dimE: number; dimF: number; dimG: number;
-  compositeScore: number; penalties: number; bonuses: number; confidenceScore: number; rankScore: number;
-  assetTier: "tier1" | "tier2" | "tier3" | "archive" | "fasttrack";
-  marketTier: "A" | "B" | "C"; dispositionCode: string | null; verifyFields: string[]; hardStopFailed: string | null;
-  scorecard: { dimensions: Dimension[]; penalties: Factor[]; bonuses: Factor[]; strengths: string[]; risks: string[]; marketNote: string; sourceNote: string };
-};
-type ScoredAsset = Record<string, any> & { historicScore: HistoricScore };
-
-const TIER_META: Record<HistoricScore["assetTier"], { label: string; cls: string }> = {
-  tier1:     { label: "Tier 1",     cls: "text-amber-400 border-amber-400/40 bg-amber-400/10" },
-  fasttrack: { label: "Fast-Track", cls: "text-rose-400 border-rose-400/40 bg-rose-400/10" },
-  tier2:     { label: "Tier 2",     cls: "text-violet-400 border-violet-400/40 bg-violet-400/10" },
-  tier3:     { label: "Tier 3",     cls: "text-sky-400 border-sky-400/40 bg-sky-400/10" },
-  archive:   { label: "Archive",    cls: "text-muted-foreground border-border bg-muted/20" },
-};
 
 const ASSET_STATUSES = ["new", "reviewing", "qualified", "rejected", "acquired"] as const;
 type AssetStatus = typeof ASSET_STATUSES[number];
@@ -192,386 +176,106 @@ function RankedCard({ rank, asset, onSelect }: { rank: number; asset: ScoredAsse
 }
 
 // ─── Full A–G scorecard drawer ────────────────────────────────────────────────
+/**
+ * Quick-scan preview. Deliberately shallow: the numbers that decide whether to
+ * keep reading, then a door to the full-page dossier (/wingate/asset/:id) which
+ * carries the same weight as the business Deal Room. Everything rendered here
+ * uses the shared dossier sections, so preview and page never drift.
+ */
 function ScorecardDrawer({ asset, onClose, onRescored }: { asset: ScoredAsset; onClose: () => void; onRescored: () => void }) {
   const s = asset.historicScore;
-  // The dossier renders exactly the modules this asset's class declares, so a new
-  // thesis changes its diligence surface from config alone (no page fork).
   const cls = getAssetClass(asset.assetClass);
   const has = (m: Parameters<typeof classSupportsModule>[1]) => classSupportsModule(cls, m);
   const tier = TIER_META[s.assetTier];
   const [, navigate] = useLocation();
-  const [status, setStatus] = useState<AssetStatus>((asset.status as AssetStatus) ?? "new");
-  // Analyst narrative is rendered INLINE below (it used to vanish in a toast).
-  const [narrative, setNarrative] = useState<{ summary: string; strengths: string[]; risks: string[] } | null>(
-    asset.aiAnalysis ? { summary: String(asset.aiAnalysis), strengths: [], risks: [] } : null,
-  );
-  const aiScore = trpc.scout.scoreAsset.useMutation({
-    onSuccess: (r: any) => { setNarrative({ summary: r.summary, strengths: r.strengths ?? [], risks: r.risks ?? [] }); toast.success("Analyst narrative ready"); },
-    onError: (e) => toast.error(e.message),
-  });
-  const [verification, setVerification] = useState<any>(
-    asset.listingStatus ? { status: asset.listingStatus, note: asset.verificationNote, citations: asset.verificationSources ?? [] } : null,
-  );
-  const verify = trpc.scout.verifyListing.useMutation({
-    onSuccess: (r: any) => { setVerification(r); toast.success(`Listing checked: ${r.status}`); onRescored(); },
-    onError: (e) => toast.error(e.message),
-  });
-  const convertToDeal = trpc.scout.convertToDeal.useMutation({
-    onSuccess: (r) => {
-      toast.success("Promoted to Deal Room");
-      navigate(r.dealId ? `/deal/${r.dealId}` : "/memos");
-    },
-    onError: (e) => toast.error(e.message),
-  });
-  const updateStatus = trpc.scout.updateStatus.useMutation({
-    onSuccess: (_r, vars: any) =>
-      toast.success(
-        vars?.status === "qualified"
-          ? "Moved to Diligence — this dossier is the deal record. Filter the pipeline by Qualified to find it."
-          : `Status set to ${vars?.status}`,
-      ),
-    onError: (e) => toast.error(e.message),
-  });
+  const dossierHref = `/wingate/asset/${asset.id}`;
+
+  const gates = [
+    { key: "A", label: "Historic qualification", score: s.dimA },
+    { key: "B", label: "Development envelope", score: s.dimB },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl bg-card border border-border shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 p-5 pb-3 bg-card border-b border-border">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[11px] font-bold text-amber-400 tracking-widest uppercase">🏛 Wingate scorecard</span>
-              <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", tier.cls)}>{tier.label}</span>
-              <span className="text-[10px] text-muted-foreground">Market {s.marketTier}</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="relative w-full max-w-xl max-h-[88vh] overflow-y-auto bg-paper border border-rule shadow-2xl" onClick={(e) => e.stopPropagation()}>
+
+        <div className="sticky top-0 z-10 bg-paper border-b border-rule px-6 pt-6 pb-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">Quick scan</span>
+                <span className={cn("font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border uppercase tracking-widest", tier.cls)}>{tier.label}</span>
+                <span className="font-eyebrow text-eyebrow text-muted-foreground">Market {s.marketTier}</span>
+              </div>
+              <h2 className="font-card-title text-[26px] text-ink leading-tight">{asset.name}</h2>
+              <p className="font-body-base text-[13px] text-muted-foreground mt-1">
+                {String(asset.address).trim() === String(asset.name).trim()
+                  ? `${asset.city}, ${asset.state}`
+                  : `${asset.address}, ${asset.city}, ${asset.state}`}
+              </p>
             </div>
-            <h2 className="text-lg font-bold text-foreground">{asset.name}</h2>
-            <p className="text-sm text-muted-foreground">{asset.address}, {asset.city}, {asset.state}</p>
+            <button onClick={onClose} className="text-muted-foreground hover:text-ink text-xl leading-none shrink-0">✕</button>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">✕</button>
         </div>
 
-        <div className="p-5 space-y-5">
-          {/* Score headline */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: "Rank Score", value: Math.round(s.rankScore), sub: "composite × confidence", color: "text-amber-400" },
-              { label: "Composite", value: s.compositeScore, sub: `+${s.bonuses} bonus · −${s.penalties} pen`, color: "text-foreground" },
-              { label: "Confidence", value: `${Math.round(s.confidenceScore * 100)}%`, sub: `${5 - s.verifyFields.length}/5 verified`, color: s.confidenceScore >= 0.8 ? "text-emerald-400" : "text-amber-400" },
-            ].map((m) => (
-              <div key={m.label} className="p-3 rounded-lg bg-muted/20 border border-border text-center">
-                <p className={cn("text-2xl font-black font-mono", m.color)}>{m.value}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5">{m.label}</p>
-                <p className="text-[9px] text-muted-foreground/60">{m.sub}</p>
-              </div>
-            ))}
-          </div>
+        <div className="px-6 py-6 space-y-6">
+          <ScoreHeadline s={s} dense />
 
-          {s.hardStopFailed && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-start gap-2">
-              <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-              <div><p className="text-xs font-semibold text-rose-400">Hard stop{s.dispositionCode ? ` · ${s.dispositionCode}` : ""}</p><p className="text-[11px] text-muted-foreground">{s.hardStopFailed}</p></div>
-            </div>
-          )}
+          <HardStopBanner s={s} />
 
-          {/* ── Deal economics (spec §9) — "what would I make?" ─────────────── */}
-          {has("economics") && asset.economics && (
-            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.03] p-3 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Deal economics</p>
-                {asset.economics.archetype && (
-                  <span className="text-[9px] text-muted-foreground">archetype: {asset.economics.archetype}</span>
-                )}
-              </div>
-
-              {/* Headline */}
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: "Project cost", v: asset.economics.headline.totalProjectCost, fmt: (n: number) => fmtMoney(n) },
-                  { label: "Incentive equity", v: asset.economics.headline.incentiveEquity, fmt: (n: number) => fmtMoney(n) },
-                  { label: "Equity gap", v: asset.economics.headline.equityGapPct, fmt: (n: number) => `${Math.round(n * 100)}%` },
-                ].map((x) => (
-                  <div key={x.label} className="p-2 rounded bg-muted/20 border border-border text-center">
-                    <p className="text-sm font-black font-mono text-foreground">{x.v == null ? "—" : x.fmt(x.v as number)}</p>
-                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide mt-0.5">{x.label}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Metrics */}
-              <div className="space-y-1">
-                {asset.economics.metrics.map((m: any) => {
-                  const statusCls =
-                    m.status === "pass" ? "text-emerald-400" :
-                    m.status === "watch" ? "text-amber-400" :
-                    m.status === "fail" ? "text-rose-400" : "text-muted-foreground";
-                  return (
-                    <div key={m.key} className="flex items-start gap-2 text-[11px] py-0.5">
-                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0 mt-1.5",
-                        m.status === "pass" ? "bg-emerald-400" : m.status === "watch" ? "bg-amber-400" :
-                        m.status === "fail" ? "bg-rose-400" : "bg-muted-foreground/40")} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-muted-foreground">{m.label}</span>
-                          <span className="flex items-center gap-1.5 shrink-0">
-                            {m.basis === "modeled" && <span className="text-[8px] px-1 rounded border border-amber-500/30 text-amber-400/80 uppercase">est</span>}
-                            {m.basis === "verified" && <span className="text-[8px] px-1 rounded border border-emerald-500/30 text-emerald-400/80 uppercase">verified</span>}
-                            <span className={cn("font-mono font-bold", statusCls)}>{m.display}</span>
-                          </span>
-                        </div>
-                        {m.target && <p className="text-[9px] text-muted-foreground/60">target {m.target}</p>}
-                        {m.assumption && <p className="text-[9px] text-amber-400/60 italic">↳ {m.assumption}</p>}
-                        {m.note && <p className="text-[9px] text-muted-foreground/60">· {m.note}</p>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <p className="text-[9px] text-muted-foreground/70 italic border-t border-border pt-2 leading-relaxed">
-                {asset.economics.disclaimer}
-              </p>
-            </div>
-          )}
-
-          {(has("agScorecard") || has("classScorecard")) && (<>
-          {/* A–G dimensions */}
-          <div className="space-y-2">
-            {s.scorecard.dimensions.map((d) => {
-              const gated = d.key === "A" || d.key === "B";
-              const gateOk = d.score >= 12;
-              return (
-                <details key={d.key} className="group rounded-lg border border-border bg-muted/10">
-                  <summary className="flex items-center gap-2 p-2.5 cursor-pointer list-none">
-                    <span className="text-[11px] font-bold text-amber-400 w-4">{d.key}</span>
-                    <span className="text-xs font-medium text-foreground flex-1">{d.label}</span>
-                    {gated && <span className={cn("text-[9px] font-bold px-1 rounded", gateOk ? "text-emerald-400" : "text-rose-400")}>{gateOk ? "gate ✓" : "gate ✗"}</span>}
-                    <span className="text-xs font-mono font-bold text-foreground">{d.score}<span className="text-muted-foreground">/{d.max}</span></span>
-                  </summary>
-                  <div className="px-2.5 pb-2.5 space-y-1">
-                    {d.factors.map((f, i) => (
-                      <div key={i} className="flex items-center gap-2 text-[11px]">
-                        <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", f.points > 0 ? "bg-emerald-400" : "bg-muted-foreground/30")} />
-                        <span className="flex-1 text-muted-foreground">{f.label}{f.note ? ` — ${f.note}` : ""}</span>
-                        {f.verify && <AlertTriangle className="w-2.5 h-2.5 text-amber-400" />}
-                        <span className="font-mono text-muted-foreground">{f.points}/{f.max}</span>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              );
-            })}
-          </div>
-
-          {/* Penalties / bonuses */}
-          {(s.scorecard.penalties.length > 0 || s.scorecard.bonuses.length > 0) && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/5">
-                <p className="text-[10px] font-bold text-rose-400 uppercase mb-1">Penalties</p>
-                {s.scorecard.penalties.length ? s.scorecard.penalties.map((p, i) => (
-                  <p key={i} className="text-[10px] text-muted-foreground">−{p.points} {p.label}</p>
-                )) : <p className="text-[10px] text-muted-foreground/50">none</p>}
-              </div>
-              <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
-                <p className="text-[10px] font-bold text-emerald-400 uppercase mb-1">Alpha bonuses</p>
-                {s.scorecard.bonuses.length ? s.scorecard.bonuses.map((b, i) => (
-                  <p key={i} className="text-[10px] text-muted-foreground">+{b.points} {b.label}</p>
-                )) : <p className="text-[10px] text-muted-foreground/50">none</p>}
-              </div>
-            </div>
-          )}
-
-          {/* Verify list */}
-          {s.verifyFields.length > 0 && (
-            <div className="p-3 rounded-lg border border-amber-500/25 bg-amber-500/5">
-              <p className="text-[10px] font-bold text-amber-400 uppercase mb-1">Unverified critical fields ({s.verifyFields.length}/5) — capped below Tier 1</p>
-              {s.verifyFields.map((v) => <p key={v} className="text-[11px] text-muted-foreground">• {v}</p>)}
-            </div>
-          )}
-
-          {/* Strengths / risks */}
-          <div className="grid grid-cols-2 gap-3">
-            <div><p className="text-[10px] font-bold text-emerald-400 uppercase mb-1">Strengths</p>{s.scorecard.strengths.length ? s.scorecard.strengths.map((x, i) => <p key={i} className="text-[11px] text-muted-foreground">✓ {x}</p>) : <p className="text-[10px] text-muted-foreground/50">—</p>}</div>
-            <div><p className="text-[10px] font-bold text-rose-400 uppercase mb-1">Risks</p>{s.scorecard.risks.length ? s.scorecard.risks.map((x, i) => <p key={i} className="text-[11px] text-muted-foreground">! {x}</p>) : <p className="text-[10px] text-muted-foreground/50">—</p>}</div>
-          </div>
-
-          <p className="text-[10px] text-muted-foreground/60 italic">{s.scorecard.marketNote} · {s.scorecard.sourceNote}</p>
-          </>)}
-
-          {/* ── Diligence modules declared by this asset class ───────────────── */}
-          {(() => {
-            const items: { m: any; label: string; done: boolean; detail: string }[] = [];
-            const hi = (asset.historicInputs ?? {}) as any;
-            if (has("incentiveStack")) items.push({
-              m: "incentiveStack", label: "Incentive stack confirmed",
-              done: !!(hi.abatementAvailable != null || hi.nmtcTract != null || hi.tifDistrict != null),
-              detail: [asset.opportunityZone ? "OZ" : null, hi.nmtcTract ? "NMTC" : null, hi.tifDistrict ? "TIF" : null, hi.abatementAvailable ? "abatement" : null].filter(Boolean).join(" · ") || "OZ/NMTC/TIF/abatement status not yet confirmed",
-            });
-            if (has("envelope")) items.push({
-              m: "envelope", label: "Development envelope",
-              done: hi.farUtilization != null,
-              detail: hi.farUtilization != null ? `FAR utilization ${hi.farUtilization} · headroom ${(1 / hi.farUtilization).toFixed(1)}×` : "needs zoning max FAR vs. existing GSF",
-            });
-            if (has("environmental")) items.push({
-              m: "environmental", label: "Phase I ESA / prior use",
-              done: hi.highRiskPriorUse != null || !!hi.priorUse,
-              detail: hi.highRiskPriorUse ? `high-risk prior use: ${hi.priorUse ?? "flagged"}` : hi.priorUse ? `prior use: ${hi.priorUse}` : "prior-use history not researched",
-            });
-            if (has("titleEasements")) items.push({
-              m: "titleEasements", label: "Title, easements & covenants",
-              done: hi.ownershipVerified === true,
-              detail: hi.facadeEasement ? "facade easement recorded — restricts vertical addition" : hi.ownershipVerified ? "ownership verified" : "ownership entity & title unverified",
-            });
-            if (!items.length) return null;
-            return (
-              <div className="rounded-lg border border-border bg-muted/10 p-3 space-y-2">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
-                  {cls.shortLabel} diligence · {items.filter(i => i.done).length}/{items.length} resolved
-                </p>
-                {items.map((i) => (
-                  <div key={i.m} className="flex items-start gap-2 text-[11px]">
-                    {i.done
-                      ? <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
-                      : <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />}
-                    <div className="flex-1 min-w-0">
-                      <p className={cn("font-medium", i.done ? "text-foreground/80" : "text-amber-400/90")}>{i.label}</p>
-                      <p className="text-[10px] text-muted-foreground">{i.detail}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-
-          <div className="space-y-2 pt-1">
-            {/* ── Provenance & freshness — click through and validate ────────── */}
-            {has("provenance") && (
-            <div className="rounded-lg border border-border bg-muted/10 p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Source &amp; verification</p>
-                {(() => {
-                  const st = verification?.status ?? asset.listingStatus;
-                  const map: Record<string, string> = {
-                    active: "text-emerald-400 border-emerald-400/30 bg-emerald-400/10",
-                    stale: "text-amber-400 border-amber-400/30 bg-amber-400/10",
-                    withdrawn: "text-rose-400 border-rose-400/30 bg-rose-400/10",
-                    sold: "text-rose-400 border-rose-400/30 bg-rose-400/10",
-                    unknown: "text-muted-foreground border-border bg-muted/20",
-                  };
-                  return (
-                    <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full border", map[st] ?? "text-muted-foreground border-border bg-muted/20")}>
-                      {st ? String(st).toUpperCase() : "UNVERIFIED"}
-                    </span>
-                  );
-                })()}
-              </div>
-              {asset.sourceUrl ? (
-                <a href={asset.sourceUrl} target="_blank" rel="noopener noreferrer"
-                   className="flex items-center gap-1.5 text-[11px] text-amber-400 hover:underline break-all">
-                  <ExternalLink className="w-3 h-3 shrink-0" />{String(asset.sourceUrl).slice(0, 70)}
-                </a>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">No source URL on record — added manually.</p>
-              )}
-              <p className="text-[10px] text-muted-foreground">
-                {asset.lastVerifiedAt
-                  ? `Last checked ${Math.max(0, Math.round((Date.now() - Number(asset.lastVerifiedAt)) / 86400000))}d ago`
-                  : "Never checked against the live web"}
-                {asset.updatedAt ? ` · record updated ${new Date(Number(asset.updatedAt)).toLocaleDateString()}` : ""}
-              </p>
-              {(verification?.note ?? asset.verificationNote) && (
-                <p className="text-[11px] text-foreground/80 leading-relaxed border-l-2 border-amber-500/40 pl-2">
-                  {verification?.note ?? asset.verificationNote}
-                </p>
-              )}
-              {!!(verification?.citations?.length) && (
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {verification.citations.slice(0, 4).map((c: string, i: number) => (
-                    <a key={i} href={c} target="_blank" rel="noopener noreferrer"
-                       className="text-[9px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-amber-400 hover:border-amber-500/40">
-                      source {i + 1}
-                    </a>
-                  ))}
+          {/* Tier-1 gates — the pass/fail that matters most at a glance */}
+          <div>
+            <SectionLabel className="mb-3">Tier-1 gates</SectionLabel>
+            <div className="divide-y divide-rule border-t border-b border-rule">
+              {gates.map((g) => (
+                <div key={g.key} className="py-2.5 flex items-baseline gap-3">
+                  <span className="font-eyebrow text-eyebrow text-amber w-4">{g.key}</span>
+                  <span className="flex-1 font-body-base text-[13px] text-ink">{g.label}</span>
+                  <span className={cn("font-eyebrow text-eyebrow uppercase tracking-widest", g.score >= 12 ? "text-sage" : "text-clay")}>
+                    {g.score >= 12 ? "pass" : "fail"}
+                  </span>
+                  <span className="font-data-mono text-[12px] text-muted-foreground w-10 text-right">{g.score}/20</span>
                 </div>
-              )}
-            </div>
-            )}
-
-            {/* ── Analyst narrative (rendered inline, not a toast) ───────────── */}
-            {narrative && (
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
-                <p className="text-[10px] font-bold text-primary uppercase tracking-wide">Analyst narrative</p>
-                <p className="text-xs text-foreground/90 leading-relaxed">{narrative.summary}</p>
-                {(narrative.strengths.length > 0 || narrative.risks.length > 0) && (
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    <div>
-                      {narrative.strengths.slice(0, 3).map((x, i) => <p key={i} className="text-[10px] text-emerald-400/90">✓ {x}</p>)}
-                    </div>
-                    <div>
-                      {narrative.risks.slice(0, 3).map((x, i) => <p key={i} className="text-[10px] text-rose-400/90">! {x}</p>)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── Actions: verify → analyze → advance ────────────────────────── */}
-            <div className="space-y-2">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Next actions</p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button size="sm" variant="outline" className="border-border justify-start" onClick={() => verify.mutate({ id: asset.id })} disabled={verify.isPending}>
-                  {verify.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5 mr-2 text-emerald-400" />}
-                  <span className="truncate">{verify.isPending ? "Checking…" : "Verify listing"}</span>
-                </Button>
-                <Button size="sm" variant="outline" className="border-border justify-start" onClick={() => aiScore.mutate({ id: asset.id })} disabled={aiScore.isPending}>
-                  {aiScore.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Zap className="w-3.5 h-3.5 mr-2 text-amber-400" />}
-                  <span className="truncate">{aiScore.isPending ? "Analyzing…" : "Analyst narrative"}</span>
-                </Button>
-                {getAssetClass(asset.assetClass).promotesToBusinessDeals ? (
-                  <Button size="sm" variant="outline" className="border-border justify-start" onClick={() => convertToDeal.mutate({ id: asset.id })} disabled={convertToDeal.isPending}>
-                    {convertToDeal.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Landmark className="w-3.5 h-3.5 mr-2 text-amber-400" />}
-                    <span className="truncate">{convertToDeal.isPending ? "Promoting…" : "Promote to Deal Room"}</span>
-                  </Button>
-                ) : (
-                  /* Property classes advance IN PLACE — the dossier (scorecard,
-                     economics, provenance) is the deal record; copying into the
-                     business deals model would strip it and misjudge the asset. */
-                  <Button size="sm" variant="outline" className="border-border justify-start"
-                    onClick={() => { setStatus("qualified"); updateStatus.mutate({ id: asset.id, status: "qualified" }); }}
-                    disabled={updateStatus.isPending || status === "qualified"}>
-                    {updateStatus.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 mr-2 text-emerald-400" />}
-                    <span className="truncate">{status === "qualified" ? "In diligence ✓" : "Advance to diligence"}</span>
-                  </Button>
-                )}
-                <Select
-                  value={status}
-                  onValueChange={(nextStatus) => { const next = nextStatus as AssetStatus; setStatus(next); updateStatus.mutate({ id: asset.id, status: next }); }}
-                  disabled={updateStatus.isPending}
-                >
-                  <SelectTrigger className="h-9 text-xs border-border bg-transparent"><SelectValue placeholder="Set status" /></SelectTrigger>
-                  <SelectContent>
-                    {ASSET_STATUSES.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              {!getAssetClass(asset.assetClass).promotesToBusinessDeals && (
-                <p className="text-[11px] text-muted-foreground leading-snug">
-                  {getAssetClass(asset.assetClass).label} assets advance in place — this dossier
-                  (scorecard, economics, provenance) <em>is</em> the deal record. There is no
-                  separate Deal Room entry to open.
-                </p>
-              )}
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="border-border shrink-0"
-                  onClick={() => {
-                    navigator.clipboard?.writeText(`${window.location.origin}/wingate/asset/${asset.id}`);
-                    toast.success("Dossier link copied");
-                  }}>
-                  <ExternalLink className="w-3.5 h-3.5 mr-2" /> Copy link
-                </Button>
-                <Button size="sm" className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={() => { onRescored(); onClose(); }}>
-                  Done
-                </Button>
-              </div>
+              ))}
             </div>
           </div>
+
+          {has("economics") && asset.economics && <EconomicsPanel economics={asset.economics} dense />}
+
+          {s.scorecard.risks.length > 0 && (
+            <div>
+              <SectionLabel className="mb-2">Top risks</SectionLabel>
+              {s.scorecard.risks.slice(0, 3).map((r, i) => (
+                <p key={i} className="font-body-base text-[13px] text-ink/80 leading-relaxed mb-1">
+                  <span className="text-clay">!</span> {r}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {s.verifyFields.length > 0 && (
+            <p className="font-body-base text-[12px] text-muted-foreground">
+              {s.verifyFields.length} of 5 critical fields unverified — {s.verifyFields.join(", ")}.
+            </p>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 bg-paper border-t border-rule px-6 py-4 flex items-center gap-3">
+          <button
+            onClick={() => { onRescored(); navigate(dossierHref); }}
+            className="flex-1 flex items-center justify-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2.5 rounded-full hover:opacity-90 transition-all uppercase tracking-widest">
+            <FileText className="w-3 h-3" />
+            Open full dossier
+          </button>
+          <button
+            onClick={() => {
+              navigator.clipboard?.writeText(`${window.location.origin}${dossierHref}`);
+              toast.success("Dossier link copied");
+            }}
+            className="flex items-center gap-2 border border-rule font-eyebrow text-eyebrow px-4 py-2.5 rounded-full hover:border-amber/40 hover:text-amber transition-all uppercase tracking-widest">
+            <ExternalLink className="w-3 h-3" />
+            Copy link
+          </button>
         </div>
       </div>
     </div>
@@ -731,13 +435,8 @@ export default function Wingate() {
   });
   const [compilationId, setCompilationId] = useState<number | null>(urlThesis ? Number(urlThesis) : null);
   const [selected, setSelected] = useState<ScoredAsset | null>(null);
-  // /wingate/asset/:id deep-link — the dossier is a real, shareable destination.
-  const routeAssetId = (() => {
-    const m = typeof window !== "undefined" ? window.location.pathname.match(/\/wingate\/asset\/(\d+)/) : null;
-    return m ? Number(m[1]) : null;
-  })();
-  const openDossier = (a: ScoredAsset) => { setSelected(a); window.history.pushState({}, "", `/wingate/asset/${a.id}`); };
-  const closeDossier = () => { setSelected(null); window.history.pushState({}, "", "/wingate"); };
+  const openDossier = (a: ScoredAsset) => setSelected(a);
+  const closeDossier = () => setSelected(null);
   const [addOpen, setAddOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [filterState, setFilterState] = useState("all");
@@ -779,19 +478,6 @@ export default function Wingate() {
   });
 
   const results: ScoredAsset[] = (search.data?.results ?? []) as any;
-  // A shared dossier link may point at an asset in a different class than the one
-  // currently selected — walk the registry until we find its home class.
-  const [deeplinkTried, setDeeplinkTried] = useState<string[]>([]);
-  useEffect(() => {
-    if (!routeAssetId || selected || search.isLoading) return;
-    const hit = results.find((a) => Number(a.id) === routeAssetId);
-    if (hit) { setSelected(hit); return; }
-    const tried = deeplinkTried.includes(assetClass) ? deeplinkTried : [...deeplinkTried, assetClass];
-    if (tried !== deeplinkTried) setDeeplinkTried(tried);
-    const next = listAssetClasses().find((c) => !tried.includes(c.id));
-    if (next) setAssetClass(next.id);
-    else if (deeplinkTried.length) toast.error("That dossier is no longer in the pipeline.");
-  }, [routeAssetId, results, selected, search.isLoading, assetClass]);
   const states = useMemo(() => Array.from(new Set(results.map(a => a.state))).sort(), [results]);
   const filtered = useMemo(() => results.filter(a => {
     if (filterState !== "all" && a.state !== filterState) return false;

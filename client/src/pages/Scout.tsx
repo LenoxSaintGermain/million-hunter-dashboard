@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { getAssetClass } from "@shared/assetClasses";
 import {
   Building2, MapPin, DollarSign, TrendingUp, Zap, Plus, Search,
@@ -634,12 +634,11 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
 
         {/* Dossier — every property-class asset's real destination */}
         {!assetCls.promotesToBusinessDeals && (
-          <a
-            href={dossierHref}
-            className="w-full flex items-center justify-center gap-1.5 h-7 text-[11px] font-medium rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 transition-colors mt-1"
-          >
-            Open {assetCls.shortLabel} dossier →
-          </a>
+          <Link href={dossierHref}>
+            <span className="w-full flex items-center justify-center gap-1.5 h-7 text-[11px] font-medium rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 transition-colors mt-1 cursor-pointer">
+              Open {assetCls.shortLabel} dossier →
+            </span>
+          </Link>
         )}
 
         {/* Convert to Deal — operating businesses only. Copying a building into
