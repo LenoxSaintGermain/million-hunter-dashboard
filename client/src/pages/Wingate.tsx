@@ -506,6 +506,25 @@ export default function Wingate() {
 
   const results: ScoredAsset[] = (search.data?.results ?? []) as any;
   const states = useMemo(() => Array.from(new Set(results.map(a => a.state))).sort(), [results]);
+
+  /** Market coverage against the thesis. Sourcing used to silently search only
+   *  the first four declared markets, so the pipeline drifted to one state
+   *  without anyone seeing it. Now the gap is on the page. */
+  const coverage = useMemo(() => {
+    const cls = getAssetClass(assetClass);
+    const declared = cls.markets ?? [];
+    const counts = new Map<string, number>();
+    results.forEach((a) => {
+      const st = String(a.state ?? "").toUpperCase();
+      counts.set(st, (counts.get(st) ?? 0) + 1);
+    });
+    return {
+      declared,
+      covered: declared.filter((m) => (counts.get(m) ?? 0) > 0),
+      empty: declared.filter((m) => !(counts.get(m) ?? 0)),
+      counts,
+    };
+  }, [results, assetClass]);
   const filtered = useMemo(() => results.filter(a => {
     if (filterState !== "all" && a.state !== filterState) return false;
     if (filterTier !== "all" && a.historicScore.assetTier !== filterTier && !(filterTier === "tier1" && a.historicScore.assetTier === "fasttrack")) return false;
@@ -623,6 +642,33 @@ export default function Wingate() {
           className="pl-9 h-9 bg-muted/20 border-border text-sm"
         />
       </div>
+
+      {/* Market coverage against the thesis */}
+      {coverage.declared.length > 0 && (
+        <div className="mb-4 flex items-start gap-3 flex-wrap">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest shrink-0 mt-1">
+            Markets {coverage.covered.length}/{coverage.declared.length}
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {coverage.declared.map((m) => {
+              const n = coverage.counts.get(m) ?? 0;
+              return (
+                <span key={m} className={cn(
+                  "text-[10px] font-semibold px-1.5 py-0.5 rounded border",
+                  n > 0 ? "text-amber-400 border-amber-500/30 bg-amber-500/10" : "text-muted-foreground/60 border-border",
+                )}>
+                  {m}{n > 0 ? ` ${n}` : ""}
+                </span>
+              );
+            })}
+          </div>
+          {coverage.empty.length > 0 && !isInvestor && (
+            <span className="text-[11px] text-muted-foreground mt-0.5">
+              {coverage.empty.length} thesis market{coverage.empty.length === 1 ? "" : "s"} with no inventory — run research to cover them.
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap mb-4">

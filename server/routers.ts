@@ -1812,21 +1812,55 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         const key = process.env.SONAR_API_KEY;
         if (!key) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "SONAR_API_KEY not configured — live sourcing unavailable" });
 
-        // Map state abbreviations to city names for better sonar search quality
-        const STATE_CITIES: Record<string, string> = {
-          IL: "Chicago, IL", IN: "Indianapolis, IN", OH: "Columbus, OH",
-          KY: "Louisville, KY", TN: "Nashville, TN", GA: "Atlanta, GA",
-          SC: "Charleston, SC", NC: "Charlotte, NC", AL: "Birmingham, AL",
-          MO: "St. Louis, MO", KS: "Kansas City, KS", TX: "Dallas, TX",
-          FL: "Tampa, FL", VA: "Richmond, VA", MI: "Detroit, MI",
+        // Several cities per state. Mapping a state to ONE city meant the whole
+        // thesis was really a search of that single city.
+        const STATE_CITIES: Record<string, string[]> = {
+          OH: ["Columbus, OH", "Cleveland, OH", "Cincinnati, OH", "Dayton, OH", "Toledo, OH", "Akron, OH"],
+          IN: ["Indianapolis, IN", "Fort Wayne, IN", "Evansville, IN", "South Bend, IN"],
+          KY: ["Louisville, KY", "Lexington, KY", "Covington, KY", "Owensboro, KY"],
+          TN: ["Nashville, TN", "Memphis, TN", "Chattanooga, TN", "Knoxville, TN"],
+          GA: ["Atlanta, GA", "Savannah, GA", "Macon, GA", "Augusta, GA", "Columbus, GA"],
+          SC: ["Charleston, SC", "Columbia, SC", "Greenville, SC", "Spartanburg, SC"],
+          NC: ["Charlotte, NC", "Raleigh, NC", "Winston-Salem, NC", "Durham, NC", "Asheville, NC"],
+          AL: ["Birmingham, AL", "Montgomery, AL", "Mobile, AL", "Huntsville, AL"],
+          MO: ["St. Louis, MO", "Kansas City, MO", "Springfield, MO", "Columbia, MO"],
+          IL: ["Chicago, IL", "Peoria, IL", "Rockford, IL", "Springfield, IL"],
+          KS: ["Wichita, KS", "Kansas City, KS", "Topeka, KS"],
+          TX: ["Dallas, TX", "Houston, TX", "San Antonio, TX", "Austin, TX", "Fort Worth, TX"],
+          FL: ["Tampa, FL", "Jacksonville, FL", "Orlando, FL", "Miami, FL"],
+          VA: ["Richmond, VA", "Norfolk, VA", "Roanoke, VA"],
+          MI: ["Detroit, MI", "Grand Rapids, MI", "Lansing, MI"],
+          AZ: ["Phoenix, AZ", "Tucson, AZ", "Mesa, AZ"],
+          NV: ["Las Vegas, NV", "Reno, NV", "Henderson, NV"],
         };
-        const rawMarkets = input.markets?.length ? input.markets : (cls.markets ?? []).slice(0, 4);
-        const markets = rawMarkets.map((m: string) => STATE_CITIES[m.toUpperCase()] ?? m).join(", ");
+
+        // Coverage-aware market selection. The old code did `.slice(0, 4)` on the
+        // class's declared markets, so 7 of the historic thesis's 11 states were
+        // NEVER searched and every run re-searched the same first four — which is
+        // why the pipeline came back all-Ohio. Now we search the markets we have
+        // the LEAST inventory in, so repeated runs spread coverage on their own.
+        const allMarkets = (input.markets?.length ? input.markets : (cls.markets ?? [])).map((m) => m.toUpperCase());
+        const priorForClass = await getCommercialAssets({ limit: 1000, assetClass: cls.id });
+        const countByState = new Map<string, number>();
+        for (const a of priorForClass as any[]) {
+          const st = String(a.state ?? "").toUpperCase();
+          countByState.set(st, (countByState.get(st) ?? 0) + 1);
+        }
+        const ranked = [...allMarkets].sort((x, y) => (countByState.get(x) ?? 0) - (countByState.get(y) ?? 0));
+        // Search the 5 least-covered markets, splitting the requested limit
+        // across them so no single city can dominate the result.
+        const targetStates = ranked.slice(0, 5);
+        const perMarket = Math.max(1, Math.ceil(input.limit / Math.max(1, targetStates.length)));
         const fieldList = cls.fields.slice(0, 8).map((f) => `"${f.key}"`).join(", ");
 
-        const sonarPrompt = `Find up to ${input.limit} REAL ${cls.label} properties currently listed for sale in: ${markets || "the United States"}. Thesis: ${cls.description}\n\nReturn ONLY a JSON array — no prose, no explanation. Each object: "name", "address", "city", "state", "sourceUrl", plus whichever of these you can source: ${fieldList}. Omit anything not stated in the source — never guess.`;
+        const promptFor = (stateCode: string) => {
+          const cities = (STATE_CITIES[stateCode] ?? [stateCode]).slice(0, 3).join(" / ");
+          return `Find up to ${perMarket} REAL ${cls.label} properties currently listed for sale in ${cities}. Thesis: ${cls.description}
 
-        const callSonar = async (endpoint: string) => {
+Return ONLY a JSON array — no prose, no explanation. Each object: "name", "address", "city", "state", "sourceUrl", plus whichever of these you can source: ${fieldList}. Omit anything not stated in the source — never guess. If you cannot find any, return [].`;
+        };
+
+        const callSonar = async (endpoint: string, prompt: string) => {
           const r = await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -1834,7 +1868,7 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
               model: "sonar-pro",
               messages: [
                 { role: "system", content: "You are a commercial real-estate acquisition researcher. Output ONLY a valid JSON array. No prose, no markdown fences, no explanation. Start your response with [ and end with ]." },
-                { role: "user", content: sonarPrompt },
+                { role: "user", content: prompt },
               ],
             }),
           });
@@ -1842,40 +1876,60 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
           return r.json();
         };
 
-        let data: any;
-        try {
-          data = await callSonar("https://api.perplexity.ai/v1/sonar");
-        } catch {
-          // Fallback to /chat/completions endpoint
-          data = await callSonar("https://api.perplexity.ai/chat/completions");
+        const parseListings = (raw: any): any[] => {
+          const content: string = raw?.choices?.[0]?.message?.content ?? "";
+          const cleaned = content.replace(/```json/gi, "").replace(/```/g, "").trim();
+          const tryParse = (t: string) => { try { return JSON.parse(t); } catch { return null; } };
+          let parsed: any = tryParse(cleaned);
+          if (!parsed) {
+            const a = cleaned.indexOf("["), b = cleaned.lastIndexOf("]");
+            if (a >= 0 && b > a) parsed = tryParse(cleaned.slice(a, b + 1));
+          }
+          if (!parsed) {
+            const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
+            if (a >= 0 && b > a) parsed = tryParse(cleaned.slice(a, b + 1));
+          }
+          if (Array.isArray(parsed)) return parsed;
+          if (parsed && typeof parsed === "object") {
+            const arr = Object.values(parsed).find((v) => Array.isArray(v));
+            if (Array.isArray(arr)) return arr as any[];
+            if ((parsed as any).name) return [parsed];
+          }
+          return [];
+        };
+
+        // ONE SEARCH PER MARKET. Asking a single search to "spread across five
+        // markets" does not work — the model anchors on the first one and returns
+        // everything from that city. Distribution has to be structural.
+        const perMarketResults = await Promise.allSettled(
+          targetStates.map(async (st) => {
+            let raw: any;
+            try { raw = await callSonar("https://api.perplexity.ai/v1/sonar", promptFor(st)); }
+            catch { raw = await callSonar("https://api.perplexity.ai/chat/completions", promptFor(st)); }
+            return {
+              state: st,
+              listings: parseListings(raw).map((x: any) => ({ ...x, state: x?.state || st })),
+              citations: Array.isArray(raw?.citations) ? raw.citations : [],
+            };
+          }),
+        );
+
+        const found: any[] = [];
+        const citations: string[] = [];
+        const perMarketCounts: Record<string, number> = {};
+        for (const r of perMarketResults) {
+          if (r.status !== "fulfilled") continue;
+          perMarketCounts[r.value.state] = r.value.listings.length;
+          found.push(...r.value.listings);
+          citations.push(...r.value.citations);
         }
 
-        const content: string = data.choices?.[0]?.message?.content ?? "";
-        const citations: string[] = Array.isArray(data.citations) ? data.citations : [];
-        let found: any[] = [];
-        const cleaned = content.replace(/```json/gi, "").replace(/```/g, "").trim();
-        const tryParse = (t: string) => { try { return JSON.parse(t); } catch { return null; } };
-        let parsed: any = tryParse(cleaned);
-        if (!parsed) {
-          const a = cleaned.indexOf("["), b = cleaned.lastIndexOf("]");
-          if (a >= 0 && b > a) parsed = tryParse(cleaned.slice(a, b + 1));
-        }
-        if (!parsed) {
-          const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
-          if (a >= 0 && b > a) parsed = tryParse(cleaned.slice(a, b + 1));
-        }
-        // Handle case where sonar returns a single object instead of array
-        if (!Array.isArray(parsed) && parsed && typeof parsed === "object") {
-          const arr = Object.values(parsed).find((v) => Array.isArray(v));
-          if (Array.isArray(arr)) found = arr as any[];
-          else if (parsed.name) found = [parsed]; // single property object
-        } else if (Array.isArray(parsed)) {
-          found = parsed;
-        }
         if (!found.length) {
-          console.warn("[researchAssets] unparseable sonar content:", cleaned.slice(0, 500));
-          // Return graceful empty result instead of throwing — user can retry
-          return { created: 0, researched: 0, citations: [], message: `Sonar returned no parseable listings for ${markets} — try again or adjust markets` };
+          return {
+            created: 0, researched: 0, citations: [],
+            searchedMarkets: targetStates, uncoveredMarkets: allMarkets.filter((m) => !(countByState.get(m) ?? 0)),
+            message: `No parseable listings returned for ${targetStates.join(", ")} — try again or adjust markets`,
+          };
         }
 
         // Dedupe against what's already in the pipeline for this class.
@@ -1928,7 +1982,19 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         for (const a of all) {
           if (a.compositeScore == null) await persistHistoricScore(a.id, scoreAssetByClass(a) as any);
         }
-        return { created, researched: found.length, citations: citations.slice(0, 5), message: `Sourced ${created} real ${cls.shortLabel} propert${created === 1 ? "y" : "ies"} via sonar-pro` };
+        // Say which markets were searched — silent market selection is how the
+        // pipeline drifted all-Ohio without anyone noticing.
+        const uncovered = allMarkets.filter((m) => !(countByState.get(m) ?? 0));
+        return {
+          created,
+          researched: found.length,
+          citations: citations.slice(0, 5),
+          searchedMarkets: targetStates,
+          uncoveredMarkets: uncovered,
+          message:
+            `Sourced ${created} real ${cls.shortLabel} propert${created === 1 ? "y" : "ies"} across ${targetStates.map((st) => `${st} ${perMarketCounts[st] ?? 0}`).join(" · ")}` +
+            (uncovered.length ? ` · ${uncovered.length} thesis market(s) still with no inventory` : ""),
+        };
       }),
 
     // ─── Freshness check: is this listing STILL real, and at what price? ──────
