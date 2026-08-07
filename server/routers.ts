@@ -2133,6 +2133,63 @@ Return ONLY a JSON array — no prose, no explanation. Each object: "name", "add
         return { status, note, citations: citations.slice(0, 6), currentAskingPrice: parsed?.currentAskingPrice ?? null, asOf: parsed?.asOf ?? null };
       }),
 
+    /**
+     * CSV ingest — the CoStar workaround.
+     *
+     * CoStar API access has cost and business-type hurdles, so the interim path
+     * is: export from CoStar (or any broker platform), paste the CSV here, and
+     * run it through the same scoring logic. Column names are matched loosely
+     * because every platform names things differently.
+     */
+    importCsv: operatorProcedure
+      .input(z.object({
+        csv: z.string().min(10).max(2_000_000),
+        assetClass: z.string().default("historic"),
+        sourceLabel: z.string().max(80).default("csv-import"),
+        dryRun: z.boolean().default(true),
+      }))
+      .mutation(async ({ input }) => {
+        const { parseAssetCsv } = await import("./csvImport");
+        const { createCommercialAsset, getCommercialAssets } = await import("./db");
+        const { scoreAssetByClass } = await import("./scoring");
+
+        const { rows, errors, headerMap } = parseAssetCsv(input.csv, input.assetClass);
+
+        // Dedupe on name+city, same rule the sonar sourcing uses.
+        const existing = await getCommercialAssets({ limit: 2000, assetClass: input.assetClass });
+        const seen = new Set(existing.map((a: any) => `${String(a.name).toLowerCase().trim()}|${String(a.city).toLowerCase().trim()}`));
+
+        const fresh = rows.filter((r) => !seen.has(`${r.name.toLowerCase().trim()}|${String(r.city ?? "").toLowerCase().trim()}`));
+        const duplicates = rows.length - fresh.length;
+
+        // Preview scores so an operator sees what they're about to take on.
+        const preview = fresh.slice(0, 8).map((r) => {
+          const score = scoreAssetByClass({ ...r, assetClass: input.assetClass } as any);
+          return { name: r.name, city: r.city, state: r.state, tier: score.assetTier, composite: score.compositeScore, rank: Math.round(score.rankScore) };
+        });
+
+        if (input.dryRun) {
+          return { imported: 0, parsed: rows.length, duplicates, willImport: fresh.length, errors, headerMap, preview };
+        }
+
+        const now = Date.now();
+        let imported = 0;
+        for (const r of fresh) {
+          try {
+            await createCommercialAsset({
+              ...r,
+              assetClass: input.assetClass,
+              source: input.sourceLabel,
+              status: "new",
+              createdAt: now,
+              updatedAt: now,
+            } as any);
+            imported++;
+          } catch { /* skip the row, keep the batch */ }
+        }
+        return { imported, parsed: rows.length, duplicates, willImport: fresh.length, errors, headerMap, preview };
+      }),
+
     // ─── Verification queue ───────────────────────────────────────────────────
     // Confidence caps every tier, so unverified fields are the real work queue.
     // This pools them across the pipeline and ranks by how much rank each asset
@@ -2727,7 +2784,7 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
         return db.select().from(thesisVariants).where(and(...conds)).orderBy(desc(thesisVariants.isPrimary));
       }),
 
-    save: operatorProcedure
+    save: protectedProcedure
       .input(z.object({
         id: z.number().int().optional(),
         name: z.string().min(1).max(120),
@@ -2754,33 +2811,87 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
         const { thesisVariants } = await import("../drizzle/schema");
         const now = Date.now();
+        const isOperator = ctx.user.role === "admin" || ctx.user.role === "user";
+
         if (input.id) {
+          // A client may edit only the theses they own; operators edit anything.
+          const [existing] = await db.select().from(thesisVariants).where(eq(thesisVariants.id, input.id)).limit(1);
+          if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Thesis not found" });
+          if (!isOperator && (existing as any).ownerUserId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "You can only edit theses you created" });
+          }
           await db.update(thesisVariants).set({
             name: input.name, description: input.description ?? null,
             assetClass: input.assetClass, clientLabel: input.clientLabel ?? null,
             assignedUserId: input.assignedUserId ?? null,
-            isPrimary: input.isPrimary, overrides: input.overrides as any, updatedAt: now,
+            // Only operators may promote a thesis to primary or reassign it.
+            ...(isOperator ? { isPrimary: input.isPrimary, assignedUserId: input.assignedUserId ?? null } : {}),
+            overrides: input.overrides as any, updatedAt: now,
           }).where(eq(thesisVariants.id, input.id));
           return { id: input.id };
         }
         const res: any = await db.insert(thesisVariants).values({
           name: input.name, description: input.description ?? null,
           assetClass: input.assetClass, clientLabel: input.clientLabel ?? null,
-          assignedUserId: input.assignedUserId ?? null, ownerUserId: ctx.user.id,
-          isPrimary: input.isPrimary, overrides: input.overrides as any,
+          // A client's own thesis is assigned to them by default.
+          assignedUserId: isOperator ? (input.assignedUserId ?? null) : ctx.user.id,
+          ownerUserId: ctx.user.id,
+          isPrimary: isOperator ? input.isPrimary : false, overrides: input.overrides as any,
           isActive: true, createdAt: now, updatedAt: now,
         });
         return { id: res[0]?.insertId ?? null };
       }),
 
-    remove: operatorProcedure
+    remove: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
         const { thesisVariants } = await import("../drizzle/schema");
+        const isOperator = ctx.user.role === "admin" || ctx.user.role === "user";
+        const [existing] = await db.select().from(thesisVariants).where(eq(thesisVariants.id, input.id)).limit(1);
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Thesis not found" });
+        if (!isOperator && (existing as any).ownerUserId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You can only remove theses you created" });
+        }
         await db.update(thesisVariants).set({ isActive: false, updatedAt: Date.now() }).where(eq(thesisVariants.id, input.id));
         return { success: true } as const;
+      }),
+
+    /**
+     * Dry-run a set of dials against the pipeline WITHOUT saving. Turning a knob
+     * and immediately seeing "this would match 17 instead of 4" is the whole
+     * point of putting the criteria in the user's hands.
+     */
+    preview: protectedProcedure
+      .input(z.object({
+        assetClass: z.string().default("historic"),
+        overrides: z.record(z.string(), z.any()).default({}),
+      }))
+      .query(async ({ input }) => {
+        const { getCommercialAssets } = await import("./db");
+        const { evaluateAcrossTheses } = await import("./scoring/crossThesis");
+        const assets = await getCommercialAssets({ limit: 1000, assetClass: input.assetClass });
+        const theses = [{ id: -1, name: "preview", assetClass: input.assetClass, overrides: input.overrides as any, isPrimary: false }];
+        let fits = 0;
+        const reasons = new Map<string, number>();
+        const sample: { name: string; city: string; state: string; tier: string; composite: number }[] = [];
+        for (const a of assets as any[]) {
+          const [v] = evaluateAcrossTheses(a, theses as any);
+          if (!v) continue;
+          if (v.fits) {
+            fits++;
+            if (sample.length < 6) sample.push({ name: a.name, city: a.city, state: a.state, tier: v.tier, composite: v.compositeScore });
+          } else if (v.reason) {
+            reasons.set(v.reason, (reasons.get(v.reason) ?? 0) + 1);
+          }
+        }
+        return {
+          total: assets.length,
+          fits,
+          sample,
+          topReasons: Array.from(reasons.entries()).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([reason, n]) => ({ reason, n })),
+        };
       }),
 
     /**

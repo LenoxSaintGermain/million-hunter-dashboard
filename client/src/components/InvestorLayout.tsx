@@ -17,6 +17,7 @@ import {
   Building2,
   Dna,
   Landmark,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -26,6 +27,7 @@ const investorNav = [
   // Thesis command — the client's own asset class, ranked + scored. First entry
   // so a Wingate-style client lands on their thesis, not the generic deal room.
   { href: "/wingate", icon: Landmark, label: "My Thesis", description: "Your ranked pipeline, scored to your thesis" },
+  { href: "/theses", icon: SlidersHorizontal, label: "My Criteria", description: "Tune the dials your pipeline is scored against" },
   { href: "/investor", icon: LayoutDashboard, label: "Deal Room", description: "Curated acquisition opportunities" },
   { href: "/investor/scan", icon: Search, label: "Market Scan", description: "Find deals in your target markets" },
   { href: "/investor/scout", icon: Building2, label: "Asset Scout", description: "Commercial real estate signals" },
