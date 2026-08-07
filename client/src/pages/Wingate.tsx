@@ -129,6 +129,19 @@ function RankedCard({ rank, asset, onSelect }: { rank: number; asset: ScoredAsse
         </div>
       </div>
 
+      {/* Cross-thesis: which other client this suits */}
+      {asset.crossThesis?.isVariantMatch && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Fits</span>
+          {asset.crossThesis.alternateFits.slice(0, 2).map((f: any) => (
+            <span key={f.thesisId ?? f.thesisName}
+              className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-sage/40 text-sage bg-sage/10">
+              {f.clientLabel || f.thesisName}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Gate + flags + verify */}
       <div className="flex flex-wrap items-center gap-1">
         <span className={cn("inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded border",
@@ -471,8 +484,15 @@ export default function Wingate() {
   const [searchText, setSearchText] = useState("");
 
   const theses = trpc.thesis.list.useQuery();
-  const search = trpc.scout.search.useQuery(
-    { compilationId: compilationId ?? undefined, assetClass },
+  // Which client's thesis am I looking through, and what am I looking at?
+  //   fits     — passes this thesis (the normal pipeline)
+  //   variants — FAILS this thesis but fits another client's (the cross-sell)
+  //   all      — thesis filter off entirely
+  const [activeThesisId, setActiveThesisId] = useState<number | null>(null);
+  const [matchMode, setMatchMode] = useState<"fits" | "variants" | "all">("fits");
+  const variants = trpc.thesisVariant.list.useQuery({ assetClass });
+  const search = trpc.thesisVariant.match.useQuery(
+    { assetClass, activeThesisId, mode: matchMode },
     { refetchOnWindowFocus: false },
   );
   const utils = trpc.useUtils();
@@ -642,6 +662,46 @@ export default function Wingate() {
           className="pl-9 h-9 bg-muted/20 border-border text-sm"
         />
       </div>
+
+      {/* Thesis lens — a fail for one client is a fit for another */}
+      <div className="mb-4 flex items-center gap-3 flex-wrap">
+        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest shrink-0">Thesis</span>
+        <Select
+          value={activeThesisId == null ? "default" : String(activeThesisId)}
+          onValueChange={(v) => setActiveThesisId(v === "default" ? null : Number(v))}
+        >
+          <SelectTrigger className="h-8 w-[230px] text-xs border-border bg-transparent"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="default">{getAssetClass(assetClass).label} (default)</SelectItem>
+            {(variants.data ?? []).map((t: any) => (
+              <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex items-center gap-1.5">
+          {([
+            { k: "fits", label: "Fits", n: search.data?.totals?.fits },
+            { k: "variants", label: "Fits another client", n: search.data?.totals?.variantMatches },
+            { k: "all", label: "No filter", n: search.data?.totals?.all },
+          ] as const).map((m) => (
+            <button key={m.k} onClick={() => setMatchMode(m.k as any)}
+              className={cn("px-3 py-1 rounded-full text-[11px] font-semibold border",
+                matchMode === m.k
+                  ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                  : "bg-muted/20 text-muted-foreground border-border")}>
+              {m.label}{m.n != null ? ` (${m.n})` : ""}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {matchMode === "variants" && (
+        <p className="text-[11px] text-muted-foreground mb-4 max-w-2xl">
+          These fail the selected thesis but clear another client's. Open one to see which thesis it
+          fits and assign it to that client.
+        </p>
+      )}
 
       {/* Market coverage against the thesis */}
       {coverage.declared.length > 0 && (

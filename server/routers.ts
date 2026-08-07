@@ -1603,12 +1603,38 @@ Produce concrete remediation plan. Give go/no-go recommendation.`;
         const { getCommercialAssetById } = await import("./db");
         const { scoreAssetByClass } = await import("./scoring");
         const { computeEconomicsByClass } = await import("./scoring/economicsByClass");
+        const { evaluateAcrossTheses } = await import("./scoring/crossThesis");
+        const { getAssetClass } = await import("../shared/assetClasses");
         const asset = await getCommercialAssetById(input.id);
         if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+
+        // Every thesis this asset is measured against, so the dossier can say
+        // "fails yours, fits theirs" rather than just archiving it.
+        const db = await getDb();
+        const { thesisVariants } = await import("../drizzle/schema");
+        const { and } = await import("drizzle-orm");
+        const cls = getAssetClass((asset as any).assetClass);
+        const rows = db
+          ? await db.select().from(thesisVariants).where(and(
+              eq(thesisVariants.isActive, true),
+              eq(thesisVariants.assetClass, cls.id),
+            ))
+          : [];
+        const theses = [
+          { id: null, name: `${cls.label} (default)`, assetClass: cls.id, overrides: {}, isPrimary: true },
+          ...rows.map((r: any) => ({
+            id: Number(r.id), name: String(r.name), clientLabel: r.clientLabel,
+            assetClass: String(r.assetClass),
+            overrides: (typeof r.overrides === "string" ? JSON.parse(r.overrides || "{}") : (r.overrides ?? {})),
+            isPrimary: !!r.isPrimary, assignedUserId: r.assignedUserId ?? null,
+          })),
+        ];
+
         return {
           ...asset,
           historicScore: scoreAssetByClass(asset as any),
           economics: computeEconomicsByClass(asset as any),
+          thesisFits: evaluateAcrossTheses(asset as any, theses as any),
         };
       }),
 
@@ -1803,7 +1829,16 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
     // Adaptive: the research query is built from the class config, so a new
     // bespoke thesis can source its own real, cited inventory with no new code.
     researchAssets: operatorProcedure
-      .input(z.object({ assetClass: z.string().default("historic"), markets: z.array(z.string()).optional(), limit: z.number().int().min(1).max(12).default(6) }))
+      .input(z.object({
+        assetClass: z.string().default("historic"),
+        markets: z.array(z.string()).optional(),
+        /** Search the whole country rather than only the thesis's declared
+         *  markets. Anything found outside them is still stored — it is flagged
+         *  as out-of-thesis geography rather than discarded. */
+        nationwide: z.boolean().default(false),
+        limit: z.number().int().min(1).max(24).default(6),
+        marketsPerRun: z.number().int().min(1).max(10).default(5),
+      }))
       .mutation(async ({ input }) => {
         const { getAssetClass } = await import("../shared/assetClasses");
         const { createCommercialAsset, getCommercialAssets, persistHistoricScore } = await import("./db");
@@ -1815,23 +1850,57 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         // Several cities per state. Mapping a state to ONE city meant the whole
         // thesis was really a search of that single city.
         const STATE_CITIES: Record<string, string[]> = {
-          OH: ["Columbus, OH", "Cleveland, OH", "Cincinnati, OH", "Dayton, OH", "Toledo, OH", "Akron, OH"],
-          IN: ["Indianapolis, IN", "Fort Wayne, IN", "Evansville, IN", "South Bend, IN"],
-          KY: ["Louisville, KY", "Lexington, KY", "Covington, KY", "Owensboro, KY"],
-          TN: ["Nashville, TN", "Memphis, TN", "Chattanooga, TN", "Knoxville, TN"],
-          GA: ["Atlanta, GA", "Savannah, GA", "Macon, GA", "Augusta, GA", "Columbus, GA"],
-          SC: ["Charleston, SC", "Columbia, SC", "Greenville, SC", "Spartanburg, SC"],
-          NC: ["Charlotte, NC", "Raleigh, NC", "Winston-Salem, NC", "Durham, NC", "Asheville, NC"],
           AL: ["Birmingham, AL", "Montgomery, AL", "Mobile, AL", "Huntsville, AL"],
-          MO: ["St. Louis, MO", "Kansas City, MO", "Springfield, MO", "Columbia, MO"],
-          IL: ["Chicago, IL", "Peoria, IL", "Rockford, IL", "Springfield, IL"],
-          KS: ["Wichita, KS", "Kansas City, KS", "Topeka, KS"],
-          TX: ["Dallas, TX", "Houston, TX", "San Antonio, TX", "Austin, TX", "Fort Worth, TX"],
-          FL: ["Tampa, FL", "Jacksonville, FL", "Orlando, FL", "Miami, FL"],
-          VA: ["Richmond, VA", "Norfolk, VA", "Roanoke, VA"],
-          MI: ["Detroit, MI", "Grand Rapids, MI", "Lansing, MI"],
+          AK: ["Anchorage, AK", "Fairbanks, AK"],
           AZ: ["Phoenix, AZ", "Tucson, AZ", "Mesa, AZ"],
+          AR: ["Little Rock, AR", "Fort Smith, AR", "Fayetteville, AR"],
+          CA: ["Los Angeles, CA", "Sacramento, CA", "Fresno, CA", "Oakland, CA", "San Diego, CA"],
+          CO: ["Denver, CO", "Colorado Springs, CO", "Pueblo, CO"],
+          CT: ["Hartford, CT", "New Haven, CT", "Bridgeport, CT"],
+          DE: ["Wilmington, DE", "Dover, DE"],
+          FL: ["Tampa, FL", "Jacksonville, FL", "Orlando, FL", "Miami, FL", "Pensacola, FL"],
+          GA: ["Atlanta, GA", "Savannah, GA", "Macon, GA", "Augusta, GA", "Columbus, GA"],
+          HI: ["Honolulu, HI", "Hilo, HI"],
+          ID: ["Boise, ID", "Idaho Falls, ID"],
+          IL: ["Chicago, IL", "Peoria, IL", "Rockford, IL", "Springfield, IL"],
+          IN: ["Indianapolis, IN", "Fort Wayne, IN", "Evansville, IN", "South Bend, IN"],
+          IA: ["Des Moines, IA", "Cedar Rapids, IA", "Davenport, IA"],
+          KS: ["Wichita, KS", "Kansas City, KS", "Topeka, KS"],
+          KY: ["Louisville, KY", "Lexington, KY", "Covington, KY", "Owensboro, KY"],
+          LA: ["New Orleans, LA", "Baton Rouge, LA", "Shreveport, LA"],
+          ME: ["Portland, ME", "Bangor, ME"],
+          MD: ["Baltimore, MD", "Frederick, MD", "Annapolis, MD"],
+          MA: ["Boston, MA", "Worcester, MA", "Springfield, MA", "Lowell, MA"],
+          MI: ["Detroit, MI", "Grand Rapids, MI", "Lansing, MI", "Kalamazoo, MI"],
+          MN: ["Minneapolis, MN", "St. Paul, MN", "Duluth, MN"],
+          MS: ["Jackson, MS", "Gulfport, MS", "Hattiesburg, MS"],
+          MO: ["St. Louis, MO", "Kansas City, MO", "Springfield, MO", "Columbia, MO"],
+          MT: ["Billings, MT", "Missoula, MT", "Butte, MT"],
+          NE: ["Omaha, NE", "Lincoln, NE"],
           NV: ["Las Vegas, NV", "Reno, NV", "Henderson, NV"],
+          NH: ["Manchester, NH", "Nashua, NH"],
+          NJ: ["Newark, NJ", "Jersey City, NJ", "Trenton, NJ", "Camden, NJ"],
+          NM: ["Albuquerque, NM", "Santa Fe, NM"],
+          NY: ["Buffalo, NY", "Rochester, NY", "Syracuse, NY", "Albany, NY", "Brooklyn, NY"],
+          NC: ["Charlotte, NC", "Raleigh, NC", "Winston-Salem, NC", "Durham, NC", "Asheville, NC"],
+          ND: ["Fargo, ND", "Bismarck, ND"],
+          OH: ["Columbus, OH", "Cleveland, OH", "Cincinnati, OH", "Dayton, OH", "Toledo, OH", "Akron, OH"],
+          OK: ["Oklahoma City, OK", "Tulsa, OK"],
+          OR: ["Portland, OR", "Eugene, OR", "Salem, OR"],
+          PA: ["Philadelphia, PA", "Pittsburgh, PA", "Allentown, PA", "Erie, PA", "Scranton, PA"],
+          RI: ["Providence, RI", "Pawtucket, RI"],
+          SC: ["Charleston, SC", "Columbia, SC", "Greenville, SC", "Spartanburg, SC"],
+          SD: ["Sioux Falls, SD", "Rapid City, SD"],
+          TN: ["Nashville, TN", "Memphis, TN", "Chattanooga, TN", "Knoxville, TN"],
+          TX: ["Dallas, TX", "Houston, TX", "San Antonio, TX", "Austin, TX", "Fort Worth, TX"],
+          UT: ["Salt Lake City, UT", "Ogden, UT", "Provo, UT"],
+          VT: ["Burlington, VT", "Montpelier, VT"],
+          VA: ["Richmond, VA", "Norfolk, VA", "Roanoke, VA", "Lynchburg, VA"],
+          WA: ["Seattle, WA", "Spokane, WA", "Tacoma, WA"],
+          WV: ["Charleston, WV", "Huntington, WV", "Wheeling, WV"],
+          WI: ["Milwaukee, WI", "Madison, WI", "Green Bay, WI"],
+          WY: ["Cheyenne, WY", "Casper, WY"],
+          DC: ["Washington, DC"],
         };
 
         // Coverage-aware market selection. The old code did `.slice(0, 4)` on the
@@ -1839,17 +1908,27 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         // NEVER searched and every run re-searched the same first four — which is
         // why the pipeline came back all-Ohio. Now we search the markets we have
         // the LEAST inventory in, so repeated runs spread coverage on their own.
-        const allMarkets = (input.markets?.length ? input.markets : (cls.markets ?? [])).map((m) => m.toUpperCase());
+        const allMarkets = (
+          input.markets?.length ? input.markets
+          : input.nationwide ? Object.keys(STATE_CITIES)
+          : (cls.markets ?? [])
+        ).map((m) => m.toUpperCase());
         const priorForClass = await getCommercialAssets({ limit: 1000, assetClass: cls.id });
         const countByState = new Map<string, number>();
         for (const a of priorForClass as any[]) {
           const st = String(a.state ?? "").toUpperCase();
           countByState.set(st, (countByState.get(st) ?? 0) + 1);
         }
-        const ranked = [...allMarkets].sort((x, y) => (countByState.get(x) ?? 0) - (countByState.get(y) ?? 0));
+        // Rank by how little inventory we hold, but SHUFFLE among equals. Without
+        // this, states that genuinely have no findable listings (AK, HI) stay at
+        // zero forever and monopolise every subsequent run.
+        const ranked = [...allMarkets]
+          .map((m) => ({ m, n: countByState.get(m) ?? 0, jitter: Math.random() }))
+          .sort((x, y) => (x.n - y.n) || (x.jitter - y.jitter))
+          .map((x) => x.m);
         // Search the 5 least-covered markets, splitting the requested limit
         // across them so no single city can dominate the result.
-        const targetStates = ranked.slice(0, 5);
+        const targetStates = ranked.slice(0, input.marketsPerRun);
         const perMarket = Math.max(1, Math.ceil(input.limit / Math.max(1, targetStates.length)));
         const fieldList = cls.fields.slice(0, 8).map((f) => `"${f.key}"`).join(", ");
 
@@ -2630,6 +2709,206 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
   }),
 
   // ─── Deal Share Tokens ─────────────────────────────────────────────────────
+  /**
+   * Variant theses — the cross-client matching layer.
+   * A building that fails the primary thesis is often a fit for a client with
+   * different criteria; these procedures make that visible and assignable.
+   */
+  thesisVariant: router({
+    list: protectedProcedure
+      .input(z.object({ assetClass: z.string().optional() }).optional())
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const { thesisVariants } = await import("../drizzle/schema");
+        const { and } = await import("drizzle-orm");
+        const conds = [eq(thesisVariants.isActive, true)];
+        if (input?.assetClass) conds.push(eq(thesisVariants.assetClass, input.assetClass));
+        return db.select().from(thesisVariants).where(and(...conds)).orderBy(desc(thesisVariants.isPrimary));
+      }),
+
+    save: operatorProcedure
+      .input(z.object({
+        id: z.number().int().optional(),
+        name: z.string().min(1).max(120),
+        description: z.string().max(2000).optional(),
+        assetClass: z.string().default("historic"),
+        clientLabel: z.string().max(160).optional(),
+        assignedUserId: z.number().int().nullable().optional(),
+        isPrimary: z.boolean().default(false),
+        overrides: z.object({
+          maxYearBuilt: z.number().int().optional(),
+          minYearBuilt: z.number().int().nullable().optional(),
+          maxStories: z.number().int().optional(),
+          gateA: z.number().optional(),
+          gateB: z.number().optional(),
+          tier1MinComposite: z.number().optional(),
+          tier2MinComposite: z.number().optional(),
+          archiveBelowComposite: z.number().optional(),
+          allowPriorHtc: z.boolean().optional(),
+          requireTriplingPath: z.boolean().optional(),
+        }).default({}),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { thesisVariants } = await import("../drizzle/schema");
+        const now = Date.now();
+        if (input.id) {
+          await db.update(thesisVariants).set({
+            name: input.name, description: input.description ?? null,
+            assetClass: input.assetClass, clientLabel: input.clientLabel ?? null,
+            assignedUserId: input.assignedUserId ?? null,
+            isPrimary: input.isPrimary, overrides: input.overrides as any, updatedAt: now,
+          }).where(eq(thesisVariants.id, input.id));
+          return { id: input.id };
+        }
+        const res: any = await db.insert(thesisVariants).values({
+          name: input.name, description: input.description ?? null,
+          assetClass: input.assetClass, clientLabel: input.clientLabel ?? null,
+          assignedUserId: input.assignedUserId ?? null, ownerUserId: ctx.user.id,
+          isPrimary: input.isPrimary, overrides: input.overrides as any,
+          isActive: true, createdAt: now, updatedAt: now,
+        });
+        return { id: res[0]?.insertId ?? null };
+      }),
+
+    remove: operatorProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { thesisVariants } = await import("../drizzle/schema");
+        await db.update(thesisVariants).set({ isActive: false, updatedAt: Date.now() }).where(eq(thesisVariants.id, input.id));
+        return { success: true } as const;
+      }),
+
+    /**
+     * Score every asset in a class against every thesis. `mode` decides what
+     * comes back:
+     *   fits     — assets that pass the active thesis (the normal pipeline)
+     *   variants — assets that FAIL the active thesis but fit another (cross-sell)
+     *   all      — no thesis filter at all
+     */
+    match: protectedProcedure
+      .input(z.object({
+        assetClass: z.string().default("historic"),
+        activeThesisId: z.number().int().nullable().default(null),
+        mode: z.enum(["fits", "variants", "all"]).default("fits"),
+      }))
+      .query(async ({ input }) => {
+        const { getCommercialAssets } = await import("./db");
+        const { evaluateAcrossTheses, crossThesisSummary } = await import("./scoring/crossThesis");
+        type ThesisDef = import("./scoring/crossThesis").ThesisDef;
+        const { computeEconomicsByClass } = await import("./scoring/economicsByClass");
+        const { scoreAssetByClass } = await import("./scoring");
+        const { getAssetClass } = await import("../shared/assetClasses");
+
+        const db = await getDb();
+        const { thesisVariants } = await import("../drizzle/schema");
+        const { and } = await import("drizzle-orm");
+        const rows = db
+          ? await db.select().from(thesisVariants).where(and(
+              eq(thesisVariants.isActive, true),
+              eq(thesisVariants.assetClass, input.assetClass),
+            ))
+          : [];
+
+        const cls = getAssetClass(input.assetClass);
+        // The class's own defaults are always thesis #0 so there is something to
+        // compare against even before anyone defines a variant.
+        const theses: ThesisDef[] = [
+          { id: null, name: `${cls.label} (default)`, assetClass: cls.id, overrides: {}, isPrimary: true },
+          ...rows.map((r: any) => ({
+            id: Number(r.id),
+            name: String(r.name),
+            clientLabel: r.clientLabel,
+            assetClass: String(r.assetClass),
+            overrides: (typeof r.overrides === "string" ? JSON.parse(r.overrides || "{}") : (r.overrides ?? {})),
+            isPrimary: !!r.isPrimary,
+            assignedUserId: r.assignedUserId ?? null,
+          })),
+        ];
+
+        const assets = await getCommercialAssets({ limit: 1000, assetClass: input.assetClass });
+        const evaluated = assets.map((a: any) => {
+          const fits = evaluateAcrossTheses(a, theses);
+          const summary = crossThesisSummary(fits, input.activeThesisId);
+          return {
+            ...a,
+            historicScore: scoreAssetByClass(a),
+            economics: computeEconomicsByClass(a),
+            thesisFits: fits,
+            crossThesis: summary,
+          };
+        });
+
+        const filtered =
+          input.mode === "all" ? evaluated
+          : input.mode === "variants" ? evaluated.filter((e: any) => e.crossThesis.isVariantMatch)
+          : evaluated.filter((e: any) => e.crossThesis.activeFits);
+
+        filtered.sort((x: any, y: any) => y.historicScore.rankScore - x.historicScore.rankScore);
+
+        return {
+          count: filtered.length,
+          totals: {
+            all: evaluated.length,
+            fits: evaluated.filter((e: any) => e.crossThesis.activeFits).length,
+            variantMatches: evaluated.filter((e: any) => e.crossThesis.isVariantMatch).length,
+          },
+          theses: theses.map((t) => ({ id: t.id, name: t.name, clientLabel: t.clientLabel ?? null })),
+          results: filtered,
+        };
+      }),
+
+    /** Hand a specific asset to a specific client. */
+    assignAsset: operatorProcedure
+      .input(z.object({ assetId: z.number().int(), userId: z.number().int().nullable(), note: z.string().max(1000).optional() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { commercialAssets } = await import("../drizzle/schema");
+        await db.update(commercialAssets).set({
+          assignedUserId: input.userId,
+          assignmentNote: input.note ?? null,
+          updatedAt: Date.now(),
+        } as any).where(eq(commercialAssets.id, input.assetId));
+        return { success: true } as const;
+      }),
+
+    /** What has been handed to me — used by the client pipeline. */
+    myAssignments: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const { commercialAssets } = await import("../drizzle/schema");
+      const { and } = await import("drizzle-orm");
+      const { scoreAssetByClass } = await import("./scoring");
+      const { computeEconomicsByClass } = await import("./scoring/economicsByClass");
+      const { coerceRows } = await import("./db");
+      const rows = await db.select().from(commercialAssets).where(and(
+        eq(commercialAssets.assignedUserId, ctx.user.id),
+        eq(commercialAssets.isArchived, false),
+      ));
+      return coerceRows(rows).map((a: any) => ({
+        ...a,
+        historicScore: scoreAssetByClass(a),
+        economics: computeEconomicsByClass(a),
+      }));
+    }),
+
+    /** Clients an operator can assign to. */
+    assignableUsers: operatorProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      const { users } = await import("../drizzle/schema");
+      const { inArray } = await import("drizzle-orm");
+      const rows = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role })
+        .from(users).where(inArray(users.role, ["investor", "insurance"] as any));
+      return rows;
+    }),
+  }),
+
   /** Link-sharing for a property dossier. The public payload is deliberately a
    *  HIGHLIGHT CARD, not the dossier: headline scores, gates, economics summary.
    *  Anything deeper requires signing in — the card's CTA routes registered users

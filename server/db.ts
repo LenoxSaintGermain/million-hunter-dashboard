@@ -67,7 +67,7 @@ function coerceRow<T extends Record<string, unknown>>(row: T): T {
   return out;
 }
 
-function coerceRows<T extends Record<string, unknown>>(rows: T[]): T[] {
+export function coerceRows<T extends Record<string, unknown>>(rows: T[]): T[] {
   return rows.map(coerceRow);
 }
 

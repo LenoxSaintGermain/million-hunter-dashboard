@@ -20,7 +20,7 @@ import InvestorLayout from "@/components/InvestorLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Loader2, MapPin, ShieldCheck, Zap, CheckCircle2, Share2,
+  ArrowLeft, Loader2, MapPin, ShieldCheck, Zap, CheckCircle2, XCircle, Share2,
 } from "lucide-react";
 import {
   ScoreHeadline, HardStopBanner, EconomicsPanel, DimensionsPanel, PenaltiesBonuses,
@@ -56,6 +56,14 @@ export default function AssetDossier() {
   const [verification, setVerification] = useState<any>(null);
   const [narrative, setNarrative] = useState<{ summary: string; strengths: string[]; risks: string[] } | null>(null);
   const [interested, setInterested] = useState(false);
+  const [assignTo, setAssignTo] = useState<string>("none");
+
+  // Who can this be handed to, and which thesis does it actually suit?
+  const clients = trpc.thesisVariant.assignableUsers.useQuery(undefined, { enabled: !isClient });
+  const assign = trpc.thesisVariant.assignAsset.useMutation({
+    onSuccess: () => { toast.success("Assigned — it now shows in that client's pipeline."); q.refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
 
   // Sharing mints a token so the recipient sees a public highlight card and a
   // way to request access — not a bare URL that dead-ends at a login wall.
@@ -310,6 +318,35 @@ export default function AssetDossier() {
 
             <StrengthsRisks s={s} />
 
+            {/* Which theses this asset clears — a fail for one client is a fit
+                for another, and that is the whole cross-sell. */}
+            {Array.isArray((asset as any).thesisFits) && (asset as any).thesisFits.length > 1 && (
+              <div>
+                <SectionLabel className="mb-4">Thesis fit · {(asset as any).thesisFits.filter((f: any) => f.fits).length} of {(asset as any).thesisFits.length}</SectionLabel>
+                <div className="divide-y divide-rule border-t border-b border-rule max-w-[680px]">
+                  {(asset as any).thesisFits.map((f: any) => (
+                    <div key={f.thesisId ?? f.thesisName} className="py-3 flex items-start gap-3">
+                      {f.fits
+                        ? <CheckCircle2 className="w-4 h-4 text-sage shrink-0 mt-0.5" />
+                        : <XCircle className="w-4 h-4 text-clay shrink-0 mt-0.5" />}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-body-base text-body-base text-ink">
+                          {f.thesisName}
+                          {f.clientLabel && <span className="text-muted-foreground"> · {f.clientLabel}</span>}
+                        </p>
+                        <p className="font-body-base text-[12px] text-muted-foreground mt-0.5">
+                          {f.fits
+                            ? `Clears this thesis · ${f.tier} · composite ${f.compositeScore}`
+                            : f.reason}
+                        </p>
+                      </div>
+                      <span className="font-data-mono text-[12px] text-muted-foreground shrink-0">{Math.round(f.rankScore)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {diligence.length > 0 && <DiligencePanel items={diligence} classLabel={cls.shortLabel} tutorial={isTutorial} />}
 
             {narrative && <NarrativePanel narrative={narrative} />}
@@ -369,6 +406,31 @@ export default function AssetDossier() {
                         {ASSET_STATUSES.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div className="border-t border-rule pt-4">
+                    <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mb-2">Assign to client</p>
+                    <Select
+                      value={assignTo}
+                      onValueChange={(v) => {
+                        setAssignTo(v);
+                        assign.mutate({ assetId: asset.id, userId: v === "none" ? null : Number(v) });
+                      }}
+                      disabled={assign.isPending}
+                    >
+                      <SelectTrigger className="h-9 text-xs border-rule bg-transparent">
+                        <SelectValue placeholder="Unassigned" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Unassigned</SelectItem>
+                        {(clients.data ?? []).map((u: any) => (
+                          <SelectItem key={u.id} value={String(u.id)}>{u.name || u.email}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="font-body-base text-[12px] text-muted-foreground leading-relaxed mt-2">
+                      Hand this asset to a client even when it fails your own thesis.
+                    </p>
                   </div>
 
                   {!cls.promotesToBusinessDeals && (

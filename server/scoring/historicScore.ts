@@ -107,6 +107,41 @@ export interface HistoricScore {
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
+/**
+ * Thesis knobs.
+ *
+ * Chad's criteria are one thesis, not the only one — a building that fails his
+ * 4-storey cap or 1945 vintage rule can be exactly right for another client. A
+ * variant overrides these dials without forking the scorer, so the same asset
+ * can be evaluated against several theses at once.
+ */
+export interface ThesisOverrides {
+  maxYearBuilt?: number;        // default 1945
+  minYearBuilt?: number | null; // default none
+  maxStories?: number;          // default 4
+  gateA?: number;               // default 12
+  gateB?: number;               // default 12
+  tier1MinComposite?: number;   // default 75
+  tier2MinComposite?: number;   // default 60
+  archiveBelowComposite?: number; // default 45
+  /** Relax the hard stop entirely — the asset is still scored, just not killed. */
+  allowPriorHtc?: boolean;
+  requireTriplingPath?: boolean; // default true
+}
+
+export const DEFAULT_THESIS: Required<Omit<ThesisOverrides, "minYearBuilt">> & { minYearBuilt: number | null } = {
+  maxYearBuilt: 1945,
+  minYearBuilt: null,
+  maxStories: 4,
+  gateA: 12,
+  gateB: 12,
+  tier1MinComposite: 75,
+  tier2MinComposite: 60,
+  archiveBelowComposite: 45,
+  allowPriorHtc: false,
+  requireTriplingPath: true,
+};
+
 // The 5 mandatory critical fields (§11). Confidence = verified / 5.
 function criticalFieldStatus(a: ScorableAsset, h: HistoricInputs) {
   const status: Record<string, boolean> = {
@@ -119,7 +154,8 @@ function criticalFieldStatus(a: ScorableAsset, h: HistoricInputs) {
   return status;
 }
 
-export function scoreHistoricAsset(a: ScorableAsset): HistoricScore {
+export function scoreHistoricAsset(a: ScorableAsset, overrides?: ThesisOverrides): HistoricScore {
+  const T = { ...DEFAULT_THESIS, ...(overrides ?? {}) };
   const h: HistoricInputs = a.historicInputs ?? {};
   const gate = getMarketGate(a.city, a.state);
   const strengths: string[] = [];
@@ -127,10 +163,11 @@ export function scoreHistoricAsset(a: ScorableAsset): HistoricScore {
 
   // ─── Hard stops (§5 Stage 1) ──────────────────────────────────────────────
   let hardStop: string | null = null;
-  if (a.yearBuilt != null && a.yearBuilt > 1945) hardStop = "Built after 1945 (not historic-eligible vintage)";
-  else if (a.stories != null && a.stories > 4) hardStop = "More than 4 stories above grade";
-  else if (h.priorHtcSyndicated === true) hardStop = "Prior HTC syndication — arbitrage already captured";
-  else if (h.triplingPathExists === false) hardStop = "No tripling path (FAR/coverage/vertical all fail)";
+  if (a.yearBuilt != null && a.yearBuilt > T.maxYearBuilt) hardStop = `Built after ${T.maxYearBuilt} (outside this thesis's vintage)`;
+  else if (T.minYearBuilt != null && a.yearBuilt != null && a.yearBuilt < T.minYearBuilt) hardStop = `Built before ${T.minYearBuilt} (outside this thesis's vintage)`;
+  else if (a.stories != null && a.stories > T.maxStories) hardStop = `More than ${T.maxStories} stories above grade`;
+  else if (!T.allowPriorHtc && h.priorHtcSyndicated === true) hardStop = "Prior HTC syndication — arbitrage already captured";
+  else if (T.requireTriplingPath && h.triplingPathExists === false) hardStop = "No tripling path (FAR/coverage/vertical all fail)";
 
   // ─── Dimension A — Historic Qualification (max 20, gated) ─────────────────
   const A: Factor[] = [];
@@ -290,10 +327,10 @@ export function scoreHistoricAsset(a: ScorableAsset): HistoricScore {
   let assetTier: AssetTier;
   let dispositionCode: string | null = null;
   const allCriticalVerified = verifyFields.length === 0;
-  const gatesPass = dimA >= 12 && dimB >= 12;
+  const gatesPass = dimA >= T.gateA && dimB >= T.gateB;
   const fastTrack = (h.deadlineDays != null && h.deadlineDays < 21 && compositeScore >= 60);
 
-  if (hardStop || compositeScore < 45) {
+  if (hardStop || compositeScore < T.archiveBelowComposite) {
     assetTier = "archive";
     dispositionCode =
       hardStop?.includes("Prior HTC") ? "R7" :
@@ -307,15 +344,15 @@ export function scoreHistoricAsset(a: ScorableAsset): HistoricScore {
       basisRatio != null && basisRatio > 0.6 ? "R3" : "R1";
   } else if (fastTrack) {
     assetTier = "fasttrack";
-  } else if (compositeScore >= 75 && rankScore >= 70 && gatesPass && allCriticalVerified && gate.tier !== "C") {
+  } else if (compositeScore >= T.tier1MinComposite && rankScore >= 70 && gatesPass && allCriticalVerified && gate.tier !== "C") {
     assetTier = "tier1";
-  } else if (compositeScore >= 60 || (compositeScore >= 75 && !allCriticalVerified)) {
+  } else if (compositeScore >= T.tier2MinComposite || (compositeScore >= T.tier1MinComposite && !allCriticalVerified)) {
     assetTier = "tier2";
   } else {
     assetTier = "tier3";
   }
 
-  if (!gatesPass && compositeScore >= 60) risks.push(`Dimension gate not met (A=${dimA}, B=${dimB}; need ≥12 each for Tier 1)`);
+  if (!gatesPass && compositeScore >= T.tier2MinComposite) risks.push(`Dimension gate not met (A=${dimA}, B=${dimB}; need ≥${T.gateA}/${T.gateB} for Tier 1)`);
 
   const marketNote = gate.tier === "C"
     ? `${a.city ?? "?"}, ${a.state ?? "?"} is outside the priority corridor (Tier C) — logged, capped below Tier 1. [seeded gate data]`

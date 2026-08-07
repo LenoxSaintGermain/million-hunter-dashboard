@@ -26,6 +26,10 @@ export default function PropertyMarketScan({ assetClass }: { assetClass: string 
   const [q, setQ] = useState("");
   const search = trpc.scout.search.useQuery({ assetClass }, { refetchOnWindowFocus: false });
   const results: ScoredAsset[] = (search.data?.results ?? []) as any;
+  // Assets an operator handed to this client specifically — including ones that
+  // fail the house thesis but fit theirs.
+  const assigned = trpc.thesisVariant.myAssignments.useQuery();
+  const assignedRows: ScoredAsset[] = (assigned.data ?? []) as any;
 
   const filtered = useMemo(
     () =>
@@ -80,6 +84,27 @@ export default function PropertyMarketScan({ assetClass }: { assetClass: string 
             className="pl-9 h-9 text-sm border-rule bg-transparent"
           />
         </div>
+
+        {assignedRows.length > 0 && (
+          <section className="border border-amber/40 bg-amber/5 p-6">
+            <p className="font-eyebrow text-eyebrow text-amber uppercase tracking-widest mb-3">
+              Selected for you · {assignedRows.length}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {assignedRows.map((a: ScoredAsset) => (
+                <Link key={a.id} href={`/wingate/asset/${a.id}`}>
+                  <div className="border border-rule bg-paper p-4 cursor-pointer hover:shadow-[0_8px_30px_-12px_rgba(15,20,40,0.12)] transition-shadow h-full">
+                    <p className="font-card-title text-[16px] text-ink leading-tight mb-1">{a.name}</p>
+                    <p className="font-body-base text-[12px] text-muted-foreground">{a.city}, {a.state}</p>
+                    <span className="mt-3 inline-flex items-center gap-1 font-eyebrow text-eyebrow text-amber uppercase tracking-widest">
+                      Open dossier <ArrowRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {search.isLoading ? (
           <div className="flex items-center gap-3 py-16">

@@ -425,6 +425,9 @@ export const commercialAssets = mysqlTable("commercial_assets", {
   listingStatus: varchar("listing_status", { length: 24 }), // active | stale | withdrawn | unknown
   verificationNote: text("verification_note"),
   verificationSources: json("verification_sources"),
+  /** Operator can hand a specific asset to a specific client. */
+  assignedUserId: int("assigned_user_id"),
+  assignmentNote: text("assignment_note"),
   status: mysqlEnum("status", ["new", "reviewing", "qualified", "rejected", "acquired"]).notNull().default("new"),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
@@ -454,6 +457,28 @@ export type MacroSignal = typeof macroSignals.$inferSelect;
 export type InsertMacroSignal = typeof macroSignals.$inferInsert;
 
 // ─── Deal Share Tokens (public investor one-pager links) ──────────────────────
+/**
+ * A variant thesis — the same scoring model with different dials, owned by an
+ * operator and optionally assigned to a client. Lets a building that fails the
+ * primary thesis still surface as a fit for someone else.
+ */
+export const thesisVariants = mysqlTable("thesis_variants", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  description: text("description"),
+  assetClass: varchar("asset_class", { length: 64 }).default("historic").notNull(),
+  /** ThesisOverrides — gates, vintage window, storey cap, tier cutoffs. */
+  overrides: json("overrides"),
+  /** Who this thesis is FOR, in human terms ("Cincinnati restoration client"). */
+  clientLabel: varchar("client_label", { length: 160 }),
+  ownerUserId: int("owner_user_id"),
+  assignedUserId: int("assigned_user_id"),
+  isPrimary: boolean("is_primary").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+
 /** Link-sharing for a property dossier — mirrors dealShareTokens. */
 export const assetShareTokens = mysqlTable("asset_share_tokens", {
   id: int("id").autoincrement().primaryKey(),
