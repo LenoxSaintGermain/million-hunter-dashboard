@@ -63,6 +63,15 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  // Scheduled sourcing. Arming the timer is inert — every schedule is disabled
+  // by default, so nothing spends tokens until a human turns one on.
+  try {
+    const { startScheduler } = await import("../scheduler");
+    startScheduler();
+  } catch (e) {
+    console.warn("[scheduler] not started:", e);
+  }
 }
 
 startServer().catch(console.error);

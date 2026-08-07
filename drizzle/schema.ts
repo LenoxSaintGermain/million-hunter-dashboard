@@ -458,6 +458,44 @@ export type InsertMacroSignal = typeof macroSignals.$inferInsert;
 
 // ─── Deal Share Tokens (public investor one-pager links) ──────────────────────
 /**
+ * Scheduled sourcing. `enabled` defaults to FALSE — an unattended job that
+ * spends tokens should never start itself.
+ */
+export const sourcingSchedules = mysqlTable("sourcing_schedules", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  assetClass: varchar("asset_class", { length: 64 }).default("historic").notNull(),
+  enabled: boolean("enabled").default(false).notNull(),
+  cadence: varchar("cadence", { length: 16 }).default("daily").notNull(),
+  hourUtc: int("hour_utc").default(9).notNull(),
+  nationwide: boolean("nationwide").default(false).notNull(),
+  marketsPerRun: int("markets_per_run").default(5).notNull(),
+  limitPerRun: int("limit_per_run").default(10).notNull(),
+  lastRunAt: bigint("last_run_at", { mode: "number" }),
+  lastRunCreated: int("last_run_created"),
+  lastRunMessage: text("last_run_message"),
+  nextRunAt: bigint("next_run_at", { mode: "number" }),
+  createdByUserId: int("created_by_user_id"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+
+/** Every run, scheduled or manual — so an unattended job leaves a trail. */
+export const sourcingRuns = mysqlTable("sourcing_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  scheduleId: int("schedule_id"),
+  assetClass: varchar("asset_class", { length: 64 }).notNull(),
+  trigger: varchar("trigger", { length: 16 }).default("schedule").notNull(),
+  createdCount: int("created_count").default(0).notNull(),
+  researchedCount: int("researched_count").default(0).notNull(),
+  markets: json("markets"),
+  message: text("message"),
+  error: text("error"),
+  ranAt: bigint("ran_at", { mode: "number" }).notNull(),
+  durationMs: int("duration_ms"),
+});
+
+/**
  * A variant thesis — the same scoring model with different dials, owned by an
  * operator and optionally assigned to a client. Lets a building that fails the
  * primary thesis still surface as a fit for someone else.
