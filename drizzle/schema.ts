@@ -425,6 +425,11 @@ export const commercialAssets = mysqlTable("commercial_assets", {
   listingStatus: varchar("listing_status", { length: 24 }), // active | stale | withdrawn | unknown
   verificationNote: text("verification_note"),
   verificationSources: json("verification_sources"),
+  /** Not for sale — found in public records (tax roll, vacant registry, land bank). */
+  isOffMarket: boolean("is_off_market").default(false).notNull(),
+  offMarketSignals: json("off_market_signals"),
+  /** 0-100: how likely the OWNER is to sell. Separate from the thesis score. */
+  motivationScore: int("motivation_score"),
   /** Operator can hand a specific asset to a specific client. */
   assignedUserId: int("assigned_user_id"),
   assignmentNote: text("assignment_note"),

@@ -1972,6 +1972,103 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         return { imported, parsed: rows.length, duplicates, willImport: fresh.length, errors, headerMap, preview };
       }),
 
+    /**
+     * Off-market sourcing from public records — the CoStar differentiator.
+     *
+     * Two-step like the CSV import: preview returns candidates without writing,
+     * so an operator sees the evidence before anything enters the pipeline.
+     * These records are partial and sometimes stale, so nothing is auto-trusted.
+     */
+    sourceOffMarket: operatorProcedure
+      .input(z.object({
+        city: z.string().min(2).max(80),
+        state: z.string().length(2),
+        assetClass: z.string().default("historic"),
+        sources: z.array(z.enum([
+          "delinquent_tax", "vacant_registry", "land_bank", "code_enforcement",
+          "foreclosure", "nrhp_nomination", "preservation_watch", "estate_probate",
+        ])).optional(),
+        perProbe: z.number().int().min(1).max(8).default(4),
+        dryRun: z.boolean().default(true),
+      }))
+      .mutation(async ({ input }) => {
+        const { sourceOffMarket } = await import("./offMarketSourcing");
+        const { createCommercialAsset, getCommercialAssets } = await import("./db");
+        const { computeMotivation } = await import("../shared/offMarket");
+
+        const started = Date.now();
+        const run = await sourceOffMarket({
+          city: input.city, state: input.state,
+          sources: input.sources as any, perProbe: input.perProbe,
+        });
+
+        // Dedupe against the pipeline on address+city — off-market records key on
+        // address, since these buildings often have no consistent name.
+        const existing = await getCommercialAssets({ limit: 2000 });
+        const seenAddr = new Set(existing.map((a: any) =>
+          `${String(a.address ?? "").toLowerCase().replace(/[^a-z0-9]/g, "")}|${String(a.city ?? "").toLowerCase().trim()}`));
+        const fresh = run.candidates.filter((c) =>
+          !seenAddr.has(`${c.address.toLowerCase().replace(/[^a-z0-9]/g, "")}|${c.city.toLowerCase().trim()}`));
+
+        const shaped = fresh.map((c) => ({
+          ...c,
+          motivation: computeMotivation(c.signals),
+        }));
+
+        if (input.dryRun) {
+          return {
+            imported: 0,
+            found: run.candidates.length,
+            duplicates: run.candidates.length - fresh.length,
+            discarded: run.discarded,
+            perSource: run.perSource,
+            citations: run.citations,
+            candidates: shaped,
+            durationMs: Date.now() - started,
+          };
+        }
+
+        const now = Date.now();
+        let imported = 0;
+        for (const c of fresh) {
+          try {
+            await createCommercialAsset({
+              name: c.name,
+              address: c.address,
+              city: c.city,
+              state: c.state,
+              propertyType: "mixed_use",
+              yearBuilt: c.yearBuilt ?? undefined,
+              squareFootage: c.squareFootage ?? undefined,
+              assetClass: input.assetClass,
+              source: "public-records",
+              sourceUrl: c.signals.citations?.[0],
+              status: "new",
+              isOffMarket: true,
+              offMarketSignals: c.signals,
+              motivationScore: c.motivationScore,
+              verificationNote: c.signals.notes ?? null,
+              verificationSources: c.signals.citations ?? [],
+              listingStatus: "unknown",
+              createdAt: now,
+              updatedAt: now,
+            } as any);
+            imported++;
+          } catch { /* skip the row, keep the batch */ }
+        }
+
+        return {
+          imported,
+          found: run.candidates.length,
+          duplicates: run.candidates.length - fresh.length,
+          discarded: run.discarded,
+          perSource: run.perSource,
+          citations: run.citations,
+          candidates: shaped,
+          durationMs: Date.now() - started,
+        };
+      }),
+
     // ─── Verification queue ───────────────────────────────────────────────────
     // Confidence caps every tier, so unverified fields are the real work queue.
     // This pools them across the pipeline and ranks by how much rank each asset
@@ -3086,110 +3183,24 @@ Be concise. Be direct. Be right.`;
 
   // ─── Off-Market Scout Agent ───────────────────────────────────────────────
   offMarket: router({
-    // Hunt for off-market opportunities using Claude-Opus-4 web-grounded research
-    hunt: protectedProcedure
+    /**
+     * RETIRED. This generated invented businesses ("realistic business name…
+     * use local flavor") and wrote them into commercial_assets as if sourced.
+     * Off-market discovery now runs on real public records —
+     * scout.sourceOffMarket, backed by server/offMarketSourcing.ts.
+     */
+    hunt: operatorProcedure
       .input(z.object({
         targetLocations: z.array(z.string()).min(1),
         industries: z.array(z.string()).optional(),
         minCashFlow: z.number().optional(),
         maxAskingPrice: z.number().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const { poeJSON, POE_MODELS } = await import("./poe");
-        const { createCommercialAsset } = await import("./db");
-        const locations = input.targetLocations.join(", ");
-        const industries = input.industries?.join(", ") ?? "HVAC, commercial cleaning, logistics, pest control, plumbing, pool services, roofing, landscaping, electrical, medical staffing";
-        const minCF = input.minCashFlow ?? 400000;
-        const maxAsk = input.maxAskingPrice ?? 10000000;
-        const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-
-        const systemPrompt = `You are an elite off-market business acquisition scout. Your job is to identify specific, real businesses in target markets that are likely acquisition candidates — businesses that are NOT listed on BizBuySell or other public marketplaces.
-
-You use signals like: aging owner demographics, Google Business reviews mentioning retirement, LinkedIn profiles showing owner age 55+, businesses with outdated websites, businesses with strong recurring revenue but no digital presence, industries with high owner burnout, and local news about business transitions.
-
-Return ONLY valid JSON. No markdown, no explanation.`;
-
-        const userPrompt = `Today is ${today}. Hunt for off-market business acquisition opportunities in: ${locations}
-
-Target industries: ${industries}
-Minimum cash flow: $${(minCF / 1000).toFixed(0)}k/year
-Maximum asking price: $${(maxAsk / 1000000).toFixed(1)}M
-
-Generate 5 specific, realistic off-market business profiles that a sophisticated SBA 7(a) acquirer would want to investigate. Each should represent a real business archetype common in these markets.
-
-For each business, provide:
-- name: realistic business name (not generic — use local flavor, e.g. "Sunshine Pool & Spa Services" for South Florida)
-- industry: specific industry
-- location: specific city, state from the target locations
-- estimatedRevenue: realistic annual revenue number
-- estimatedCashFlow: realistic annual cash flow (owner benefit)
-- estimatedAskingPrice: realistic asking price (3-4x cash flow for service businesses)
-- offMarketSignal: why this business is likely off-market (e.g., "Owner age 67, no succession plan, Google reviews mention 'retiring soon'")
-- acquisitionAngle: specific SBA/OZ/creative finance angle for this deal
-- urgencyScore: 0.0-1.0 (how urgent is this opportunity)
-- contactStrategy: how to find and approach the owner
-
-Return JSON array: [{"name":"...","industry":"...","location":"...","estimatedRevenue":0,"estimatedCashFlow":0,"estimatedAskingPrice":0,"offMarketSignal":"...","acquisitionAngle":"...","urgencyScore":0.0,"contactStrategy":"..."}]`;
-
-        const results = await poeJSON<Array<{
-          name: string;
-          industry: string;
-          location: string;
-          estimatedRevenue: number;
-          estimatedCashFlow: number;
-          estimatedAskingPrice: number;
-          offMarketSignal: string;
-          acquisitionAngle: string;
-          urgencyScore: number;
-          contactStrategy: string;
-        }>>({
-          model: POE_MODELS.CLAUDE_OPUS,
-          systemPrompt,
-          userPrompt,
-          maxTokens: 3000,
+      .mutation(async () => {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Off-market hunting now uses real public records. Use Off-Market Discovery (/off-market) — it searches land bank inventories, delinquent tax rolls, vacant registries and code enforcement, and shows you the source document before anything is saved.",
         });
-
-        if (!Array.isArray(results)) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Off-market agent returned invalid response" });
-        }
-
-        // Push results into the commercial_assets (Scout) pipeline
-        const created: number[] = [];
-        const now = Date.now();
-        for (const biz of results.slice(0, 5)) {
-          try {
-            const locationParts = String(biz.location ?? "").split(",");
-            const city = locationParts[0]?.trim() ?? "Unknown";
-            const state = locationParts[1]?.trim() ?? "FL";
-            const res = await createCommercialAsset({
-              name: String(biz.name ?? "").slice(0, 255),
-              address: `${city} (Off-Market)`,
-              city,
-              state,
-              propertyType: "retail" as const,
-              askingPrice: typeof biz.estimatedAskingPrice === "number" ? biz.estimatedAskingPrice : undefined,
-              noi: typeof biz.estimatedCashFlow === "number" ? biz.estimatedCashFlow : undefined,
-              capRate: typeof biz.estimatedCashFlow === "number" && typeof biz.estimatedAskingPrice === "number" && biz.estimatedAskingPrice > 0
-                ? Math.round((biz.estimatedCashFlow / biz.estimatedAskingPrice) * 10000) / 10000
-                : undefined,
-              zoning: `OFF-MARKET | ${String(biz.offMarketSignal ?? "").slice(0, 200)}`,
-              sourceUrl: `signal://off-market/${encodeURIComponent(biz.name ?? "")}`,
-              source: "off-market-agent",
-              createdAt: now,
-              updatedAt: now,
-            }) as any;
-            created.push(res[0].insertId);
-          } catch (e) {
-            console.error("[OffMarket] Failed to create asset:", e);
-          }
-        }
-
-        return {
-          found: results.length,
-          created: created.length,
-          opportunities: results,
-          message: `${results.length} off-market opportunities identified · ${created.length} added to Scout pipeline`,
-        };
       }),
   }),
 

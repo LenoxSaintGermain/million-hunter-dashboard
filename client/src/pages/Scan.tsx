@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,7 @@ const stageColor: Record<string, string> = {
 };
 
 export default function Scan() {
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [showConfig, setShowConfig] = useState(true);
@@ -104,14 +106,7 @@ export default function Scan() {
   const scoreDeal = trpc.deals.score.useMutation({
     onSuccess: (d) => { toast.success(`Scored: ${parseFloat(String(d.score)).toFixed(3)}`); refetch(); },
   });
-  const huntOffMarket = trpc.offMarket.hunt.useMutation({
-    onSuccess: (r) => {
-      toast.success(r.message);
-      setOffMarketResults(r.opportunities ?? []);
-      setShowOffMarket(true);
-    },
-    onError: (e) => toast.error(`Off-Market Scout failed: ${e.message}`),
-  });
+
   const createDeal = trpc.deals.create.useMutation({
     onSuccess: () => {
       toast.success("Deal added");
@@ -394,14 +389,9 @@ export default function Scan() {
               size="sm"
               variant="outline"
               className="h-7 text-xs gap-1.5 border-amber-500/40 text-[var(--amber)] hover:bg-amber-500/10"
-              onClick={() => huntOffMarket.mutate({ targetLocations, industries: [], minCashFlow })}
-              disabled={huntOffMarket.isPending}
+              onClick={() => navigate("/off-market")}
             >
-              {huntOffMarket.isPending ? (
-                <><Loader2 className="w-3 h-3 animate-spin" />Hunting...</>
-              ) : (
-                <><Search className="w-3 h-3" />Hunt Off-Market</>
-              )}
+              <Search className="w-3 h-3" />Off-Market Discovery
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-1">

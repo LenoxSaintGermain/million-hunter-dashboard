@@ -53,6 +53,7 @@ import VerificationQueue from "./pages/VerificationQueue";
 import ThesisStudio from "./pages/ThesisStudio";
 import CsvImport from "./pages/CsvImport";
 import SourcingSchedules from "./pages/SourcingSchedules";
+import OffMarketDiscovery from "./pages/OffMarketDiscovery";
 import { getLoginUrl } from "./const";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
@@ -207,6 +208,7 @@ function Router() {
         {/* Operator research queue — unverified critical fields across the pipeline. */}
         {/* Criteria dials — operators AND clients (scoped to their own theses). */}
         <Route path="/theses">{() => <ProtectedRoute component={ThesisStudio} />}</Route>
+        <Route path="/off-market">{() => <ProtectedRoute component={OffMarketDiscovery} />}</Route>
         <Route path="/schedules">{() => <ProtectedRoute component={SourcingSchedules} />}</Route>
         <Route path="/import">{() => <ProtectedRoute component={CsvImport} />}</Route>
         <Route path="/verify">{() => <ProtectedRoute component={VerificationQueue} />}</Route>

@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { isTutorialAsset, TUTORIAL_STEPS } from "@shared/tutorial";
 import { formatAskingPrice } from "@shared/pricing";
+import { computeMotivation, RECORD_SOURCE_LABELS, MOTIVATION_BAND_LABEL } from "@shared/offMarket";
 import { Explain } from "@/components/Explain";
 import { GraduationCap, Trash2 } from "lucide-react";
 
@@ -317,6 +318,42 @@ export default function AssetDossier() {
             {(s.scorecard.penalties.length > 0 || s.scorecard.bonuses.length > 0) && <PenaltiesBonuses s={s} />}
 
             <StrengthsRisks s={s} />
+
+            {/* Owner motivation — the second axis. The thesis score says whether
+                this is the right building; this says whether it can be bought. */}
+            {(asset as any).isOffMarket && (() => {
+              const sig = (asset as any).offMarketSignals ?? {};
+              const m = computeMotivation(sig);
+              return (
+                <div>
+                  <SectionLabel className="mb-4">
+                    Owner motivation · {MOTIVATION_BAND_LABEL[m.band]} {m.score}/100
+                  </SectionLabel>
+                  <p className="font-body-base text-body-base text-ink/85 leading-relaxed mb-4 max-w-[680px]">
+                    {m.headline}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {(sig.sources ?? []).map((src: string) => (
+                      <span key={src} className="font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border border-rule text-muted-foreground uppercase tracking-widest">
+                        {(RECORD_SOURCE_LABELS as any)[src] ?? src}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="divide-y divide-rule border-t border-b border-rule max-w-[680px]">
+                    {m.factors.filter((f) => f.present).map((f) => (
+                      <div key={f.label} className="py-2.5 flex items-baseline gap-3">
+                        <span className="flex-1 font-body-base text-[13px] text-ink">{f.label}</span>
+                        <span className="font-data-mono text-[12px] text-amber shrink-0">+{f.points}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="font-body-base text-[12px] text-muted-foreground mt-3 max-w-[680px] leading-relaxed">
+                    Not for sale. Sourced from public records — confirm current ownership and tax
+                    status with the county before any approach.
+                  </p>
+                </div>
+              );
+            })()}
 
             {/* Which theses this asset clears — a fail for one client is a fit
                 for another, and that is the whole cross-sell. */}
