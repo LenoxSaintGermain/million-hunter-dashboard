@@ -1972,6 +1972,171 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         return { imported, parsed: rows.length, duplicates, willImport: fresh.length, errors, headerMap, preview };
       }),
 
+    /** Which counties have a direct-data adapter. */
+    countyAdapters: operatorProcedure.query(async () => {
+      const { listAdapters } = await import("./countyAdapters");
+      return listAdapters();
+    }),
+
+    /**
+     * Off-market discovery straight from a county's own data service.
+     *
+     * Where the web-search path guesses at what a portal contains, this runs a
+     * query against the county's actual tables — so every figure is a database
+     * value with a parcel ID behind it.
+     */
+    countyDiscover: operatorProcedure
+      .input(z.object({
+        city: z.string().min(2).max(80),
+        state: z.string().length(2),
+        assetClass: z.string().default("historic"),
+        minLien: z.number().int().min(0).max(1_000_000).default(25_000),
+        limit: z.number().int().min(1).max(60).default(20),
+        dryRun: z.boolean().default(true),
+      }))
+      .mutation(async ({ input }) => {
+        const { adapterFor } = await import("./countyAdapters");
+        const { computeMotivation } = await import("../shared/offMarket");
+        const { createCommercialAsset, getCommercialAssets } = await import("./db");
+
+        const adapter = adapterFor(input.city, input.state);
+        if (!adapter) {
+          return {
+            adapter: null,
+            imported: 0, found: 0, duplicates: 0, candidates: [],
+            message: `No county adapter covers ${input.city}, ${input.state} yet. Direct county data has to be wired per county — the web-record search is the fallback for this market.`,
+          };
+        }
+
+        const parcels = await adapter.discoverDistressed({
+          city: input.city, minLien: input.minLien, limit: input.limit,
+        });
+
+        const existing = await getCommercialAssets({ limit: 2000 });
+        const seen = new Set(existing.map((a: any) =>
+          `${String(a.address ?? "").toLowerCase().replace(/[^a-z0-9]/g, "")}|${String(a.city ?? "").toLowerCase().trim()}`));
+        const fresh = parcels.filter((p) =>
+          !seen.has(`${p.address.toLowerCase().replace(/[^a-z0-9]/g, "")}|${p.city.toLowerCase().trim()}`));
+
+        const shaped = fresh.map((p) => ({ ...p, motivation: computeMotivation(p.signals) }));
+
+        if (input.dryRun) {
+          return {
+            adapter: { id: adapter.id, label: adapter.label, coverageNote: adapter.coverageNote },
+            imported: 0, found: parcels.length, duplicates: parcels.length - fresh.length,
+            candidates: shaped,
+            message: `${parcels.length} distressed commercial parcels from ${adapter.label}`,
+          };
+        }
+
+        const now = Date.now();
+        let imported = 0;
+        for (const p of fresh) {
+          try {
+            await createCommercialAsset({
+              name: p.useDescription ? `${p.address} (${p.useDescription})` : p.address,
+              address: p.address,
+              city: p.city,
+              state: p.state,
+              propertyType: "mixed_use",
+              yearBuilt: p.yearBuilt ?? undefined,
+              lotSqFt: p.lotSqFt ?? undefined,
+              assetClass: input.assetClass,
+              source: `county:${adapter.id}`,
+              sourceUrl: p.sourceUrl,
+              status: "new",
+              isOffMarket: true,
+              offMarketSignals: p.signals,
+              motivationScore: computeMotivation(p.signals).score,
+              verificationNote: p.signals.notes ?? null,
+              verificationSources: [p.sourceUrl],
+              lastVerifiedAt: now,
+              listingStatus: "unknown",
+              createdAt: now,
+              updatedAt: now,
+            } as any);
+            imported++;
+          } catch { /* skip the row, keep the batch */ }
+        }
+
+        return {
+          adapter: { id: adapter.id, label: adapter.label, coverageNote: adapter.coverageNote },
+          imported, found: parcels.length, duplicates: parcels.length - fresh.length,
+          candidates: shaped,
+          message: `Added ${imported} from ${adapter.label}`,
+        };
+      }),
+
+    /**
+     * Enrichment over discovery: take an asset we already hold — however it was
+     * sourced — and fill in real county data for its address. This is the path
+     * that works even where no bulk discovery is possible.
+     */
+    countyEnrich: operatorProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ input }) => {
+        const { adapterFor } = await import("./countyAdapters");
+        const { computeMotivation } = await import("../shared/offMarket");
+        const { getCommercialAssetById, getDb } = await import("./db");
+
+        const asset: any = await getCommercialAssetById(input.id);
+        if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+
+        const adapter = adapterFor(String(asset.city ?? ""), String(asset.state ?? ""));
+        if (!adapter) {
+          return { enriched: false, reason: `No county adapter covers ${asset.city}, ${asset.state} yet.`, adapter: null };
+        }
+
+        const parcel = await adapter.lookupByAddress(String(asset.address ?? ""), String(asset.city ?? ""), String(asset.state ?? ""));
+        if (!parcel) {
+          // "Not found" and "wrong county" look identical to the caller unless we
+          // name the county we actually searched — Pennsylvania has 67 of them.
+          return {
+            enriched: false,
+            reason: `No matching parcel in ${adapter.label} records for this address. If the property sits in a different county, that county needs its own adapter.`,
+            adapter: adapter.label,
+          };
+        }
+
+        // Merge onto whatever signals the asset already carries.
+        const prior = (typeof asset.offMarketSignals === "string"
+          ? JSON.parse(asset.offMarketSignals || "{}")
+          : (asset.offMarketSignals ?? {})) as Record<string, any>;
+        const merged = {
+          ...prior,
+          ...parcel.signals,
+          sources: Array.from(new Set([...(prior.sources ?? []), ...(parcel.signals.sources ?? [])])),
+          notes: [prior.notes, parcel.signals.notes].filter(Boolean).join(" · ").slice(0, 1500),
+          citations: Array.from(new Set([...(prior.citations ?? []), ...(parcel.signals.citations ?? [])])),
+        };
+        const motivation = computeMotivation(merged);
+
+        const db = await getDb();
+        if (db) {
+          const { commercialAssets } = await import("../drizzle/schema");
+          const { eq } = await import("drizzle-orm");
+          await db.update(commercialAssets).set({
+            offMarketSignals: merged as any,
+            motivationScore: motivation.score,
+            lotSqFt: asset.lotSqFt ?? parcel.lotSqFt ?? null,
+            lastVerifiedAt: Date.now(),
+            updatedAt: Date.now(),
+          } as any).where(eq(commercialAssets.id, input.id));
+        }
+
+        return {
+          enriched: true,
+          adapter: adapter.label,
+          parcelId: parcel.parcelId,
+          ownerName: parcel.ownerName,
+          useDescription: parcel.useDescription,
+          assessedValue: parcel.assessedValue,
+          lastSaleDate: parcel.lastSaleDate,
+          lastSalePrice: parcel.lastSalePrice,
+          motivation,
+        };
+      }),
+
     /**
      * Off-market sourcing from public records — the CoStar differentiator.
      *

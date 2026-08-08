@@ -53,6 +53,18 @@ export default function OffMarketDiscovery() {
   const [sources, setSources] = useState<PublicRecordSource[]>(ALL_SOURCES);
   const [result, setResult] = useState<any>(null);
   const [committed, setCommitted] = useState(false);
+  const [countyResult, setCountyResult] = useState<any>(null);
+  const [minLien, setMinLien] = useState(25000);
+
+  const adapters = trpc.scout.countyAdapters.useQuery();
+  const county = trpc.scout.countyDiscover.useMutation({
+    onSuccess: (r: any, vars: any) => {
+      setCountyResult(r);
+      if (!r.adapter) toast.warning(r.message);
+      else if (!vars.dryRun) toast.success(r.message);
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const run = trpc.scout.sourceOffMarket.useMutation({
     onSuccess: (r: any, vars: any) => {
@@ -126,6 +138,41 @@ export default function OffMarketDiscovery() {
               </div>
             </div>
 
+            {/* County direct data — the higher-confidence channel */}
+            <div className="border border-sage/40 bg-sage/5 p-4">
+              <p className="font-eyebrow text-eyebrow text-sage uppercase tracking-widest mb-2">
+                Direct county data
+              </p>
+              <p className="font-body-base text-[12px] text-muted-foreground leading-relaxed mb-3">
+                Queries the county's own tables rather than searching the web — every figure is a
+                database value with a parcel ID. Available where an adapter has been wired:
+                {" "}{(adapters.data ?? []).map((a: any) => a.label).join(", ") || "none yet"}.
+              </p>
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <Label className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">Min tax lien</Label>
+                  <Input type="number" min={0} step={5000} value={minLien}
+                    onChange={(e) => setMinLien(Number(e.target.value))}
+                    className="h-9 mt-1 border-rule bg-transparent" />
+                </div>
+                <button
+                  onClick={() => { setCountyResult(null); county.mutate({ city, state, assetClass, minLien, dryRun: true }); }}
+                  disabled={county.isPending || !city.trim() || state.length !== 2}
+                  className="flex items-center gap-2 border border-sage/50 text-sage font-eyebrow text-eyebrow px-4 py-2.5 rounded-full hover:bg-sage/10 transition-all uppercase tracking-widest disabled:opacity-50 shrink-0">
+                  {county.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Radar className="w-3 h-3" />}
+                  Query county
+                </button>
+              </div>
+              {countyResult?.candidates?.length > 0 && (
+                <button
+                  onClick={() => county.mutate({ city, state, assetClass, minLien, dryRun: false })}
+                  disabled={county.isPending}
+                  className="w-full mt-3 flex items-center justify-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2.5 rounded-full hover:opacity-90 transition-all uppercase tracking-widest">
+                  <Check className="w-3 h-3" /> Add {countyResult.candidates.length} from county
+                </button>
+              )}
+            </div>
+
             <div className="flex items-center gap-3">
               <button
                 onClick={() => { setCommitted(false); run.mutate({ city, state, assetClass, sources, dryRun: true }); }}
@@ -147,6 +194,50 @@ export default function OffMarketDiscovery() {
 
           {/* ── Results ──────────────────────────────────────────────────── */}
           <div className="lg:col-span-7">
+            {countyResult && (
+              <div className="mb-8 space-y-4">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-eyebrow text-eyebrow text-sage uppercase tracking-widest">
+                    County records {countyResult.adapter ? `· ${countyResult.adapter.label}` : ""}
+                  </p>
+                  <span className="font-data-mono text-[13px] text-ink">{countyResult.found ?? 0}</span>
+                </div>
+                {!countyResult.adapter ? (
+                  <p className="font-body-base text-[13px] text-muted-foreground leading-relaxed border-l-2 border-amber pl-4">
+                    {countyResult.message}
+                  </p>
+                ) : (
+                  (countyResult.candidates ?? []).map((c: any) => (
+                    <div key={c.parcelId} className="border border-sage/30 bg-paper p-4">
+                      <div className="flex items-start justify-between gap-3 mb-1">
+                        <p className="font-card-title text-[16px] text-ink leading-tight">{c.address}, {c.city}</p>
+                        <span className={cn("font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border uppercase tracking-widest shrink-0",
+                          BAND_CLS[c.motivation.band])}>
+                          {MOTIVATION_BAND_LABEL[c.motivation.band as keyof typeof MOTIVATION_BAND_LABEL]} {c.motivation.score}
+                        </span>
+                      </div>
+                      <p className="font-body-base text-[12px] text-muted-foreground mb-2">
+                        {c.useDescription} · parcel {c.parcelId}
+                      </p>
+                      <div className="grid grid-cols-3 gap-3 border-t border-rule pt-2">
+                        {[
+                          { l: "Tax lien", v: c.signals.taxDelinquentAmount == null ? "—" : `$${Math.round(c.signals.taxDelinquentAmount).toLocaleString()}` },
+                          { l: "Assessed", v: c.assessedValue == null ? "—" : `$${Math.round(c.assessedValue).toLocaleString()}` },
+                          { l: "Held", v: c.signals.yearsSinceLastSale == null ? "—" : `${c.signals.yearsSinceLastSale} yrs` },
+                        ].map((x) => (
+                          <div key={x.l}>
+                            <p className="font-eyebrow text-[9px] text-muted-foreground uppercase tracking-widest">{x.l}</p>
+                            <p className="font-data-mono text-[13px] text-ink">{x.v}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="font-body-base text-[12px] text-ink/80 mt-2 leading-relaxed">{c.motivation.headline}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
             {!result ? (
               <div className="border border-rule bg-paper p-6">
                 <p className="font-card-title text-[18px] text-ink mb-2">Nothing searched yet</p>

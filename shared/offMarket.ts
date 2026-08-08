@@ -41,6 +41,8 @@ export interface OffMarketSignals {
   sources?: PublicRecordSource[];
   taxDelinquentYears?: number | null;
   taxDelinquentAmount?: number | null;
+  /** County assessed / fair-market value, used for the lien-to-value ratio. */
+  assessedValue?: number | null;
   onVacantRegistry?: boolean | null;
   landBankOwned?: boolean | null;
   openCodeViolations?: number | null;
@@ -89,11 +91,33 @@ export function computeMotivation(s: OffMarketSignals | null | undefined): Motiv
   const add = (label: string, present: boolean, points: number, max: number) =>
     f.push({ label, present, points: present ? points : 0, max });
 
+  // Delinquency scores on YEARS or AMOUNT, whichever the record actually gives.
+  // County lien tables publish a dollar figure and no duration; inferring years
+  // from an amount would be a guess, and a $460k lien is plainly distress
+  // regardless of how long it took to accrue.
   const delinqYears = sig.taxDelinquentYears ?? 0;
-  const delinqPoints = delinqYears >= 3 ? 30 : delinqYears === 2 ? 22 : delinqYears === 1 ? 12 : 0;
+  const amount = sig.taxDelinquentAmount ?? 0;
+  const yearPoints = delinqYears >= 3 ? 30 : delinqYears === 2 ? 22 : delinqYears === 1 ? 12 : 0;
+  const amountPoints = amount >= 100_000 ? 28 : amount >= 50_000 ? 22 : amount >= 20_000 ? 16 : amount > 0 ? 9 : 0;
+  const delinqPoints = Math.max(yearPoints, amountPoints);
   f.push({
-    label: delinqYears ? `Tax delinquent ${delinqYears} year${delinqYears === 1 ? "" : "s"}` : "Tax delinquent",
-    present: delinqYears > 0, points: delinqPoints, max: 30,
+    label: delinqYears
+      ? `Tax delinquent ${delinqYears} year${delinqYears === 1 ? "" : "s"}`
+      : amount > 0
+        ? `Tax lien of $${Math.round(amount).toLocaleString()}`
+        : "Tax delinquent",
+    present: delinqPoints > 0, points: delinqPoints, max: 30,
+  });
+
+  // The sharpest signal available: debt approaching or exceeding what the county
+  // says the property is worth. At that point holding costs more than selling.
+  const assessed = sig.assessedValue ?? 0;
+  const ltv = assessed > 0 && amount > 0 ? amount / assessed : 0;
+  f.push({
+    label: ltv > 0 ? `Lien is ${ltv >= 1 ? `${ltv.toFixed(1)}×` : `${Math.round(ltv * 100)}% of`} assessed value` : "Lien vs. assessed value",
+    present: ltv >= 0.25,
+    points: ltv >= 1 ? 20 : ltv >= 0.5 ? 14 : ltv >= 0.25 ? 8 : 0,
+    max: 20,
   });
 
   add("Foreclosure filed", !!sig.foreclosureFiled, 20, 20);

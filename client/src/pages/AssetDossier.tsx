@@ -90,6 +90,16 @@ export default function AssetDossier() {
     onSuccess: (r: any) => { setNarrative({ summary: r.summary, strengths: r.strengths ?? [], risks: r.risks ?? [] }); toast.success("Analyst narrative ready"); },
     onError: (e) => toast.error(e.message),
   });
+  // Pull real county data for this address — owner, parcel, liens, sale history.
+  const enrich = trpc.scout.countyEnrich.useMutation({
+    onSuccess: (r: any) => {
+      if (!r.enriched) toast.warning(r.reason);
+      else toast.success(`${r.adapter}: parcel ${r.parcelId} · motivation ${r.motivation.score}`);
+      q.refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const rescore = trpc.scout.scoreHistoric.useMutation({
     onSuccess: () => { toast.success("Re-scored"); q.refetch(); },
     onError: (e) => toast.error(e.message),
@@ -413,6 +423,12 @@ export default function AssetDossier() {
                     className="w-full flex items-center gap-2 border border-rule px-4 py-2.5 font-eyebrow text-eyebrow uppercase tracking-widest hover:border-amber/40 hover:text-amber transition-all">
                     {verify.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3 text-sage" />}
                     {verify.isPending ? "Checking…" : "Verify listing"}
+                  </button>
+
+                  <button onClick={() => enrich.mutate({ id: asset.id })} disabled={enrich.isPending}
+                    className="w-full flex items-center gap-2 border border-rule px-4 py-2.5 font-eyebrow text-eyebrow uppercase tracking-widest hover:border-amber/40 hover:text-amber transition-all">
+                    {enrich.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3 text-sage" />}
+                    {enrich.isPending ? "Checking county…" : "Enrich from county"}
                   </button>
 
                   <button onClick={() => aiScore.mutate({ id: asset.id })} disabled={aiScore.isPending}

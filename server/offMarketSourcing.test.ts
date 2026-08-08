@@ -46,3 +46,30 @@ describe("computeMotivation", () => {
     expect(present).toEqual(["Land bank owned (motivated by mandate)"]);
   });
 });
+
+describe("computeMotivation — county lien data", () => {
+  it("scores a large lien even when the record gives no delinquent-year count", () => {
+    // County lien tables publish an amount, not a duration. Scoring only on
+    // years made a $467k lien read as "cold".
+    const m = computeMotivation({ taxDelinquentAmount: 467_468, taxDelinquentYears: null });
+    expect(m.score).toBeGreaterThanOrEqual(28);
+    expect(m.headline).toContain("467,468");
+  });
+
+  it("takes the stronger of the year-based and amount-based reads", () => {
+    const byYears = computeMotivation({ taxDelinquentYears: 3, taxDelinquentAmount: 500 });
+    expect(byYears.factors.find((f) => f.max === 30)?.points).toBe(30);
+  });
+
+  it("treats a lien exceeding assessed value as the sharpest signal", () => {
+    const under = computeMotivation({ taxDelinquentAmount: 20_000, assessedValue: 900_000 });
+    const over = computeMotivation({ taxDelinquentAmount: 120_000, assessedValue: 18_000 });
+    expect(over.score).toBeGreaterThan(under.score);
+    expect(over.factors.find((f) => f.label.includes("assessed value"))?.points).toBe(20);
+  });
+
+  it("ignores the ratio when the county gives no assessed value", () => {
+    const m = computeMotivation({ taxDelinquentAmount: 50_000, assessedValue: null });
+    expect(m.factors.find((f) => f.label.includes("assessed value"))?.present).toBe(false);
+  });
+});
