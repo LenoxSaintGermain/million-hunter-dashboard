@@ -1972,6 +1972,185 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         return { imported, parsed: rows.length, duplicates, willImport: fresh.length, errors, headerMap, preview };
       }),
 
+    /** How big is the qualifying universe for a set of markets? */
+    nrhpCount: operatorProcedure
+      .input(z.object({
+        states: z.array(z.string()).optional(),
+        county: z.string().optional(),
+        city: z.string().optional(),
+      }))
+      .query(async ({ input }) => {
+        const { countNrhp } = await import("./nrhp");
+        const [buildings, districts] = await Promise.all([
+          countNrhp({ ...input, resType: "building" }),
+          countNrhp({ ...input, resType: "district" }),
+        ]);
+        return { buildings, districts };
+      }),
+
+    /**
+     * Discovery from the National Register — the qualifying universe, not the
+     * market. These buildings are not for sale; they are simply every structure
+     * that meets the thesis's historic criterion, whether or not anyone is
+     * selling. Preview then commit, like every other ingest path.
+     */
+    nrhpDiscover: operatorProcedure
+      .input(z.object({
+        states: z.array(z.string()).optional(),
+        county: z.string().optional(),
+        city: z.string().optional(),
+        assetClass: z.string().default("historic"),
+        /** Intersections and restricted locations can't be matched or mailed. */
+        mailableOnly: z.boolean().default(true),
+        limit: z.number().int().min(1).max(200).default(50),
+        dryRun: z.boolean().default(true),
+      }))
+      .mutation(async ({ input }) => {
+        const { searchNrhp, NRHP_SOURCE_URL } = await import("./nrhp");
+        const { createCommercialAsset, getCommercialAssets } = await import("./db");
+
+        const rows = await searchNrhp({
+          states: input.states, county: input.county, city: input.city,
+          resType: "building", mailableOnly: input.mailableOnly, limit: input.limit,
+        });
+
+        const existing = await getCommercialAssets({ limit: 2000 });
+        const seenAddr = new Set(existing.map((a: any) =>
+          `${String(a.address ?? "").toLowerCase().replace(/[^a-z0-9]/g, "")}|${String(a.city ?? "").toLowerCase().trim()}`));
+        const seenName = new Set(existing.map((a: any) => String(a.name ?? "").toLowerCase().trim()));
+
+        const fresh = rows.filter((r) =>
+          !seenAddr.has(`${String(r.address ?? "").toLowerCase().replace(/[^a-z0-9]/g, "")}|${String(r.city ?? "").toLowerCase().trim()}`) &&
+          !seenName.has(r.name.toLowerCase().trim()));
+
+        if (input.dryRun) {
+          return {
+            imported: 0, found: rows.length, duplicates: rows.length - fresh.length,
+            candidates: fresh.slice(0, 40),
+            message: `${rows.length} National Register buildings · ${fresh.length} not yet in the pipeline`,
+          };
+        }
+
+        const now = Date.now();
+        let imported = 0;
+        for (const r of fresh) {
+          try {
+            await createCommercialAsset({
+              name: r.name,
+              address: r.address ?? "Address not stated in the Register",
+              city: r.city ?? "",
+              state: r.state ?? "",
+              propertyType: "mixed_use",
+              assetClass: input.assetClass,
+              source: "nrhp",
+              sourceUrl: r.documentUrl ?? NRHP_SOURCE_URL,
+              status: "new",
+              // The Register IS the proof of listing — this is not an inference.
+              isHistoric: true,
+              historicRegisterEligible: true,
+              historicInputs: {
+                registerStatus: "listed",
+                nrhpRefNumber: r.refNumber,
+                nrhpListedYear: r.listedYear,
+                contributingBuildings: r.contributingBuildings,
+                isNationalHistoricLandmark: r.isNationalHistoricLandmark,
+              },
+              // Not for sale — it qualifies, that is all we are claiming.
+              isOffMarket: true,
+              verificationNote: `Listed on the National Register ${r.listedYear ?? ""} (ref ${r.refNumber}). Not currently for sale — sourced from the Register, not a listing.`.trim(),
+              verificationSources: [r.documentUrl, NRHP_SOURCE_URL].filter(Boolean),
+              lastVerifiedAt: now,
+              listingStatus: "unknown",
+              createdAt: now,
+              updatedAt: now,
+            } as any);
+            imported++;
+          } catch { /* skip the row, keep the batch */ }
+        }
+
+        return {
+          imported, found: rows.length, duplicates: rows.length - fresh.length,
+          candidates: fresh.slice(0, 40),
+          message: `Added ${imported} National Register buildings`,
+        };
+      }),
+
+    /**
+     * Enrich a known asset against the Register.
+     *
+     * This is the one enrichment that can VERIFY a critical field outright: an
+     * NRHP reference number settles "NRHP / district status" as fact, which
+     * lifts confidence and can unlock a tier. It also checks whether the asset
+     * sits inside a historic district — a contributing structure qualifies for
+     * the federal credit without being individually listed.
+     */
+    nrhpEnrich: operatorProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ input }) => {
+        const { matchAddress, districtsContaining, NRHP_SOURCE_URL } = await import("./nrhp");
+        const { getCommercialAssetById, getDb } = await import("./db");
+        const { scoreAssetByClass } = await import("./scoring");
+
+        const asset: any = await getCommercialAssetById(input.id);
+        if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+
+        const direct = await matchAddress(String(asset.address ?? ""), String(asset.city ?? ""), String(asset.state ?? ""));
+
+        // If the building itself isn't listed, it may still sit in a district.
+        let districts: any[] = [];
+        const lat = direct?.lat ?? null, lng = direct?.lng ?? null;
+        if (lat != null && lng != null) {
+          try { districts = await districtsContaining(lat, lng); } catch { /* non-fatal */ }
+        }
+
+        if (!direct && !districts.length) {
+          return { matched: false, reason: "No National Register record matches this address, and no district contains it." };
+        }
+
+        const prior = (typeof asset.historicInputs === "string"
+          ? JSON.parse(asset.historicInputs || "{}")
+          : (asset.historicInputs ?? {})) as Record<string, any>;
+
+        const merged = {
+          ...prior,
+          registerStatus: direct ? "listed" : "contributing",
+          nrhpRefNumber: direct?.refNumber ?? districts[0]?.refNumber,
+          nrhpListedYear: direct?.listedYear ?? districts[0]?.listedYear,
+          nrhpDistrictName: districts[0]?.name ?? undefined,
+          contributingBuildings: direct?.contributingBuildings ?? undefined,
+          isNationalHistoricLandmark: direct?.isNationalHistoricLandmark ?? undefined,
+        };
+
+        const priorSources: string[] = Array.isArray(asset.verificationSources) ? asset.verificationSources : [];
+        const db = await getDb();
+        if (db) {
+          const { commercialAssets } = await import("../drizzle/schema");
+          const { eq } = await import("drizzle-orm");
+          await db.update(commercialAssets).set({
+            isHistoric: true,
+            historicRegisterEligible: true,
+            historicInputs: merged as any,
+            verificationSources: Array.from(new Set([
+              ...priorSources, direct?.documentUrl, NRHP_SOURCE_URL,
+            ].filter(Boolean))).slice(0, 12) as any,
+            lastVerifiedAt: Date.now(),
+            updatedAt: Date.now(),
+          } as any).where(eq(commercialAssets.id, input.id));
+        }
+
+        const updated: any = await getCommercialAssetById(input.id);
+        const score = scoreAssetByClass(updated);
+        return {
+          matched: true,
+          directMatch: direct ? { name: direct.name, refNumber: direct.refNumber, listedYear: direct.listedYear } : null,
+          districts: districts.map((d) => ({ name: d.name, refNumber: d.refNumber })),
+          confidenceScore: score.confidenceScore,
+          rankScore: Math.round(score.rankScore * 10) / 10,
+          assetTier: score.assetTier,
+          remainingFields: score.verifyFields,
+        };
+      }),
+
     /** Which counties have a direct-data adapter. */
     countyAdapters: operatorProcedure.query(async () => {
       const { listAdapters } = await import("./countyAdapters");

@@ -19,7 +19,7 @@ import EditorialTopNav from "@/components/EditorialTopNav";
 import { listAssetClasses } from "@shared/assetClasses";
 import { RECORD_SOURCE_LABELS, MOTIVATION_BAND_LABEL, type PublicRecordSource } from "@shared/offMarket";
 import { toast } from "sonner";
-import { Loader2, Radar, Check, ExternalLink, AlertTriangle } from "lucide-react";
+import { Loader2, Radar, Check, ExternalLink, AlertTriangle, Landmark } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -55,6 +55,22 @@ export default function OffMarketDiscovery() {
   const [committed, setCommitted] = useState(false);
   const [countyResult, setCountyResult] = useState<any>(null);
   const [minLien, setMinLien] = useState(25000);
+  const [nrhpResult, setNrhpResult] = useState<any>(null);
+
+  // The qualifying universe — every NR-listed building in this market, for sale
+  // or not. Counting it first shows the size of the board before playing on it.
+  const nrhpCount = trpc.scout.nrhpCount.useQuery(
+    { states: state.length === 2 ? [state] : undefined, city: city.trim() || undefined },
+    { enabled: state.length === 2, refetchOnWindowFocus: false },
+  );
+  const nrhp = trpc.scout.nrhpDiscover.useMutation({
+    onSuccess: (r: any, vars: any) => {
+      setNrhpResult(r);
+      if (!vars.dryRun) toast.success(r.message);
+      else if (!r.found) toast.warning("No National Register buildings match that market.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const adapters = trpc.scout.countyAdapters.useQuery();
   const county = trpc.scout.countyDiscover.useMutation({
@@ -138,6 +154,46 @@ export default function OffMarketDiscovery() {
               </div>
             </div>
 
+            {/* National Register — the qualifying universe */}
+            <div className="border border-amber/40 bg-amber/5 p-4">
+              <p className="font-eyebrow text-eyebrow text-amber uppercase tracking-widest mb-2">
+                National Register
+              </p>
+              <p className="font-body-base text-[12px] text-muted-foreground leading-relaxed mb-3">
+                Not a market search — the complete, finite list of buildings that QUALIFY for the
+                thesis, listed or not. Roughly 500 new listings a year nationally, so this universe
+                barely moves.
+              </p>
+              {nrhpCount.data && (
+                <div className="grid grid-cols-2 gap-3 mb-3 border-t border-rule pt-3">
+                  {[
+                    { l: "Listed buildings", v: nrhpCount.data.buildings },
+                    { l: "Historic districts", v: nrhpCount.data.districts },
+                  ].map((x) => (
+                    <div key={x.l}>
+                      <p className="font-data-mono text-[20px] text-ink leading-none">{x.v.toLocaleString()}</p>
+                      <p className="font-eyebrow text-[9px] text-muted-foreground uppercase tracking-widest mt-1">{x.l}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => { setNrhpResult(null); nrhp.mutate({ states: [state], city: city.trim() || undefined, assetClass, dryRun: true }); }}
+                disabled={nrhp.isPending || state.length !== 2}
+                className="w-full flex items-center justify-center gap-2 border border-amber/50 text-amber font-eyebrow text-eyebrow px-4 py-2.5 rounded-full hover:bg-amber/10 transition-all uppercase tracking-widest disabled:opacity-50">
+                {nrhp.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Landmark className="w-3 h-3" />}
+                Pull the register
+              </button>
+              {nrhpResult?.candidates?.length > 0 && (
+                <button
+                  onClick={() => nrhp.mutate({ states: [state], city: city.trim() || undefined, assetClass, dryRun: false })}
+                  disabled={nrhp.isPending}
+                  className="w-full mt-3 flex items-center justify-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2.5 rounded-full hover:opacity-90 transition-all uppercase tracking-widest">
+                  <Check className="w-3 h-3" /> Add {nrhpResult.candidates.length} new
+                </button>
+              )}
+            </div>
+
             {/* County direct data — the higher-confidence channel */}
             <div className="border border-sage/40 bg-sage/5 p-4">
               <p className="font-eyebrow text-eyebrow text-sage uppercase tracking-widest mb-2">
@@ -194,6 +250,31 @@ export default function OffMarketDiscovery() {
 
           {/* ── Results ──────────────────────────────────────────────────── */}
           <div className="lg:col-span-7">
+            {nrhpResult && (
+              <div className="mb-8 space-y-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-eyebrow text-eyebrow text-amber uppercase tracking-widest">National Register</p>
+                  <span className="font-body-base text-[12px] text-muted-foreground">{nrhpResult.message}</span>
+                </div>
+                {(nrhpResult.candidates ?? []).slice(0, 12).map((r: any) => (
+                  <div key={r.refNumber} className="border border-amber/25 bg-paper p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-card-title text-[16px] text-ink leading-tight">{r.name}</p>
+                      {r.isNationalHistoricLandmark && (
+                        <span className="font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border border-amber/50 text-amber uppercase tracking-widest shrink-0">
+                          Landmark
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-body-base text-[12px] text-muted-foreground mt-1">
+                      {r.address}, {r.city} {r.state} · listed {r.listedYear ?? "—"} · ref {r.refNumber}
+                      {r.contributingBuildings ? ` · ${r.contributingBuildings} contributing` : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {countyResult && (
               <div className="mb-8 space-y-4">
                 <div className="flex items-baseline justify-between gap-3">

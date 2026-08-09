@@ -100,6 +100,18 @@ export default function AssetDossier() {
     onError: (e) => toast.error(e.message),
   });
 
+  // The Register can VERIFY a critical field outright — an NRHP reference number
+  // settles "NRHP / district status" as fact rather than assumption.
+  const nrhpEnrich = trpc.scout.nrhpEnrich.useMutation({
+    onSuccess: (r: any) => {
+      if (!r.matched) { toast.warning(r.reason); return; }
+      const where = r.directMatch ? `listed (ref ${r.directMatch.refNumber})` : `contributing to ${r.districts[0]?.name}`;
+      toast.success(`Register: ${where} · confidence ${Math.round(r.confidenceScore * 100)}% · rank ${r.rankScore}`);
+      q.refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const rescore = trpc.scout.scoreHistoric.useMutation({
     onSuccess: () => { toast.success("Re-scored"); q.refetch(); },
     onError: (e) => toast.error(e.message),
@@ -423,6 +435,12 @@ export default function AssetDossier() {
                     className="w-full flex items-center gap-2 border border-rule px-4 py-2.5 font-eyebrow text-eyebrow uppercase tracking-widest hover:border-amber/40 hover:text-amber transition-all">
                     {verify.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3 text-sage" />}
                     {verify.isPending ? "Checking…" : "Verify listing"}
+                  </button>
+
+                  <button onClick={() => nrhpEnrich.mutate({ id: asset.id })} disabled={nrhpEnrich.isPending}
+                    className="w-full flex items-center gap-2 border border-rule px-4 py-2.5 font-eyebrow text-eyebrow uppercase tracking-widest hover:border-amber/40 hover:text-amber transition-all">
+                    {nrhpEnrich.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3 text-amber" />}
+                    {nrhpEnrich.isPending ? "Checking Register…" : "Verify against Register"}
                   </button>
 
                   <button onClick={() => enrich.mutate({ id: asset.id })} disabled={enrich.isPending}
