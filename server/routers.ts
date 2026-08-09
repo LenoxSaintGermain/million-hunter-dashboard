@@ -2002,17 +2002,41 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         assetClass: z.string().default("historic"),
         /** Intersections and restricted locations can't be matched or mailed. */
         mailableOnly: z.boolean().default(true),
+        /**
+         * The Register has no use code, so a raw pull mixes houses, cemeteries
+         * and monuments in with the buildings you could actually convert.
+         * Defaults to the adaptive-reuse set — which deliberately KEEPS churches,
+         * schools and theatres, since those are the classic conversion plays.
+         */
+        useCategories: z.array(z.enum([
+          "commercial", "industrial", "institutional", "entertainment",
+          "residential", "civic_monument", "funerary", "infrastructure",
+          "agricultural", "unknown",
+        ])).optional(),
         limit: z.number().int().min(1).max(200).default(50),
         dryRun: z.boolean().default(true),
       }))
       .mutation(async ({ input }) => {
         const { searchNrhp, NRHP_SOURCE_URL } = await import("./nrhp");
+        const { classifyUseFromName, ADAPTIVE_REUSE_CATEGORIES } = await import("../shared/propertyUse");
         const { createCommercialAsset, getCommercialAssets } = await import("./db");
 
-        const rows = await searchNrhp({
+        const raw = await searchNrhp({
           states: input.states, county: input.county, city: input.city,
           resType: "building", mailableOnly: input.mailableOnly, limit: input.limit,
         });
+
+        const wanted = new Set(input.useCategories ?? ADAPTIVE_REUSE_CATEGORIES);
+        const classified = raw.map((r) => ({ ...r, use: classifyUseFromName(r.name) }));
+        const rows = classified.filter((r) => wanted.has(r.use.category as any));
+
+        // Report what was set aside and why, rather than silently shrinking.
+        const filteredOut: Record<string, number> = {};
+        for (const r of classified) {
+          if (!wanted.has(r.use.category as any)) {
+            filteredOut[r.use.category] = (filteredOut[r.use.category] ?? 0) + 1;
+          }
+        }
 
         const existing = await getCommercialAssets({ limit: 2000 });
         const seenAddr = new Set(existing.map((a: any) =>
@@ -2023,11 +2047,17 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
           !seenAddr.has(`${String(r.address ?? "").toLowerCase().replace(/[^a-z0-9]/g, "")}|${String(r.city ?? "").toLowerCase().trim()}`) &&
           !seenName.has(r.name.toLowerCase().trim()));
 
+        const setAside = Object.values(filteredOut).reduce((a, b) => a + b, 0);
+        const asideNote = setAside
+          ? ` · ${setAside} set aside by use filter (${Object.entries(filteredOut).map(([k, n]) => `${n} ${k}`).join(", ")})`
+          : "";
+
         if (input.dryRun) {
           return {
-            imported: 0, found: rows.length, duplicates: rows.length - fresh.length,
+            imported: 0, found: rows.length, scanned: classified.length,
+            duplicates: rows.length - fresh.length, filteredOut,
             candidates: fresh.slice(0, 40),
-            message: `${rows.length} National Register buildings · ${fresh.length} not yet in the pipeline`,
+            message: `${rows.length} of ${classified.length} National Register buildings match the use filter · ${fresh.length} not yet in the pipeline${asideNote}`,
           };
         }
 
@@ -2054,6 +2084,9 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
                 nrhpListedYear: r.listedYear,
                 contributingBuildings: r.contributingBuildings,
                 isNationalHistoricLandmark: r.isNationalHistoricLandmark,
+                // Heuristic from the building name — the Register has no use code.
+                useCategory: r.use.category,
+                useMatchedTerm: r.use.matchedTerm,
               },
               // Not for sale — it qualifies, that is all we are claiming.
               isOffMarket: true,
@@ -2069,9 +2102,10 @@ ${(asset as any).isHistoric || (asset as any).historicRegisterEligible ? 'SCORIN
         }
 
         return {
-          imported, found: rows.length, duplicates: rows.length - fresh.length,
+          imported, found: rows.length, scanned: classified.length,
+          duplicates: rows.length - fresh.length, filteredOut,
           candidates: fresh.slice(0, 40),
-          message: `Added ${imported} National Register buildings`,
+          message: `Added ${imported} National Register buildings${asideNote}`,
         };
       }),
 

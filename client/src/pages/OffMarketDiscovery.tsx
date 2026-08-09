@@ -18,6 +18,9 @@ import { cn } from "@/lib/utils";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { listAssetClasses } from "@shared/assetClasses";
 import { RECORD_SOURCE_LABELS, MOTIVATION_BAND_LABEL, type PublicRecordSource } from "@shared/offMarket";
+import {
+  USE_CATEGORY_LABELS, ADAPTIVE_REUSE_CATEGORIES, type PropertyUseCategory,
+} from "@shared/propertyUse";
 import { toast } from "sonner";
 import { Loader2, Radar, Check, ExternalLink, AlertTriangle, Landmark } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -56,6 +59,10 @@ export default function OffMarketDiscovery() {
   const [countyResult, setCountyResult] = useState<any>(null);
   const [minLien, setMinLien] = useState(25000);
   const [nrhpResult, setNrhpResult] = useState<any>(null);
+  // The Register has no use code, so this filter is how a pull stops returning
+  // houses and cemeteries. Churches, schools and theatres stay IN by default —
+  // they're the adaptive-reuse plays, not the noise.
+  const [useCats, setUseCats] = useState<PropertyUseCategory[]>([...ADAPTIVE_REUSE_CATEGORIES]);
 
   // The qualifying universe — every NR-listed building in this market, for sale
   // or not. Counting it first shows the size of the board before playing on it.
@@ -177,8 +184,29 @@ export default function OffMarketDiscovery() {
                   ))}
                 </div>
               )}
+              <div className="mb-3">
+                <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mb-2">Building use</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(Object.keys(USE_CATEGORY_LABELS) as PropertyUseCategory[]).map((c) => {
+                    const on = useCats.includes(c);
+                    return (
+                      <button key={c}
+                        onClick={() => setUseCats((p) => on ? p.filter((x) => x !== c) : [...p, c])}
+                        className={cn("font-eyebrow text-eyebrow px-2 py-1 rounded-sm border uppercase tracking-widest transition-colors",
+                          on ? "border-amber/50 bg-amber/10 text-amber" : "border-rule text-muted-foreground")}>
+                        {USE_CATEGORY_LABELS[c]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="font-body-base text-[11px] text-muted-foreground mt-2 leading-snug">
+                  Classified from the building name — the Register carries no use code. Churches,
+                  schools and theatres are kept on purpose; they convert well.
+                </p>
+              </div>
+
               <button
-                onClick={() => { setNrhpResult(null); nrhp.mutate({ states: [state], city: city.trim() || undefined, assetClass, dryRun: true }); }}
+                onClick={() => { setNrhpResult(null); nrhp.mutate({ states: [state], city: city.trim() || undefined, assetClass, useCategories: useCats, dryRun: true }); }}
                 disabled={nrhp.isPending || state.length !== 2}
                 className="w-full flex items-center justify-center gap-2 border border-amber/50 text-amber font-eyebrow text-eyebrow px-4 py-2.5 rounded-full hover:bg-amber/10 transition-all uppercase tracking-widest disabled:opacity-50">
                 {nrhp.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Landmark className="w-3 h-3" />}
@@ -186,7 +214,7 @@ export default function OffMarketDiscovery() {
               </button>
               {nrhpResult?.candidates?.length > 0 && (
                 <button
-                  onClick={() => nrhp.mutate({ states: [state], city: city.trim() || undefined, assetClass, dryRun: false })}
+                  onClick={() => nrhp.mutate({ states: [state], city: city.trim() || undefined, assetClass, useCategories: useCats, dryRun: false })}
                   disabled={nrhp.isPending}
                   className="w-full mt-3 flex items-center justify-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2.5 rounded-full hover:opacity-90 transition-all uppercase tracking-widest">
                   <Check className="w-3 h-3" /> Add {nrhpResult.candidates.length} new
@@ -256,6 +284,17 @@ export default function OffMarketDiscovery() {
                   <p className="font-eyebrow text-eyebrow text-amber uppercase tracking-widest">National Register</p>
                   <span className="font-body-base text-[12px] text-muted-foreground">{nrhpResult.message}</span>
                 </div>
+                {nrhpResult.filteredOut && Object.keys(nrhpResult.filteredOut).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">Set aside</span>
+                    {Object.entries(nrhpResult.filteredOut).map(([k, n]) => (
+                      <span key={k} className="font-eyebrow text-eyebrow px-2 py-0.5 rounded-sm border border-rule text-muted-foreground">
+                        {String(n)} {USE_CATEGORY_LABELS[k as PropertyUseCategory] ?? k}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {(nrhpResult.candidates ?? []).slice(0, 12).map((r: any) => (
                   <div key={r.refNumber} className="border border-amber/25 bg-paper p-4">
                     <div className="flex items-start justify-between gap-3">
@@ -270,6 +309,12 @@ export default function OffMarketDiscovery() {
                       {r.address}, {r.city} {r.state} · listed {r.listedYear ?? "—"} · ref {r.refNumber}
                       {r.contributingBuildings ? ` · ${r.contributingBuildings} contributing` : ""}
                     </p>
+                    {r.use && (
+                      <span className="font-eyebrow text-eyebrow px-2 py-0.5 mt-2 inline-block rounded-sm border border-rule text-muted-foreground uppercase tracking-widest">
+                        {USE_CATEGORY_LABELS[r.use.category as PropertyUseCategory]}
+                        {r.use.matchedTerm ? ` · "${r.use.matchedTerm}"` : ""}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
