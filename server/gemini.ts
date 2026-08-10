@@ -30,7 +30,7 @@ const GEMINI_MID    = GEMINI_BALANCED;  // gemini-3.5-flash: balanced scoring/co
 // Tolerant JSON parse: models occasionally append trailing prose or wrap output
 // in markdown fences even with responseMimeType=json ("Unexpected non-whitespace
 // character after JSON at position N"). Recover the JSON span instead of throwing.
-function looseJsonParse(raw: string | null | undefined): any {
+export function looseJsonParse(raw: string | null | undefined): any {
   const s = (raw ?? "").trim();
   try { return JSON.parse(s); } catch {}
   const cleaned = s.replace(/```json/gi, "").replace(/```/g, "").trim();
