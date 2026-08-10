@@ -176,7 +176,16 @@ const CAPABILITY_MATRIX = [
   { capability: "Capital Stack Modeler", description: "SBA 7(a) + seller note + equity stack with DSCR validation", status: "Live" as const },
   { capability: "Investment Memo + LOI", description: "Diligence brief and LOI draft from deal signals", status: "Live" as const },
   { capability: "TIDE Intelligence", description: "Federal spend, SBA policy, and macro signal monitoring", status: "Live" as const },
-  { capability: "Market Scan", description: "LLM-synthesized deal sourcing across listing platforms", status: "Demo" as const },
+  { capability: "Market Scan", description: "Real cited listings via sonar-pro, sourced per-market", status: "Live" as const },
+  { capability: "National Register universe", description: "63,127 listed buildings + 19,476 historic districts, queryable", status: "Live" as const },
+  { capability: "Register verification", description: "Settles NRHP status as fact from a reference number, not a claim", status: "Live" as const },
+  { capability: "County direct data", description: "Parcel assessments joined to tax liens — Allegheny County, PA", status: "Live" as const },
+  { capability: "Owner motivation scoring", description: "Distress and ownership signals, scored apart from the thesis score", status: "Live" as const },
+  { capability: "Cross-client thesis matching", description: "Surfaces buildings that fail one thesis but fit another client's", status: "Live" as const },
+  { capability: "Thesis Studio", description: "Client-editable criteria dials with a live match preview", status: "Live" as const },
+  { capability: "Verification Queue", description: "Pools unverified critical fields, researches and writes back with citations", status: "Live" as const },
+  { capability: "Scheduled sourcing", description: "Daily/weekly automated runs, disabled by default", status: "Live" as const },
+  { capability: "CSV / CoStar ingest", description: "Broker exports scored through the same engine", status: "Live" as const },
   { capability: "Opportunity Radar", description: "Permit, zoning, and capital convergence signal detection", status: "Demo" as const },
   { capability: "Searcher Intelligence DB", description: "Demand-side dataset from every diligence run — the moat", status: "Roadmap" as const },
   { capability: "Gated Free Run (/try)", description: "Public diligence run with email gate — top-of-funnel acquisition", status: "Roadmap" as const },
@@ -193,6 +202,7 @@ const NAV_SECTIONS = [
   { id: "seller", label: "Seller Sim" },
   { id: "capital", label: "Capital Stack" },
   { id: "memo", label: "Memo + LOI" },
+  { id: "hunt", label: "The Hunt" },
   { id: "moat", label: "The Moat" },
   { id: "model", label: "Business Model" },
   { id: "rigor", label: "Rigor Gate" },
@@ -816,10 +826,18 @@ export default function InvestorBrief() {
               className="text-4xl lg:text-5xl font-black leading-tight mb-6"
               style={{ fontFamily: "var(--font-serif, 'Fraunces', serif)", color: "var(--sh-text-primary)" }}
             >
-              Signal Hunter OS is the diligence-and-decision layer for the $4.5 trillion small-business acquisition wave.
+              Signal Hunter OS finds the deal, then tries to kill it — across operating businesses and property.
             </h1>
+            <p className="text-lg leading-relaxed mb-4" style={{ color: "var(--sh-text-secondary)" }}>
+              Two halves of the same job. <strong style={{ color: "var(--sh-text-primary)" }}>Sourcing</strong> starts
+              from the qualifying universe rather than the listings — 63,127 National Register buildings, county
+              ownership and tax records, a motivation score for whether an owner will actually sell. <strong style={{ color: "var(--sh-text-primary)" }}>Diligence</strong> then
+              asks the question a broker sheet never does — <em>what kills this deal?</em> — before the LOI, not after.
+            </p>
             <p className="text-lg leading-relaxed mb-6" style={{ color: "var(--sh-text-secondary)" }}>
-              It does one thing: catch the deals that look clean on the broker sheet but will cost the buyer $1–2M after close. Every feature is built around a single question — <em>what kills this deal?</em> — not <em>how do we close it faster?</em>
+              The original wedge was the $4.5 trillion small-business transition. The same engine now runs
+              bespoke property theses, where the qualifying set is finite and a listing platform cannot see
+              the buildings that are not for sale.
             </p>
             <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>
               Market size estimate sourced from BizBuySell 2025 Insight Report and SBA Office of Advocacy SMB data. $4.5T represents total estimated value of US small businesses with owner age ≥55 expected to transact 2025–2035.
@@ -968,11 +986,150 @@ export default function InvestorBrief() {
           </section>
 
           {/* ── 9. MOAT ── */}
+          {/* ── 9a. THE HUNT — property sourcing spine ── */}
+          <section ref={setRef("hunt")} id="hunt" className="scroll-mt-20">
+            <SectionLabel>The Hunt — Live</SectionLabel>
+            <div className="flex items-start gap-4 mb-5">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
+                <Target className="w-5 h-5" style={{ color: "var(--sh-primary)" }} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black" style={{ fontFamily: "var(--font-serif, 'Fraunces', serif)", color: "var(--sh-text-primary)" }}>
+                  Hunt the universe, not the market
+                </h2>
+                <p className="text-sm mt-1" style={{ color: "var(--sh-fg-muted)" }}>
+                  Property theses — historic adaptive reuse, self-storage, and any class added after them
+                </p>
+              </div>
+            </div>
+
+            <p className="text-base leading-relaxed mb-4" style={{ color: "var(--sh-text-secondary)" }}>
+              A listing platform answers one question: what is advertised for sale right now? An asset
+              enters your view only when someone decides to sell it. For a thesis defined by a
+              qualification — a tax credit, a vintage, a register status — that is the wrong question.
+            </p>
+            <p className="text-base leading-relaxed mb-6" style={{ color: "var(--sh-text-secondary)" }}>
+              The National Register is published as an open dataset. That makes the qualifying universe
+              finite, enumerable, and nearly static — so the work inverts. Instead of watching a feed
+              and reacting, you hold the whole board and choose which owners to approach first.
+            </p>
+
+            <div className="grid sm:grid-cols-3 gap-3 mb-6">
+              {[
+                { v: "63,127", l: "Listed buildings", d: "Nationally, plus 19,476 historic districts" },
+                { v: "16,849", l: "In target states", d: "Across the eleven states of the historic thesis" },
+                { v: "~500 / yr", l: "New listings", d: "Nationally — the universe barely moves" },
+              ].map((x) => (
+                <div key={x.l} className="rounded-xl p-4" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
+                  <p className="text-2xl font-black font-mono" style={{ color: "var(--sh-primary)" }}>{x.v}</p>
+                  <p className="text-sm font-semibold mt-1" style={{ color: "var(--sh-text-primary)" }}>{x.l}</p>
+                  <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>{x.d}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl p-6 mb-4" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
+              <p className="text-sm font-semibold mb-4" style={{ color: "var(--sh-text-primary)" }}>Two axes, deliberately kept apart</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {[
+                  { icon: CheckCircle2, label: "Does it qualify?", desc: "The A–G scorecard against the client's thesis. A Register reference number settles historic status as fact rather than an unsourced claim." },
+                  { icon: TrendingUp, label: "Can it be bought?", desc: "Owner motivation from public records — tax liens, vacancy, code enforcement, holding period. A building can be perfect and unavailable." },
+                ].map((item) => (
+                  <div key={item.label} className="p-4 rounded-lg" style={{ background: "var(--sh-surface-3)" }}>
+                    <item.icon className="w-5 h-5 mb-2" style={{ color: "var(--sh-primary)" }} />
+                    <p className="text-sm font-semibold mb-1" style={{ color: "var(--sh-text-primary)" }}>{item.label}</p>
+                    <p className="text-xs leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs mt-4 leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>
+                Collapsing the two into one number would hide the distinction that makes an approach
+                worth making. Neither alone is a deal; together they are a ranked call list.
+              </p>
+            </div>
+
+            <div className="rounded-xl p-5 mb-4" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
+              <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: "var(--sh-fg-muted)" }}>
+                Worked example — Allegheny County, PA
+              </p>
+              <p className="text-sm leading-relaxed mb-3" style={{ color: "var(--sh-text-secondary)" }}>
+                The county publishes 584,999 parcel assessments and 88,273 tax liens through an open
+                data service. Joined on parcel ID, they answer a question no web search can:
+                <em> which commercial buildings here carry serious tax debt?</em>
+              </p>
+              <div className="rounded-lg p-4" style={{ background: "var(--sh-surface-3)" }}>
+                <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>11 Torrance St, Pittsburgh</p>
+                <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>
+                  $120,094 outstanding tax lien against an $18,000 county assessed value — debt at 6.7×
+                  the property's worth. Not listed anywhere. Every figure is a database value with a
+                  parcel ID behind it.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl p-5" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
+              <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: "var(--sh-fg-muted)" }}>
+                Cross-client matching
+              </p>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>
+                One thesis is one client. A building that fails a firm's own criteria — too tall, too
+                late a vintage — is often exactly right for a different client on the same desk. Every
+                asset is scored against every thesis, so a rejection becomes a referral instead of a
+                deletion. On a 36-asset test pipeline, <strong style={{ color: "var(--sh-text-primary)" }}>13 failed the
+                primary thesis but cleared another client's</strong>.
+              </p>
+            </div>
+
+            <p className="text-xs mt-4 leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>
+              Honest limits: the Register defines the universe but carries no year built, square
+              footage, ownership or price — those come from county data, broker exports, and the
+              verification queue. County coverage is per-county and currently one deep. Roughly a
+              third of Register addresses are intersections or restricted locations that cannot be
+              matched to a parcel; those are filtered and counted, not hidden.
+            </p>
+          </section>
+
           <section ref={setRef("moat")} id="moat" className="scroll-mt-20">
-            <SectionLabel>The Moat — Roadmap</SectionLabel>
+            <SectionLabel>The Moat</SectionLabel>
             <div className="flex items-start gap-4 mb-5">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
                 <Database className="w-5 h-5" style={{ color: "var(--sh-primary)" }} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black" style={{ fontFamily: "var(--font-serif, 'Fraunces', serif)", color: "var(--sh-text-primary)" }}>The data spine</h2>
+                <p className="text-sm mt-1" style={{ color: "var(--sh-fg-muted)" }}>Built, not projected</p>
+              </div>
+            </div>
+
+            <p className="text-base leading-relaxed mb-4" style={{ color: "var(--sh-text-secondary)" }}>
+              The defensible position is not the agents — those are replaceable. It is the joined
+              dataset underneath them: a finite qualifying universe, per-county ownership and distress
+              records, and a scoring model that says plainly which figures are verified and which are
+              modelled. A competitor can copy a prompt in an afternoon. Wiring a county's own tables
+              and keeping the honesty contract intact is the part that takes time.
+            </p>
+
+            <div className="rounded-xl p-6 mb-8" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
+              <div className="grid sm:grid-cols-3 gap-4">
+                {[
+                  { icon: Layers, label: "Static layer, acquired once", desc: "Register status, district boundaries, parcel geometry. Under 1% annual change — no live API needed for most of the scorecard." },
+                  { icon: Database, label: "Dynamic layer, per county", desc: "Ownership, liens, sale history. Each county wired is a market a listing-only competitor cannot see into." },
+                  { icon: Shield, label: "Provenance as a feature", desc: "Every figure declares verified, modelled, or unknown, with its source. The thing that survives contact with an investment committee." },
+                ].map((item) => (
+                  <div key={item.label} className="p-4">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: "var(--sh-surface-3)", border: "1px solid var(--sh-border-1)" }}>
+                      <item.icon className="w-5 h-5" style={{ color: "var(--sh-primary)" }} />
+                    </div>
+                    <p className="text-sm font-semibold mb-1" style={{ color: "var(--sh-text-primary)" }}>{item.label}</p>
+                    <p className="text-xs leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 mb-5">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
+                <Target className="w-5 h-5" style={{ color: "var(--sh-primary)" }} />
               </div>
               <div>
                 <h2 className="text-2xl font-black" style={{ fontFamily: "var(--font-serif, 'Fraunces', serif)", color: "var(--sh-text-primary)" }}>Searcher Intelligence DB</h2>
@@ -987,7 +1144,9 @@ export default function InvestorBrief() {
               Every diligence run captures a searcher's live thesis: what they're looking for, what they rejected, what they flagged as a deal-killer. Aggregated across thousands of runs, this becomes a proprietary demand-side dataset that no competitor holds — a real-time map of what the acquisition market actually wants, before it appears in any listing or broker data.
             </p>
             <p className="text-base leading-relaxed mb-6" style={{ color: "var(--sh-text-secondary)" }}>
-              The Searcher Intelligence DB is the path from a diligence tool to a data and matching business. The wedge is the free run. The moat is what the free run captures.
+              The Searcher Intelligence DB is the path from a diligence tool to a data and matching
+              business. It extends the spine above rather than replacing it: the supply side is already
+              enumerable, and this would make the demand side legible too.
             </p>
             <div className="rounded-xl p-6" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
               <div className="grid sm:grid-cols-3 gap-4">
