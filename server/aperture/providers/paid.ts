@@ -12,7 +12,7 @@ import type { Fact } from "../facts";
 import { DAY, httpJson, num, unknownFact, type FetchCtx, type ProviderAdapter } from "./types";
 
 // ── Financial Modeling Prep ──────────────────────────────────────────────────
-const FMP_KEYS = ["pe_ratio", "price_to_sales", "market_cap", "sector", "industry", "dividend_yield"];
+const FMP_KEYS = ["pe_ratio", "price_to_sales", "market_cap", "sector", "industry", "dividend_per_share", "dividend_yield"];
 
 export const fmpProvider: ProviderAdapter = {
   id: "fmp",
@@ -41,7 +41,30 @@ export const fmpProvider: ProviderAdapter = {
       );
 
     push("market_cap", p ? num(p.mktCap) : null, "usd");
-    push("dividend_yield", p ? num(p.lastDiv) : null, "usd");
+
+    // FMP's `lastDiv` is the trailing dividend PER SHARE in dollars, not a yield.
+    // Storing it under a yield key would put a $2.40 dividend into a field the
+    // scorer and memos read as 240%. Emit it under its real name, and derive the
+    // yield only when there is a price to divide by — labelled `modeled`, since
+    // it is a computation over two point-in-time figures rather than a stated one.
+    const divPerShare = p ? num(p.lastDiv) : null;
+    push("dividend_per_share", divPerShare, "usd");
+
+    const price = p ? num(p.price) : null;
+    out.push(
+      divPerShare != null && price != null && price > 0
+        ? {
+            factKey: "dividend_yield",
+            valueNum: divPerShare / price,
+            unit: "ratio" as const,
+            basis: "modeled" as const,
+            assumption: `trailing dividend per share ($${divPerShare}) over last price ($${price})`,
+            ...src,
+            asOf: ctx.now,
+            ttlMs: DAY,
+          }
+        : unknownFact("dividend_yield", "fmp", src.sourceName),
+    );
 
     for (const [factKey, field] of [["sector", "sector"], ["industry", "industry"]] as const) {
       const v = p?.[field];
