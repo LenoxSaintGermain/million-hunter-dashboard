@@ -13,6 +13,7 @@ import { z } from "zod";
 import { getDb } from "./db";
 import { roleModulePermissions } from "../drizzle/schema";
 import { protectedProcedure, router } from "./_core/trpc";
+import { isModuleGrantable } from "../shared/adminOnlyModules";
 
 // ─── All available modules ────────────────────────────────────────────────────
 export const ALL_MODULES = [
@@ -30,6 +31,10 @@ export const ALL_MODULES = [
   { key: "investor_dossier",     label: "Investor Dossier",     href: "/investor-dossier" },
   { key: "insurance_prospector", label: "Insurance Prospector", href: "/insurance-prospector" },
   { key: "ripple_effect",        label: "RippleEffect Scanner", href: "/ripple" },
+  // Capital Aperture is a SECOND engine (liquid securities), not part of the
+  // property/business pipeline. Admin-only and deliberately absent from every
+  // client-facing role default — see ROLE_DEFAULTS below.
+  { key: "capital_aperture",     label: "Capital Aperture",     href: "/aperture" },
   { key: "settings",             label: "Settings",             href: "/settings" },
 ];
 
@@ -110,6 +115,12 @@ export const rolePermissionsRouter = router({
       if (ctx.user.role !== "admin") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
       }
+      if (input.enabled && !isModuleGrantable(input.moduleKey, input.role)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `"${input.moduleKey}" is admin-only and cannot be granted to role "${input.role}".`,
+        });
+      }
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -168,7 +179,13 @@ export const rolePermissionsRouter = router({
         )
       );
 
-    return { allowedModules: rows.map((r) => r.moduleKey) };
+    // Belt and braces: even if a stale row in the DB grants an admin-only module
+    // to this role, it does not get served.
+    return {
+      allowedModules: rows
+        .map((r) => r.moduleKey)
+        .filter((k) => isModuleGrantable(k, userRole)),
+    };
   }),
 
   /**

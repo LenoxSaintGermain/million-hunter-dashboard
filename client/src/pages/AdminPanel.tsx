@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { isModuleGrantable } from "@shared/adminOnlyModules";
 import {
   Users, Shield, TrendingUp, Building2, BarChart3,
   RefreshCw, ChevronDown, Lock, UserCheck, Activity,
@@ -231,28 +232,42 @@ function ModulePermissionsMatrix() {
           <div className="space-y-1.5">
             {modules.map((mod) => {
               const enabled = isEnabled(activeRole, mod.key);
+              // Some modules cannot be granted to a client role at all. Render
+              // them locked rather than offering a switch the server will refuse.
+              const locked = !isModuleGrantable(mod.key, activeRole);
               return (
                 <div
                   key={mod.key}
-                  className={`flex items-center justify-between py-2.5 px-4 rounded-lg border transition-colors cursor-pointer ${
-                    enabled
-                      ? "border-primary/20 hover:border-primary/40"
-                      : "border-[var(--sh-border)] opacity-60 hover:opacity-80"
+                  className={`flex items-center justify-between py-2.5 px-4 rounded-lg border transition-colors ${
+                    locked
+                      ? "border-[var(--sh-border)] opacity-50 cursor-not-allowed"
+                      : enabled
+                        ? "border-primary/20 hover:border-primary/40 cursor-pointer"
+                        : "border-[var(--sh-border)] opacity-60 hover:opacity-80 cursor-pointer"
                   }`}
-                  style={{ background: enabled ? "var(--sh-surface-2)" : "transparent" }}
+                  style={{ background: enabled && !locked ? "var(--sh-surface-2)" : "transparent" }}
+                  title={locked ? "Admin-only module — cannot be granted to this role." : undefined}
                   onClick={() => {
+                    if (locked) return;
                     setPermission.mutate({ role: activeRole, moduleKey: mod.key, enabled: !enabled });
                   }}
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      enabled ? "bg-emerald-500" : "bg-muted-foreground/30"
+                      enabled && !locked ? "bg-emerald-500" : "bg-muted-foreground/30"
                     }`} />
                     <span className="text-sm font-medium text-foreground">{mod.label}</span>
                     <span className="text-[10px] text-muted-foreground font-mono">{mod.href}</span>
+                    {locked && (
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-[var(--sh-border)] rounded px-1.5 py-0.5">
+                        Admin only
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {enabled ? (
+                    {locked ? (
+                      <Lock className="w-4 h-4 text-muted-foreground/40" />
+                    ) : enabled ? (
                       <ToggleRight className="w-5 h-5 text-emerald-500" />
                     ) : (
                       <ToggleLeft className="w-5 h-5 text-muted-foreground/40" />

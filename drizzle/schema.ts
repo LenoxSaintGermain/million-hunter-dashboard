@@ -24,6 +24,14 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
   huntingParams: text("hunting_params"), // Free-text agentic command / hunting parameters
+  /**
+   * Duplicate-account pointer. When one person has signed up twice under two
+   * OAuth identities, the non-canonical row keeps existing (deleting it is not
+   * reversible, and investor_dna.user_id is UNIQUE so a naive merge throws) and
+   * points here instead. createContext resolves it, so either login lands in the
+   * same account. NULL for every ordinary user.
+   */
+  mergedIntoUserId: int("merged_into_user_id"),
 });
 
 export type User = typeof users.$inferSelect;
@@ -995,3 +1003,241 @@ export const researchResults = mysqlTable("research_results", {
 });
 export type ResearchResult = typeof researchResults.$inferSelect;
 export type InsertResearchResult = typeof researchResults.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CAPITAL APERTURE — the second engine (liquid securities)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Everything above this line describes ONE illiquid thing at a time: a building,
+// a business. There is no quantity, no price series, no portfolio. Capital
+// Aperture answers a different question — "given a thesis, a portfolio, and
+// $X of deployable capital, what is the best way to deploy the next dollar?" —
+// so it gets its own tables rather than distorting `commercial_assets`.
+//
+// MONEY IS STORED IN CENTS. Every monetary column is named `...Cents` so a unit
+// mix-up has to be written out in full before it can happen. Share quantities
+// are floats because fractional shares are real.
+//
+// ⚠️ Admin-only surface. See ADMIN_ONLY_MODULES in server/rolePermissionsRouter.ts.
+
+/** The Thesis Graph — an investment constitution, not a risk-tolerance bucket. */
+export const capitalTheses = mysqlTable("capital_theses", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  name: varchar("name", { length: 160 }),
+  rawText: text("raw_text").notNull(),
+  /** Compiled constitution: beliefs, what to seek/avoid, portfolio rules, behaviour. */
+  graph: json("graph").$type<{
+    beliefs?: string[];
+    seek?: string[];
+    avoid?: string[];
+    horizons?: string[];
+    sectors?: string[];
+    exclusions?: string[];
+    portfolioRules?: {
+      maxSingleNamePct?: number;
+      maxCorrelatedClusterPct?: number;
+      minAvgDailyVolumeUsd?: number;
+      reservePct?: number;
+    };
+    behavior?: { researches?: number; shortlists?: number; executes?: number };
+  }>(),
+  /** The compiler flagging its own ambiguous readings — never silently resolved. */
+  confidenceNotes: json("confidence_notes").$type<string[]>().default([]),
+  status: mysqlEnum("status", ["compiling", "review", "active", "archived"]).default("compiling").notNull(),
+  isPrimary: boolean("is_primary").default(false).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type CapitalThesis = typeof capitalTheses.$inferSelect;
+export type InsertCapitalThesis = typeof capitalTheses.$inferInsert;
+
+/** Broker-agnostic account. Jim does not have "a Robinhood portfolio". */
+export const portfolioAccounts = mysqlTable("portfolio_accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  label: varchar("label", { length: 120 }).notNull(),
+  /** manual | alpaca_paper | robinhood_mcp — see server/aperture/brokers/. */
+  brokerId: varchar("broker_id", { length: 32 }).default("manual").notNull(),
+  externalAccountId: varchar("external_account_id", { length: 128 }),
+  /** No live-money account is supported by this build. Guarded in the adapters. */
+  isPaper: boolean("is_paper").default(true).notNull(),
+  cashCents: bigint("cash_cents", { mode: "number" }),
+  buyingPowerCents: bigint("buying_power_cents", { mode: "number" }),
+  equityValueCents: bigint("equity_value_cents", { mode: "number" }),
+  lastSyncedAt: bigint("last_synced_at", { mode: "number" }),
+  syncSource: varchar("sync_source", { length: 64 }),
+  syncError: text("sync_error"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type PortfolioAccount = typeof portfolioAccounts.$inferSelect;
+export type InsertPortfolioAccount = typeof portfolioAccounts.$inferInsert;
+
+export const positions = mysqlTable("positions", {
+  id: int("id").autoincrement().primaryKey(),
+  accountId: int("account_id").notNull(),
+  symbol: varchar("symbol", { length: 24 }).notNull(),
+  assetType: mysqlEnum("asset_type", ["equity", "etf", "option", "crypto", "cash"]).default("equity").notNull(),
+  qty: float("qty").notNull(),
+  avgCostCents: bigint("avg_cost_cents", { mode: "number" }),
+  lastPriceCents: bigint("last_price_cents", { mode: "number" }),
+  marketValueCents: bigint("market_value_cents", { mode: "number" }),
+  /** A price with no timestamp and no source is not a fact. Both are recorded. */
+  priceAsOf: bigint("price_as_of", { mode: "number" }),
+  priceSource: varchar("price_source", { length: 64 }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type Position = typeof positions.$inferSelect;
+export type InsertPosition = typeof positions.$inferInsert;
+
+/** Thin identity record. Anything with a value lives in `security_facts`. */
+export const securities = mysqlTable("securities", {
+  id: int("id").autoincrement().primaryKey(),
+  symbol: varchar("symbol", { length: 24 }).notNull().unique(),
+  name: varchar("name", { length: 255 }),
+  exchange: varchar("exchange", { length: 32 }),
+  sector: varchar("sector", { length: 96 }),
+  industry: varchar("industry", { length: 128 }),
+  cik: varchar("cik", { length: 16 }),
+  assetType: mysqlEnum("asset_type", ["equity", "etf", "option", "crypto"]).default("equity").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type Security = typeof securities.$inferSelect;
+export type InsertSecurity = typeof securities.$inferInsert;
+
+/**
+ * THE HONESTY CONTRACT, MADE STRUCTURAL.
+ *
+ * No number may appear in a memo, a score, or a strategy unless a row exists
+ * here to back it. The memo generator is handed only these rows, and a validator
+ * rejects any figure in generated prose that does not trace back to one. This is
+ * the same failure shape already killed three times in the property engine
+ * (offMarket.hunt, Market Scan, convertToDeal) — a model asked for plausible
+ * numbers will produce them, so the schema refuses to store an unsourced one.
+ */
+export const securityFacts = mysqlTable("security_facts", {
+  id: int("id").autoincrement().primaryKey(),
+  symbol: varchar("symbol", { length: 24 }).notNull(),
+  /** e.g. "revenue_ttm", "pe_ratio", "adv_usd_30d", "last_price". */
+  factKey: varchar("fact_key", { length: 80 }).notNull(),
+  valueNum: float("value_num"),
+  valueText: text("value_text"),
+  unit: varchar("unit", { length: 24 }),
+  /** verified = stated by the source · modeled = derived from an assumption ·
+   *  unknown = the input is missing and NO number was invented. */
+  basis: mysqlEnum("basis", ["verified", "modeled", "unknown"]).notNull(),
+  /** Required when basis = "modeled": the assumption, rendered inline in the UI. */
+  assumption: text("assumption"),
+  providerId: varchar("provider_id", { length: 32 }).notNull(),
+  sourceName: varchar("source_name", { length: 160 }),
+  sourceUrl: text("source_url"),
+  /** When the SOURCE says this was true — not when we fetched it. */
+  asOf: bigint("as_of", { mode: "number" }),
+  fetchedAt: bigint("fetched_at", { mode: "number" }).notNull(),
+  expiresAt: bigint("expires_at", { mode: "number" }),
+});
+export type SecurityFact = typeof securityFacts.$inferSelect;
+export type InsertSecurityFact = typeof securityFacts.$inferInsert;
+
+/** One capital-deployment analysis. */
+export const apertureRuns = mysqlTable("aperture_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  thesisId: int("thesis_id").notNull(),
+  accountId: int("account_id"),
+  deployableCapitalCents: bigint("deployable_capital_cents", { mode: "number" }).notNull(),
+  /** What the human was already planning to do — the baseline to re-underwrite. */
+  intendedTrades: json("intended_trades").$type<Array<{ symbol: string; dollarsCents: number; note?: string }>>().default([]),
+  /** Below this, capital stays in cash rather than chasing a marginal idea. */
+  hurdleRateBps: int("hurdle_rate_bps"),
+  status: mysqlEnum("status", [
+    "queued", "compiling", "discovering", "researching", "scoring", "constructing", "completed", "failed",
+  ]).default("queued").notNull(),
+  universeCount: int("universe_count"),
+  candidateCount: int("candidate_count"),
+  /** What the universe cap threw away. A silent top-N reads as "covered everything". */
+  droppedNote: text("dropped_note"),
+  /** Which data providers were actually live for this run — missing ones are
+   *  rendered as named gaps, never as a silent null. */
+  providerAvailability: json("provider_availability").$type<Record<string, boolean>>(),
+  error: text("error"),
+  startedAt: bigint("started_at", { mode: "number" }),
+  completedAt: bigint("completed_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type ApertureRun = typeof apertureRuns.$inferSelect;
+export type InsertApertureRun = typeof apertureRuns.$inferInsert;
+
+export const apertureCandidates = mysqlTable("aperture_candidates", {
+  id: int("id").autoincrement().primaryKey(),
+  runId: int("run_id").notNull(),
+  symbol: varchar("symbol", { length: 24 }).notNull(),
+  /** core = expresses the thesis directly · complementary = strengthens/diversifies
+   *  it · remainder = optimised for capital that would sit idle ·
+   *  alternative_expression = a different way to hold the same idea. */
+  role: mysqlEnum("role", ["core", "complementary", "remainder", "alternative_expression"]).notNull(),
+  compositeScore: int("composite_score"),
+  confidenceScore: float("confidence_score"),
+  rankScore: float("rank_score"),
+  dimensions: json("dimensions"),
+  /** Facts a Tier-1 call would need but which no source stated. */
+  verifyFields: json("verify_fields").$type<string[]>().default([]),
+  exposureNodeIds: json("exposure_node_ids").$type<number[]>().default([]),
+  memo: json("memo"),
+  /** rejected = the fact-validator found a figure with no supporting fact row. */
+  memoStatus: mysqlEnum("memo_status", ["pending", "ok", "rejected", "skipped"]).default("pending").notNull(),
+  memoRejectReason: text("memo_reject_reason"),
+  citations: json("citations").$type<string[]>().default([]),
+  /** A range, never an unexplained point estimate. */
+  suggestedSizeLowCents: bigint("suggested_size_low_cents", { mode: "number" }),
+  suggestedSizeHighCents: bigint("suggested_size_high_cents", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type ApertureCandidate = typeof apertureCandidates.$inferSelect;
+export type InsertApertureCandidate = typeof apertureCandidates.$inferInsert;
+
+/** Competing deployment strategies — the output is a choice, not a list. */
+export const apertureStrategies = mysqlTable("aperture_strategies", {
+  id: int("id").autoincrement().primaryKey(),
+  runId: int("run_id").notNull(),
+  kind: mysqlEnum("kind", ["concentrated", "expanded", "risk_balanced", "dry_powder", "human_baseline"]).notNull(),
+  label: varchar("label", { length: 120 }).notNull(),
+  rationale: text("rationale"),
+  allocations: json("allocations").$type<Array<{ symbol: string; dollarsCents: number; pctOfDeployable: number }>>().default([]),
+  cashRetainedCents: bigint("cash_retained_cents", { mode: "number" }),
+  /** Concentration, correlation, liquidity, thesis exposure — each with a basis. */
+  portfolioImpact: json("portfolio_impact"),
+  /** What deploying here gives up versus the alternatives and versus cash. */
+  opportunityCost: json("opportunity_cost"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type ApertureStrategy = typeof apertureStrategies.$inferSelect;
+export type InsertApertureStrategy = typeof apertureStrategies.$inferInsert;
+
+/** The thesis decomposed into a tree — "AI infrastructure" → power → uranium. */
+export const exposureNodes = mysqlTable("exposure_nodes", {
+  id: int("id").autoincrement().primaryKey(),
+  thesisId: int("thesis_id").notNull(),
+  parentId: int("parent_id"),
+  label: varchar("label", { length: 160 }).notNull(),
+  depth: int("depth").default(0).notNull(),
+  path: varchar("path", { length: 512 }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type ExposureNode = typeof exposureNodes.$inferSelect;
+export type InsertExposureNode = typeof exposureNodes.$inferInsert;
+
+/** Which nodes the portfolio actually covers — and which are underexposed. */
+export const exposureCoverage = mysqlTable("exposure_coverage", {
+  id: int("id").autoincrement().primaryKey(),
+  runId: int("run_id").notNull(),
+  nodeId: int("node_id").notNull(),
+  symbol: varchar("symbol", { length: 24 }).notNull(),
+  weightPct: float("weight_pct"),
+  source: mysqlEnum("source", ["holding", "intended", "candidate"]).notNull(),
+});
+export type ExposureCoverage = typeof exposureCoverage.$inferSelect;
+export type InsertExposureCoverage = typeof exposureCoverage.$inferInsert;
