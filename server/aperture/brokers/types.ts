@@ -79,6 +79,11 @@ export interface BrokerAdapter {
   getAccount(): Promise<BrokerAccount>;
   getPositions(): Promise<BrokerPosition[]>;
   submitOrder(order: OrderRequest, opts: { isPaper: boolean }): Promise<OrderResult>;
+  /** Recent orders, newest first. A notional market order is `accepted` before
+   *  it is `filled`, so the fill has to be read back rather than assumed. */
+  getOrders(opts?: { limit?: number }): Promise<OrderResult[]>;
+  /** One order by broker id. Null when the broker has no record of it. */
+  getOrder(brokerOrderId: string): Promise<OrderResult | null>;
 }
 
 /** The single gate every adapter routes order submission through. */

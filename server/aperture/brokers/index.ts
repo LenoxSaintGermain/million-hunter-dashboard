@@ -72,6 +72,39 @@ export function manualBroker(accountId: number): BrokerAdapter {
         "Manual accounts cannot execute. Connect a paper broker, or record the trade yourself.",
       );
     },
+
+    async getOrders(): Promise<OrderResult[]> {
+      return []; // a manual account has no order history to read back
+    },
+
+    async getOrder(): Promise<OrderResult | null> {
+      return null;
+    },
+  };
+}
+
+/**
+ * Alpaca's order JSON → our shape. Shared by submit and read-back.
+ *
+ * Alpaca has many more order states than we do, and the mapping matters: a
+ * notional market order comes back `pending_new` on submit and only becomes
+ * `filled` later. Anything not clearly accepted or terminal is `pending`, so a
+ * caller never reads an in-flight order as done.
+ */
+export function toOrderResult(data: any): OrderResult {
+  const filledAvg = num(data?.filled_avg_price);
+  const status = String(data?.status ?? "");
+  return {
+    brokerOrderId: String(data?.id ?? ""),
+    status:
+      status === "filled" ? "filled"
+        : status === "rejected" || status === "canceled" || status === "expired" ? "rejected"
+        : status === "accepted" || status === "new" ? "accepted"
+        : "pending",
+    filledQty: num(data?.filled_qty),
+    filledAvgPriceCents: filledAvg == null ? null : dollarsToCents(filledAvg),
+    submittedAt: data?.submitted_at ? Date.parse(data.submitted_at) : Date.now(),
+    raw: data,
   };
 }
 
@@ -178,15 +211,25 @@ export const alpacaPaperBroker: BrokerAdapter = {
         raw: data ?? { status: res.status },
       };
     }
-    const filledAvg = num(data?.filled_avg_price);
-    return {
-      brokerOrderId: String(data?.id ?? ""),
-      status: data?.status === "filled" ? "filled" : "accepted",
-      filledQty: num(data?.filled_qty),
-      filledAvgPriceCents: filledAvg == null ? null : dollarsToCents(filledAvg),
-      submittedAt: Date.now(),
-      raw: data,
-    };
+    return toOrderResult(data);
+  },
+
+  async getOrders(opts: { limit?: number } = {}): Promise<OrderResult[]> {
+    const limit = opts.limit ?? 25;
+    const data = await httpJson<any[]>(
+      `${ALPACA_PAPER_BASE}/orders?status=all&limit=${limit}&direction=desc`,
+      { headers: alpacaHeaders() },
+    );
+    return Array.isArray(data) ? data.map(toOrderResult) : [];
+  },
+
+  async getOrder(brokerOrderId: string): Promise<OrderResult | null> {
+    if (!brokerOrderId) return null;
+    const data = await httpJson<any>(
+      `${ALPACA_PAPER_BASE}/orders/${encodeURIComponent(brokerOrderId)}`,
+      { headers: alpacaHeaders() },
+    );
+    return data ? toOrderResult(data) : null;
   },
 };
 
@@ -216,6 +259,12 @@ export const robinhoodMcpBroker: BrokerAdapter = {
     throw new BrokerUnavailableError(robinhoodMcpBroker.unavailableReason()!);
   },
   async submitOrder(): Promise<OrderResult> {
+    throw new BrokerUnavailableError(robinhoodMcpBroker.unavailableReason()!);
+  },
+  async getOrders(): Promise<OrderResult[]> {
+    throw new BrokerUnavailableError(robinhoodMcpBroker.unavailableReason()!);
+  },
+  async getOrder(): Promise<OrderResult | null> {
     throw new BrokerUnavailableError(robinhoodMcpBroker.unavailableReason()!);
   },
 };

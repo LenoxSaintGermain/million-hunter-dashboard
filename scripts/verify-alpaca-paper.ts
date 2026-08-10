@@ -75,6 +75,36 @@ async function main() {
     if (res.status === "rejected") {
       console.log(`  raw           ${JSON.stringify(res.raw).slice(0, 300)}`);
       console.log("\n  A rejection is still a working path — read the message above (markets closed, etc).");
+    } else if (res.brokerOrderId) {
+      // A notional market order comes back `accepted` and fills asynchronously.
+      // Read it back rather than assuming — that is the half of the round trip
+      // the submit call cannot prove.
+      console.log("\n  polling for the fill…");
+      for (let i = 0; i < 10; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const back = await alpacaPaperBroker.getOrder(res.brokerOrderId);
+        if (!back) {
+          console.log("  ✗ order id not found on read-back");
+          break;
+        }
+        const rawStatus = (back.raw as any)?.status;
+        console.log(`  [${i + 1}] status=${back.status} (${rawStatus}) filled=${back.filledQty ?? "—"} @ ${money(back.filledAvgPriceCents)}`);
+        if (back.status === "filled") {
+          console.log("\n  ✓ round trip complete: submitted, read back, filled.");
+          break;
+        }
+        if (back.status === "rejected") {
+          console.log("\n  order did not survive — see status above.");
+          break;
+        }
+        if (i === 9) {
+          console.log("\n  still open after 20s — likely outside market hours. The submit and");
+          console.log("  read-back paths both work; the fill will land when the market opens.");
+        }
+      }
+
+      const recent = await alpacaPaperBroker.getOrders({ limit: 5 });
+      console.log(`\n  order history reads back ${recent.length} order(s)`);
     }
   } else {
     console.log("\n(skipped order submission — pass --order to test the execution path)");

@@ -4,7 +4,7 @@ import { statusOf, unknownFact, num } from "./providers/types";
 import { __marketDataInternals } from "./providers/marketData";
 import { __edgarInternals } from "./providers/edgar";
 import { assertFactWritable } from "./facts";
-import { alpacaPaperBroker, robinhoodMcpBroker, listBrokers, brokerFor, assertPaperOnly, LiveTradingRefusedError } from "./brokers";
+import { alpacaPaperBroker, robinhoodMcpBroker, listBrokers, brokerFor, assertPaperOnly, toOrderResult, LiveTradingRefusedError } from "./brokers";
 
 const PAID_ENV = ["POLYGON_API_KEY", "FMP_API_KEY", "BENZINGA_API_KEY", "FRED_API_KEY", "ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY"];
 const saved: Record<string, string | undefined> = {};
@@ -194,5 +194,45 @@ describe("brokers — nothing in this build trades real money", () => {
     expect(m.capabilities.readPositions).toBe(true);
     await expect(m.submitOrder({ symbol: "X", side: "buy", qty: 1, type: "market", timeInForce: "day" }, { isPaper: true }))
       .rejects.toThrow(/cannot execute/);
+    expect(await m.getOrders()).toEqual([]);
+    expect(await m.getOrder("anything")).toBeNull();
+  });
+});
+
+describe("Alpaca order status mapping", () => {
+  // Verified against the live sandbox: a $1 notional SPY market order returns
+  // pending_new on submit and filled on read-back a few seconds later.
+  it("does not read an in-flight order as done", () => {
+    expect(toOrderResult({ id: "x", status: "pending_new" }).status).toBe("pending");
+    expect(toOrderResult({ id: "x", status: "partially_filled" }).status).toBe("pending");
+  });
+
+  it("maps accepted and new to accepted", () => {
+    expect(toOrderResult({ id: "x", status: "accepted" }).status).toBe("accepted");
+    expect(toOrderResult({ id: "x", status: "new" }).status).toBe("accepted");
+  });
+
+  it("maps every terminal failure to rejected", () => {
+    for (const s of ["rejected", "canceled", "expired"]) {
+      expect(toOrderResult({ id: "x", status: s }).status).toBe("rejected");
+    }
+  });
+
+  it("converts the fill price to cents and keeps the raw payload", () => {
+    const r = toOrderResult({ id: "abc", status: "filled", filled_qty: "0.001281808", filled_avg_price: "772.35" });
+    expect(r.status).toBe("filled");
+    expect(r.filledAvgPriceCents).toBe(77235);
+    expect(r.filledQty).toBeCloseTo(0.001281808, 9);
+    expect((r.raw as any).id).toBe("abc");
+  });
+
+  it("leaves an unfilled order's price null rather than zero", () => {
+    const r = toOrderResult({ id: "x", status: "pending_new", filled_avg_price: null });
+    expect(r.filledAvgPriceCents).toBeNull();
+  });
+
+  it("parses the broker's submitted_at rather than stamping now", () => {
+    const r = toOrderResult({ id: "x", status: "filled", submitted_at: "2026-08-10T19:40:00Z" });
+    expect(r.submittedAt).toBe(Date.parse("2026-08-10T19:40:00Z"));
   });
 });
