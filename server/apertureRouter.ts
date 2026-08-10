@@ -11,7 +11,7 @@
  * so the contract is visible in the server code too.
  */
 import { z } from "zod";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   capitalTheses,
@@ -38,6 +38,11 @@ import { assembleRun } from "./aperture/run";
 import { generateMemo } from "./aperture/memo";
 import { brokerFor, listBrokers } from "./aperture/brokers/index";
 import { normSymbol } from "./aperture/facts";
+import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills } from "./aperture/orderFlow";
+import { runMonitoringChecks, getMonitoringChecks, getFlaggedChecks } from "./aperture/monitor";
+import { computeAlpha, getAlpha } from "./aperture/alpha";
+import { brokerOrders, monitoringChecks } from "../drizzle/schema";
+import { desc } from "drizzle-orm";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -402,8 +407,108 @@ export const apertureRouter = router({
         citations: memoResult.citations,
       }).where(eq(apertureCandidates.id, input.candidateId));
 
-      return memoResult;
+    return memoResult;
     }),
+
+  // ── Order management ──────────────────────────────────────────────────────
+
+  order: router({
+    list: adminProcedure
+      .input(z.object({ runId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        return db!.select().from(brokerOrders)
+          .where(and(eq(brokerOrders.runId, input.runId), eq(brokerOrders.userId, ctx.user.id)))
+          .orderBy(desc(brokerOrders.createdAt));
+      }),
+
+    create: adminProcedure
+      .input(z.object({
+        runId: z.number(),
+        candidateId: z.number().optional(),
+        accountId: z.number(),
+        symbol: z.string(),
+        side: z.enum(["buy", "sell"]),
+        qty: z.number().optional(),
+        notionalCents: z.number().optional(),
+        orderType: z.enum(["market", "limit"]).default("market"),
+        limitPriceCents: z.number().optional(),
+        timeInForce: z.enum(["day", "gtc"]).default("day"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const orderId = await createOrder({ ...input, userId: ctx.user.id });
+        return { orderId };
+      }),
+
+    approve: adminProcedure
+      .input(z.object({ orderId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        return approveOrder(input.orderId, ctx.user.id);
+      }),
+
+    reject: adminProcedure
+      .input(z.object({ orderId: z.number(), reason: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        await rejectOrder(input.orderId, ctx.user.id, input.reason);
+        return { ok: true };
+      }),
+
+    submit: adminProcedure
+      .input(z.object({ orderId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        return submitBrokerOrder(input.orderId, ctx.user.id);
+      }),
+
+    mirrorFills: adminProcedure
+      .mutation(async ({ ctx }) => {
+        const updated = await mirrorFills(ctx.user.id);
+        return { updated };
+      }),
+  }),
+
+  // ── Monitoring ─────────────────────────────────────────────────────────────
+
+  monitor: router({
+    run: adminProcedure
+      .input(z.object({
+        runId: z.number(),
+        candidateId: z.number(),
+        symbol: z.string(),
+        thesisSummary: z.string(),
+        checkTypes: z.array(z.enum(["catalyst", "thesis_invalidation", "earnings", "macro"])).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return runMonitoringChecks(
+          input.runId,
+          input.candidateId,
+          input.symbol,
+          input.thesisSummary,
+          input.checkTypes,
+        );
+      }),
+
+    list: adminProcedure
+      .input(z.object({ runId: z.number() }))
+      .query(async ({ input }) => getMonitoringChecks(input.runId)),
+
+    flagged: adminProcedure
+      .input(z.object({ runId: z.number() }))
+      .query(async ({ input }) => getFlaggedChecks(input.runId)),
+  }),
+
+  // ── Aperture Alpha ─────────────────────────────────────────────────────────
+
+  alpha: router({
+    compute: adminProcedure
+      .input(z.object({ runId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        return computeAlpha(input.runId, ctx.user.id);
+      }),
+
+    get: adminProcedure
+      .input(z.object({ runId: z.number() }))
+      .query(async ({ input }) => getAlpha(input.runId)),
+  }),
 });
 
 // ── Background run executor ───────────────────────────────────────────────────

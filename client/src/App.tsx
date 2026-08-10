@@ -60,6 +60,7 @@ import ExposureMap from "./pages/aperture/ExposureMap";
 import CandidateBoard from "./pages/aperture/CandidateBoard";
 import StrategyCompare from "./pages/aperture/StrategyCompare";
 import MemoDrawer from "./pages/aperture/MemoDrawer";
+import ApertureExecute from "./pages/aperture/ApertureExecute";
 import { getLoginUrl } from "./const";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
@@ -228,6 +229,7 @@ function Router() {
         <Route path="/aperture/run/:id/exposure">{() => <ProtectedRoute component={ExposureMap} />}</Route>
         <Route path="/aperture/run/:id/strategies">{() => <ProtectedRoute component={StrategyCompare} />}</Route>
         <Route path="/aperture/run/:runId/memo/:candidateId">{() => <ProtectedRoute component={MemoDrawer} />}</Route>
+        <Route path="/aperture/run/:id/execute">{() => <ProtectedRoute component={ApertureExecute} />}</Route>
 
         {/* Invite accept — role assignment on first login */}
         <Route path="/invite/:token" component={InviteAccept} />

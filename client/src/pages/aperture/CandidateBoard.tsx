@@ -90,6 +90,9 @@ export default function CandidateBoard() {
             <Button variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}/strategies`)}>
               Strategies
             </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}/execute`)}>
+              Execute &amp; Monitor
+            </Button>
           </div>
         </div>
 

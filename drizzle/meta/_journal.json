@@ -169,6 +169,13 @@
       "when": 1785107908833,
       "tag": "0023_peaceful_brother_voodoo",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1786389702978,
+      "tag": "0024_sticky_scream",
+      "breakpoints": true
     }
   ]
 }

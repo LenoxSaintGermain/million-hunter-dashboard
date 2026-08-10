@@ -1241,3 +1241,129 @@ export const exposureCoverage = mysqlTable("exposure_coverage", {
 });
 export type ExposureCoverage = typeof exposureCoverage.$inferSelect;
 export type InsertExposureCoverage = typeof exposureCoverage.$inferInsert;
+
+// ── Phase 2: Execute, Monitor, Measure ───────────────────────────────────────
+
+/**
+ * Paper orders — the human approves, the system submits, fills are mirrored back.
+ * No live money. assertPaperOnly() enforces this at the adapter layer.
+ *
+ * Lifecycle: pending_approval → approved → submitted → filled | rejected | cancelled
+ * A human must approve before submission. There is no auto-submit path.
+ */
+export const brokerOrders = mysqlTable("broker_orders", {
+  id: int("id").autoincrement().primaryKey(),
+  runId: int("run_id").notNull(),
+  candidateId: int("candidate_id"),
+  accountId: int("account_id").notNull(),
+  userId: int("user_id").notNull(),
+  symbol: varchar("symbol", { length: 24 }).notNull(),
+  side: mysqlEnum("side", ["buy", "sell"]).notNull(),
+  /** Whole or fractional shares. Exactly one of qty / notionalCents. */
+  qty: float("qty"),
+  notionalCents: bigint("notional_cents", { mode: "number" }),
+  orderType: mysqlEnum("order_type", ["market", "limit"]).default("market").notNull(),
+  limitPriceCents: bigint("limit_price_cents", { mode: "number" }),
+  timeInForce: mysqlEnum("time_in_force", ["day", "gtc"]).default("day").notNull(),
+  /** Human approval is required before submission. */
+  status: mysqlEnum("status", [
+    "pending_approval", "approved", "submitted", "filled", "rejected", "cancelled",
+  ]).default("pending_approval").notNull(),
+  /** Broker-assigned order ID, set after submission. */
+  brokerOrderId: varchar("broker_order_id", { length: 128 }),
+  /** Fill details, mirrored from the broker after the order settles. */
+  filledQty: float("filled_qty"),
+  filledAvgPriceCents: bigint("filled_avg_price_cents", { mode: "number" }),
+  /** Why the human rejected or the broker rejected. */
+  rejectionReason: text("rejection_reason"),
+  approvedAt: bigint("approved_at", { mode: "number" }),
+  submittedAt: bigint("submitted_at", { mode: "number" }),
+  filledAt: bigint("filled_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type BrokerOrder = typeof brokerOrders.$inferSelect;
+export type InsertBrokerOrder = typeof brokerOrders.$inferInsert;
+
+/**
+ * Position snapshots — periodic captures of account state for P&L tracking.
+ * Measured from real paper fills, never asserted.
+ */
+export const positionSnapshots = mysqlTable("position_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  accountId: int("account_id").notNull(),
+  runId: int("run_id"),
+  symbol: varchar("symbol", { length: 24 }).notNull(),
+  qty: float("qty").notNull(),
+  avgCostCents: bigint("avg_cost_cents", { mode: "number" }),
+  lastPriceCents: bigint("last_price_cents", { mode: "number" }),
+  marketValueCents: bigint("market_value_cents", { mode: "number" }),
+  unrealizedPnlCents: bigint("unrealized_pnl_cents", { mode: "number" }),
+  /** Verified = from broker API. Modeled = estimated from last known price. */
+  priceBasis: mysqlEnum("price_basis", ["verified", "modeled"]).default("modeled").notNull(),
+  snapshotAt: bigint("snapshot_at", { mode: "number" }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type PositionSnapshot = typeof positionSnapshots.$inferSelect;
+export type InsertPositionSnapshot = typeof positionSnapshots.$inferInsert;
+
+/**
+ * Monitoring checks — post-entry catalyst and thesis-invalidation signals.
+ * Sourced from Sonar with citations. A check that fires is surfaced to the
+ * operator; it does not trigger any autonomous action.
+ */
+export const monitoringChecks = mysqlTable("monitoring_checks", {
+  id: int("id").autoincrement().primaryKey(),
+  runId: int("run_id").notNull(),
+  candidateId: int("candidate_id").notNull(),
+  symbol: varchar("symbol", { length: 24 }).notNull(),
+  checkType: mysqlEnum("check_type", ["catalyst", "thesis_invalidation", "earnings", "macro"]).notNull(),
+  /** What the check found. Null if nothing material. */
+  finding: text("finding"),
+  /** Did this check find something that warrants operator review? */
+  flagged: boolean("flagged").default(false).notNull(),
+  citations: json("citations").$type<string[]>().default([]),
+  checkedAt: bigint("checked_at", { mode: "number" }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type MonitoringCheck = typeof monitoringChecks.$inferSelect;
+export type InsertMonitoringCheck = typeof monitoringChecks.$inferInsert;
+
+/**
+ * Aperture Alpha — the honest product metric.
+ *
+ * Measures: human opportunity set vs system opportunity set, candidates added,
+ * and deltas in return, max drawdown, concentration, and capital utilization.
+ * Computed from real paper outcomes only. Never asserted.
+ *
+ * One row per run, updated as fills arrive and positions are marked.
+ */
+export const apertureAlpha = mysqlTable("aperture_alpha", {
+  id: int("id").autoincrement().primaryKey(),
+  runId: int("run_id").notNull().unique(),
+  userId: int("user_id").notNull(),
+  /** How many symbols the human intended to trade. */
+  humanOpportunitySetCount: int("human_opportunity_set_count").default(0).notNull(),
+  /** How many symbols the system discovered beyond the human set. */
+  systemAddedCount: int("system_added_count").default(0).notNull(),
+  /** How many system candidates the human approved and filled. */
+  systemFilledCount: int("system_filled_count").default(0).notNull(),
+  /** P&L of human-intended positions (paper, cents). */
+  humanPnlCents: bigint("human_pnl_cents", { mode: "number" }),
+  /** P&L of system-added positions (paper, cents). */
+  systemPnlCents: bigint("system_pnl_cents", { mode: "number" }),
+  /** Max drawdown of the full aperture portfolio (basis points). */
+  maxDrawdownBps: int("max_drawdown_bps"),
+  /** HHI concentration before vs after system additions. */
+  hhiBefore: float("hhi_before"),
+  hhiAfter: float("hhi_after"),
+  /** Capital utilization: deployed / deployable. */
+  capitalUtilizationPct: float("capital_utilization_pct"),
+  /** Basis for all figures: verified = from real fills, modeled = estimated. */
+  metricBasis: mysqlEnum("metric_basis", ["verified", "modeled", "mixed"]).default("modeled").notNull(),
+  lastComputedAt: bigint("last_computed_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type ApertureAlpha = typeof apertureAlpha.$inferSelect;
+export type InsertApertureAlpha = typeof apertureAlpha.$inferInsert;
