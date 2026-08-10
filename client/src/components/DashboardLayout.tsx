@@ -27,6 +27,7 @@ import {
   Settings2,
   Layers,
   Landmark,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -54,6 +55,13 @@ const navSections = [
       { href: "/strategy-blender", icon: BarChart3, label: "Strategy Blender", badge: null },
       { href: "/investor-dossier", icon: Sparkles, label: "Investor Dossier", badge: null },
       { href: "/tide", icon: Activity, label: "TIDE Intelligence", badge: { label: "New", color: "amber" } },
+    ],
+  },
+  {
+    label: "Capital Aperture",
+    items: [
+      { href: "/aperture", icon: TrendingUp, label: "Aperture Home", badge: { label: "v0", color: "amber" } },
+      { href: "/aperture/thesis/new", icon: Sparkles, label: "New Thesis", badge: null },
     ],
   },
   {

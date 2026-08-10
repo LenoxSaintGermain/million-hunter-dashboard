@@ -34,10 +34,12 @@ import { rippleRouter } from "./rippleRouter";
 import { agentRouter } from "./routers/agentRouter";
 import { rolePermissionsRouter } from "./rolePermissionsRouter";
 import { researchRouter } from "./routers/research";
+import { apertureRouter } from "./apertureRouter";
 
 export const appRouter = router({
   system: systemRouter,
   agent: agentRouter,
+  aperture: apertureRouter,
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),

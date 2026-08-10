@@ -54,6 +54,12 @@ import ThesisStudio from "./pages/ThesisStudio";
 import CsvImport from "./pages/CsvImport";
 import SourcingSchedules from "./pages/SourcingSchedules";
 import OffMarketDiscovery from "./pages/OffMarketDiscovery";
+import ApertureHome from "./pages/aperture/ApertureHome";
+import ThesisGraphEditor from "./pages/aperture/ThesisGraphEditor";
+import ExposureMap from "./pages/aperture/ExposureMap";
+import CandidateBoard from "./pages/aperture/CandidateBoard";
+import StrategyCompare from "./pages/aperture/StrategyCompare";
+import MemoDrawer from "./pages/aperture/MemoDrawer";
 import { getLoginUrl } from "./const";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
@@ -213,6 +219,15 @@ function Router() {
         <Route path="/import">{() => <ProtectedRoute component={CsvImport} />}</Route>
         <Route path="/verify">{() => <ProtectedRoute component={VerificationQueue} />}</Route>
         <Route path="/wingate/asset/:id">{() => <ProtectedRoute component={AssetDossier} />}</Route>
+
+        {/* ── Capital Aperture — liquid securities engine ── */}
+        <Route path="/aperture">{() => <ProtectedRoute component={ApertureHome} />}</Route>
+        <Route path="/aperture/thesis/new">{() => <ProtectedRoute component={ThesisGraphEditor} />}</Route>
+        <Route path="/aperture/thesis/:id">{() => <ProtectedRoute component={ThesisGraphEditor} />}</Route>
+        <Route path="/aperture/run/:id">{() => <ProtectedRoute component={CandidateBoard} />}</Route>
+        <Route path="/aperture/run/:id/exposure">{() => <ProtectedRoute component={ExposureMap} />}</Route>
+        <Route path="/aperture/run/:id/strategies">{() => <ProtectedRoute component={StrategyCompare} />}</Route>
+        <Route path="/aperture/run/:runId/memo/:candidateId">{() => <ProtectedRoute component={MemoDrawer} />}</Route>
 
         {/* Invite accept — role assignment on first login */}
         <Route path="/invite/:token" component={InviteAccept} />
