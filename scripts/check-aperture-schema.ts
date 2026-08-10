@@ -1,80 +1,97 @@
-import 'dotenv/config';
-import mysql from 'mysql2/promise';
+/**
+ * Is migration 0028 (Capital Aperture) actually present on this database?
+ *
+ * Worth having as its own check because a Manus deploy ships CODE; it does not
+ * necessarily run migrations. "Deployed" and "migrated" are separate facts, and
+ * assuming the first implies the second is how you get a router that 500s on
+ * every call against a table that was never created.
+ *
+ * READ-ONLY. Every statement is a catalogue lookup.
+ *
+ *     export PATH="/opt/homebrew/opt/node@26/bin:/opt/homebrew/bin:$PATH"
+ *     npx tsx scripts/check-aperture-schema.ts
+ */
+import "dotenv/config";
+import { sql } from "drizzle-orm";
+import { getDb } from "../server/db";
 
-// All tables and indexes introduced by 0028_capital_aperture.sql
-const EXPECTED_TABLES = [
-  'portfolio_accounts',
-  'positions',
-  'securities',
-  'security_facts',
-  'aperture_runs',
-  'aperture_candidates',
-  'aperture_strategies',
-  'exposure_nodes',
-  'exposure_coverage',
+const TABLES = [
+  "capital_theses",
+  "portfolio_accounts",
+  "positions",
+  "securities",
+  "security_facts",
+  "aperture_runs",
+  "aperture_candidates",
+  "aperture_strategies",
+  "exposure_nodes",
+  "exposure_coverage",
 ];
 
-const EXPECTED_INDEXES: Record<string, string[]> = {
-  positions:           ['positions_account_idx', 'positions_symbol_idx'],
-  security_facts:      ['security_facts_symbol_key_idx', 'security_facts_expiry_idx'],
-  aperture_runs:       ['aperture_runs_user_idx'],
-  aperture_candidates: ['aperture_candidates_run_idx'],
-  aperture_strategies: ['aperture_strategies_run_idx'],
-  exposure_nodes:      ['exposure_nodes_thesis_idx'],
-  exposure_coverage:   ['exposure_coverage_run_idx'],
-};
+const COLUMNS: Array<[string, string]> = [["users", "merged_into_user_id"]];
 
-async function main() {
-  const conn = await mysql.createConnection(process.env.DATABASE_URL!);
-
-  // 1. Check tables exist
-  const [rows] = await conn.execute<mysql.RowDataPacket[]>(
-    `SELECT TABLE_NAME FROM information_schema.TABLES
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (${EXPECTED_TABLES.map(() => '?').join(',')})`,
-    EXPECTED_TABLES
-  );
-  const foundTables = new Set(rows.map(r => r.TABLE_NAME as string));
-
-  let allOk = true;
-  for (const t of EXPECTED_TABLES) {
-    if (foundTables.has(t)) {
-      console.log(`  ✓  ${t}`);
-    } else {
-      console.error(`  ✗  MISSING TABLE: ${t}`);
-      allOk = false;
-    }
-  }
-
-  // 2. Check indexes exist
-  for (const [table, indexes] of Object.entries(EXPECTED_INDEXES)) {
-    const [idxRows] = await conn.execute<mysql.RowDataPacket[]>(
-      `SELECT INDEX_NAME FROM information_schema.STATISTICS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME IN (${indexes.map(() => '?').join(',')})`,
-      [table, ...indexes]
-    );
-    const foundIdx = new Set(idxRows.map(r => r.INDEX_NAME as string));
-    for (const idx of indexes) {
-      if (foundIdx.has(idx)) {
-        console.log(`  ✓  ${table}.${idx}`);
-      } else {
-        console.error(`  ✗  MISSING INDEX: ${table}.${idx}`);
-        allOk = false;
-      }
-    }
-  }
-
-  await conn.end();
-
-  if (allOk) {
-    console.log('\n✅  0028_capital_aperture schema verified — all 9 tables and 11 indexes present.');
-    process.exit(0);
-  } else {
-    console.error('\n❌  Schema verification FAILED — see missing items above.');
-    process.exit(1);
-  }
+function unwrap(rows: any): any[] {
+  if (!Array.isArray(rows)) return rows ? [rows] : [];
+  return Array.isArray(rows[0]) ? rows[0] : rows;
 }
 
-main().catch(e => {
-  console.error(e);
+async function main() {
+  const db = await getDb();
+  if (!db) {
+    console.error("Could not connect to the database.");
+    process.exit(1);
+  }
+
+  console.log("Migration 0028 — Capital Aperture · schema presence check\n");
+
+  const present: string[] = [];
+  const missing: string[] = [];
+
+  for (const t of TABLES) {
+    const rows = unwrap(
+      await db.execute(
+        sql`SELECT COUNT(*) AS n FROM information_schema.tables
+            WHERE table_schema = DATABASE() AND table_name = ${t}`,
+      ),
+    );
+    (Number(rows[0]?.n ?? 0) > 0 ? present : missing).push(t);
+  }
+
+  for (const [table, column] of COLUMNS) {
+    const rows = unwrap(
+      await db.execute(
+        sql`SELECT COUNT(*) AS n FROM information_schema.columns
+            WHERE table_schema = DATABASE() AND table_name = ${table} AND column_name = ${column}`,
+      ),
+    );
+    (Number(rows[0]?.n ?? 0) > 0 ? present : missing).push(`${table}.${column}`);
+  }
+
+  console.log(`PRESENT (${present.length})`);
+  for (const p of present) console.log(`  ✓ ${p}`);
+  console.log(`\nMISSING (${missing.length})`);
+  for (const m of missing) console.log(`  ✗ ${m}`);
+
+  if (!missing.length) {
+    console.log("\n0028 is fully applied. The merge script and the Aperture router can run.");
+    process.exit(0);
+  }
+  if (present.length === 0) {
+    console.log("\n0028 has NOT been applied at all — the deploy shipped code without running migrations.");
+    console.log("Apply it with:  npx tsx scripts/apply-0028.ts --apply");
+    console.log("");
+    console.log("Do NOT reach for `pnpm db:push` on this database. drizzle-kit push diffs the");
+    console.log("WHOLE of schema.ts against the live schema and will happily propose dropping or");
+    console.log("altering unrelated columns wherever prod has drifted from the file. 0028 is");
+    console.log("purely additive; apply exactly it and nothing else.");
+  } else {
+    console.log("\n0028 is PARTIALLY applied. Do not re-run the whole file blindly —");
+    console.log("apply only the missing objects, or the CREATE TABLEs that already exist will error.");
+  }
+  process.exit(1);
+}
+
+main().catch((e) => {
+  console.error("Check failed:", e);
   process.exit(1);
 });
