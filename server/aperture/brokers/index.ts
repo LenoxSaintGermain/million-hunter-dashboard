@@ -111,10 +111,25 @@ export function toOrderResult(data: any): OrderResult {
 // ── Alpaca paper ─────────────────────────────────────────────────────────────
 const ALPACA_PAPER_BASE = "https://paper-api.alpaca.markets/v2";
 
-function alpacaHeaders(): Record<string, string> {
+const ALPACA_KEY_ID_ENV = ["ALPACA_PAPER_KEY", "ALPACA_API_KEY_ID"] as const;
+const ALPACA_SECRET_ENV = ["ALPACA_PAPER_SECRET", "ALPACA_API_SECRET_KEY"] as const;
+
+function firstConfiguredEnv(names: readonly string[]): string | null {
+  return names.map((name) => process.env[name]).find((value): value is string => Boolean(value)) ?? null;
+}
+
+function alpacaCredentials() {
   return {
-    "APCA-API-KEY-ID": process.env.ALPACA_API_KEY_ID ?? "",
-    "APCA-API-SECRET-KEY": process.env.ALPACA_API_SECRET_KEY ?? "",
+    keyId: firstConfiguredEnv(ALPACA_KEY_ID_ENV),
+    secret: firstConfiguredEnv(ALPACA_SECRET_ENV),
+  };
+}
+
+function alpacaHeaders(): Record<string, string> {
+  const credentials = alpacaCredentials();
+  return {
+    "APCA-API-KEY-ID": credentials.keyId ?? "",
+    "APCA-API-SECRET-KEY": credentials.secret ?? "",
     "Content-Type": "application/json",
   };
 }
@@ -122,7 +137,7 @@ function alpacaHeaders(): Record<string, string> {
 export const alpacaPaperBroker: BrokerAdapter = {
   id: "alpaca_paper",
   label: "Alpaca (paper)",
-  requiredEnv: ["ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY"],
+  requiredEnv: ["ALPACA_PAPER_KEY", "ALPACA_PAPER_SECRET"],
   capabilities: {
     serverSideExecution: true,
     paperTrading: true,
@@ -134,10 +149,15 @@ export const alpacaPaperBroker: BrokerAdapter = {
     ],
   },
   available() {
-    return this.requiredEnv.every((k) => Boolean(process.env[k]));
+    const credentials = alpacaCredentials();
+    return Boolean(credentials.keyId && credentials.secret);
   },
   unavailableReason() {
-    const missing = this.requiredEnv.filter((k) => !process.env[k]);
+    const credentials = alpacaCredentials();
+    const missing = [
+      !credentials.keyId ? "ALPACA_PAPER_KEY (or ALPACA_API_KEY_ID)" : null,
+      !credentials.secret ? "ALPACA_PAPER_SECRET (or ALPACA_API_SECRET_KEY)" : null,
+    ].filter(Boolean);
     return missing.length ? `not configured — missing ${missing.join(", ")}` : null;
   },
 

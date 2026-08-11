@@ -1106,3 +1106,7 @@
 - [x] Add "Review in Wingate →" shortcut link on historic asset cards in Scout
 - [x] Fix Home HistoricPipeline widget to filter only genuine historic/stabilized assets (not all assets)
 - [x] Fix stack.test.ts boundary condition (>0.35 → >=0.35) and seed missing macro_signals (106/106 passing)
+
+## Capital Aperture — Alpaca Paper E2E Readiness (Aug 11 2026)
+- [x] Align Alpaca broker adapter environment-variable names with the configured Paper key and secret
+- [x] Verify the Paper account endpoint and safe position sync without submitting an order

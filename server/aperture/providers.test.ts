@@ -6,7 +6,10 @@ import { __edgarInternals } from "./providers/edgar";
 import { assertFactWritable } from "./facts";
 import { alpacaPaperBroker, robinhoodMcpBroker, listBrokers, brokerFor, assertPaperOnly, toOrderResult, LiveTradingRefusedError } from "./brokers";
 
-const PAID_ENV = ["POLYGON_API_KEY", "FMP_API_KEY", "BENZINGA_API_KEY", "FRED_API_KEY", "ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY"];
+const PAID_ENV = [
+  "POLYGON_API_KEY", "FMP_API_KEY", "BENZINGA_API_KEY", "FRED_API_KEY",
+  "ALPACA_PAPER_KEY", "ALPACA_PAPER_SECRET", "ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY",
+];
 const saved: Record<string, string | undefined> = {};
 
 beforeEach(() => {
@@ -158,17 +161,23 @@ describe("brokers — nothing in this build trades real money", () => {
     expect(() => assertPaperOnly("Alpaca", true)).not.toThrow();
   });
 
-  it("reports Alpaca unavailable without keys, naming both", () => {
+  it("reports Alpaca unavailable without keys, naming both Paper credential variables", () => {
     expect(alpacaPaperBroker.available()).toBe(false);
-    expect(alpacaPaperBroker.unavailableReason()).toMatch(/ALPACA_API_KEY_ID/);
-    expect(alpacaPaperBroker.unavailableReason()).toMatch(/ALPACA_API_SECRET_KEY/);
+    expect(alpacaPaperBroker.unavailableReason()).toMatch(/ALPACA_PAPER_KEY/);
+    expect(alpacaPaperBroker.unavailableReason()).toMatch(/ALPACA_PAPER_SECRET/);
   });
 
-  it("becomes available once both Alpaca keys exist", () => {
+  it("becomes available once both current Alpaca Paper keys exist", () => {
+    process.env.ALPACA_PAPER_KEY = "k";
+    process.env.ALPACA_PAPER_SECRET = "s";
+    expect(alpacaPaperBroker.available()).toBe(true);
+    expect(alpacaPaperBroker.unavailableReason()).toBeNull();
+  });
+
+  it("keeps legacy Alpaca credential aliases working during the migration", () => {
     process.env.ALPACA_API_KEY_ID = "k";
     process.env.ALPACA_API_SECRET_KEY = "s";
     expect(alpacaPaperBroker.available()).toBe(true);
-    expect(alpacaPaperBroker.unavailableReason()).toBeNull();
   });
 
   // The constraint that reshaped the design.
