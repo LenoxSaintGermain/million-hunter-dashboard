@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  AlertTriangle, CheckCircle2, XCircle, Send, RefreshCw, TrendingUp,
+  AlertTriangle, ArrowLeft, CheckCircle2, XCircle, Send, RefreshCw, TrendingUp,
   TrendingDown, Minus, Flag, BarChart3, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
