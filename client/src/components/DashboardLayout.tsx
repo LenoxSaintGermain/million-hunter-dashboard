@@ -28,6 +28,7 @@ import {
   Layers,
   Landmark,
   TrendingUp,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -62,6 +63,7 @@ const navSections = [
     items: [
       { href: "/aperture", icon: TrendingUp, label: "Aperture Home", badge: { label: "v0", color: "amber" } },
       { href: "/aperture/thesis/new", icon: Sparkles, label: "New Thesis", badge: null },
+      { href: "/aperture/accounts", icon: Wallet, label: "Accounts", badge: null },
     ],
   },
   {

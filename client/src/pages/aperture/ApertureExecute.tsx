@@ -360,6 +360,7 @@ function MetricCard({
 export default function ApertureExecute() {
   const [, params] = useRoute("/aperture/run/:id/execute");
   const runId = Number(params?.id);
+  const [, navigate] = useLocation();
 
   const { data } = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
   const run = data?.run;
@@ -370,9 +371,14 @@ export default function ApertureExecute() {
         <DisclaimerBanner />
 
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>
-            Run #{runId} · Execute & Monitor
-          </h1>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate(`/aperture/run/${runId}`)}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>
+              Run #{runId} · Execute &amp; Monitor
+            </h1>
+          </div>
           {run && (
             <p className="text-sm mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>
               Status: {run.status} · {run.candidateCount ?? "—"} candidates

@@ -2,11 +2,12 @@
  * Strategy Compare — four strategies side by side + Recomposition diff.
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
  */
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/DashboardLayout";
 
 const KIND_LABELS: Record<string, string> = {
@@ -33,6 +34,7 @@ function fmt(cents: number | null | undefined): string {
 export default function StrategyCompare() {
   const [, params] = useRoute("/aperture/run/:id/strategies");
   const runId = Number(params?.id);
+  const [, navigate] = useLocation();
 
   const { data, isLoading } = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
 
@@ -53,7 +55,12 @@ export default function StrategyCompare() {
         </div>
 
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>Strategy Comparison</h1>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate(`/aperture/run/${runId}`)}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>Strategy Comparison</h1>
+          </div>
           <p className="text-sm mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>Run #{runId} · {strategies.length} strategies constructed</p>
         </div>
 

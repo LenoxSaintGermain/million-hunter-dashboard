@@ -2,17 +2,19 @@
  * Memo Drawer — evidence-backed investment memo for one candidate.
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
  */
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, ExternalLink, CheckCircle2, XCircle, SkipForward } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ExternalLink, CheckCircle2, XCircle, SkipForward } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/DashboardLayout";
 
 export default function MemoDrawer() {
   const [, params] = useRoute("/aperture/run/:runId/memo/:candidateId");
   const runId = Number(params?.runId);
   const candidateId = Number(params?.candidateId);
+  const [, navigate] = useLocation();
 
   const { data, isLoading } = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
 
@@ -36,7 +38,10 @@ export default function MemoDrawer() {
           Internal research tool — not investment advice. All figures traced to the fact ledger.
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate(`/aperture/run/${runId}`)}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <span className="text-2xl font-bold font-mono" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol}</span>
           <Badge variant="outline">{candidate.role}</Badge>
           {candidate.memoStatus === "ok" && <Badge style={{ background: "oklch(0.45 0.15 145)", color: "#fff" }}>Memo validated</Badge>}

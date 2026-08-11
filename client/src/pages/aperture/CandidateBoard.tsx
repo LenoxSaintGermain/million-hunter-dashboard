@@ -8,7 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, FileText, TrendingUp, TrendingDown, Minus, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, FileText, TrendingUp, TrendingDown, Minus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 
@@ -71,16 +71,21 @@ export default function CandidateBoard() {
         </div>
 
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>
-              Run #{runId} · Candidates
-            </h1>
-            <div className="flex items-center gap-2 mt-0.5">
-              <Badge variant="outline" style={{ color: statusColor }}>{run.status}</Badge>
-              <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
-                {candidates.length} candidates
-                {run.droppedNote ? ` · ${run.droppedNote}` : ""}
-              </span>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/aperture")}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>
+                Run #{runId} · Candidates
+              </h1>
+              <div className="flex items-center gap-2 mt-0.5">
+                <Badge variant="outline" style={{ color: statusColor }}>{run.status}</Badge>
+                <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
+                  {candidates.length} candidates
+                  {run.droppedNote ? ` · ${run.droppedNote}` : ""}
+                </span>
+              </div>
             </div>
           </div>
           <div className="flex gap-2">

@@ -61,6 +61,7 @@ import CandidateBoard from "./pages/aperture/CandidateBoard";
 import StrategyCompare from "./pages/aperture/StrategyCompare";
 import MemoDrawer from "./pages/aperture/MemoDrawer";
 import ApertureExecute from "./pages/aperture/ApertureExecute";
+import ApertureAccounts from "./pages/aperture/ApertureAccounts";
 import { getLoginUrl } from "./const";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
@@ -230,6 +231,7 @@ function Router() {
         <Route path="/aperture/run/:id/strategies">{() => <ProtectedRoute component={StrategyCompare} />}</Route>
         <Route path="/aperture/run/:runId/memo/:candidateId">{() => <ProtectedRoute component={MemoDrawer} />}</Route>
         <Route path="/aperture/run/:id/execute">{() => <ProtectedRoute component={ApertureExecute} />}</Route>
+        <Route path="/aperture/accounts">{() => <ProtectedRoute component={ApertureAccounts} />}</Route>
 
         {/* Invite accept — role assignment on first login */}
         <Route path="/invite/:token" component={InviteAccept} />
