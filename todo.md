@@ -1110,3 +1110,9 @@
 ## Capital Aperture — Alpaca Paper E2E Readiness (Aug 11 2026)
 - [x] Align Alpaca broker adapter environment-variable names with the configured Paper key and secret
 - [x] Verify the Paper account endpoint and safe position sync without submitting an order
+
+## Capital Aperture — Memo Flow & Editorial Alignment (Aug 11 2026)
+- [x] Audit the candidate-generated memo persistence path and clarify where generated memos live
+- [x] Add an Aperture memo library with explicit navigation from candidate cards and a persistent memo destination
+- [x] Align Aperture layouts, navigation, typography, tokens, empty states, and actions with the main Signal Hunter editorial app
+- [x] Verify the complete Aperture journey with route/type/test coverage without exposing Aperture to investor roles

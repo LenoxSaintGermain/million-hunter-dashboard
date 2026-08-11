@@ -354,8 +354,11 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
   const isActive = (href: string) =>
     href === "/" ? location === "/" : location.startsWith(href);
 
+  const analyzeNav = isAdmin
+    ? [...ANALYZE_NAV, { label: "Capital Aperture", href: "/aperture", icon: Landmark, badge: "Paper" }]
+    : ANALYZE_NAV;
   const hasMoreActive = MORE_NAV.some((n) => isActive(n.href));
-  const hasAnalyzeActive = ANALYZE_NAV.some((n) => isActive(n.href));
+  const hasAnalyzeActive = analyzeNav.some((n) => isActive(n.href));
   const hasActActive = ACT_NAV.some((n) => isActive(n.href));
 
   return (
@@ -430,7 +433,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                 <div className="px-3 py-1.5">
                   <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium">Analysis Tools</p>
                 </div>
-                {ANALYZE_NAV.map((item) => {
+                {analyzeNav.map((item) => {
                   const Icon = item.icon;
                   return (
                     <DropdownMenuItem key={item.href} asChild>

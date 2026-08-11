@@ -11,16 +11,25 @@ import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/DashboardLayout";
 
 export default function MemoDrawer() {
-  const [, params] = useRoute("/aperture/run/:runId/memo/:candidateId");
-  const runId = Number(params?.runId);
-  const candidateId = Number(params?.candidateId);
+  const [, runParams] = useRoute("/aperture/run/:runId/memo/:candidateId");
+  const [, libraryParams] = useRoute("/aperture/memos/:candidateId");
+  const runId = Number(runParams?.runId);
+  const candidateId = Number(runParams?.candidateId ?? libraryParams?.candidateId);
+  const isLibraryRoute = Boolean(libraryParams?.candidateId) && !runParams?.candidateId;
   const [, navigate] = useLocation();
 
-  const { data, isLoading } = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
+  const { data: runData, isLoading: isRunLoading } = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
+  const { data: libraryData, isLoading: isLibraryLoading } = trpc.aperture.memo.get.useQuery(
+    { candidateId },
+    { enabled: isLibraryRoute && !!candidateId },
+  );
+  const isLoading = isLibraryRoute ? isLibraryLoading : isRunLoading;
 
   if (isLoading) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Loading…</div></DashboardLayout>;
 
-  const candidate = data?.candidates.find((c) => c.id === candidateId);
+  const candidate = isLibraryRoute
+    ? libraryData?.candidate
+    : runData?.candidates.find((c) => c.id === candidateId);
   if (!candidate) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Candidate not found.</div></DashboardLayout>;
 
   const memo = candidate.memo as any;
@@ -39,7 +48,7 @@ export default function MemoDrawer() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate(`/aperture/run/${runId}`)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate(isLibraryRoute ? "/aperture/memos" : `/aperture/run/${runId}`)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <span className="text-2xl font-bold font-mono" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol}</span>

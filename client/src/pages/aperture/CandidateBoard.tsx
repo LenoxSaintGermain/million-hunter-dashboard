@@ -47,7 +47,12 @@ export default function CandidateBoard() {
 
   const { data, isLoading, refetch } = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
   const genMemo = trpc.aperture.generateMemo.useMutation({
-    onSuccess: () => { toast.success("Memo generated"); refetch(); setGeneratingMemo(null); },
+    onSuccess: (_result, variables) => {
+      toast.success("Memo generated — opening the memo library record");
+      refetch();
+      setGeneratingMemo(null);
+      navigate(`/aperture/memos/${variables.candidateId}`);
+    },
     onError: (e) => { toast.error(e.message); setGeneratingMemo(null); },
   });
 
@@ -97,6 +102,9 @@ export default function CandidateBoard() {
             </Button>
             <Button variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}/execute`)}>
               Execute &amp; Monitor
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/aperture/memos")}>
+              Memo Library
             </Button>
           </div>
         </div>

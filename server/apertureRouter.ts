@@ -36,6 +36,7 @@ import { buildStrategies } from "./aperture/strategies";
 import { snapshot } from "./aperture/portfolioMath";
 import { assembleRun } from "./aperture/run";
 import { generateMemo } from "./aperture/memo";
+import { belongsInMemoLibrary } from "./aperture/memoLibrary";
 import { brokerFor, listBrokers } from "./aperture/brokers/index";
 import { normSymbol } from "./aperture/facts";
 import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills } from "./aperture/orderFlow";
@@ -296,6 +297,48 @@ export const apertureRouter = router({
   // ── Provider availability ──────────────────────────────────────────────────
 
   providers: adminProcedure.query(() => describeAvailability()),
+
+  // ── Memo library ───────────────────────────────────────────────────────────
+  // Memos live on their originating candidate rows so they retain the precise
+  // score, role, fact ledger, and thesis context that produced them. This is the
+  // cross-run index that makes that durable record discoverable to an operator.
+  memo: router({
+    list: adminProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      const rows = await db!.select({
+        candidate: apertureCandidates,
+        run: apertureRuns,
+        thesisName: capitalTheses.name,
+      })
+        .from(apertureCandidates)
+        .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
+        .leftJoin(capitalTheses, eq(apertureRuns.thesisId, capitalTheses.id))
+        .where(eq(apertureRuns.userId, ctx.user.id))
+        .orderBy(desc(apertureRuns.createdAt), desc(apertureCandidates.id));
+
+      return rows
+        .filter(({ candidate }) => belongsInMemoLibrary(candidate.memoStatus))
+        .map(({ candidate, run, thesisName }) => ({ candidate, run, thesisName }));
+    }),
+
+    get: adminProcedure
+      .input(z.object({ candidateId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [row] = await db!.select({
+          candidate: apertureCandidates,
+          run: apertureRuns,
+          thesisName: capitalTheses.name,
+        })
+          .from(apertureCandidates)
+          .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
+          .leftJoin(capitalTheses, eq(apertureRuns.thesisId, capitalTheses.id))
+          .where(and(eq(apertureCandidates.id, input.candidateId), eq(apertureRuns.userId, ctx.user.id)))
+          .limit(1);
+        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Memo candidate not found" });
+        return row;
+      }),
+  }),
 
   // ── Run lifecycle ──────────────────────────────────────────────────────────
 

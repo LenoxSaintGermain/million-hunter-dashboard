@@ -33,6 +33,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import ApertureShell from "@/components/aperture/ApertureShell";
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
 const navSections = [
@@ -585,6 +586,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [location] = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
   const userRole = (user as any)?.role as string | undefined;
+
+  // Capital Aperture is an operator-only workspace, but it should feel like one
+  // coherent Signal Hunter product rather than the legacy sidebar application.
+  if (location.startsWith("/aperture")) {
+    return <ApertureShell>{children}</ApertureShell>;
+  }
 
   useEffect(() => {
     setMobileOpen(false);

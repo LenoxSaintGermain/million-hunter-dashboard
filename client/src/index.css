@@ -734,3 +734,32 @@
 /* ─── Layout ────────────────────────────────────────────────────────────────── */
 .container { @apply mx-auto px-4 sm:px-6; max-width: 1280px; }
 .flex { min-width: 0; min-height: 0; }
+
+/* ─── Capital Aperture — Editorial Shell ───────────────────────────────────── */
+/* Scoped intentionally: Aperture keeps its dense research functionality while
+   inheriting the paper/rule/serif grammar that defines the main application. */
+.aperture-editorial [data-slot="card"] {
+  border-radius: 0;
+  border-color: var(--rule);
+  background: var(--paper);
+  box-shadow: none;
+}
+.aperture-editorial [data-slot="card"]:hover {
+  box-shadow: 0 10px 26px -20px color-mix(in oklab, var(--ink) 40%, transparent);
+}
+.aperture-editorial h1,
+.aperture-editorial h2,
+.aperture-editorial h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.025em;
+}
+.aperture-editorial [data-slot="badge"] {
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.aperture-editorial [data-slot="button"] {
+  border-radius: 0;
+}

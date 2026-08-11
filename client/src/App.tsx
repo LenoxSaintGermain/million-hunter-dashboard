@@ -62,6 +62,7 @@ import StrategyCompare from "./pages/aperture/StrategyCompare";
 import MemoDrawer from "./pages/aperture/MemoDrawer";
 import ApertureExecute from "./pages/aperture/ApertureExecute";
 import ApertureAccounts from "./pages/aperture/ApertureAccounts";
+import ApertureMemoLibrary from "./pages/aperture/ApertureMemoLibrary";
 import { getLoginUrl } from "./const";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
@@ -72,6 +73,23 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   if (loading) return null; // silent while resolving
   if (!isAuthenticated) {
     window.location.href = getLoginUrl();
+    return null;
+  }
+  return <Component />;
+}
+
+// Capital Aperture is an operator workspace. The server uses adminProcedure on
+// every aperture endpoint; this matching client guard prevents investors from
+// landing on a non-functional research surface through a copied URL.
+function ApertureRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated, loading, user } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) {
+    window.location.href = getLoginUrl();
+    return null;
+  }
+  if ((user as any)?.role !== "admin") {
+    window.location.href = "/";
     return null;
   }
   return <Component />;
@@ -223,15 +241,17 @@ function Router() {
         <Route path="/wingate/asset/:id">{() => <ProtectedRoute component={AssetDossier} />}</Route>
 
         {/* ── Capital Aperture — liquid securities engine ── */}
-        <Route path="/aperture">{() => <ProtectedRoute component={ApertureHome} />}</Route>
-        <Route path="/aperture/thesis/new">{() => <ProtectedRoute component={ThesisGraphEditor} />}</Route>
-        <Route path="/aperture/thesis/:id">{() => <ProtectedRoute component={ThesisGraphEditor} />}</Route>
-        <Route path="/aperture/run/:id">{() => <ProtectedRoute component={CandidateBoard} />}</Route>
-        <Route path="/aperture/run/:id/exposure">{() => <ProtectedRoute component={ExposureMap} />}</Route>
-        <Route path="/aperture/run/:id/strategies">{() => <ProtectedRoute component={StrategyCompare} />}</Route>
-        <Route path="/aperture/run/:runId/memo/:candidateId">{() => <ProtectedRoute component={MemoDrawer} />}</Route>
-        <Route path="/aperture/run/:id/execute">{() => <ProtectedRoute component={ApertureExecute} />}</Route>
-        <Route path="/aperture/accounts">{() => <ProtectedRoute component={ApertureAccounts} />}</Route>
+        <Route path="/aperture">{() => <ApertureRoute component={ApertureHome} />}</Route>
+        <Route path="/aperture/thesis/new">{() => <ApertureRoute component={ThesisGraphEditor} />}</Route>
+        <Route path="/aperture/thesis/:id">{() => <ApertureRoute component={ThesisGraphEditor} />}</Route>
+        <Route path="/aperture/run/:id">{() => <ApertureRoute component={CandidateBoard} />}</Route>
+        <Route path="/aperture/run/:id/exposure">{() => <ApertureRoute component={ExposureMap} />}</Route>
+        <Route path="/aperture/run/:id/strategies">{() => <ApertureRoute component={StrategyCompare} />}</Route>
+        <Route path="/aperture/run/:runId/memo/:candidateId">{() => <ApertureRoute component={MemoDrawer} />}</Route>
+        <Route path="/aperture/memos">{() => <ApertureRoute component={ApertureMemoLibrary} />}</Route>
+        <Route path="/aperture/memos/:candidateId">{() => <ApertureRoute component={MemoDrawer} />}</Route>
+        <Route path="/aperture/run/:id/execute">{() => <ApertureRoute component={ApertureExecute} />}</Route>
+        <Route path="/aperture/accounts">{() => <ApertureRoute component={ApertureAccounts} />}</Route>
 
         {/* Invite accept — role assignment on first login */}
         <Route path="/invite/:token" component={InviteAccept} />
