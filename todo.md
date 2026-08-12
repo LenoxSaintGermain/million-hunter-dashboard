@@ -1116,3 +1116,8 @@
 - [x] Add an Aperture memo library with explicit navigation from candidate cards and a persistent memo destination
 - [x] Align Aperture layouts, navigation, typography, tokens, empty states, and actions with the main Signal Hunter editorial app
 - [x] Verify the complete Aperture journey with route/type/test coverage without exposing Aperture to investor roles
+
+## Capital Aperture — Jim Stakeholder Day-Trade MVP (Aug 11 2026)
+- [x] Convert stakeholder notes into a day-trade MVP product brief, decision log, and prioritised backlog
+- [x] Define an evidence-first pilot scorecard for paper-trading performance without asserting target returns
+- [x] Document hosting, data-provider, broker, and access-model decisions required before Phase 3 breadth
