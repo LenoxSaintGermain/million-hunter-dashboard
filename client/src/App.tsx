@@ -64,6 +64,7 @@ import ApertureExecute from "./pages/aperture/ApertureExecute";
 import ApertureAccounts from "./pages/aperture/ApertureAccounts";
 import ApertureMemoLibrary from "./pages/aperture/ApertureMemoLibrary";
 import { getLoginUrl } from "./const";
+import { getDefaultWorkspacePath } from "@shared/defaultWorkspace";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
 // Redirects unauthenticated users to the landing page.
@@ -136,12 +137,12 @@ function OnboardingGuard() {
   useEffect(() => {
     if (!authData) return;
 
-    // Role-based redirect: a client landing on the operator root goes to THEIR
-    // THESIS, not the business Deal Room. Signal Hunter is thesis-driven — for a
-    // bespoke property mandate the operating-company pipeline is the wrong first
-    // screen. The Deal Room stays one click away in the client nav.
-    if ((userRole === "investor" || userRole === "insurance") && (location === "/" || location === "")) {
-      navigate("/wingate");
+    // A default workspace redirects only a root landing; deep links retain their
+    // context. This lets a Capital stakeholder be Aperture-first without changing
+    // the Command Center default for the wider operator base.
+    const defaultPath = getDefaultWorkspacePath(userRole, (authData as any)?.defaultWorkspace);
+    if (defaultPath && (location === "/" || location === "")) {
+      navigate(defaultPath);
       return;
     }
 

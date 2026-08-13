@@ -24,6 +24,8 @@ export const users = mysqlTable("users", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
+  /** The first authenticated workspace for this user; controls the root-route handoff only. */
+  defaultWorkspace: mysqlEnum("default_workspace", ["command_center", "capital_aperture"]).default("command_center").notNull(),
   huntingParams: text("hunting_params"), // Free-text agentic command / hunting parameters
   /**
    * Duplicate-account pointer. When one person has signed up twice under two

@@ -1137,3 +1137,9 @@
 - [x] Add operator-managed shared thesis visibility for stakeholder collaborators without exposing admin execution controls
 - [x] Verify canonical sharing, scoped creation, and Capital projection with database checks and 357 regression tests
 - [ ] Jim live UAT: refresh the session, create a Capital / Trade thesis, and confirm the handoff opens Capital Aperture
+
+## Jim Stakeholder Default Workspace (Aug 13 2026)
+- [x] Audit the existing post-login route and user-level workspace preference model
+- [x] Add a persisted default workspace preference and set Jim to Capital Aperture
+- [x] Route Jim’s empty Aperture state into the Capital / Trade thesis flow
+- [x] Verify default routing logic while retaining Command Center for other users
