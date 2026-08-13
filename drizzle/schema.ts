@@ -9,6 +9,7 @@ import {
   json,
   boolean,
   bigint,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -707,6 +708,19 @@ export const thesisCompilations = mysqlTable("thesis_compilations", {
 export type ThesisCompilation = typeof thesisCompilations.$inferSelect;
 export type InsertThesisCompilation = typeof thesisCompilations.$inferInsert;
 
+/** Operator-managed access to a canonical thesis without transferring ownership. */
+export const thesisShares = mysqlTable("thesis_shares", {
+  id: int("id").autoincrement().primaryKey(),
+  compilationId: int("compilation_id").notNull(),
+  userId: int("user_id").notNull(),
+  sharedByUserId: int("shared_by_user_id").notNull(),
+  permission: mysqlEnum("permission", ["view", "use"]).default("use").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  thesisUserUnique: uniqueIndex("thesis_shares_compilation_user_unique").on(table.compilationId, table.userId),
+}));
+export type ThesisShare = typeof thesisShares.$inferSelect;
+
 // ─── Insurance Prospects (NY Life / commercial insurance prospecting) ─────────
 // Each deal in the pipeline can be scored as a commercial insurance prospect.
 // Surfaces premium potential, policy fit, and a pre-call brief for insurance agents.
@@ -1027,7 +1041,7 @@ export const capitalTheses = mysqlTable("capital_theses", {
   name: varchar("name", { length: 160 }),
   rawText: text("raw_text").notNull(),
   /** Canonical Signal Hunter thesis compilation this liquid-securities view projects. */
-  sourceCompilationId: int("source_compilation_id").unique(),
+  sourceCompilationId: int("source_compilation_id"),
   /** Compiled constitution: beliefs, what to seek/avoid, portfolio rules, behaviour. */
   graph: json("graph").$type<{
     beliefs?: string[];
@@ -1050,7 +1064,9 @@ export const capitalTheses = mysqlTable("capital_theses", {
   isPrimary: boolean("is_primary").default(false).notNull(),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
-});
+}, (table) => ({
+  sourcePerUserUnique: uniqueIndex("capital_theses_user_source_compilation_unique").on(table.userId, table.sourceCompilationId),
+}));
 export type CapitalThesis = typeof capitalTheses.$inferSelect;
 export type InsertCapitalThesis = typeof capitalTheses.$inferInsert;
 

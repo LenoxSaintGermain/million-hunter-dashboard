@@ -1129,3 +1129,11 @@
 - [x] Preserve existing thesis-builder and Aperture records through a backward-compatible migration
 - [x] Verify all thesis consumers receive the intended active thesis and test the unified workflow
 - [x] Surface unprojected canonical theses directly in Aperture run setup with a one-click Capital projection action
+
+## Thesis Workspace — Jim UAT Reconciliation (Aug 13 2026)
+- [x] Audit Jim’s user record, role, and current personal/shared thesis visibility
+- [x] Replace Thesis Studio / Thesis Engine / Aperture thesis labels with one user-facing Thesis workspace and explicit scopes
+- [x] Let users create a personal thesis from their empty state and choose Acquisition, Property, or Capital / Trade scope
+- [x] Add operator-managed shared thesis visibility for stakeholder collaborators without exposing admin execution controls
+- [x] Verify canonical sharing, scoped creation, and Capital projection with database checks and 357 regression tests
+- [ ] Jim live UAT: refresh the session, create a Capital / Trade thesis, and confirm the handoff opens Capital Aperture

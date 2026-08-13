@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import {
   Sparkles, ChevronRight, Loader2, Trash2, Lock, Play, Pencil, Check, X,
   AlertTriangle, CheckCircle2, Target, Scale, FileSearch,
-  XCircle, MessageSquareWarning, TrendingUp, RotateCcw, ArrowUpRight,
+  XCircle, MessageSquareWarning, TrendingUp, RotateCcw, ArrowUpRight, Share2,
 } from "lucide-react";
 
 // ── Thesis Templates ──────────────────────────────────────────────────────────
@@ -78,6 +78,16 @@ const TEMPLATES = [
   },
 ];
 
+type ThesisScope = "acquisition" | "property" | "capital";
+
+const CAPITAL_TRADE_STARTER = "I am testing a paper-trading thesis. Define the catalyst, the evidence required before entry, the invalidation condition, the maximum position size, and the time horizon. Prefer liquid securities with clear liquidity and risk controls. Do not infer missing facts.";
+
+const SCOPE_COPY: Record<ThesisScope, { label: string; detail: string }> = {
+  acquisition: { label: "Acquisition", detail: "Find and underwrite operating businesses." },
+  property: { label: "Property", detail: "Set building criteria and portfolio-fit dials." },
+  capital: { label: "Capital / Trade", detail: "Turn a market view into a paper-trading research plan." },
+};
+
 // ── Fade-in animation variant ─────────────────────────────────────────────────
 const fadeIn = {
   hidden: { opacity: 0, filter: "blur(4px)", y: 8 },
@@ -105,7 +115,12 @@ function WeightBar({ weight, isCustom }: { weight: number; isCustom: boolean }) 
 export default function ThesisEngine() {
   const { user } = useAuth();
   const canUseAperture = user?.role === "admin";
-  const [thesisText, setThesisText] = useState("");
+  const [location, navigate] = useLocation();
+  const requestedScope = new URLSearchParams(location.split("?")[1] ?? "").get("scope");
+  const initialScope: ThesisScope = requestedScope === "capital" ? "capital" : requestedScope === "property" ? "property" : "acquisition";
+  const [thesisText, setThesisText] = useState(initialScope === "capital" ? CAPITAL_TRADE_STARTER : "");
+  const [scope, setScope] = useState<ThesisScope>(initialScope);
+  const [capitalName, setCapitalName] = useState("");
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [compilationResult, setCompilationResult] = useState<any>(null);
   const [compilationId, setCompilationId] = useState<number | null>(null);
@@ -130,6 +145,7 @@ export default function ThesisEngine() {
   });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [shareTargets, setShareTargets] = useState<Record<number, string>>({});
   const renameMutation = trpc.thesis.rename.useMutation({
     onSuccess: () => { toast.success("Renamed"); setEditingId(null); refetchList(); },
     onError: (e) => toast.error(e.message),
@@ -137,7 +153,6 @@ export default function ThesisEngine() {
   const isHistoricThesisRow = (t: any) =>
     t.templateUsed === "wingate" || t.compiledFilters?.yearBuiltMax != null ||
     t.compiledFilters?.requireHistoricRegister != null || t.compiledFilters?.maxStories != null;
-  const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const triggerScan = trpc.scan.trigger.useMutation({
     onSuccess: (d) => {
@@ -153,14 +168,29 @@ export default function ThesisEngine() {
   });
   const apertureProjection = trpc.thesis.useInAperture.useMutation({
     onSuccess: ({ apertureThesisId, linked }) => {
+      setIsCompiling(false);
       toast.success(linked ? "Capital projection refreshed" : "Capital projection created", {
         description: "Your saved thesis is now available in Capital Aperture without re-entry.",
       });
       navigate(`/aperture/thesis/${apertureThesisId}`);
     },
+    onError: (error) => { setIsCompiling(false); toast.error(error.message); },
+  });
+  const { data: shareCandidates } = trpc.thesis.shareCandidates.useQuery(undefined, { enabled: canUseAperture });
+  const shareThesis = trpc.thesis.share.useMutation({
+    onSuccess: () => toast.success("Thesis shared — it will appear in the recipient's Thesis workspace."),
     onError: (error) => toast.error(error.message),
   });
   const openInAperture = (id: number) => apertureProjection.mutate({ compilationId: id });
+  const createCapitalThesis = trpc.thesis.createCapital.useMutation({
+    onSuccess: ({ compilationId: newCompilationId }) => {
+      refetchList();
+      setCompilationId(newCompilationId);
+      toast.success("Capital / Trade thesis saved — building its paper-research projection.");
+      openInAperture(newCompilationId);
+    },
+    onError: (error) => { setIsCompiling(false); toast.error(error.message); },
+  });
   function handleApproveAndRun() {
     if (!compilationResult) return;
     const f = compilationResult.compiledFilters ?? {};
@@ -189,6 +219,7 @@ export default function ThesisEngine() {
   }
 
   function handleTemplate(t: typeof TEMPLATES[0]) {
+    setScope(t.id === "wingate" ? "property" : "acquisition");
     setActiveTemplate(t.id);
     setThesisText(t.text);
     setCompilationResult(null);
@@ -202,6 +233,10 @@ export default function ThesisEngine() {
     }
     setIsCompiling(true);
     setCompilationResult(null);
+    if (scope === "capital") {
+      createCapitalThesis.mutate({ thesisText, name: capitalName.trim() || undefined });
+      return;
+    }
     compileMutation.mutate({
       thesisText,
       templateUsed: activeTemplate ?? undefined,
@@ -222,11 +257,10 @@ export default function ThesisEngine() {
         <motion.div variants={fadeIn} initial="hidden" animate="visible">
           <div className="flex items-start justify-between">
             <div>
-              <p className="eyebrow text-muted-foreground mb-1">Signal Hunter · Spec A1</p>
-              <h1 className="font-display text-3xl font-bold tracking-tight">Thesis Engine</h1>
+              <p className="eyebrow text-muted-foreground mb-1">Thesis workspace</p>
+              <h1 className="font-display text-3xl font-bold tracking-tight">One thesis. The right execution path.</h1>
               <p className="text-muted-foreground mt-1 text-sm max-w-xl">
-                Describe your investment thesis in plain language. STRATEGIST decomposes it into filters,
-                custom scoring dimensions, and evidence requirements — then runs the pipeline.
+                Define a conviction once, then choose whether it drives acquisition search, property criteria, or a Capital Aperture paper-research run.
               </p>
             </div>
             <Badge variant="outline" className="border-amber-500/40 text-[var(--amber)] bg-amber-500/5 text-xs">
@@ -242,8 +276,29 @@ export default function ThesisEngine() {
           <motion.div variants={fadeIn} initial="hidden" animate="visible" transition={{ delay: 0.1 }}
             className="space-y-4">
 
+            <div className="rounded-lg border border-border bg-muted/10 p-2 grid grid-cols-1 sm:grid-cols-3 gap-1">
+              {(Object.keys(SCOPE_COPY) as ThesisScope[]).map((scopeId) => (
+                <button
+                  key={scopeId}
+                  onClick={() => {
+                    setScope(scopeId);
+                    setCompilationResult(null);
+                    setCompilationId(null);
+                    if (scopeId === "capital" && !thesisText) setThesisText(CAPITAL_TRADE_STARTER);
+                  }}
+                  className={cn(
+                    "text-left rounded-md px-3 py-2 transition-colors",
+                    scope === scopeId ? "bg-background shadow-sm ring-1 ring-amber-500/35" : "hover:bg-background/60",
+                  )}
+                >
+                  <span className="block text-xs font-semibold text-foreground">{SCOPE_COPY[scopeId].label}</span>
+                  <span className="block text-[11px] leading-snug text-muted-foreground mt-0.5">{SCOPE_COPY[scopeId].detail}</span>
+                </button>
+              ))}
+            </div>
+
             {/* Template Gallery */}
-            <div>
+            {scope !== "capital" && <div>
               <p className="eyebrow text-muted-foreground mb-3">Start from a template</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {TEMPLATES.map((t) => (
@@ -275,11 +330,24 @@ export default function ThesisEngine() {
                   </button>
                 ))}
               </div>
-            </div>
+            </div>}
+
+            {scope === "capital" && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
+                <p className="eyebrow text-emerald-700">Capital / Trade thesis</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">This creates your personal canonical thesis, then opens Capital Aperture to build a paper-only securities research projection. No live orders are created.</p>
+                <button onClick={() => { setThesisText(CAPITAL_TRADE_STARTER); setActiveTemplate(null); }} className="text-xs font-medium text-emerald-700 hover:underline">
+                  Start from the paper-trading research template
+                </button>
+              </div>
+            )}
 
             {/* Thesis Textarea */}
             <div className="space-y-2">
-              <p className="eyebrow text-muted-foreground">Or write your own thesis</p>
+              <p className="eyebrow text-muted-foreground">{scope === "capital" ? "Your capital / trade thesis" : "Or write your own thesis"}</p>
+              {scope === "capital" && (
+                <input value={capitalName} onChange={(e) => setCapitalName(e.target.value)} placeholder="Name this thesis, e.g. AI Infrastructure Catalysts" className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50" />
+              )}
               <div className={cn(
                 "relative rounded-lg border transition-all",
                 thesisText.length > 0 ? "border-amber-500/40" : "border-border"
@@ -290,7 +358,7 @@ export default function ThesisEngine() {
                     setThesisText(e.target.value);
                     if (activeTemplate) setActiveTemplate(null);
                   }}
-                  placeholder={`"Businesses with products needed 40 years ago and 40 years from now, $20–40M revenue, founder-led, in the Sunbelt."\n\n"Specialty manufacturers serving aerospace primes, $5–15M EBITDA, second-generation ownership, Midwest."\n\n"Regional service businesses with recurring contract revenue >60%, owner age 60+, sub-$10M EBITDA, no PE ownership."`}
+                  placeholder={scope === "capital" ? CAPITAL_TRADE_STARTER : `"Businesses with products needed 40 years ago and 40 years from now, $20–40M revenue, founder-led, in the Sunbelt."\n\n"Specialty manufacturers serving aerospace primes, $5–15M EBITDA, second-generation ownership, Midwest."\n\n"Regional service businesses with recurring contract revenue >60%, owner age 60+, sub-$10M EBITDA, no PE ownership."`}
                   className="min-h-[220px] resize-none border-0 bg-transparent font-sans text-sm leading-relaxed focus-visible:ring-0 placeholder:text-muted-foreground/40"
                 />
                 <div className="absolute bottom-3 right-3 text-xs text-muted-foreground/40 tabular-nums">
@@ -313,12 +381,12 @@ export default function ThesisEngine() {
               {isCompiling ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  STRATEGIST compiling…
+                  {scope === "capital" ? "Building capital projection…" : "STRATEGIST compiling…"}
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Compile Thesis
+                  {scope === "capital" ? "Create Capital / Trade Thesis" : "Compile Thesis"}
                 </>
               )}
             </Button>
@@ -370,6 +438,8 @@ export default function ThesisEngine() {
                           >
                             {t.name ?? "Untitled Thesis"}
                             {isHistoricThesisRow(t) && <span className="ml-1.5 text-[9px] text-amber-500 font-semibold">HISTORIC</span>}
+                            {t.templateUsed === "capital_trade" && <span className="ml-1.5 text-[9px] text-emerald-600 font-semibold">CAPITAL / TRADE</span>}
+                            {t.access === "shared" && <span className="ml-1.5 text-[9px] text-sky-600 font-semibold">SHARED BY {t.ownerName ?? "OPERATOR"}</span>}
                           </button>
                         )}
                       </div>
@@ -394,17 +464,32 @@ export default function ThesisEngine() {
                               <ArrowUpRight className="h-3.5 w-3.5" />
                             </button>
                           )}
-                          <button title="Rename" onClick={() => { setEditingId(t.id); setEditingName(t.name ?? ""); }} className="text-muted-foreground hover:text-primary">
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button title="Delete" onClick={() => deleteMutation.mutate({ id: t.id })} className="text-muted-foreground hover:text-destructive">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {t.access !== "shared" && <>
+                            {canUseAperture && shareCandidates?.length ? <>
+                              <select
+                                aria-label="Select a collaborator to share with"
+                                value={shareTargets[t.id] ?? ""}
+                                onChange={(e) => setShareTargets((current) => ({ ...current, [t.id]: e.target.value }))}
+                                className="h-6 max-w-28 rounded border border-border bg-background px-1 text-[10px] text-muted-foreground"
+                              >
+                                <option value="">Share with…</option>
+                                {shareCandidates.map((candidate) => <option key={candidate.id} value={String(candidate.id)}>{candidate.name || candidate.email}</option>)}
+                              </select>
+                              <button title="Share this thesis with the selected collaborator" disabled={!shareTargets[t.id] || shareThesis.isPending} onClick={() => shareThesis.mutate({ compilationId: t.id, userId: Number(shareTargets[t.id]), permission: "use" })} className="text-muted-foreground hover:text-sky-600 disabled:opacity-40"><Share2 className="h-3.5 w-3.5" /></button>
+                            </> : null}
+                            <button title="Rename" onClick={() => { setEditingId(t.id); setEditingName(t.name ?? ""); }} className="text-muted-foreground hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
+                            <button title="Delete" onClick={() => deleteMutation.mutate({ id: t.id })} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+                          </>}
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+            {savedTheses && savedTheses.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                No personal or shared theses yet. Choose a scope above and create your first one—**Capital / Trade** opens Aperture automatically after it is saved.
               </div>
             )}
           </motion.div>

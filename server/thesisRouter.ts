@@ -11,9 +11,10 @@ import { getDb } from "./db";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { logActivity } from "./db";
-import { capitalTheses, thesisCompilations } from "../drizzle/schema";
+import { capitalTheses, thesisCompilations, thesisShares, users } from "../drizzle/schema";
 import { compileThesis } from "./aperture/thesisGraph";
 import { projectionValues } from "./thesisBridge";
+import { canUseCanonicalThesis } from "./thesisAccess";
 
 // ── STRATEGIST System Prompt ──────────────────────────────────────────────────
 const STRATEGIST_SYSTEM_PROMPT = `You are STRATEGIST, the thesis compiler for Signal Hunter — an AI-powered acquisition intelligence platform.
@@ -311,41 +312,115 @@ export const thesisRouter = router({
       return { compilationId, compiled, suggestedName: compiled.suggestedName };
     }),
 
-  /** List saved thesis compilations for the current user */
+  /** List personal and explicitly shared canonical theses for the current user. */
   list: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
-    const rows = await db.execute(
-      sql`SELECT * FROM thesis_compilations WHERE user_id = ${ctx.user.id} ORDER BY created_at DESC LIMIT 20`
-    ) as any;
-    // TiDB returns JSON columns as already-parsed objects (not strings).
-    // Guard: if value is already an object/array, use it directly; only JSON.parse strings.
-    const parseCol = (v: any, fallback: any) => {
-      if (v === null || v === undefined) return fallback;
-      if (typeof v === 'string') {
-        try { return JSON.parse(v); } catch { return fallback; }
-      }
-      return v; // already parsed by TiDB driver
+    const rows = await db.execute(sql`
+      SELECT tc.*, CASE WHEN tc.user_id = ${ctx.user.id} THEN 'owner' ELSE 'shared' END AS access,
+        owner.name AS owner_name, ts.permission AS share_permission
+      FROM thesis_compilations tc
+      LEFT JOIN thesis_shares ts ON ts.compilation_id = tc.id AND ts.user_id = ${ctx.user.id}
+      LEFT JOIN users owner ON owner.id = tc.user_id
+      WHERE tc.user_id = ${ctx.user.id} OR ts.user_id = ${ctx.user.id}
+      ORDER BY tc.created_at DESC LIMIT 50
+    `) as any;
+    const parseCol = (value: any, fallback: any) => {
+      if (value === null || value === undefined) return fallback;
+      if (typeof value !== "string") return value;
+      try { return JSON.parse(value); } catch { return fallback; }
     };
-    return (rows[0] as any[]).map((r: any) => ({
-      id: r.id,
-      userId: r.user_id,
-      thesisText: r.thesis_text,
-      templateUsed: r.template_used,
-      name: r.name,
-      status: r.status,
-      compiledFilters: parseCol(r.compiled_filters, {}),
-      scoringWeights: parseCol(r.scoring_weights, []),
-      evidenceRequirements: parseCol(r.evidence_requirements, []),
-      autoDisqualifiers: parseCol(r.auto_disqualifiers, []),
-      confidenceNotes: parseCol(r.confidence_notes, []),
-      estimatedTargetsMin: r.estimated_targets_min,
-      estimatedTargetsMax: r.estimated_targets_max,
-      estimatedCostMin: r.estimated_cost_min,
-      estimatedCostMax: r.estimated_cost_max,
-      createdAt: r.created_at,
+    const rawRows = rows[0] as any[];
+    return rawRows.map((row: any) => ({
+      id: row.id,
+      userId: row.user_id,
+      access: row.access ?? "owner",
+      ownerName: row.owner_name ?? null,
+      sharePermission: row.share_permission ?? null,
+      thesisText: row.thesis_text,
+      templateUsed: row.template_used,
+      name: row.name,
+      status: row.status,
+      compiledFilters: parseCol(row.compiled_filters, {}),
+      scoringWeights: parseCol(row.scoring_weights, []),
+      evidenceRequirements: parseCol(row.evidence_requirements, []),
+      autoDisqualifiers: parseCol(row.auto_disqualifiers, []),
+      confidenceNotes: parseCol(row.confidence_notes, []),
+      estimatedTargetsMin: row.estimated_targets_min,
+      estimatedTargetsMax: row.estimated_targets_max,
+      estimatedCostMin: row.estimated_cost_min,
+      estimatedCostMax: row.estimated_cost_max,
+      createdAt: row.created_at,
     }));
   }),
+
+  /** Create a canonical thesis for a capital/trade workflow without forcing acquisition filters. */
+  createCapital: adminProcedure
+    .input(z.object({ thesisText: z.string().min(20).max(4000), name: z.string().min(1).max(120).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const [result] = await db.insert(thesisCompilations).values({
+        userId: ctx.user.id,
+        thesisText: input.thesisText,
+        name: input.name ?? "Capital / Trade Thesis",
+        templateUsed: "capital_trade",
+        compiledFilters: {},
+        scoringWeights: [],
+        evidenceRequirements: [],
+        autoDisqualifiers: [],
+        confidenceNotes: ["Capital / Trade scope: use the linked Aperture graph for securities analysis."],
+        status: "review",
+      });
+      return { compilationId: Number((result as any).insertId) };
+    }),
+
+  /** Operator-owned thesis sharing. A share grants visibility/use, never edit or delete rights. */
+  shareCandidates: adminProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    return db.select({ id: users.id, name: users.name, email: users.email, role: users.role })
+      .from(users).where(sql`${users.id} != ${ctx.user.id}`).orderBy(users.name);
+  }),
+
+  shares: protectedProcedure
+    .input(z.object({ compilationId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const [owner] = await db.select({ userId: thesisCompilations.userId }).from(thesisCompilations)
+        .where(eq(thesisCompilations.id, input.compilationId)).limit(1);
+      if (!owner || owner.userId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN" });
+      return db.select({ userId: thesisShares.userId, permission: thesisShares.permission, name: users.name, email: users.email })
+        .from(thesisShares).innerJoin(users, eq(users.id, thesisShares.userId))
+        .where(eq(thesisShares.compilationId, input.compilationId));
+    }),
+
+  share: adminProcedure
+    .input(z.object({ compilationId: z.number(), userId: z.number(), permission: z.enum(["view", "use"]).default("use") }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const [owner] = await db.select({ userId: thesisCompilations.userId }).from(thesisCompilations)
+        .where(eq(thesisCompilations.id, input.compilationId)).limit(1);
+      if (!owner || owner.userId !== ctx.user.id || input.userId === ctx.user.id) throw new TRPCError({ code: "FORBIDDEN" });
+      await db.execute(sql`INSERT INTO thesis_shares (compilation_id, user_id, shared_by_user_id, permission, created_at)
+        VALUES (${input.compilationId}, ${input.userId}, ${ctx.user.id}, ${input.permission}, ${Date.now()})
+        ON DUPLICATE KEY UPDATE permission = VALUES(permission), shared_by_user_id = VALUES(shared_by_user_id)`);
+      return { success: true };
+    }),
+
+  unshare: adminProcedure
+    .input(z.object({ compilationId: z.number(), userId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const [owner] = await db.select({ userId: thesisCompilations.userId }).from(thesisCompilations)
+        .where(eq(thesisCompilations.id, input.compilationId)).limit(1);
+      if (!owner || owner.userId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN" });
+      await db.delete(thesisShares).where(and(eq(thesisShares.compilationId, input.compilationId), eq(thesisShares.userId, input.userId)));
+      return { success: true };
+    }),
 
   /** Delete a saved thesis compilation */
   delete: protectedProcedure
@@ -383,9 +458,15 @@ export const thesisRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       const [source] = await db.select().from(thesisCompilations)
-        .where(and(eq(thesisCompilations.id, input.compilationId), eq(thesisCompilations.userId, ctx.user.id)))
-        .limit(1);
+        .where(eq(thesisCompilations.id, input.compilationId)).limit(1);
       if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Saved thesis not found" });
+
+      const ownsSource = source.userId === ctx.user.id;
+      const [sharedAccess] = ownsSource ? [undefined] : await db.select().from(thesisShares)
+        .where(and(eq(thesisShares.compilationId, input.compilationId), eq(thesisShares.userId, ctx.user.id), eq(thesisShares.permission, "use"))).limit(1);
+      if (!canUseCanonicalThesis({ ownerUserId: source.userId, requesterUserId: ctx.user.id, sharedPermission: sharedAccess?.permission })) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You do not have use access to this thesis" });
+      }
 
       const [existing] = await db.select().from(capitalTheses)
         .where(and(eq(capitalTheses.sourceCompilationId, source.id), eq(capitalTheses.userId, ctx.user.id)))

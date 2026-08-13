@@ -1,5 +1,5 @@
 /**
- * Thesis Studio — /theses
+ * Property Criteria — /theses
  *
  * From the Wingate call: criteria editing was admin-only, buried in per-agent
  * system prompts. Chad needs the dials himself — his own thesis, plus one per
@@ -111,14 +111,13 @@ export default function ThesisStudio() {
         <div className="flex items-start justify-between gap-6 flex-wrap border-b border-rule pb-8 mb-8">
           <div className="max-w-2xl">
             <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mb-2 inline-flex items-center gap-1.5">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-amber" /> Thesis studio
+              <SlidersHorizontal className="w-3.5 h-3.5 text-amber" /> Property criteria
             </p>
             <h1 className="font-hero-h1 text-[clamp(2rem,4vw,3rem)] text-ink leading-[1.05] mb-3">
-              Your criteria, your dials
+              Property criteria, your dials
             </h1>
             <p className="font-body-base text-body-base text-muted-foreground leading-relaxed">
-              One thesis per client or client type. A building that fails one still surfaces as a
-              match for another — so widen a dial rather than throwing the deal away.
+              Use these dials only to tune property-screening criteria for a client or client type. Create acquisition and capital / trade theses in <strong>Theses</strong>—this is not a second thesis library.
             </p>
           </div>
 

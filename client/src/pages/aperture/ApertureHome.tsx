@@ -154,8 +154,8 @@ export default function ApertureHome() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button variant="outline" size="sm" onClick={() => navigate("/thesis")}>
-                      <ArrowUpRight className="h-3.5 w-3.5 mr-1" /> Thesis Engine
+                    <Button variant="outline" size="sm" onClick={() => navigate("/thesis?scope=capital")}>
+                      <ArrowUpRight className="h-3.5 w-3.5 mr-1" /> Create capital thesis
                     </Button>
                   </div>
                   {selectedThesisId && theses?.find((t) => t.id === selectedThesisId)?.confidenceNotes?.length ? (
