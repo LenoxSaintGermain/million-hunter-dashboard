@@ -1143,3 +1143,8 @@
 - [x] Add a persisted default workspace preference and set Jim to Capital Aperture
 - [x] Route Jim’s empty Aperture state into the Capital / Trade thesis flow
 - [x] Verify default routing logic while retaining Command Center for other users
+
+## Jim-equivalent Capital Aperture UAT Fixture (Aug 13 2026)
+- [x] Create an isolated admin fixture with Capital Aperture default workspace, completed onboarding, and a shared canonical thesis
+- [x] Verify the fixture’s root redirect, visible Thesis workspace record, and Capital / Trade handoff
+- [x] Preserve repeatable UAT evidence without modifying Jim’s live user record or creating a real OAuth identity
