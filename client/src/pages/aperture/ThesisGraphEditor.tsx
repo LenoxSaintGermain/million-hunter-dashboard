@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Loader2, Sparkles, CheckCircle2, ArrowLeft } from "lucide-react";
+import { AlertTriangle, Loader2, Sparkles, CheckCircle2, ArrowLeft, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 
@@ -49,6 +49,11 @@ export default function ThesisGraphEditor() {
     onError: (e) => toast.error(e.message),
   });
 
+  const updateThesis = trpc.aperture.thesis.update.useMutation({
+    onSuccess: () => toast.success("Legacy thesis updated — recompile to refresh the graph."),
+    onError: (e) => toast.error(e.message),
+  });
+
   const compileThesis = trpc.aperture.thesis.compile.useMutation({
     onSuccess: ({ confidenceNotes }) => {
       toast.success("Compiled successfully");
@@ -75,13 +80,40 @@ export default function ThesisGraphEditor() {
     if (!rawText.trim()) return toast.error("Write your thesis first");
     setSaving(true);
     try {
-      await createThesis.mutateAsync({ name: name || undefined, rawText });
+      if (isNew) await createThesis.mutateAsync({ name: name || undefined, rawText });
+      else await updateThesis.mutateAsync({ id: thesisId!, name: name || undefined, rawText });
     } finally {
       setSaving(false);
     }
   };
 
   const graph = thesis?.graph;
+
+  if (isNew) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-2xl space-y-6">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/aperture")}><ArrowLeft className="h-4 w-4" /></Button>
+            <div>
+              <p className="eyebrow text-[var(--sh-signal)]">Canonical thesis workflow</p>
+              <h1 className="font-display text-3xl">Create once. Use everywhere.</h1>
+            </div>
+          </div>
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                New theses are created and compiled in the main Thesis Engine. From there, <strong className="text-foreground">Use in Capital Aperture</strong> creates the linked liquid-securities projection without asking you to re-enter the thesis.
+              </p>
+              <Button onClick={() => navigate("/thesis")}>
+                <ArrowUpRight className="h-4 w-4 mr-2" /> Open Thesis Engine
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -98,10 +130,12 @@ export default function ThesisGraphEditor() {
           </Button>
           <div>
             <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>
-              {isNew ? "New Thesis" : (thesis?.name ?? `Thesis #${thesisId}`)}
+              {thesis?.name ?? `Thesis #${thesisId}`}
             </h1>
             <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
-              Write your investment thesis in plain language. The compiler extracts the structured graph.
+              {thesis?.sourceCompilationId
+                ? "Linked to the main Thesis Engine. Refresh this securities projection there when the thesis changes."
+                : "Legacy Aperture thesis. It remains editable and available for runs."}
             </p>
           </div>
         </div>
@@ -117,6 +151,7 @@ export default function ThesisGraphEditor() {
                     placeholder="e.g. AI Infrastructure Cycle"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    disabled={Boolean(thesis?.sourceCompilationId)}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -126,21 +161,28 @@ export default function ThesisGraphEditor() {
                     placeholder={PLACEHOLDER}
                     value={rawText}
                     onChange={(e) => setRawText(e.target.value)}
+                    disabled={Boolean(thesis?.sourceCompilationId)}
                   />
                   <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
                     {rawText.length} chars · Write naturally — beliefs, what you seek, what you avoid, position sizing rules.
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    className="flex-1"
-                    disabled={saving || createThesis.isPending}
-                    onClick={handleSave}
-                  >
-                    {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                    {isNew ? "Save Thesis" : "Update"}
-                  </Button>
-                  {!isNew && (
+                  {thesis?.sourceCompilationId ? (
+                    <Button className="flex-1" onClick={() => navigate("/thesis")}>
+                      <ArrowUpRight className="h-4 w-4 mr-2" /> Manage Canonical Thesis
+                    </Button>
+                  ) : (
+                    <Button
+                      className="flex-1"
+                      disabled={saving || createThesis.isPending || updateThesis.isPending}
+                      onClick={handleSave}
+                    >
+                      {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                      Update Legacy Thesis
+                    </Button>
+                  )}
+                  {!thesis?.sourceCompilationId && (
                     <Button
                       variant="outline"
                       disabled={compileThesis.isPending}

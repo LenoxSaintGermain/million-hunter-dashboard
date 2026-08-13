@@ -6,11 +6,14 @@
  * using Claude structured output. Saves compilations to thesis_compilations table.
  */
 import { z } from "zod";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { protectedProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { logActivity } from "./db";
+import { capitalTheses, thesisCompilations } from "../drizzle/schema";
+import { compileThesis } from "./aperture/thesisGraph";
+import { projectionValues } from "./thesisBridge";
 
 // ── STRATEGIST System Prompt ──────────────────────────────────────────────────
 const STRATEGIST_SYSTEM_PROMPT = `You are STRATEGIST, the thesis compiler for Signal Hunter — an AI-powered acquisition intelligence platform.
@@ -366,5 +369,52 @@ export const thesisRouter = router({
         sql`UPDATE thesis_compilations SET name = ${input.name} WHERE id = ${input.id} AND user_id = ${ctx.user.id}`
       );
       return { success: true, name: input.name };
+    }),
+
+  /**
+   * Compiles a liquid-securities projection from the canonical main-app thesis.
+   * This is a bridge, not a copy: repeat calls update the same linked Aperture
+   * record so the user never has to re-enter their thesis in a second tool.
+   */
+  useInAperture: adminProcedure
+    .input(z.object({ compilationId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+      const [source] = await db.select().from(thesisCompilations)
+        .where(and(eq(thesisCompilations.id, input.compilationId), eq(thesisCompilations.userId, ctx.user.id)))
+        .limit(1);
+      if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Saved thesis not found" });
+
+      const [existing] = await db.select().from(capitalTheses)
+        .where(and(eq(capitalTheses.sourceCompilationId, source.id), eq(capitalTheses.userId, ctx.user.id)))
+        .limit(1);
+
+      let graph;
+      try {
+        graph = await compileThesis(source.thesisText);
+      } catch (error: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Capital projection failed: ${error?.message ?? "unknown compiler error"}` });
+      }
+
+      const now = Date.now();
+      const values = projectionValues({ id: source.id, name: source.name, thesisText: source.thesisText }, graph, existing?.isPrimary ?? false, now);
+      let apertureThesisId: number;
+
+      if (existing) {
+        await db.update(capitalTheses).set(values).where(eq(capitalTheses.id, existing.id));
+        apertureThesisId = existing.id;
+      } else {
+        const [result] = await db.insert(capitalTheses).values({
+          userId: ctx.user.id,
+          ...values,
+          isPrimary: false,
+          createdAt: now,
+        });
+        apertureThesisId = (result as any).insertId as number;
+      }
+
+      return { apertureThesisId, sourceCompilationId: source.id, graph, linked: Boolean(existing) };
     }),
 });

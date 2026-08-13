@@ -103,6 +103,25 @@ export const apertureRouter = router({
         return { id: (result as any).insertId as number };
       }),
 
+    /** Legacy only: canonical-linked theses are edited in the main Thesis Engine. */
+    update: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().max(160).optional(),
+        rawText: z.string().min(10).max(8000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const thesis = await requireThesis(db, input.id, ctx.user.id);
+        if (thesis.sourceCompilationId) {
+          throw new TRPCError({ code: "CONFLICT", message: "This linked thesis is managed in the main Thesis Engine." });
+        }
+        await db!.update(capitalTheses)
+          .set({ name: input.name ?? null, rawText: input.rawText, graph: null, confidenceNotes: [], status: "review", updatedAt: Date.now() })
+          .where(eq(capitalTheses.id, input.id));
+        return { ok: true };
+      }),
+
     compile: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {

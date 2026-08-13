@@ -1026,6 +1026,8 @@ export const capitalTheses = mysqlTable("capital_theses", {
   userId: int("user_id").notNull(),
   name: varchar("name", { length: 160 }),
   rawText: text("raw_text").notNull(),
+  /** Canonical Signal Hunter thesis compilation this liquid-securities view projects. */
+  sourceCompilationId: int("source_compilation_id").unique(),
   /** Compiled constitution: beliefs, what to seek/avoid, portfolio rules, behaviour. */
   graph: json("graph").$type<{
     beliefs?: string[];

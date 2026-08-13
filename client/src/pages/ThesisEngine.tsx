@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ import { cn } from "@/lib/utils";
 import {
   Sparkles, ChevronRight, Loader2, Trash2, Lock, Play, Pencil, Check, X,
   AlertTriangle, CheckCircle2, Target, Scale, FileSearch,
-  XCircle, MessageSquareWarning, TrendingUp, RotateCcw,
+  XCircle, MessageSquareWarning, TrendingUp, RotateCcw, ArrowUpRight,
 } from "lucide-react";
 
 // ── Thesis Templates ──────────────────────────────────────────────────────────
@@ -102,6 +103,8 @@ function WeightBar({ weight, isCustom }: { weight: number; isCustom: boolean }) 
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ThesisEngine() {
+  const { user } = useAuth();
+  const canUseAperture = user?.role === "admin";
   const [thesisText, setThesisText] = useState("");
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [compilationResult, setCompilationResult] = useState<any>(null);
@@ -148,6 +151,16 @@ export default function ThesisEngine() {
     },
     onError: (e) => toast.error(`Scan failed: ${e.message}`),
   });
+  const apertureProjection = trpc.thesis.useInAperture.useMutation({
+    onSuccess: ({ apertureThesisId, linked }) => {
+      toast.success(linked ? "Capital projection refreshed" : "Capital projection created", {
+        description: "Your saved thesis is now available in Capital Aperture without re-entry.",
+      });
+      navigate(`/aperture/thesis/${apertureThesisId}`);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const openInAperture = (id: number) => apertureProjection.mutate({ compilationId: id });
   function handleApproveAndRun() {
     if (!compilationResult) return;
     const f = compilationResult.compiledFilters ?? {};
@@ -371,6 +384,16 @@ export default function ThesisEngine() {
                           >
                             <Play className="h-3.5 w-3.5" />
                           </button>
+                          {canUseAperture && (
+                            <button
+                              title="Use this saved thesis in Capital Aperture"
+                              onClick={() => openInAperture(t.id)}
+                              disabled={apertureProjection.isPending}
+                              className="text-muted-foreground hover:text-emerald-500 disabled:opacity-50"
+                            >
+                              <ArrowUpRight className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                           <button title="Rename" onClick={() => { setEditingId(t.id); setEditingName(t.name ?? ""); }} className="text-muted-foreground hover:text-primary">
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
@@ -602,6 +625,18 @@ export default function ThesisEngine() {
                         <><TrendingUp className="h-4 w-4 mr-2" />Approve & Run Pipeline</>
                       )}
                     </Button>
+                    {canUseAperture && compilationId != null && (
+                      <Button
+                        variant="outline"
+                        className="border-emerald-500/30 text-emerald-700 hover:text-emerald-800"
+                        onClick={() => openInAperture(compilationId)}
+                        disabled={apertureProjection.isPending}
+                      >
+                        {apertureProjection.isPending
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <><ArrowUpRight className="h-4 w-4 mr-2" />Use in Capital Aperture</>}
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       onClick={() => {

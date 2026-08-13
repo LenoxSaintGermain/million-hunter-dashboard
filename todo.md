@@ -1121,3 +1121,11 @@
 - [x] Convert stakeholder notes into a day-trade MVP product brief, decision log, and prioritised backlog
 - [x] Define an evidence-first pilot scorecard for paper-trading performance without asserting target returns
 - [x] Document hosting, data-provider, broker, and access-model decisions required before Phase 3 breadth
+
+## Canonical Thesis Workflow Reconciliation (Aug 12 2026)
+- [x] Audit duplicate main-app and Aperture thesis schemas, compile paths, active-state semantics, and consumers
+- [x] Define and migrate to one canonical thesis record with Aperture-compatible compiled graph data
+- [x] Make main-app thesis creation and compilation available in Aperture without re-entry
+- [x] Preserve existing thesis-builder and Aperture records through a backward-compatible migration
+- [x] Verify all thesis consumers receive the intended active thesis and test the unified workflow
+- [x] Surface unprojected canonical theses directly in Aperture run setup with a one-click Capital projection action
