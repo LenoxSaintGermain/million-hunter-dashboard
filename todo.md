@@ -1148,3 +1148,8 @@
 - [x] Create an isolated admin fixture with Capital Aperture default workspace, completed onboarding, and a shared canonical thesis
 - [x] Verify the fixture’s root redirect, visible Thesis workspace record, and Capital / Trade handoff
 - [x] Preserve repeatable UAT evidence without modifying Jim’s live user record or creating a real OAuth identity
+
+## Jim-equivalent Browser Thesis Workflow UAT (Aug 13 2026)
+- [x] Create a temporary local-only browser-authentication path for the isolated Jim Capital UAT fixture
+- [x] Verify root → Capital Aperture, shared thesis visibility, Capital / Trade creation, and Aperture handoff in the browser
+- [x] Remove the local-only authentication path after the browser walkthrough and retain the evidence
