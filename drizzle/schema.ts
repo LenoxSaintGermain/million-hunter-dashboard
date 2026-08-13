@@ -1173,6 +1173,20 @@ export const apertureRuns = mysqlTable("aperture_runs", {
   intendedTrades: json("intended_trades").$type<Array<{ symbol: string; dollarsCents: number; note?: string }>>().default([]),
   /** Below this, capital stays in cash rather than chasing a marginal idea. */
   hurdleRateBps: int("hurdle_rate_bps"),
+  // ── Short-Horizon Paper Run preset — these fields ARE the mandate ──────────
+  // Null on runs created before the preset existed: pre-mandate, not gated.
+  // See server/aperture/mandate.ts.
+  holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window"]),
+  /** When the thesis for this run expires. A short-horizon run without one is a hold. */
+  catalystDeadlineAt: bigint("catalyst_deadline_at", { mode: "number" }),
+  /** 30-day ADV floor in USD. May tighten the mandate floor, never loosen it. */
+  liquidityFloorAdvUsd: bigint("liquidity_floor_adv_usd", { mode: "number" }),
+  /** Single-name cap, 0..100. May tighten the mandate cap, never loosen it. */
+  maxSingleNamePct: float("max_single_name_pct"),
+  /** What would make this run's premise wrong. Free text, boilerplate rejected. */
+  invalidationRule: text("invalidation_rule"),
+  /** Which mandate version the preset was checked against. */
+  mandateVersion: varchar("mandate_version", { length: 16 }),
   status: mysqlEnum("status", [
     "queued", "compiling", "discovering", "researching", "scoring", "constructing", "completed", "failed",
   ]).default("queued").notNull(),
@@ -1296,6 +1310,26 @@ export const brokerOrders = mysqlTable("broker_orders", {
   filledAvgPriceCents: bigint("filled_avg_price_cents", { mode: "number" }),
   /** Why the human rejected or the broker rejected. */
   rejectionReason: text("rejection_reason"),
+  // ── Risk gates — see server/aperture/gates.ts. Null on pre-mandate rows. ───
+  /** Why this trade. Required; boilerplate is rejected at the gate. */
+  reason: text("reason"),
+  /** What would make it wrong. Required; boilerplate is rejected at the gate. */
+  invalidationCondition: text("invalidation_condition"),
+  /** Optional price level attached to the invalidation. */
+  invalidationPriceCents: bigint("invalidation_price_cents", { mode: "number" }),
+  holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window"]),
+  catalystDeadlineAt: bigint("catalyst_deadline_at", { mode: "number" }),
+  /** regular | pre_market | after_hours | closed | unknown, at creation time. */
+  marketSession: varchar("market_session", { length: 24 }),
+  /** HOW the session was determined — computed, never asserted. */
+  sessionBasis: varchar("session_basis", { length: 200 }),
+  /** When the operator echoed the paper acknowledgement. */
+  paperAckAt: bigint("paper_ack_at", { mode: "number" }),
+  /** The notional the ceilings were actually checked against (qty orders included). */
+  gatedNotionalCents: bigint("gated_notional_cents", { mode: "number" }),
+  mandateVersion: varchar("mandate_version", { length: 16 }),
+  /** The full gate evaluation, so a blocked order records which ceiling stopped it. */
+  gateSnapshot: json("gate_snapshot"),
   approvedAt: bigint("approved_at", { mode: "number" }),
   submittedAt: bigint("submitted_at", { mode: "number" }),
   filledAt: bigint("filled_at", { mode: "number" }),

@@ -39,7 +39,9 @@ import { generateMemo } from "./aperture/memo";
 import { belongsInMemoLibrary } from "./aperture/memoLibrary";
 import { brokerFor, listBrokers } from "./aperture/brokers/index";
 import { normSymbol } from "./aperture/facts";
-import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills } from "./aperture/orderFlow";
+import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills, OrderGateError } from "./aperture/orderFlow";
+import { evaluateRunPreset } from "./aperture/gates";
+import { CURRENT_MANDATE, HOLDING_PERIOD_KEYS, MIN_NARRATIVE_CHARS, PAPER_ACKNOWLEDGEMENT } from "./aperture/mandate";
 import { runMonitoringChecks, getMonitoringChecks, getFlaggedChecks } from "./aperture/monitor";
 import { computeAlpha, getAlpha } from "./aperture/alpha";
 import { brokerOrders, monitoringChecks } from "../drizzle/schema";
@@ -388,6 +390,15 @@ export const apertureRouter = router({
         return { run, candidates, strategies, coverage };
       }),
 
+    /**
+     * Short-Horizon Paper Run. The five preset fields are required because they
+     * ARE the mandate — a run that does not state its holding period, liquidity
+     * floor, catalyst deadline, concentration cap and invalidation rule has no
+     * standard to be judged against, and every order under it would inherit that
+     * silence. Presence is checked here; the values are checked against
+     * MANDATE_V1 by evaluateRunPreset, which is where "may tighten, never
+     * loosen" is enforced.
+     */
     start: adminProcedure
       .input(z.object({
         thesisId: z.number(),
@@ -399,6 +410,11 @@ export const apertureRouter = router({
           note: z.string().optional(),
         })).default([]),
         hurdleRateBps: z.number().optional(),
+        holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]),
+        liquidityFloorAdvUsd: z.number().positive(),
+        catalystDeadlineAt: z.number(),
+        maxSingleNamePct: z.number().positive(),
+        invalidationRule: z.string().min(MIN_NARRATIVE_CHARS),
       }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -408,6 +424,30 @@ export const apertureRouter = router({
         }
 
         const now = Date.now();
+        const account = input.accountId
+          ? await requireAccount(db, input.accountId, ctx.user.id)
+          : null;
+
+        const preset = evaluateRunPreset(
+          {
+            holdingPeriod: input.holdingPeriod,
+            liquidityFloorAdvUsd: input.liquidityFloorAdvUsd,
+            catalystDeadlineAt: input.catalystDeadlineAt,
+            maxSingleNamePct: input.maxSingleNamePct,
+            invalidationRule: input.invalidationRule,
+            deployableCapitalCents: input.deployableCapitalCents,
+          },
+          { accountLinked: account != null, equityCents: account?.equityValueCents ?? null },
+          CURRENT_MANDATE,
+          now,
+        );
+        if (!preset.passed) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `run preset rejected by the mandate: ${preset.failures.join("; ")}`,
+          });
+        }
+
         const [result] = await db!.insert(apertureRuns).values({
           userId: ctx.user.id,
           thesisId: input.thesisId,
@@ -415,6 +455,12 @@ export const apertureRouter = router({
           deployableCapitalCents: input.deployableCapitalCents,
           intendedTrades: input.intendedTrades,
           hurdleRateBps: input.hurdleRateBps ?? null,
+          holdingPeriod: input.holdingPeriod as any,
+          catalystDeadlineAt: input.catalystDeadlineAt,
+          liquidityFloorAdvUsd: Math.round(input.liquidityFloorAdvUsd),
+          maxSingleNamePct: input.maxSingleNamePct,
+          invalidationRule: input.invalidationRule,
+          mandateVersion: preset.mandateVersion,
           status: "queued",
           createdAt: now,
         });
@@ -485,6 +531,11 @@ export const apertureRouter = router({
       }),
 
     create: adminProcedure
+      // This schema checks PRESENCE, not policy. The ceilings are enforced in
+      // orderFlow.createOrder — the only layer that can see the account, the
+      // positions and the fact ledger at once, and the layer every non-router
+      // caller also goes through. Duplicating the numbers here would give two
+      // places to change them and one of them would drift.
       .input(z.object({
         runId: z.number(),
         candidateId: z.number().optional(),
@@ -496,10 +547,43 @@ export const apertureRouter = router({
         orderType: z.enum(["market", "limit"]).default("market"),
         limitPriceCents: z.number().optional(),
         timeInForce: z.enum(["day", "gtc"]).default("day"),
+        reason: z.string().min(MIN_NARRATIVE_CHARS),
+        invalidationCondition: z.string().min(MIN_NARRATIVE_CHARS),
+        invalidationPriceCents: z.number().optional(),
+        holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]),
+        catalystDeadlineAt: z.number(),
+        paperAcknowledgement: z.literal(PAPER_ACKNOWLEDGEMENT),
       }))
       .mutation(async ({ ctx, input }) => {
-        const orderId = await createOrder({ ...input, userId: ctx.user.id });
-        return { orderId };
+        const db = await getDb();
+        await requireAccount(db, input.accountId, ctx.user.id);
+
+        // A run's own preset tightens the mandate for orders placed under it.
+        const [run] = await db!.select().from(apertureRuns)
+          .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id)))
+          .limit(1);
+        if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+
+        try {
+          const orderId = await createOrder({
+            ...input,
+            userId: ctx.user.id,
+            portfolioRules: {
+              maxSingleNamePct: run.maxSingleNamePct ?? null,
+              minAvgDailyVolumeUsd: run.liquidityFloorAdvUsd ?? null,
+            },
+          });
+          return { orderId };
+        } catch (e: any) {
+          if (e instanceof OrderGateError) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: e.message,
+              cause: e,
+            });
+          }
+          throw e;
+        }
       }),
 
     approve: adminProcedure
@@ -575,6 +659,29 @@ export const apertureRouter = router({
 
 // ── Background run executor ───────────────────────────────────────────────────
 
+/** Tightening-only merge of the run preset into the thesis's portfolio rules. */
+function withPresetRules(
+  graph: any,
+  input: { maxSingleNamePct?: number; liquidityFloorAdvUsd?: number },
+): any {
+  if (!graph) return graph;
+  const rules = { ...(graph.portfolioRules ?? {}) };
+  const existingSingle = Number(rules.maxSingleNamePct);
+  const existingAdv = Number(rules.minAvgDailyVolumeUsd);
+
+  if (input.maxSingleNamePct != null) {
+    rules.maxSingleNamePct = Number.isFinite(existingSingle)
+      ? Math.min(existingSingle, input.maxSingleNamePct)
+      : input.maxSingleNamePct;
+  }
+  if (input.liquidityFloorAdvUsd != null) {
+    rules.minAvgDailyVolumeUsd = Number.isFinite(existingAdv)
+      ? Math.max(existingAdv, input.liquidityFloorAdvUsd)
+      : input.liquidityFloorAdvUsd;
+  }
+  return { ...graph, portfolioRules: rules };
+}
+
 async function executeRun(
   runId: number,
   userId: number,
@@ -585,6 +692,11 @@ async function executeRun(
     deployableCapitalCents: number;
     intendedTrades: Array<{ symbol: string; dollarsCents: number; note?: string }>;
     hurdleRateBps?: number;
+    holdingPeriod?: string;
+    liquidityFloorAdvUsd?: number;
+    catalystDeadlineAt?: number;
+    maxSingleNamePct?: number;
+    invalidationRule?: string;
   },
 ) {
   const db = await getDb();
@@ -593,7 +705,11 @@ async function executeRun(
 
   try {
     await setStatus("compiling", { startedAt: Date.now() });
-    const graph = thesis.graph as any;
+    // The run preset tightens the thesis's own portfolio rules for this run, so
+    // the concentration cap and liquidity floor reach strategy construction
+    // instead of sitting inert on the row. Tightening only — a preset can never
+    // widen what the thesis allows.
+    const graph = withPresetRules(thesis.graph as any, input);
     const nodeRows = flattenExposureTree(graph.exposureTree ?? []);
 
     // ── 1. Persist exposure nodes ──────────────────────────────────────────

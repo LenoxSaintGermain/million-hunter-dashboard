@@ -41,6 +41,16 @@ export default function ApertureHome() {
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [deployable, setDeployable] = useState("");
   const [hurdleRate, setHurdleRate] = useState("");
+  // Short-Horizon Paper Run preset. These five fields ARE the mandate — the run
+  // cannot start without them. The values below are the mandate's own ceilings
+  // (server/aperture/mandate.ts), prefilled as a starting point; the server is
+  // authoritative and rejects anything looser, so tightening here is the only
+  // thing this form can actually do.
+  const [holdingPeriod, setHoldingPeriod] = useState("");
+  const [liquidityFloor, setLiquidityFloor] = useState("20000000");
+  const [maxSingleName, setMaxSingleName] = useState("10");
+  const [catalystDeadline, setCatalystDeadline] = useState("");
+  const [invalidationRule, setInvalidationRule] = useState("");
   const [intendedTrades, setIntendedTrades] = useState<Array<{ symbol: string; dollars: string; note: string }>>([]);
   const [starting, setStarting] = useState(false);
 
@@ -79,12 +89,22 @@ export default function ApertureHome() {
   const handleStart = () => {
     if (!selectedThesisId) return toast.error("Select a thesis first");
     if (!deployable) return toast.error("Enter deployable capital");
+    if (!holdingPeriod) return toast.error("Choose a holding period — it is part of the mandate");
+    if (!catalystDeadline) return toast.error("Set a catalyst deadline — a short-horizon run without one is a hold");
+    if (!invalidationRule.trim()) return toast.error("State what would make this run wrong");
+    const deadlineMs = Date.parse(catalystDeadline);
+    if (!Number.isFinite(deadlineMs)) return toast.error("Catalyst deadline is not a valid date");
     setStarting(true);
     startRun.mutate({
       thesisId: selectedThesisId,
       accountId: selectedAccountId ?? undefined,
       deployableCapitalCents: dollarsToCents(deployable),
       hurdleRateBps: hurdleRate ? Math.round(parseFloat(hurdleRate) * 100) : undefined,
+      holdingPeriod,
+      liquidityFloorAdvUsd: Math.round(parseFloat(liquidityFloor.replace(/[^0-9.]/g, "")) || 0),
+      catalystDeadlineAt: deadlineMs,
+      maxSingleNamePct: parseFloat(maxSingleName) || 0,
+      invalidationRule: invalidationRule.trim(),
       intendedTrades: intendedTrades
         .filter((t) => t.symbol.trim() && t.dollars.trim())
         .map((t) => ({ symbol: t.symbol.trim().toUpperCase(), dollarsCents: dollarsToCents(t.dollars) })),
@@ -237,6 +257,50 @@ export default function ApertureHome() {
                       placeholder="e.g. 8"
                       value={hurdleRate}
                       onChange={(e) => setHurdleRate(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Short-Horizon Paper Run preset — the mandate, per run */}
+                <div className="space-y-3 rounded-lg p-3" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
+                  <div>
+                    <Label className="text-xs font-semibold">Short-Horizon Paper Run preset</Label>
+                    <p className="text-[11px] mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>
+                      Required. Every order in this run is gated against these. A preset may tighten the mandate, never loosen it.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Holding Period</Label>
+                      <Select value={holdingPeriod} onValueChange={setHoldingPeriod}>
+                        <SelectTrigger><SelectValue placeholder="Choose" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="intraday">Intraday — flat by 15:55 ET</SelectItem>
+                          <SelectItem value="overnight">Overnight — exit by the next close</SelectItem>
+                          <SelectItem value="swing">Swing — 2 to 10 sessions</SelectItem>
+                          <SelectItem value="catalyst_window">Catalyst window — up to 20 sessions</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Catalyst Deadline</Label>
+                      <Input type="datetime-local" value={catalystDeadline} onChange={(e) => setCatalystDeadline(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Liquidity Floor — 30d ADV ($)</Label>
+                      <Input value={liquidityFloor} onChange={(e) => setLiquidityFloor(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Concentration Cap — single name (%)</Label>
+                      <Input value={maxSingleName} onChange={(e) => setMaxSingleName(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Invalidation Rule</Label>
+                    <Input
+                      placeholder="What would make this run's premise wrong?"
+                      value={invalidationRule}
+                      onChange={(e) => setInvalidationRule(e.target.value)}
                     />
                   </div>
                 </div>
