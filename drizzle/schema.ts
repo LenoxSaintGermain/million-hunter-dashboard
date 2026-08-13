@@ -1413,6 +1413,34 @@ export const apertureAlpha = mysqlTable("aperture_alpha", {
   hhiAfter: float("hhi_after"),
   /** Capital utilization: deployed / deployable. */
   capitalUtilizationPct: float("capital_utilization_pct"),
+  // ── Pilot scorecard: baseline · benchmark · sample size · horizon ─────────
+  // Without these, "system P&L was +$400" is a number with nothing behind it.
+  /** Every system candidate that reached an order, approved or not. */
+  systemSurfacedCount: int("system_surfaced_count"),
+  /** System candidates the operator declined — the filter, made visible. */
+  systemDeclinedCount: int("system_declined_count"),
+  selectionBiasNote: text("selection_bias_note"),
+  /** What the system is measured against: the operator's plan, or cash. */
+  baselineKind: mysqlEnum("baseline_kind", ["human_intended", "cash_only"]),
+  baselinePnlCents: bigint("baseline_pnl_cents", { mode: "number" }),
+  baselineNote: text("baseline_note"),
+  /** Market benchmark. Null + basis "unknown" when no priced history covers it. */
+  benchmarkSymbol: varchar("benchmark_symbol", { length: 24 }),
+  benchmarkReturnBps: int("benchmark_return_bps"),
+  benchmarkBasis: mysqlEnum("benchmark_basis", ["verified", "modeled", "unknown"]),
+  benchmarkNote: text("benchmark_note"),
+  /** Sample size, and which claim it can carry. n=30 cannot measure an edge. */
+  filledOrderCount: int("filled_order_count"),
+  closedTradeCount: int("closed_trade_count"),
+  sampleSufficiency: mysqlEnum("sample_sufficiency", ["process_only", "indicative", "edge_capable"]),
+  sampleNote: text("sample_note"),
+  /** Horizon the figures cover. */
+  horizonStartAt: bigint("horizon_start_at", { mode: "number" }),
+  horizonEndAt: bigint("horizon_end_at", { mode: "number" }),
+  horizonDays: float("horizon_days"),
+  holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window"]),
+  /** Paper fills flatter. The assumption travels with the figures. */
+  slippageAssumption: text("slippage_assumption"),
   /** Basis for all figures: verified = from real fills, modeled = estimated. */
   metricBasis: mysqlEnum("metric_basis", ["verified", "modeled", "mixed"]).default("modeled").notNull(),
   lastComputedAt: bigint("last_computed_at", { mode: "number" }),

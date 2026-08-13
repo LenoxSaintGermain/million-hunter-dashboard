@@ -2,177 +2,129 @@
  * Aperture Alpha — the honest product metric.
  *
  * Measures:
- *   - Human opportunity set vs system opportunity set
- *   - Candidates the system added that the human approved and filled
+ *   - Human opportunity set vs system opportunity set, and the operator's filter
  *   - Delta in return (human-intended P&L vs system-added P&L)
- *   - Max drawdown of the full aperture portfolio
- *   - HHI concentration before vs after system additions
- *   - Capital utilization: deployed / deployable
+ *   - Baseline and benchmark — WHAT the comparison is against, as fields
+ *   - Sample size and what claim it can carry (process vs edge)
+ *   - Horizon: when the run started, when it ended, how long that was
+ *   - Max drawdown, HHI before/after, capital utilization
  *
  * All figures come from real paper fills (broker_orders.status = 'filled') and
  * position_snapshots. Nothing is asserted. If there are no fills, the metric
  * basis is 'modeled' and the P&L figures are null.
  *
- * This is the product's claim to value — it must be honest or it is worthless.
+ * The arithmetic lives in scorecard.ts and is unit-tested; this file is the I/O
+ * around it. This is the product's claim to value — it must be honest or it is
+ * worthless.
  */
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   apertureAlpha, apertureRuns, apertureCandidates, brokerOrders, positionSnapshots,
   type ApertureAlpha, type InsertApertureAlpha,
 } from "../../drizzle/schema";
-
-// ── HHI helper ────────────────────────────────────────────────────────────────
-
-function computeHhi(allocations: Array<{ valueCents: number }>): number {
-  const total = allocations.reduce((s, a) => s + a.valueCents, 0);
-  if (total === 0) return 0;
-  return allocations.reduce((s, a) => {
-    const share = a.valueCents / total;
-    return s + share * share;
-  }, 0);
-}
-
-// ── Max drawdown ──────────────────────────────────────────────────────────────
-
-function computeMaxDrawdownBps(snapshots: Array<{ marketValueCents: number | null; snapshotAt: number }>): number {
-  const sorted = snapshots
-    .filter((s) => s.marketValueCents != null)
-    .sort((a, b) => a.snapshotAt - b.snapshotAt);
-  if (sorted.length < 2) return 0;
-
-  let peak = sorted[0].marketValueCents!;
-  let maxDrawdown = 0;
-  for (const s of sorted) {
-    const val = s.marketValueCents!;
-    if (val > peak) peak = val;
-    const drawdown = peak > 0 ? (peak - val) / peak : 0;
-    if (drawdown > maxDrawdown) maxDrawdown = drawdown;
-  }
-  return Math.round(maxDrawdown * 10_000); // basis points
-}
+import { buildScorecard } from "./scorecard";
 
 // ── Compute or refresh alpha for a run ───────────────────────────────────────
 
+/**
+ * Loads the rows and hands them to buildScorecard. All arithmetic lives in
+ * scorecard.ts so it can be tested without a database — this function is I/O.
+ */
 export async function computeAlpha(runId: number, userId: number): Promise<ApertureAlpha> {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
 
   const now = Date.now();
 
-  // ── 1. Load the run ────────────────────────────────────────────────────────
   const runRows = await db.select().from(apertureRuns).where(eq(apertureRuns.id, runId)).limit(1);
   const run = runRows[0];
   if (!run) throw new Error("run not found");
 
-  // ── 2. Load candidates ─────────────────────────────────────────────────────
   const candidates = await db.select().from(apertureCandidates)
     .where(eq(apertureCandidates.runId, runId));
 
-  // ── 3. Human opportunity set = intended trades from the run ────────────────
-  const intendedTrades = (run.intendedTrades as Array<{ symbol: string; dollarsCents: number }>) ?? [];
-  const humanSymbols = new Set(intendedTrades.map((t) => t.symbol.toUpperCase()));
-  const humanOpportunitySetCount = humanSymbols.size;
+  // Every order, not just the filled ones: the declined system candidates are
+  // what makes the operator's filter visible instead of invisible.
+  const orders = await db.select().from(brokerOrders)
+    .where(and(eq(brokerOrders.runId, runId), eq(brokerOrders.userId, userId)));
 
-  // ── 4. System added = candidates whose symbol was NOT in the human set ─────
-  const systemAddedSymbols = candidates
-    .filter((c) => !humanSymbols.has(c.symbol))
-    .map((c) => c.symbol);
-  const systemAddedCount = systemAddedSymbols.length;
-
-  // ── 5. Load filled orders ──────────────────────────────────────────────────
-  const filledOrders = await db.select().from(brokerOrders)
-    .where(and(eq(brokerOrders.runId, runId), eq(brokerOrders.status, "filled")));
-
-  const systemFilledCount = filledOrders.filter((o) =>
-    systemAddedSymbols.includes(o.symbol)
-  ).length;
-
-  // ── 6. P&L from position snapshots ────────────────────────────────────────
-  const allSnapshots = await db.select().from(positionSnapshots)
+  const snapshots = await db.select().from(positionSnapshots)
     .where(eq(positionSnapshots.runId, runId));
 
-  let humanPnlCents: number | null = null;
-  let systemPnlCents: number | null = null;
-  let metricBasis: "verified" | "modeled" | "mixed" = "modeled";
-
-  if (filledOrders.length > 0) {
-    // Group snapshots by symbol, take the latest per symbol
-    const latestBySymbol = new Map<string, typeof allSnapshots[0]>();
-    for (const s of allSnapshots) {
-      const existing = latestBySymbol.get(s.symbol);
-      if (!existing || s.snapshotAt > existing.snapshotAt) {
-        latestBySymbol.set(s.symbol, s);
-      }
-    }
-
-    let humanPnl = 0;
-    let systemPnl = 0;
-    let hasVerified = false;
-    let hasModeled = false;
-
-    for (const [symbol, snap] of Array.from(latestBySymbol.entries())) {
-      const pnl = snap.unrealizedPnlCents ?? 0;
-      if (snap.priceBasis === "verified") hasVerified = true;
-      else hasModeled = true;
-      if (humanSymbols.has(symbol)) {
-        humanPnl += pnl;
-      } else {
-        systemPnl += pnl;
-      }
-    }
-
-    humanPnlCents = humanPnl;
-    systemPnlCents = systemPnl;
-    metricBasis = hasVerified && hasModeled ? "mixed" : hasVerified ? "verified" : "modeled";
-  }
-
-  // ── 7. Max drawdown ────────────────────────────────────────────────────────
-  const maxDrawdownBps = computeMaxDrawdownBps(allSnapshots.map((s) => ({
-    marketValueCents: s.marketValueCents,
-    snapshotAt: s.snapshotAt,
-  })));
-
-  // ── 8. HHI concentration ───────────────────────────────────────────────────
-  // Before: human intended trades
-  const hhiBefore = computeHhi(intendedTrades.map((t) => ({ valueCents: t.dollarsCents })));
-
-  // After: all filled orders (human + system)
-  const filledBySymbol = new Map<string, number>();
-  for (const o of filledOrders) {
-    const val = o.filledQty && o.filledAvgPriceCents
-      ? Math.round(o.filledQty * o.filledAvgPriceCents)
-      : o.notionalCents ?? 0;
-    filledBySymbol.set(o.symbol, (filledBySymbol.get(o.symbol) ?? 0) + val);
-  }
-  const hhiAfter = computeHhi(Array.from(filledBySymbol.values()).map((v) => ({ valueCents: v })));
-
-  // ── 9. Capital utilization ─────────────────────────────────────────────────
-  const deployedCents = Array.from(filledBySymbol.values()).reduce((s, v) => s + v, 0);
-  const capitalUtilizationPct = run.deployableCapitalCents > 0
-    ? deployedCents / run.deployableCapitalCents
-    : null;
-
-  // ── 10. Upsert aperture_alpha ──────────────────────────────────────────────
-  const existing = await db.select().from(apertureAlpha)
-    .where(eq(apertureAlpha.runId, runId)).limit(1);
+  const metrics = buildScorecard({
+    run: {
+      deployableCapitalCents: run.deployableCapitalCents,
+      intendedTrades: (run.intendedTrades as Array<{ symbol: string; dollarsCents: number }>) ?? [],
+      holdingPeriod: (run.holdingPeriod as any) ?? null,
+      createdAt: run.createdAt,
+      startedAt: run.startedAt ?? null,
+      completedAt: run.completedAt ?? null,
+      catalystDeadlineAt: run.catalystDeadlineAt ?? null,
+    },
+    candidateSymbols: candidates.map((c) => c.symbol),
+    orders: orders.map((o) => ({
+      symbol: o.symbol,
+      side: o.side,
+      status: o.status,
+      filledQty: o.filledQty,
+      filledAvgPriceCents: o.filledAvgPriceCents,
+      notionalCents: o.notionalCents,
+      gatedNotionalCents: o.gatedNotionalCents,
+      filledAt: o.filledAt,
+    })),
+    snapshots: snapshots.map((s) => ({
+      symbol: s.symbol,
+      marketValueCents: s.marketValueCents,
+      unrealizedPnlCents: s.unrealizedPnlCents,
+      priceBasis: s.priceBasis,
+      snapshotAt: s.snapshotAt,
+    })),
+    // No priced history covers a run horizon yet, so the benchmark is declared
+    // unknown rather than approximated. Pass a BenchmarkQuote here the day a
+    // provider can state one.
+    benchmark: null,
+    now,
+  });
 
   const payload: Partial<InsertApertureAlpha> = {
     runId,
     userId,
-    humanOpportunitySetCount,
-    systemAddedCount,
-    systemFilledCount,
-    humanPnlCents,
-    systemPnlCents,
-    maxDrawdownBps,
-    hhiBefore,
-    hhiAfter,
-    capitalUtilizationPct,
-    metricBasis,
+    humanOpportunitySetCount: metrics.humanOpportunitySetCount,
+    systemAddedCount: metrics.systemAddedCount,
+    systemFilledCount: metrics.systemFilledCount,
+    systemSurfacedCount: metrics.systemSurfacedCount,
+    systemDeclinedCount: metrics.systemDeclinedCount,
+    selectionBiasNote: metrics.selectionBiasNote,
+    humanPnlCents: metrics.humanPnlCents,
+    systemPnlCents: metrics.systemPnlCents,
+    baselineKind: metrics.baselineKind,
+    baselinePnlCents: metrics.baselinePnlCents,
+    baselineNote: metrics.baselineNote,
+    benchmarkSymbol: metrics.benchmarkSymbol,
+    benchmarkReturnBps: metrics.benchmarkReturnBps,
+    benchmarkBasis: metrics.benchmarkBasis,
+    benchmarkNote: metrics.benchmarkNote,
+    maxDrawdownBps: metrics.maxDrawdownBps,
+    hhiBefore: metrics.hhiBefore,
+    hhiAfter: metrics.hhiAfter,
+    capitalUtilizationPct: metrics.capitalUtilizationPct,
+    filledOrderCount: metrics.filledOrderCount,
+    closedTradeCount: metrics.closedTradeCount,
+    sampleSufficiency: metrics.sampleSufficiency,
+    sampleNote: metrics.sampleNote,
+    horizonStartAt: metrics.horizonStartAt,
+    horizonEndAt: metrics.horizonEndAt,
+    horizonDays: metrics.horizonDays,
+    holdingPeriod: metrics.holdingPeriod,
+    slippageAssumption: metrics.slippageAssumption,
+    metricBasis: metrics.metricBasis,
     lastComputedAt: now,
     updatedAt: now,
   };
+
+  const existing = await db.select().from(apertureAlpha)
+    .where(eq(apertureAlpha.runId, runId)).limit(1);
 
   if (existing[0]) {
     await db.update(apertureAlpha).set(payload).where(eq(apertureAlpha.runId, runId));
