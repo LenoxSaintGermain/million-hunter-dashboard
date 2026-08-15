@@ -41,7 +41,7 @@ export default function StrategyCompare() {
   if (isLoading) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Loading…</div></DashboardLayout>;
   if (!data) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Run not found.</div></DashboardLayout>;
 
-  const { strategies } = data;
+  const { strategies, brief } = data;
   const human = strategies.find((s) => s.kind === "human_baseline");
   const others = strategies.filter((s) => s.kind !== "human_baseline");
 
@@ -59,10 +59,21 @@ export default function StrategyCompare() {
             <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate(`/aperture/run/${runId}`)}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>Strategy Comparison</h1>
+            <h1 className="font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>Choose a research posture</h1>
           </div>
-          <p className="text-sm mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>Run #{runId} · {strategies.length} strategies constructed</p>
+          <p className="text-sm mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>Run #{runId} · compare concentration, diversification, and retained cash against the stated horizon.</p>
         </div>
+
+        {brief?.recommendedResearchPosture && (
+          <Card style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
+            <CardContent className="pt-4">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Research posture to compare first</p>
+              <p className="mt-1 text-base font-medium" style={{ color: "var(--sh-text-primary)" }}>{brief.recommendedResearchPosture.label}</p>
+              <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{brief.recommendedResearchPosture.rationale}</p>
+              <p className="mt-3 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Horizon: {brief.horizon.label} · {brief.evidence.verificationCount} evidence check(s) remain before a paper order can be considered.</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Human baseline first */}
         {human && (

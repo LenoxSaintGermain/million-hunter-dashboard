@@ -5,7 +5,7 @@ import EditorialTopNav from "@/components/EditorialTopNav";
 import { cn } from "@/lib/utils";
 
 const APERTURE_NAV = [
-  { href: "/aperture", label: "Overview", icon: LayoutDashboard },
+  { href: "/aperture", label: "Decision Center", icon: LayoutDashboard },
   { href: "/aperture/thesis/new", label: "Theses", icon: BookOpen },
   { href: "/aperture/accounts", label: "Accounts", icon: Wallet },
   { href: "/aperture/memos", label: "Memo Library", icon: FileText },

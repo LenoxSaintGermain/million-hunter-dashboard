@@ -94,7 +94,7 @@ function OrderQueue({ runId }: { runId: number }) {
 
       {orders?.length === 0 && (
         <p className="text-sm text-center py-8" style={{ color: "var(--sh-fg-muted)" }}>
-          No orders yet. Generate orders from the Candidate Board.
+          No paper orders yet. A reviewed research decision must be translated into an order before it can enter this queue.
         </p>
       )}
 
@@ -133,7 +133,7 @@ function OrderQueue({ runId }: { runId: number }) {
                   )}
                   {o.status === "approved" && (
                     <Button size="sm" className="h-7 text-xs" onClick={() => submit.mutate({ orderId: o.id })} disabled={submit.isPending}>
-                      <Send className="h-3.5 w-3.5 mr-1" /> Submit to broker
+                        <Send className="h-3.5 w-3.5 mr-1" /> Submit paper order
                     </Button>
                   )}
                   <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
@@ -224,7 +224,7 @@ function MonitoringPanel({ runId }: { runId: number }) {
         ))}
         {checks?.length === 0 && (
           <p className="text-sm text-center py-8" style={{ color: "var(--sh-fg-muted)" }}>
-            No monitoring checks yet. Run checks from the Candidate Board.
+              No monitoring checks yet. Add a reviewed paper position, then use this surface to challenge its catalyst and invalidation conditions.
           </p>
         )}
       </div>
@@ -376,21 +376,34 @@ export default function ApertureExecute() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>
-              Run #{runId} · Execute &amp; Monitor
+              Decision follow-through
             </h1>
           </div>
           {run && (
             <p className="text-sm mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>
-              Status: {run.status} · {run.candidateCount ?? "—"} candidates
+              Run #{runId} · Paper-only follow-through after evidence and posture review
             </p>
           )}
         </div>
 
+        {data?.brief && (
+          <div className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Current human decision</p>
+                <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{data.brief.nextDecision.title}</p>
+                <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.brief.nextDecision.detail}</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}`)}>Return to decision brief</Button>
+            </div>
+          </div>
+        )}
+
         <Tabs defaultValue="orders">
           <TabsList>
-            <TabsTrigger value="orders">Order Queue</TabsTrigger>
-            <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
-            <TabsTrigger value="alpha">Aperture Alpha</TabsTrigger>
+            <TabsTrigger value="orders">Paper order review</TabsTrigger>
+            <TabsTrigger value="monitoring">Thesis monitoring</TabsTrigger>
+            <TabsTrigger value="alpha">Measured outcomes</TabsTrigger>
           </TabsList>
           <TabsContent value="orders" className="mt-4">
             <OrderQueue runId={runId} />

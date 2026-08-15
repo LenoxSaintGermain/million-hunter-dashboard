@@ -11,7 +11,7 @@
  * so the contract is visible in the server code too.
  */
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   capitalTheses,
@@ -46,6 +46,7 @@ import { runMonitoringChecks, getMonitoringChecks, getFlaggedChecks } from "./ap
 import { computeAlpha, getAlpha } from "./aperture/alpha";
 import { brokerOrders, monitoringChecks } from "../drizzle/schema";
 import { desc } from "drizzle-orm";
+import { buildCapitalDecisionBrief } from "./aperture/decisionBrief";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -387,7 +388,28 @@ export const apertureRouter = router({
           .where(eq(apertureStrategies.runId, input.id));
         const coverage = await db!.select().from(exposureCoverage)
           .where(eq(exposureCoverage.runId, input.id));
-        return { run, candidates, strategies, coverage };
+        const thesis = await requireThesis(db, run.thesisId, ctx.user.id);
+        const coverageNodeIds = coverage.map((item) => item.nodeId);
+        const coverageNodes = coverageNodeIds.length
+          ? await db!.select().from(exposureNodes).where(inArray(exposureNodes.id, coverageNodeIds))
+          : [];
+        const nodePathById = new Map(coverageNodes.map((node) => [node.id, node.path || node.label]));
+        const thesisNodes = flattenExposureTree((thesis.graph as any)?.exposureTree ?? [])
+          .map((node) => ({ label: node.label, path: node.path || node.label, depth: node.depth }));
+        const coverageDetail = coverage.map((item) => ({
+          nodePath: nodePathById.get(item.nodeId) ?? `unmapped:${item.nodeId}`,
+          symbol: item.symbol,
+          source: item.source,
+        }));
+        const brief = buildCapitalDecisionBrief({
+          graph: thesis.graph,
+          run,
+          candidates,
+          strategies,
+          coverage: coverageDetail,
+          thesisNodePaths: thesisNodes.map((node) => node.path),
+        });
+        return { run, candidates, strategies, coverage, coverageDetail, thesisNodes, brief };
       }),
 
     /**

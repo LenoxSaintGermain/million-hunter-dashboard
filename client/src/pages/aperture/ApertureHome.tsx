@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, Play, Plus, RefreshCw, Trash2, BookOpen, TrendingUp, BarChart3, ArrowUpRight } from "lucide-react";
+import { AlertTriangle, Play, Plus, RefreshCw, Trash2, BookOpen, TrendingUp, ArrowUpRight, Compass, Layers3, Target } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { formatDistanceToNow } from "date-fns";
@@ -119,6 +119,8 @@ export default function ApertureHome() {
 
   const liveProviders = providers?.filter((p) => p.available) ?? [];
   const deadProviders = providers?.filter((p) => !p.available) ?? [];
+  const selectedThesis = theses?.find((thesis) => thesis.id === selectedThesisId);
+  const selectedHorizon = selectedThesis?.graph?.horizons?.[0] ?? null;
   const unprojectedCanonicalTheses = (canonicalTheses ?? []).filter(
     (canonical) => !(theses ?? []).some((projection) => projection.sourceCompilationId === canonical.id),
   );
@@ -128,32 +130,30 @@ export default function ApertureHome() {
       <div className="space-y-6 max-w-5xl">
         <DisclaimerBanner />
 
-        {/* Header */}
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingUp className="h-5 w-5" style={{ color: "var(--sh-signal)" }} />
-            <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--sh-text-primary)" }}>
-              Capital Aperture
-            </h1>
-            <Badge variant="outline" className="text-xs">v0 · Paper Only</Badge>
+        <header className="max-w-3xl">
+          <div className="flex items-center gap-2 mb-2">
+            <Compass className="h-5 w-5" style={{ color: "var(--sh-signal)" }} />
+            <span className="text-[0.7rem] font-semibold uppercase tracking-[0.17em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture · Paper research</span>
+            <Badge variant="outline" className="text-xs">Human-approved only</Badge>
           </div>
-          <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>
-            Given a thesis, a portfolio, and deployable capital — find what you haven't considered and re-underwrite what you planned.
+          <h1 className="font-serif text-3xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Build a capital brief before you consider a paper allocation.</h1>
+          <p className="mt-3 text-sm leading-6" style={{ color: "var(--sh-text-secondary)" }}>
+            Start with the belief and time horizon that matter. Aperture will map what your portfolio already expresses, what is missing, and which research decision deserves attention next.
           </p>
-        </div>
+        </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Run Setup */}
           <div className="lg:col-span-2 space-y-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">New Run</CardTitle>
-                <CardDescription>Discover → Research → Score → Construct</CardDescription>
+                <CardTitle className="font-serif text-xl">Frame the decision</CardTitle>
+                <CardDescription>Thesis horizon → portfolio context → evidence brief. Symbols are reviewed later, as evidence.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Thesis */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">Thesis</Label>
+                  <Label className="text-xs font-medium">1 · Which belief should be re-underwritten?</Label>
                   <div className="flex gap-2">
                     <Select
                       value={selectedThesisId?.toString() ?? ""}
@@ -178,11 +178,12 @@ export default function ApertureHome() {
                       <ArrowUpRight className="h-3.5 w-3.5 mr-1" /> Create capital thesis
                     </Button>
                   </div>
-                  {selectedThesisId && theses?.find((t) => t.id === selectedThesisId)?.confidenceNotes?.length ? (
-                    <div className="text-xs p-2 rounded" style={{ background: "var(--sh-surface-2)", color: "var(--sh-signal)" }}>
-                      ⚠ Compiler notes: {theses.find((t) => t.id === selectedThesisId)!.confidenceNotes!.join(" · ")}
+                  {selectedThesisId && (
+                    <div className="rounded-lg border p-3 text-xs" style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
+                      <div className="flex items-center gap-2"><Target className="h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} /><span><strong style={{ color: "var(--sh-text-primary)" }}>Research horizon:</strong> {selectedHorizon ?? "Not set — add one in the Capital / Trade thesis so catalyst timing and long-duration fit can be separated."}</span></div>
+                      {selectedThesis?.confidenceNotes?.length ? <p className="mt-2" style={{ color: "var(--sh-signal)" }}>Compiler notes: {selectedThesis.confidenceNotes.join(" · ")}</p> : null}
                     </div>
-                  ) : null}
+                  )}
                   {unprojectedCanonicalTheses.length > 0 && (
                     <div className="rounded-md border border-dashed border-emerald-500/35 bg-emerald-500/5 p-3 space-y-2">
                       <div className="flex items-start gap-2">
@@ -217,7 +218,7 @@ export default function ApertureHome() {
 
                 {/* Account */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">Portfolio Account <span className="opacity-50">(optional)</span></Label>
+                  <Label className="text-xs font-medium">2 · What must this fit alongside? <span className="opacity-50">(portfolio context)</span></Label>
                   <div className="flex gap-2">
                     <Select
                       value={selectedAccountId?.toString() ?? "none"}
@@ -244,7 +245,7 @@ export default function ApertureHome() {
                 {/* Capital + Hurdle */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Deployable Capital ($)</Label>
+                    <Label className="text-xs font-medium">3 · Paper capital available ($)</Label>
                     <Input
                       placeholder="e.g. 25000"
                       value={deployable}
@@ -252,7 +253,7 @@ export default function ApertureHome() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Hurdle Rate (%) <span className="opacity-50">optional</span></Label>
+                    <Label className="text-xs font-medium">Decision hurdle (%) <span className="opacity-50">optional</span></Label>
                     <Input
                       placeholder="e.g. 8"
                       value={hurdleRate}
@@ -308,7 +309,7 @@ export default function ApertureHome() {
                 {/* Intended trades */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium">Intended Trades <span className="opacity-50">(what you were already planning)</span></Label>
+                    <Label className="text-xs font-medium">Your starting view <span className="opacity-50">(ideas to re-underwrite, not commitments)</span></Label>
                     <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={addTrade}>
                       <Plus className="h-3 w-3 mr-1" /> Add
                     </Button>
@@ -340,7 +341,7 @@ export default function ApertureHome() {
                   ))}
                   {intendedTrades.length === 0 && (
                     <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
-                      No intended trades — the run will discover from scratch.
+                      No starting ideas — Aperture will map the thesis and research the evidence universe from scratch.
                     </p>
                   )}
                 </div>
@@ -352,7 +353,7 @@ export default function ApertureHome() {
                   onClick={handleStart}
                 >
                   <Play className="h-4 w-4 mr-2" />
-                  {startRun.isPending ? "Starting…" : "Start Run"}
+                  {startRun.isPending ? "Building brief…" : "Build Capital Brief"}
                 </Button>
               </CardContent>
             </Card>
@@ -384,7 +385,7 @@ export default function ApertureHome() {
             <Card>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm">Recent Runs</CardTitle>
+                  <CardTitle className="text-sm">Recent Capital Briefs</CardTitle>
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => refetchRuns()}>
                     <RefreshCw className="h-3.5 w-3.5" />
                   </Button>
@@ -398,7 +399,7 @@ export default function ApertureHome() {
                     onClick={() => navigate(`/aperture/run/${r.id}`)}
                   >
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="font-medium" style={{ color: "var(--sh-text-primary)" }}>Run #{r.id}</span>
+                      <span className="font-medium" style={{ color: "var(--sh-text-primary)" }}>Brief #{r.id}</span>
                       <Badge
                         variant="outline"
                         className="text-xs px-1.5 py-0"
@@ -411,7 +412,7 @@ export default function ApertureHome() {
                       </Badge>
                     </div>
                     <div style={{ color: "var(--sh-fg-muted)" }}>
-                      {r.candidateCount ?? "—"} candidates · {formatDistanceToNow(r.createdAt)} ago
+                      {r.candidateCount ?? "—"} research inputs · review decision frame · {formatDistanceToNow(r.createdAt)} ago
                     </div>
                   </button>
                 ))}

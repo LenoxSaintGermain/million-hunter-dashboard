@@ -1153,3 +1153,15 @@
 - [x] Create a temporary local-only browser-authentication path for the isolated Jim Capital UAT fixture
 - [x] Verify root → Capital Aperture, shared thesis visibility, Capital / Trade creation, and Aperture handoff in the browser
 - [x] Remove the local-only authentication path after the browser walkthrough and retain the evidence
+
+## Septic Services Acquisition Thesis (Aug 13 2026)
+- [x] Distill the supplied septic-services research into an evidence-first acquisition thesis with explicit diligence gates
+- [x] Create and compile the named septic-services thesis in the canonical Thesis workspace
+- [x] Verify the saved compiled thesis is available for acquisition search and scoring workflows
+
+## Capital Aperture — Horizon-Aware Decision Journey (Aug 15 2026)
+- [x] Audit the current run, candidates, strategies, memo, and execution screens against the user’s thesis and trading horizon
+- [x] Add a Capital Brief that explains portfolio context, horizon, strategic recommendation, uncertainty, and the next human decision
+- [x] Reframe candidates as supporting evidence for a recommendation, with thesis role, time horizon, catalyst, invalidation, and portfolio effect
+- [x] Rework strategy comparison, memo, and execution handoffs to reinforce deliberate paper-only decisions rather than symbol browsing
+- [x] Verify the redesigned journey in an isolated browser session and retain investor-role gating

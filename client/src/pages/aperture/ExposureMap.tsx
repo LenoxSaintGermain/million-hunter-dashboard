@@ -107,18 +107,11 @@ export default function ExposureMap() {
   if (isLoading) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Loading…</div></DashboardLayout>;
   if (!data) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Run not found.</div></DashboardLayout>;
 
-  const { run, coverage } = data;
-  // coverage has nodeId not nodePath — reconstruct path from nodeId for display
-  const nodes = coverage.map((c) => ({
-    label: `Node ${c.nodeId}`,
-    path: `node-${c.nodeId}`,
-    depth: 0,
-  }));
-  const uniqueNodes = Array.from(new Map(nodes.map((n) => [n.path, n])).values());
-  const tree = buildTree(uniqueNodes, coverage.map((c) => ({ nodePath: `node-${c.nodeId}`, symbol: c.symbol, source: c.source })));
-
-  const coveredCount = uniqueNodes.filter((n) => coverage.some((c) => `node-${c.nodeId}` === n.path)).length;
-  const uncoveredCount = uniqueNodes.length - coveredCount;
+  const { run, coverageDetail, thesisNodes, brief } = data;
+  const tree = buildTree(thesisNodes, coverageDetail);
+  const coveredPaths = new Set(coverageDetail.map((item) => item.nodePath));
+  const coveredCount = thesisNodes.filter((node) => coveredPaths.has(node.path)).length;
+  const uncoveredCount = brief.portfolioContext.uncoveredNodes.length;
 
   return (
     <DashboardLayout>
@@ -130,8 +123,8 @@ export default function ExposureMap() {
         </div>
 
         <div>
-          <h1 className="text-xl font-bold mb-1" style={{ color: "var(--sh-text-primary)" }}>Exposure Map</h1>
-          <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Run #{runId} · {run.status}</p>
+          <h1 className="font-serif text-2xl mb-1" style={{ color: "var(--sh-text-primary)" }}>Portfolio gap map</h1>
+          <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Run #{runId} · which thesis nodes are represented, and which require research before a paper decision.</p>
         </div>
 
         <div className="flex gap-4 text-sm">
@@ -150,6 +143,14 @@ export default function ExposureMap() {
           <div className="flex items-center gap-1"><Circle className="h-2.5 w-2.5" style={{ color: "var(--sh-signal)" }} /> Intended trade</div>
           <div className="flex items-center gap-1"><Circle className="h-2.5 w-2.5" style={{ color: "var(--sh-border-1)" }} /> Candidate</div>
         </div>
+
+        {brief.portfolioContext.uncoveredNodes.length > 0 && (
+          <div className="rounded-xl border p-4" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Research question</p>
+            <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Do these uncovered thesis nodes deserve evidence review before they receive paper capital?</p>
+            <div className="mt-3 flex flex-wrap gap-1.5">{brief.portfolioContext.uncoveredNodes.slice(0, 6).map((node) => <Badge key={node} variant="outline" className="text-xs">{node}</Badge>)}</div>
+          </div>
+        )}
 
         <Card>
           <CardContent className="pt-4 divide-y divide-border">
