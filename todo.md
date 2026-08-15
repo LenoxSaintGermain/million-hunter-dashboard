@@ -1172,3 +1172,8 @@
 - [x] Turn invalidation into a guided, example-driven rule with a clear “why it matters” explanation
 - [x] Replace raw provider gaps with connected / needs key / what it enables / activation guidance
 - [x] Connect sources available without a new key and verify the guided setup in browser
+
+## Capital Aperture — FRED Macro Data Activation (Aug 15 2026)
+- [x] Configure the supplied FRED API credential securely
+- [x] Validate FRED macro-series retrieval through the Capital Aperture provider adapter
+- [x] Confirm FRED appears as connected in the evidence-source panel
