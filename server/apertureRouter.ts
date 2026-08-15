@@ -28,7 +28,7 @@ import { adminProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { compileThesis, flattenExposureTree } from "./aperture/thesisGraph";
 import { discoverUniverse, thesisSummary } from "./aperture/universe";
-import { collectSecurityFacts, describeAvailability, availabilityMap } from "./aperture/providers/index";
+import { collectSecurityFacts, collectMacroFacts, describeAvailability, availabilityMap, MACRO_SYMBOL } from "./aperture/providers/index";
 import { getFacts, freshestPerKey } from "./aperture/facts";
 import { runResearchSwarm } from "./aperture/researchSwarm";
 import { scoreThesisFit, assignRole } from "./aperture/score";
@@ -364,6 +364,18 @@ export const apertureRouter = router({
 
   // ── Run lifecycle ──────────────────────────────────────────────────────────
 
+  macro: router({
+    /** Refresh the shared macro ledger on operator request. It never trades or changes a thesis. */
+    refresh: adminProcedure.mutation(async () => {
+      const result = await collectMacroFacts();
+      return {
+        factsWritten: result.facts.length,
+        providers: result.ranProviders,
+        errors: result.errors,
+      };
+    }),
+  }),
+
   run: router({
     list: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
@@ -388,6 +400,7 @@ export const apertureRouter = router({
           .where(eq(apertureStrategies.runId, input.id));
         const coverage = await db!.select().from(exposureCoverage)
           .where(eq(exposureCoverage.runId, input.id));
+        const macroFacts = await getFacts(MACRO_SYMBOL);
         const thesis = await requireThesis(db, run.thesisId, ctx.user.id);
         const coverageNodeIds = coverage.map((item) => item.nodeId);
         const coverageNodes = coverageNodeIds.length
@@ -409,7 +422,7 @@ export const apertureRouter = router({
           coverage: coverageDetail,
           thesisNodePaths: thesisNodes.map((node) => node.path),
         });
-        return { run, candidates, strategies, coverage, coverageDetail, thesisNodes, brief };
+        return { run, candidates, strategies, coverage, coverageDetail, thesisNodes, macroFacts, brief };
       }),
 
     /**
@@ -774,6 +787,10 @@ async function executeRun(
 
     // ── 4. Research swarm ──────────────────────────────────────────────────
     const symbols = universe.discovered.map((d) => d.symbol);
+    // Macro facts are sourced once per run against the __MACRO__ ledger symbol.
+    // They inform the operator's regime context, but are never silently blended
+    // into a per-security score without an explicit thesis-level rule.
+    await collectMacroFacts();
     await runResearchSwarm(symbols, { concurrency: 4 });
 
     // ── 5. Load facts and assemble ─────────────────────────────────────────

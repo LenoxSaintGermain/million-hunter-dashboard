@@ -1177,3 +1177,9 @@
 - [x] Configure the supplied FRED API credential securely
 - [x] Validate FRED macro-series retrieval through the Capital Aperture provider adapter
 - [x] Confirm FRED appears as connected in the evidence-source panel
+
+## Capital Aperture — FRED Ledger Provenance & Brief Repair (Aug 15 2026)
+- [x] Audit research-ledger fact rendering and diagnose the Capital Brief persistence failure surfaced in UAT
+- [x] Add FRED macro provenance badges, tooltips, observation dates, and thesis-impact context to ledger facts
+- [x] Fix Capital Brief run persistence and add regression coverage for the relevant schema contract
+- [x] Verify the ledger indicators and successful brief generation in browser

@@ -9,6 +9,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, Loader2, SearchCheck,
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { CapitalBrief } from "@/components/aperture/CapitalBrief";
+import { ResearchLedger } from "@/components/aperture/ResearchLedger";
 
 type Role = "core" | "complementary" | "remainder" | "alternative_expression";
 
@@ -26,10 +27,14 @@ export default function CandidateBoard() {
   const [, params] = useRoute("/aperture/run/:id");
   const [, navigate] = useLocation();
   const runId = Number(params?.id);
-  const [view, setView] = useState<"brief" | "evidence">("brief");
+  const [view, setView] = useState<"brief" | "evidence" | "ledger">("brief");
   const [activeRole, setActiveRole] = useState<Role | "all">("all");
   const [generatingMemo, setGeneratingMemo] = useState<number | null>(null);
   const { data, isLoading, refetch } = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
+  const refreshMacro = trpc.aperture.macro.refresh.useMutation({
+    onSuccess: (result) => { toast.success(`Macro ledger refreshed — ${result.factsWritten} FRED observations recorded`); refetch(); },
+    onError: (error) => toast.error(`Could not refresh macro evidence: ${error.message}`),
+  });
   const genMemo = trpc.aperture.generateMemo.useMutation({
     onSuccess: (_result, variables) => { toast.success("Memo generated — opening the fact-traced record"); refetch(); setGeneratingMemo(null); navigate(`/aperture/memos/${variables.candidateId}`); },
     onError: (error) => { toast.error(error.message); setGeneratingMemo(null); },
@@ -38,7 +43,7 @@ export default function CandidateBoard() {
   if (isLoading) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Assembling your research brief…</div></DashboardLayout>;
   if (!data) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Run not found.</div></DashboardLayout>;
 
-  const { run, candidates, brief } = data;
+  const { run, candidates, macroFacts, brief } = data;
   const roles: Array<Role | "all"> = ["all", "core", "complementary", "remainder", "alternative_expression"];
   const filtered = activeRole === "all" ? candidates : candidates.filter((candidate) => candidate.role === activeRole);
 
@@ -62,6 +67,7 @@ export default function CandidateBoard() {
           <div className="flex rounded-lg border p-1" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
             <button onClick={() => setView("brief")} className="rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "brief" ? "var(--sh-surface)" : "transparent", color: view === "brief" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Decision brief</button>
             <button onClick={() => setView("evidence")} className="rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "evidence" ? "var(--sh-surface)" : "transparent", color: view === "evidence" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Evidence queue</button>
+            <button onClick={() => setView("ledger")} className="rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "ledger" ? "var(--sh-surface)" : "transparent", color: view === "ledger" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Research ledger</button>
           </div>
         </header>
 
@@ -73,6 +79,8 @@ export default function CandidateBoard() {
             onReviewGaps={() => navigate(`/aperture/run/${runId}/exposure`)}
             onSetHorizon={() => navigate("/thesis?scope=capital")}
           />
+        ) : view === "ledger" ? (
+          <ResearchLedger macroFacts={macroFacts} onRefresh={() => refreshMacro.mutate()} refreshing={refreshMacro.isPending} />
         ) : (
           <section className="space-y-4">
             <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
