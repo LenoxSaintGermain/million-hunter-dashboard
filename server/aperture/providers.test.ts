@@ -42,6 +42,18 @@ describe("provider availability — gaps are named, never silent", () => {
     expect(statusOf(providerById("fmp")!).available).toBe(true);
   });
 
+  it("uses the configured Alpaca Paper credential names for market data", () => {
+    process.env.ALPACA_PAPER_KEY = "paper-key";
+    process.env.ALPACA_PAPER_SECRET = "paper-secret";
+    expect(statusOf(providerById("alpaca")!).available).toBe(true);
+  });
+
+  it("keeps legacy Alpaca market-data credential aliases compatible", () => {
+    process.env.ALPACA_API_KEY_ID = "legacy-key";
+    process.env.ALPACA_API_SECRET_KEY = "legacy-secret";
+    expect(statusOf(providerById("alpaca")!).available).toBe(true);
+  });
+
   it("still lists unavailable providers rather than hiding them", () => {
     const all = describeAvailability();
     expect(all.map((s) => s.id).sort()).toEqual(PROVIDERS.map((p) => p.id).sort());

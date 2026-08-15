@@ -16,6 +16,21 @@ import { DAY, httpJson, num, unknownFact, type FetchCtx, type ProviderAdapter } 
 
 const KEYS = ["last_price", "adv_usd_30d", "volatility_30d"];
 
+function alpacaCredentials() {
+  return {
+    key: process.env.ALPACA_PAPER_KEY ?? process.env.ALPACA_API_KEY_ID ?? "",
+    secret: process.env.ALPACA_PAPER_SECRET ?? process.env.ALPACA_API_SECRET_KEY ?? "",
+  };
+}
+
+function missingAlpacaCredentials(): string[] {
+  const credentials = alpacaCredentials();
+  const missing: string[] = [];
+  if (!credentials.key) missing.push("ALPACA_PAPER_KEY (or ALPACA_API_KEY_ID)");
+  if (!credentials.secret) missing.push("ALPACA_PAPER_SECRET (or ALPACA_API_SECRET_KEY)");
+  return missing;
+}
+
 interface Bar { c: number; v: number; t: number }
 
 /** Average daily DOLLAR volume — shares alone say nothing about tradability. */
@@ -107,11 +122,14 @@ export const alpacaDataProvider: ProviderAdapter = {
   id: "alpaca",
   label: "Alpaca market data (free IEX tier — delayed, IEX only)",
   kind: "security",
-  requiredEnv: ["ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY"],
+  requiredEnv: [],
+  isAvailable: () => missingAlpacaCredentials().length === 0,
+  missingEnv: missingAlpacaCredentials,
   provides: KEYS,
   homepage: "https://alpaca.markets/",
 
   async fetchSecurityFacts(symbol, ctx: FetchCtx): Promise<Fact[]> {
+    const credentials = alpacaCredentials();
     const start = new Date(ctx.now - 45 * DAY).toISOString().slice(0, 10);
     const url =
       `https://data.alpaca.markets/v2/stocks/${encodeURIComponent(symbol)}/bars` +
@@ -119,8 +137,8 @@ export const alpacaDataProvider: ProviderAdapter = {
     const data = await httpJson<{ bars?: Array<{ c: number; v: number; t: string }> }>(url, {
       timeoutMs: ctx.timeoutMs,
       headers: {
-        "APCA-API-KEY-ID": process.env.ALPACA_API_KEY_ID ?? "",
-        "APCA-API-SECRET-KEY": process.env.ALPACA_API_SECRET_KEY ?? "",
+        "APCA-API-KEY-ID": credentials.key,
+        "APCA-API-SECRET-KEY": credentials.secret,
       },
     });
     const bars = (data?.bars ?? [])

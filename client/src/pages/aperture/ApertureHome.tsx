@@ -4,7 +4,7 @@
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
  * Modeled figures are labeled as such throughout.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,7 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, Play, Plus, RefreshCw, Trash2, BookOpen, TrendingUp, ArrowUpRight, Compass, Layers3, Target } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertTriangle, Play, Plus, RefreshCw, Trash2, BookOpen, TrendingUp, ArrowUpRight, Compass, Layers3, Target, Info, Lightbulb, DatabaseZap, CheckCircle2, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { formatDistanceToNow } from "date-fns";
@@ -33,6 +34,78 @@ function DisclaimerBanner() {
 
 function dollarsToCents(v: string): number {
   return Math.round(parseFloat(v.replace(/[^0-9.]/g, "")) * 100);
+}
+
+const HORIZON_GUIDANCE = {
+  intraday: {
+    title: "Intraday decision",
+    recommendation: "Use only when the thesis has a same-day, observable catalyst. Keep exposure tight and plan to be flat before the close.",
+    liquidity: "50,000,000",
+    concentration: "5",
+  },
+  overnight: {
+    title: "Overnight decision",
+    recommendation: "Use when the catalyst resolves by the next close. Overnight risk is real, so name concentration should stay conservative.",
+    liquidity: "35,000,000",
+    concentration: "7.5",
+  },
+  swing: {
+    title: "Swing decision",
+    recommendation: "Use when the evidence can mature over 2–10 sessions. State the evidence that would disprove the premise before you research names.",
+    liquidity: "20,000,000",
+    concentration: "10",
+  },
+  catalyst_window: {
+    title: "Catalyst-window decision",
+    recommendation: "Use only when a dated event can resolve the thesis within 20 sessions. The deadline is a research stop, not permission to keep holding.",
+    liquidity: "20,000,000",
+    concentration: "10",
+  },
+} as const;
+
+const PROVIDER_GUIDANCE: Record<string, { enables: string; activation: string }> = {
+  edgar: {
+    enables: "Company filings, revenue, margins, and balance-sheet facts.",
+    activation: "Connected automatically — no key required.",
+  },
+  fred: {
+    enables: "Macro series for rates, inflation, employment, and growth context.",
+    activation: "Add a free FRED API key in Settings to enable macro evidence.",
+  },
+  alpaca: {
+    enables: "Delayed IEX price, 30-day dollar liquidity, and modeled volatility for paper research.",
+    activation: "Uses your Alpaca Paper credentials. Data is delayed and IEX-only, so it is never presented as a consolidated live quote.",
+  },
+  polygon: {
+    enables: "Consolidated daily price and volume evidence across the broader market.",
+    activation: "Add POLYGON_API_KEY in Settings when you need consolidated market coverage.",
+  },
+  fmp: {
+    enables: "Valuation, profile, sector, industry, and transcript-adjacent evidence.",
+    activation: "Add FMP_API_KEY in Settings when you need richer fundamental coverage.",
+  },
+  benzinga: {
+    enables: "Analyst actions, price targets, and earnings-calendar catalysts.",
+    activation: "Add BENZINGA_API_KEY in Settings when catalyst and analyst evidence matter to the thesis.",
+  },
+};
+
+function FieldLabel({ label, help }: { label: string; help: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Label className="text-xs font-medium">{label}</Label>
+      <TooltipProvider delayDuration={120}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" aria-label={`Explain ${label}`} className="text-muted-foreground hover:text-foreground">
+              <Info className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-[280px] text-xs leading-relaxed">{help}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  );
 }
 
 export default function ApertureHome() {
@@ -124,6 +197,28 @@ export default function ApertureHome() {
   const unprojectedCanonicalTheses = (canonicalTheses ?? []).filter(
     (canonical) => !(theses ?? []).some((projection) => projection.sourceCompilationId === canonical.id),
   );
+  const horizonGuidance = holdingPeriod ? HORIZON_GUIDANCE[holdingPeriod as keyof typeof HORIZON_GUIDANCE] : null;
+  const invalidationExamples = useMemo(() => [
+    {
+      label: "Missed or negative catalyst",
+      text: "Invalidate if the stated catalyst does not occur by the deadline, or its disclosed result contradicts the thesis.",
+    },
+    {
+      label: "Fundamentals deteriorate",
+      text: "Invalidate if new filings show the revenue, margin, or balance-sheet condition that supports this thesis is deteriorating.",
+    },
+    {
+      label: "Mandate breach",
+      text: "Invalidate if the portfolio would exceed its concentration or liquidity mandate after the evidence changes.",
+    },
+  ], []);
+
+  const applyHorizonRecommendation = () => {
+    if (!horizonGuidance) return;
+    setLiquidityFloor(horizonGuidance.liquidity);
+    setMaxSingleName(horizonGuidance.concentration);
+    toast.success("Recommended guardrails applied", { description: "You can tighten these further; the server will not allow looser mandate limits." });
+  };
 
   return (
     <DashboardLayout>
@@ -245,7 +340,7 @@ export default function ApertureHome() {
                 {/* Capital + Hurdle */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">3 · Paper capital available ($)</Label>
+                    <FieldLabel label="3 · Paper capital available ($)" help="The maximum simulated capital you are willing to evaluate for this run. It is not an order and is never sent to a broker automatically." />
                     <Input
                       placeholder="e.g. 25000"
                       value={deployable}
@@ -253,7 +348,7 @@ export default function ApertureHome() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Decision hurdle (%) <span className="opacity-50">optional</span></Label>
+                    <FieldLabel label="Decision hurdle (%)" help="An optional minimum evidence-adjusted return threshold for comparing research postures. Leave blank if this run is about validating a thesis rather than selecting an allocation." />
                     <Input
                       placeholder="e.g. 8"
                       value={hurdleRate}
@@ -265,14 +360,14 @@ export default function ApertureHome() {
                 {/* Short-Horizon Paper Run preset — the mandate, per run */}
                 <div className="space-y-3 rounded-lg p-3" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
                   <div>
-                    <Label className="text-xs font-semibold">Short-Horizon Paper Run preset</Label>
+                    <Label className="text-xs font-semibold">Short-Horizon decision guardrails</Label>
                     <p className="text-[11px] mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>
-                      Required. Every order in this run is gated against these. A preset may tighten the mandate, never loosen it.
+                      These are the rules that keep a short-horizon research idea from becoming an unbounded hold. They constrain paper-order review; they never submit an order.
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium">Holding Period</Label>
+                      <FieldLabel label="Holding Period" help="Choose how long the evidence is allowed to work. This determines when Aperture should stop researching the idea and ask for a new decision." />
                       <Select value={holdingPeriod} onValueChange={setHoldingPeriod}>
                         <SelectTrigger><SelectValue placeholder="Choose" /></SelectTrigger>
                         <SelectContent>
@@ -284,25 +379,47 @@ export default function ApertureHome() {
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium">Catalyst Deadline</Label>
+                      <FieldLabel label="Catalyst Deadline" help="The latest date when the event or evidence should resolve the premise. If it does not, Aperture treats the research decision as expired rather than quietly extending it." />
                       <Input type="datetime-local" value={catalystDeadline} onChange={(e) => setCatalystDeadline(e.target.value)} />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium">Liquidity Floor — 30d ADV ($)</Label>
+                      <FieldLabel label="Liquidity Floor — 30d ADV ($)" help="Minimum 30-day average daily dollar volume. It helps prevent a paper idea from looking executable when it would be difficult to enter or exit at the planned size." />
                       <Input value={liquidityFloor} onChange={(e) => setLiquidityFloor(e.target.value)} />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium">Concentration Cap — single name (%)</Label>
+                      <FieldLabel label="Concentration Cap — single name (%)" help="Maximum share of this run’s paper capital assigned to one company. It controls single-name risk even when the thesis looks compelling." />
                       <Input value={maxSingleName} onChange={(e) => setMaxSingleName(e.target.value)} />
                     </div>
                   </div>
+                  {horizonGuidance && (
+                    <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex gap-2">
+                        <Lightbulb className="h-4 w-4 mt-0.5 text-amber-600 shrink-0" />
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">Recommended guardrails for this {horizonGuidance.title.toLowerCase()}</p>
+                          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{horizonGuidance.recommendation}</p>
+                        </div>
+                      </div>
+                      <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={applyHorizonRecommendation}>Use recommendations</Button>
+                    </div>
+                  )}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Invalidation Rule</Label>
+                    <FieldLabel label="What would make this run invalid?" help="Write the evidence condition—not a price move—that would prove the research premise wrong. This creates a visible stop condition for the thesis, the deadline, and future monitoring." />
                     <Input
-                      placeholder="What would make this run's premise wrong?"
+                      placeholder="Example: if the earnings release cuts guidance or the stated catalyst does not occur by the deadline…"
                       value={invalidationRule}
                       onChange={(e) => setInvalidationRule(e.target.value)}
                     />
+                    <p className="text-[11px] leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>
+                      This is not a stop-loss instruction. It is the evidence that would tell you the premise no longer deserves capital research.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {invalidationExamples.map((example) => (
+                        <Button key={example.label} type="button" size="sm" variant="outline" className="h-auto min-h-7 whitespace-normal px-2 py-1 text-left text-[10px] leading-snug" onClick={() => setInvalidationRule(example.text)}>
+                          {example.label}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -363,19 +480,36 @@ export default function ApertureHome() {
           <div className="space-y-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Data Providers</CardTitle>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-sm">Evidence sources</CardTitle>
+                    <CardDescription className="mt-1 text-[11px]">A source is either connected, or its missing coverage is named before a brief starts.</CardDescription>
+                  </div>
+                  <DatabaseZap className="h-4 w-4" style={{ color: "var(--sh-signal)" }} />
+                </div>
               </CardHeader>
-              <CardContent className="space-y-1.5">
+              <CardContent className="space-y-3">
                 {liveProviders.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between text-xs">
-                    <span style={{ color: "var(--sh-text-primary)" }}>{p.label}</span>
-                    <Badge className="text-xs px-1.5 py-0" style={{ background: "oklch(0.45 0.15 145)", color: "#fff" }}>live</Badge>
+                  <div key={p.id} className="rounded-md border p-2.5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 32%, transparent)", background: "color-mix(in srgb, var(--sh-signal) 5%, transparent)" }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>{p.label}</p>
+                      <Badge className="shrink-0 text-[10px] px-1.5 py-0" style={{ background: "oklch(0.45 0.15 145)", color: "#fff" }}><CheckCircle2 className="mr-1 h-2.5 w-2.5" />Connected</Badge>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>{PROVIDER_GUIDANCE[p.id]?.enables ?? `Provides: ${p.provides.join(", ")}`}</p>
+                    <p className="mt-1 text-[10px] leading-relaxed" style={{ color: "var(--sh-signal)" }}>{PROVIDER_GUIDANCE[p.id]?.activation ?? "Connected for this run."}</p>
                   </div>
                 ))}
                 {deadProviders.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between text-xs">
-                    <span style={{ color: "var(--sh-fg-muted)" }}>{p.label}</span>
-                    <Badge variant="outline" className="text-xs px-1.5 py-0 opacity-50">gap</Badge>
+                  <div key={p.id} className="rounded-md border p-2.5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>{p.label}</p>
+                      <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0"><KeyRound className="mr-1 h-2.5 w-2.5" />Needs key</Badge>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>{PROVIDER_GUIDANCE[p.id]?.enables ?? `Would cover: ${p.provides.join(", ")}`}</p>
+                    <p className="mt-1 text-[10px] leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>{PROVIDER_GUIDANCE[p.id]?.activation ?? p.reason}</p>
+                    <Button type="button" variant="ghost" size="sm" className="mt-1.5 h-7 px-0 text-[11px]" onClick={() => navigate("/settings")}>
+                      View activation settings <ArrowUpRight className="ml-1 h-3 w-3" />
+                    </Button>
                   </div>
                 ))}
                 {!providers && <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Loading…</p>}

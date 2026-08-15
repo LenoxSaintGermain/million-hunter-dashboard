@@ -30,6 +30,10 @@ export interface ProviderAdapter {
   kind: "security" | "macro";
   /** Env vars that must be set. Empty = free and keyless. */
   requiredEnv: string[];
+  /** Optional credential rule for providers that support current and legacy key names. */
+  isAvailable?: () => boolean;
+  /** Human-readable missing credential aliases when an optional rule is used. */
+  missingEnv?: () => string[];
   /** Fact keys this provider can supply, for the availability matrix. */
   provides: string[];
   homepage?: string;
@@ -49,17 +53,19 @@ export interface ProviderStatus {
 }
 
 export function isAvailable(p: ProviderAdapter): boolean {
+  if (p.isAvailable) return p.isAvailable();
   return p.requiredEnv.every((k) => Boolean(process.env[k]));
 }
 
 export function statusOf(p: ProviderAdapter): ProviderStatus {
-  const missingEnv = p.requiredEnv.filter((k) => !process.env[k]);
+  const missingEnv = p.missingEnv ? p.missingEnv() : p.requiredEnv.filter((k) => !process.env[k]);
+  const available = isAvailable(p);
   return {
     id: p.id,
     label: p.label,
     kind: p.kind,
-    available: missingEnv.length === 0,
-    reason: missingEnv.length ? `not configured — missing ${missingEnv.join(", ")}` : null,
+    available,
+    reason: available ? null : `not configured — missing ${missingEnv.join(", ")}`,
     provides: p.provides,
     missingEnv,
   };

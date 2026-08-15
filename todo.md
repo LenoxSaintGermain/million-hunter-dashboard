@@ -1165,3 +1165,10 @@
 - [x] Reframe candidates as supporting evidence for a recommendation, with thesis role, time horizon, catalyst, invalidation, and portfolio effect
 - [x] Rework strategy comparison, memo, and execution handoffs to reinforce deliberate paper-only decisions rather than symbol browsing
 - [x] Verify the redesigned journey in an isolated browser session and retain investor-role gating
+
+## Capital Aperture — Guided Short-Horizon Setup (Aug 15 2026)
+- [x] Audit short-horizon controls and the current provider availability model
+- [x] Add tooltip explanations and recommended values for holding period, catalyst deadline, liquidity floor, concentration cap, and decision hurdle
+- [x] Turn invalidation into a guided, example-driven rule with a clear “why it matters” explanation
+- [x] Replace raw provider gaps with connected / needs key / what it enables / activation guidance
+- [x] Connect sources available without a new key and verify the guided setup in browser
