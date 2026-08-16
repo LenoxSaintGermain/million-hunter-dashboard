@@ -47,6 +47,7 @@ import { computeAlpha, getAlpha } from "./aperture/alpha";
 import { brokerOrders, monitoringChecks } from "../drizzle/schema";
 import { desc } from "drizzle-orm";
 import { buildCapitalDecisionBrief } from "./aperture/decisionBrief";
+import { ensureThesisReady } from "./aperture/thesisReadiness";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -453,9 +454,27 @@ export const apertureRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
-        const thesis = await requireThesis(db, input.thesisId, ctx.user.id);
+        let thesis = await requireThesis(db, input.thesisId, ctx.user.id);
+        // A graph is an implementation detail, not an operator task. Prepare a
+        // saved thesis at the moment it is needed, then persist the result so the
+        // next brief is immediate. The operator's job is to state a belief, not
+        // to understand compilation or a second internal workflow.
         if (!thesis.graph) {
-          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Thesis must be compiled before running" });
+          try {
+            thesis = await ensureThesisReady(thesis, {
+              compile: compileThesis,
+              persist: async ({ graph, confidenceNotes }) => {
+                await db!.update(capitalTheses)
+                  .set({ graph, confidenceNotes, status: "review", updatedAt: Date.now() })
+                  .where(eq(capitalTheses.id, thesis.id));
+              },
+            });
+          } catch (error: any) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: `This saved thesis needs a little more detail before Aperture can frame a brief: ${error?.message ?? "add the belief, time horizon, and what you want to learn."}`,
+            });
+          }
         }
 
         const now = Date.now();

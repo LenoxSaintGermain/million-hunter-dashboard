@@ -1183,3 +1183,9 @@
 - [x] Add FRED macro provenance badges, tooltips, observation dates, and thesis-impact context to ledger facts
 - [x] Fix Capital Brief run persistence and add regression coverage for the relevant schema contract
 - [x] Verify the ledger indicators and successful brief generation in browser
+
+## Capital Aperture — Goal-First Setup Journey (Aug 15 2026)
+- [x] Diagnose and remove the “Thesis must be compiled before running” dead end from the Build Capital Brief action
+- [x] Reframe setup around the operator’s single goal: build a paper research brief, not configure an internal thesis object
+- [x] Replace dense mandatory controls with progressive, plain-language defaults and an explicit advanced-settings escape hatch
+- [x] Add tests and browser verification for an end-to-end first brief without prior thesis compilation

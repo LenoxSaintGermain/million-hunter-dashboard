@@ -36,6 +36,13 @@ function dollarsToCents(v: string): number {
   return Math.round(parseFloat(v.replace(/[^0-9.]/g, "")) * 100);
 }
 
+function defaultCatalystDeadline(holdingPeriod = "swing"): string {
+  const daysByPeriod: Record<string, number> = { intraday: 1, overnight: 1, swing: 10, catalyst_window: 20 };
+  const deadline = new Date(Date.now() + (daysByPeriod[holdingPeriod] ?? 10) * 86_400_000);
+  deadline.setMinutes(0, 0, 0);
+  return deadline.toISOString().slice(0, 16);
+}
+
 const HORIZON_GUIDANCE = {
   intraday: {
     title: "Intraday decision",
@@ -112,18 +119,17 @@ export default function ApertureHome() {
   const [, navigate] = useLocation();
   const [selectedThesisId, setSelectedThesisId] = useState<number | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
-  const [deployable, setDeployable] = useState("");
-  const [hurdleRate, setHurdleRate] = useState("");
+  const [deployable, setDeployable] = useState("20000");
   // Short-Horizon Paper Run preset. These five fields ARE the mandate — the run
   // cannot start without them. The values below are the mandate's own ceilings
   // (server/aperture/mandate.ts), prefilled as a starting point; the server is
   // authoritative and rejects anything looser, so tightening here is the only
   // thing this form can actually do.
-  const [holdingPeriod, setHoldingPeriod] = useState("");
+  const [holdingPeriod, setHoldingPeriod] = useState("swing");
   const [liquidityFloor, setLiquidityFloor] = useState("20000000");
   const [maxSingleName, setMaxSingleName] = useState("10");
-  const [catalystDeadline, setCatalystDeadline] = useState("");
-  const [invalidationRule, setInvalidationRule] = useState("");
+  const [catalystDeadline, setCatalystDeadline] = useState(() => defaultCatalystDeadline());
+  const [invalidationRule, setInvalidationRule] = useState("Invalidate if the stated catalyst does not occur by the deadline, or its disclosed result contradicts the thesis.");
   const [intendedTrades, setIntendedTrades] = useState<Array<{ symbol: string; dollars: string; note: string }>>([]);
   const [starting, setStarting] = useState(false);
 
@@ -172,7 +178,7 @@ export default function ApertureHome() {
       thesisId: selectedThesisId,
       accountId: selectedAccountId ?? undefined,
       deployableCapitalCents: dollarsToCents(deployable),
-      hurdleRateBps: hurdleRate ? Math.round(parseFloat(hurdleRate) * 100) : undefined,
+      hurdleRateBps: undefined,
       holdingPeriod,
       liquidityFloorAdvUsd: Math.round(parseFloat(liquidityFloor.replace(/[^0-9.]/g, "")) || 0),
       catalystDeadlineAt: deadlineMs,
@@ -231,9 +237,9 @@ export default function ApertureHome() {
             <span className="text-[0.7rem] font-semibold uppercase tracking-[0.17em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture · Paper research</span>
             <Badge variant="outline" className="text-xs">Human-approved only</Badge>
           </div>
-          <h1 className="font-serif text-3xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Build a capital brief before you consider a paper allocation.</h1>
+          <h1 className="font-serif text-3xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Turn one market belief into a clear paper research brief.</h1>
           <p className="mt-3 text-sm leading-6" style={{ color: "var(--sh-text-secondary)" }}>
-            Start with the belief and time horizon that matter. Aperture will map what your portfolio already expresses, what is missing, and which research decision deserves attention next.
+            Choose what you want to investigate. Aperture prepares the research map, checks your paper safeguards, and shows the next decision—without sending an order.
           </p>
         </header>
 
@@ -242,20 +248,28 @@ export default function ApertureHome() {
           <div className="lg:col-span-2 space-y-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="font-serif text-xl">Frame the decision</CardTitle>
-                <CardDescription>Thesis horizon → portfolio context → evidence brief. Symbols are reviewed later, as evidence.</CardDescription>
+                <CardTitle className="font-serif text-xl">What do you want to learn?</CardTitle>
+                <CardDescription>Two choices, then Aperture builds the research brief. Safeguards are ready by default and can be adjusted only when needed.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Thesis */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">1 · Which belief should be re-underwritten?</Label>
+                  <Label className="text-xs font-medium">1 · Choose the belief to investigate</Label>
                   <div className="flex gap-2">
                     <Select
                       value={selectedThesisId?.toString() ?? ""}
-                      onValueChange={(v) => setSelectedThesisId(Number(v))}
+                      onValueChange={(v) => {
+                        if (v.startsWith("canonical:")) {
+                          const compilationId = Number(v.replace("canonical:", ""));
+                          setCanonicalThesisId(String(compilationId));
+                          projectCanonicalThesis.mutate({ compilationId });
+                          return;
+                        }
+                        setSelectedThesisId(Number(v));
+                      }}
                     >
                       <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Select a thesis…" />
+                        <SelectValue placeholder="Choose a saved thesis…" />
                       </SelectTrigger>
                       <SelectContent>
                         {theses?.map((t) => (
@@ -267,53 +281,34 @@ export default function ApertureHome() {
                             )}
                           </SelectItem>
                         ))}
+                        {unprojectedCanonicalTheses.map((thesis) => (
+                          <SelectItem key={`canonical-${thesis.id}`} value={`canonical:${thesis.id}`}>
+                            {thesis.name ?? `Untitled Thesis #${thesis.id}`} · saved thesis
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <Button variant="outline" size="sm" onClick={() => navigate("/thesis?scope=capital")}>
-                      <ArrowUpRight className="h-3.5 w-3.5 mr-1" /> Create capital thesis
+                      <ArrowUpRight className="h-3.5 w-3.5 mr-1" /> New thesis
                     </Button>
                   </div>
                   {selectedThesisId && (
                     <div className="rounded-lg border p-3 text-xs" style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
-                      <div className="flex items-center gap-2"><Target className="h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} /><span><strong style={{ color: "var(--sh-text-primary)" }}>Research horizon:</strong> {selectedHorizon ?? "Not set — add one in the Capital / Trade thesis so catalyst timing and long-duration fit can be separated."}</span></div>
-                      {selectedThesis?.confidenceNotes?.length ? <p className="mt-2" style={{ color: "var(--sh-signal)" }}>Compiler notes: {selectedThesis.confidenceNotes.join(" · ")}</p> : null}
+                      <div className="flex items-center gap-2"><Target className="h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} /><span><strong style={{ color: "var(--sh-text-primary)" }}>Ready to frame:</strong> {selectedHorizon ?? "Aperture will prepare this saved belief for securities research when you build the brief."}</span></div>
                     </div>
                   )}
-                  {unprojectedCanonicalTheses.length > 0 && (
-                    <div className="rounded-md border border-dashed border-emerald-500/35 bg-emerald-500/5 p-3 space-y-2">
-                      <div className="flex items-start gap-2">
-                        <BookOpen className="mt-0.5 h-3.5 w-3.5 text-emerald-600" />
-                        <div>
-                          <p className="text-xs font-medium text-foreground">Saved in Thesis Engine</p>
-                          <p className="text-[11px] text-muted-foreground">Project a saved thesis here—no duplicate entry, and future refreshes preserve the same link.</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Select value={canonicalThesisId} onValueChange={setCanonicalThesisId}>
-                          <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue placeholder="Select a saved thesis…" /></SelectTrigger>
-                          <SelectContent>
-                            {unprojectedCanonicalTheses.map((thesis) => (
-                              <SelectItem key={thesis.id} value={String(thesis.id)}>{thesis.name ?? `Untitled Thesis #${thesis.id}`}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 border-emerald-500/30 text-emerald-700"
-                          disabled={!canonicalThesisId || projectCanonicalThesis.isPending}
-                          onClick={() => projectCanonicalThesis.mutate({ compilationId: Number(canonicalThesisId) })}
-                        >
-                          {projectCanonicalThesis.isPending ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : "Use in Aperture"}
-                        </Button>
-                      </div>
-                    </div>
+                  {projectCanonicalThesis.isPending && canonicalThesisId && (
+                    <p className="flex items-center gap-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Preparing this saved belief for the brief…
+                    </p>
                   )}
                 </div>
 
-                {/* Account */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">2 · What must this fit alongside? <span className="opacity-50">(portfolio context)</span></Label>
+                {/* Optional portfolio context */}
+                <details className="rounded-lg border px-3 py-2" style={{ borderColor: "var(--sh-border-1)" }}>
+                  <summary className="cursor-pointer text-xs font-medium" style={{ color: "var(--sh-text-secondary)" }}>Optional: compare this research with my paper portfolio</summary>
+                  <div className="mt-3 space-y-1.5">
+                    <Label className="text-xs font-medium">Paper portfolio</Label>
                   <div className="flex gap-2">
                     <Select
                       value={selectedAccountId?.toString() ?? "none"}
@@ -335,40 +330,29 @@ export default function ApertureHome() {
                       <Plus className="h-3.5 w-3.5 mr-1" /> Manage
                     </Button>
                   </div>
-                </div>
+                  </div>
+                </details>
 
-                {/* Capital + Hurdle */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="max-w-xs space-y-1.5">
                   <div className="space-y-1.5">
-                    <FieldLabel label="3 · Paper capital available ($)" help="The maximum simulated capital you are willing to evaluate for this run. It is not an order and is never sent to a broker automatically." />
+                    <FieldLabel label="Research budget ($)" help="The maximum simulated capital you are willing to evaluate for this brief. It is not an order and is never sent to a broker automatically." />
                     <Input
                       placeholder="e.g. 25000"
                       value={deployable}
                       onChange={(e) => setDeployable(e.target.value)}
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <FieldLabel label="Decision hurdle (%)" help="An optional minimum evidence-adjusted return threshold for comparing research postures. Leave blank if this run is about validating a thesis rather than selecting an allocation." />
-                    <Input
-                      placeholder="e.g. 8"
-                      value={hurdleRate}
-                      onChange={(e) => setHurdleRate(e.target.value)}
-                    />
-                  </div>
                 </div>
 
                 {/* Short-Horizon Paper Run preset — the mandate, per run */}
-                <div className="space-y-3 rounded-lg p-3" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
-                  <div>
-                    <Label className="text-xs font-semibold">Short-Horizon decision guardrails</Label>
-                    <p className="text-[11px] mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>
-                      These are the rules that keep a short-horizon research idea from becoming an unbounded hold. They constrain paper-order review; they never submit an order.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
+                <details className="space-y-3 rounded-lg p-3" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
+                  <summary className="cursor-pointer list-none">
+                    <Label className="pointer-events-none text-xs font-semibold">Safeguards are ready <span className="font-normal" style={{ color: "var(--sh-fg-muted)" }}>· review only if you want to customize them</span></Label>
+                  </summary>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <FieldLabel label="Holding Period" help="Choose how long the evidence is allowed to work. This determines when Aperture should stop researching the idea and ask for a new decision." />
-                      <Select value={holdingPeriod} onValueChange={setHoldingPeriod}>
+                      <Select value={holdingPeriod} onValueChange={(period) => { setHoldingPeriod(period); setCatalystDeadline(defaultCatalystDeadline(period)); }}>
                         <SelectTrigger><SelectValue placeholder="Choose" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="intraday">Intraday — flat by 15:55 ET</SelectItem>
@@ -421,7 +405,7 @@ export default function ApertureHome() {
                       ))}
                     </div>
                   </div>
-                </div>
+                </details>
 
                 {/* Intended trades */}
                 <div className="space-y-2">
@@ -470,7 +454,7 @@ export default function ApertureHome() {
                   onClick={handleStart}
                 >
                   <Play className="h-4 w-4 mr-2" />
-                  {startRun.isPending ? "Building brief…" : "Build Capital Brief"}
+                  {startRun.isPending ? "Preparing your brief…" : "Build my research brief"}
                 </Button>
               </CardContent>
             </Card>
@@ -482,13 +466,16 @@ export default function ApertureHome() {
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <CardTitle className="text-sm">Evidence sources</CardTitle>
-                    <CardDescription className="mt-1 text-[11px]">A source is either connected, or its missing coverage is named before a brief starts.</CardDescription>
+                    <CardTitle className="text-sm">Evidence coverage</CardTitle>
+                    <CardDescription className="mt-1 text-[11px]">Connected sources enrich the brief. Missing paid sources never block it.</CardDescription>
                   </div>
                   <DatabaseZap className="h-4 w-4" style={{ color: "var(--sh-signal)" }} />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent>
+                <details>
+                  <summary className="cursor-pointer text-xs font-medium" style={{ color: "var(--sh-text-secondary)" }}>View source coverage</summary>
+                  <div className="mt-3 space-y-3">
                 {liveProviders.map((p) => (
                   <div key={p.id} className="rounded-md border p-2.5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 32%, transparent)", background: "color-mix(in srgb, var(--sh-signal) 5%, transparent)" }}>
                     <div className="flex items-start justify-between gap-2">
@@ -512,7 +499,9 @@ export default function ApertureHome() {
                     </Button>
                   </div>
                 ))}
-                {!providers && <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Loading…</p>}
+                    {!providers && <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Loading…</p>}
+                  </div>
+                </details>
               </CardContent>
             </Card>
 
