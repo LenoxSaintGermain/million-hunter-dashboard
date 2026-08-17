@@ -38,7 +38,7 @@ The operator approved the following **simulated notional purchases** for the con
 | CEG | $4,000 | Independent power-generation exposure |
 | **Total** | **$40,000** | **Six-paper-position research canvas** |
 
-The orders were accepted by Alpaca Paper on **2026-08-16** and currently have `new` status because the market is closed. The portfolio must remain labeled **Pending market-open fills** until the broker returns filled positions. The existing app sync correctly retains the prior SPY position until then.
+The orders were accepted by Alpaca Paper on **2026-08-16**. After the market opened, Alpaca reported **partial fills** for NVDA and CEG while MSFT, AVGO, VRT, and ETN remained queued as `new`. A read-only sync then mirrored four current positions into Capital Aperture and updated synced cash to **$90,790.62**. The portfolio remains labeled **Partially filled — broker updates pending** until the remaining orders resolve; no autonomous follow-on order is permitted.
 
 ## Where Outcomes Appear
 

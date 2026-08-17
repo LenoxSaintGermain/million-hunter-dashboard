@@ -16,6 +16,6 @@ Browser verification ran against an isolated owner-context preview on **2026-08-
 | Operator tooling | Research-budget and safeguard controls retain explanatory tooltips; advanced sections remain collapsed by default. |
 | Status discoverability | Recent briefs remain visible as a secondary history panel rather than the primary status mechanism. |
 
-## Remaining Market-State Note
+## Market-State Follow-Up
 
-The six approved Alpaca Paper orders are accepted and queued as `new` while the market is closed. The account sync correctly still shows the pre-existing SPY position. The paper research canvas must not be marked filled until Alpaca reports the positions after market open.
+The six approved Alpaca Paper orders were accepted. After market open, NVDA and CEG reported partial fills; MSFT, AVGO, VRT, and ETN remained queued. A read-only account sync mirrored four current broker positions and synced cash of **$90,790.62**. The research canvas is intentionally described as **partially filled** until the broker resolves the remaining orders.
