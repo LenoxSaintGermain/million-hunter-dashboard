@@ -10,6 +10,7 @@ import { AlertTriangle, ArrowLeft, ExternalLink, CheckCircle2, XCircle, SkipForw
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/DashboardLayout";
+import { DecisionFocusCard } from "@/components/aperture/DecisionFocusCard";
 
 export default function MemoDrawer() {
   const [, runParams] = useRoute("/aperture/run/:runId/memo/:candidateId");
@@ -44,6 +45,7 @@ export default function MemoDrawer() {
   const memo = candidate.memo as any;
   const citations = (candidate.citations as string[]) ?? [];
   const memoRunId = isLibraryRoute ? libraryData?.run.id : runId;
+  const paperPositions = isLibraryRoute ? (libraryData as any)?.paperContext?.positions ?? [] : (runData as any)?.paperContext?.positions ?? [];
 
   const confidenceColor = memo?.researchConfidence === "high" ? "oklch(0.55 0.15 145)" :
     memo?.researchConfidence === "medium" ? "var(--sh-signal)" : "var(--sh-fg-muted)";
@@ -96,6 +98,7 @@ export default function MemoDrawer() {
 
         {memo && candidate.memoStatus === "ok" && (
           <div className="space-y-4">
+            <DecisionFocusCard candidate={candidate as any} positions={paperPositions} onReviewEvidence={memoRunId ? () => navigate(`/aperture/run/${memoRunId}`) : undefined} onComparePostures={memoRunId ? () => navigate(`/aperture/run/${memoRunId}/strategies`) : undefined} />
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium" style={{ color: "var(--sh-fg-muted)" }}>Research confidence:</span>
               <Badge variant="outline" style={{ color: confidenceColor }}>{memo.researchConfidence}</Badge>

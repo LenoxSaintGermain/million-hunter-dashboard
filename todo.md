@@ -1236,3 +1236,11 @@
 - [x] Add clear legend, progressive disclosure, and research actions without raw implementation vocabulary
 - [x] Add regression coverage and browser UAT for the redesigned gap-map experience
 - [x] Preserve readable gap-map output for completed legacy briefs whose exposure rows are stored only in the decision brief
+
+## Capital Aperture — Decision-First Portfolio Workflow (Aug 17 2026)
+- [x] Audit LLY’s fact-traced thesis, catalysts, open checks, and incremental paper-portfolio effects without making a return prediction
+- [x] Define a machine POV that separates evidence-supported portfolio impact, conditions required for a positive outcome, disconfirming evidence, and the human decision gate
+- [x] Redesign LLY memo, evidence queue, and portfolio-posture surfaces around a ranked human-checklist hierarchy rather than long-form research artifacts
+- [x] Connect decision brief, evidence queue, gap map, memo library, and paper-account context with direct, state-aware navigation
+- [x] Add a bounded follow-up brief path for the 33 deferred GLP-1 symbols, preserving the no-order research gate
+- [x] Add regression coverage and browser UAT for the decision-first workflow

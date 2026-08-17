@@ -50,6 +50,11 @@ import { buildCapitalDecisionBrief } from "./aperture/decisionBrief";
 import { ensureThesisReady } from "./aperture/thesisReadiness";
 import { buildBriefResearchPlan, isRunStale } from "./aperture/runRecovery";
 
+function followUpOffset(run: { droppedNote?: string | null; universeCount?: number | null }) {
+  const priorOffset = Number(run.droppedNote?.match(/research offset (\d+)/i)?.[1] ?? 0);
+  return priorOffset + Math.max(0, Number(run.universeCount ?? 0));
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function requireThesis(db: Awaited<ReturnType<typeof getDb>>, thesisId: number, userId: number) {
@@ -360,7 +365,16 @@ export const apertureRouter = router({
           .where(and(eq(apertureCandidates.id, input.candidateId), eq(apertureRuns.userId, ctx.user.id)))
           .limit(1);
         if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Memo candidate not found" });
-        return row;
+        const [account] = row.run.accountId
+          ? await db!.select().from(portfolioAccounts)
+            .where(and(eq(portfolioAccounts.id, row.run.accountId), eq(portfolioAccounts.userId, ctx.user.id)))
+            .limit(1)
+          : [];
+        const paperPositions = account
+          ? await db!.select({ symbol: positions.symbol, marketValueCents: positions.marketValueCents, priceAsOf: positions.priceAsOf })
+            .from(positions).where(eq(positions.accountId, account.id))
+          : [];
+        return { ...row, paperContext: account ? { account, positions: paperPositions } : null };
       }),
   }),
 
@@ -404,6 +418,15 @@ export const apertureRouter = router({
           .where(eq(exposureCoverage.runId, input.id));
         const macroFacts = await getFacts(MACRO_SYMBOL);
         const thesis = await requireThesis(db, run.thesisId, ctx.user.id);
+        const [paperAccount] = run.accountId
+          ? await db!.select().from(portfolioAccounts)
+            .where(and(eq(portfolioAccounts.id, run.accountId), eq(portfolioAccounts.userId, ctx.user.id)))
+            .limit(1)
+          : [];
+        const paperPositions = paperAccount
+          ? await db!.select({ symbol: positions.symbol, marketValueCents: positions.marketValueCents, priceAsOf: positions.priceAsOf })
+            .from(positions).where(eq(positions.accountId, paperAccount.id))
+          : [];
         const coverageNodeIds = coverage.map((item) => item.nodeId);
         const coverageNodes = coverageNodeIds.length
           ? await db!.select().from(exposureNodes).where(inArray(exposureNodes.id, coverageNodeIds))
@@ -424,7 +447,7 @@ export const apertureRouter = router({
           coverage: coverageDetail,
           thesisNodePaths: thesisNodes.map((node) => node.path),
         });
-        return { run, stale: isRunStale(run), candidates, strategies, coverage, coverageDetail, thesisNodes, macroFacts, brief };
+        return { run, stale: isRunStale(run), candidates, strategies, coverage, coverageDetail, thesisNodes, macroFacts, brief, paperContext: paperAccount ? { account: paperAccount, positions: paperPositions } : null };
       }),
 
     /**
@@ -489,6 +512,42 @@ export const apertureRouter = router({
           console.error(`[aperture] retry run ${retryRunId} failed:`, error?.message ?? error);
         });
         return { runId: retryRunId };
+      }),
+
+    /** Advance only to the next deferred evidence batch. Never creates an order. */
+    followUp: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [run] = await db!.select().from(apertureRuns)
+          .where(and(eq(apertureRuns.id, input.id), eq(apertureRuns.userId, ctx.user.id))).limit(1);
+        if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+        if (run.status !== "completed" || !/deferred/i.test(run.droppedNote ?? "")) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This completed brief has no deferred research batch to continue." });
+        }
+        const thesis = await requireThesis(db, run.thesisId, ctx.user.id);
+        if (!thesis.graph) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This thesis needs to be prepared before follow-up research can run." });
+        const offset = followUpOffset(run);
+        const now = Date.now();
+        const [result] = await db!.insert(apertureRuns).values({
+          userId: ctx.user.id, thesisId: run.thesisId, accountId: run.accountId,
+          deployableCapitalCents: run.deployableCapitalCents, intendedTrades: run.intendedTrades ?? [],
+          hurdleRateBps: run.hurdleRateBps, holdingPeriod: run.holdingPeriod,
+          liquidityFloorAdvUsd: run.liquidityFloorAdvUsd, catalystDeadlineAt: run.catalystDeadlineAt,
+          maxSingleNamePct: run.maxSingleNamePct, invalidationRule: run.invalidationRule,
+          mandateVersion: run.mandateVersion, status: "queued", createdAt: now,
+          droppedNote: `Follow-up research from run #${run.id}; research offset ${offset}.`,
+        });
+        const followUpRunId = (result as any).insertId as number;
+        executeRun(followUpRunId, ctx.user.id, thesis, {
+          thesisId: run.thesisId, accountId: run.accountId ?? undefined,
+          deployableCapitalCents: run.deployableCapitalCents, intendedTrades: (run.intendedTrades ?? []) as Array<{ symbol: string; dollarsCents: number; note?: string }>,
+          hurdleRateBps: run.hurdleRateBps ?? undefined, holdingPeriod: run.holdingPeriod ?? undefined,
+          liquidityFloorAdvUsd: run.liquidityFloorAdvUsd ?? undefined, catalystDeadlineAt: run.catalystDeadlineAt ?? undefined,
+          maxSingleNamePct: run.maxSingleNamePct ?? undefined, invalidationRule: run.invalidationRule ?? undefined,
+          researchOffset: offset, followUpFromRunId: run.id,
+        }).catch((error) => console.error(`[aperture] follow-up run ${followUpRunId} failed:`, error?.message ?? error));
+        return { runId: followUpRunId, offset };
       }),
 
     /**
@@ -816,6 +875,8 @@ async function executeRun(
     catalystDeadlineAt?: number;
     maxSingleNamePct?: number;
     invalidationRule?: string;
+    researchOffset?: number;
+    followUpFromRunId?: number;
   },
 ) {
   const db = await getDb();
@@ -864,8 +925,10 @@ async function executeRun(
     // ── 3. Universe discovery ──────────────────────────────────────────────
     const summary = thesisSummary(graph.beliefs ?? [], graph.seek ?? []);
     const universe = await discoverUniverse(nodeRows, summary, known);
-    const researchPlan = buildBriefResearchPlan(universe.discovered, input.holdingPeriod);
+    const offset = Math.max(0, input.researchOffset ?? 0);
+    const researchPlan = buildBriefResearchPlan(universe.discovered.slice(offset), input.holdingPeriod);
     const researchDroppedNote = [
+      input.followUpFromRunId ? `Follow-up research from run #${input.followUpFromRunId}; research offset ${offset}.` : null,
       universe.droppedNote,
       researchPlan.deferredCount > 0 ? `${researchPlan.deferredCount} symbols deferred to a follow-up brief` : null,
     ].filter(Boolean).join(" · ") || null;

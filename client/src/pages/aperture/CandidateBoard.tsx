@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { CapitalBrief } from "@/components/aperture/CapitalBrief";
 import { ResearchLedger } from "@/components/aperture/ResearchLedger";
+import { DecisionFocusCard } from "@/components/aperture/DecisionFocusCard";
+import { decisionPriority } from "@shared/decisionFocus";
 
 type Role = "core" | "complementary" | "remainder" | "alternative_expression";
 
@@ -123,6 +125,13 @@ export default function CandidateBoard() {
     },
     onError: (error) => toast.error(error.message),
   });
+  const followUpRun = trpc.aperture.run.followUp.useMutation({
+    onSuccess: ({ runId: followUpRunId }) => {
+      toast.success("Starting the next bounded evidence batch — progress will update in its own paper-research brief.");
+      navigate(`/aperture/run/${followUpRunId}`);
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const genMemo = trpc.aperture.generateMemo.useMutation({
     onSuccess: (_result, variables) => { toast.success("Memo generated — opening the fact-traced record"); refetch(); setGeneratingMemo(null); navigate(`/aperture/memos/${variables.candidateId}`); },
     onError: (error) => { toast.error(error.message); setGeneratingMemo(null); },
@@ -154,7 +163,11 @@ export default function CandidateBoard() {
 
   const { run, stale, candidates, macroFacts, brief } = data;
   const roles: Array<Role | "all"> = ["all", "core", "complementary", "remainder", "alternative_expression"];
-  const filtered = activeRole === "all" ? candidates : candidates.filter((candidate) => candidate.role === activeRole);
+  const filtered = (activeRole === "all" ? candidates : candidates.filter((candidate) => candidate.role === activeRole))
+    .slice().sort((a, b) => decisionPriority(b) - decisionPriority(a));
+  const focusCandidate = candidates.find((candidate) => candidate.symbol === brief?.priorityCandidate?.symbol)
+    ?? candidates.slice().sort((a, b) => decisionPriority(b) - decisionPriority(a))[0];
+  const paperPositions = data.paperContext?.positions ?? [];
 
   const openEvidence = () => { setView("evidence"); setActiveRole("all"); };
   return (
@@ -191,21 +204,25 @@ export default function CandidateBoard() {
         />
 
         {view === "brief" ? (
-          <CapitalBrief
-            brief={brief}
-            onReviewEvidence={openEvidence}
-            onComparePostures={() => navigate(`/aperture/run/${runId}/strategies`)}
-            onReviewGaps={() => navigate(`/aperture/run/${runId}/exposure`)}
-            onSetHorizon={() => navigate("/thesis?scope=capital")}
-          />
+          <div className="space-y-5">
+            {focusCandidate && <DecisionFocusCard candidate={focusCandidate} positions={paperPositions} onOpenMemo={focusCandidate.memoStatus === "ok" ? () => navigate(`/aperture/memos/${focusCandidate.id}`) : undefined} onReviewEvidence={openEvidence} onComparePostures={() => navigate(`/aperture/run/${runId}/strategies`)} />}
+            {run.status === "completed" && /deferred/i.test(run.droppedNote ?? "") && <section className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>More thesis evidence is available</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{run.droppedNote} Continue only when the current human checks are clear; this starts research, never an order.</p></div><Button size="sm" disabled={followUpRun.isPending} onClick={() => followUpRun.mutate({ id: runId })}>{followUpRun.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <SearchCheck className="mr-1.5 h-3.5 w-3.5" />}Research next batch</Button></section>}
+            <CapitalBrief
+              brief={brief}
+              onReviewEvidence={openEvidence}
+              onComparePostures={() => navigate(`/aperture/run/${runId}/strategies`)}
+              onReviewGaps={() => navigate(`/aperture/run/${runId}/exposure`)}
+              onSetHorizon={() => navigate("/thesis?scope=capital")}
+            />
+          </div>
         ) : view === "ledger" ? (
           <ResearchLedger macroFacts={macroFacts} onRefresh={() => refreshMacro.mutate()} refreshing={refreshMacro.isPending} />
         ) : (
           <section className="space-y-4">
             <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Evidence queue</p>
-                <p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>These symbols support research questions. They are not a ranked instruction to trade.</p>
+                <p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Human decision queue</p>
+                <p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>The highest unresolved checks appear first. These are research questions—not a ranked instruction to trade.</p>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}/strategies`)}>Compare postures</Button>
@@ -228,7 +245,7 @@ export default function CandidateBoard() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>{ROLE_LABELS[role]}</p>
-                          <h2 className="mt-1 text-base font-semibold" style={{ color: "var(--sh-text-primary)" }}>Research {candidate.symbol} as a {role === "core" ? "thesis expression" : "portfolio option"}</h2>
+                          <h2 className="mt-1 text-base font-semibold" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol} · {verifyFields.length ? `${verifyFields.length} human check${verifyFields.length === 1 ? "" : "s"} before comparison` : "evidence review ready"}</h2>
                           <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{ROLE_DESCRIPTIONS[role]}</p>
                         </div>
                         <Badge variant="outline" className="shrink-0 text-xs">{percent(candidate.confidenceScore)} evidence confidence</Badge>
