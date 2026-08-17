@@ -80,6 +80,31 @@ export interface BuildInput {
 /** rank = fit discounted by how much of that fit is actually evidenced. */
 export const rankOf = (c: Candidate): number => round(c.compositeScore * (0.5 + 0.5 * c.confidenceScore), 2);
 
+const ROLE_PRIORITY: Record<Candidate["role"], number> = {
+  core: 4,
+  complementary: 3,
+  alternative_expression: 2,
+  remainder: 1,
+};
+
+/**
+ * Research can surface the same security through more than one thesis path. A
+ * strategy is a portfolio posture, not a list of paths, so each symbol must
+ * have one deterministic allocation identity.
+ */
+export function uniqueCandidatesBySymbol(candidates: Candidate[]): Candidate[] {
+  const selected = new Map<string, Candidate>();
+  for (const candidate of candidates) {
+    const existing = selected.get(candidate.symbol);
+    if (!existing
+      || rankOf(candidate) > rankOf(existing)
+      || (rankOf(candidate) === rankOf(existing) && ROLE_PRIORITY[candidate.role] > ROLE_PRIORITY[existing.role])) {
+      selected.set(candidate.symbol, candidate);
+    }
+  }
+  return Array.from(selected.values());
+}
+
 /**
  * Size a set of names by rank, respecting the portfolio rules.
  * Returns the funded allocations and every name the rules pushed out.
@@ -91,7 +116,7 @@ export function sizeByRank(
   rules: PortfolioRules = {},
 ): { allocations: Allocation[]; excluded: Array<{ symbol: string; reason: string }>; unspentCents: number } {
   const excluded: Array<{ symbol: string; reason: string }> = [];
-  const investable = picks.filter((c) => {
+  const investable = uniqueCandidatesBySymbol(picks).filter((c) => {
     if (rules.minAvgDailyVolumeUsd != null) {
       if (c.advUsd == null) {
         excluded.push({ symbol: c.symbol, reason: "no average daily volume on record — liquidity rule cannot be checked" });
@@ -240,14 +265,15 @@ export function humanBaseline(input: BuildInput): Strategy {
 }
 
 export function buildStrategies(input: BuildInput): Strategy[] {
-  const ranked = input.candidates.slice().sort((a, b) => rankOf(b) - rankOf(a));
+  const normalizedInput = { ...input, candidates: uniqueCandidatesBySymbol(input.candidates) };
+  const ranked = normalizedInput.candidates.slice().sort((a, b) => rankOf(b) - rankOf(a));
   const core = ranked.filter((c) => c.role === "core");
   const complementary = ranked.filter((c) => c.role === "complementary" || c.role === "alternative_expression");
   const remainder = ranked.filter((c) => c.role === "remainder");
 
   const out: Strategy[] = [];
 
-  if (input.intendedTrades?.length) out.push(humanBaseline(input));
+  if (normalizedInput.intendedTrades?.length) out.push(humanBaseline(normalizedInput));
 
   out.push(
     build(
@@ -255,8 +281,8 @@ export function buildStrategies(input: BuildInput): Strategy[] {
       "Concentrated",
       "Two research leads only. Highest conviction concentration, with a modest reserve held back for evidence surprises.",
       (core.length ? core : ranked).slice(0, 2),
-      input,
-      { reservePct: Math.max(input.rules?.reservePct ?? 0, 15) },
+      normalizedInput,
+      { reservePct: Math.max(normalizedInput.rules?.reservePct ?? 0, 15) },
     ),
   );
 
@@ -266,8 +292,8 @@ export function buildStrategies(input: BuildInput): Strategy[] {
       "Expanded aperture",
       "Broadest thesis map. It puts more candidate pathways under comparison while retaining a larger reserve for unresolved evidence.",
       [...(core.length ? core : ranked).slice(0, 3), ...complementary.slice(0, 4)],
-      input,
-      { reservePct: Math.max(input.rules?.reservePct ?? 0, 25) },
+      normalizedInput,
+      { reservePct: Math.max(normalizedInput.rules?.reservePct ?? 0, 25) },
     ),
   );
 
@@ -287,8 +313,8 @@ export function buildStrategies(input: BuildInput): Strategy[] {
       "Risk-balanced",
       "One expression per sector proxy before doubling up. It trades maximum thesis purity for lower cluster concentration and a larger cash buffer.",
       diversified.slice(0, 4),
-      input,
-      { reservePct: Math.max(input.rules?.reservePct ?? 0, 35) },
+      normalizedInput,
+      { reservePct: Math.max(normalizedInput.rules?.reservePct ?? 0, 35) },
     ),
   );
 

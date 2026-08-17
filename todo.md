@@ -1260,3 +1260,9 @@
 - [x] Fold superseded zero-candidate interruptions into the recovered research journey so the workspace does not recreate a raw failure stack
 - [x] Align every decision-surface CTA and helper sentence with progressive readiness so research comparison is never falsely presented as blocked by supporting checks
 - [x] Replace raw portfolio-gap paths in the Capital Brief summary with the same readable exposure themes used in the gap map
+
+## Capital Aperture — Strategy Candidate Identity Repair (Aug 17 2026)
+- [x] Diagnose duplicate security symbols emitted into an individual strategy posture and the resulting duplicate React keys
+- [x] Deduplicate each posture allocation by symbol and maintain deterministic, unique row identity
+- [x] Add regression coverage for repeated candidates and verify the strategy-comparison browser render
+- [x] Normalize legacy persisted duplicate allocation rows at the strategy display boundary without changing historical order records

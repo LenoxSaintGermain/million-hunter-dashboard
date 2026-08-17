@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  buildStrategies, humanBaseline, sizeByRank, rankOf, recompose, opportunityCost,
+  buildStrategies, humanBaseline, sizeByRank, rankOf, recompose, opportunityCost, uniqueCandidatesBySymbol,
   type Candidate, type BuildInput,
 } from "./strategies";
 import type { Holding } from "./portfolioMath";
@@ -142,6 +142,23 @@ describe("buildStrategies", () => {
     for (const s of built) {
       const spent = s.allocations.reduce((a, b) => a + b.dollarsCents, 0);
       expect(spent).toBeLessThanOrEqual(BASE.deployableCapitalCents);
+    }
+  });
+
+  it("collapses repeated research paths into one stable allocation per symbol", () => {
+    const repeated = [
+      cand({ symbol: "LITE", role: "remainder", compositeScore: 62, confidenceScore: 0.7 }),
+      cand({ symbol: "LITE", role: "core", compositeScore: 84, confidenceScore: 0.9 }),
+      cand({ symbol: "PLD", role: "complementary", compositeScore: 76 }),
+      cand({ symbol: "PLD", role: "alternative_expression", compositeScore: 69 }),
+    ];
+    expect(uniqueCandidatesBySymbol(repeated).map((candidate) => candidate.symbol)).toEqual(["LITE", "PLD"]);
+    expect(uniqueCandidatesBySymbol(repeated)[0].role).toBe("core");
+
+    const strategies = buildStrategies({ ...BASE, candidates: repeated, intendedTrades: [] });
+    for (const strategy of strategies) {
+      const symbols = strategy.allocations.map((allocation) => allocation.symbol);
+      expect(new Set(symbols).size).toBe(symbols.length);
     }
   });
 });
