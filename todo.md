@@ -1200,3 +1200,9 @@
 - [x] Verify market-open partial fills and synchronize current Alpaca Paper positions into Capital Aperture without submitting any additional order
 - [x] Verify the accepted six-order Alpaca Paper research canvas after market-open fills and account sync; no autonomous follow-on order
 - [x] Add regression tests and perform browser UAT for the complete new-user research journey
+
+## Capital Aperture — Filled Canvas Live Brief Walkthrough (Aug 17 2026)
+- [x] Confirm a canvas-backed Capital / Trade thesis and complete Alpaca Paper portfolio context are ready for the walkthrough
+- [x] Execute one paper-only Capital Brief against the filled research canvas and observe its live status through completion
+- [x] Verify the in-page decision frame, evidence queue, and FRED research ledger on the resulting run
+- [x] Record the human decision framing and walkthrough outcome without creating or submitting any new order
