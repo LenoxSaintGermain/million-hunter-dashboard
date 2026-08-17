@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateMemo, buildMemoPrompt, coerceMemo, citationsFrom } from "./memo";
+import { buildFactLedgerFallbackMemo, generateMemo, buildMemoPrompt, coerceMemo, citationsFrom, parseMemoResponse } from "./memo";
 import { normalizeGraph, flattenExposureTree, optionalNum, type ThesisGraph } from "./thesisGraph";
 import type { SecurityFact } from "../../drizzle/schema";
 
@@ -128,6 +128,28 @@ describe("generateMemo", () => {
     expect(call).toBe(2);
     expect(r.status).toBe("ok");
   });
+
+  it("recovers valid memo JSON delivered through a candidate-part response wrapper", async () => {
+    const r = await generateMemo("NVDA", FACTS, GRAPH, [], {
+      generate: async () => ({ candidates: [{ content: { parts: [{ text: goodMemo }] } }] }),
+    });
+    expect(r.status).toBe("ok");
+  });
+
+  it("returns a validated, transparent ledger-only memo if malformed output survives the retry", async () => {
+    const r = await generateMemo("NVDA", FACTS, GRAPH, [], { generate: async () => "not structured output" });
+    expect(r.status).toBe("ok");
+    expect(r.memo?.generationBasis).toBe("fact_ledger_fallback");
+    expect(r.validation?.ok).toBe(true);
+  });
+});
+
+describe("parseMemoResponse", () => {
+  it("unwraps quoted JSON and common output envelopes", () => {
+    const raw = { thesisFit: "Ledger-only analysis", whatWouldInvalidate: "A falsifiable condition", risks: [], unknowns: [], researchConfidence: "low" };
+    expect(parseMemoResponse({ text: JSON.stringify(JSON.stringify(raw)) })).toEqual(raw);
+    expect(parseMemoResponse({ text: JSON.stringify({ output: raw }) })).toEqual(raw);
+  });
 });
 
 describe("coerceMemo", () => {
@@ -142,6 +164,14 @@ describe("coerceMemo", () => {
     expect(m.thesisFit).toBe("x");
     expect(m.catalyst).toBe("");
     expect(m.risks).toEqual([]);
+  });
+});
+
+describe("buildFactLedgerFallbackMemo", () => {
+  it("does not introduce a paper-allocation conclusion", () => {
+    const memo = buildFactLedgerFallbackMemo("NVDA", FACTS, GRAPH, []);
+    expect(memo.generationBasis).toBe("fact_ledger_fallback");
+    expect(memo.whyThisDeservesCapital).toMatch(/does not support a paper-allocation conclusion/i);
   });
 });
 

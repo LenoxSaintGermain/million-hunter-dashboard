@@ -31,6 +31,8 @@ export interface InvestmentMemo {
   /** What the memo could not assess, and why. Required, not optional garnish. */
   unknowns: string[];
   researchConfidence: "high" | "medium" | "low";
+  /** The UI labels deterministic fallback output; it is not model narrative. */
+  generationBasis: "model" | "fact_ledger_fallback";
 }
 
 export interface MemoResult {
@@ -118,17 +120,102 @@ export function citationsFrom(facts: SecurityFact[]): string[] {
   return Array.from(urls);
 }
 
+/** A non-directional, no-new-number summary for structurally unrecoverable model output. */
+export function buildFactLedgerFallbackMemo(
+  symbol: string,
+  facts: SecurityFact[],
+  graph: ThesisGraph,
+  holdings: string[],
+): InvestmentMemo {
+  const covered = Array.from(new Set(facts.filter((f) => f.basis !== "unknown").map((f) => f.factKey))).slice(0, 6);
+  const gaps = Array.from(new Set(unknownGaps(facts).map((f) => f.factKey))).slice(0, 8);
+  const belief = graph.beliefs[0] ?? "the stated thesis";
+  const held = holdings.includes(symbol) ? `${symbol} is already present in the paper context.` : `${symbol} is not currently present in the paper context.`;
+
+  return {
+    thesisFit: `Ledger-only research summary for ${symbol}: assess its relation to ${belief} using the available fact coverage rather than a directional conclusion.`,
+    whyNow: covered.length ? `The ledger currently covers ${covered.join(", ")}.` : "The current ledger contains sourced research context but no complete timing conclusion.",
+    catalyst: "No validated catalyst conclusion is asserted until the open evidence checks are completed.",
+    whatWouldInvalidate: "Invalidate this research path if subsequent verified evidence contradicts the stated thesis mechanism or removes the identified catalyst premise.",
+    relationToPortfolio: held,
+    whyThisDeservesCapital: "This memo does not support a paper-allocation conclusion; it preserves the fact-backed research record for human review.",
+    risks: ["The model-formatted memo could not be structurally recovered.", "Open evidence checks remain before any paper-allocation decision."],
+    downsideScenario: "Evidence remains incomplete or later verified facts weaken the thesis mechanism.",
+    unknowns: gaps.length ? gaps.map((gap) => `Ledger gap: ${gap}`) : ["No explicit unknown fact rows were recorded; review source coverage before acting."],
+    researchConfidence: "low",
+    generationBasis: "fact_ledger_fallback",
+  };
+}
+
+function factLedgerFallbackResult(symbol: string, facts: SecurityFact[], graph: ThesisGraph, holdings: string[], citations: string[], reason: string): MemoResult {
+  const memo = buildFactLedgerFallbackMemo(symbol, facts, graph, holdings);
+  return { memo, status: "ok", rejectReason: reason, validation: validateMemoNumbers(memo, facts), citations };
+}
+
 export interface GenerateOpts {
   /** Injected for tests; defaults to a real Gemini call. */
-  generate?: (prompt: string) => Promise<string>;
+  generate?: (prompt: string) => Promise<unknown>;
   /** Retry once with the offending figures named. Models usually fix it. */
   retryOnReject?: boolean;
 }
 
-async function callGemini(prompt: string): Promise<string> {
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function collectMemoTexts(value: unknown, out: string[], seen: Set<object>, depth = 0): void {
+  if (depth > 7 || value == null) return;
+  if (typeof value === "string") {
+    if (value.trim()) out.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectMemoTexts(item, out, seen, depth + 1));
+    return;
+  }
+  if (!isRecord(value) || seen.has(value)) return;
+  seen.add(value);
+  for (const key of ["text", "parts", "content", "candidates", "response", "data", "result", "output"]) {
+    if (key in value) collectMemoTexts(value[key], out, seen, depth + 1);
+  }
+}
+
+function unwrapMemoPayload(value: unknown): unknown {
+  let payload = value;
+  for (let i = 0; i < 3 && isRecord(payload); i++) {
+    if ("thesisFit" in payload || "whatWouldInvalidate" in payload || "researchConfidence" in payload) break;
+    const record = payload;
+    const nested = ["data", "result", "output", "response", "content"]
+      .map((key) => record[key])
+      .find((candidate) => isRecord(candidate));
+    if (!nested) break;
+    payload = nested;
+  }
+  return payload;
+}
+
+/** Accept text, candidate parts, quoted JSON, and structured SDK envelopes. */
+export function parseMemoResponse(response: unknown): unknown {
+  const texts: string[] = [];
+  collectMemoTexts(response, texts, new Set<object>());
+  for (const text of texts) {
+    try {
+      let parsed = looseJsonParse(text);
+      if (typeof parsed === "string") parsed = looseJsonParse(parsed);
+      return unwrapMemoPayload(parsed);
+    } catch {
+      // Try the next textual part supplied by the provider.
+    }
+  }
+  throw new Error("Memo output contained no parseable structured JSON.");
+}
+
+async function callGemini(prompt: string): Promise<unknown> {
   if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
   const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const res = await genai.models.generateContent({
+  return genai.models.generateContent({
     model: GEMINI_STRONG,
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     config: {
@@ -138,7 +225,6 @@ async function callGemini(prompt: string): Promise<string> {
       maxOutputTokens: 4096,
     },
   });
-  return res.text ?? "";
 }
 
 /**
@@ -173,7 +259,7 @@ export async function generateMemo(
   const generate = opts.generate ?? callGemini;
   const prompt = buildMemoPrompt(symbol, facts, graph, holdings);
 
-  let raw: string;
+  let raw: unknown;
   try {
     raw = await generate(prompt);
   } catch (e: any) {
@@ -182,7 +268,7 @@ export async function generateMemo(
 
   let parsed: any;
   try {
-    parsed = looseJsonParse(raw);
+    parsed = parseMemoResponse(raw);
   } catch {
     if (opts.retryOnReject !== false) {
       try {
@@ -190,15 +276,12 @@ export async function generateMemo(
           `${prompt}\n\nYOUR PREVIOUS ATTEMPT WAS REJECTED BEFORE VALIDATION because it was not parseable JSON. ` +
           `Return only one valid JSON object matching the requested fields. Do not add markdown, commentary, or code fences.`,
         );
-        parsed = looseJsonParse(retryRaw);
+        parsed = parseMemoResponse(retryRaw);
       } catch {
-        return {
-          memo: null,
-          status: "rejected",
-          rejectReason: "Memo formatting could not be validated after one automatic fact-only retry. Your research facts remain available; retry when you are ready.",
-          validation: null,
-          citations,
-        };
+        return factLedgerFallbackResult(
+          symbol, facts, graph, holdings, citations,
+          "The model memo could not be structurally recovered after one retry. Showing a validated ledger-only summary instead.",
+        );
       }
     } else {
       return { memo: null, status: "rejected", rejectReason: "Memo generation did not return parseable JSON.", validation: null, citations };
@@ -215,7 +298,7 @@ export async function generateMemo(
           `Rewrite the memo without them. Either omit the claim entirely or state that the ledger does not contain the figure. ` +
           `Do not substitute a different invented number.`,
       );
-      const retryParsed = looseJsonParse(retryRaw);
+      const retryParsed = parseMemoResponse(retryRaw);
       const retryValidation = validateMemoNumbers(retryParsed, facts);
       if (retryValidation.ok) {
         parsed = retryParsed;
@@ -250,5 +333,6 @@ export function coerceMemo(raw: any): InvestmentMemo {
     unknowns: arr(raw?.unknowns),
     // An unrecognised confidence value means we do not know it is high.
     researchConfidence: conf === "high" || conf === "medium" ? (conf as "high" | "medium") : "low",
+    generationBasis: raw?.generationBasis === "fact_ledger_fallback" ? "fact_ledger_fallback" : "model",
   };
 }

@@ -1221,3 +1221,11 @@
 - [x] Detect stale in-progress Capital Briefs after a server interruption and expose a safe retry path rather than an indefinite research state
 - [x] Bound Sonar research requests with a timeout so one upstream stall cannot leave a Capital Brief in research indefinitely
 - [x] Bound an initial Capital Brief to a decision-sized evidence set so a 45-security universe does not create an opaque multi-minute wait
+
+## Capital Aperture — LLY Memo & GLP-1 Posture Comparison (Aug 17 2026)
+- [x] Confirm LLY evidence coverage and GLP-1 strategy inputs for the completed no-order brief
+- [x] Generate and validate the LLY fact-traced research memo
+- [x] Compare the GLP-1 paper-research portfolio postures against the synchronized paper canvas
+- [x] Verify the memo and posture comparison in browser and record the research-only outcome
+- [x] Diagnose and repair LLY memo-format recovery after its automatic fact-only retry rejects a structurally valid response
+- [x] Provide a transparent deterministic fact-ledger memo fallback when a model response cannot be structurally recovered

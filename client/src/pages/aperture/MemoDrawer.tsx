@@ -64,6 +64,7 @@ export default function MemoDrawer() {
           <span className="text-2xl font-bold font-mono" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol}</span>
           <Badge variant="outline">{candidate.role}</Badge>
           {candidate.memoStatus === "ok" && <Badge style={{ background: "oklch(0.45 0.15 145)", color: "#fff" }}>Memo validated</Badge>}
+          {candidate.memoStatus === "ok" && memo?.generationBasis === "fact_ledger_fallback" && <Badge variant="outline">Ledger-only fallback</Badge>}
           {candidate.memoStatus === "rejected" && <Badge style={{ background: "var(--sh-red)", color: "#fff" }}>Rejected</Badge>}
           {candidate.memoStatus === "skipped" && <Badge variant="outline">Skipped</Badge>}
         </div>
@@ -99,6 +100,12 @@ export default function MemoDrawer() {
               <span className="text-xs font-medium" style={{ color: "var(--sh-fg-muted)" }}>Research confidence:</span>
               <Badge variant="outline" style={{ color: confidenceColor }}>{memo.researchConfidence}</Badge>
             </div>
+
+            {memo.generationBasis === "fact_ledger_fallback" && (
+              <div className="rounded-lg px-3 py-2 text-xs leading-relaxed" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", border: "1px solid var(--sh-border-1)" }}>
+                The source facts passed validation, but the model narrative was not structurally recoverable. This is a deterministic ledger-only summary, not a directional conclusion.
+              </div>
+            )}
 
             {[
               { key: "thesisFit", label: "Thesis Fit" },
