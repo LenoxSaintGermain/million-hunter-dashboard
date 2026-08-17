@@ -48,12 +48,7 @@ import { brokerOrders, monitoringChecks } from "../drizzle/schema";
 import { desc } from "drizzle-orm";
 import { buildCapitalDecisionBrief } from "./aperture/decisionBrief";
 import { ensureThesisReady } from "./aperture/thesisReadiness";
-import { buildBriefResearchPlan, isRunStale } from "./aperture/runRecovery";
-
-function followUpOffset(run: { droppedNote?: string | null; universeCount?: number | null }) {
-  const priorOffset = Number(run.droppedNote?.match(/research offset (\d+)/i)?.[1] ?? 0);
-  return priorOffset + Math.max(0, Number(run.universeCount ?? 0));
-}
+import { buildBriefResearchPlan, isRunStale, nextFollowUpOffset } from "./aperture/runRecovery";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -527,7 +522,7 @@ export const apertureRouter = router({
         }
         const thesis = await requireThesis(db, run.thesisId, ctx.user.id);
         if (!thesis.graph) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This thesis needs to be prepared before follow-up research can run." });
-        const offset = followUpOffset(run);
+        const offset = nextFollowUpOffset(run);
         const now = Date.now();
         const [result] = await db!.insert(apertureRuns).values({
           userId: ctx.user.id, thesisId: run.thesisId, accountId: run.accountId,

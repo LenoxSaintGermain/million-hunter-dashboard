@@ -35,3 +35,9 @@ export function buildBriefResearchPlan<T>(items: T[], holdingPeriod?: string) {
     passes: intraday ? (["catalyst", "technical"] as const) : undefined,
   };
 }
+
+/** Calculates the next unseen universe index for a traceable bounded follow-up. */
+export function nextFollowUpOffset(run: { droppedNote?: string | null; universeCount?: number | null }) {
+  const priorOffset = Number(run.droppedNote?.match(/research offset (\d+)/i)?.[1] ?? 0);
+  return priorOffset + Math.max(0, Number(run.universeCount ?? 0));
+}

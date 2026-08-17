@@ -1244,3 +1244,9 @@
 - [x] Connect decision brief, evidence queue, gap map, memo library, and paper-account context with direct, state-aware navigation
 - [x] Add a bounded follow-up brief path for the 33 deferred GLP-1 symbols, preserving the no-order research gate
 - [x] Add regression coverage and browser UAT for the decision-first workflow
+
+## Capital Aperture — Complete Deferred GLP-1 Research (Aug 17 2026)
+- [x] Confirm the deferred-research chain and remaining GLP-1 symbol count
+- [x] Complete each remaining bounded GLP-1 follow-up research batch with no broker action
+- [x] Verify the final completed batch retains its portfolio-aware machine POV and human decision gate
+- [x] Record the complete research-universe coverage outcome
