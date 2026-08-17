@@ -74,7 +74,7 @@ export default function ApertureMemoLibrary() {
                   </div>
                   <div className="mt-7 pt-4 border-t border-rule flex items-center justify-between">
                     <Badge variant="outline" className={isOk ? "border-sage/30 text-sage" : "border-clay/30 text-clay"}>{isOk ? "Validated memo" : candidate.memoStatus}</Badge>
-                    <span className="font-eyebrow text-eyebrow uppercase tracking-widest text-amber group-hover:underline">Open record →</span>
+                    <span className="font-eyebrow text-eyebrow uppercase tracking-widest text-amber group-hover:underline">Continue decision →</span>
                   </div>
                 </button>
               );

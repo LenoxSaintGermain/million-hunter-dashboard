@@ -12,6 +12,7 @@ import { CapitalBrief } from "@/components/aperture/CapitalBrief";
 import { ResearchLedger } from "@/components/aperture/ResearchLedger";
 import { DecisionFocusCard } from "@/components/aperture/DecisionFocusCard";
 import { decisionPriority } from "@shared/decisionFocus";
+import { buildDecisionPath } from "@shared/decisionPath";
 
 type Role = "core" | "complementary" | "remainder" | "alternative_expression";
 
@@ -103,8 +104,12 @@ export default function CandidateBoard() {
   const [, params] = useRoute("/aperture/run/:id");
   const [, navigate] = useLocation();
   const runId = Number(params?.id);
-  const [view, setView] = useState<"brief" | "evidence" | "ledger">("brief");
+  const [view, setView] = useState<"brief" | "evidence" | "ledger">(() => {
+    const requested = new URLSearchParams(window.location.search).get("view");
+    return requested === "evidence" || requested === "ledger" ? requested : "brief";
+  });
   const [activeRole, setActiveRole] = useState<Role | "all">("all");
+  const [showSupporting, setShowSupporting] = useState(false);
   const [generatingMemo, setGeneratingMemo] = useState<number | null>(null);
   const { data, isLoading, refetch } = trpc.aperture.run.get.useQuery(
     { id: runId },
@@ -205,8 +210,8 @@ export default function CandidateBoard() {
 
         {view === "brief" ? (
           <div className="space-y-5">
-            {focusCandidate && <DecisionFocusCard candidate={focusCandidate} positions={paperPositions} onOpenMemo={focusCandidate.memoStatus === "ok" ? () => navigate(`/aperture/memos/${focusCandidate.id}`) : undefined} onReviewEvidence={openEvidence} onComparePostures={() => navigate(`/aperture/run/${runId}/strategies`)} />}
-            {run.status === "completed" && /deferred/i.test(run.droppedNote ?? "") && <section className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>More thesis evidence is available</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{run.droppedNote} Continue only when the current human checks are clear; this starts research, never an order.</p></div><Button size="sm" disabled={followUpRun.isPending} onClick={() => followUpRun.mutate({ id: runId })}>{followUpRun.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <SearchCheck className="mr-1.5 h-3.5 w-3.5" />}Research next batch</Button></section>}
+            {focusCandidate && <DecisionFocusCard candidate={focusCandidate} positions={paperPositions} onOpenMemo={focusCandidate.memoStatus === "ok" ? () => navigate(`/aperture/memos/${focusCandidate.id}`) : undefined} onReviewEvidence={openEvidence} onComparePostures={() => navigate(`/aperture/run/${runId}/strategies`)} onViewPaperAccount={() => navigate("/aperture/accounts")} />}
+            {run.status === "completed" && /deferred/i.test(run.droppedNote ?? "") && <section className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>More thesis evidence is available</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{run.droppedNote} You may continue research now; decisive checks only control whether a human can begin paper-order review. This starts research, never an order.</p></div><Button size="sm" disabled={followUpRun.isPending} onClick={() => followUpRun.mutate({ id: runId })}>{followUpRun.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <SearchCheck className="mr-1.5 h-3.5 w-3.5" />}Research next batch</Button></section>}
             <CapitalBrief
               brief={brief}
               onReviewEvidence={openEvidence}
@@ -220,23 +225,25 @@ export default function CandidateBoard() {
         ) : (
           <section className="space-y-4">
             <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-              <div>
-                <p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Human decision queue</p>
-                <p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{brief?.evidence.decisionCriticalCheckCount ?? 0} decision-critical check{brief?.evidence.decisionCriticalCheckCount === 1 ? "" : "s"} lead this queue. {brief?.evidence.researchFollowUpCheckCount ?? 0} supporting checks can progress in parallel and do not prevent memo review or posture comparison.</p>
-              </div>
+              <div><p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Only the decisive evidence first</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{brief?.evidence.decisionCriticalCheckCount ?? 0} decision-critical check{brief?.evidence.decisionCriticalCheckCount === 1 ? "" : "s"} determine whether paper-order review is even available. {brief?.evidence.researchFollowUpCheckCount ?? 0} supporting checks are optional for this moment.</p></div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}/strategies`)}>Compare postures</Button>
                 <Button variant="ghost" size="sm" onClick={() => setView("brief")}>Back to brief</Button>
               </div>
             </div>
+            {focusCandidate && (() => {
+              const checks = Array.isArray(focusCandidate.verifyFields) ? focusCandidate.verifyFields as string[] : [];
+              const path = buildDecisionPath({ symbol: focusCandidate.symbol, memoStatus: focusCandidate.memoStatus, decisionCriticalChecks: checks.length });
+              return <Card className="border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Your decision checklist</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{focusCandidate.symbol} · {path.label}</h2></div><Badge variant="outline" style={{ color: "var(--sh-signal)" }}>{checks.length} decisive</Badge></div>{checks.length ? <ol className="space-y-2">{checks.map((check, index) => <li key={check} className="flex gap-2 text-sm" style={{ color: "var(--sh-text-primary)" }}><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px]" style={{ background: "color-mix(in oklab, var(--sh-signal) 14%, transparent)", color: "var(--sh-signal)" }}>{index + 1}</span>{check}</li>)}</ol> : <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>No decision-critical checks remain in this research record.</p>}<div className="flex flex-wrap gap-2 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}>{focusCandidate.memoStatus === "ok" ? <Button size="sm" onClick={() => navigate(`/aperture/memos/${focusCandidate.id}`)}>Read decision record</Button> : <Button size="sm" disabled={generatingMemo === focusCandidate.id} onClick={() => { setGeneratingMemo(focusCandidate.id); genMemo.mutate({ runId, candidateId: focusCandidate.id }); }}>Create decision record</Button>}<Button variant="ghost" size="sm" onClick={() => setShowSupporting((value) => !value)}>{showSupporting ? "Hide supporting research" : `See ${Math.max(0, candidates.length - 1)} supporting candidates`}</Button></div></CardContent></Card>;
+            })()}
             <div className="flex gap-1 overflow-x-auto pb-1">
               {roles.map((role) => {
                 const count = role === "all" ? candidates.length : candidates.filter((candidate) => candidate.role === role).length;
                 return <button key={role} onClick={() => setActiveRole(role)} className="shrink-0 rounded-full px-3 py-1.5 text-xs font-medium" style={{ background: activeRole === role ? "var(--sh-signal)" : "var(--sh-surface-2)", color: activeRole === role ? "var(--sh-primary-fg)" : "var(--sh-fg-muted)" }}>{role === "all" ? "All research" : ROLE_LABELS[role]} ({count})</button>;
               })}
             </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {filtered.map((candidate) => {
+            {showSupporting && <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {filtered.filter((candidate) => candidate.id !== focusCandidate?.id).map((candidate) => {
                 const verifyFields = Array.isArray(candidate.verifyFields) ? candidate.verifyFields as string[] : [];
                 const role = candidate.role as Role;
                 return (
@@ -263,7 +270,7 @@ export default function CandidateBoard() {
                   </Card>
                 );
               })}
-            </div>
+            </div>}
           </section>
         )}
       </div>

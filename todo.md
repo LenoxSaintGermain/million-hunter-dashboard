@@ -1266,3 +1266,14 @@
 - [x] Deduplicate each posture allocation by symbol and maintain deterministic, unique row identity
 - [x] Add regression coverage for repeated candidates and verify the strategy-comparison browser render
 - [x] Normalize legacy persisted duplicate allocation rows at the strategy display boundary without changing historical order records
+
+## Capital Aperture — One Clear Decision Path (Aug 17 2026)
+- [x] Audit evidence triage, memo library, and paper-account readiness handoffs for unnecessary operator steps
+- [x] Add a ranked decision checklist that isolates only decision-critical evidence and exposes one next action
+- [x] Connect memo reading and evidence review without forcing a return through a search or generic run page
+- [x] Explain paper-account readiness, remaining human gate, and no-order status in the same decision context
+- [x] Add regression coverage and browser UAT for the unified operator journey
+- [x] Align follow-up research copy with progressive evidence rules so operators can continue research without first clearing decision-critical checks
+- [x] Remove self-referential memo actions and make the memo page’s sole primary action the next decisive evidence step
+- [x] Preserve the evidence-queue view when a memo sends the operator to decisive checks instead of returning to the decision-brief default
+- [x] Distinguish counted decision-critical evidence checks from the separate invalidation guardrail so the human checklist is never numerically contradictory

@@ -207,7 +207,7 @@ export default function ApertureAccounts() {
                 <div className="flex items-center gap-2 text-xs">
                   {brokers.find((b) => b.id === account.brokerId)!.available ? (
                     <><CheckCircle2 className="h-3.5 w-3.5" style={{ color: "oklch(0.55 0.15 145)" }} />
-                    <span style={{ color: "oklch(0.55 0.15 145)" }}>Broker connected — orders can be submitted</span></>
+                    <span style={{ color: "oklch(0.55 0.15 145)" }}>Paper context connected — positions can sync. A human must still clear decision-critical evidence and explicitly approve any paper order.</span></>
                   ) : (
                     <><XCircle className="h-3.5 w-3.5" style={{ color: "var(--sh-fg-muted)" }} />
                     <span style={{ color: "var(--sh-fg-muted)" }}>

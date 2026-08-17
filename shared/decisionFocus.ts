@@ -5,6 +5,7 @@ export interface DecisionCandidate {
   confidenceScore: number | null;
   verifyFields: unknown;
   memo?: unknown;
+  memoStatus?: string | null;
 }
 
 export interface PaperPosition { symbol: string; marketValueCents?: number | null; }

@@ -98,7 +98,7 @@ export default function MemoDrawer() {
 
         {memo && candidate.memoStatus === "ok" && (
           <div className="space-y-4">
-            <DecisionFocusCard candidate={candidate as any} positions={paperPositions} onReviewEvidence={memoRunId ? () => navigate(`/aperture/run/${memoRunId}`) : undefined} onComparePostures={memoRunId ? () => navigate(`/aperture/run/${memoRunId}/strategies`) : undefined} />
+            <DecisionFocusCard candidate={{ ...(candidate as any), memoStatus: null }} positions={paperPositions} onReviewEvidence={memoRunId ? () => navigate(`/aperture/run/${memoRunId}?view=evidence`) : undefined} onComparePostures={memoRunId ? () => navigate(`/aperture/run/${memoRunId}/strategies`) : undefined} onViewPaperAccount={() => navigate("/aperture/accounts")} />
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium" style={{ color: "var(--sh-fg-muted)" }}>Research confidence:</span>
               <Badge variant="outline" style={{ color: confidenceColor }}>{memo.researchConfidence}</Badge>
