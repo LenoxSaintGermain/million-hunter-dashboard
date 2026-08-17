@@ -18,4 +18,4 @@ Browser verification ran against an isolated owner-context preview on **2026-08-
 
 ## Market-State Follow-Up
 
-The six approved Alpaca Paper orders were accepted. After market open, NVDA and CEG reported partial fills; MSFT, AVGO, VRT, and ETN remained queued. A read-only account sync mirrored four current broker positions and synced cash of **$90,790.62**. The research canvas is intentionally described as **partially filled** until the broker resolves the remaining orders.
+All six approved Alpaca Paper orders reached `filled` status. A final read-only account sync mirrored seven broker positions—the six-position research canvas plus the prior SPY residual—and synced cash of **$59,998.07**. No further order was placed.

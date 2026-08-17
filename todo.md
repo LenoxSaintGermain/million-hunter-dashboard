@@ -1198,5 +1198,5 @@
 - [x] Make the three thesis scopes unmistakable in the Thesis Workspace and standardize their templates and selection cards
 - [x] Elevate Capital Aperture to a first-class editorial navigation module with Wingate-level priority while reducing page and click transitions
 - [x] Verify market-open partial fills and synchronize current Alpaca Paper positions into Capital Aperture without submitting any additional order
-- [ ] Verify the accepted six-order Alpaca Paper research canvas after market-open fills and account sync; no autonomous follow-on order
+- [x] Verify the accepted six-order Alpaca Paper research canvas after market-open fills and account sync; no autonomous follow-on order
 - [x] Add regression tests and perform browser UAT for the complete new-user research journey
