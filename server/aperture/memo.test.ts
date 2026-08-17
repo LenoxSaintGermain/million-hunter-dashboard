@@ -87,11 +87,13 @@ describe("generateMemo", () => {
     expect(r.status).toBe("ok");
   });
 
-  it("stays rejected when the retry invents something else", async () => {
+  it("falls back to a validated ledger-only memo when the retry repeats an invented figure", async () => {
     const generate = async () => JSON.stringify({ ...JSON.parse(goodMemo), catalyst: "Guided to $2.9B." });
     const r = await generateMemo("NVDA", FACTS, GRAPH, [], { generate });
-    expect(r.status).toBe("rejected");
-    expect(r.memo).toBeNull();
+    expect(r.status).toBe("ok");
+    expect(r.memo?.generationBasis).toBe("fact_ledger_fallback");
+    expect(r.memo?.catalyst).toMatch(/No validated catalyst conclusion/i);
+    expect(r.validation?.ok).toBe(true);
   });
 
   it("skips rather than writing a memo of hedges when nothing is sourced", async () => {

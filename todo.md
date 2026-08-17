@@ -1277,3 +1277,9 @@
 - [x] Remove self-referential memo actions and make the memo page’s sole primary action the next decisive evidence step
 - [x] Preserve the evidence-queue view when a memo sends the operator to decisive checks instead of returning to the decision-brief default
 - [x] Distinguish counted decision-critical evidence checks from the separate invalidation guardrail so the human checklist is never numerically contradictory
+
+## Capital Aperture — CSCO Memo Recovery (Aug 17 2026)
+- [x] Diagnose the CSCO memo validator rejection and identify whether the saved fact ledger supports a transparent fallback memo
+- [x] Automatically recover formatting-only memo failures with a labeled ledger-backed record while preserving strict rejection of unsupported financial claims
+- [x] Replace raw validator fragments with plain-language state, fact-ledger continuity, and one next action
+- [x] Add regression coverage and browser UAT for rejected-memo recovery

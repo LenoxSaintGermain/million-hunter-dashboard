@@ -310,6 +310,16 @@ export async function generateMemo(
   }
 
   if (!validation.ok) {
+    if (opts.retryOnReject !== false) {
+      return factLedgerFallbackResult(
+        symbol,
+        facts,
+        graph,
+        holdings,
+        citations,
+        "The model repeated figures that did not trace to the fact ledger. Those claims were discarded; showing a validated ledger-only research record instead.",
+      );
+    }
     return { memo: null, status: "rejected", rejectReason: validation.reason, validation, citations };
   }
 
