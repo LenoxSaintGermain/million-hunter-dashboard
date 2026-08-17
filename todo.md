@@ -1229,3 +1229,10 @@
 - [x] Verify the memo and posture comparison in browser and record the research-only outcome
 - [x] Diagnose and repair LLY memo-format recovery after its automatic fact-only retry rejects a structurally valid response
 - [x] Provide a transparent deterministic fact-ledger memo fallback when a model response cannot be structurally recovered
+
+## Capital Aperture — Portfolio Gap Map Clarity (Aug 17 2026)
+- [x] Replace serialized thesis-tree paths with human-readable exposure themes and compact parent-child context
+- [x] Reframe the gap-map summary around what is covered, what is missing, and the single next research decision
+- [x] Add clear legend, progressive disclosure, and research actions without raw implementation vocabulary
+- [x] Add regression coverage and browser UAT for the redesigned gap-map experience
+- [x] Preserve readable gap-map output for completed legacy briefs whose exposure rows are stored only in the decision brief
