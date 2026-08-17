@@ -1212,3 +1212,12 @@
 - [x] Normalize valid JSON-bearing model response shapes and provide a bounded retry or safe recovery before raising an operator-visible error
 - [x] Add regression coverage for malformed wrappers and successful Capital / Trade projection
 - [x] Verify the repaired projection path from the Capital Brief UI
+
+## Capital Aperture — GLP-1 Paper Brief Walkthrough (Aug 17 2026)
+- [x] Confirm the GLP-1 Capital / Trade thesis and paper-account context for a no-order research brief
+- [x] Execute the GLP-1 Capital Brief and verify live in-page research status through terminal completion
+- [x] Verify the completed decision frame, evidence queue, and FRED macro ledger for the GLP-1 research set
+- [x] Record the paper-only walkthrough outcome and human decision framing
+- [x] Detect stale in-progress Capital Briefs after a server interruption and expose a safe retry path rather than an indefinite research state
+- [x] Bound Sonar research requests with a timeout so one upstream stall cannot leave a Capital Brief in research indefinitely
+- [x] Bound an initial Capital Brief to a decision-sized evidence set so a 45-security universe does not create an opaque multi-minute wait

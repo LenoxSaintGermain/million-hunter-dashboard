@@ -34,11 +34,14 @@ const RUN_STEPS = [
 
 const ACTIVE_RUN_STATUSES = new Set(RUN_STEPS.map((step) => step.key));
 
-function RunProgress({ run, candidateCount, onRefresh, onStartFresh }: {
+function RunProgress({ run, candidateCount, stale, retrying, onRefresh, onStartFresh, onRetry }: {
   run: any;
   candidateCount: number;
+  stale: boolean;
+  retrying: boolean;
   onRefresh: () => void;
   onStartFresh: () => void;
+  onRetry: () => void;
 }) {
   const stepIndex = RUN_STEPS.findIndex((step) => step.key === run.status);
   const step = stepIndex >= 0 ? RUN_STEPS[stepIndex] : null;
@@ -56,10 +59,12 @@ function RunProgress({ run, candidateCount, onRefresh, onStartFresh }: {
           {failed ? <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-red)" }} /> : active ? <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin" style={{ color: "var(--sh-signal)" }} /> : <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-signal)" }} />}
           <div>
             <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>
-              {failed ? "Research paused before a decision brief was ready" : completedWithoutCandidates ? "Research finished with no evidence candidates" : `${step?.label} · your brief is updating here`}
+              {stale ? "Research needs a restart to continue" : failed ? "Research paused before a decision brief was ready" : completedWithoutCandidates ? "Research finished with no evidence candidates" : `${step?.label} · your brief is updating here`}
             </p>
             <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>
-              {failed
+              {stale
+                ? "This brief stopped receiving updates after a background interruption. Its inputs are preserved. Restarting resumes the same paper-research question in a traceable new brief; it never creates an order."
+                : failed
                 ? (run.error || "The research process stopped unexpectedly before it returned enough evidence.")
                 : completedWithoutCandidates
                   ? "No securities met the current evidence and guardrail threshold. This is a research result, not a silent failure."
@@ -70,7 +75,7 @@ function RunProgress({ run, candidateCount, onRefresh, onStartFresh }: {
         <div className="flex shrink-0 items-center gap-2">
           {active && elapsedSeconds != null && <span className="text-[11px] tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>{elapsedSeconds}s elapsed</span>}
           <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="mr-1.5 h-3.5 w-3.5" />Refresh status</Button>
-          {(failed || completedWithoutCandidates) && <Button size="sm" onClick={onStartFresh}>Start a new brief</Button>}
+          {stale ? <Button size="sm" disabled={retrying} onClick={onRetry}>{retrying ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}Restart this brief</Button> : (failed || completedWithoutCandidates) && <Button size="sm" onClick={onStartFresh}>Start a new brief</Button>}
         </div>
       </div>
       {active && (
@@ -111,6 +116,13 @@ export default function CandidateBoard() {
     onSuccess: (result) => { toast.success(`Macro ledger refreshed — ${result.factsWritten} FRED observations recorded`); refetch(); },
     onError: (error) => toast.error(`Could not refresh macro evidence: ${error.message}`),
   });
+  const retryRun = trpc.aperture.run.retry.useMutation({
+    onSuccess: ({ runId: restartedRunId }) => {
+      toast.success("Research restarted in a new traceable brief — progress will update here.");
+      navigate(`/aperture/run/${restartedRunId}`);
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const genMemo = trpc.aperture.generateMemo.useMutation({
     onSuccess: (_result, variables) => { toast.success("Memo generated — opening the fact-traced record"); refetch(); setGeneratingMemo(null); navigate(`/aperture/memos/${variables.candidateId}`); },
     onError: (error) => { toast.error(error.message); setGeneratingMemo(null); },
@@ -140,7 +152,7 @@ export default function CandidateBoard() {
   );
   if (!data) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Run not found.</div></DashboardLayout>;
 
-  const { run, candidates, macroFacts, brief } = data;
+  const { run, stale, candidates, macroFacts, brief } = data;
   const roles: Array<Role | "all"> = ["all", "core", "complementary", "remainder", "alternative_expression"];
   const filtered = activeRole === "all" ? candidates : candidates.filter((candidate) => candidate.role === activeRole);
 
@@ -171,8 +183,11 @@ export default function CandidateBoard() {
         <RunProgress
           run={run}
           candidateCount={candidates.length}
+          stale={stale}
+          retrying={retryRun.isPending}
           onRefresh={() => refetch()}
           onStartFresh={() => navigate("/aperture")}
+          onRetry={() => retryRun.mutate({ id: runId })}
         />
 
         {view === "brief" ? (

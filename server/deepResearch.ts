@@ -14,6 +14,15 @@ import { researchResults } from "../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
 
 const SONAR_API_URL = "https://api.perplexity.ai/v1/sonar";
+export const SONAR_TIMEOUT_MS = 60_000;
+
+export function sonarRequestError(error: unknown): Error {
+  const name = error instanceof Error ? error.name : "";
+  if (name === "TimeoutError" || name === "AbortError") {
+    return new Error(`Sonar research timed out after ${Math.round(SONAR_TIMEOUT_MS / 1000)} seconds.`);
+  }
+  return error instanceof Error ? error : new Error(String(error));
+}
 
 function getSonarKey(): string {
   const key = process.env.SONAR_API_KEY;
@@ -84,24 +93,30 @@ export async function runResearch(opts: ResearchOptions) {
   }
 
   const key = getSonarKey();
-  const response = await fetch(SONAR_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a rigorous business due diligence analyst. Return only verified, sourced information. Clearly distinguish between confirmed facts and publicly available information. Never fabricate data. Always cite sources.",
-        },
-        { role: "user", content: query },
-      ],
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(SONAR_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a rigorous business due diligence analyst. Return only verified, sourced information. Clearly distinguish between confirmed facts and publicly available information. Never fabricate data. Always cite sources.",
+          },
+          { role: "user", content: query },
+        ],
+      }),
+      signal: AbortSignal.timeout(SONAR_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw sonarRequestError(error);
+  }
 
   if (!response.ok) {
     const text = await response.text();

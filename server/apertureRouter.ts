@@ -48,6 +48,7 @@ import { brokerOrders, monitoringChecks } from "../drizzle/schema";
 import { desc } from "drizzle-orm";
 import { buildCapitalDecisionBrief } from "./aperture/decisionBrief";
 import { ensureThesisReady } from "./aperture/thesisReadiness";
+import { buildBriefResearchPlan, isRunStale } from "./aperture/runRecovery";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -423,7 +424,71 @@ export const apertureRouter = router({
           coverage: coverageDetail,
           thesisNodePaths: thesisNodes.map((node) => node.path),
         });
-        return { run, candidates, strategies, coverage, coverageDetail, thesisNodes, macroFacts, brief };
+        return { run, stale: isRunStale(run), candidates, strategies, coverage, coverageDetail, thesisNodes, macroFacts, brief };
+      }),
+
+    /**
+     * Process restarts can interrupt the detached executor. Preserve the original
+     * record as an explicit interruption and restart the identical paper research
+     * inputs in a new, traceable run. No order is created or submitted.
+     */
+    retry: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [run] = await db!.select().from(apertureRuns)
+          .where(and(eq(apertureRuns.id, input.id), eq(apertureRuns.userId, ctx.user.id)))
+          .limit(1);
+        if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+        if (!isRunStale(run)) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This brief is still active or already finished; refresh status before restarting it." });
+        }
+
+        const thesis = await requireThesis(db, run.thesisId, ctx.user.id);
+        if (!thesis.graph) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This brief's thesis needs to be prepared before research can restart." });
+        }
+
+        const now = Date.now();
+        await db!.update(apertureRuns).set({
+          status: "failed",
+          error: "Research was interrupted before completion. Restarted as a new linked brief.",
+          completedAt: now,
+        }).where(eq(apertureRuns.id, run.id));
+
+        const [result] = await db!.insert(apertureRuns).values({
+          userId: ctx.user.id,
+          thesisId: run.thesisId,
+          accountId: run.accountId,
+          deployableCapitalCents: run.deployableCapitalCents,
+          intendedTrades: run.intendedTrades ?? [],
+          hurdleRateBps: run.hurdleRateBps,
+          holdingPeriod: run.holdingPeriod,
+          catalystDeadlineAt: run.catalystDeadlineAt,
+          liquidityFloorAdvUsd: run.liquidityFloorAdvUsd,
+          maxSingleNamePct: run.maxSingleNamePct,
+          invalidationRule: run.invalidationRule,
+          mandateVersion: run.mandateVersion,
+          status: "queued",
+          createdAt: now,
+        });
+        const retryRunId = (result as any).insertId as number;
+        const retryInput = {
+          thesisId: run.thesisId,
+          accountId: run.accountId ?? undefined,
+          deployableCapitalCents: run.deployableCapitalCents,
+          intendedTrades: (run.intendedTrades ?? []) as Array<{ symbol: string; dollarsCents: number; note?: string }> ,
+          hurdleRateBps: run.hurdleRateBps ?? undefined,
+          holdingPeriod: run.holdingPeriod ?? undefined,
+          liquidityFloorAdvUsd: run.liquidityFloorAdvUsd ?? undefined,
+          catalystDeadlineAt: run.catalystDeadlineAt ?? undefined,
+          maxSingleNamePct: run.maxSingleNamePct ?? undefined,
+          invalidationRule: run.invalidationRule ?? undefined,
+        };
+        executeRun(retryRunId, ctx.user.id, thesis, retryInput).catch((error) => {
+          console.error(`[aperture] retry run ${retryRunId} failed:`, error?.message ?? error);
+        });
+        return { runId: retryRunId };
       }),
 
     /**
@@ -799,18 +864,23 @@ async function executeRun(
     // ── 3. Universe discovery ──────────────────────────────────────────────
     const summary = thesisSummary(graph.beliefs ?? [], graph.seek ?? []);
     const universe = await discoverUniverse(nodeRows, summary, known);
+    const researchPlan = buildBriefResearchPlan(universe.discovered, input.holdingPeriod);
+    const researchDroppedNote = [
+      universe.droppedNote,
+      researchPlan.deferredCount > 0 ? `${researchPlan.deferredCount} symbols deferred to a follow-up brief` : null,
+    ].filter(Boolean).join(" · ") || null;
     await setStatus("researching", {
-      universeCount: universe.discovered.length,
-      droppedNote: universe.droppedNote,
+      universeCount: researchPlan.items.length,
+      droppedNote: researchDroppedNote,
     });
 
     // ── 4. Research swarm ──────────────────────────────────────────────────
-    const symbols = universe.discovered.map((d) => d.symbol);
+    const symbols = researchPlan.items.map((d) => d.symbol);
     // Macro facts are sourced once per run against the __MACRO__ ledger symbol.
     // They inform the operator's regime context, but are never silently blended
     // into a per-security score without an explicit thesis-level rule.
     await collectMacroFacts();
-    await runResearchSwarm(symbols, { concurrency: 4 });
+    await runResearchSwarm(symbols, { concurrency: 4, passes: researchPlan.passes ? [...researchPlan.passes] : undefined });
 
     // ── 5. Load facts and assemble ─────────────────────────────────────────
     await setStatus("scoring");
@@ -824,7 +894,7 @@ async function executeRun(
     await setStatus("constructing");
     const assembled = assembleRun({
       graph,
-      discovered: universe.discovered,
+      discovered: researchPlan.items,
       factsBySymbol,
       holdings,
       cashCents: holdingRows.reduce((s, p) => s + (p.marketValueCents ?? 0), 0),
