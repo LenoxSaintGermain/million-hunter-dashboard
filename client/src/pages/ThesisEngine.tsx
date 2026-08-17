@@ -78,14 +78,33 @@ const TEMPLATES = [
   },
 ];
 
+const CAPITAL_TEMPLATES = [
+  {
+    id: "capital_catalyst",
+    label: "Dated catalyst",
+    icon: "◉",
+    badge: "Paper research",
+    description: "A bounded event, what it must prove, and when the premise expires.",
+    text: "I am researching a paper-only catalyst thesis. State the dated catalyst, the causal mechanism, the evidence required before entry, the disconfirming evidence, the maximum position size, and the holding horizon. Prefer liquid securities. Do not infer missing facts or make a trade recommendation.",
+  },
+  {
+    id: "capital_portfolio_gap",
+    label: "Portfolio gap",
+    icon: "◇",
+    badge: "Paper research",
+    description: "Test whether a thesis fills, duplicates, or conflicts with current exposure.",
+    text: "I am researching a paper-only portfolio-gap thesis. Define the market belief, which existing exposure it may complement or duplicate, the evidence required, the invalidation condition, the maximum position size, and the holding horizon. Prefer liquid securities. Do not infer missing facts or make a trade recommendation.",
+  },
+] as const;
+
 type ThesisScope = "acquisition" | "property" | "capital";
 
 const CAPITAL_TRADE_STARTER = "I am testing a paper-trading thesis. Define the catalyst, the evidence required before entry, the invalidation condition, the maximum position size, and the time horizon. Prefer liquid securities with clear liquidity and risk controls. Do not infer missing facts.";
 
 const SCOPE_COPY: Record<ThesisScope, { label: string; detail: string }> = {
-  acquisition: { label: "Acquisition", detail: "Find and underwrite operating businesses." },
-  property: { label: "Property", detail: "Set building criteria and portfolio-fit dials." },
-  capital: { label: "Capital / Trade", detail: "Turn a market view into a paper-trading research plan." },
+  acquisition: { label: "Acquire a business", detail: "Search the operating-business market and add qualified deals to Command Center." },
+  property: { label: "Find a property", detail: "Set historic-building criteria and open the Wingate command center." },
+  capital: { label: "Research a market view", detail: "Build a paper-only Capital Aperture brief. No order is created." },
 };
 
 // ── Fade-in animation variant ─────────────────────────────────────────────────
@@ -125,6 +144,11 @@ export default function ThesisEngine() {
   const [compilationResult, setCompilationResult] = useState<any>(null);
   const [compilationId, setCompilationId] = useState<number | null>(null);
   const [isCompiling, setIsCompiling] = useState(false);
+  const templatesForScope = scope === "capital"
+    ? CAPITAL_TEMPLATES
+    : scope === "property"
+      ? TEMPLATES.filter((template) => template.id === "wingate")
+      : TEMPLATES.filter((template) => template.id !== "wingate");
 
   const { data: savedTheses, refetch: refetchList } = trpc.thesis.list.useQuery();
   const compileMutation = trpc.thesis.compile.useMutation({
@@ -193,6 +217,11 @@ export default function ThesisEngine() {
   });
   function handleApproveAndRun() {
     if (!compilationResult) return;
+    if (scope === "capital") {
+      if (compilationId != null) openInAperture(compilationId);
+      else navigate("/aperture");
+      return;
+    }
     const f = compilationResult.compiledFilters ?? {};
     // Real-estate / historic theses run against commercial_assets on the Wingate
     // command page (the A–G scorer) — NOT the SMB business scraper. Detect by the
@@ -215,11 +244,22 @@ export default function ThesisEngine() {
       description: `Geography: ${geoLabel} · Min cash flow: $${(minCashFlow / 1000).toFixed(0)}k · Max multiple: ${maxMultiple}x`,
       duration: 3000,
     });
-    triggerScan.mutate({ targetLocations, minCashFlow, maxMultiple });
+    triggerScan.mutate({ targetLocations, minCashFlow, maxMultiple, thesisId: compilationId ?? undefined });
   }
 
-  function handleTemplate(t: typeof TEMPLATES[0]) {
-    setScope(t.id === "wingate" ? "property" : "acquisition");
+  function launchSavedAcquisitionSearch(thesis: any) {
+    const filters = thesis.compiledFilters ?? {};
+    const targetLocations: string[] = filters.geographies ?? [];
+    const minCashFlow = filters.cashFlowMin ?? (filters.revenueMin ? Math.round(filters.revenueMin * 0.35) : 500000);
+    const maxMultiple = filters.multipleMax ?? 5;
+    toast.info("Launching acquisition search", {
+      description: "Your thesis is now linked to this discovery run. Progress and results will appear in Command Center.",
+    });
+    triggerScan.mutate({ targetLocations, minCashFlow, maxMultiple, thesisId: thesis.id });
+  }
+
+  function handleTemplate(t: { id: string; text: string }) {
+    setScope(t.id.startsWith("capital_") ? "capital" : t.id === "wingate" ? "property" : "acquisition");
     setActiveTemplate(t.id);
     setThesisText(t.text);
     setCompilationResult(null);
@@ -276,7 +316,7 @@ export default function ThesisEngine() {
           <motion.div variants={fadeIn} initial="hidden" animate="visible" transition={{ delay: 0.1 }}
             className="space-y-4">
 
-            <div className="rounded-lg border border-border bg-muted/10 p-2 grid grid-cols-1 sm:grid-cols-3 gap-1">
+            <div className="rounded-xl border border-border bg-muted/10 p-2 grid grid-cols-1 sm:grid-cols-3 gap-1" aria-label="Choose what this thesis should do">
               {(Object.keys(SCOPE_COPY) as ThesisScope[]).map((scopeId) => (
                 <button
                   key={scopeId}
@@ -298,10 +338,16 @@ export default function ThesisEngine() {
             </div>
 
             {/* Template Gallery */}
-            {scope !== "capital" && <div>
-              <p className="eyebrow text-muted-foreground mb-3">Start from a template</p>
+            <div>
+              <div className="mb-3 flex items-end justify-between gap-3">
+                <div>
+                  <p className="eyebrow text-muted-foreground">Step 1 · choose a starting point</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Each option opens a different destination. You can rewrite every word before creating the thesis.</p>
+                </div>
+                <Badge variant="outline" className="shrink-0 text-[10px]">{SCOPE_COPY[scope].label}</Badge>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {TEMPLATES.map((t) => (
+                {templatesForScope.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => handleTemplate(t)}
@@ -330,21 +376,21 @@ export default function ThesisEngine() {
                   </button>
                 ))}
               </div>
-            </div>}
+            </div>
 
             {scope === "capital" && (
               <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
-                <p className="eyebrow text-emerald-700">Capital / Trade thesis</p>
-                <p className="text-xs leading-relaxed text-muted-foreground">This creates your personal canonical thesis, then opens Capital Aperture to build a paper-only securities research projection. No live orders are created.</p>
+                <p className="eyebrow text-emerald-700">What happens next</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">Aperture saves this as one canonical thesis, prepares a paper-research projection, then opens a live decision brief. It never sends an order.</p>
                 <button onClick={() => { setThesisText(CAPITAL_TRADE_STARTER); setActiveTemplate(null); }} className="text-xs font-medium text-emerald-700 hover:underline">
-                  Start from the paper-trading research template
+                  Reset to the general paper-research starter
                 </button>
               </div>
             )}
 
             {/* Thesis Textarea */}
             <div className="space-y-2">
-              <p className="eyebrow text-muted-foreground">{scope === "capital" ? "Your capital / trade thesis" : "Or write your own thesis"}</p>
+              <p className="eyebrow text-muted-foreground">Step 2 · {scope === "capital" ? "describe the market view" : "describe the criteria"}</p>
               {scope === "capital" && (
                 <input value={capitalName} onChange={(e) => setCapitalName(e.target.value)} placeholder="Name this thesis, e.g. AI Infrastructure Catalysts" className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50" />
               )}
@@ -386,7 +432,7 @@ export default function ThesisEngine() {
               ) : (
                 <>
                   <Sparkles className="h-4 w-4 mr-2" />
-                  {scope === "capital" ? "Create Capital / Trade Thesis" : "Compile Thesis"}
+                  {scope === "capital" ? "Create paper research brief" : scope === "property" ? "Create property criteria" : "Create acquisition search"}
                 </>
               )}
             </Button>
@@ -421,6 +467,7 @@ export default function ThesisEngine() {
                           <button
                             className="text-sm text-foreground hover:text-primary truncate text-left flex-1"
                             onClick={() => {
+                              setScope(isHistoricThesisRow(t) ? "property" : t.templateUsed === "capital_trade" ? "capital" : "acquisition");
                               setThesisText(t.thesisText);
                               setCompilationResult({
                                 compiledFilters: t.compiledFilters,
@@ -437,24 +484,28 @@ export default function ThesisEngine() {
                             }}
                           >
                             {t.name ?? "Untitled Thesis"}
-                            {isHistoricThesisRow(t) && <span className="ml-1.5 text-[9px] text-amber-500 font-semibold">HISTORIC</span>}
-                            {t.templateUsed === "capital_trade" && <span className="ml-1.5 text-[9px] text-emerald-600 font-semibold">CAPITAL / TRADE</span>}
+                            {isHistoricThesisRow(t) && <span className="ml-1.5 text-[9px] text-amber-500 font-semibold">PROPERTY · WINGATE</span>}
+                            {t.templateUsed === "capital_trade" && <span className="ml-1.5 text-[9px] text-emerald-600 font-semibold">CAPITAL · PAPER RESEARCH</span>}
+                            {!isHistoricThesisRow(t) && t.templateUsed !== "capital_trade" && <span className="ml-1.5 text-[9px] text-sky-600 font-semibold">ACQUISITION · MARKET SEARCH</span>}
                             {t.access === "shared" && <span className="ml-1.5 text-[9px] text-sky-600 font-semibold">SHARED BY {t.ownerName ?? "OPERATOR"}</span>}
                           </button>
                         )}
                       </div>
                       {editingId !== t.id && (
-                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all ml-2 shrink-0">
+                        <div className="flex items-center gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all ml-2 shrink-0">
                           <button
-                            title="Run this thesis"
+                            title={isHistoricThesisRow(t) ? "Open property criteria in Wingate" : t.templateUsed === "capital_trade" ? "Open paper research in Capital Aperture" : "Launch acquisition search"}
                             onClick={() => isHistoricThesisRow(t)
                               ? navigate(`/wingate?thesis=${t.id}`)
-                              : (() => { setCompilationId(t.id); setCompilationResult({ compiledFilters: t.compiledFilters }); toast.info("Loaded — click Approve & Run"); })()}
-                            className="text-muted-foreground hover:text-amber-500"
+                              : t.templateUsed === "capital_trade"
+                                ? openInAperture(t.id)
+                                : launchSavedAcquisitionSearch(t)}
+                            className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[10px] font-medium text-muted-foreground hover:border-amber-500/40 hover:text-amber-600"
                           >
-                            <Play className="h-3.5 w-3.5" />
+                            <Play className="h-3 w-3" />
+                            {isHistoricThesisRow(t) ? "Wingate" : t.templateUsed === "capital_trade" ? "Research" : "Search"}
                           </button>
-                          {canUseAperture && (
+                          {canUseAperture && t.templateUsed !== "capital_trade" && (
                             <button
                               title="Use this saved thesis in Capital Aperture"
                               onClick={() => openInAperture(t.id)}
@@ -707,10 +758,10 @@ export default function ThesisEngine() {
                       {triggerScan.isPending ? (
                         <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Launching Scan…</>
                       ) : (
-                        <><TrendingUp className="h-4 w-4 mr-2" />Approve & Run Pipeline</>
+                        <><TrendingUp className="h-4 w-4 mr-2" />{scope === "property" ? "Open Wingate command" : scope === "capital" ? "Open paper research" : "Launch acquisition search"}</>
                       )}
                     </Button>
-                    {canUseAperture && compilationId != null && (
+                    {canUseAperture && compilationId != null && scope !== "capital" && (
                       <Button
                         variant="outline"
                         className="border-emerald-500/30 text-emerald-700 hover:text-emerald-800"

@@ -6,7 +6,8 @@ import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, ArrowLeft, ExternalLink, CheckCircle2, XCircle, SkipForward } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ExternalLink, CheckCircle2, XCircle, SkipForward, Loader2, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/DashboardLayout";
 
@@ -24,6 +25,14 @@ export default function MemoDrawer() {
     { enabled: isLibraryRoute && !!candidateId },
   );
   const isLoading = isLibraryRoute ? isLibraryLoading : isRunLoading;
+  const retryMemo = trpc.aperture.generateMemo.useMutation({
+    onSuccess: () => {
+      toast.success("Memo retry complete — the fact validator checked the result.");
+      if (isLibraryRoute) window.location.reload();
+      else window.location.reload();
+    },
+    onError: (error) => toast.error(`Memo retry could not start: ${error.message}`),
+  });
 
   if (isLoading) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Loading…</div></DashboardLayout>;
 
@@ -34,6 +43,7 @@ export default function MemoDrawer() {
 
   const memo = candidate.memo as any;
   const citations = (candidate.citations as string[]) ?? [];
+  const memoRunId = isLibraryRoute ? libraryData?.run.id : runId;
 
   const confidenceColor = memo?.researchConfidence === "high" ? "oklch(0.55 0.15 145)" :
     memo?.researchConfidence === "medium" ? "var(--sh-signal)" : "var(--sh-fg-muted)";
@@ -59,11 +69,18 @@ export default function MemoDrawer() {
         </div>
 
         {candidate.memoStatus === "rejected" && (
-          <div className="p-3 rounded-lg text-sm" style={{ background: "var(--sh-surface-2)", color: "var(--sh-red)" }}>
+          <div className="rounded-lg p-4 text-sm" style={{ background: "var(--sh-surface-2)", color: "var(--sh-red)" }}>
             <div className="flex items-center gap-2 mb-1 font-medium">
-              <XCircle className="h-4 w-4" /> Memo rejected by fact validator
+              <XCircle className="h-4 w-4" /> The memo was not published
             </div>
-            <p style={{ color: "var(--sh-fg-muted)" }}>{candidate.memoRejectReason}</p>
+            <p className="mt-1 leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>
+              The fact ledger is still intact. A response-formatting issue stopped the memo before it could be approved—not an investment conclusion.
+            </p>
+            <p className="mt-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{candidate.memoRejectReason}</p>
+            {memoRunId ? <Button className="mt-3" size="sm" variant="outline" disabled={retryMemo.isPending} onClick={() => retryMemo.mutate({ runId: memoRunId, candidateId })}>
+              {retryMemo.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+              Retry fact-only memo
+            </Button> : null}
           </div>
         )}
 

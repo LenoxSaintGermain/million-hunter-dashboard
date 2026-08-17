@@ -184,7 +184,25 @@ export async function generateMemo(
   try {
     parsed = looseJsonParse(raw);
   } catch {
-    return { memo: null, status: "rejected", rejectReason: "Memo generation did not return parseable JSON.", validation: null, citations };
+    if (opts.retryOnReject !== false) {
+      try {
+        const retryRaw = await generate(
+          `${prompt}\n\nYOUR PREVIOUS ATTEMPT WAS REJECTED BEFORE VALIDATION because it was not parseable JSON. ` +
+          `Return only one valid JSON object matching the requested fields. Do not add markdown, commentary, or code fences.`,
+        );
+        parsed = looseJsonParse(retryRaw);
+      } catch {
+        return {
+          memo: null,
+          status: "rejected",
+          rejectReason: "Memo formatting could not be validated after one automatic fact-only retry. Your research facts remain available; retry when you are ready.",
+          validation: null,
+          citations,
+        };
+      }
+    } else {
+      return { memo: null, status: "rejected", rejectReason: "Memo generation did not return parseable JSON.", validation: null, citations };
+    }
   }
 
   let validation = validateMemoNumbers(parsed, facts);

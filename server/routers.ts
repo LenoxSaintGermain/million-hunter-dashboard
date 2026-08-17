@@ -645,8 +645,9 @@ export const appRouter = router({
         minCashFlow: z.number().optional(),
         maxMultiple: z.number().optional(),
         targetLocations: z.array(z.string()).optional(),
+        thesisId: z.number().optional(),
       }).optional())
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const sources = input?.sources ?? ["bizbuysell","dealstream","flippa","quietlight","empireflippers"];
         const minCashFlow = input?.minCashFlow ?? 500000;
         const maxMultiple = input?.maxMultiple ?? 6;
@@ -662,18 +663,51 @@ export const appRouter = router({
           progressPct: 2,
         });
         const jobId = (insertResult as any)[0].insertId as number;
+        const thesisId = input?.thesisId;
+
+        if (thesisId) {
+          const db = await getDb();
+          const { thesisCompilations } = await import("../drizzle/schema");
+          const [thesis] = await db!.select().from(thesisCompilations)
+            .where(eq(thesisCompilations.id, thesisId))
+            .limit(1);
+          if (!thesis || thesis.userId !== ctx.user.id) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Saved thesis not found" });
+          }
+          await db!.update(thesisCompilations)
+            .set({ status: "running", scanJobId: jobId })
+            .where(eq(thesisCompilations.id, thesisId));
+        }
 
         // Run the full pipeline asynchronously — don't await, return immediately
-        runScanPipeline(jobId, sources, minCashFlow, maxMultiple, targetLocations).catch((err) => {
-          console.error("[Scan] Pipeline failed:", err);
-          updateScanJob(jobId, {
-            status: "failed",
-            errorMessage: err?.message ?? "Unknown error",
-            completedAt: new Date(),
-            currentPhase: "Failed",
-            progressPct: 0,
-          }).catch(() => {});
-        });
+        runScanPipeline(jobId, sources, minCashFlow, maxMultiple, targetLocations)
+          .then(async () => {
+            if (!thesisId) return;
+            const db = await getDb();
+            const { thesisCompilations } = await import("../drizzle/schema");
+            await db!.update(thesisCompilations)
+              .set({ status: "completed" })
+              .where(eq(thesisCompilations.id, thesisId));
+          })
+          .catch((err) => {
+            console.error("[Scan] Pipeline failed:", err);
+            updateScanJob(jobId, {
+              status: "failed",
+              errorMessage: err?.message ?? "Unknown error",
+              completedAt: new Date(),
+              currentPhase: "Failed",
+              progressPct: 0,
+            }).catch(() => {});
+            if (thesisId) {
+              getDb().then(async (db) => {
+                if (!db) return;
+                const { thesisCompilations } = await import("../drizzle/schema");
+                await db.update(thesisCompilations)
+                  .set({ status: "review" })
+                  .where(eq(thesisCompilations.id, thesisId));
+              }).catch(() => {});
+            }
+          });
 
         return { success: true, jobId, message: `Scanning ${sources.length} marketplace${sources.length > 1 ? "s" : ""}…` };
       }),

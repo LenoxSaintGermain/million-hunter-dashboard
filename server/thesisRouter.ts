@@ -341,6 +341,7 @@ export const thesisRouter = router({
       templateUsed: row.template_used,
       name: row.name,
       status: row.status,
+      scanJobId: row.scan_job_id ?? null,
       compiledFilters: parseCol(row.compiled_filters, {}),
       scoringWeights: parseCol(row.scoring_weights, []),
       evidenceRequirements: parseCol(row.evidence_requirements, []),

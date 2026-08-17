@@ -381,9 +381,11 @@ function HistoricPipeline() {
 export default function Home() {
   const [activeScanJobId, setActiveScanJobId] = useState<number | null>(null);
   const utils = trpc.useUtils();
+  const { isAuthenticated } = useAuth();
   const { data, isLoading } = trpc.dashboard.stats.useQuery();
   const { data: macroPosture } = trpc.dashboard.macroPosture.useQuery();
   const { data: topDealsData } = trpc.deals.list.useQuery({ limit: 10 });
+  const { data: savedTheses } = trpc.thesis.list.useQuery(undefined, { enabled: isAuthenticated });
   const deleteDeal = trpc.deals.delete.useMutation({
     onSuccess: () => { toast.success("Deal removed"); utils.deals.list.invalidate(); utils.dashboard.stats.invalidate(); },
     onError: (e) => toast.error(`Delete failed: ${e.message}`),
@@ -403,6 +405,11 @@ export default function Home() {
     }
     return Array.from(seen.values());
   })();
+  const linkedAcquisitionSearch = savedTheses?.find((thesis: any) =>
+    thesis.scanJobId && thesis.templateUsed !== "capital_trade" &&
+    !(thesis.templateUsed === "wingate" || thesis.compiledFilters?.yearBuiltMax != null),
+  );
+  const visibleScanJobId = activeScanJobId ?? linkedAcquisitionSearch?.scanJobId ?? null;
 
   return (
     <EditorialTopNav>
@@ -473,9 +480,18 @@ export default function Home() {
 
         <HistoricPipeline />
 
-        {activeScanJobId !== null && (
+        {visibleScanJobId !== null && (
           <div className="mb-8">
-            <ScanProgress jobId={activeScanJobId} onComplete={() => {
+            {linkedAcquisitionSearch && (
+              <div className="mb-3 flex flex-col gap-1 border-l-2 border-amber pl-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">Thesis-linked acquisition search</p>
+                  <p className="font-card-title text-[16px] text-ink">{linkedAcquisitionSearch.name ?? "Untitled acquisition thesis"}</p>
+                </div>
+                <Link href="/thesis"><span className="font-eyebrow text-eyebrow text-amber hover:underline">Open thesis workspace →</span></Link>
+              </div>
+            )}
+            <ScanProgress jobId={visibleScanJobId} onComplete={() => {
               setActiveScanJobId(null);
               utils.deals.list.invalidate();
               utils.dashboard.stats.invalidate();

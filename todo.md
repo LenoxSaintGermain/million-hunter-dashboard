@@ -1189,3 +1189,13 @@
 - [x] Reframe setup around the operator’s single goal: build a paper research brief, not configure an internal thesis object
 - [x] Replace dense mandatory controls with progressive, plain-language defaults and an explicit advanced-settings escape hatch
 - [x] Add tests and browser verification for an end-to-end first brief without prior thesis compilation
+
+## Capital Aperture — Observable Happy Path & Thesis Clarity (Aug 16 2026)
+- [x] Audit why the Septic Route thesis does not surface a clearly explained outcome in Dashboard or Asset Scout and connect the right discovery handoff
+- [x] Add contextual tooltips and plain-language next-step guidance across Capital Aperture, including memo rejection recovery
+- [x] Show live research-brief progress, partial evidence, completion or failure state, and next action directly on the run detail page
+- [x] Keep the initial run surface informed with an in-place loading state and link it to live brief status rather than relying on Recent Capital Briefs
+- [x] Make the three thesis scopes unmistakable in the Thesis Workspace and standardize their templates and selection cards
+- [x] Elevate Capital Aperture to a first-class editorial navigation module with Wingate-level priority while reducing page and click transitions
+- [ ] Verify the accepted six-order Alpaca Paper research canvas after market-open fills and account sync; no autonomous follow-on order
+- [x] Add regression tests and perform browser UAT for the complete new-user research journey

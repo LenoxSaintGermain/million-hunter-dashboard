@@ -114,6 +114,20 @@ describe("generateMemo", () => {
     expect(r.status).toBe("rejected");
     expect(r.rejectReason).toMatch(/parseable JSON/);
   });
+
+  it("retries malformed output once and accepts a valid fact-only JSON rewrite", async () => {
+    let call = 0;
+    const r = await generateMemo("NVDA", FACTS, GRAPH, [], {
+      generate: async (prompt) => {
+        call++;
+        if (call === 1) return "I cannot provide JSON today.";
+        expect(prompt).toMatch(/not parseable JSON/);
+        return goodMemo;
+      },
+    });
+    expect(call).toBe(2);
+    expect(r.status).toBe("ok");
+  });
 });
 
 describe("coerceMemo", () => {

@@ -360,6 +360,9 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
   const hasMoreActive = MORE_NAV.some((n) => isActive(n.href));
   const hasAnalyzeActive = analyzeNav.some((n) => isActive(n.href));
   const hasActActive = ACT_NAV.some((n) => isActive(n.href));
+  const primaryNav = isAdmin
+    ? [...PRIMARY_NAV, { label: "Capital", href: "/aperture", icon: Landmark }]
+    : PRIMARY_NAV;
 
   return (
     <div className="min-h-screen bg-[var(--bone)]">
@@ -402,7 +405,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
 
           {/* Primary Nav — desktop (Search → Review → Analyze → Act) */}
           <nav className="hidden md:flex items-center gap-6">
-            {PRIMARY_NAV.map((item) => (
+            {primaryNav.map((item) => (
               <NavLink
                 key={item.href}
                 href={item.href}
@@ -680,7 +683,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
 
                   {/* Mobile nav items */}
                   <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-                    {[...PRIMARY_NAV, ...MORE_NAV].map((item) => {
+                    {[...primaryNav, ...MORE_NAV].map((item) => {
                       const Icon = item.icon;
                       const active = isActive(item.href);
                       return (

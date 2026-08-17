@@ -5,7 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, Loader2, SearchCheck, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, CircleAlert, FileText, Loader2, RefreshCw, SearchCheck, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { CapitalBrief } from "@/components/aperture/CapitalBrief";
@@ -23,6 +23,75 @@ const ROLE_DESCRIPTIONS: Record<Role, string> = {
 
 function percent(value: number | null | undefined) { return `${Math.round((value ?? 0) * 100)}%`; }
 
+const RUN_STEPS = [
+  { key: "queued", label: "Queued", detail: "Your paper research brief is waiting to start.", pct: 5 },
+  { key: "compiling", label: "Framing your thesis", detail: "Preparing the belief and guardrails for evidence research.", pct: 15 },
+  { key: "discovering", label: "Mapping the evidence universe", detail: "Finding the thesis paths and securities worth researching.", pct: 30 },
+  { key: "researching", label: "Gathering fact-traced evidence", detail: "Collecting company, price, and macro facts. Candidates appear as they clear the evidence threshold.", pct: 58 },
+  { key: "scoring", label: "Testing thesis fit", detail: "Scoring evidence against your thesis and portfolio context.", pct: 78 },
+  { key: "constructing", label: "Preparing your decision brief", detail: "Building the research queue and paper-research postures.", pct: 92 },
+] as const;
+
+const ACTIVE_RUN_STATUSES = new Set(RUN_STEPS.map((step) => step.key));
+
+function RunProgress({ run, candidateCount, onRefresh, onStartFresh }: {
+  run: any;
+  candidateCount: number;
+  onRefresh: () => void;
+  onStartFresh: () => void;
+}) {
+  const stepIndex = RUN_STEPS.findIndex((step) => step.key === run.status);
+  const step = stepIndex >= 0 ? RUN_STEPS[stepIndex] : null;
+  const active = Boolean(step);
+  const failed = run.status === "failed";
+  const completedWithoutCandidates = run.status === "completed" && candidateCount === 0;
+  const elapsedSeconds = run.startedAt ? Math.max(0, Math.floor((Date.now() - Number(run.startedAt)) / 1000)) : null;
+
+  if (!active && !failed && !completedWithoutCandidates) return null;
+
+  return (
+    <section className="overflow-hidden rounded-xl border" style={{ borderColor: failed ? "color-mix(in srgb, var(--sh-red) 38%, var(--sh-border-1))" : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between" style={{ background: failed ? "color-mix(in srgb, var(--sh-red) 6%, var(--sh-surface))" : "var(--sh-surface-2)" }}>
+        <div className="flex min-w-0 items-start gap-3">
+          {failed ? <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-red)" }} /> : active ? <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin" style={{ color: "var(--sh-signal)" }} /> : <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-signal)" }} />}
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>
+              {failed ? "Research paused before a decision brief was ready" : completedWithoutCandidates ? "Research finished with no evidence candidates" : `${step?.label} · your brief is updating here`}
+            </p>
+            <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>
+              {failed
+                ? (run.error || "The research process stopped unexpectedly before it returned enough evidence.")
+                : completedWithoutCandidates
+                  ? "No securities met the current evidence and guardrail threshold. This is a research result, not a silent failure."
+                  : `${step?.detail} ${run.universeCount ? `${run.universeCount} securities are in scope.` : ""}`}
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {active && elapsedSeconds != null && <span className="text-[11px] tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>{elapsedSeconds}s elapsed</span>}
+          <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="mr-1.5 h-3.5 w-3.5" />Refresh status</Button>
+          {(failed || completedWithoutCandidates) && <Button size="sm" onClick={onStartFresh}>Start a new brief</Button>}
+        </div>
+      </div>
+      {active && (
+        <>
+          <div className="h-1" style={{ background: "var(--sh-border-1)" }}><div className="h-full transition-all duration-700" style={{ width: `${step?.pct ?? 5}%`, background: "var(--sh-signal)" }} /></div>
+          <div className="grid grid-cols-3 gap-2 px-4 py-3 text-[11px] sm:grid-cols-6">
+            {RUN_STEPS.map((item, index) => {
+              const past = index < stepIndex;
+              const current = index === stepIndex;
+              return <div key={item.key} className="flex items-center gap-1.5" style={{ color: current ? "var(--sh-text-primary)" : past ? "var(--sh-signal)" : "var(--sh-fg-muted)" }}>
+                {past ? <CheckCircle2 className="h-3.5 w-3.5" /> : current ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span className="h-2 w-2 rounded-full" style={{ background: "var(--sh-border-1)" }} />}
+                <span>{item.label}</span>
+              </div>;
+            })}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function CandidateBoard() {
   const [, params] = useRoute("/aperture/run/:id");
   const [, navigate] = useLocation();
@@ -30,7 +99,14 @@ export default function CandidateBoard() {
   const [view, setView] = useState<"brief" | "evidence" | "ledger">("brief");
   const [activeRole, setActiveRole] = useState<Role | "all">("all");
   const [generatingMemo, setGeneratingMemo] = useState<number | null>(null);
-  const { data, isLoading, refetch } = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
+  const { data, isLoading, refetch } = trpc.aperture.run.get.useQuery(
+    { id: runId },
+    {
+      enabled: !!runId,
+      refetchInterval: (query) => ACTIVE_RUN_STATUSES.has((query.state.data as any)?.run?.status) ? 1_500 : false,
+      refetchIntervalInBackground: true,
+    },
+  );
   const refreshMacro = trpc.aperture.macro.refresh.useMutation({
     onSuccess: (result) => { toast.success(`Macro ledger refreshed — ${result.factsWritten} FRED observations recorded`); refetch(); },
     onError: (error) => toast.error(`Could not refresh macro evidence: ${error.message}`),
@@ -40,7 +116,28 @@ export default function CandidateBoard() {
     onError: (error) => { toast.error(error.message); setGeneratingMemo(null); },
   });
 
-  if (isLoading) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Assembling your research brief…</div></DashboardLayout>;
+  if (isLoading) return (
+    <DashboardLayout>
+      <div className="mx-auto max-w-6xl space-y-5">
+        <div className="flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-medium" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}>
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} /> Internal research tool — not investment advice. Paper-only decisions require human approval.
+        </div>
+        <section className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+          <div className="flex items-start gap-3 px-5 py-5" style={{ background: "var(--sh-surface-2)" }}>
+            <Loader2 className="mt-0.5 h-5 w-5 animate-spin" style={{ color: "var(--sh-signal)" }} />
+            <div>
+              <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Opening your paper research brief</p>
+              <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>This page stays with the brief. You will see its phase, evidence count, and any recovery action here—not in a separate status page.</p>
+            </div>
+          </div>
+          <div className="h-1" style={{ background: "var(--sh-border-1)" }}><div className="h-full w-[12%] animate-pulse" style={{ background: "var(--sh-signal)" }} /></div>
+          <div className="grid grid-cols-3 gap-3 p-5 sm:grid-cols-6">
+            {RUN_STEPS.map((step, index) => <div key={step.key} className="space-y-2"><div className={`h-2 rounded ${index === 0 ? "animate-pulse" : ""}`} style={{ background: index === 0 ? "var(--sh-signal)" : "var(--sh-surface-2)" }} /><p className="text-[10px]" style={{ color: "var(--sh-fg-muted)" }}>{step.label}</p></div>)}
+          </div>
+        </section>
+      </div>
+    </DashboardLayout>
+  );
   if (!data) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Run not found.</div></DashboardLayout>;
 
   const { run, candidates, macroFacts, brief } = data;
@@ -70,6 +167,13 @@ export default function CandidateBoard() {
             <button onClick={() => setView("ledger")} className="rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "ledger" ? "var(--sh-surface)" : "transparent", color: view === "ledger" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Research ledger</button>
           </div>
         </header>
+
+        <RunProgress
+          run={run}
+          candidateCount={candidates.length}
+          onRefresh={() => refetch()}
+          onStartFresh={() => navigate("/aperture")}
+        />
 
         {view === "brief" ? (
           <CapitalBrief

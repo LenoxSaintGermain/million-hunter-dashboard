@@ -4,7 +4,7 @@
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
  * Modeled figures are labeled as such throughout.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -139,6 +139,14 @@ export default function ApertureHome() {
   const { data: runs, refetch: refetchRuns } = trpc.aperture.run.list.useQuery();
   const { data: providers } = trpc.aperture.providers.useQuery();
 
+  useEffect(() => {
+    if (selectedAccountId || !accounts?.length) return;
+    const preferred = accounts.find((account) => account.brokerId === "alpaca_paper" && account.isPaper)
+      ?? accounts.find((account) => account.isPaper)
+      ?? accounts[0];
+    if (preferred) setSelectedAccountId(preferred.id);
+  }, [accounts, selectedAccountId]);
+
   const startRun = trpc.aperture.run.start.useMutation({
     onSuccess: ({ runId }) => {
       toast.success("Run started — polling for results");
@@ -199,6 +207,7 @@ export default function ApertureHome() {
   const liveProviders = providers?.filter((p) => p.available) ?? [];
   const deadProviders = providers?.filter((p) => !p.available) ?? [];
   const selectedThesis = theses?.find((thesis) => thesis.id === selectedThesisId);
+  const selectedAccount = accounts?.find((account) => account.id === selectedAccountId);
   const selectedHorizon = selectedThesis?.graph?.horizons?.[0] ?? null;
   const unprojectedCanonicalTheses = (canonicalTheses ?? []).filter(
     (canonical) => !(theses ?? []).some((projection) => projection.sourceCompilationId === canonical.id),
@@ -242,6 +251,23 @@ export default function ApertureHome() {
             Choose what you want to investigate. Aperture prepares the research map, checks your paper safeguards, and shows the next decision—without sending an order.
           </p>
         </header>
+
+        <Card className="overflow-hidden border-amber-500/25 bg-amber-500/[0.035]">
+          <CardContent className="grid gap-4 p-4 sm:grid-cols-[1.1fr_1fr] sm:items-center">
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-amber-700">New operator · the happy path</p>
+              <p className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Ask one question. Watch the evidence arrive. Decide with a human in the loop.</p>
+              <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Use this workspace to test a dated catalyst, identify a portfolio gap, or challenge overlap in a paper portfolio. It does not propose or submit a live trade.</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center text-xs">
+              {[
+                ["1", "Choose", "a market belief"],
+                ["2", "Build", "a live research brief"],
+                ["3", "Review", "evidence before any paper order"],
+              ].map(([step, label, detail]) => <div key={step} className="rounded-lg border border-amber-500/20 bg-background/70 p-2.5"><p className="font-mono text-amber-700">{step}</p><p className="mt-1 font-medium" style={{ color: "var(--sh-text-primary)" }}>{label}</p><p className="mt-0.5 text-[10px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{detail}</p></div>)}
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Run Setup */}
@@ -308,14 +334,14 @@ export default function ApertureHome() {
                 <details className="rounded-lg border px-3 py-2" style={{ borderColor: "var(--sh-border-1)" }}>
                   <summary className="cursor-pointer text-xs font-medium" style={{ color: "var(--sh-text-secondary)" }}>Optional: compare this research with my paper portfolio</summary>
                   <div className="mt-3 space-y-1.5">
-                    <Label className="text-xs font-medium">Paper portfolio</Label>
+                    <Label className="text-xs font-medium">Paper portfolio context</Label>
                   <div className="flex gap-2">
                     <Select
                       value={selectedAccountId?.toString() ?? "none"}
                       onValueChange={(v) => setSelectedAccountId(v === "none" ? null : Number(v))}
                     >
                       <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="No account (run without holdings)" />
+                        <SelectValue placeholder="Choose a paper account" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">No account</SelectItem>
@@ -330,6 +356,7 @@ export default function ApertureHome() {
                       <Plus className="h-3.5 w-3.5 mr-1" /> Manage
                     </Button>
                   </div>
+                  {selectedAccount && <p className="text-[11px] leading-4 text-muted-foreground">Using <span className="font-medium text-foreground">{selectedAccount.label}</span> to identify overlap and concentration. This does not create or submit an order.</p>}
                   </div>
                 </details>
 
