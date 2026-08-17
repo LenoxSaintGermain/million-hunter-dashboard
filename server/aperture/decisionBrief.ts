@@ -5,6 +5,7 @@
  * It turns the run's existing evidence into a plain-language decision frame:
  * thesis horizon → portfolio gap → evidence state → next human decision.
  */
+import { buildProgressiveEvidenceGate } from "@shared/evidenceGate";
 
 export type DecisionCandidate = {
   id: number;
@@ -52,6 +53,10 @@ export type CapitalDecisionBrief = {
     memoReadyCount: number;
     verificationCount: number;
     lowConfidenceCount: number;
+    decisionCriticalCheckCount: number;
+    researchFollowUpCheckCount: number;
+    researchReady: boolean;
+    paperOrderEligible: boolean;
   };
   nextDecision: {
     stage: "set_horizon" | "validate_evidence" | "compare_postures" | "review_memo" | "monitor";
@@ -110,6 +115,7 @@ export function buildCapitalDecisionBrief(input: {
     ?? input.strategies.find((strategy) => strategy.kind === "dry_powder")
     ?? input.strategies[0]
     ?? null;
+  const evidenceGate = buildProgressiveEvidenceGate(priorityCandidate, input.candidates);
 
   let nextDecision: CapitalDecisionBrief["nextDecision"];
   if (!horizonLabel) {
@@ -119,11 +125,11 @@ export function buildCapitalDecisionBrief(input: {
       detail: "A horizon tells the research process whether to prioritise nearer catalysts, multi-quarter compounding, or a reserve-first posture.",
       primaryCandidateId: null,
     };
-  } else if (verificationCount > 0 && priorityCandidate) {
+  } else if (priorityCandidate && evidenceGate.decisionCriticalCheckCount > 0) {
     nextDecision = {
       stage: "validate_evidence",
-      title: `Validate the evidence behind ${priorityCandidate.symbol} before making a paper-allocation decision`,
-      detail: `${verificationCount} open evidence checks remain across this research set. Candidate symbols are research inputs, not instructions to trade.`,
+      title: evidenceGate.headline,
+      detail: `${evidenceGate.researchFollowUpCheckCount} supporting check${evidenceGate.researchFollowUpCheckCount === 1 ? "" : "s"} can continue in parallel; they do not block memo review, posture comparison, or research continuation. A paper order remains off-limits until the decision-critical checks and human approval are complete.`,
       primaryCandidateId: priorityCandidate.id,
     };
   } else if (memoReadyCount > 0 && priorityCandidate) {
@@ -175,6 +181,10 @@ export function buildCapitalDecisionBrief(input: {
       memoReadyCount,
       verificationCount,
       lowConfidenceCount,
+      decisionCriticalCheckCount: evidenceGate.decisionCriticalCheckCount,
+      researchFollowUpCheckCount: evidenceGate.researchFollowUpCheckCount,
+      researchReady: evidenceGate.researchReady,
+      paperOrderEligible: evidenceGate.paperOrderEligible,
     },
     nextDecision,
     recommendedResearchPosture: riskBalanced ? {

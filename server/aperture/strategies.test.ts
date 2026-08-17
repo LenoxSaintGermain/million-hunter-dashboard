@@ -123,14 +123,14 @@ describe("buildStrategies", () => {
     const funded = s.allocations.map((a) => a.symbol);
     expect(funded).not.toContain("CCJ"); // expectedReturnBps === null
     expect(funded).not.toContain("XLU"); // 400bps, below the hurdle
-    expect(funded).toEqual(expect.arrayContaining(["NVDA", "VRT"]));
+    expect(funded).toEqual(["NVDA"]); // one strongest evidenced research lead
     expect(s.rationale).toMatch(/a gap is not a pass/);
   });
 
   it("retains cash when a high hurdle disqualifies nearly everything", () => {
     const s = buildStrategies({ ...BASE, hurdleRateBps: 1300 }).find((x) => x.kind === "dry_powder")!;
     expect(s.allocations.map((a) => a.symbol)).toEqual(["NVDA"]);
-    expect(s.cashRetainedCents).toBe(0); // all deployable went to the one qualifier
+    expect(s.cashRetainedCents).toBeGreaterThan(0); // dry powder intentionally preserves a reserve
   });
 
   it("omits the human baseline when there were no intended trades", () => {

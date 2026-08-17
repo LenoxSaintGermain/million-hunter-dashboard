@@ -390,10 +390,12 @@ export const apertureRouter = router({
   run: router({
     list: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
-      return db!.select().from(apertureRuns)
+      const rows = await db!.select({ run: apertureRuns, thesisName: capitalTheses.name }).from(apertureRuns)
+        .leftJoin(capitalTheses, eq(apertureRuns.thesisId, capitalTheses.id))
         .where(eq(apertureRuns.userId, ctx.user.id))
         .orderBy(desc(apertureRuns.createdAt))
         .limit(20);
+      return rows.map(({ run, thesisName }) => ({ ...run, thesisName }));
     }),
 
     get: adminProcedure

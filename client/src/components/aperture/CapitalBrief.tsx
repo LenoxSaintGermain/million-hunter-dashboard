@@ -1,5 +1,6 @@
 import { ArrowRight, Compass, Eye, Layers3, ShieldAlert, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { friendlyExposureTheme } from "@shared/exposureThemes";
 
 export type CapitalBriefData = {
   horizon: { label: string; specified: boolean; guidance: string };
@@ -17,6 +18,10 @@ export type CapitalBriefData = {
     memoReadyCount: number;
     verificationCount: number;
     lowConfidenceCount: number;
+    decisionCriticalCheckCount: number;
+    researchFollowUpCheckCount: number;
+    researchReady: boolean;
+    paperOrderEligible: boolean;
   };
   nextDecision: {
     stage: "set_horizon" | "validate_evidence" | "compare_postures" | "review_memo" | "monitor";
@@ -45,6 +50,7 @@ export function CapitalBrief({
   onReviewGaps: () => void;
   onSetHorizon: () => void;
 }) {
+  const gapLabels = brief.portfolioContext.uncoveredNodes.map((path) => friendlyExposureTheme(path).theme);
   const primaryAction = brief.nextDecision.stage === "set_horizon"
     ? { label: "Set thesis horizon", action: onSetHorizon }
     : brief.nextDecision.stage === "compare_postures"
@@ -84,14 +90,14 @@ export function CapitalBrief({
           <BriefMetric label="Research horizon" value={brief.horizon.label} note={brief.horizon.guidance} icon={<Target className="h-4 w-4" />} />
           <BriefMetric
             label="Portfolio question"
-            value={brief.portfolioContext.uncoveredNodes.length ? `${brief.portfolioContext.uncoveredNodes.length} thesis gap${brief.portfolioContext.uncoveredNodes.length === 1 ? "" : "s"} to examine` : "Coverage mapped"}
-            note={brief.portfolioContext.uncoveredNodes.length ? brief.portfolioContext.uncoveredNodes.slice(0, 2).join(" · ") : `${brief.portfolioContext.coveredNodeCount} thesis node(s) already represented`}
+            value={brief.portfolioContext.uncoveredNodes.length ? `${brief.portfolioContext.uncoveredNodes.length} exposure theme${brief.portfolioContext.uncoveredNodes.length === 1 ? "" : "s"} to examine` : "Coverage mapped"}
+            note={brief.portfolioContext.uncoveredNodes.length ? gapLabels.slice(0, 2).join(" · ") : `${brief.portfolioContext.coveredNodeCount} thesis node(s) already represented`}
             icon={<Layers3 className="h-4 w-4" />}
           />
           <BriefMetric
             label="Evidence posture"
-            value={`${brief.evidence.verificationCount} open checks`}
-            note={`${brief.evidence.researchPriorityCount} research priorities · ${brief.evidence.memoReadyCount} fact-traced memo${brief.evidence.memoReadyCount === 1 ? "" : "s"} ready`}
+            value={brief.evidence.decisionCriticalCheckCount ? `${brief.evidence.decisionCriticalCheckCount} decision-critical check${brief.evidence.decisionCriticalCheckCount === 1 ? "" : "s"}` : brief.evidence.paperOrderEligible ? "Research gate cleared" : "Memo review remains"}
+            note={`${brief.evidence.researchFollowUpCheckCount} supporting check${brief.evidence.researchFollowUpCheckCount === 1 ? "" : "s"} can continue in parallel · ${brief.evidence.memoReadyCount} fact-traced memo${brief.evidence.memoReadyCount === 1 ? "" : "s"} ready`}
             icon={<ShieldAlert className="h-4 w-4" />}
           />
         </div>

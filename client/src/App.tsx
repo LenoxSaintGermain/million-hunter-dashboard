@@ -63,6 +63,7 @@ import MemoDrawer from "./pages/aperture/MemoDrawer";
 import ApertureExecute from "./pages/aperture/ApertureExecute";
 import ApertureAccounts from "./pages/aperture/ApertureAccounts";
 import ApertureMemoLibrary from "./pages/aperture/ApertureMemoLibrary";
+import ApertureRuns from "./pages/aperture/ApertureRuns";
 import { getLoginUrl } from "./const";
 import { getDefaultWorkspacePath } from "@shared/defaultWorkspace";
 
@@ -245,6 +246,7 @@ function Router() {
         <Route path="/aperture">{() => <ApertureRoute component={ApertureHome} />}</Route>
         <Route path="/aperture/thesis/new">{() => <ApertureRoute component={ThesisGraphEditor} />}</Route>
         <Route path="/aperture/thesis/:id">{() => <ApertureRoute component={ThesisGraphEditor} />}</Route>
+        <Route path="/aperture/runs">{() => <ApertureRoute component={ApertureRuns} />}</Route>
         <Route path="/aperture/run/:id">{() => <ApertureRoute component={CandidateBoard} />}</Route>
         <Route path="/aperture/run/:id/exposure">{() => <ApertureRoute component={ExposureMap} />}</Route>
         <Route path="/aperture/run/:id/strategies">{() => <ApertureRoute component={StrategyCompare} />}</Route>

@@ -1250,3 +1250,13 @@
 - [x] Complete each remaining bounded GLP-1 follow-up research batch with no broker action
 - [x] Verify the final completed batch retains its portfolio-aware machine POV and human decision gate
 - [x] Record the complete research-universe coverage outcome
+
+## Capital Aperture — Coherent Decision Journey (Aug 17 2026)
+- [x] Replace the raw Recent Capital Briefs stack with an operator-oriented run workspace that groups a research chain and exposes its current decision state
+- [x] Make the next step explicit across brief, evidence, memo, postures, and account context so operators do not loop between disconnected pages
+- [x] Replace the all-checks prerequisite with a progressive, severity-weighted evidence gate and clear distinction between research progression and paper-order eligibility
+- [x] Redesign research postures with materially different exposure, concentration, reserve, and evidence requirements against the current paper portfolio
+- [x] Add test coverage and browser UAT for the unified run workspace and progressive decision journey
+- [x] Fold superseded zero-candidate interruptions into the recovered research journey so the workspace does not recreate a raw failure stack
+- [x] Align every decision-surface CTA and helper sentence with progressive readiness so research comparison is never falsely presented as blocked by supporting checks
+- [x] Replace raw portfolio-gap paths in the Capital Brief summary with the same readable exposure themes used in the gap map

@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { BookOpen, FileText, Landmark, LayoutDashboard, Wallet } from "lucide-react";
+import { BookOpen, FileText, Landmark, LayoutDashboard, Route, Wallet } from "lucide-react";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { cn } from "@/lib/utils";
 
 const APERTURE_NAV = [
   { href: "/aperture", label: "Decision Center", icon: LayoutDashboard },
+  { href: "/aperture/runs", label: "Research Journeys", icon: Route },
   { href: "/aperture/thesis/new", label: "Theses", icon: BookOpen },
   { href: "/aperture/accounts", label: "Accounts", icon: Wallet },
   { href: "/aperture/memos", label: "Memo Library", icon: FileText },

@@ -47,7 +47,9 @@ export function buildDecisionFocus(candidate: DecisionCandidate, positions: Pape
       : `${candidate.symbol} is not held in the current paper context, so it would add a new research exposure rather than increase an existing position.`,
     returnOutlook: "The current evidence cannot establish whether this will improve portfolio returns. It can only show the conditions that would need to hold and the evidence still missing.",
     humanChecks,
-    nextAction: needsMoreEvidence ? "Clear the listed evidence checks before comparing a paper allocation." : "Compare the paper postures, then decide whether to create a human-approved paper order.",
+    nextAction: needsMoreEvidence
+      ? "Review these decision-critical checks now. Supporting research can continue in parallel, and you may compare research postures before any paper-order review."
+      : "Compare the research postures, then decide whether to begin a human-approved paper-order review.",
   };
 }
 

@@ -180,8 +180,9 @@ function build(
   rationale: string,
   picks: Candidate[],
   input: BuildInput,
+  postureRules: Partial<PortfolioRules> = {},
 ): Strategy {
-  const rules = input.rules ?? {};
+  const rules = { ...(input.rules ?? {}), ...postureRules };
   const { usableCents, reservedCents } = applyReserve(input.deployableCapitalCents, rules);
   const { allocations, excluded, unspentCents } = sizeByRank(picks, usableCents, input.holdings, rules);
   const sectorOf = new Map(input.candidates.map((c) => [c.symbol, c.sector ?? null]));
@@ -252,9 +253,10 @@ export function buildStrategies(input: BuildInput): Strategy[] {
     build(
       "concentrated",
       "Concentrated",
-      "The three highest-conviction expressions of the thesis and nothing else. Highest thesis exposure, highest single-name risk.",
-      (core.length ? core : ranked).slice(0, 3),
+      "Two research leads only. Highest conviction concentration, with a modest reserve held back for evidence surprises.",
+      (core.length ? core : ranked).slice(0, 2),
       input,
+      { reservePct: Math.max(input.rules?.reservePct ?? 0, 15) },
     ),
   );
 
@@ -262,9 +264,10 @@ export function buildStrategies(input: BuildInput): Strategy[] {
     build(
       "expanded",
       "Expanded aperture",
-      "The core plus complementary exposure you would not have surfaced alone — same thesis, more of its surface area.",
+      "Broadest thesis map. It puts more candidate pathways under comparison while retaining a larger reserve for unresolved evidence.",
       [...(core.length ? core : ranked).slice(0, 3), ...complementary.slice(0, 4)],
       input,
+      { reservePct: Math.max(input.rules?.reservePct ?? 0, 25) },
     ),
   );
 
@@ -282,9 +285,10 @@ export function buildStrategies(input: BuildInput): Strategy[] {
     build(
       "risk_balanced",
       "Risk-balanced",
-      "Core thesis preserved, but weighted to hold cluster concentration down — one name per correlated group before doubling up.",
-      diversified,
+      "One expression per sector proxy before doubling up. It trades maximum thesis purity for lower cluster concentration and a larger cash buffer.",
+      diversified.slice(0, 4),
       input,
+      { reservePct: Math.max(input.rules?.reservePct ?? 0, 35) },
     ),
   );
 
@@ -298,10 +302,11 @@ export function buildStrategies(input: BuildInput): Strategy[] {
     "dry_powder",
     "Dry powder",
     hurdle == null
-      ? "Deploy selectively and hold the rest. No hurdle rate was set, so this funds only the top names."
+      ? "Research only the single strongest expression and retain most capital while missing return evidence is resolved."
       : `Deploy only where a sourced expected return clears ${(hurdle / 100).toFixed(2)}%. Everything else stays in cash — including names with no return evidence, because a gap is not a pass.`,
-    clears,
+    clears.slice(0, 1),
     input,
+    { reservePct: Math.max(input.rules?.reservePct ?? 0, 65) },
   );
   out.push(dry);
 

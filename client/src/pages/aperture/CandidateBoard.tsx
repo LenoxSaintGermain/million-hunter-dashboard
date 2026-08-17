@@ -222,7 +222,7 @@ export default function CandidateBoard() {
             <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
               <div>
                 <p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Human decision queue</p>
-                <p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>The highest unresolved checks appear first. These are research questions—not a ranked instruction to trade.</p>
+                <p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{brief?.evidence.decisionCriticalCheckCount ?? 0} decision-critical check{brief?.evidence.decisionCriticalCheckCount === 1 ? "" : "s"} lead this queue. {brief?.evidence.researchFollowUpCheckCount ?? 0} supporting checks can progress in parallel and do not prevent memo review or posture comparison.</p>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}/strategies`)}>Compare postures</Button>
@@ -245,7 +245,7 @@ export default function CandidateBoard() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>{ROLE_LABELS[role]}</p>
-                          <h2 className="mt-1 text-base font-semibold" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol} · {verifyFields.length ? `${verifyFields.length} human check${verifyFields.length === 1 ? "" : "s"} before comparison` : "evidence review ready"}</h2>
+                          <h2 className="mt-1 text-base font-semibold" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol} · {candidate.id === brief?.priorityCandidate?.id && verifyFields.length ? `${verifyFields.length} decision-critical check${verifyFields.length === 1 ? "" : "s"}` : verifyFields.length ? `${verifyFields.length} supporting check${verifyFields.length === 1 ? "" : "s"}` : "evidence review ready"}</h2>
                           <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{ROLE_DESCRIPTIONS[role]}</p>
                         </div>
                         <Badge variant="outline" className="shrink-0 text-xs">{percent(candidate.confidenceScore)} evidence confidence</Badge>

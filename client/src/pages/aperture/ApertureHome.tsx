@@ -19,6 +19,7 @@ import { AlertTriangle, Play, Plus, RefreshCw, Trash2, BookOpen, TrendingUp, Arr
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { formatDistanceToNow } from "date-fns";
+import { buildResearchJourneys } from "@shared/runWorkspace";
 
 const DISCLAIMER = "Internal research tool — not investment advice. Modeled figures are labeled as such.";
 
@@ -213,6 +214,7 @@ export default function ApertureHome() {
     (canonical) => !(theses ?? []).some((projection) => projection.sourceCompilationId === canonical.id),
   );
   const horizonGuidance = holdingPeriod ? HORIZON_GUIDANCE[holdingPeriod as keyof typeof HORIZON_GUIDANCE] : null;
+  const researchJourneys = buildResearchJourneys((runs ?? []) as any[]);
   const invalidationExamples = useMemo(() => [
     {
       label: "Missed or negative catalyst",
@@ -535,39 +537,39 @@ export default function ApertureHome() {
             <Card>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm">Recent Capital Briefs</CardTitle>
+                  <div><CardTitle className="text-sm">Research journeys</CardTitle><CardDescription className="mt-1 text-[11px]">Follow-up batches stay with the same decision, so you always know where to continue.</CardDescription></div>
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => refetchRuns()}>
                     <RefreshCw className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                {runs?.slice(0, 8).map((r) => (
+                {researchJourneys.slice(0, 3).map((journey) => (
                   <button
-                    key={r.id}
-                    className="w-full text-left p-2 rounded-md text-xs hover:bg-muted/50 transition-colors"
-                    onClick={() => navigate(`/aperture/run/${r.id}`)}
+                    key={journey.rootId}
+                    className="w-full text-left rounded-lg border p-3 text-xs transition-colors hover:bg-muted/50"
+                    style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}
+                    onClick={() => navigate(`/aperture/run/${journey.latest.id}`)}
                   >
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="font-medium" style={{ color: "var(--sh-text-primary)" }}>Brief #{r.id}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium" style={{ color: "var(--sh-text-primary)" }}>{journey.thesisName}</span>
                       <Badge
                         variant="outline"
                         className="text-xs px-1.5 py-0"
                         style={{
-                          color: r.status === "completed" ? "oklch(0.55 0.15 145)" :
-                            r.status === "failed" ? "var(--sh-red)" : "var(--sh-signal)",
+                          color: journey.state === "ready_to_review" ? "oklch(0.55 0.15 145)" :
+                            journey.state === "needs_attention" ? "var(--sh-red)" : "var(--sh-signal)",
                         }}
                       >
-                        {r.status}
+                        {journey.state === "ready_to_review" ? "review" : journey.state === "more_research_available" ? "continue" : journey.state}
                       </Badge>
                     </div>
-                    <div style={{ color: "var(--sh-fg-muted)" }}>
-                      {r.candidateCount ?? "—"} research inputs · review decision frame · {formatDistanceToNow(r.createdAt)} ago
-                    </div>
+                    <div className="mt-1 leading-4" style={{ color: "var(--sh-fg-muted)" }}>{journey.symbolsReviewed} symbols · {journey.evidenceCandidates} evidence candidates · {journey.nextLabel}</div>
                   </button>
                 ))}
-                {runs?.length === 0 && (
-                  <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>No runs yet.</p>
+                {researchJourneys.length > 0 && <Button variant="ghost" size="sm" className="w-full justify-between text-xs" onClick={() => navigate("/aperture/runs")}>Open all research journeys <ArrowUpRight className="h-3.5 w-3.5" /></Button>}
+                {researchJourneys.length === 0 && (
+                  <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>No research journeys yet.</p>
                 )}
               </CardContent>
             </Card>
