@@ -6,7 +6,7 @@
  * the looseJsonParse fallback that the compiler relies on.
  */
 import { describe, it, expect } from "vitest";
-import { flattenExposureTree, type ThesisGraph } from "./thesisGraph";
+import { flattenExposureTree, parseCompilerResponse, type ThesisGraph } from "./thesisGraph";
 
 describe("flattenExposureTree", () => {
   it("returns an empty array for an empty tree", () => {
@@ -111,5 +111,30 @@ describe("ThesisGraph structural contract", () => {
     };
     expect(Array.isArray(graph.confidenceNotes)).toBe(true);
     expect(graph.confidenceNotes).toHaveLength(1);
+  });
+});
+
+describe("Capital compiler response recovery", () => {
+  const graph = {
+    beliefs: ["GLP-1 adoption may create event-driven dislocations"],
+    seek: ["liquid catalyst-backed expressions"],
+    avoid: [],
+    exposureTree: [{ label: "GLP-1 adoption" }],
+    confidenceNotes: [],
+    suggestedName: "GLP-1 event research",
+  };
+
+  it("parses JSON delivered through a candidate-part response wrapper", () => {
+    expect(parseCompilerResponse({
+      candidates: [{ content: { parts: [{ text: JSON.stringify(graph) }] } }],
+    })).toEqual(graph);
+  });
+
+  it("unwraps a JSON-string response instead of normalizing it as an empty graph", () => {
+    expect(parseCompilerResponse({ text: JSON.stringify(JSON.stringify(graph)) })).toEqual(graph);
+  });
+
+  it("unwraps common structured response envelopes", () => {
+    expect(parseCompilerResponse({ text: JSON.stringify({ output: graph }) })).toEqual(graph);
   });
 });

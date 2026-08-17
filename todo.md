@@ -1206,3 +1206,9 @@
 - [x] Execute one paper-only Capital Brief against the filled research canvas and observe its live status through completion
 - [x] Verify the in-page decision frame, evidence queue, and FRED research ledger on the resulting run
 - [x] Record the human decision framing and walkthrough outcome without creating or submitting any new order
+
+## Capital Aperture — Projection Parser Recovery (Aug 17 2026)
+- [x] Diagnose the Capital / Trade projection failure when the thesis compiler returns non-parseable structured output
+- [x] Normalize valid JSON-bearing model response shapes and provide a bounded retry or safe recovery before raising an operator-visible error
+- [x] Add regression coverage for malformed wrappers and successful Capital / Trade projection
+- [x] Verify the repaired projection path from the Capital Brief UI

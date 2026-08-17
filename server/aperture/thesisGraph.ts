@@ -219,6 +219,90 @@ export function flattenExposureTree(
 
 export class ThesisCompileError extends Error {}
 
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Gemini can expose structured content through `text`, candidate parts, or a
+ * nested response wrapper depending on SDK version and safety/stream handling.
+ * Collect textual leaves so a valid JSON object is never rejected merely because
+ * it arrived through a different SDK response shape.
+ */
+function collectResponseTexts(value: unknown, out: string[], seen: Set<object>, depth = 0): void {
+  if (depth > 7 || value == null) return;
+  if (typeof value === "string") {
+    if (value.trim()) out.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectResponseTexts(item, out, seen, depth + 1));
+    return;
+  }
+  if (!isRecord(value) || seen.has(value)) return;
+  seen.add(value);
+
+  for (const key of ["text", "parts", "content", "candidates", "response", "data", "result", "output"]) {
+    if (key in value) collectResponseTexts(value[key], out, seen, depth + 1);
+  }
+}
+
+function unwrapCompilerPayload(value: unknown): unknown {
+  let payload = value;
+  for (let i = 0; i < 3 && isRecord(payload); i++) {
+    if ("beliefs" in payload || "seek" in payload || "exposureTree" in payload) break;
+    const record = payload;
+    const wrapped = ["data", "result", "output", "response", "content"]
+      .map((key) => record[key])
+      .find((candidate) => isRecord(candidate));
+    if (!wrapped) break;
+    payload = wrapped;
+  }
+  return payload;
+}
+
+/**
+ * Parse JSON from any supported Gemini response shape. Exported so parser
+ * recovery is deterministic and independently regression-tested.
+ */
+export function parseCompilerResponse(response: unknown): unknown {
+  const texts: string[] = [];
+  collectResponseTexts(response, texts, new Set<object>());
+
+  for (const text of texts) {
+    try {
+      let parsed = looseJsonParse(text);
+      // Some providers serialise the JSON object as a JSON string. Unwrap it
+      // once more rather than treating a valid response as an empty graph.
+      if (typeof parsed === "string") parsed = looseJsonParse(parsed);
+      return unwrapCompilerPayload(parsed);
+    } catch {
+      // Try the next text-bearing candidate part.
+    }
+  }
+  throw new ThesisCompileError("The thesis service returned an unreadable structured response.");
+}
+
+async function generateCompilerResponse(genai: GoogleGenAI, thesisText: string, retry = false) {
+  const recovery = retry
+    ? "\n\nRECOVERY: Your previous response could not be parsed. Return exactly one JSON object matching the schema. Do not use markdown, prose, or code fences."
+    : "";
+  return genai.models.generateContent({
+    model: GEMINI_STRONG,
+    contents: [
+      { role: "user", parts: [{ text: `${SYSTEM_PROMPT}${recovery}\n\nINVESTOR'S THESIS:\n${thesisText}` }] },
+    ],
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: SCHEMA as any,
+      temperature: 0.2,
+      maxOutputTokens: 8192,
+    },
+  });
+}
+
 /** Compile free text into a Thesis Graph. */
 export async function compileThesis(thesisText: string): Promise<ThesisGraph> {
   if (!thesisText || thesisText.trim().length < 20) {
@@ -229,24 +313,16 @@ export async function compileThesis(thesisText: string): Promise<ThesisGraph> {
   }
 
   const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const res = await genai.models.generateContent({
-    model: GEMINI_STRONG,
-    contents: [
-      { role: "user", parts: [{ text: `${SYSTEM_PROMPT}\n\nINVESTOR'S THESIS:\n${thesisText}` }] },
-    ],
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: SCHEMA as any,
-      temperature: 0.2,
-      maxOutputTokens: 8192,
-    },
-  });
 
   let raw: any;
   try {
-    raw = looseJsonParse(res.text);
+    raw = parseCompilerResponse(await generateCompilerResponse(genai, thesisText));
   } catch {
-    throw new ThesisCompileError("The thesis compiler did not return parseable JSON. Try again or simplify the thesis.");
+    try {
+      raw = parseCompilerResponse(await generateCompilerResponse(genai, thesisText, true));
+    } catch {
+      throw new ThesisCompileError("The thesis service could not format a structured projection after an automatic retry. Your thesis is saved unchanged; please try the projection again.");
+    }
   }
   const graph = normalizeGraph(raw);
 
