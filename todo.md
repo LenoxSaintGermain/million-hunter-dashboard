@@ -1336,3 +1336,11 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Build a play-first recommendation surface with progressive provenance from play to evidence to thesis
 - [x] Preserve strict human-only paper-order approval and eliminate any interpretation that a recipe is an autonomous instruction
 - [ ] Validate the play-first journey on mobile and desktop, including the no-trade path and low-confidence state
+
+## Aperture Cockpit, Live Preflight & Set-Aside Review (Aug 18 2026)
+- [ ] Verify the supplied cockpit, preflight, and set-aside server contracts and migration assumptions against the current checked-out project
+- [ ] Apply only verified pending Aperture migrations in dependency order, with no backfill or duplicate broker-order columns
+- [ ] Render the paper-only cockpit rail on Capital Aperture views using the server-provided market, account, headroom, and run truth states
+- [ ] Surface live order preflight, including blocking conditions, modeled-notional basis, and planned-loss risk before a proposal can be submitted
+- [ ] Render set-aside candidates and legacy-record notes without treating a missing historical record as an empty list
+- [ ] Complete regression and authenticated browser UAT without creating, approving, submitting, or modifying a paper order
