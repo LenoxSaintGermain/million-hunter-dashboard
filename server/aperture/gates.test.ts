@@ -9,9 +9,9 @@
  * Everything here is pure — no database, no clock, no network.
  */
 import { describe, it, expect } from "vitest";
-import { evaluateOrderGates, evaluateRunPreset, measurePctCeiling, type OrderAccountState, type OrderGateInput } from "./gates";
+import { evaluateOrderGates, evaluateRunPreset, measurePctCeiling, plannedRiskCentsFor, type OrderAccountState, type OrderGateInput } from "./gates";
 import { marketSession, type SessionState } from "./marketSession";
-import { CURRENT_MANDATE, MANDATE_V1, effectiveMandate, PAPER_ACKNOWLEDGEMENT } from "./mandate";
+import { CURRENT_MANDATE, MANDATE_V1, MANDATE_V2, effectiveMandate, PAPER_ACKNOWLEDGEMENT } from "./mandate";
 
 const NOW = Date.parse("2026-06-10T14:30:00Z"); // Wed 10:30 ET, regular session
 const DAY = 86_400_000;
@@ -45,6 +45,8 @@ const account = (over: Partial<OrderAccountState> = {}): OrderAccountState => ({
   newNotionalTodayCents: 0,
   runGrossDeployedCents: 0,
   advUsd: 500_000_000,
+  plannedRiskTodayCents: 0,
+  clusterPlannedRiskCents: 0,
   ...over,
 });
 
@@ -67,7 +69,7 @@ describe("evaluateOrderGates — a fully specified order", () => {
   });
 
   it("stamps the mandate version so the row records what it was checked against", () => {
-    expect(evalOrder().mandateVersion).toBe(MANDATE_V1.version);
+    expect(evalOrder().mandateVersion).toBe(CURRENT_MANDATE.version);
   });
 
   it("records every gate, passed or failed — the snapshot is the audit trail", () => {
@@ -224,6 +226,7 @@ describe("market hours", () => {
     const ev = evalOrder({
       holdingPeriod: "intraday",
       catalystDeadlineAt: now + 3_600_000,
+      qty: 41,
       entryPriceCents: 10_865,
       stopPriceCents: 10_790,
       slippageCents: 8,
@@ -422,7 +425,7 @@ describe("evaluateRunPreset", () => {
   it("passes a fully specified short-horizon run", () => {
     const ev = evalPreset();
     expect(ev.failures).toEqual([]);
-    expect(ev.mandateVersion).toBe(MANDATE_V1.version);
+    expect(ev.mandateVersion).toBe(CURRENT_MANDATE.version);
   });
 
   it("blocks a run with no valid holding period", () => {
@@ -531,5 +534,137 @@ describe("measurePctCeiling rounding", () => {
     const m = measurePctCeiling(0, 1_000_000, 10_000_000, 10);
     expect(m.exactPct).toBe(10);
     expect(m.ok).toBe(true);
+  });
+});
+
+// ── The planned-loss axis (mandate v2) ────────────────────────────────────────
+//
+// Notional ceilings cap what an order commits. These cap what its stop puts at
+// risk. An order can sit inside every notional ceiling and still plan to lose
+// 4% of the account on a wide stop — that is the hole these close.
+
+describe("plannedRiskCentsFor", () => {
+  it("is qty x (stop distance + slippage)", () => {
+    // 41 shares, $108.65 entry, $107.90 stop, $0.15 slippage → 41 x 90c = $36.90
+    expect(plannedRiskCentsFor({ qty: 41, entryPriceCents: 10_865, stopPriceCents: 10_790, slippageCents: 15 }))
+      .toBe(3_690);
+  });
+
+  it("is direction-agnostic — a short's stop sits above the entry", () => {
+    const long = plannedRiskCentsFor({ qty: 10, entryPriceCents: 10_000, stopPriceCents: 9_900, slippageCents: 0 });
+    const short = plannedRiskCentsFor({ qty: 10, entryPriceCents: 9_900, stopPriceCents: 10_000, slippageCents: 0 });
+    expect(long).toBe(short);
+  });
+
+  it("returns null — not zero — when any input is missing", () => {
+    expect(plannedRiskCentsFor({ qty: 41, entryPriceCents: 10_865, stopPriceCents: 10_790 })).toBeNull();
+    expect(plannedRiskCentsFor({ qty: 41, entryPriceCents: 10_865, slippageCents: 15 })).toBeNull();
+    expect(plannedRiskCentsFor({ entryPriceCents: 10_865, stopPriceCents: 10_790, slippageCents: 15 })).toBeNull();
+  });
+
+  it("returns null when the stop equals the entry — that is not a zero-risk trade", () => {
+    expect(plannedRiskCentsFor({ qty: 10, entryPriceCents: 10_000, stopPriceCents: 10_000, slippageCents: 5 }))
+      .toBeNull();
+  });
+});
+
+/** A play whose planned loss is $600 — 0.6% of the $100k account. */
+const play = (over: Partial<OrderGateInput> = {}): Partial<OrderGateInput> => ({
+  holdingPeriod: "intraday",
+  qty: 100,
+  entryPriceCents: 10_000,
+  stopPriceCents: 9_940,
+  slippageCents: 0,
+  timeStopAt: NOW + 3 * 3_600_000,
+  noTradeConditions: ["skip if it opens more than 1% beyond the trigger"],
+  catalystDeadlineAt: NOW + 6 * 3_600_000,
+  ...over,
+});
+
+describe("planned-loss gates", () => {
+  it("passes a play inside all three ceilings", () => {
+    const ev = evalOrder(play());
+    expect(gate(ev, "planned_risk_per_play")!.passed).toBe(true);
+    expect(gate(ev, "daily_planned_risk")!.passed).toBe(true);
+    expect(gate(ev, "correlated_planned_risk")!.passed).toBe(true);
+  });
+
+  it("blocks a play planning to lose more than 0.75% of equity", () => {
+    // 100 shares x $8.00 stop distance = $800 = 0.8% of a $100k account
+    const ev = evalOrder(play({ stopPriceCents: 9_200 }));
+    expect(gate(ev, "planned_risk_per_play")!.passed).toBe(false);
+    expect(gate(ev, "planned_risk_per_play")!.detail).toContain("the size must come down");
+    expect(ev.passed).toBe(false);
+  });
+
+  it("counts the slippage allowance as risk, because a stop is a request", () => {
+    // A $7.40 stop distance is $740, inside the $750 ceiling. Add a 20c
+    // allowance and the same play plans to lose $760, which is not.
+    expect(gate(evalOrder(play({ stopPriceCents: 9_260 })), "planned_risk_per_play")!.passed).toBe(true);
+    expect(gate(evalOrder(play({ stopPriceCents: 9_260, slippageCents: 20 })), "planned_risk_per_play")!.passed)
+      .toBe(false);
+  });
+
+  it("blocks when the day's combined planned loss would exceed 2%", () => {
+    const ev = evalOrder(play(), { plannedRiskTodayCents: 196_000 }); // $1,960 already
+    expect(gate(ev, "daily_planned_risk")!.passed).toBe(false);       // + $60 = 2.06%
+  });
+
+  it("blocks a second play on the same theme past the 1.25% correlated ceiling", () => {
+    // The housing case: an ETF and a homebuilder are one bet, not two.
+    const ev = evalOrder(
+      play(),
+      { clusterPlannedRiskCents: 122_000, clusterLabel: "Homebuilding" },
+    );
+    expect(gate(ev, "correlated_planned_risk")!.passed).toBe(false);
+    expect(gate(ev, "correlated_planned_risk")!.detail).toContain("one bet, not two");
+  });
+
+  it("allows the same second play once it is small enough to fit the theme budget", () => {
+    const ev = evalOrder(
+      play({ stopPriceCents: 9_990 }), // $10 planned loss
+      { clusterPlannedRiskCents: 122_000, clusterLabel: "Homebuilding" },
+    );
+    expect(gate(ev, "correlated_planned_risk")!.passed).toBe(true);
+  });
+
+  it("requires a stated planned loss on an intraday play", () => {
+    const ev = evalOrder(play({ stopPriceCents: null }));
+    expect(gate(ev, "planned_risk_stated")!.passed).toBe(false);
+    expect(gate(ev, "planned_risk_stated")!.detail).toContain("unmeasurable loss is not a small one");
+  });
+
+  it("requires it on an overnight play too", () => {
+    const ev = evalOrder({ holdingPeriod: "overnight", catalystDeadlineAt: NOW + DAY });
+    expect(gate(ev, "planned_risk_stated")!.passed).toBe(false);
+  });
+
+  it("does not require it on a swing, but records that nothing measured it", () => {
+    const ev = evalOrder(); // the default swing order states no stop
+    expect(gate(ev, "planned_risk_stated")).toBeUndefined();
+    expect(ev.notes.join(" ")).toContain("only sizing constraint");
+    expect(ev.passed).toBe(true);
+  });
+
+  it("enforces the ceilings on a swing that does state a stop", () => {
+    const ev = evalOrder({ qty: 100, entryPriceCents: 10_000, stopPriceCents: 9_200, slippageCents: 0 });
+    expect(gate(ev, "planned_risk_per_play")!.passed).toBe(false);
+  });
+
+  it("cannot be measured without equity, and does not pass by default", () => {
+    const ev = evalOrder(play(), { equityCents: null });
+    expect(gate(ev, "planned_risk_per_play")).toBeUndefined();
+    expect(gate(ev, "equity_known")!.passed).toBe(false);
+    expect(ev.passed).toBe(false);
+  });
+
+  it("warns that an unclassified name hides a real theme overlap", () => {
+    const ev = evalOrder(play(), { sectorKnown: false, clusterLabel: "NVDA (unclassified)" });
+    expect(ev.notes.join(" ")).toContain("would not be caught");
+  });
+
+  it("stamps mandate v2", () => {
+    expect(evalOrder(play()).mandateVersion).toBe(MANDATE_V2.version);
+    expect(MANDATE_V2.version).toBe("v2");
   });
 });

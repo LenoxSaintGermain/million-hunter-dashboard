@@ -33,6 +33,7 @@ import { getFacts, freshestPerKey, normSymbol } from "./facts";
 import { marketSession, startOfEtDay, type SessionState } from "./marketSession";
 import {
   evaluateOrderGates,
+  plannedRiskCentsFor,
   gateFailureMessage,
   type GateEvaluation,
   type NotionalBasis,
@@ -154,6 +155,7 @@ async function evaluateOrder(input: CreateOrderInput): Promise<OrderEvaluation> 
       reason: input.reason,
       invalidationCondition: input.invalidationCondition,
       catalystDeadlineAt: input.catalystDeadlineAt ?? null,
+      qty: input.qty ?? null,
       entryPriceCents: input.entryPriceCents ?? null,
       stopPriceCents: input.stopPriceCents ?? null,
       slippageCents: input.slippageCents ?? null,
@@ -196,14 +198,10 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
   } = await evaluateOrder(input);
 
   const holdingPeriod = isStoredHoldingPeriod(input.holdingPeriod) ? input.holdingPeriod : null;
-  const plannedRiskCents = holdingPeriod === "intraday"
-    && input.qty != null
-    && input.qty > 0
-    && input.entryPriceCents != null
-    && input.stopPriceCents != null
-    && input.slippageCents != null
-    ? Math.round(input.qty * (Math.abs(input.entryPriceCents - input.stopPriceCents) + input.slippageCents))
-    : null;
+  // Same helper the planned-loss gates decide on, so the number persisted on the
+  // row and the number that gated it can never be two different figures. Stored
+  // for every holding period that states a stop, not just intraday.
+  const plannedRiskCents = plannedRiskCentsFor(input);
   const base = {
     runId: input.runId,
     candidateId: input.candidateId ?? null,
@@ -345,6 +343,8 @@ async function loadOrderAccountState(args: {
     gated: brokerOrders.gatedNotionalCents,
     notional: brokerOrders.notionalCents,
     side: brokerOrders.side,
+    symbol: brokerOrders.symbol,
+    plannedRisk: brokerOrders.plannedRiskCents,
   }).from(brokerOrders).where(and(
     eq(brokerOrders.userId, userId),
     gte(brokerOrders.createdAt, dayStart),
@@ -364,6 +364,19 @@ async function loadOrderAccountState(args: {
   const sumBuys = (rows: Array<{ gated: number | null; notional: number | null; side: string }>) =>
     rows.filter((r) => r.side === "buy").reduce((s, r) => s + (r.gated ?? r.notional ?? 0), 0);
 
+  // Planned loss already committed today, and the slice of it that shares this
+  // symbol's cluster. Orders with no stated planned loss contribute 0 here —
+  // they were gated on notional instead, and the gate says so in its notes
+  // rather than inventing a risk figure for them.
+  const plannedRiskTodayCents = todayRows.reduce((s, r) => s + (r.plannedRisk ?? 0), 0);
+  const clusterPlannedRiskCents = todayRows.reduce((s, r) => {
+    const sym = normSymbol(r.symbol);
+    const sameCluster = orderSector
+      ? sectorBySymbol.get(sym) === orderSector
+      : sym === symbol;
+    return sameCluster ? s + (r.plannedRisk ?? 0) : s;
+  }, 0);
+
   return {
     isPaper: account.isPaper === true,
     // Equity, not cash: a ceiling measured against cash shrinks as you deploy.
@@ -372,6 +385,8 @@ async function loadOrderAccountState(args: {
     clusterValueCents,
     clusterLabel: orderSector ?? `${symbol} (unclassified)`,
     sectorKnown: orderSector != null,
+    plannedRiskTodayCents,
+    clusterPlannedRiskCents,
     newNotionalTodayCents: sumBuys(todayRows),
     runGrossDeployedCents: sumBuys(runRows),
     advUsd: advRow?.valueNum ?? null,

@@ -109,6 +109,18 @@ export interface Mandate {
   maxOrderPctOfAdv: number;
   /** Minutes past ET midnight after which no new intraday order may be created. */
   intradayCutoffEtMinutes: number;
+  // ── Planned-loss ceilings ─────────────────────────────────────────────────
+  // A second, independent axis from the notional ceilings above. Notional caps
+  // how much capital an order commits; planned loss caps how much of it the
+  // stop actually puts at risk. An order can sit inside every notional ceiling
+  // and still risk 4% of the account on a wide stop, which is why both exist.
+  //   planned loss = qty x (|entry - stop| + slippage allowance)
+  /** Most a single play may plan to lose, as a percentage of equity. */
+  maxPlannedRiskPctPerPlay: number;
+  /** Most all plays opened in one ET day may plan to lose, combined. */
+  maxDailyPlannedRiskPct: number;
+  /** Most plays sharing a correlated cluster may plan to lose, combined. */
+  maxCorrelatedPlannedRiskPct: number;
 }
 
 /**
@@ -128,9 +140,34 @@ export const MANDATE_V1: Mandate = {
   minAdvUsd30d: 20_000_000,
   maxOrderPctOfAdv: 0.5,
   intradayCutoffEtMinutes: 15 * 60 + 55, // 15:55 ET
+  // v1 did not have a planned-loss axis at all. These carry v2's values so the
+  // type is satisfied, but no order was ever gated against them under v1.
+  maxPlannedRiskPctPerPlay: 0.75,
+  maxDailyPlannedRiskPct: 2,
+  maxCorrelatedPlannedRiskPct: 1.25,
 };
 
-export const CURRENT_MANDATE: Mandate = MANDATE_V1;
+/**
+ * v2 — adds the planned-loss axis, 2026-08-18.
+ *
+ * v1 sized only by notional, so a stop three points wide and a stop thirty
+ * points wide were the same order to the gates. These three ceilings come from
+ * the operator's own day-trading model: risk a fraction of a percent per play,
+ * cap the day, and cap what a single correlated theme can cost when several
+ * plays are really one bet.
+ *
+ * Orders and runs stamped "v1" were gated without them and are not
+ * retroactively failed.
+ */
+export const MANDATE_V2: Mandate = {
+  ...MANDATE_V1,
+  version: "v2",
+  maxPlannedRiskPctPerPlay: 0.75,
+  maxDailyPlannedRiskPct: 2,
+  maxCorrelatedPlannedRiskPct: 1.25,
+};
+
+export const CURRENT_MANDATE: Mandate = MANDATE_V2;
 
 /** The literal the operator must echo. Cheap, but it puts consent on the record. */
 export const PAPER_ACKNOWLEDGEMENT = "PAPER";

@@ -143,6 +143,32 @@ export function measurePctCeiling(
 }
 
 /**
+ * Planned loss for a play: what the stop actually puts at risk, not what the
+ * order commits. The slippage allowance is included because a stop is a request,
+ * not a guarantee — and on paper fills, which execute at the quote, the
+ * allowance is the ONLY place execution cost is represented at all.
+ *
+ * Returns null when any input is missing. A planned loss that cannot be computed
+ * is not zero risk.
+ */
+export function plannedRiskCentsFor(input: {
+  qty?: number | null;
+  entryPriceCents?: number | null;
+  stopPriceCents?: number | null;
+  slippageCents?: number | null;
+}): number | null {
+  const { qty, entryPriceCents: entry, stopPriceCents: stop, slippageCents: slip } = input;
+  if (qty == null || qty <= 0) return null;
+  if (entry == null || entry <= 0) return null;
+  if (stop == null || stop <= 0 || stop === entry) return null;
+  if (slip == null || slip < 0) return null;
+  return Math.round(qty * (Math.abs(entry - stop) + slip));
+}
+
+/** Holding periods where a stated planned loss is mandatory, not optional. */
+const PLANNED_RISK_REQUIRED: ReadonlySet<string> = new Set(["intraday", "overnight"]);
+
+/**
  * The single-order ceiling: a percentage of equity and an absolute cap,
  * whichever binds first.
  */
@@ -164,6 +190,8 @@ export interface OrderGateInput {
   invalidationCondition?: string | null;
   /** When the thesis for this trade expires. Required on every holding period. */
   catalystDeadlineAt?: number | null;
+  /** Needed to turn the entry/stop distance into a planned loss. */
+  qty?: number | null;
   entryPriceCents?: number | null;
   stopPriceCents?: number | null;
   slippageCents?: number | null;
@@ -198,6 +226,10 @@ export interface OrderAccountState {
   runGrossDeployedCents: number;
   /** 30-day average daily dollar volume, USD. Null when no fact states it. */
   advUsd: number | null;
+  /** Planned loss already committed by live orders created this ET day. */
+  plannedRiskTodayCents: number;
+  /** Planned loss already committed by live orders in this symbol's cluster. */
+  clusterPlannedRiskCents: number;
 }
 
 export interface EvaluateOrderArgs {
@@ -340,6 +372,83 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
     g.add("play_no_trade_condition", noTradeConditions.length > 0, noTradeConditions.length ? "no-trade condition is stated" : "intraday play requires at least one no-trade condition");
   }
 
+  // Equity is the denominator for both sizing axes below.
+  const equity = account.equityCents;
+  const equityKnown = equity != null && equity > 0;
+
+  // ── Planned loss ───────────────────────────────────────────────────────────
+  // The second sizing axis. Notional caps what an order commits; this caps what
+  // the stop puts at risk. Both must pass.
+  const plannedRisk = plannedRiskCentsFor(input);
+  const riskRequired = PLANNED_RISK_REQUIRED.has(String(input.holdingPeriod));
+
+  if (plannedRisk == null) {
+    if (riskRequired) {
+      g.add(
+        "planned_risk_stated",
+        false,
+        `a ${String(input.holdingPeriod)} play must state qty, entry, stop and slippage so its planned loss can be measured — an unmeasurable loss is not a small one`,
+      );
+    } else {
+      // Not a failure: a longer-horizon position may legitimately be held
+      // without a hard stop. Recorded so nobody later reads the silence as zero.
+      g.note(
+        `planned loss is not measurable for this order (needs qty, entry, stop and slippage) — the notional ceilings are the only sizing constraint applied`,
+      );
+    }
+  } else {
+    g.add(
+      "planned_risk_stated",
+      true,
+      `planned loss $${dollars(plannedRisk)} = qty x (|entry - stop| + slippage)`,
+      plannedRisk,
+    );
+
+    if (equityKnown) {
+      const e = equity!;
+
+      const perPlay = measurePctCeiling(0, plannedRisk, e, mandate.maxPlannedRiskPctPerPlay);
+      g.add(
+        "planned_risk_per_play",
+        perPlay.ok,
+        perPlay.ok
+          ? `planned loss is ${perPlay.pct}% of equity, within the ${mandate.maxPlannedRiskPctPerPlay}% per-play ceiling`
+          : `planned loss is ${perPlay.pct}% of equity, over the ${mandate.maxPlannedRiskPctPerPlay}% per-play ceiling — widen the stop and the size must come down`,
+        perPlay.pct,
+        mandate.maxPlannedRiskPctPerPlay,
+      );
+
+      const daily = measurePctCeiling(account.plannedRiskTodayCents, plannedRisk, e, mandate.maxDailyPlannedRiskPct);
+      g.add(
+        "daily_planned_risk",
+        daily.ok,
+        daily.ok
+          ? `planned loss across today's plays would be ${daily.pct}% of equity, within ${mandate.maxDailyPlannedRiskPct}%`
+          : `planned loss across today's plays would be ${daily.pct}% of equity, over the ${mandate.maxDailyPlannedRiskPct}% daily ceiling`,
+        daily.pct,
+        mandate.maxDailyPlannedRiskPct,
+      );
+
+      // Several plays on one theme are one bet. This is the ceiling that stops
+      // a housing ETF and a homebuilder from being counted as diversification.
+      const correlated = measurePctCeiling(
+        account.clusterPlannedRiskCents, plannedRisk, e, mandate.maxCorrelatedPlannedRiskPct,
+      );
+      g.add(
+        "correlated_planned_risk",
+        correlated.ok,
+        correlated.ok
+          ? `planned loss across "${account.clusterLabel}" would be ${correlated.pct}% of equity, within ${mandate.maxCorrelatedPlannedRiskPct}%`
+          : `planned loss across "${account.clusterLabel}" would be ${correlated.pct}% of equity, over the ${mandate.maxCorrelatedPlannedRiskPct}% correlated ceiling — these plays are one bet, not two`,
+        correlated.pct,
+        mandate.maxCorrelatedPlannedRiskPct,
+      );
+      if (!account.sectorKnown) {
+        g.note(`no sector fact for ${input.symbol} — the correlated planned-loss ceiling covers this name alone, so a genuine theme overlap would not be caught`);
+      }
+    }
+  }
+
   // ── Notional ────────────────────────────────────────────────────────────────
   const notional = input.gatedNotionalCents;
   const notionalKnown = notional != null && notional > 0 && input.notionalBasis !== "unknown";
@@ -355,8 +464,6 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
     g.note("order notional derived from the last priced fact, not stated by the operator — the ceiling was checked against a modeled figure");
   }
 
-  const equity = account.equityCents;
-  const equityKnown = equity != null && equity > 0;
   g.add(
     "equity_known",
     equityKnown,
@@ -591,7 +698,10 @@ export type HeadroomKey =
   | "cluster"
   | "run_gross_deployed"
   | "daily_new_notional"
-  | "single_order";
+  | "single_order"
+  | "daily_planned_risk"
+  | "correlated_planned_risk"
+  | "planned_risk_per_play";
 
 export interface HeadroomLine {
   key: HeadroomKey;
@@ -624,6 +734,11 @@ export interface HeadroomInput {
   runGrossDeployedCents: number | null;
   /** Buy notional already created in this ET day, across all runs. */
   newNotionalTodayCents: number | null;
+  /** Planned loss committed by live orders created this ET day. */
+  plannedRiskTodayCents: number | null;
+  /** The largest planned-loss concentration in one correlated cluster. */
+  largestClusterPlannedRiskLabel: string | null;
+  largestClusterPlannedRiskCents: number | null;
 }
 
 export interface HeadroomRail {
@@ -718,11 +833,47 @@ export function computeHeadroom(input: HeadroomInput, mandate: Mandate = CURRENT
       "buy notional created since ET midnight, across all runs",
       "today's order history could not be read",
     ),
+    // ── The planned-loss axis ────────────────────────────────────────────────
+    // Separate from everything above: notional is what the orders commit, this
+    // is what their stops put at risk. An order inside every notional ceiling
+    // can still breach these.
+    line(
+      "daily_planned_risk",
+      "Planned loss today (ET)",
+      null,
+      input.plannedRiskTodayCents,
+      mandate.maxDailyPlannedRiskPct,
+      "qty x (|entry - stop| + slippage), summed over live orders created since ET midnight; orders with no stated stop contribute nothing",
+      "today's order history could not be read",
+    ),
+    line(
+      "correlated_planned_risk",
+      "Planned loss, largest theme",
+      input.largestClusterPlannedRiskLabel,
+      input.largestClusterPlannedRiskCents,
+      mandate.maxCorrelatedPlannedRiskPct,
+      "planned loss summed over today's live orders sharing a sector fact — several plays on one theme are one bet",
+      "no planned loss is committed in any cluster today",
+    ),
   ];
 
-  // The single-order ceiling is not a running total: nothing accumulates against
-  // it. `usedCents` stays null rather than 0 so the client does not render a
-  // consumption bar for a ceiling that is never consumed.
+  // Neither of the two ceilings below is a running total: nothing accumulates
+  // against them. `usedCents` stays null rather than 0 so the client does not
+  // render a consumption bar for a ceiling that is never consumed.
+  lines.push({
+    key: "planned_risk_per_play",
+    label: "Planned loss, one play",
+    subject: null,
+    usedCents: null,
+    ceilingCents: equityKnown ? (mandate.maxPlannedRiskPctPerPlay / 100) * e! : null,
+    remainingCents: null,
+    usedPct: null,
+    ceilingPct: mandate.maxPlannedRiskPctPerPlay,
+    basis: "per-play ceiling on qty x (|entry - stop| + slippage)",
+    reason: equityKnown ? null : EQUITY_UNKNOWN,
+  });
+
+
   lines.push({
     key: "single_order",
     label: "Single order",

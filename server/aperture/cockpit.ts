@@ -501,6 +501,8 @@ export async function buildCockpit(args: BuildCockpitArgs): Promise<Cockpit> {
     gated: brokerOrders.gatedNotionalCents,
     notional: brokerOrders.notionalCents,
     side: brokerOrders.side,
+    symbol: brokerOrders.symbol,
+    plannedRisk: brokerOrders.plannedRiskCents,
   }).from(brokerOrders).where(and(
     eq(brokerOrders.userId, args.userId),
     gte(brokerOrders.createdAt, dayStart),
@@ -519,6 +521,33 @@ export async function buildCockpit(args: BuildCockpitArgs): Promise<Cockpit> {
 
   const exposures = largestExposures(holdings, sectorBySymbol);
 
+  // Planned loss committed today, and the theme carrying the most of it. An
+  // order with no stated stop contributes nothing here — it was sized on
+  // notional, and the gate records that rather than inventing a risk figure.
+  const plannedRiskTodayCents = todayRows == null
+    ? null
+    : todayRows.reduce((s, r) => s + (r.plannedRisk ?? 0), 0);
+
+  let largestClusterPlannedRiskLabel: string | null = null;
+  let largestClusterPlannedRiskCents: number | null = null;
+  if (todayRows != null) {
+    const byCluster = new Map<string, number>();
+    for (const r of todayRows) {
+      if (!r.plannedRisk) continue;
+      const sym = normSymbol(r.symbol);
+      // A name with no sector fact is its own cluster — the same treatment the
+      // gate applies, and the same blind spot: a real theme overlap is missed.
+      const label = sectorBySymbol.get(sym) ?? `${sym} (unclassified)`;
+      byCluster.set(label, (byCluster.get(label) ?? 0) + r.plannedRisk);
+    }
+    for (const [label, cents] of Array.from(byCluster.entries())) {
+      if (largestClusterPlannedRiskCents == null || cents > largestClusterPlannedRiskCents) {
+        largestClusterPlannedRiskCents = cents;
+        largestClusterPlannedRiskLabel = label;
+      }
+    }
+  }
+
   return {
     generatedAt: now,
     liveTrading: false,
@@ -527,6 +556,9 @@ export async function buildCockpit(args: BuildCockpitArgs): Promise<Cockpit> {
     account: accountRail(account ?? null, now),
     headroom: computeHeadroom({
       equityCents: account?.equityValueCents ?? null,
+      plannedRiskTodayCents,
+      largestClusterPlannedRiskLabel,
+      largestClusterPlannedRiskCents,
       ...exposures,
       runGrossDeployedCents: runRows ? sumBuys(runRows) : null,
       newNotionalTodayCents: todayRows ? sumBuys(todayRows) : null,

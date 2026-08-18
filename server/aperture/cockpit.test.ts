@@ -51,7 +51,7 @@ const lineOf = (rail: ReturnType<typeof computeHeadroom>, key: string) =>
 
 describe("computeHeadroom — used, ceiling, remaining", () => {
   it("states the mandate version the figures were measured against", () => {
-    expect(computeHeadroom(headroomInput()).mandateVersion).toBe(MANDATE_V1.version);
+    expect(computeHeadroom(headroomInput()).mandateVersion).toBe(CURRENT_MANDATE.version);
   });
 
   it("computes the single-name ceiling as a percentage of equity", () => {
