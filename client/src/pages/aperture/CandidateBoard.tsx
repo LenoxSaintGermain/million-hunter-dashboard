@@ -12,6 +12,7 @@ import { CapitalBrief } from "@/components/aperture/CapitalBrief";
 import { ResearchLedger } from "@/components/aperture/ResearchLedger";
 import { DecisionFocusCard } from "@/components/aperture/DecisionFocusCard";
 import { PlayRecipeCard } from "@/components/aperture/PlayRecipeCard";
+import { SetAsideHistory } from "@/components/aperture/SetAsideHistory";
 import { decisionPriority } from "@shared/decisionFocus";
 import { buildDecisionPath } from "@shared/decisionPath";
 import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
@@ -172,7 +173,7 @@ export default function CandidateBoard() {
   );
   if (!data) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Run not found.</div></DashboardLayout>;
 
-  const { run, stale, candidates, macroFacts, brief, thesisContext } = data;
+  const { run, stale, candidates, macroFacts, brief, thesisContext, setAside, setAsideNote } = data;
   const roles: Array<Role | "all"> = ["all", "core", "complementary", "remainder", "alternative_expression"];
   const filtered = (activeRole === "all" ? candidates : candidates.filter((candidate) => candidate.role === activeRole))
     .slice().sort((a, b) => decisionPriority(b) - decisionPriority(a));
@@ -280,6 +281,7 @@ export default function CandidateBoard() {
               onReviewGaps={() => navigate(`/aperture/run/${runId}/exposure`)}
               onSetHorizon={() => navigate("/thesis?scope=capital")}
             />
+            <SetAsideHistory records={setAside ?? []} note={setAsideNote ?? null} />
           </div>
         ) : view === "ledger" ? (
           <ResearchLedger macroFacts={macroFacts} onRefresh={() => refreshMacro.mutate()} refreshing={refreshMacro.isPending} />

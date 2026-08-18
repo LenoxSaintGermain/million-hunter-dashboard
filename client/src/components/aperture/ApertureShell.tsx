@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { BookOpen, FileText, Landmark, LayoutDashboard, Route, Wallet } from "lucide-react";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { cn } from "@/lib/utils";
+import { CapitalCockpitRail } from "@/components/aperture/CapitalCockpitRail";
 
 const APERTURE_NAV = [
   { href: "/aperture", label: "Decision Center", icon: LayoutDashboard },
@@ -14,6 +15,7 @@ const APERTURE_NAV = [
 
 export default function ApertureShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
+  const runId = Number(location.match(/^\/aperture\/run\/(\d+)/)?.[1]) || undefined;
 
   return (
     <EditorialTopNav>
@@ -56,6 +58,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
         </div>
       </section>
       <main className="aperture-editorial max-w-[1280px] mx-auto w-full px-6 lg:px-10 py-8 lg:py-10">
+        <CapitalCockpitRail runId={runId} />
         {children}
       </main>
     </EditorialTopNav>
