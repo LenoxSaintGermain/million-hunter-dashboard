@@ -24,6 +24,7 @@ import {
   exposureCoverage,
   securityFacts,
   apertureEvidenceReviews,
+  aperturePlayDecisions,
   apertureSetAside,
 } from "../drizzle/schema";
 import { adminProcedure, router } from "./_core/trpc";
@@ -863,6 +864,72 @@ export const apertureRouter = router({
 
     return memoResult;
     }),
+
+  // ── Daily trader plays ─────────────────────────────────────────────────────
+  // This is a read model over completed short-horizon runs. It starts no
+  // research, alters no thesis, and never reaches the broker adapter.
+  play: router({
+    list: adminProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      const rows = await db!.select({ candidate: apertureCandidates, run: apertureRuns, thesisName: capitalTheses.name, thesisRawText: capitalTheses.rawText })
+        .from(apertureCandidates)
+        .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
+        .leftJoin(capitalTheses, eq(apertureRuns.thesisId, capitalTheses.id))
+        .where(and(
+          eq(apertureRuns.userId, ctx.user.id),
+          eq(apertureRuns.status, "completed"),
+          inArray(apertureRuns.holdingPeriod, ["intraday", "catalyst_window"]),
+        ))
+        .orderBy(desc(apertureCandidates.compositeScore), desc(apertureRuns.createdAt))
+        .limit(40);
+      const candidateIds = rows.map(({ candidate }) => candidate.id);
+      const reviews = candidateIds.length
+        ? await db!.select().from(apertureEvidenceReviews).where(and(eq(apertureEvidenceReviews.userId, ctx.user.id), inArray(apertureEvidenceReviews.candidateId, candidateIds)))
+        : [];
+      const decisions = candidateIds.length
+        ? await db!.select().from(aperturePlayDecisions).where(and(eq(aperturePlayDecisions.userId, ctx.user.id), inArray(aperturePlayDecisions.candidateId, candidateIds)))
+        : [];
+      const reviewsByCandidate = new Map<number, typeof reviews>();
+      for (const review of reviews) reviewsByCandidate.set(review.candidateId, [...(reviewsByCandidate.get(review.candidateId) ?? []), review]);
+      const decisionByCandidate = new Map(decisions.map((decision) => [decision.candidateId, decision]));
+      return rows.map(({ candidate, run, thesisName, thesisRawText }) => ({
+        candidate,
+        run,
+        thesisName,
+        thesisRawText,
+        reviews: reviewsByCandidate.get(candidate.id) ?? [],
+        decision: decisionByCandidate.get(candidate.id) ?? null,
+        confidenceReason: Array.isArray(candidate.verifyFields) && candidate.verifyFields.length
+          ? `${candidate.verifyFields.length} decision-critical evidence check${candidate.verifyFields.length === 1 ? " remains" : "s remain"}.`
+          : "No decision-critical evidence field was generated; current market conditions still require human confirmation.",
+      }));
+    }),
+
+    decide: adminProcedure
+      .input(z.object({ runId: z.number(), candidateId: z.number(), decision: z.enum(["skipped", "deferred"]), reason: z.string().trim().min(3).max(1_000) }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [row] = await db!.select({ candidate: apertureCandidates })
+          .from(apertureCandidates)
+          .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
+          .where(and(eq(apertureCandidates.id, input.candidateId), eq(apertureCandidates.runId, input.runId), eq(apertureRuns.userId, ctx.user.id)))
+          .limit(1);
+        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Play not found in your research history" });
+        const now = Date.now();
+        const [existing] = await db!.select().from(aperturePlayDecisions).where(and(
+          eq(aperturePlayDecisions.userId, ctx.user.id),
+          eq(aperturePlayDecisions.runId, input.runId),
+          eq(aperturePlayDecisions.candidateId, input.candidateId),
+        )).limit(1);
+        if (existing) {
+          await db!.update(aperturePlayDecisions).set({ decision: input.decision, reason: input.reason, updatedAt: now })
+            .where(eq(aperturePlayDecisions.id, existing.id));
+        } else {
+          await db!.insert(aperturePlayDecisions).values({ userId: ctx.user.id, ...input, createdAt: now, updatedAt: now });
+        }
+        return { ok: true };
+      }),
+  }),
 
   // ── Order management ──────────────────────────────────────────────────────
 

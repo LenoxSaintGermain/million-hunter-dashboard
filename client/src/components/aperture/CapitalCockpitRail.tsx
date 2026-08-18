@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, Clock3, Landmark, ShieldCheck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { formatMandatePercentPoints } from "@shared/cockpitPresentation";
@@ -50,7 +50,12 @@ function MeasureLine({ line }: { line: HeadroomLine }) {
 }
 
 export function CapitalCockpitRail({ runId }: { runId?: number }) {
-  const { data, isLoading } = trpc.aperture.cockpit.useQuery(runId ? { runId } : undefined, { refetchInterval: 60_000, refetchIntervalInBackground: true });
+  const { data: accounts } = trpc.aperture.account.list.useQuery();
+  const preferredAccountId = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")?.id
+    ?? accounts?.find((account) => account.isPaper)?.id
+    ?? null;
+  const cockpitInput = useMemo(() => runId ? { runId } : preferredAccountId ? { accountId: preferredAccountId } : undefined, [runId, preferredAccountId]);
+  const { data, isLoading } = trpc.aperture.cockpit.useQuery(cockpitInput, { refetchInterval: 60_000, refetchIntervalInBackground: true });
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     const interval = window.setInterval(() => setElapsed((value) => value + 30_000), 30_000);

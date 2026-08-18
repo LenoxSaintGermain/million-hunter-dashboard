@@ -1335,7 +1335,7 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Define a play-first day-trader recipe that presents sequence, sizing, risk, exit timing, no-trade conditions, and confidence before thesis detail
 - [x] Build a play-first recommendation surface with progressive provenance from play to evidence to thesis
 - [x] Preserve strict human-only paper-order approval and eliminate any interpretation that a recipe is an autonomous instruction
-- [ ] Validate the play-first journey on mobile and desktop, including the no-trade path and low-confidence state
+- [x] Validate the play-first journey on mobile and desktop, including the no-trade path and low-confidence state
 
 ## Aperture Cockpit, Live Preflight & Set-Aside Review (Aug 18 2026)
 - [x] Verify the supplied cockpit, preflight, and set-aside server contracts and migration assumptions against the current checked-out project
@@ -1350,3 +1350,14 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Verify the upstream intraday VWAP and opening-range helpers before wiring them into the paper-order ticket
 - [x] Add ticket-side rendering for measured VWAP and opening-range status, with an explicit not-measured state when no verified tape is available
 - [x] Require live preflight to surface all paper-order blocks, modeled-notional basis, and planned-risk ceilings before proposal creation
+
+## Two-Audience Play-First Journey (Aug 18 2026)
+- [x] Verify which daily-play, skip, scorecard, thesis-produced-play, correlation, and trigger-state fields are already available without adding unsupported server capability
+- [x] Make `/aperture` a ranked daily play list with a visible cash/no-trade outcome and New Research Brief moved behind a secondary action
+- [x] Add in-place play detail that prioritizes plan, trigger task, catalyst provenance, invalidation, and a prefilled paper ticket handoff
+- [x] Show same-theme correlation use and the correlated planned-loss ceiling at the list decision point
+- [x] Record trader skips with a reason and surface them in the weekly scorecard without creating an order
+- [x] Show a thesis the plays it produced, including available outcomes and set-aside history
+- [x] Validate the play list at 375px and complete authenticated UAT of no-trade, unavailable trigger, skip, and paper-only boundaries
+- [ ] Re-run the external Alpaca connectivity test when `paper-api.alpaca.markets` is reachable; the full suite otherwise passed 613 tests and the failure was a network connect timeout, not an assertion failure
+- [x] Add the minimal persistent play-decision record required to retain a trader skip reason; no current table stores this decision

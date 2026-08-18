@@ -15,23 +15,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertTriangle, Play, Plus, RefreshCw, Trash2, BookOpen, TrendingUp, ArrowUpRight, Compass, Layers3, Target, Info, Lightbulb, DatabaseZap, CheckCircle2, KeyRound } from "lucide-react";
+import { Play, Plus, RefreshCw, Trash2, BookOpen, TrendingUp, ArrowUpRight, Compass, Layers3, Target, Info, Lightbulb, DatabaseZap, CheckCircle2, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { formatDistanceToNow } from "date-fns";
 import { buildResearchJourneys } from "@shared/runWorkspace";
-
-const DISCLAIMER = "Internal research tool — not investment advice. Modeled figures are labeled as such.";
-
-function DisclaimerBanner() {
-  return (
-    <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium"
-      style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", border: "1px solid var(--sh-border-1)" }}>
-      <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} />
-      {DISCLAIMER}
-    </div>
-  );
-}
+import { DailyPlayList } from "@/components/aperture/DailyPlayList";
 
 function dollarsToCents(v: string): number {
   return Math.round(parseFloat(v.replace(/[^0-9.]/g, "")) * 100);
@@ -118,6 +107,7 @@ function FieldLabel({ label, help }: { label: string; help: string }) {
 
 export default function ApertureHome() {
   const [, navigate] = useLocation();
+  const [showResearchSetup, setShowResearchSetup] = useState(() => new URLSearchParams(window.location.search).get("setup") === "1");
   const [selectedThesisId, setSelectedThesisId] = useState<number | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [deployable, setDeployable] = useState("20000");
@@ -139,6 +129,7 @@ export default function ApertureHome() {
   const { data: accounts } = trpc.aperture.account.list.useQuery();
   const { data: runs, refetch: refetchRuns } = trpc.aperture.run.list.useQuery();
   const { data: providers } = trpc.aperture.providers.useQuery();
+  const { data: dailyPlays } = trpc.aperture.play.list.useQuery();
 
   useEffect(() => {
     if (selectedAccountId || !accounts?.length) return;
@@ -210,6 +201,7 @@ export default function ApertureHome() {
   const selectedThesis = theses?.find((thesis) => thesis.id === selectedThesisId);
   const selectedAccount = accounts?.find((account) => account.id === selectedAccountId);
   const selectedHorizon = selectedThesis?.graph?.horizons?.[0] ?? null;
+  const thesisProducedPlays = (dailyPlays ?? []).filter((play) => play.run.thesisId === selectedThesisId);
   const unprojectedCanonicalTheses = (canonicalTheses ?? []).filter(
     (canonical) => !(theses ?? []).some((projection) => projection.sourceCompilationId === canonical.id),
   );
@@ -237,13 +229,19 @@ export default function ApertureHome() {
     toast.success("Recommended guardrails applied", { description: "You can tighten these further; the server will not allow looser mandate limits." });
   };
 
+  if (!showResearchSetup) {
+    return <DashboardLayout><div className="mx-auto max-w-6xl space-y-5"><DailyPlayList onNewResearch={() => { setShowResearchSetup(true); navigate("/aperture?setup=1"); }} onOpenRun={(runId, candidateId, view) => {
+      if (view === "execute") navigate(`/aperture/run/${runId}/execute?candidate=${candidateId}`);
+      else navigate(`/aperture/run/${runId}?view=${view ?? "play"}`);
+    }} /></div></DashboardLayout>;
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-5xl">
-        <DisclaimerBanner />
-
         <header className="max-w-3xl">
           <div className="flex items-center gap-2 mb-2">
+            <Button variant="ghost" size="sm" className="h-7 px-0 text-xs" onClick={() => { setShowResearchSetup(false); navigate("/aperture"); }}>← Today’s plays</Button>
             <Compass className="h-5 w-5" style={{ color: "var(--sh-signal)" }} />
             <span className="text-[0.7rem] font-semibold uppercase tracking-[0.17em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture · Paper research</span>
             <Badge variant="outline" className="text-xs">Human-approved only</Badge>
@@ -323,6 +321,7 @@ export default function ApertureHome() {
                   {selectedThesisId && (
                     <div className="rounded-lg border p-3 text-xs" style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
                       <div className="flex items-center gap-2"><Target className="h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} /><span><strong style={{ color: "var(--sh-text-primary)" }}>Ready to frame:</strong> {selectedHorizon ?? "Aperture will prepare this saved belief for securities research when you build the brief."}</span></div>
+                      <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Plays this thesis produced</p>{thesisProducedPlays.length ? <div className="mt-2 flex flex-wrap gap-1.5">{thesisProducedPlays.slice(0, 8).map((play) => <Button key={play.candidate.id} type="button" variant="outline" size="sm" className="h-7 text-[11px]" onClick={() => navigate(`/aperture/run/${play.run.id}?view=play`)}>{play.candidate.symbol} · {play.run.holdingPeriod ?? "research"}</Button>)}</div> : <p className="mt-1 leading-5">No short-horizon play is recorded for this thesis yet. Building a brief creates research, not a paper order.</p>}</div>
                     </div>
                   )}
                   {projectCanonicalThesis.isPending && canonicalThesisId && (

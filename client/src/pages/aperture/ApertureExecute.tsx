@@ -418,10 +418,12 @@ function Chip({ text, color }: { text: string; color: string }) {
 
 function AlphaDashboard({ runId }: { runId: number }) {
   const { data: alpha, refetch } = trpc.aperture.alpha.get.useQuery({ runId });
+  const { data: dailyPlays } = trpc.aperture.play.list.useQuery();
   const compute = trpc.aperture.alpha.compute.useMutation({
     onSuccess: () => { toast.success("Alpha metric refreshed"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
+  const recordedDecisions = (dailyPlays ?? []).filter((play) => play.run.id === runId && play.decision);
 
   return (
     <div className="space-y-4">
@@ -450,6 +452,10 @@ function AlphaDashboard({ runId }: { runId: number }) {
       ) : (
         <Scorecard alpha={alpha} />
       )}
+      <section className="space-y-2 rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+        <LedgerHead label="Recorded trader decisions · selectivity is part of the process" />
+        {recordedDecisions.length ? <div className="mt-2 space-y-2">{recordedDecisions.map((play) => <div key={play.decision!.id} className="rounded-md border px-3 py-2 text-xs" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><span className="font-mono font-semibold" style={{ color: "var(--sh-text-primary)" }}>{play.candidate.symbol}</span><span className="ml-2 uppercase tracking-[0.1em]" style={{ color: "var(--sh-signal)" }}>{play.decision!.decision}</span><p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>{play.decision!.reason}</p></div>)}</div> : <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>No skip or defer was recorded for this run. This is not evidence that every surfaced play was actionable; it only means no trader decision was saved.</p>}
+      </section>
     </div>
   );
 }

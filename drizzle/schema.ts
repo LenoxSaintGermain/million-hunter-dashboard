@@ -1254,6 +1254,29 @@ export const apertureEvidenceReviews = mysqlTable("aperture_evidence_reviews", {
 }));
 export type ApertureEvidenceReview = typeof apertureEvidenceReviews.$inferSelect;
 
+/**
+ * A trader's explicit decision not to use a surfaced research play.
+ *
+ * This is distinct from a broker-order rejection: no proposal need exist to
+ * conclude that cash, delay, or another play is the correct action. Retaining
+ * the reason makes the weekly scorecard measure selectivity as well as fills.
+ */
+export const aperturePlayDecisions = mysqlTable("aperture_play_decisions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  runId: int("run_id").notNull(),
+  candidateId: int("candidate_id").notNull(),
+  decision: mysqlEnum("decision", ["skipped", "deferred"]).notNull(),
+  reason: text("reason").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  decisionScope: uniqueIndex("aperture_play_decision_scope").on(table.userId, table.runId, table.candidateId),
+  byRun: index("aperture_play_decision_run_idx").on(table.runId),
+}));
+export type AperturePlayDecision = typeof aperturePlayDecisions.$inferSelect;
+export type InsertAperturePlayDecision = typeof aperturePlayDecisions.$inferInsert;
+
 /** Competing deployment strategies — the output is a choice, not a list. */
 export const apertureStrategies = mysqlTable("aperture_strategies", {
   id: int("id").autoincrement().primaryKey(),

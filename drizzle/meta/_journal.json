@@ -190,6 +190,13 @@
       "when": 1787060221971,
       "tag": "0026_zippy_boomer",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "5",
+      "when": 1787094224841,
+      "tag": "0027_harsh_bloodaxe",
+      "breakpoints": true
     }
   ]
 }
