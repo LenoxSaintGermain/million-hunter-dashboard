@@ -1283,3 +1283,14 @@
 - [x] Automatically recover formatting-only memo failures with a labeled ledger-backed record while preserving strict rejection of unsupported financial claims
 - [x] Replace raw validator fragments with plain-language state, fact-ledger continuity, and one next action
 - [x] Add regression coverage and browser UAT for rejected-memo recovery
+
+## Operator Loop — Compact Research to Action (Aug 17 2026)
+- [x] Replace the static Command Center system-status hero with a compact, current operator pulse that summarizes actionable work and recent research state
+- [x] Eliminate wasteful fixed-height, empty-column, and forced-line-break layouts across reviewed Capital Aperture surfaces with mobile-first responsive grids
+- [x] Convert the Memo Library into a compact filterable triage workspace with in-context detail expansion instead of mandatory navigation to a separate page
+- [x] Make validated, needs-evidence, and rejected memo counts directly filterable and explain their meaning in plain language
+- [x] Add plain-language tooltips for evidence confidence, research fit, open checks, macro evidence, research posture, paper readiness, and action state
+- [x] Surface thesis and current paper-portfolio impact wherever an evidence item, memo, or macro observation matters
+- [x] Add a clear research-to-action summary describing connected versus manual implementation, human approvals, no-order status, and tracked post-action follow-up
+- [x] Add regression coverage and browser UAT for the compact operator loop
+- [x] Distinguish manual imported holdings from broker-connected accounts in the paper-readiness status language

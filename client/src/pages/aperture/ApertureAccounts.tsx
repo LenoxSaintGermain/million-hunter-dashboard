@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
-  AlertTriangle, ArrowLeft, Plus, RefreshCw, Upload, Wallet, CheckCircle2, XCircle,
+  AlertTriangle, ArrowLeft, ArrowRight, Plus, RefreshCw, Upload, Wallet, CheckCircle2, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -88,7 +88,7 @@ export default function ApertureAccounts() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 max-w-3xl">
+      <div className="mx-auto max-w-5xl space-y-5 px-4 py-5 sm:px-6 sm:py-7">
         {/* Disclaimer */}
         <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium"
           style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", border: "1px solid var(--sh-border-1)" }}>
@@ -102,15 +102,25 @@ export default function ApertureAccounts() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>Portfolio Accounts</h1>
+            <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>Paper readiness</h1>
             <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>
-              Connect Alpaca paper or enter holdings manually. Paper only — no real capital.
+              See how research becomes a human-approved paper action. No live capital and no autonomous order.
             </p>
           </div>
           <Button className="ml-auto" size="sm" onClick={() => setShowCreate(!showCreate)}>
             <Plus className="h-3.5 w-3.5 mr-1" /> New Account
           </Button>
         </div>
+
+        <section className="border border-rule bg-paper p-4" aria-label="Research to paper action flow">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div><p className="font-eyebrow text-eyebrow text-amber">How this works</p><p className="mt-1 text-sm text-ink">Research informs a proposed paper action; a human controls every approval and submission.</p></div>
+            <button onClick={() => navigate("/aperture/runs")} className="inline-flex shrink-0 items-center gap-1 text-xs text-amber hover:underline">Open research journeys <ArrowRight className="h-3 w-3" /></button>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 border-t border-rule pt-4 sm:grid-cols-4">
+            {["1 · Sync context", "2 · Review decisive checks", "3 · Approve paper order", "4 · Track fill & follow-up"].map((step, index) => <div key={step} className="min-w-0"><p className="font-eyebrow text-eyebrow text-muted-foreground">{step}</p><p className="mt-1 text-xs leading-5 text-ink/70">{["Connected accounts sync automatically; manual accounts use CSV.", "Only decision-critical evidence gates order review.", "Approval and submission are separate human actions.", "Filled paper orders enter monitoring and outcome analysis."][index]}</p></div>)}
+          </div>
+        </section>
 
         {/* Create form */}
         {showCreate && (
@@ -194,24 +204,29 @@ export default function ApertureAccounts() {
                   variant="outline"
                   size="sm"
                   onClick={() => syncAccount.mutate({ id: account.id })}
-                  disabled={syncAccount.isPending}
+                  disabled={syncAccount.isPending || account.brokerId === "manual"}
                 >
                   <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                  Sync
+                  {account.brokerId === "manual" ? "Imported context" : "Sync"}
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {/* Broker availability */}
-              {brokers?.find((b) => b.id === account.brokerId) && (
+              {account.brokerId === "manual" ? (
+                <div className="flex items-center gap-2 text-xs">
+                  <XCircle className="h-3.5 w-3.5" style={{ color: "var(--sh-fg-muted)" }} />
+                  <span style={{ color: "var(--sh-fg-muted)" }}><strong>Manual context:</strong> these holdings came from an import. They inform research, but nothing syncs automatically and no broker order can be sent from this account.</span>
+                </div>
+              ) : brokers?.find((b) => b.id === account.brokerId) && (
                 <div className="flex items-center gap-2 text-xs">
                   {brokers.find((b) => b.id === account.brokerId)!.available ? (
                     <><CheckCircle2 className="h-3.5 w-3.5" style={{ color: "oklch(0.55 0.15 145)" }} />
-                    <span style={{ color: "oklch(0.55 0.15 145)" }}>Paper context connected — positions can sync. A human must still clear decision-critical evidence and explicitly approve any paper order.</span></>
+                    <span style={{ color: "oklch(0.55 0.15 145)" }}><strong>Connected:</strong> positions sync automatically from this paper broker. Research still requires human evidence review, order approval, and a separate paper submission.</span></>
                   ) : (
                     <><XCircle className="h-3.5 w-3.5" style={{ color: "var(--sh-fg-muted)" }} />
                     <span style={{ color: "var(--sh-fg-muted)" }}>
-                      {brokers.find((b) => b.id === account.brokerId)!.unavailableReason ?? "Broker not configured"}
+                      <strong>Manual context:</strong> {brokers.find((b) => b.id === account.brokerId)!.unavailableReason ?? "positions are not connected; import a CSV to use them in research."}
                     </span></>
                   )}
                 </div>

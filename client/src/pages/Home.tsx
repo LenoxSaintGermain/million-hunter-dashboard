@@ -416,54 +416,32 @@ export default function Home() {
       <CoAnalystBanner stats={stats} macroPosture={macroPosture} />
       <main className="max-w-[1280px] mx-auto w-full px-6 lg:px-10 py-12">
 
-        {/* ── Page Hero ─────────────────────────────────────────────────────── */}
-        <header className="mb-16 border-b border-rule pb-12">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-4 flex-wrap">
+        {/* ── Operator pulse: the work that needs attention, not a static mood ── */}
+        <header className="mb-8 border-b border-rule pb-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">SIGNAL HUNTER OS</span>
-                <span className="w-8 h-px bg-rule" />
-                <span className="font-eyebrow text-eyebrow text-ink border border-rule px-2 py-1 rounded-sm flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber animate-pulse" />
-                  COMMAND CENTER
-                </span>
+                <span className="w-5 h-px bg-rule" />
+                <span className="font-eyebrow text-eyebrow text-ink border border-rule px-2 py-1 rounded-sm">COMMAND CENTER</span>
               </div>
-              <h1 className="font-hero-h1 text-hero-h1 text-ink max-w-3xl mb-4 leading-[1.05]">
-                System Status: {isLoading ? "—" : (macroPosture?.posture ?? "Active")}
-              </h1>
-              {macroPosture?.topSignals && macroPosture.topSignals.length > 0 && (
-                <div className="flex items-center gap-3 mt-4 flex-wrap">
-                  <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">TIDE</span>
-                  <span className="w-px h-3 bg-rule" />
-                  <div className="flex gap-6 flex-wrap">
-                    {macroPosture.topSignals.map((sig: any) => (
-                      <div key={sig.id} className="flex items-center gap-2">
-                        <span className={`w-1.5 h-1.5 rounded-full ${sig.direction === "headwind" ? "bg-clay" : "bg-sage"}`} />
-                        <span className="font-body-base text-[13px] text-ink/70">
-                          {sig.title.length > 55 ? sig.title.slice(0, 55) + "…" : sig.title}
-                        </span>
-                        <span className={`font-data-mono text-data-mono ${sig.direction === "headwind" ? "text-clay" : "text-sage"}`}>
-                          {Math.round((sig.confidenceScore ?? 0.5) * 100)}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <h1 className="font-card-title text-[clamp(1.75rem,4vw,2.5rem)] leading-none text-ink">Your operator pulse</h1>
+              <p className="mt-2 max-w-2xl font-body-base text-body-base text-ink/70">
+                {isLoading ? "Loading the work that needs review…" : stats?.highPriority
+                  ? `${stats.highPriority} high-priority target${stats.highPriority === 1 ? " needs" : "s need"} human review before outreach.`
+                  : `${stats?.total ?? 0} active targets · ${macroPosture?.tailwindCount ?? 0} current tailwind signal${(macroPosture?.tailwindCount ?? 0) === 1 ? "" : "s"} · choose the next research action below.`}
+              </p>
             </div>
-            <div className="flex flex-col items-end gap-4 shrink-0">
-              <div className="flex items-center gap-2 border border-rule bg-paper px-4 py-2 rounded-full">
-                <span className="w-2 h-2 rounded-full bg-amber animate-pulse" />
-                <span className="font-eyebrow text-eyebrow text-ink tracking-widest">{macroPosture?.posture ?? "ACTIVE"}</span>
-              </div>
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              <Link href="/aperture/runs"><span className="inline-flex items-center gap-1.5 border border-rule bg-paper px-3 py-2 font-eyebrow text-eyebrow text-ink hover:border-amber hover:text-amber cursor-pointer">Research journeys <ArrowRight className="w-3 h-3" /></span></Link>
               <button onClick={() => triggerScan.mutate({})} disabled={triggerScan.isPending}
-                className="flex items-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-5 py-2.5 rounded-full hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-50">
+                className="flex items-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2 hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-50">
                 {triggerScan.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ScanLine className="w-3 h-3" />}
                 {triggerScan.isPending ? "SCANNING…" : "RUN SCAN"}
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-rule pt-8 mt-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-5 border-t border-rule pt-5 mt-5">
             {[
               { label: "PIPELINE VALUE", value: fmt(stats?.totalPipelineValue) },
               { label: "ACTIVE DEALS",   value: isLoading ? "—" : String(stats?.total ?? 0) },
@@ -472,7 +450,7 @@ export default function Home() {
             ].map((item, i) => (
               <div key={i}>
                 <p className="font-eyebrow text-eyebrow text-muted-foreground mb-2 uppercase tracking-widest">{item.label}</p>
-                <p className="font-data-mono text-section-h2 text-ink leading-none">{item.value}</p>
+                <p className="font-data-mono text-[clamp(1.45rem,3vw,2rem)] text-ink leading-none">{item.value}</p>
               </div>
             ))}
           </div>

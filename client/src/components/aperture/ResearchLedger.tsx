@@ -40,7 +40,7 @@ export function ResearchLedger({ macroFacts, onRefresh, refreshing = false }: { 
   const fredFacts = macroFacts.filter((fact) => fact.providerId === "fred");
   return (
     <section className="space-y-4">
-      <div className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+      <div className="rounded-xl border p-3 sm:p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -48,7 +48,7 @@ export function ResearchLedger({ macroFacts, onRefresh, refreshing = false }: { 
               <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Research ledger · macro evidence</p>
               <span className="rounded-full px-2 py-0.5 text-[0.62rem] font-semibold tracking-[0.12em]" style={{ background: "var(--sh-signal)", color: "var(--sh-primary-fg)" }}>FRED</span>
             </div>
-            <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Verified Federal Reserve observations that frame the macro regime for this brief. They provide context for research—not a directional trade instruction.</p>
+            <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>A macro snapshot for this thesis and paper portfolio. It explains the backdrop; it does not predict a trade outcome.</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden items-center gap-1.5 text-xs sm:flex" style={{ color: "var(--sh-fg-muted)" }}><CalendarDays className="h-3.5 w-3.5" /> Source observation dates shown below</span>
@@ -64,10 +64,10 @@ export function ResearchLedger({ macroFacts, onRefresh, refreshing = false }: { 
           <p className="mx-auto mt-1 max-w-md text-xs leading-5">FRED is connected. Build or refresh the Capital Brief to collect the latest macro snapshot into this ledger.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {fredFacts.map((fact) => {
             const context = FRED_CONTEXT[fact.factKey] ?? { label: fact.factKey.replace(/_/g, " "), impact: "Macro context captured from the Federal Reserve economic data service." };
-            return <article key={fact.id} className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+            return <article key={fact.id} className="rounded-xl border p-3 sm:p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-1.5">
