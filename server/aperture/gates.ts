@@ -95,6 +95,11 @@ export interface OrderGateInput {
   invalidationCondition?: string | null;
   /** When the thesis for this trade expires. Required on every holding period. */
   catalystDeadlineAt?: number | null;
+  entryPriceCents?: number | null;
+  stopPriceCents?: number | null;
+  slippageCents?: number | null;
+  timeStopAt?: number | null;
+  noTradeConditions?: string[] | null;
   paperAcknowledgement?: string | null;
   /**
    * The order's notional in cents as the gates will use it. `stated` when the
@@ -243,6 +248,27 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
         mandate.intradayCutoffEtMinutes,
       );
     }
+  }
+
+  // ── Intraday play recipe ───────────────────────────────────────────────────
+  // These are proposal-creation gates only. A time stop or invalidation never
+  // closes a position automatically; it gives the human a documented review plan.
+  if (input.holdingPeriod === "intraday") {
+    const entry = input.entryPriceCents ?? null;
+    const stop = input.stopPriceCents ?? null;
+    const slippage = input.slippageCents ?? null;
+    const validEntry = entry != null && entry > 0;
+    const validStop = stop != null && stop > 0 && stop !== entry;
+    const validSlippage = slippage != null && slippage >= 0;
+    g.add("play_entry", validEntry, validEntry ? "play entry is stated" : "intraday play requires a positive entry price");
+    g.add("play_stop", validStop, validStop ? "play stop is stated" : "intraday play requires a stop different from entry");
+    g.add("play_slippage", validSlippage, validSlippage ? "slippage allowance is stated" : "intraday play requires a slippage allowance");
+    const timeStop = input.timeStopAt ?? null;
+    const deadlineForStop = input.catalystDeadlineAt ?? null;
+    const validTimeStop = timeStop != null && timeStop > now && (deadlineForStop == null || timeStop <= deadlineForStop);
+    g.add("play_time_stop", validTimeStop, validTimeStop ? "human close-review time is inside the catalyst window" : "intraday play requires a future time stop inside the catalyst window");
+    const noTradeConditions = (input.noTradeConditions ?? []).map((condition) => condition.trim()).filter(Boolean);
+    g.add("play_no_trade_condition", noTradeConditions.length > 0, noTradeConditions.length ? "no-trade condition is stated" : "intraday play requires at least one no-trade condition");
   }
 
   // ── Notional ────────────────────────────────────────────────────────────────

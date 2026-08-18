@@ -11,6 +11,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { CapitalBrief } from "@/components/aperture/CapitalBrief";
 import { ResearchLedger } from "@/components/aperture/ResearchLedger";
 import { DecisionFocusCard } from "@/components/aperture/DecisionFocusCard";
+import { PlayRecipeCard } from "@/components/aperture/PlayRecipeCard";
 import { decisionPriority } from "@shared/decisionFocus";
 import { buildDecisionPath } from "@shared/decisionPath";
 import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
@@ -105,9 +106,9 @@ export default function CandidateBoard() {
   const [, params] = useRoute("/aperture/run/:id");
   const [, navigate] = useLocation();
   const runId = Number(params?.id);
-  const [view, setView] = useState<"brief" | "evidence" | "ledger">(() => {
+  const [view, setView] = useState<"play" | "brief" | "evidence" | "ledger">(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
-    return requested === "evidence" || requested === "ledger" ? requested : "brief";
+    return requested === "brief" || requested === "evidence" || requested === "ledger" ? requested : "play";
   });
   const [activeRole, setActiveRole] = useState<Role | "all">("all");
   const [showSupporting, setShowSupporting] = useState(false);
@@ -171,7 +172,7 @@ export default function CandidateBoard() {
   );
   if (!data) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Run not found.</div></DashboardLayout>;
 
-  const { run, stale, candidates, macroFacts, brief } = data;
+  const { run, stale, candidates, macroFacts, brief, thesisContext } = data;
   const roles: Array<Role | "all"> = ["all", "core", "complementary", "remainder", "alternative_expression"];
   const filtered = (activeRole === "all" ? candidates : candidates.filter((candidate) => candidate.role === activeRole))
     .slice().sort((a, b) => decisionPriority(b) - decisionPriority(a));
@@ -198,14 +199,15 @@ export default function CandidateBoard() {
             <Button variant="ghost" size="icon" className="mt-0.5 h-8 w-8 shrink-0" onClick={() => navigate("/aperture")}><ArrowLeft className="h-4 w-4" /></Button>
             <div>
               <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-fg-muted)" }}>Capital Aperture · run #{runId}</p>
-              <h1 className="mt-1 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>From research signals to a deliberate portfolio decision</h1>
+              <h1 className="mt-1 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>Start with the play. Work backward to the evidence.</h1>
               <p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>{run.candidateCount ?? candidates.length} evidence candidates · {run.status} {run.droppedNote ? `· ${run.droppedNote}` : ""}</p>
             </div>
           </div>
-          <div className="flex rounded-lg border p-1" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
-            <button onClick={() => setView("brief")} className="rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "brief" ? "var(--sh-surface)" : "transparent", color: view === "brief" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Decision brief</button>
-            <button onClick={() => setView("evidence")} className="rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "evidence" ? "var(--sh-surface)" : "transparent", color: view === "evidence" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Evidence queue</button>
-            <button onClick={() => setView("ledger")} className="rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "ledger" ? "var(--sh-surface)" : "transparent", color: view === "ledger" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Research ledger</button>
+          <div className="flex max-w-full overflow-x-auto rounded-lg border p-1" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+            <button onClick={() => setView("play")} className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "play" ? "var(--sh-surface)" : "transparent", color: view === "play" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Your play</button>
+            <button onClick={() => setView("brief")} className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "brief" ? "var(--sh-surface)" : "transparent", color: view === "brief" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Decision detail</button>
+            <button onClick={() => setView("evidence")} className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "evidence" ? "var(--sh-surface)" : "transparent", color: view === "evidence" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Evidence</button>
+            <button onClick={() => setView("ledger")} className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "ledger" ? "var(--sh-surface)" : "transparent", color: view === "ledger" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Research</button>
           </div>
         </header>
 
@@ -219,7 +221,21 @@ export default function CandidateBoard() {
           onRetry={() => retryRun.mutate({ id: runId })}
         />
 
-        {view === "brief" ? (
+        {view === "play" ? (
+          <div className="space-y-5">
+            {focusCandidate ? <PlayRecipeCard
+              candidate={focusCandidate}
+              run={run}
+              reviewedChecks={reviewedChecks}
+              alreadyHeld={alreadyHeld}
+              thesisContext={thesisContext}
+              onReviewEvidence={openEvidence}
+              onPrepareProposal={() => navigate(`/aperture/run/${runId}/execute?candidate=${focusCandidate.id}`)}
+              onOpenResearch={() => setView("ledger")}
+            /> : <section className="rounded-xl border p-5 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>No paper play is available until research returns a candidate.</section>}
+            {focusCandidate && <DecisionFocusCard candidate={focusCandidate} positions={paperPositions} onOpenMemo={focusCandidate.memoStatus === "ok" ? () => navigate(`/aperture/memos/${focusCandidate.id}`) : undefined} onReviewEvidence={openEvidence} onComparePostures={() => navigate(`/aperture/run/${runId}/strategies`)} onViewPaperAccount={() => navigate("/aperture/accounts")} />}
+          </div>
+        ) : view === "brief" ? (
           <div className="space-y-5">
             {focusCandidate && <section className="rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

@@ -221,7 +221,15 @@ describe("market hours", () => {
   it("allows an intraday order at 15:54 ET", () => {
     const ok = at("2026-06-10T19:54:00Z");
     const now = Date.parse("2026-06-10T19:54:00Z");
-    const ev = evalOrder({ holdingPeriod: "intraday", catalystDeadlineAt: now + 3_600_000 }, {}, ok, now);
+    const ev = evalOrder({
+      holdingPeriod: "intraday",
+      catalystDeadlineAt: now + 3_600_000,
+      entryPriceCents: 10_865,
+      stopPriceCents: 10_790,
+      slippageCents: 8,
+      timeStopAt: now + 30 * 60_000,
+      noTradeConditions: ["Skip if the catalyst response loses VWAP before entry."],
+    }, {}, ok, now);
     expect(gate(ev, "intraday_cutoff")!.passed).toBe(true);
     expect(ev.passed).toBe(true);
   });
@@ -467,5 +475,32 @@ describe("evaluateRunPreset", () => {
     const ev = evalPreset({}, { accountLinked: false, equityCents: null });
     expect(ev.passed).toBe(true);
     expect(ev.notes.join(" ")).toContain("analysis-only");
+  });
+});
+
+describe("intraday play recipe", () => {
+  const intradayRecipe: Partial<OrderGateInput> = {
+    holdingPeriod: "intraday",
+    catalystDeadlineAt: NOW + 4 * 60 * 60 * 1000,
+    entryPriceCents: 10_865,
+    stopPriceCents: 10_790,
+    slippageCents: 8,
+    timeStopAt: NOW + 3 * 60 * 60 * 1000,
+    noTradeConditions: ["Skip when price does not hold above VWAP after the catalyst window."],
+  };
+
+  it("requires the complete human-reviewed entry, stop, time, and no-trade recipe", () => {
+    const ev = evalOrder(intradayRecipe);
+    for (const key of ["play_entry", "play_stop", "play_slippage", "play_time_stop", "play_no_trade_condition"]) {
+      expect(gate(ev, key)?.passed).toBe(true);
+    }
+  });
+
+  it("blocks an intraday proposal when the stop, time stop, or no-trade condition is missing", () => {
+    const ev = evalOrder({ ...intradayRecipe, stopPriceCents: null, timeStopAt: null, noTradeConditions: [] });
+    expect(gate(ev, "play_stop")?.passed).toBe(false);
+    expect(gate(ev, "play_time_stop")?.passed).toBe(false);
+    expect(gate(ev, "play_no_trade_condition")?.passed).toBe(false);
+    expect(ev.passed).toBe(false);
   });
 });

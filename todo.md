@@ -1316,3 +1316,11 @@
 - [x] Create the reference thesis and run it through the paper-only Capital Brief workflow without creating, approving, submitting, or modifying an order
 - [x] Prioritize the highest-leverage remedies required for a reliable catalyst-reaction workflow without adding incomplete execution logic
 - [x] Record the trial outcome, residual gaps, and recommended operating sequence
+
+## Play-First Day Trader Journey & Broker Repair (Aug 18 2026)
+- [x] Repair the missing broker-order database columns causing Capital Aperture order, readiness, and run-detail queries to fail
+- [x] Add regression coverage for the repaired broker-order contract and verify legacy order queries return safely
+- [x] Define a play-first day-trader recipe that presents sequence, sizing, risk, exit timing, no-trade conditions, and confidence before thesis detail
+- [x] Build a play-first recommendation surface with progressive provenance from play to evidence to thesis
+- [x] Preserve strict human-only paper-order approval and eliminate any interpretation that a recipe is an autonomous instruction
+- [ ] Validate the play-first journey on mobile and desktop, including the no-trade path and low-confidence state

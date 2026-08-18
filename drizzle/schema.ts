@@ -1337,6 +1337,16 @@ export const brokerOrders = mysqlTable("broker_orders", {
   invalidationCondition: text("invalidation_condition"),
   /** Optional price level attached to the invalidation. */
   invalidationPriceCents: bigint("invalidation_price_cents", { mode: "number" }),
+  /** Intraday play recipe: entry, stop, and slippage are operator-stated price controls. */
+  entryPriceCents: bigint("entry_price_cents", { mode: "number" }),
+  stopPriceCents: bigint("stop_price_cents", { mode: "number" }),
+  slippageCents: bigint("slippage_cents", { mode: "number" }),
+  /** Derived server-side from quantity × stop distance including slippage. */
+  plannedRiskCents: bigint("planned_risk_cents", { mode: "number" }),
+  /** A human review deadline for an intraday close; never an autonomous exit. */
+  timeStopAt: bigint("time_stop_at", { mode: "number" }),
+  /** Market conditions that mean the operator should not create or should reject this proposal. */
+  noTradeConditions: json("no_trade_conditions").$type<string[]>().default([]),
   holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window"]),
   catalystDeadlineAt: bigint("catalyst_deadline_at", { mode: "number" }),
   /** regular | pre_market | after_hours | closed | unknown, at creation time. */

@@ -183,6 +183,13 @@
       "when": 1787021777094,
       "tag": "0025_silly_clea",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1787060221971,
+      "tag": "0026_zippy_boomer",
+      "breakpoints": true
     }
   ]
 }

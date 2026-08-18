@@ -61,6 +61,11 @@ export interface CreateOrderInput {
   /** What would make it wrong. Boilerplate is rejected. */
   invalidationCondition?: string | null;
   invalidationPriceCents?: number | null;
+  entryPriceCents?: number | null;
+  stopPriceCents?: number | null;
+  slippageCents?: number | null;
+  timeStopAt?: number | null;
+  noTradeConditions?: string[] | null;
   holdingPeriod?: HoldingPeriod | string | null;
   catalystDeadlineAt?: number | null;
   /** Must be the literal "PAPER". */
@@ -119,6 +124,11 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
       reason: input.reason,
       invalidationCondition: input.invalidationCondition,
       catalystDeadlineAt: input.catalystDeadlineAt ?? null,
+      entryPriceCents: input.entryPriceCents ?? null,
+      stopPriceCents: input.stopPriceCents ?? null,
+      slippageCents: input.slippageCents ?? null,
+      timeStopAt: input.timeStopAt ?? null,
+      noTradeConditions: input.noTradeConditions ?? [],
       paperAcknowledgement: input.paperAcknowledgement,
       gatedNotionalCents,
       notionalBasis,
@@ -130,6 +140,14 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
   });
 
   const holdingPeriod = isStoredHoldingPeriod(input.holdingPeriod) ? input.holdingPeriod : null;
+  const plannedRiskCents = holdingPeriod === "intraday"
+    && input.qty != null
+    && input.qty > 0
+    && input.entryPriceCents != null
+    && input.stopPriceCents != null
+    && input.slippageCents != null
+    ? Math.round(input.qty * (Math.abs(input.entryPriceCents - input.stopPriceCents) + input.slippageCents))
+    : null;
   const base = {
     runId: input.runId,
     candidateId: input.candidateId ?? null,
@@ -145,6 +163,12 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
     reason: input.reason ?? null,
     invalidationCondition: input.invalidationCondition ?? null,
     invalidationPriceCents: input.invalidationPriceCents ?? null,
+    entryPriceCents: input.entryPriceCents ?? null,
+    stopPriceCents: input.stopPriceCents ?? null,
+    slippageCents: input.slippageCents ?? null,
+    plannedRiskCents,
+    timeStopAt: input.timeStopAt ?? null,
+    noTradeConditions: (input.noTradeConditions ?? []).map((condition) => condition.trim()).filter(Boolean),
     holdingPeriod,
     catalystDeadlineAt: input.catalystDeadlineAt ?? null,
     marketSession: session.session,

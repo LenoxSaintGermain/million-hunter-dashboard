@@ -448,7 +448,20 @@ export const apertureRouter = router({
           coverage: coverageDetail,
           thesisNodePaths: thesisNodes.map((node) => node.path),
         });
-        return { run, stale: isRunStale(run), candidates, strategies, coverage, coverageDetail, thesisNodes, macroFacts, brief, evidenceReviews, paperContext: paperAccount ? { account: paperAccount, positions: paperPositions } : null };
+        return {
+          run,
+          stale: isRunStale(run),
+          candidates,
+          strategies,
+          coverage,
+          coverageDetail,
+          thesisNodes,
+          macroFacts,
+          brief,
+          evidenceReviews,
+          thesisContext: { id: thesis.id, name: thesis.name, rawText: thesis.rawText },
+          paperContext: paperAccount ? { account: paperAccount, positions: paperPositions } : null,
+        };
       }),
 
     evidence: router({
@@ -761,6 +774,11 @@ export const apertureRouter = router({
         reason: z.string().min(MIN_NARRATIVE_CHARS),
         invalidationCondition: z.string().min(MIN_NARRATIVE_CHARS),
         invalidationPriceCents: z.number().optional(),
+        entryPriceCents: z.number().positive().optional(),
+        stopPriceCents: z.number().positive().optional(),
+        slippageCents: z.number().min(0).optional(),
+        timeStopAt: z.number().optional(),
+        noTradeConditions: z.array(z.string().min(2).max(300)).max(8).optional(),
         holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]),
         catalystDeadlineAt: z.number(),
         paperAcknowledgement: z.literal(PAPER_ACKNOWLEDGEMENT),
