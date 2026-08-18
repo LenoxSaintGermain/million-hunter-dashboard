@@ -11,3 +11,9 @@ The Memo Library presents validated and needs-review counts as direct filters. S
 ## Paper Readiness
 
 The paper-readiness view presents a four-step research-to-action loop: synchronize context, review decisive checks, approve a paper order, then monitor paper fills and follow-up. The Alpaca paper account is explicitly labeled **Connected** and auto-synced; the imported holdings account is explicitly labeled **Manual context**, with no broker synchronization or order submission available.
+
+## Anchored Memo Detail Repair
+
+Before selection, the memo grid now uses two responsive columns rather than the previous dense three-column desktop grid. The selected-detail panel is reserved beside the grid on desktop and appears above it on mobile, avoiding an off-screen expansion below every row.
+
+Selecting LLY immediately placed its validated decision answer in the visible right-hand panel beside the grid. The panel retained two direct continuations—decisive checks and the full research record—without leaving the triage screen or requiring a scroll through the remaining cards.

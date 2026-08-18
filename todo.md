@@ -1294,3 +1294,9 @@
 - [x] Add a clear research-to-action summary describing connected versus manual implementation, human approvals, no-order status, and tracked post-action follow-up
 - [x] Add regression coverage and browser UAT for the compact operator loop
 - [x] Distinguish manual imported holdings from broker-connected accounts in the paper-readiness status language
+
+## Memo Library — Visible In-Context Detail (Aug 17 2026)
+- [x] Move selected memo detail into an anchored visible panel so it does not render below the full record grid
+- [x] Reduce Memo Library grid density and preserve a clear selected state across desktop and mobile layouts
+- [x] Ensure selection moves focus to the memo answer within one interaction without forcing a separate screen or scroll hunt
+- [x] Add regression coverage and browser UAT for inline memo-detail visibility
