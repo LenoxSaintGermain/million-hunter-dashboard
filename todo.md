@@ -1343,7 +1343,7 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Render the paper-only cockpit rail on Capital Aperture views using the server-provided market, account, headroom, and run truth states
 - [x] Surface live order preflight, including blocking conditions, modeled-notional basis, and planned-loss risk before a proposal can be submitted
 - [x] Render set-aside candidates and legacy-record notes without treating a missing historical record as an empty list
-- [ ] Complete regression and authenticated browser UAT without creating, approving, submitting, or modifying a paper order
+- [x] Complete regression and authenticated browser UAT without creating, approving, submitting, or modifying a paper order
 
 ## Cockpit Contract Repair & VWAP-Gated Ticket (Aug 18 2026)
 - [x] Pull and verify upstream commit 2633679 exposes all three planned-loss mandate ceilings and its completeness regression test
