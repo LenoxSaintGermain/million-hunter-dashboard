@@ -9,6 +9,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { getDb, createDeal, getDealIdByNameSource, getAllModelConfigs, upsertModelConfig } from "./db";
 import { deals } from "../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { GEMINI_STRONG, GEMINI_LEGACY_LITE } from "../shared/models";
 
 // ─── 1. Deal Deduplication ────────────────────────────────────────────────────
 describe("Deal Deduplication", () => {
@@ -143,30 +144,30 @@ describe("OZ/TAD Enrichment Schema", () => {
 describe("Consensus Model Config", () => {
   it("can write and read consensus model IDs from model_configs", async () => {
     // Write test values
-    await upsertModelConfig("consensus_model_1" as any, "gemini-3.1-pro-preview", true);
-    await upsertModelConfig("consensus_model_2" as any, "gemini-3.1-flash-lite", true);
-    await upsertModelConfig("consensus_model_3" as any, "gemini-3.1-flash-lite", true);
+    await upsertModelConfig("consensus_model_1" as any, GEMINI_STRONG, true);
+    await upsertModelConfig("consensus_model_2" as any, GEMINI_LEGACY_LITE, true);
+    await upsertModelConfig("consensus_model_3" as any, GEMINI_LEGACY_LITE, true);
 
     const configs = await getAllModelConfigs();
     const m1 = configs.find((c) => c.module === "consensus_model_1");
     const m2 = configs.find((c) => c.module === "consensus_model_2");
     const m3 = configs.find((c) => c.module === "consensus_model_3");
 
-    expect(m1?.modelId).toBe("gemini-3.1-pro-preview");
-    expect(m2?.modelId).toBe("gemini-3.1-flash-lite");
-    expect(m3?.modelId).toBe("gemini-3.1-flash-lite");
+    expect(m1?.modelId).toBe(GEMINI_STRONG);
+    expect(m2?.modelId).toBe(GEMINI_LEGACY_LITE);
+    expect(m3?.modelId).toBe(GEMINI_LEGACY_LITE);
   });
 
   it("consensus model IDs can be changed and persisted", async () => {
-    await upsertModelConfig("consensus_model_1" as any, "gemini-3.1-flash-lite", true);
+    await upsertModelConfig("consensus_model_1" as any, GEMINI_LEGACY_LITE, true);
     const configs = await getAllModelConfigs();
     const m1 = configs.find((c) => c.module === "consensus_model_1");
-    expect(m1?.modelId).toBe("gemini-3.1-flash-lite");
+    expect(m1?.modelId).toBe(GEMINI_LEGACY_LITE);
 
     // Reset to default
-    await upsertModelConfig("consensus_model_1" as any, "gemini-3.1-pro-preview", true);
+    await upsertModelConfig("consensus_model_1" as any, GEMINI_STRONG, true);
     const reset = await getAllModelConfigs();
     const m1Reset = reset.find((c) => c.module === "consensus_model_1");
-    expect(m1Reset?.modelId).toBe("gemini-3.1-pro-preview");
+    expect(m1Reset?.modelId).toBe(GEMINI_STRONG);
   });
 });

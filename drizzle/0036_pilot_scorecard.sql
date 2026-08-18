@@ -1,4 +1,4 @@
--- 0033 — Pilot scorecard: baseline, benchmark, sample size, horizon.
+-- 0036 — Pilot scorecard: baseline, benchmark, sample size, horizon.
 --
 -- aperture_alpha could already say "system P&L was +$400". It could not say what
 -- that was measured against, over what window, or on how many closed trades —

@@ -3,14 +3,39 @@
  *
  * Single source of truth for all available models across providers.
  *
- * MODEL POLICY (Jul 2026): All Gemini 3.x variants below are validated live
- * against the production GEMINI_API_KEY. Safe to use:
+ * MODEL POLICY — re-validated live Aug 18 2026 via `npx tsx scripts/validate-models.ts`
+ * (one-token generateContent probe per id against the production GEMINI_API_KEY).
+ * Re-run that script before changing anything here; it is the authority, not this
+ * comment and not CLAUDE.md.
+ *
+ * PASSED (6/7) — safe to use:
  *   gemini-3.6-flash         → GA Jul 21 2026, best token efficiency, high-volume
  *   gemini-3.5-flash         → GA, strongest Flash tier, balanced speed/quality
  *   gemini-3.5-flash-lite    → GA Jul 21 2026, ultra-cheap subagent tasks
  *   gemini-3.1-pro-preview   → Deep reasoning, long-context, multimodal
  *   gemini-3.1-flash-lite    → Fast structured extraction (legacy fallback)
  *   gemini-3-flash-preview   → Available but superseded by 3.5-flash
+ *
+ * FAILED (1/7) — DO NOT USE, and do not re-add on the assumption it is a typo:
+ *   gemini-3.1-flash         → HTTP 404 NOT_FOUND: "models/gemini-3.1-flash is not
+ *                              found for API version v1beta, or is not supported for
+ *                              generateContent." This id was live in
+ *                              server/_core/llm.ts until Aug 18 2026.
+ *
+ * POE IDS — VALIDATED LIVE 2026-08-18 against GET /v1/models plus a real
+ * /v1/chat/completions probe on the production Poe_api_key. Poe uses its own
+ * label-style namespace; these ids are NOT interchangeable with the direct-API
+ * Gemini ids above.
+ *   PASS  claude-opus-4.8 · claude-opus-4.7 · Claude-Sonnet-4.6 · Claude-Haiku-4.5
+ *         Gemini-3.1-Pro · Gemini-3-Flash · Gemini-3.1-Flash-Lite · GPT-5.4 · GPT-4.1
+ *   FAIL  Claude-Opus-4 → HTTP 500, absent from /v1/models. This was the id
+ *         server/poe.ts actually sent for Owner Psychology and the Digital
+ *         Footprint Audit, so both were calling a model that does not exist.
+ *   FAIL  GPT-5.5 → HTTP 404 "Model `GPT-5.5` not found." Catalog-only, never sent.
+ * Both dead ids are removed. Re-validate before changing any of them: an invented
+ * Poe label fails at request time exactly the way gemini-3.1-flash did.
+ *
+ * Perplexity sonar ids remain unverified by any validator.
  */
 
 export type ModelProvider = "google" | "poe" | "perplexity";
@@ -102,17 +127,28 @@ export const MODEL_CATALOG: ModelDefinition[] = [
     supportsGrounding: false,
     notes: "Legacy fast/cheap Gemini 3.1. Kept as fallback.",
   },
+  {
+    id: "gemini-3-flash-preview",
+    label: "Gemini 3 Flash (Preview)",
+    provider: "google",
+    tier: "preview",
+    contextWindow: 1000000,
+    outputLimit: 65536,
+    supportsJson: true,
+    supportsGrounding: true,
+    notes: "Validated live but superseded by gemini-3.5-flash. Listed so the Settings UI can render any id that passes VALID_GEMINI_IDS; prefer 3.5-flash.",
+  },
   // ── Claude via Poe API ────────────────────────────────────────────────────────────────────
   {
-    id: "Claude-Opus-4.7",
-    label: "Claude Opus 4.7 (via Poe)",
+    id: "claude-opus-4.8",
+    label: "Claude Opus 4.8 (via Poe)",
     provider: "poe",
     tier: "preview",
     contextWindow: 200000,
     outputLimit: 32000,
     supportsJson: true,
     supportsGrounding: false,
-    notes: "Anthropic's most capable model. Best for Owner Psychology profiling.",
+    notes: "Most capable Claude on this key (validated live Aug 18 2026). Best for Owner Psychology profiling.",
   },
   {
     id: "Claude-Sonnet-4.6",
@@ -138,15 +174,15 @@ export const MODEL_CATALOG: ModelDefinition[] = [
   },
   // ── GPT via Poe API ───────────────────────────────────────────────────────────────────────
   {
-    id: "GPT-5.5",
-    label: "GPT-5.5 (via Poe)",
+    id: "GPT-5.4",
+    label: "GPT-5.4 (via Poe)",
     provider: "poe",
     tier: "preview",
     contextWindow: 128000,
     outputLimit: 32768,
     supportsJson: true,
     supportsGrounding: false,
-    notes: "OpenAI's latest flagship. Released April 23, 2026.",
+    notes: "OpenAI flagship available on this key. GPT-5.5 was catalogued here and does not exist (404).",
   },
   {
     id: "GPT-4.1",
@@ -195,14 +231,20 @@ export const MODEL_CATALOG: ModelDefinition[] = [
 ];
 
 // ─── Production Gemini model policy ───────────────────────────────────────────
-// All IDs below validated live against production GEMINI_API_KEY (Jul 24 2026).
-// Direct-API call sites must resolve to one of these; anything else read from
-// config (e.g. a stale model_configs row) must fall back to a valid default.
+// Every ID below re-validated live against the production GEMINI_API_KEY on
+// Aug 18 2026 (scripts/validate-models.ts). Call sites MUST import these
+// constants rather than hardcoding a model string; anything read from config
+// (e.g. a stale model_configs row) MUST pass through toValidGeminiId() with a
+// valid fallback. Skipping that coercion is what produced the Memos
+// "Generation failed" bug.
 
 export const GEMINI_STRONG = "gemini-3.1-pro-preview";   // Deep reasoning: Red Team, Memo
 export const GEMINI_FAST   = "gemini-3.6-flash";          // High-volume: Scoring, Capital Stack
 export const GEMINI_BALANCED = "gemini-3.5-flash";        // Balanced: Market Scan, Consensus
 export const GEMINI_LITE   = "gemini-3.5-flash-lite";     // Ultra-cheap: background tasks
+// Legacy 3.1 lite tier. Still validated live, kept only as a fallback and for
+// config round-trip tests. Prefer GEMINI_LITE for new work.
+export const GEMINI_LEGACY_LITE = "gemini-3.1-flash-lite";
 export const VALID_GEMINI_IDS = new Set<string>([
   "gemini-3.6-flash",
   "gemini-3.5-flash",
@@ -219,7 +261,7 @@ export function toValidGeminiId(id: string | null | undefined, fallback: string)
 // ─── Default Module → Model Assignments ──────────────────────────────────────
 
 export const DEFAULT_MODULE_MODELS: Record<AnalysisModule, string> = {
-  ownerPsychology: "Claude-Opus-4.7",     // Nuanced behavioral profiling
+  ownerPsychology: "claude-opus-4.8",     // Nuanced behavioral profiling
   digitalAudit:    "sonar-pro",            // Live web research with citations
   redTeam:         GEMINI_STRONG,          // gemini-3.1-pro-preview — deep adversarial reasoning
   capitalStack:    GEMINI_FAST,            // gemini-3.6-flash — fast structured math

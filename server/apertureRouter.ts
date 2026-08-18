@@ -24,6 +24,7 @@ import {
   exposureCoverage,
   securityFacts,
   apertureEvidenceReviews,
+  apertureSetAside,
 } from "../drizzle/schema";
 import { adminProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
@@ -40,8 +41,9 @@ import { generateMemo } from "./aperture/memo";
 import { belongsInMemoLibrary } from "./aperture/memoLibrary";
 import { brokerFor, listBrokers } from "./aperture/brokers/index";
 import { normSymbol } from "./aperture/facts";
-import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills, OrderGateError } from "./aperture/orderFlow";
+import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills, preflightOrder, OrderGateError } from "./aperture/orderFlow";
 import { evaluateRunPreset } from "./aperture/gates";
+import { buildCockpit } from "./aperture/cockpit";
 import { CURRENT_MANDATE, HOLDING_PERIOD_KEYS, MIN_NARRATIVE_CHARS, PAPER_ACKNOWLEDGEMENT } from "./aperture/mandate";
 import { runMonitoringChecks, getMonitoringChecks, getFlaggedChecks } from "./aperture/monitor";
 import { computeAlpha, getAlpha } from "./aperture/alpha";
@@ -69,6 +71,91 @@ async function requireAccount(db: Awaited<ReturnType<typeof getDb>>, accountId: 
   if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Account not found" });
   return rows[0];
 }
+
+/**
+ * The non-gate precondition on a candidate-originated order: the operator must
+ * have recorded a review of every decision-critical evidence check. Returns the
+ * blocking message, or null when nothing blocks.
+ *
+ * Shared by `order.create` (which throws it) and `order.preflight` (which
+ * reports it). Preflight would otherwise be able to say "clear" about an order
+ * create refuses for a reason that is not a gate.
+ */
+async function evidenceReviewBlock(
+  db: Awaited<ReturnType<typeof getDb>>,
+  userId: number,
+  runId: number,
+  candidateId: number | null | undefined,
+): Promise<string | null> {
+  if (candidateId == null) return null;
+  const [candidate] = await db!.select().from(apertureCandidates)
+    .where(and(eq(apertureCandidates.id, candidateId), eq(apertureCandidates.runId, runId)))
+    .limit(1);
+  if (!candidate) throw new TRPCError({ code: "NOT_FOUND", message: "Candidate not found in this research brief" });
+  const requiredChecks = Array.isArray(candidate.verifyFields) ? candidate.verifyFields : [];
+  if (!requiredChecks.length) return null;
+  const reviews = await db!.select().from(apertureEvidenceReviews).where(and(
+    eq(apertureEvidenceReviews.userId, userId),
+    eq(apertureEvidenceReviews.runId, runId),
+    eq(apertureEvidenceReviews.candidateId, candidateId),
+  ));
+  const readiness = getEvidenceReviewReadiness(requiredChecks, reviews);
+  if (!readiness.unreviewedChecks.length) return null;
+  const n = readiness.unreviewedChecks.length;
+  return `Record your review of ${n} evidence check${n === 1 ? "" : "s"} before preparing this paper proposal`;
+}
+
+// ── Order input schemas ───────────────────────────────────────────────────────
+
+/**
+ * This schema checks PRESENCE, not policy. The ceilings are enforced in
+ * orderFlow.createOrder — the only layer that can see the account, the positions
+ * and the fact ledger at once, and the layer every non-router caller also goes
+ * through. Duplicating the numbers here would give two places to change them and
+ * one of them would drift.
+ */
+const orderCreateInput = z.object({
+  runId: z.number(),
+  candidateId: z.number().optional(),
+  accountId: z.number(),
+  symbol: z.string(),
+  side: z.enum(["buy", "sell"]),
+  qty: z.number().optional(),
+  notionalCents: z.number().optional(),
+  orderType: z.enum(["market", "limit"]).default("market"),
+  limitPriceCents: z.number().optional(),
+  timeInForce: z.enum(["day", "gtc"]).default("day"),
+  reason: z.string().min(MIN_NARRATIVE_CHARS),
+  invalidationCondition: z.string().min(MIN_NARRATIVE_CHARS),
+  invalidationPriceCents: z.number().optional(),
+  entryPriceCents: z.number().positive().optional(),
+  stopPriceCents: z.number().positive().optional(),
+  slippageCents: z.number().min(0).optional(),
+  timeStopAt: z.number().optional(),
+  noTradeConditions: z.array(z.string().min(2).max(300)).max(8).optional(),
+  holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]),
+  catalystDeadlineAt: z.number(),
+  paperAcknowledgement: z.literal(PAPER_ACKNOWLEDGEMENT),
+});
+
+/**
+ * The same fields, with the required-narrative and acknowledgement constraints
+ * relaxed. A ticket being typed is incomplete by definition, and a preflight
+ * that answers a half-written ticket with a zod validation error tells the
+ * operator nothing about the mandate. The gates answer instead — which is the
+ * same division of labour the create path already uses ("presence, not policy").
+ *
+ * Relaxing this here cannot let anything through: preflight re-parses the input
+ * against `orderCreateInput` and reports every schema error as blocking, so
+ * `wouldPass` is false for exactly the inputs create would refuse.
+ */
+const orderPreflightInput = orderCreateInput.extend({
+  reason: z.string().max(4000).optional(),
+  invalidationCondition: z.string().max(4000).optional(),
+  holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]).optional(),
+  catalystDeadlineAt: z.number().optional(),
+  paperAcknowledgement: z.string().max(64).optional(),
+});
 
 // ── Router ────────────────────────────────────────────────────────────────────
 
@@ -324,6 +411,32 @@ export const apertureRouter = router({
 
   providers: adminProcedure.query(() => describeAvailability()),
 
+  /**
+   * The operator cockpit — market session, account, mandate headroom and run
+   * preset in ONE round trip, for a rail that stays on screen.
+   *
+   * Reads only what is already persisted: no provider call, no broker call, no
+   * model call. That keeps it cheap enough to poll and means it cannot fail
+   * because an upstream was slow — a rail that can go blank is a rail the
+   * operator learns to ignore.
+   *
+   * Both inputs are optional. With no accountId the run's own account is used;
+   * with neither, the session and mandate still render and every account-derived
+   * figure is null with a stated reason rather than a zero.
+   */
+  cockpit: adminProcedure
+    .input(z.object({
+      accountId: z.number().optional(),
+      runId: z.number().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      return buildCockpit({
+        userId: ctx.user.id,
+        accountId: input?.accountId ?? null,
+        runId: input?.runId ?? null,
+      });
+    }),
+
   // ── Memo library ───────────────────────────────────────────────────────────
   // Memos live on their originating candidate rows so they retain the precise
   // score, role, fact ledger, and thesis context that produced them. This is the
@@ -417,6 +530,8 @@ export const apertureRouter = router({
           .where(eq(apertureStrategies.runId, input.id));
         const coverage = await db!.select().from(exposureCoverage)
           .where(eq(exposureCoverage.runId, input.id));
+        const setAside = await db!.select().from(apertureSetAside)
+          .where(eq(apertureSetAside.runId, input.id));
         const macroFacts = await getFacts(MACRO_SYMBOL);
         const thesis = await requireThesis(db, run.thesisId, ctx.user.id);
         const [paperAccount] = run.accountId
@@ -455,6 +570,13 @@ export const apertureRouter = router({
           strategies,
           coverage,
           coverageDetail,
+          setAside,
+          // An empty list on a run that finished before migration 0037 means
+          // "never recorded", not "nothing was set aside". The client must not
+          // render silence as a clean sweep.
+          setAsideNote: setAside.length === 0 && run.status === "completed"
+            ? "No set-aside record for this brief. Briefs completed before the set-aside list was persisted carry none — this is an absence of record, not evidence that nothing was rejected."
+            : null,
           thesisNodes,
           macroFacts,
           brief,
@@ -755,34 +877,7 @@ export const apertureRouter = router({
       }),
 
     create: adminProcedure
-      // This schema checks PRESENCE, not policy. The ceilings are enforced in
-      // orderFlow.createOrder — the only layer that can see the account, the
-      // positions and the fact ledger at once, and the layer every non-router
-      // caller also goes through. Duplicating the numbers here would give two
-      // places to change them and one of them would drift.
-      .input(z.object({
-        runId: z.number(),
-        candidateId: z.number().optional(),
-        accountId: z.number(),
-        symbol: z.string(),
-        side: z.enum(["buy", "sell"]),
-        qty: z.number().optional(),
-        notionalCents: z.number().optional(),
-        orderType: z.enum(["market", "limit"]).default("market"),
-        limitPriceCents: z.number().optional(),
-        timeInForce: z.enum(["day", "gtc"]).default("day"),
-        reason: z.string().min(MIN_NARRATIVE_CHARS),
-        invalidationCondition: z.string().min(MIN_NARRATIVE_CHARS),
-        invalidationPriceCents: z.number().optional(),
-        entryPriceCents: z.number().positive().optional(),
-        stopPriceCents: z.number().positive().optional(),
-        slippageCents: z.number().min(0).optional(),
-        timeStopAt: z.number().optional(),
-        noTradeConditions: z.array(z.string().min(2).max(300)).max(8).optional(),
-        holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]),
-        catalystDeadlineAt: z.number(),
-        paperAcknowledgement: z.literal(PAPER_ACKNOWLEDGEMENT),
-      }))
+      .input(orderCreateInput)
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
         await requireAccount(db, input.accountId, ctx.user.id);
@@ -796,25 +891,8 @@ export const apertureRouter = router({
         // A candidate-originated proposal cannot skip the operator's recorded review
         // of the evidence questions that can change the decision. Manual paper orders
         // remain possible for operational uses without a research-candidate link.
-        if (input.candidateId != null) {
-          const [candidate] = await db!.select().from(apertureCandidates)
-            .where(and(eq(apertureCandidates.id, input.candidateId), eq(apertureCandidates.runId, input.runId)))
-            .limit(1);
-          if (!candidate) throw new TRPCError({ code: "NOT_FOUND", message: "Candidate not found in this research brief" });
-          const requiredChecks = Array.isArray(candidate.verifyFields) ? candidate.verifyFields : [];
-          if (requiredChecks.length) {
-            const reviews = await db!.select().from(apertureEvidenceReviews).where(and(
-              eq(apertureEvidenceReviews.userId, ctx.user.id),
-              eq(apertureEvidenceReviews.runId, input.runId),
-              eq(apertureEvidenceReviews.candidateId, input.candidateId),
-            ));
-            const readiness = getEvidenceReviewReadiness(requiredChecks, reviews);
-            if (readiness.unreviewedChecks.length) throw new TRPCError({
-              code: "PRECONDITION_FAILED",
-              message: `Record your review of ${readiness.unreviewedChecks.length} evidence check${readiness.unreviewedChecks.length === 1 ? "" : "s"} before preparing this paper proposal`,
-            });
-          }
-        }
+        const evidenceBlock = await evidenceReviewBlock(db, ctx.user.id, input.runId, input.candidateId);
+        if (evidenceBlock) throw new TRPCError({ code: "PRECONDITION_FAILED", message: evidenceBlock });
 
         try {
           const orderId = await createOrder({
@@ -836,6 +914,64 @@ export const apertureRouter = router({
           }
           throw e;
         }
+      }),
+
+    /**
+     * Evaluate the gates for an order that has NOT been created.
+     *
+     * Writes no row, touches no broker, changes no state — it is a query, not a
+     * mutation, and that is enforced by the procedure type as well as by the
+     * code path. It exists so the order ticket can show the mandate live as the
+     * operator types, instead of after they submit and get refused.
+     *
+     * It reuses `preflightOrder`, which is literally the evaluation half of
+     * `createOrder` (server/aperture/orderFlow.ts → `evaluateOrder`). The three
+     * non-gate preconditions create also applies — the run's tightening rules,
+     * the evidence-review requirement, and the create input schema — are
+     * evaluated here too and folded into `blocking`, so `wouldPass` is true only
+     * where create would actually go through.
+     */
+    preflight: adminProcedure
+      .input(orderPreflightInput)
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        await requireAccount(db, input.accountId, ctx.user.id);
+
+        const [run] = await db!.select().from(apertureRuns)
+          .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id)))
+          .limit(1);
+        if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+
+        const evidenceBlock = await evidenceReviewBlock(db, ctx.user.id, input.runId, input.candidateId);
+
+        // Everything create's own zod would refuse, as messages rather than a
+        // 400 — a half-typed ticket must still get an answer about the mandate.
+        const parsed = orderCreateInput.safeParse(input);
+        const schemaErrors = parsed.success
+          ? []
+          : parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`);
+
+        const { evaluation, gatedNotionalCents, notionalBasis, session } = await preflightOrder({
+          ...input,
+          userId: ctx.user.id,
+          portfolioRules: {
+            maxSingleNamePct: run.maxSingleNamePct ?? null,
+            minAvgDailyVolumeUsd: run.liquidityFloorAdvUsd ?? null,
+          },
+        });
+
+        const blocking = [...evaluation.failures, ...schemaErrors, ...(evidenceBlock ? [evidenceBlock] : [])];
+        return {
+          wouldPass: blocking.length === 0,
+          blocking,
+          evaluation,
+          schemaErrors,
+          evidenceBlock,
+          gatedNotionalCents,
+          notionalBasis,
+          marketSession: session.session,
+          sessionBasis: session.basis,
+        };
       }),
 
     approve: adminProcedure
@@ -1088,6 +1224,22 @@ async function executeRun(
         symbol: cov.symbol,
         weightPct: null,
         source: cov.source,
+      });
+    }
+
+    // ── 9. Persist the set-aside list ──────────────────────────────────────
+    // Every symbol a hard stop dropped, and the rule that dropped it. Before
+    // migration 0037 this array was computed and then discarded, leaving only
+    // the coarse dropped_note — so the brief could say what it found but not
+    // what it rejected, which is the half that makes it diligence rather than a
+    // screen. Persisted after coverage so a failure here cannot cost the run its
+    // candidates.
+    for (const aside of assembled.setAside) {
+      await db!.insert(apertureSetAside).values({
+        runId,
+        symbol: aside.symbol,
+        reason: aside.reason,
+        createdAt: now,
       });
     }
 

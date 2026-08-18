@@ -9,7 +9,7 @@
  * Everything here is pure — no database, no clock, no network.
  */
 import { describe, it, expect } from "vitest";
-import { evaluateOrderGates, evaluateRunPreset, type OrderAccountState, type OrderGateInput } from "./gates";
+import { evaluateOrderGates, evaluateRunPreset, measurePctCeiling, type OrderAccountState, type OrderGateInput } from "./gates";
 import { marketSession, type SessionState } from "./marketSession";
 import { CURRENT_MANDATE, MANDATE_V1, effectiveMandate, PAPER_ACKNOWLEDGEMENT } from "./mandate";
 
@@ -502,5 +502,34 @@ describe("intraday play recipe", () => {
     expect(gate(ev, "play_time_stop")?.passed).toBe(false);
     expect(gate(ev, "play_no_trade_condition")?.passed).toBe(false);
     expect(ev.passed).toBe(false);
+  });
+});
+
+// ── Rounding: a risk gate does not round in the operator's favour ─────────────
+
+describe("measurePctCeiling rounding", () => {
+  it("blocks a breach that two decimal places would round back inside the cap", () => {
+    // 10.001% of equity against a 10% cap — rounds to 10.00%, but it is over.
+    const m = measurePctCeiling(0, 1_000_100, 10_000_000, 10);
+    expect(m.exactPct).toBeGreaterThan(10);
+    expect(m.ok).toBe(false);
+  });
+
+  it("shows the extra precision when it blocks on it, so the figure is arguable", () => {
+    const m = measurePctCeiling(0, 1_000_100, 10_000_000, 10);
+    expect(m.pct).toBeGreaterThan(10);
+    expect(String(m.pct)).not.toBe("10");
+  });
+
+  it("still reports two decimal places on an ordinary pass", () => {
+    const m = measurePctCeiling(0, 500_000, 10_000_000, 10);
+    expect(m.pct).toBe(5);
+    expect(m.ok).toBe(true);
+  });
+
+  it("allows a position exactly at the cap", () => {
+    const m = measurePctCeiling(0, 1_000_000, 10_000_000, 10);
+    expect(m.exactPct).toBe(10);
+    expect(m.ok).toBe(true);
   });
 });

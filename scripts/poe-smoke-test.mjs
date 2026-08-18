@@ -1,6 +1,6 @@
 /**
  * Poe API Smoke Test
- * Tests Claude-Opus-4.7, Claude-Haiku-4.5 (ping), and GPT-5.5 via Poe API
+ * Tests claude-opus-4.8, Claude-Haiku-4.5 (ping), and GPT-5.4 via Poe API
  * Run: node scripts/poe-smoke-test.mjs
  */
 import OpenAI from "openai";
@@ -140,7 +140,7 @@ Respond ONLY with valid JSON. No markdown, no explanation.`;
 // ─── Run all tests ────────────────────────────────────────────────────────────
 console.log("╔══════════════════════════════════════════════════════════╗");
 console.log("║         POE API SMOKE TEST — Signal Hunter               ║");
-console.log("║         Testing Claude-Opus-4.7, Haiku-4.5, GPT-5.5     ║");
+console.log("║         Testing claude-opus-4.8, Haiku-4.5, GPT-5.4     ║");
 console.log("╚══════════════════════════════════════════════════════════╝");
 console.log(`\nPoe API Key: ${POE_API_KEY.slice(0, 8)}...${POE_API_KEY.slice(-4)}`);
 console.log(`Timestamp: ${new Date().toISOString()}`);
@@ -155,24 +155,24 @@ results.push(await runTest(
   10
 ));
 
-// Test 2: Claude-Opus-4.7 — Owner Psychology (the primary use case)
+// Test 2: claude-opus-4.8 — Owner Psychology (the primary use case)
 results.push(await runStructuredTest(
-  "Owner Psychology — Claude-Opus-4.7",
-  "Claude-Opus-4.7"
+  "Owner Psychology — claude-opus-4.8",
+  "claude-opus-4.8"
 ));
 
-// Test 3: Claude-Opus-4.7 — Free-form deal analysis
+// Test 3: claude-opus-4.8 — Free-form deal analysis
 results.push(await runTest(
-  "Deal Analysis — Claude-Opus-4.7",
-  "Claude-Opus-4.7",
+  "Deal Analysis — claude-opus-4.8",
+  "claude-opus-4.8",
   `You are analyzing a potential acquisition. Give me the top 3 red flags and top 3 green flags for this deal:\n${DEAL_CONTEXT}`,
   300
 ));
 
-// Test 4: GPT-5.5 — Confirm it's accessible via Poe
+// Test 4: GPT-5.4 — Confirm it's accessible via Poe
 results.push(await runTest(
-  "GPT-5.5 Availability Check",
-  "GPT-5.5",
+  "GPT-5.4 Availability Check",
+  "GPT-5.4",
   `Briefly assess this acquisition opportunity in 2-3 sentences:\n${DEAL_CONTEXT}`,
   150
 ));

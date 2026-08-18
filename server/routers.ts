@@ -514,7 +514,9 @@ export const appRouter = router({
             cashOnCashReturn: capital.cashOnCashReturn,
             capitalStackSummary: capital.summary,
           }),
-          modelVersions: { psychology: "claude-opus-4", digital: "claude-opus-4", redteam: GEMINI_STRONG, capital: GEMINI_FAST },
+          // Record the ids actually used, not hardcoded guesses: runOwnerPsychology
+          // and runDigitalAudit both call POE_MODELS.CLAUDE_OPUS (server/gemini.ts).
+          modelVersions: { psychology: POE_MODELS.CLAUDE_OPUS, digital: POE_MODELS.CLAUDE_OPUS, redteam: GEMINI_STRONG, capital: GEMINI_FAST },
         };
         await upsertSignal(signalData);
         await logActivity({
@@ -775,7 +777,7 @@ export const appRouter = router({
       const result: Record<string, string> = {};
       for (const [key, defaultModel] of Object.entries(defaults)) {
         const entry = saved.find((r) => r.module === key);
-        // Coerce stale pre-policy IDs (e.g. gemini-2.5-pro) to the default so
+        // Coerce stale pre-policy IDs to the default so
         // the Settings UI never shows a model the key can't actually run.
         result[key] = toValidGeminiId(entry?.modelId, defaultModel);
       }
@@ -2965,7 +2967,7 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
         return { success: true };
       }),
 
-    // AI Refresh: use Claude-Opus-4 via Poe to generate 3 real-time macro signals
+    // AI Refresh: live macro signals.
     // Fetch REAL, source-cited market signals via Perplexity sonar-pro (live web
     // research), not LLM-generated guesses. Each signal carries a real source URL.
     aiRefresh: protectedProcedure

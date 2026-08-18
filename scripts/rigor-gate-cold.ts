@@ -9,6 +9,7 @@
 import "dotenv/config";
 import { writeFileSync } from "fs";
 import { runRedTeamAnalysis } from "../server/gemini";
+import { GEMINI_STRONG } from "../shared/models";
 
 const REPO = "/Volumes/Mini_2T/lenoxparis data/Dev/million-hunter-dashboard";
 
@@ -104,7 +105,7 @@ async function main() {
     const raw = await runRedTeamAnalysis(t.deal as any);
     results.push({
       test_deal: t.id,
-      model: "gemini-3.1-pro-preview",
+      model: GEMINI_STRONG,
       duration_ms: Date.now() - started,
       input_description: t.deal.description,
       expected_failure_modes: t.expected_failure_modes,

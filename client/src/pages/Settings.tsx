@@ -18,7 +18,11 @@ import {
   Database, Brain, Bell, Settings2, RefreshCw, Cpu, RotateCcw,
   Zap, Globe, FlaskConical, CheckCircle2,
 } from "lucide-react";
-import { MODULE_LABELS, MODULE_DESCRIPTIONS, MODEL_CATALOG, type AnalysisModule } from "@shared/models";
+import {
+  MODULE_LABELS, MODULE_DESCRIPTIONS, MODEL_CATALOG,
+  GEMINI_STRONG, GEMINI_BALANCED, GEMINI_FAST,
+  type AnalysisModule,
+} from "@shared/models";
 
 // ─── Consensus Model Config Sub-Component ─────────────────────────────────────
 function ConsensusModelConfig() {
@@ -33,9 +37,9 @@ function ConsensusModelConfig() {
   const dataRef = useState(() => ({ loaded: false }))[0];
   if (consensusData && !dataRef.loaded) {
     dataRef.loaded = true;
-    setM1(consensusData.consensus_model_1 ?? "gemini-3.1-pro-preview");
-    setM2(consensusData.consensus_model_2 ?? "gemini-3.5-flash");
-    setM3(consensusData.consensus_model_3 ?? "gemini-3.6-flash");
+    setM1(consensusData.consensus_model_1 ?? GEMINI_STRONG);
+    setM2(consensusData.consensus_model_2 ?? GEMINI_BALANCED);
+    setM3(consensusData.consensus_model_3 ?? GEMINI_FAST);
   }
 
   const updateConsensus = trpc.models.updateConsensus.useMutation({

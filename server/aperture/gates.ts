@@ -81,6 +81,75 @@ class GateCollector {
 const pctOf = (cents: number, equityCents: number): number => (cents / equityCents) * 100;
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
+// ── Shared ceiling arithmetic ─────────────────────────────────────────────────
+//
+// Every percent-of-equity ceiling in the mandate is measured the same way, and
+// it is measured here ONCE. The order gates below call this, and so does the
+// cockpit's headroom rail (server/aperture/cockpit.ts). That is deliberate: a
+// top rail that says "$4,200 of room left" and a gate that then blocks the order
+// would be worse than showing nothing, and the only way to guarantee they agree
+// is for both to be the same function — not two readings of the same policy.
+
+export interface PctCeilingMeasure {
+  /** Cents already counted against the ceiling. */
+  usedCents: number;
+  /** Cents this order would add. Zero when asking "how much room is left". */
+  addedCents: number;
+  equityCents: number;
+  ceilingPct: number;
+  /** The ceiling expressed in cents at the given equity. */
+  ceilingCents: number;
+  /**
+   * (used + added) as a percentage of equity — the figure the gate SHOWS.
+   * Normally 2dp; when the exact value breaches a ceiling that 2dp would round
+   * back inside, it carries more precision so the operator can see what bound.
+   */
+  pct: number;
+  /** The unrounded percentage — the figure the gate DECIDES on. */
+  exactPct: number;
+  /** Cents that may still be added before the ceiling binds. Never negative. */
+  remainingCents: number;
+  ok: boolean;
+}
+
+export function measurePctCeiling(
+  usedCents: number,
+  addedCents: number,
+  equityCents: number,
+  ceilingPct: number,
+): PctCeilingMeasure {
+  const ceilingCents = (ceilingPct / 100) * equityCents;
+  const exactPct = pctOf(usedCents + addedCents, equityCents);
+  // Decide on the exact value. A ceiling that yields at the fourth decimal is a
+  // ceiling that can be walked past 10 basis points at a time, and this is a
+  // risk gate — it does not round in the operator's favour.
+  const ok = exactPct <= ceilingPct;
+  // Show 2dp normally. If the exact value breaches a ceiling that 2dp would
+  // round back inside, show more precision instead: a gate that blocks on a
+  // figure it does not display is a gate the operator cannot argue with.
+  const rounded = round2(exactPct);
+  const pct = !ok && rounded <= ceilingPct ? Math.round(exactPct * 10_000) / 10_000 : rounded;
+  return {
+    usedCents,
+    addedCents,
+    equityCents,
+    ceilingPct,
+    ceilingCents,
+    pct,
+    exactPct,
+    remainingCents: Math.max(0, ceilingCents - usedCents),
+    ok,
+  };
+}
+
+/**
+ * The single-order ceiling: a percentage of equity and an absolute cap,
+ * whichever binds first.
+ */
+export function singleOrderCeilingCents(equityCents: number, mandate: Mandate = CURRENT_MANDATE): number {
+  return Math.min((mandate.maxOrderNotionalPctOfEquity / 100) * equityCents, mandate.maxOrderNotionalCents);
+}
+
 // ── Order gates ───────────────────────────────────────────────────────────────
 
 export type NotionalBasis = "stated" | "derived_from_last_price" | "unknown";
@@ -299,8 +368,7 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
     const n = notional!;
     const e = equity!;
 
-    const pctCeiling = (mandate.maxOrderNotionalPctOfEquity / 100) * e;
-    const ceiling = Math.min(pctCeiling, mandate.maxOrderNotionalCents);
+    const ceiling = singleOrderCeilingCents(e, mandate);
     const ok = n <= ceiling;
     g.add(
       "order_notional_ceiling",
@@ -313,29 +381,25 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
     );
 
     if (isBuy) {
-      const postPosition = account.positionValueCents + n;
-      const posPct = pctOf(postPosition, e);
-      const posOk = posPct <= mandate.maxPositionPctOfEquity;
+      const pos = measurePctCeiling(account.positionValueCents, n, e, mandate.maxPositionPctOfEquity);
       g.add(
         "position_concentration",
-        posOk,
-        posOk
-          ? `${input.symbol} would be ${round2(posPct)}% of equity, within ${mandate.maxPositionPctOfEquity}%`
-          : `${input.symbol} would be ${round2(posPct)}% of equity, over the ${mandate.maxPositionPctOfEquity}% single-name cap`,
-        round2(posPct),
+        pos.ok,
+        pos.ok
+          ? `${input.symbol} would be ${pos.pct}% of equity, within ${mandate.maxPositionPctOfEquity}%`
+          : `${input.symbol} would be ${pos.pct}% of equity, over the ${mandate.maxPositionPctOfEquity}% single-name cap`,
+        pos.pct,
         mandate.maxPositionPctOfEquity,
       );
 
-      const postCluster = account.clusterValueCents + n;
-      const cluPct = pctOf(postCluster, e);
-      const cluOk = cluPct <= mandate.maxClusterPctOfEquity;
+      const clu = measurePctCeiling(account.clusterValueCents, n, e, mandate.maxClusterPctOfEquity);
       g.add(
         "cluster_concentration",
-        cluOk,
-        cluOk
-          ? `cluster "${account.clusterLabel}" would be ${round2(cluPct)}% of equity, within ${mandate.maxClusterPctOfEquity}%`
-          : `cluster "${account.clusterLabel}" would be ${round2(cluPct)}% of equity, over the ${mandate.maxClusterPctOfEquity}% cap`,
-        round2(cluPct),
+        clu.ok,
+        clu.ok
+          ? `cluster "${account.clusterLabel}" would be ${clu.pct}% of equity, within ${mandate.maxClusterPctOfEquity}%`
+          : `cluster "${account.clusterLabel}" would be ${clu.pct}% of equity, over the ${mandate.maxClusterPctOfEquity}% cap`,
+        clu.pct,
         mandate.maxClusterPctOfEquity,
       );
       if (!account.sectorKnown) {
@@ -345,29 +409,25 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
         g.note(`no sector fact for ${input.symbol} — treated as a single-name cluster, so the cluster gate equals the position gate`);
       }
 
-      const postRun = account.runGrossDeployedCents + n;
-      const runPct = pctOf(postRun, e);
-      const runOk = runPct <= mandate.maxRunGrossDeployedPctOfEquity;
+      const run = measurePctCeiling(account.runGrossDeployedCents, n, e, mandate.maxRunGrossDeployedPctOfEquity);
       g.add(
         "run_gross_deployed",
-        runOk,
-        runOk
-          ? `run would have deployed ${round2(runPct)}% of equity, within ${mandate.maxRunGrossDeployedPctOfEquity}%`
-          : `run would have deployed ${round2(runPct)}% of equity, over the ${mandate.maxRunGrossDeployedPctOfEquity}% per-run ceiling`,
-        round2(runPct),
+        run.ok,
+        run.ok
+          ? `run would have deployed ${run.pct}% of equity, within ${mandate.maxRunGrossDeployedPctOfEquity}%`
+          : `run would have deployed ${run.pct}% of equity, over the ${mandate.maxRunGrossDeployedPctOfEquity}% per-run ceiling`,
+        run.pct,
         mandate.maxRunGrossDeployedPctOfEquity,
       );
 
-      const postDay = account.newNotionalTodayCents + n;
-      const dayPct = pctOf(postDay, e);
-      const dayOk = dayPct <= mandate.maxDailyNewNotionalPctOfEquity;
+      const day = measurePctCeiling(account.newNotionalTodayCents, n, e, mandate.maxDailyNewNotionalPctOfEquity);
       g.add(
         "daily_new_notional",
-        dayOk,
-        dayOk
-          ? `new notional today would be ${round2(dayPct)}% of equity, within ${mandate.maxDailyNewNotionalPctOfEquity}%`
-          : `new notional today would be ${round2(dayPct)}% of equity, over the ${mandate.maxDailyNewNotionalPctOfEquity}% daily ceiling`,
-        round2(dayPct),
+        day.ok,
+        day.ok
+          ? `new notional today would be ${day.pct}% of equity, within ${mandate.maxDailyNewNotionalPctOfEquity}%`
+          : `new notional today would be ${day.pct}% of equity, over the ${mandate.maxDailyNewNotionalPctOfEquity}% daily ceiling`,
+        day.pct,
         mandate.maxDailyNewNotionalPctOfEquity,
       );
     } else {
@@ -499,20 +559,191 @@ export function evaluateRunPreset(
   } else if (ctx.equityCents == null || ctx.equityCents <= 0) {
     g.add("deployable_capital", false, "account equity is unknown — sync the account before starting a run against it", ctx.equityCents);
   } else {
-    const pct = pctOf(input.deployableCapitalCents, ctx.equityCents);
-    const ok = pct <= mandate.maxRunGrossDeployedPctOfEquity;
+    const m = measurePctCeiling(input.deployableCapitalCents, 0, ctx.equityCents, mandate.maxRunGrossDeployedPctOfEquity);
     g.add(
       "deployable_capital",
-      ok,
-      ok
-        ? `deployable capital is ${round2(pct)}% of equity, within ${mandate.maxRunGrossDeployedPctOfEquity}%`
-        : `deployable capital is ${round2(pct)}% of equity, over the ${mandate.maxRunGrossDeployedPctOfEquity}% per-run ceiling`,
-      round2(pct),
+      m.ok,
+      m.ok
+        ? `deployable capital is ${m.pct}% of equity, within ${mandate.maxRunGrossDeployedPctOfEquity}%`
+        : `deployable capital is ${m.pct}% of equity, over the ${mandate.maxRunGrossDeployedPctOfEquity}% per-run ceiling`,
+      m.pct,
       mandate.maxRunGrossDeployedPctOfEquity,
     );
   }
 
   return g.finish(mandate.version, now);
+}
+
+// ── Mandate headroom ──────────────────────────────────────────────────────────
+//
+// The same ceilings the order gates enforce, read as "how much room is left"
+// instead of "does this order fit". It lives in this file, not in cockpit.ts,
+// because it MUST use `measurePctCeiling` and `singleOrderCeilingCents` — the
+// literal functions the gates call. Re-deriving 10%-of-equity in a display layer
+// is how a rail ends up promising room that an order then cannot use.
+//
+// Unknown equity produces null figures and a reason, never a zero. A zero here
+// would read as "no room left", which is a different and much more alarming
+// statement than "we do not know your equity".
+
+export type HeadroomKey =
+  | "position"
+  | "cluster"
+  | "run_gross_deployed"
+  | "daily_new_notional"
+  | "single_order";
+
+export interface HeadroomLine {
+  key: HeadroomKey;
+  label: string;
+  /** The name/cluster the figure is about, when the ceiling is per-subject. */
+  subject: string | null;
+  /** Cents already counted against this ceiling. Null when not measurable. */
+  usedCents: number | null;
+  ceilingCents: number | null;
+  /** ceilingCents − usedCents, floored at zero. Null when not measurable. */
+  remainingCents: number | null;
+  usedPct: number | null;
+  ceilingPct: number;
+  /** Where `usedCents` came from — stated the same way a fact states its basis. */
+  basis: string;
+  /** Why the figures are null. Null when they are populated. */
+  reason: string | null;
+}
+
+export interface HeadroomInput {
+  /** Account equity in cents. Null when the account has never synced. */
+  equityCents: number | null;
+  /** The largest single holding — the position ceiling's binding constraint. */
+  largestPositionSymbol: string | null;
+  largestPositionValueCents: number | null;
+  /** The largest sector cluster. Unclassified names are their own cluster. */
+  largestClusterLabel: string | null;
+  largestClusterValueCents: number | null;
+  /** Buy notional already committed by the run in scope. Null when no run given. */
+  runGrossDeployedCents: number | null;
+  /** Buy notional already created in this ET day, across all runs. */
+  newNotionalTodayCents: number | null;
+}
+
+export interface HeadroomRail {
+  mandateVersion: string;
+  equityCents: number | null;
+  /** How equity was established, or why it is null. */
+  equityBasis: string;
+  lines: HeadroomLine[];
+}
+
+const EQUITY_UNKNOWN = "account equity is unknown — sync the account before any ceiling can be measured against it";
+
+export function computeHeadroom(input: HeadroomInput, mandate: Mandate = CURRENT_MANDATE): HeadroomRail {
+  const e = input.equityCents;
+  const equityKnown = e != null && e > 0;
+
+  const line = (
+    key: HeadroomKey,
+    label: string,
+    subject: string | null,
+    used: number | null,
+    ceilingPct: number,
+    basis: string,
+    missingReason: string | null,
+  ): HeadroomLine => {
+    if (!equityKnown) {
+      return {
+        key, label, subject,
+        usedCents: null, ceilingCents: null, remainingCents: null, usedPct: null,
+        ceilingPct, basis, reason: EQUITY_UNKNOWN,
+      };
+    }
+    if (used == null) {
+      return {
+        key, label, subject,
+        usedCents: null,
+        ceilingCents: (ceilingPct / 100) * e!,
+        remainingCents: null,
+        usedPct: null,
+        ceilingPct,
+        basis,
+        reason: missingReason,
+      };
+    }
+    const m = measurePctCeiling(used, 0, e!, ceilingPct);
+    return {
+      key, label, subject,
+      usedCents: m.usedCents,
+      ceilingCents: m.ceilingCents,
+      remainingCents: m.remainingCents,
+      usedPct: m.pct,
+      ceilingPct,
+      basis,
+      reason: null,
+    };
+  };
+
+  const lines: HeadroomLine[] = [
+    line(
+      "position",
+      "Largest single name",
+      input.largestPositionSymbol,
+      input.largestPositionValueCents,
+      mandate.maxPositionPctOfEquity,
+      "market value of the largest held position",
+      "no positions are held, so no single name is measured yet",
+    ),
+    line(
+      "cluster",
+      "Largest correlated cluster",
+      input.largestClusterLabel,
+      input.largestClusterValueCents,
+      mandate.maxClusterPctOfEquity,
+      "summed market value of held names sharing a sector fact; a name with no sector fact is its own cluster",
+      "no positions are held, so no cluster is measured yet",
+    ),
+    line(
+      "run_gross_deployed",
+      "This run, gross deployed",
+      null,
+      input.runGrossDeployedCents,
+      mandate.maxRunGrossDeployedPctOfEquity,
+      "buy notional on this run's orders that are pending approval, approved, submitted or filled",
+      "no run in scope — pass a runId to measure the per-run ceiling",
+    ),
+    line(
+      "daily_new_notional",
+      "New notional today (ET)",
+      null,
+      input.newNotionalTodayCents,
+      mandate.maxDailyNewNotionalPctOfEquity,
+      "buy notional created since ET midnight, across all runs",
+      "today's order history could not be read",
+    ),
+  ];
+
+  // The single-order ceiling is not a running total: nothing accumulates against
+  // it. `usedCents` stays null rather than 0 so the client does not render a
+  // consumption bar for a ceiling that is never consumed.
+  lines.push({
+    key: "single_order",
+    label: "Single order",
+    subject: null,
+    usedCents: null,
+    ceilingCents: equityKnown ? singleOrderCeilingCents(e!, mandate) : null,
+    remainingCents: equityKnown ? singleOrderCeilingCents(e!, mandate) : null,
+    usedPct: null,
+    ceilingPct: mandate.maxOrderNotionalPctOfEquity,
+    basis: `per-order ceiling — ${mandate.maxOrderNotionalPctOfEquity}% of equity or $${dollars(mandate.maxOrderNotionalCents)}, whichever binds first. Not a running total.`,
+    reason: equityKnown ? null : EQUITY_UNKNOWN,
+  });
+
+  return {
+    mandateVersion: mandate.version,
+    equityCents: equityKnown ? e! : null,
+    equityBasis: equityKnown
+      ? "last synced account equity"
+      : EQUITY_UNKNOWN,
+    lines,
+  };
 }
 
 // ── Formatting ────────────────────────────────────────────────────────────────

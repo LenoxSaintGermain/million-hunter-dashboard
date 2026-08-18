@@ -10,6 +10,7 @@ import {
   boolean,
   bigint,
   uniqueIndex,
+  index,
 } from "drizzle-orm/mysql-core";
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -1295,6 +1296,30 @@ export const exposureCoverage = mysqlTable("exposure_coverage", {
 });
 export type ExposureCoverage = typeof exposureCoverage.$inferSelect;
 export type InsertExposureCoverage = typeof exposureCoverage.$inferInsert;
+
+/**
+ * Every symbol the run deliberately dropped, and the rule that dropped it.
+ *
+ * assembleRun has always computed this list; until migration 0037 it was thrown
+ * away at persistence and only the coarse `dropped_note` survived. The honest-gap
+ * list is the thing that separates this from a screener — "we looked at 41 names
+ * and set 12 aside for these stated reasons" is a defensible piece of work;
+ * "here are 29 names" is not. A row per symbol (rather than a json blob on
+ * aperture_runs) so a name that keeps failing the same hard stop across runs is
+ * queryable, and so this joins to candidates the same way exposure_coverage does.
+ */
+export const apertureSetAside = mysqlTable("aperture_set_aside", {
+  id: int("id").autoincrement().primaryKey(),
+  runId: int("run_id").notNull(),
+  symbol: varchar("symbol", { length: 24 }).notNull(),
+  /** The hard stop that dropped it, in the scorer's own words. Never blank. */
+  reason: text("reason").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  byRun: index("aperture_set_aside_run_idx").on(table.runId),
+}));
+export type ApertureSetAside = typeof apertureSetAside.$inferSelect;
+export type InsertApertureSetAside = typeof apertureSetAside.$inferInsert;
 
 // ── Phase 2: Execute, Monitor, Measure ───────────────────────────────────────
 

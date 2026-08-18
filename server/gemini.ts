@@ -1,18 +1,18 @@
 /**
  * AI Service Layer — Signal Hunter
  *
- * Model routing (updated Jul 24 2026 — all IDs validated on production key):
- *   Google Gemini (direct API):
- *     GEMINI_STRONG (gemini-3.1-pro-preview)  → Red Team, Investment Memo (deep reasoning)
- *     GEMINI_FAST   (gemini-3.6-flash)         → Capital Stack, Market Scan (high-volume)
- *     GEMINI_BALANCED (gemini-3.5-flash)       → Deal Scoring, Consensus (balanced)
- *     GEMINI_LITE   (gemini-3.5-flash-lite)    → Background tasks, subagent work
+ * Model routing. Concrete model IDs live ONLY in shared/models.ts — never inline
+ * them here, or they drift (see the Memos "Generation failed" bug). Roles:
+ *     GEMINI_STRONG    → Red Team, Investment Memo (deep reasoning)
+ *     GEMINI_FAST      → Capital Stack, Market Scan (high-volume)
+ *     GEMINI_BALANCED  → Deal Scoring, Consensus (balanced)
+ *     GEMINI_LITE      → Background tasks, subagent work
  *
  *   Poe API (OpenAI-compatible gateway) — non-Gemini models:
- *     Claude-Opus-4.7         → Owner Psychology profiling (nuanced language analysis)
+ *     POE_MODELS.CLAUDE_OPUS  → Owner Psychology profiling, Digital Footprint Audit
  *
  *   Perplexity Sonar Pro (direct) — live web research:
- *     sonar-pro               → Digital Footprint Audit, URL import extraction
+ *     sonar-pro               → URL import extraction, live web research
  */
 
 import { GoogleGenAI } from "@google/genai";
@@ -23,9 +23,9 @@ import type { Deal } from "../drizzle/schema";
 const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 // ─── Gemini model IDs (single source of truth: shared/models.ts) ─────────────────
-const GEMINI_PRO    = GEMINI_STRONG;    // gemini-3.1-pro-preview: deep reasoning
-const GEMINI_FLASH  = GEMINI_FAST;      // gemini-3.6-flash: high-volume
-const GEMINI_MID    = GEMINI_BALANCED;  // gemini-3.5-flash: balanced scoring/consensus
+const GEMINI_PRO    = GEMINI_STRONG;    // deep reasoning
+const GEMINI_FLASH  = GEMINI_FAST;      // high-volume
+const GEMINI_MID    = GEMINI_BALANCED;  // balanced scoring/consensus
 
 // Tolerant JSON parse: models occasionally append trailing prose or wrap output
 // in markdown fences even with responseMimeType=json ("Unexpected non-whitespace
@@ -42,7 +42,7 @@ export function looseJsonParse(raw: string | null | undefined): any {
   }
   throw new Error("Model did not return parseable JSON");
 }
-const _GEMINI_LITE  = GEMINI_LITE;      // gemini-3.5-flash-lite: background tasks (reserved)
+const _GEMINI_LITE  = GEMINI_LITE;      // background tasks (reserved)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface OwnerPsychologyResult {

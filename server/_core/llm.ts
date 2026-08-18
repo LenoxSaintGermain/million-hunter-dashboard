@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { GEMINI_BALANCED } from "../../shared/models";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -280,7 +281,18 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } = params;
 
   const payload: Record<string, unknown> = {
-    model: "gemini-3.1-flash",
+    // Was hardcoded to a nonexistent 3.1-flash id, which
+    // scripts/validate-models.ts proved returns HTTP 404 NOT_FOUND on the
+    // production key (Aug 18 2026). Now sourced from the shared registry.
+    // See the Model policy section of CLAUDE.md for the full matrix.
+    //
+    // CAVEAT, stated plainly: this path talks to the Forge gateway
+    // (BUILT_IN_FORGE_API_URL), not the Gemini API directly, and that gateway is
+    // unconfigured in the local environment — so the id could not be probed
+    // against Forge itself. GEMINI_BALANCED is a validated Gemini id and is
+    // strictly better than a known-404 one, but if Forge rejects it, probe the
+    // gateway's own model list rather than reverting to the dead id.
+    model: GEMINI_BALANCED,
     messages: messages.map(normalizeMessage),
   };
 

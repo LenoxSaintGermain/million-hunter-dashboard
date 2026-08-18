@@ -26,12 +26,45 @@ Signal Hunter OS — a multi-agent **deal diligence & decision** engine for smal
 
 ## Model policy (current API key)
 
-Only two Gemini variants are valid on the production key (validated live, Sprint 46):
+**`shared/models.ts` is the single source of truth. This section describes it; it does not override it.** Re-validated live against the production `GEMINI_API_KEY` on **2026-08-18** by `npx tsx scripts/validate-models.ts` (run from the repo root — a one-token `generateContent` probe per candidate, costs almost nothing, re-runnable). That script is the authority. Before changing any model ID, re-run it and update `shared/models.ts` and this section together.
 
-- **`gemini-3.1-pro-preview`** — deep reasoning: Red Team, investment memo synthesis, consensus lead
-- **`gemini-3.1-flash-lite`** — fast structured extraction, capital stack math, high-volume scoring
+### Validated set (6 of 7 candidates passed, 2026-08-18)
 
-Do not introduce any other Gemini model string. The Memos "Generation failed" bug came from mixed versions (`2.5-*`, `3.1-pro`, `3.1-flash`, `3.1-pro-exp`) scattered across routers. The DB `model_configs` table can also hold stale IDs — code must fall back to a valid default when a stored ID isn't in the allowed set.
+| Model ID | Result |
+| --- | --- |
+| `gemini-3.1-pro-preview` | PASS |
+| `gemini-3.6-flash` | PASS |
+| `gemini-3.5-flash` | PASS |
+| `gemini-3.5-flash-lite` | PASS |
+| `gemini-3.1-flash-lite` | PASS (legacy, fallback only) |
+| `gemini-3-flash-preview` | PASS (superseded by `3.5-flash`) |
+| `gemini-3.1-flash` | **FAIL — HTTP 404 NOT_FOUND**, "not found for API version v1beta, or is not supported for generateContent" |
+
+`gemini-3.1-flash` does not exist. It was hardcoded in `server/_core/llm.ts` until 2026-08-18. Do not re-add it on the assumption it is a typo for something real.
+
+Note: the previous version of this section claimed only `gemini-3.1-pro-preview` and `gemini-3.1-flash-lite` were valid. That was wrong — four more IDs validate live. The doc had drifted behind the code.
+
+### The four role constants — import these, never a literal
+
+| Constant | Resolves to | Use for |
+| --- | --- | --- |
+| `GEMINI_STRONG` | `gemini-3.1-pro-preview` | Red Team, Investment Memo — deepest reasoning, 2M context |
+| `GEMINI_FAST` | `gemini-3.6-flash` | High-volume: capital stack math, scoring, market scan |
+| `GEMINI_BALANCED` | `gemini-3.5-flash` | Middle tier: deal scoring, consensus |
+| `GEMINI_LITE` | `gemini-3.5-flash-lite` | Ultra-cheap background/subagent tasks |
+
+(`GEMINI_LEGACY_LITE` = `gemini-3.1-flash-lite` exists as a fallback only.)
+
+### Rules
+
+1. **Call sites import role constants from `shared/models.ts`.** No hardcoded model strings anywhere in `server/`, `client/`, or `scripts/` except `shared/models.ts` itself and `scripts/validate-models.ts`. Enforce with:
+   `grep -rn "gemini-[0-9]" server client shared scripts`
+2. **Anything read from the DB `model_configs` table must pass through `toValidGeminiId(id, fallback)`** with a valid fallback. A stale row must never reach the API. Verified at every call site: `server/routers.ts` (`consensusConfig`), `server/agents/index.ts` (`getConsensusModelIds`); `updateConsensus` additionally rejects writes outside `VALID_GEMINI_IDS` via zod.
+3. **The Memos "Generation failed" bug came from mixed versions** (`2.5-*`, `3.1-pro`, `3.1-flash`, `3.1-pro-exp`) scattered across routers, plus stale `model_configs` rows reaching the API uncoerced. Both halves of that failure mode are still live risks — keep the registry single-sourced and keep the coercion.
+
+### Non-Gemini providers — unverified, do not invent
+
+`scripts/validate-models.ts` only holds a Gemini key, so **Poe and Perplexity IDs are unvalidated.** Poe uses its own label-style namespace (`Claude-Opus-4`, `GPT-5.5`, …). The current Anthropic family is Opus 5 / Sonnet 5 / Haiku 4.5, so the Poe labels in the catalog are likely stale — but **do not rename them without confirming the exact label against the live Poe gateway.** An invented Poe label fails at request time exactly the way `gemini-3.1-flash` did. Known drift, left deliberately untouched: `shared/models.ts` catalogs `Claude-Opus-4.7` while `server/poe.ts` actually sends `Claude-Opus-4`.
 
 ---
 

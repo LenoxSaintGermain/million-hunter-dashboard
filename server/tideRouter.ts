@@ -15,6 +15,7 @@ import { sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
 import { TRPCError } from "@trpc/server";
+import { GEMINI_FAST } from "../shared/models";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -166,7 +167,7 @@ Return a JSON object with key "classifications" containing an array of classific
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${forgeKey}` },
       body: JSON.stringify({
-        model: "gemini-3.6-flash",
+        model: GEMINI_FAST,
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
         max_tokens: 2048,
@@ -234,7 +235,7 @@ Return a JSON object with key "events" containing an array. If no clear converge
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${forgeKey}` },
       body: JSON.stringify({
-        model: "gemini-3.6-flash",
+        model: GEMINI_FAST,
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
         max_tokens: 2048,

@@ -24,6 +24,7 @@ import { sql, eq, and, gt } from "drizzle-orm";
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
 import { TRPCError } from "@trpc/server";
+import { GEMINI_FAST } from "../shared/models";
 import {
   rippleScanCache,
   rippleFavorites,
@@ -364,7 +365,7 @@ Focus on businesses acquirable or startable with $100K-$2M. No explanation outsi
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${forgeKey}` },
       body: JSON.stringify({
-        model: "gemini-3.6-flash",
+        model: GEMINI_FAST,
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
         max_tokens: 1500,
@@ -517,7 +518,7 @@ Return JSON: { "verdict": "approve" | "pass" | "review", "score": 0.0-1.0, "rati
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${forgeKey}` },
           body: JSON.stringify({
-            model: "gemini-3.6-flash",
+            model: GEMINI_FAST,
             messages: [{ role: "user", content: icPrompt }],
             response_format: { type: "json_object" },
             max_tokens: 512,

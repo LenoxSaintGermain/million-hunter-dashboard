@@ -66,11 +66,14 @@ const HALF_DAYS = new Set<string>([
 export const CALENDAR_HORIZON = { from: "2026-01-01", to: "2027-12-31" };
 export const CALENDAR_BASIS = `maintained US equity calendar ${CALENDAR_HORIZON.from}..${CALENDAR_HORIZON.to}`;
 
-const PRE_MARKET_OPEN = 4 * 60; // 04:00 ET
-const REGULAR_OPEN = 9 * 60 + 30; // 09:30 ET
-const FULL_CLOSE = 16 * 60; // 16:00 ET
-const HALF_CLOSE = 13 * 60; // 13:00 ET
-const EXTENDED_MINUTES_AFTER_CLOSE = 4 * 60; // after-hours runs 4h past the close
+// Exported so anything computing session boundaries (the cockpit rail's
+// countdown, for one) reads the same numbers this file decides on, rather than
+// mirroring them and drifting.
+export const PRE_MARKET_OPEN = 4 * 60; // 04:00 ET
+export const REGULAR_OPEN = 9 * 60 + 30; // 09:30 ET
+export const FULL_CLOSE = 16 * 60; // 16:00 ET
+export const HALF_CLOSE = 13 * 60; // 13:00 ET
+export const EXTENDED_MINUTES_AFTER_CLOSE = 4 * 60; // after-hours runs 4h past the close
 
 const FMT = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York",

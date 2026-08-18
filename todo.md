@@ -25,11 +25,23 @@
 - [x] dashboard.stats — aggregate KPI stats
 
 ## AI Integrations
-- [x] Gemini 2.5 Flash — deal scoring and capital stack modeling
-- [x] Gemini 2.5 Pro — investment memo synthesis and Red Team analysis
-- [x] Gemini 2.0 Flash — digital audit with web grounding
-- [x] Perplexity Sonar Pro — Digital Audit (live market research)
-- [x] Anthropic Claude 3.5 Sonnet — Owner Psychology (with Gemini fallback for low credits)
+
+Model IDs are single-sourced in `shared/models.ts` and re-validated live on 2026-08-18
+via `npx tsx scripts/validate-models.ts`. See the Model policy section of CLAUDE.md.
+Code imports the role constants below — never a literal model string.
+
+- [x] `GEMINI_STRONG` (`gemini-3.1-pro-preview`) — Red Team analysis, investment memo synthesis
+- [x] `GEMINI_FAST` (`gemini-3.6-flash`) — capital stack modeling, market scan, high-volume extraction
+- [x] `GEMINI_BALANCED` (`gemini-3.5-flash`) — deal scoring, IC consensus
+- [x] `GEMINI_LITE` (`gemini-3.5-flash-lite`) — background/subagent tasks
+- [x] Perplexity Sonar Pro (`sonar-pro`) — Digital Audit, Opportunity Radar, deep research (live, cited)
+- [x] Claude via the Poe gateway (`server/poe.ts`) — Owner Psychology, Digital Footprint Audit
+- [ ] Verify the Poe model labels against the live Poe gateway. They are the one part of the
+      registry no validator covers, and `shared/models.ts` (`Claude-Opus-4.7`) disagrees with
+      `server/poe.ts` (`Claude-Opus-4`). Do not rename either until the real label is confirmed.
+
+Superseded: Gemini 2.5 Flash / 2.5 Pro / 2.0 Flash and Claude 3.5 Sonnet are no longer used
+anywhere in the codebase; those IDs fail on the current production key.
 
 ## Frontend — Dashboard Pages
 - [x] Command Center (Home) — wired to real tRPC data

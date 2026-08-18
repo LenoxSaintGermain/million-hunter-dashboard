@@ -208,7 +208,7 @@ export async function getConsensusModelIds(): Promise<[string, string, string]> 
     const { getAllModelConfigs } = await import("../db");
     const saved = await getAllModelConfigs();
     // model_configs rows can hold stale IDs from before the model policy
-    // (e.g. gemini-2.5-pro) — those fail at the API, so coerce anything
+    // — those fail at the API, so coerce anything
     // outside the key-validated set back to the tier default.
     const m1 = toValidGeminiId(saved.find((r) => r.module === "consensus_model_1")?.modelId, MODEL_STRONG);
     const m2 = toValidGeminiId(saved.find((r) => r.module === "consensus_model_2")?.modelId, MODEL_FAST);

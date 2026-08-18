@@ -4,15 +4,27 @@
  * Base URL: https://api.poe.com/v1
  * Auth: Poe_api_key (stored in env as Poe_api_key)
  *
- * Poe bot name reference (as of April 2026):
- *   Claude-Opus-4         → Anthropic Claude 4 Opus (most capable)
- *   Claude-Sonnet-4.6       → Anthropic Claude Sonnet 4.6 (speed+intelligence)
- *   Claude-Haiku-4.5        → Anthropic Claude Haiku 4.5 (fastest Claude)
- *   Gemini-3.1-Pro          → Google Gemini 3.1 Pro Preview (complex reasoning)
- *   Gemini-3-Flash          → Google Gemini 3 Flash Preview (frontier, cost-efficient)
- *   Gemini-3.1-Flash-Lite   → Google Gemini 3.1 Flash-Lite Preview (fastest/cheapest)
- *   GPT-5.5                 → OpenAI GPT-5.5 (released April 23, 2026)
- *   GPT-5.4                 → OpenAI GPT-5.4
+ * Poe model ids — every id below was validated live against /v1/models and a
+ * 1-token /v1/chat/completions probe on 2026-08-18. Poe ids are label-style and
+ * are NOT interchangeable with the direct-API ids in shared/models.ts.
+ *
+ *   claude-opus-4.8         → most capable Claude on this key
+ *   Claude-Sonnet-4.6       → speed + intelligence
+ *   Claude-Haiku-4.5        → fastest Claude
+ *   Gemini-3.1-Pro          → complex reasoning
+ *   Gemini-3-Flash          → frontier, cost-efficient
+ *   Gemini-3.1-Flash-Lite   → fastest/cheapest
+ *   GPT-5.4                 → OpenAI flagship on this key
+ *
+ * Two ids this file previously used are DEAD and were removed:
+ *   Claude-Opus-4  → HTTP 500 "Server got itself in trouble"; not in /v1/models.
+ *                    This was the live id for Owner Psychology and the Digital
+ *                    Footprint Audit, so both were calling a model that does not
+ *                    exist. Same failure class as the Memos "Generation failed"
+ *                    bug: a stale model string nobody re-validated.
+ *   GPT-5.5        → HTTP 404 "Model `GPT-5.5` not found." (catalog only)
+ *
+ * Re-validate with: npx tsx scripts/validate-models.ts (run from the repo root)
  *
  * Usage: call poeChat() for simple completions, poeJSON() for structured output.
  */
@@ -44,7 +56,7 @@ function getPoeClient(): OpenAI {
 
 export const POE_MODELS = {
   // Anthropic via Poe
-  CLAUDE_OPUS: "Claude-Opus-4",
+  CLAUDE_OPUS: "claude-opus-4.8",
   CLAUDE_SONNET: "Claude-Sonnet-4.6",
   CLAUDE_HAIKU: "Claude-Haiku-4.5",
 
@@ -54,7 +66,7 @@ export const POE_MODELS = {
   GEMINI_FLASH_LITE: "Gemini-3.1-Flash-Lite",
 
   // OpenAI via Poe
-  GPT_FLAGSHIP: "GPT-5.5",
+  GPT_FLAGSHIP: "GPT-5.4",
   GPT_FAST: "GPT-5.4",
 } as const;
 

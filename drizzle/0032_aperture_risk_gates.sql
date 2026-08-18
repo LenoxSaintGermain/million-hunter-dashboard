@@ -1,3 +1,9 @@
+-- SUPERSEDED IN PRODUCTION: this file was never applied to the deployed
+-- database. 0034_broker_order_risk_gate_repair.sql applies the same broker_orders
+-- columns and indexes. Do NOT run this file against a database that has had 0034
+-- applied — the ALTERs below are not idempotent and will fail on duplicate
+-- columns. The aperture_runs preset columns in this file are still required.
+--
 -- 0032 — Capital Aperture risk gates and the Short-Horizon Paper Run preset.
 --
 -- Two P0 gaps closed:

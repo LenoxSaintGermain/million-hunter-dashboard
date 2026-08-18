@@ -15,6 +15,7 @@ import { capitalTheses, thesisCompilations, thesisShares, users } from "../drizz
 import { compileThesis } from "./aperture/thesisGraph";
 import { projectionValues } from "./thesisBridge";
 import { canUseCanonicalThesis } from "./thesisAccess";
+import { GEMINI_FAST } from "../shared/models";
 
 // ── STRATEGIST System Prompt ──────────────────────────────────────────────────
 const STRATEGIST_SYSTEM_PROMPT = `You are STRATEGIST, the thesis compiler for Signal Hunter — an AI-powered acquisition intelligence platform.
@@ -200,7 +201,7 @@ export const thesisRouter = router({
             authorization: `Bearer ${ENV.forgeApiKey}`,
           },
           body: JSON.stringify({
-            model: "gemini-3.6-flash",
+            model: GEMINI_FAST,
             messages: [
               { role: "system", content: STRATEGIST_SYSTEM_PROMPT },
               { role: "user", content: `Compile this investment thesis into a JSON object with these exact keys: compiledFilters (object with revenueMin, revenueMax, geographies, businessAgeMin, headcountMin, headcountMax, exclusions), scoringWeights (array of {dimension, weight, isCustom}), evidenceRequirements (array), autoDisqualifiers (array), confidenceNotes (array), estimatedTargetsMin, estimatedTargetsMax, estimatedCostMin, estimatedCostMax, suggestedName.\n\nIMPORTANT: All numeric values MUST be plain integers with NO decimal points (e.g. 2000000 not 2000000.0).\n\nThesis: ${input.thesisText}` },
@@ -230,7 +231,7 @@ export const thesisRouter = router({
             method: "POST",
             headers: { "content-type": "application/json", authorization: `Bearer ${ENV.forgeApiKey}` },
             body: JSON.stringify({
-              model: "gemini-3.6-flash",
+              model: GEMINI_FAST,
               messages: [
                 { role: "system", content: "You are STRATEGIST, a deal thesis compiler. Return ONLY a JSON object, no markdown, no explanation." },
                 { role: "user", content: `Compile this investment thesis into a JSON object with EXACTLY these keys:\n- compiledFilters: {revenueMin, revenueMax, geographies (state abbrevs array), businessAgeMin, headcountMin, headcountMax, exclusions (array)}\n- scoringWeights: array of {dimension, weight (integer 1-100), isCustom (bool)}, weights sum to 100\n- evidenceRequirements: string array\n- autoDisqualifiers: string array\n- confidenceNotes: string array\n- estimatedTargetsMin, estimatedTargetsMax (integers)\n- estimatedCostMin, estimatedCostMax (integers, USD thousands)\n- suggestedName (3-6 words)\n\nAll numbers as plain integers. Return ONLY the JSON object.\n\nThesis: ${input.thesisText}` },

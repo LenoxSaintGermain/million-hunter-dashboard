@@ -30,7 +30,7 @@ import {
 import { brokerFor } from "./brokers/index";
 import type { OrderRequest } from "./brokers/types";
 import { getFacts, freshestPerKey, normSymbol } from "./facts";
-import { marketSession, startOfEtDay } from "./marketSession";
+import { marketSession, startOfEtDay, type SessionState } from "./marketSession";
 import {
   evaluateOrderGates,
   gateFailureMessage,
@@ -76,6 +76,13 @@ export interface CreateOrderInput {
   now?: number;
 }
 
+/**
+ * Orders that still count against a ceiling: anything not rejected or cancelled.
+ * Exported so the cockpit's headroom rail counts exactly the same rows the gates
+ * count — a rail built on a different status set would quietly disagree.
+ */
+export const LIVE_ORDER_STATUSES = ["pending_approval", "approved", "submitted", "filled"] as const;
+
 /** Thrown when an order fails the mandate. Carries the full evaluation. */
 export class OrderGateError extends Error {
   readonly evaluation: GateEvaluation;
@@ -88,9 +95,32 @@ export class OrderGateError extends Error {
   }
 }
 
-// ── Create (gate → pending_approval) ──────────────────────────────────────────
+// ── Gate evaluation (shared by create and preflight) ──────────────────────────
 
-export async function createOrder(input: CreateOrderInput): Promise<number> {
+/**
+ * Everything the gates saw, and what they concluded — without any write.
+ *
+ * `createOrder` and `preflightOrder` BOTH go through this. That is the whole
+ * point of the extraction: an order ticket that shows gates live as the operator
+ * types is only useful if its verdict is the verdict. Two evaluators with the
+ * same intent would drift on the first change to either, and a preflight that
+ * says "pass" where create says "fail" trains the operator to ignore the rail.
+ */
+export interface OrderEvaluation {
+  evaluation: GateEvaluation;
+  session: SessionState;
+  mandate: Mandate;
+  accountState: OrderAccountState;
+  gatedNotionalCents: number | null;
+  notionalBasis: NotionalBasis;
+  symbol: string;
+  orderType: "market" | "limit";
+  timeInForce: "day" | "gtc";
+  now: number;
+  account: { id: number; isPaper: boolean; equityValueCents: number | null; cashCents: number | null };
+}
+
+async function evaluateOrder(input: CreateOrderInput): Promise<OrderEvaluation> {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
 
@@ -138,6 +168,32 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
     mandate,
     now,
   });
+
+  return {
+    evaluation, session, mandate, accountState,
+    gatedNotionalCents, notionalBasis,
+    symbol, orderType, timeInForce, now, account,
+  };
+}
+
+/**
+ * Evaluate the gates and return the verdict. Writes NOTHING and never reaches
+ * the broker — no row, no status transition, no submission. Same code path as
+ * createOrder's evaluation, by construction.
+ */
+export async function preflightOrder(input: CreateOrderInput): Promise<OrderEvaluation> {
+  return evaluateOrder(input);
+}
+
+// ── Create (gate → pending_approval) ──────────────────────────────────────────
+
+export async function createOrder(input: CreateOrderInput): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("database unavailable");
+
+  const {
+    evaluation, session, gatedNotionalCents, symbol, orderType, timeInForce, now,
+  } = await evaluateOrder(input);
 
   const holdingPeriod = isStoredHoldingPeriod(input.holdingPeriod) ? input.holdingPeriod : null;
   const plannedRiskCents = holdingPeriod === "intraday"
@@ -282,8 +338,7 @@ async function loadOrderAccountState(args: {
   const advRow = freshestPerKey(factRows.filter((f) => normSymbol(f.symbol) === symbol))
     .find((f) => f.factKey === "adv_usd_30d" && f.basis !== "unknown" && f.valueNum != null);
 
-  // Orders that still count against a ceiling: anything not rejected or cancelled.
-  const LIVE = ["pending_approval", "approved", "submitted", "filled"] as const;
+  const LIVE = LIVE_ORDER_STATUSES;
   const dayStart = startOfEtDay(now) ?? now - 86_400_000;
 
   const todayRows = await db.select({
