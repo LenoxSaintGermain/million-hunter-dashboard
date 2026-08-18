@@ -1338,9 +1338,15 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [ ] Validate the play-first journey on mobile and desktop, including the no-trade path and low-confidence state
 
 ## Aperture Cockpit, Live Preflight & Set-Aside Review (Aug 18 2026)
-- [ ] Verify the supplied cockpit, preflight, and set-aside server contracts and migration assumptions against the current checked-out project
-- [ ] Apply only verified pending Aperture migrations in dependency order, with no backfill or duplicate broker-order columns
+- [x] Verify the supplied cockpit, preflight, and set-aside server contracts and migration assumptions against the current checked-out project
+- [x] Apply only verified pending Aperture migrations in dependency order, with no backfill or duplicate broker-order columns
 - [ ] Render the paper-only cockpit rail on Capital Aperture views using the server-provided market, account, headroom, and run truth states
 - [ ] Surface live order preflight, including blocking conditions, modeled-notional basis, and planned-loss risk before a proposal can be submitted
 - [ ] Render set-aside candidates and legacy-record notes without treating a missing historical record as an empty list
 - [ ] Complete regression and authenticated browser UAT without creating, approving, submitting, or modifying a paper order
+
+## Cockpit Contract Repair & VWAP-Gated Ticket (Aug 18 2026)
+- [ ] Pull and verify upstream commit 2633679 exposes all three planned-loss mandate ceilings and its completeness regression test
+- [ ] Verify the upstream intraday VWAP and opening-range helpers before wiring them into the paper-order ticket
+- [ ] Add ticket-side rendering for measured VWAP and opening-range status, with an explicit not-measured state when no verified tape is available
+- [ ] Require live preflight to surface all paper-order blocks, modeled-notional basis, and planned-risk ceilings before proposal creation
