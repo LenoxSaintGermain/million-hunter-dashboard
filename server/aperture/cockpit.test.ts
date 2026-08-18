@@ -17,8 +17,8 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  accountRail, etInstant, largestExposures, nextTradingOpen, runRail, sessionRail,
-  UNLINKED_ACCOUNT_RAIL,
+  accountRail, buildCockpitMandateSummary, etInstant, largestExposures,
+  nextTradingOpen, runRail, sessionRail, UNLINKED_ACCOUNT_RAIL,
 } from "./cockpit";
 import { computeHeadroom, evaluateOrderGates, measurePctCeiling, singleOrderCeilingCents } from "./gates";
 import { marketSession } from "./marketSession";
@@ -488,5 +488,28 @@ describe("largestExposures", () => {
     expect(e.largestPositionSymbol).toBeNull();
     expect(e.largestPositionValueCents).toBeNull();
     expect(e.largestClusterValueCents).toBeNull();
+  });
+});
+
+// ── The rail must expose every ceiling that can block an order ────────────────
+//
+// Regression: mandate v2 added the planned-loss ceilings and the rail's summary
+// was not extended, so a client building against it would have shown risk
+// headroom with a third of the mandate missing. A rail that omits a binding
+// ceiling is worse than no rail.
+
+describe("cockpit mandate summary", () => {
+  it("exposes every numeric ceiling the mandate defines", () => {
+    const summary = buildCockpitMandateSummary(CURRENT_MANDATE) as Record<string, unknown>;
+    for (const key of Object.keys(CURRENT_MANDATE)) {
+      expect(Object.keys(summary)).toContain(key);
+    }
+  });
+
+  it("carries the planned-loss ceilings at their signed-off values", () => {
+    const summary = buildCockpitMandateSummary(CURRENT_MANDATE);
+    expect(summary.maxPlannedRiskPctPerPlay).toBe(0.75);
+    expect(summary.maxDailyPlannedRiskPct).toBe(2);
+    expect(summary.maxCorrelatedPlannedRiskPct).toBe(1.25);
   });
 });

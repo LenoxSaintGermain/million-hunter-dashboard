@@ -12,7 +12,104 @@
  * `modeled` with the window stated: it is an average, not a fact about today.
  */
 import type { Fact } from "../facts";
+import type { MinuteBar, TapeFeed } from "../intraday";
 import { DAY, httpJson, num, unknownFact, type FetchCtx, type ProviderAdapter } from "./types";
+
+// ── Intraday tape ─────────────────────────────────────────────────────────────
+
+/**
+ * Which Alpaca feed the intraday endpoints read. Measured 2026-08-18 on the
+ * production key, XHB at 10:24 ET:
+ *
+ *   iex   12,317 shares on the day, ~1 min behind  — real-time, 4.8% of the tape
+ *   sip  255,439 shares on the day, 15 min behind  — consolidated, delayed
+ *
+ * Default is `sip`: for VWAP and an opening range, the whole tape fifteen
+ * minutes late beats a twentieth of the tape live. A VWAP built from IEX prints
+ * alone is not the number any other participant is looking at.
+ *
+ * When the account is upgraded to real-time SIP, this changes nothing — the same
+ * feed string starts arriving with a sub-minute lag, and every figure already
+ * carries its measured `lagMs`, so the surfaces relabel themselves. Set
+ * ALPACA_DATA_FEED=iex only to deliberately trade completeness for latency.
+ */
+export function intradayFeed(): TapeFeed {
+  const raw = (process.env.ALPACA_DATA_FEED ?? "sip").trim().toLowerCase();
+  return raw === "iex" ? "iex" : raw === "sip" ? "sip" : "unknown";
+}
+
+export interface IntradayBarsResult {
+  bars: MinuteBar[];
+  feed: TapeFeed;
+  /** Non-null when no bars could be fetched — never an empty array passed off
+   *  as "nothing traded". */
+  unavailableReason: string | null;
+}
+
+/**
+ * One-minute bars from `start` (epoch ms) to now, paging until exhausted.
+ * Returns Alpaca's own `vw` per bar untouched — sessionVwap() decides what to
+ * do with it, and records when a bar had none.
+ */
+export async function fetchIntradayBars(
+  symbol: string,
+  opts: { startMs: number; timeoutMs?: number; feed?: TapeFeed; maxPages?: number },
+): Promise<IntradayBarsResult> {
+  const feed = opts.feed ?? intradayFeed();
+  const missing = missingAlpacaCredentials();
+  if (missing.length) {
+    return { bars: [], feed, unavailableReason: `Alpaca credentials missing: ${missing.join(", ")}` };
+  }
+  const credentials = alpacaCredentials();
+  const start = new Date(opts.startMs).toISOString();
+  const bars: MinuteBar[] = [];
+  let token: string | null | undefined = null;
+  let pages = 0;
+  const maxPages = opts.maxPages ?? 6;
+
+  try {
+    do {
+      const url: string =
+        `https://data.alpaca.markets/v2/stocks/${encodeURIComponent(symbol)}/bars` +
+        `?timeframe=1Min&limit=10000&adjustment=raw&feed=${feed}` +
+        `&start=${encodeURIComponent(start)}` +
+        (token ? `&page_token=${encodeURIComponent(token)}` : "");
+      const data: {
+        bars?: Array<{ t: string; o: number; h: number; l: number; c: number; v: number; vw?: number }>;
+        next_page_token?: string | null;
+      } | null = await httpJson(url, {
+        timeoutMs: opts.timeoutMs ?? 10_000,
+        headers: {
+          "APCA-API-KEY-ID": credentials.key,
+          "APCA-API-SECRET-KEY": credentials.secret,
+        },
+      });
+      for (const b of data?.bars ?? []) {
+        bars.push({
+          t: Date.parse(b.t),
+          o: num(b.o) ?? 0,
+          h: num(b.h) ?? 0,
+          l: num(b.l) ?? 0,
+          c: num(b.c) ?? 0,
+          v: num(b.v) ?? 0,
+          vw: num(b.vw) ?? null,
+        });
+      }
+      token = data?.next_page_token ?? null;
+      pages++;
+    } while (token && pages < maxPages);
+  } catch (e: any) {
+    return { bars, feed, unavailableReason: `Alpaca bars request failed: ${e?.message ?? e}` };
+  }
+
+  return {
+    bars,
+    feed,
+    unavailableReason: bars.length
+      ? null
+      : `no ${feed.toUpperCase()} minute bars returned for ${symbol} since ${start}`,
+  };
+}
 
 const KEYS = ["last_price", "adv_usd_30d", "volatility_30d"];
 

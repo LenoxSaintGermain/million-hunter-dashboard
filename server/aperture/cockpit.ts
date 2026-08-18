@@ -359,6 +359,12 @@ export function runRail(run: ApertureRun, now: number): RunRail {
 
 // ── The whole rail ────────────────────────────────────────────────────────────
 
+/**
+ * Hand-listed rather than spread from Mandate, so adding a ceiling to the
+ * mandate is a compile error here until it is deliberately exposed — the rail
+ * should never silently omit a ceiling that blocks orders. (It did exactly that
+ * for the three planned-loss fields between v2 landing and this fix.)
+ */
 export interface CockpitMandateSummary {
   version: string;
   maxOrderNotionalPctOfEquity: number;
@@ -367,6 +373,10 @@ export interface CockpitMandateSummary {
   maxClusterPctOfEquity: number;
   maxRunGrossDeployedPctOfEquity: number;
   maxDailyNewNotionalPctOfEquity: number;
+  /** The planned-loss axis — see mandate.ts. */
+  maxPlannedRiskPctPerPlay: number;
+  maxDailyPlannedRiskPct: number;
+  maxCorrelatedPlannedRiskPct: number;
   minAdvUsd30d: number;
   maxOrderPctOfAdv: number;
   intradayCutoffEtMinutes: number;
@@ -383,7 +393,7 @@ export interface Cockpit {
   run: RunRail | null;
 }
 
-function mandateSummary(m: Mandate): CockpitMandateSummary {
+export function buildCockpitMandateSummary(m: Mandate): CockpitMandateSummary {
   return {
     version: m.version,
     maxOrderNotionalPctOfEquity: m.maxOrderNotionalPctOfEquity,
@@ -392,6 +402,9 @@ function mandateSummary(m: Mandate): CockpitMandateSummary {
     maxClusterPctOfEquity: m.maxClusterPctOfEquity,
     maxRunGrossDeployedPctOfEquity: m.maxRunGrossDeployedPctOfEquity,
     maxDailyNewNotionalPctOfEquity: m.maxDailyNewNotionalPctOfEquity,
+    maxPlannedRiskPctPerPlay: m.maxPlannedRiskPctPerPlay,
+    maxDailyPlannedRiskPct: m.maxDailyPlannedRiskPct,
+    maxCorrelatedPlannedRiskPct: m.maxCorrelatedPlannedRiskPct,
     minAdvUsd30d: m.minAdvUsd30d,
     maxOrderPctOfAdv: m.maxOrderPctOfAdv,
     intradayCutoffEtMinutes: m.intradayCutoffEtMinutes,
@@ -551,7 +564,7 @@ export async function buildCockpit(args: BuildCockpitArgs): Promise<Cockpit> {
   return {
     generatedAt: now,
     liveTrading: false,
-    mandate: mandateSummary(CURRENT_MANDATE),
+    mandate: buildCockpitMandateSummary(CURRENT_MANDATE),
     session: sessionRail(now),
     account: accountRail(account ?? null, now),
     headroom: computeHeadroom({
