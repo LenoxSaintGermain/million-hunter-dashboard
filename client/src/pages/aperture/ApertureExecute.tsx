@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
+import { PaperProposalForm } from "@/components/aperture/PaperProposalForm";
 import { formatDistanceToNow } from "date-fns";
 
 const DISCLAIMER = "Internal research tool — not investment advice. Paper only — no real capital.";
@@ -76,15 +77,23 @@ function OrderQueue({ runId }: { runId: number }) {
   const statusColor = (s: string) => s === "filled" ? "oklch(0.55 0.15 145)" :
     s === "rejected" || s === "cancelled" ? "var(--sh-red)" :
     s === "approved" ? "var(--sh-signal)" : "var(--sh-fg-muted)";
+  const statusLabel = (status: string) => ({
+    pending_approval: "Waiting for your review",
+    approved: "Ready to submit to Alpaca Paper",
+    submitted: "Sent to Alpaca Paper",
+    filled: "Paper trade executed",
+    rejected: "Not approved",
+    cancelled: "Cancelled",
+  }[status] ?? status.replaceAll("_", " "));
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex gap-3 text-xs">
-          <span style={{ color: "var(--sh-signal)" }}>{pending.length} pending approval</span>
-          <span style={{ color: "var(--sh-fg-muted)" }}>{approved.length} approved</span>
-          <span style={{ color: "var(--sh-fg-muted)" }}>{submitted.length} submitted</span>
-          <span style={{ color: "oklch(0.55 0.15 145)" }}>{terminal.filter((o) => o.status === "filled").length} filled</span>
+          <span style={{ color: "var(--sh-signal)" }}>{pending.length} waiting for review</span>
+          <span style={{ color: "var(--sh-fg-muted)" }}>{approved.length} ready to submit</span>
+          <span style={{ color: "var(--sh-fg-muted)" }}>{submitted.length} sent to paper broker</span>
+          <span style={{ color: "oklch(0.55 0.15 145)" }}>{terminal.filter((o) => o.status === "filled").length} executed</span>
         </div>
         <Button variant="outline" size="sm" onClick={() => mirror.mutate()} disabled={mirror.isPending}>
           {mirror.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
@@ -112,7 +121,7 @@ function OrderQueue({ runId }: { runId: number }) {
                     {o.qty ? `${o.qty} shares` : fmt(o.notionalCents)} · {o.orderType} · {o.timeInForce}
                   </span>
                   <Badge variant="outline" className="text-xs" style={{ color: statusColor(o.status) }}>
-                    {o.status}
+                    {statusLabel(o.status)}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
@@ -124,16 +133,16 @@ function OrderQueue({ runId }: { runId: number }) {
                   {o.status === "pending_approval" && (
                     <>
                       <Button size="sm" className="h-7 text-xs" onClick={() => approve.mutate({ orderId: o.id })} disabled={approve.isPending}>
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve proposal
                       </Button>
                       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => reject.mutate({ orderId: o.id })} disabled={reject.isPending}>
-                        <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                        <XCircle className="h-3.5 w-3.5 mr-1" /> Do not approve
                       </Button>
                     </>
                   )}
                   {o.status === "approved" && (
                     <Button size="sm" className="h-7 text-xs" onClick={() => submit.mutate({ orderId: o.id })} disabled={submit.isPending}>
-                        <Send className="h-3.5 w-3.5 mr-1" /> Submit paper order
+                        <Send className="h-3.5 w-3.5 mr-1" /> Send to Alpaca Paper
                     </Button>
                   )}
                   <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
@@ -364,6 +373,8 @@ export default function ApertureExecute() {
 
   const { data } = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
   const run = data?.run;
+  const candidateId = Number(new URLSearchParams(window.location.search).get("candidate"));
+  const proposalCandidate = Number.isFinite(candidateId) && candidateId > 0 ? data?.candidates.find((candidate) => candidate.id === candidateId) : undefined;
 
   return (
     <DashboardLayout>
@@ -398,6 +409,8 @@ export default function ApertureExecute() {
             </div>
           </div>
         )}
+
+        {proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(`/aperture/run/${runId}?view=evidence`)} onProposalCreated={() => navigate(`/aperture/run/${runId}/execute`)} />}
 
         <Tabs defaultValue="orders">
           <TabsList>

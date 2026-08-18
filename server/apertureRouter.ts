@@ -23,6 +23,7 @@ import {
   exposureNodes,
   exposureCoverage,
   securityFacts,
+  apertureEvidenceReviews,
 } from "../drizzle/schema";
 import { adminProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
@@ -49,6 +50,7 @@ import { desc } from "drizzle-orm";
 import { buildCapitalDecisionBrief } from "./aperture/decisionBrief";
 import { ensureThesisReady } from "./aperture/thesisReadiness";
 import { buildBriefResearchPlan, isRunStale, nextFollowUpOffset } from "./aperture/runRecovery";
+import { getEvidenceReviewReadiness } from "../shared/evidenceReview";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -409,6 +411,8 @@ export const apertureRouter = router({
         const candidates = await db!.select().from(apertureCandidates)
           .where(eq(apertureCandidates.runId, input.id))
           .orderBy(desc(apertureCandidates.compositeScore));
+        const evidenceReviews = await db!.select().from(apertureEvidenceReviews)
+          .where(and(eq(apertureEvidenceReviews.runId, input.id), eq(apertureEvidenceReviews.userId, ctx.user.id)));
         const strategies = await db!.select().from(apertureStrategies)
           .where(eq(apertureStrategies.runId, input.id));
         const coverage = await db!.select().from(exposureCoverage)
@@ -444,8 +448,40 @@ export const apertureRouter = router({
           coverage: coverageDetail,
           thesisNodePaths: thesisNodes.map((node) => node.path),
         });
-        return { run, stale: isRunStale(run), candidates, strategies, coverage, coverageDetail, thesisNodes, macroFacts, brief, paperContext: paperAccount ? { account: paperAccount, positions: paperPositions } : null };
+        return { run, stale: isRunStale(run), candidates, strategies, coverage, coverageDetail, thesisNodes, macroFacts, brief, evidenceReviews, paperContext: paperAccount ? { account: paperAccount, positions: paperPositions } : null };
       }),
+
+    evidence: router({
+      review: adminProcedure
+        .input(z.object({
+          runId: z.number(),
+          candidateId: z.number(),
+          checkLabel: z.string().min(2).max(255),
+          status: z.enum(["reviewed", "needs_follow_up"]),
+          note: z.string().max(1_000).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const db = await getDb();
+          const [candidate] = await db!.select().from(apertureCandidates)
+            .where(and(eq(apertureCandidates.id, input.candidateId), eq(apertureCandidates.runId, input.runId)))
+            .limit(1);
+          if (!candidate) throw new TRPCError({ code: "NOT_FOUND", message: "Evidence item not found in this research brief" });
+          const now = Date.now();
+          const existing = await db!.select().from(apertureEvidenceReviews).where(and(
+            eq(apertureEvidenceReviews.userId, ctx.user.id),
+            eq(apertureEvidenceReviews.runId, input.runId),
+            eq(apertureEvidenceReviews.candidateId, input.candidateId),
+            eq(apertureEvidenceReviews.checkLabel, input.checkLabel),
+          )).limit(1);
+          if (existing[0]) {
+            await db!.update(apertureEvidenceReviews).set({ status: input.status, note: input.note ?? null, reviewedAt: now })
+              .where(eq(apertureEvidenceReviews.id, existing[0].id));
+          } else {
+            await db!.insert(apertureEvidenceReviews).values({ userId: ctx.user.id, runId: input.runId, candidateId: input.candidateId, checkLabel: input.checkLabel, status: input.status, note: input.note ?? null, reviewedAt: now, createdAt: now });
+          }
+          return { ok: true };
+        }),
+    }),
 
     /**
      * Process restarts can interrupt the detached executor. Preserve the original
@@ -738,6 +774,29 @@ export const apertureRouter = router({
           .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id)))
           .limit(1);
         if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+
+        // A candidate-originated proposal cannot skip the operator's recorded review
+        // of the evidence questions that can change the decision. Manual paper orders
+        // remain possible for operational uses without a research-candidate link.
+        if (input.candidateId != null) {
+          const [candidate] = await db!.select().from(apertureCandidates)
+            .where(and(eq(apertureCandidates.id, input.candidateId), eq(apertureCandidates.runId, input.runId)))
+            .limit(1);
+          if (!candidate) throw new TRPCError({ code: "NOT_FOUND", message: "Candidate not found in this research brief" });
+          const requiredChecks = Array.isArray(candidate.verifyFields) ? candidate.verifyFields : [];
+          if (requiredChecks.length) {
+            const reviews = await db!.select().from(apertureEvidenceReviews).where(and(
+              eq(apertureEvidenceReviews.userId, ctx.user.id),
+              eq(apertureEvidenceReviews.runId, input.runId),
+              eq(apertureEvidenceReviews.candidateId, input.candidateId),
+            ));
+            const readiness = getEvidenceReviewReadiness(requiredChecks, reviews);
+            if (readiness.unreviewedChecks.length) throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: `Record your review of ${readiness.unreviewedChecks.length} evidence check${readiness.unreviewedChecks.length === 1 ? "" : "s"} before preparing this paper proposal`,
+            });
+          }
+        }
 
         try {
           const orderId = await createOrder({

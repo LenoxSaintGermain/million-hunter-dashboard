@@ -1300,3 +1300,12 @@
 - [x] Reduce Memo Library grid density and preserve a clear selected state across desktop and mobile layouts
 - [x] Ensure selection moves focus to the memo answer within one interaction without forcing a separate screen or scroll hunt
 - [x] Add regression coverage and browser UAT for inline memo-detail visibility
+
+## Capital Aperture — From Recommendation to Paper Action (Aug 17 2026)
+- [x] Replace jargon-first decisive-check framing with a plain-language recommendation explaining the current lead, portfolio impact, verification needed, and resulting action availability
+- [x] Show the specific paper-portfolio change or no-change resulting from each research recommendation without predicting returns
+- [x] Create an explicit human-approved paper-action path that distinguishes research completion, proposal creation, approval, broker submission, fill tracking, and post-action monitoring
+- [x] Reduce mobile navigation depth and expose the relevant next decision action from Research Journeys and final brief views
+- [ ] Add regression coverage and browser UAT for the recommendation-to-action journey
+- [x] Persist human evidence-review acknowledgements so paper-proposal readiness is based on recorded verification rather than a cosmetic checklist
+- [x] Provide a no-order paper-proposal preparation form after recorded evidence review, retaining separate human approval and broker-submission steps

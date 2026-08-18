@@ -5,7 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowLeft, CheckCircle2, CircleAlert, FileText, Loader2, RefreshCw, SearchCheck, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, CircleAlert, ClipboardCheck, FileText, Loader2, RefreshCw, SearchCheck, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { CapitalBrief } from "@/components/aperture/CapitalBrief";
@@ -13,6 +13,7 @@ import { ResearchLedger } from "@/components/aperture/ResearchLedger";
 import { DecisionFocusCard } from "@/components/aperture/DecisionFocusCard";
 import { decisionPriority } from "@shared/decisionFocus";
 import { buildDecisionPath } from "@shared/decisionPath";
+import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
 
 type Role = "core" | "complementary" | "remainder" | "alternative_expression";
 
@@ -137,6 +138,10 @@ export default function CandidateBoard() {
     },
     onError: (error) => toast.error(error.message),
   });
+  const reviewEvidence = trpc.aperture.run.evidence.review.useMutation({
+    onSuccess: () => { toast.success("Human review recorded. This does not create a paper order."); refetch(); },
+    onError: (error) => toast.error(error.message),
+  });
   const genMemo = trpc.aperture.generateMemo.useMutation({
     onSuccess: (_result, variables) => { toast.success("Memo generated — opening the fact-traced record"); refetch(); setGeneratingMemo(null); navigate(`/aperture/memos/${variables.candidateId}`); },
     onError: (error) => { toast.error(error.message); setGeneratingMemo(null); },
@@ -173,6 +178,12 @@ export default function CandidateBoard() {
   const focusCandidate = candidates.find((candidate) => candidate.symbol === brief?.priorityCandidate?.symbol)
     ?? candidates.slice().sort((a, b) => decisionPriority(b) - decisionPriority(a))[0];
   const paperPositions = data.paperContext?.positions ?? [];
+  const focusChecks = Array.isArray(focusCandidate?.verifyFields) ? focusCandidate.verifyFields as string[] : [];
+  const evidenceReadiness = getEvidenceReviewReadiness(focusChecks, (data.evidenceReviews ?? []).filter((review: any) => review.candidateId === focusCandidate?.id));
+  const reviewedChecks = new Set(evidenceReadiness.reviewedChecks);
+  const unreviewedChecks = evidenceReadiness.unreviewedChecks;
+  const paperProposalReady = evidenceReadiness.paperProposalReady;
+  const alreadyHeld = Boolean(focusCandidate && paperPositions.some((position: any) => position.symbol === focusCandidate.symbol));
 
   const openEvidence = () => { setView("evidence"); setActiveRole("all"); };
   return (
@@ -210,6 +221,40 @@ export default function CandidateBoard() {
 
         {view === "brief" ? (
           <div className="space-y-5">
+            {focusCandidate && <section className="rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Your current recommendation</p>
+                  <h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Keep {focusCandidate.symbol} in research — do not change the paper portfolio yet.</h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>The machine surfaced {focusCandidate.symbol} as the strongest current research lead for this brief. This is not a return forecast or trade instruction. {alreadyHeld ? `${focusCandidate.symbol} is already in the connected paper context, so any later proposal would review an existing exposure.` : `${focusCandidate.symbol} is not in the connected paper context, so any later proposal would be a new paper exposure.`}</p>
+                </div>
+                <Badge variant="outline" className="shrink-0" style={{ color: "var(--sh-signal)" }}>{paperProposalReady ? "Proposal can be prepared" : `${unreviewedChecks.length} review${unreviewedChecks.length === 1 ? "" : "s"} before proposal`}</Badge>
+              </div>
+              <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-[1.2fr_1fr]" style={{ borderColor: "var(--sh-border-1)" }}>
+                <div>
+                  <p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>What you need to verify</p>
+                  <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Record your review of the few questions that would change whether a paper proposal is reasonable. Supporting research can continue separately.</p>
+                  <div className="mt-3 space-y-2">
+                    {focusChecks.map((check) => {
+                      const reviewed = reviewedChecks.has(check);
+                      return <div key={check} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2" style={{ background: "var(--sh-surface)" }}>
+                        <span className="text-xs" style={{ color: "var(--sh-text-primary)" }}>{check}</span>
+                        {reviewed ? <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium" style={{ color: "oklch(0.55 0.15 145)" }}><CheckCircle2 className="h-3.5 w-3.5" /> reviewed</span> : <Button variant="outline" size="sm" className="h-7 text-[11px]" disabled={reviewEvidence.isPending} onClick={() => reviewEvidence.mutate({ runId, candidateId: focusCandidate.id, checkLabel: check, status: "reviewed" })}><ClipboardCheck className="mr-1 h-3.5 w-3.5" />Mark reviewed</Button>}
+                      </div>;
+                    })}
+                  </div>
+                </div>
+                <div className="rounded-lg p-3" style={{ background: "var(--sh-surface)" }}>
+                  <p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>What happens next</p>
+                  <ol className="mt-2 space-y-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>
+                    <li><strong style={{ color: "var(--sh-text-primary)" }}>1. Review evidence.</strong> Nothing changes in the portfolio.</li>
+                    <li><strong style={{ color: "var(--sh-text-primary)" }}>2. Prepare a paper proposal.</strong> You choose the size and rationale; it enters pending approval.</li>
+                    <li><strong style={{ color: "var(--sh-text-primary)" }}>3. Approve, submit, and monitor.</strong> Each step stays human-controlled and paper-only.</li>
+                  </ol>
+                  {paperProposalReady ? <Button className="mt-3 w-full" size="sm" onClick={() => navigate(`/aperture/run/${runId}/execute?candidate=${focusCandidate.id}`)}>Prepare paper proposal</Button> : <Button variant="outline" className="mt-3 w-full" size="sm" onClick={() => navigate(`/aperture/memos/${focusCandidate.id}`)}>Read evidence record</Button>}
+                </div>
+              </div>
+            </section>}
             {focusCandidate && <DecisionFocusCard candidate={focusCandidate} positions={paperPositions} onOpenMemo={focusCandidate.memoStatus === "ok" ? () => navigate(`/aperture/memos/${focusCandidate.id}`) : undefined} onReviewEvidence={openEvidence} onComparePostures={() => navigate(`/aperture/run/${runId}/strategies`)} onViewPaperAccount={() => navigate("/aperture/accounts")} />}
             {run.status === "completed" && /deferred/i.test(run.droppedNote ?? "") && <section className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>More thesis evidence is available</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{run.droppedNote} You may continue research now; decisive checks only control whether a human can begin paper-order review. This starts research, never an order.</p></div><Button size="sm" disabled={followUpRun.isPending} onClick={() => followUpRun.mutate({ id: runId })}>{followUpRun.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <SearchCheck className="mr-1.5 h-3.5 w-3.5" />}Research next batch</Button></section>}
             <CapitalBrief
@@ -225,7 +270,7 @@ export default function CandidateBoard() {
         ) : (
           <section className="space-y-4">
             <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-              <div><p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Only the decisive evidence first</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{brief?.evidence.decisionCriticalCheckCount ?? 0} decision-critical check{brief?.evidence.decisionCriticalCheckCount === 1 ? "" : "s"} determine whether paper-order review is even available. {brief?.evidence.researchFollowUpCheckCount ?? 0} supporting checks are optional for this moment.</p></div>
+              <div><p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Review the few questions that could change this decision</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{brief?.evidence.decisionCriticalCheckCount ?? 0} question{brief?.evidence.decisionCriticalCheckCount === 1 ? "" : "s"} must be reviewed before a paper proposal can be prepared. {brief?.evidence.researchFollowUpCheckCount ?? 0} supporting research items can continue without blocking that step.</p></div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}/strategies`)}>Compare postures</Button>
                 <Button variant="ghost" size="sm" onClick={() => setView("brief")}>Back to brief</Button>
@@ -234,7 +279,7 @@ export default function CandidateBoard() {
             {focusCandidate && (() => {
               const checks = Array.isArray(focusCandidate.verifyFields) ? focusCandidate.verifyFields as string[] : [];
               const path = buildDecisionPath({ symbol: focusCandidate.symbol, memoStatus: focusCandidate.memoStatus, decisionCriticalChecks: checks.length });
-              return <Card className="border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Your decision checklist</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{focusCandidate.symbol} · {path.label}</h2></div><Badge variant="outline" style={{ color: "var(--sh-signal)" }}>{checks.length} decisive</Badge></div>{checks.length ? <ol className="space-y-2">{checks.map((check, index) => <li key={check} className="flex gap-2 text-sm" style={{ color: "var(--sh-text-primary)" }}><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px]" style={{ background: "color-mix(in oklab, var(--sh-signal) 14%, transparent)", color: "var(--sh-signal)" }}>{index + 1}</span>{check}</li>)}</ol> : <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>No decision-critical checks remain in this research record.</p>}<div className="flex flex-wrap gap-2 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}>{focusCandidate.memoStatus === "ok" ? <Button size="sm" onClick={() => navigate(`/aperture/memos/${focusCandidate.id}`)}>Read decision record</Button> : <Button size="sm" disabled={generatingMemo === focusCandidate.id} onClick={() => { setGeneratingMemo(focusCandidate.id); genMemo.mutate({ runId, candidateId: focusCandidate.id }); }}>Create decision record</Button>}<Button variant="ghost" size="sm" onClick={() => setShowSupporting((value) => !value)}>{showSupporting ? "Hide supporting research" : `See ${Math.max(0, candidates.length - 1)} supporting candidates`}</Button></div></CardContent></Card>;
+              return <Card className="border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Questions to review before a paper proposal</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{focusCandidate.symbol} · {path.label}</h2></div><Badge variant="outline" style={{ color: "var(--sh-signal)" }}>{checks.length} to review</Badge></div>{checks.length ? <ol className="space-y-2">{checks.map((check, index) => <li key={check} className="flex gap-2 text-sm" style={{ color: "var(--sh-text-primary)" }}><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px]" style={{ background: "color-mix(in oklab, var(--sh-signal) 14%, transparent)", color: "var(--sh-signal)" }}>{index + 1}</span>{check}</li>)}</ol> : <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>No required reviews remain in this research record.</p>}<div className="flex flex-wrap gap-2 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}>{focusCandidate.memoStatus === "ok" ? <Button size="sm" onClick={() => navigate(`/aperture/memos/${focusCandidate.id}`)}>Read decision record</Button> : <Button size="sm" disabled={generatingMemo === focusCandidate.id} onClick={() => { setGeneratingMemo(focusCandidate.id); genMemo.mutate({ runId, candidateId: focusCandidate.id }); }}>Create decision record</Button>}<Button variant="ghost" size="sm" onClick={() => setShowSupporting((value) => !value)}>{showSupporting ? "Hide supporting research" : `See ${Math.max(0, candidates.length - 1)} supporting candidates`}</Button></div></CardContent></Card>;
             })()}
             <div className="flex gap-1 overflow-x-auto pb-1">
               {roles.map((role) => {

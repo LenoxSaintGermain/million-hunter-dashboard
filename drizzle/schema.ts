@@ -1233,6 +1233,26 @@ export const apertureCandidates = mysqlTable("aperture_candidates", {
 export type ApertureCandidate = typeof apertureCandidates.$inferSelect;
 export type InsertApertureCandidate = typeof apertureCandidates.$inferInsert;
 
+/**
+ * A human acknowledgement of one decision-critical evidence item. This does
+ * not recommend, approve, or submit a trade; it makes the operator's review
+ * visible before a paper proposal may be prepared.
+ */
+export const apertureEvidenceReviews = mysqlTable("aperture_evidence_reviews", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  runId: int("run_id").notNull(),
+  candidateId: int("candidate_id").notNull(),
+  checkLabel: varchar("check_label", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["reviewed", "needs_follow_up"]).default("reviewed").notNull(),
+  note: text("note"),
+  reviewedAt: bigint("reviewed_at", { mode: "number" }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  reviewScope: uniqueIndex("aperture_evidence_review_scope").on(table.userId, table.runId, table.candidateId, table.checkLabel),
+}));
+export type ApertureEvidenceReview = typeof apertureEvidenceReviews.$inferSelect;
+
 /** Competing deployment strategies — the output is a choice, not a list. */
 export const apertureStrategies = mysqlTable("aperture_strategies", {
   id: int("id").autoincrement().primaryKey(),
