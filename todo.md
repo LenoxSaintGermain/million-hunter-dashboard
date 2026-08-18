@@ -1309,3 +1309,10 @@
 - [ ] Add regression coverage and browser UAT for the recommendation-to-action journey
 - [x] Persist human evidence-review acknowledgements so paper-proposal readiness is based on recorded verification rather than a cosmetic checklist
 - [x] Provide a no-order paper-proposal preparation form after recorded evidence review, retaining separate human approval and broker-submission steps
+
+## Jim Reference Playbook — Thesis Fit & Paper Trial (Aug 18 2026)
+- [x] Translate Jim’s catalyst-reaction playbook into a canonical Capital / Trade thesis with explicit risk, exclusivity, trigger, invalidation, and time-stop controls
+- [x] Map the playbook’s required evidence and market-state inputs against existing Capital Aperture capabilities and identify workflow gaps
+- [x] Create the reference thesis and run it through the paper-only Capital Brief workflow without creating, approving, submitting, or modifying an order
+- [x] Prioritize the highest-leverage remedies required for a reliable catalyst-reaction workflow without adding incomplete execution logic
+- [x] Record the trial outcome, residual gaps, and recommended operating sequence
