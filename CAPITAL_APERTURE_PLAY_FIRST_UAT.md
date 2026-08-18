@@ -19,3 +19,11 @@
 ## Known Limitation, Shown Honestly
 
 The daily-play list does not yet carry a verified per-play VWAP/opening-range observation or same-theme classification. It explicitly labels those states as **not measured** and sends the operator to the evidence/preflight path rather than inventing a trigger or correlation claim.
+
+## Daily-Play Integrity Correction UAT
+
+The revised daily list was evaluated after the eight reference intraday plays reached their catalyst deadlines. The list returned the cash/no-trade outcome and explicitly stated that **eight past-catalyst plays were excluded**. It did not show stale candidates as today’s actionable opportunities, and the thesis-fit rank numerals were removed.
+
+The expanded intraday ticket now uses a server-backed VWAP/30-minute-opening-range query. The query carries feed, lag, and unavailable state from the live market-data adapter; until current tape is available it asks for terminal confirmation rather than rendering a permanent hardcoded `Unknown` label. Per-play theme classification remains unavailable, while the list now prints the cockpit’s measured correlated planned-loss context and clearly distinguishes that account-wide measurement from an unavailable play-level comparison.
+
+Deferred plays now store a next-regular-session resume time. A skip remains a retirement decision. No proposal, approval, submission, or broker action was created during this validation.

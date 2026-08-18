@@ -11,7 +11,7 @@
  * so the contract is visible in the server code too.
  */
 import { z } from "zod";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, gte, lt } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   capitalTheses,
@@ -54,6 +54,9 @@ import { buildCapitalDecisionBrief } from "./aperture/decisionBrief";
 import { ensureThesisReady } from "./aperture/thesisReadiness";
 import { buildBriefResearchPlan, isRunStale, nextFollowUpOffset } from "./aperture/runRecovery";
 import { getEvidenceReviewReadiness } from "../shared/evidenceReview";
+import { fetchIntradayBars } from "./aperture/providers/marketData";
+import { checkVwapHold, openingRange, sessionVwap } from "./aperture/intraday";
+import { REGULAR_OPEN, nextRegularSessionOpen, startOfEtDay } from "./aperture/marketSession";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -871,6 +874,7 @@ export const apertureRouter = router({
   play: router({
     list: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
+      const now = Date.now();
       const rows = await db!.select({ candidate: apertureCandidates, run: apertureRuns, thesisName: capitalTheses.name, thesisRawText: capitalTheses.rawText })
         .from(apertureCandidates)
         .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
@@ -879,9 +883,19 @@ export const apertureRouter = router({
           eq(apertureRuns.userId, ctx.user.id),
           eq(apertureRuns.status, "completed"),
           inArray(apertureRuns.holdingPeriod, ["intraday", "catalyst_window"]),
+          gte(apertureRuns.catalystDeadlineAt, now),
         ))
-        .orderBy(desc(apertureCandidates.compositeScore), desc(apertureRuns.createdAt))
+        .orderBy(apertureRuns.catalystDeadlineAt, desc(apertureRuns.createdAt))
         .limit(40);
+      const expiredRows = await db!.select({ id: apertureCandidates.id })
+        .from(apertureCandidates)
+        .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
+        .where(and(
+          eq(apertureRuns.userId, ctx.user.id),
+          eq(apertureRuns.status, "completed"),
+          inArray(apertureRuns.holdingPeriod, ["intraday", "catalyst_window"]),
+          lt(apertureRuns.catalystDeadlineAt, now),
+        ));
       const candidateIds = rows.map(({ candidate }) => candidate.id);
       const reviews = candidateIds.length
         ? await db!.select().from(apertureEvidenceReviews).where(and(eq(apertureEvidenceReviews.userId, ctx.user.id), inArray(apertureEvidenceReviews.candidateId, candidateIds)))
@@ -891,19 +905,62 @@ export const apertureRouter = router({
         : [];
       const reviewsByCandidate = new Map<number, typeof reviews>();
       for (const review of reviews) reviewsByCandidate.set(review.candidateId, [...(reviewsByCandidate.get(review.candidateId) ?? []), review]);
-      const decisionByCandidate = new Map(decisions.map((decision) => [decision.candidateId, decision]));
-      return rows.map(({ candidate, run, thesisName, thesisRawText }) => ({
+      // Skip retires the current play. Defer is a next-regular-session pause;
+      // legacy null-resume defers are deliberately resurfaced rather than hidden
+      // forever by a rule that did not exist when they were recorded.
+      const decisionByCandidate = new Map(decisions
+        .filter((decision) => decision.decision === "skipped" || (decision.resumeAt != null && decision.resumeAt > now))
+        .map((decision) => [decision.candidateId, decision]));
+      return {
+        expiredPlayCount: expiredRows.length,
+        plays: rows.map(({ candidate, run, thesisName, thesisRawText }) => ({
         candidate,
         run,
         thesisName,
         thesisRawText,
         reviews: reviewsByCandidate.get(candidate.id) ?? [],
         decision: decisionByCandidate.get(candidate.id) ?? null,
-        confidenceReason: Array.isArray(candidate.verifyFields) && candidate.verifyFields.length
+        evidenceSummary: Array.isArray(candidate.verifyFields) && candidate.verifyFields.length
           ? `${candidate.verifyFields.length} decision-critical evidence check${candidate.verifyFields.length === 1 ? " remains" : "s remain"}.`
           : "No decision-critical evidence field was generated; current market conditions still require human confirmation.",
-      }));
+        })),
+      };
     }),
+
+    trigger: adminProcedure
+      .input(z.object({ runId: z.number(), candidateId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [row] = await db!.select({ candidate: apertureCandidates, run: apertureRuns })
+          .from(apertureCandidates)
+          .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
+          .where(and(
+            eq(apertureCandidates.id, input.candidateId),
+            eq(apertureCandidates.runId, input.runId),
+            eq(apertureRuns.userId, ctx.user.id),
+          )).limit(1);
+        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Play not found in your research history" });
+        if (row.run.holdingPeriod !== "intraday") {
+          return { applicable: false, state: "not_applicable" as const, basis: "VWAP hold is only evaluated for intraday plays.", vwap: null, openingRange: null };
+        }
+        const now = Date.now();
+        const dayStart = startOfEtDay(now);
+        if (dayStart == null) {
+          return { applicable: true, state: "unknown" as const, basis: "The ET session day could not be determined, so no intraday trigger can be measured.", vwap: null, openingRange: null };
+        }
+        const tape = await fetchIntradayBars(row.candidate.symbol, { startMs: dayStart, timeoutMs: 4_000, maxPages: 1 });
+        const vwap = sessionVwap(tape.bars, { feed: tape.feed, now });
+        const range = openingRange(tape.bars, { sessionOpenAt: dayStart + REGULAR_OPEN * 60_000, minutes: 30, feed: tape.feed, now });
+        const hold = checkVwapHold(tape.bars, vwap, { side: "above", minutesRequired: 15, now });
+        return {
+          applicable: true,
+          state: hold.state,
+          basis: tape.unavailableReason ?? hold.basis,
+          triggerSide: "above" as const,
+          vwap: { value: hold.vwap, lastPrice: hold.lastPrice, feed: hold.feed, lagMs: hold.lagMs, needsOperatorConfirmation: hold.needsOperatorConfirmation },
+          openingRange: { high: range.high, low: range.low, widthPct: range.widthPct, complete: range.complete, feed: range.feed, lagMs: range.lagMs, unavailableReason: range.unavailableReason },
+        };
+      }),
 
     decide: adminProcedure
       .input(z.object({ runId: z.number(), candidateId: z.number(), decision: z.enum(["skipped", "deferred"]), reason: z.string().trim().min(3).max(1_000) }))
@@ -921,11 +978,13 @@ export const apertureRouter = router({
           eq(aperturePlayDecisions.runId, input.runId),
           eq(aperturePlayDecisions.candidateId, input.candidateId),
         )).limit(1);
+        const resumeAt = input.decision === "deferred" ? nextRegularSessionOpen(now) : null;
+        if (input.decision === "deferred" && resumeAt == null) throw new TRPCError({ code: "BAD_REQUEST", message: "The next regular session cannot be determined; defer was not recorded." });
         if (existing) {
-          await db!.update(aperturePlayDecisions).set({ decision: input.decision, reason: input.reason, updatedAt: now })
+          await db!.update(aperturePlayDecisions).set({ decision: input.decision, reason: input.reason, resumeAt, updatedAt: now })
             .where(eq(aperturePlayDecisions.id, existing.id));
         } else {
-          await db!.insert(aperturePlayDecisions).values({ userId: ctx.user.id, ...input, createdAt: now, updatedAt: now });
+          await db!.insert(aperturePlayDecisions).values({ userId: ctx.user.id, ...input, resumeAt, createdAt: now, updatedAt: now });
         }
         return { ok: true };
       }),

@@ -166,3 +166,24 @@ export function startOfEtDay(nowMs: number): number | null {
   if (!clock) return null;
   return nowMs - clock.etMinutes * 60_000 - (nowMs % 60_000);
 }
+
+/**
+ * First regular-session open after `nowMs`, using the same holiday calendar the
+ * order gate uses. A trader defer is a next-session pause, not a permanent
+ * retirement; weekends and closures are skipped rather than treated as 24 hours.
+ */
+export function nextRegularSessionOpen(nowMs: number): number | null {
+  if (!Number.isFinite(nowMs)) return null;
+  const dayMs = 24 * 60 * 60 * 1_000;
+  for (let day = 1; day <= 8; day++) {
+    const probe = nowMs + day * dayMs;
+    const dayStart = startOfEtDay(probe);
+    if (dayStart == null) continue;
+    const candidate = dayStart + REGULAR_OPEN * 60_000;
+    // A late probe on a valid half-day is "closed", but 09:30 on that same
+    // date was a regular session. Ask the calendar about the candidate open,
+    // not the arbitrary probe time, so a Friday defer does not jump to Monday.
+    if (candidate > nowMs && marketSession(candidate).session === "regular") return candidate;
+  }
+  return null;
+}

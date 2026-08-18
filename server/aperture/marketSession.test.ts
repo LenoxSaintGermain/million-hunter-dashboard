@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  marketSession, etClock, startOfEtDay, isHalfDay, isMarketHoliday, closeMinutesFor,
+  marketSession, etClock, startOfEtDay, nextRegularSessionOpen, isHalfDay, isMarketHoliday, closeMinutesFor,
   CALENDAR_HORIZON,
 } from "./marketSession";
 
@@ -123,5 +123,17 @@ describe("startOfEtDay", () => {
   it("uses the ET date, not the UTC date, late in the evening", () => {
     const start = startOfEtDay(utc("2026-06-11T02:00:00Z"))!;
     expect(etClock(start)!.dateEt).toBe("2026-06-10");
+  });
+});
+
+describe("nextRegularSessionOpen", () => {
+  it("moves a Friday defer to Monday's 09:30 ET regular open", () => {
+    const next = nextRegularSessionOpen(utc("2026-06-12T20:30:00Z"))!; // Friday 16:30 ET
+    expect(etClock(next)).toMatchObject({ dateEt: "2026-06-15", etMinutes: 9 * 60 + 30 });
+  });
+
+  it("skips a market holiday when finding the next regular session", () => {
+    const next = nextRegularSessionOpen(utc("2026-11-25T22:00:00Z"))!; // Eve of Thanksgiving
+    expect(etClock(next)).toMatchObject({ dateEt: "2026-11-27", etMinutes: 9 * 60 + 30 });
   });
 });

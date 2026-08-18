@@ -1360,4 +1360,14 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Show a thesis the plays it produced, including available outcomes and set-aside history
 - [x] Validate the play list at 375px and complete authenticated UAT of no-trade, unavailable trigger, skip, and paper-only boundaries
 - [ ] Re-run the external Alpaca connectivity test when `paper-api.alpaca.markets` is reachable; the full suite otherwise passed 613 tests and the failure was a network connect timeout, not an assertion failure
+
+## Daily Play Integrity Corrections (Aug 18 2026)
+- [x] Filter daily plays to completed runs with a future catalyst deadline, and state when the empty list reflects expired-play exclusion
+- [x] Remove thesis-fit rank numerals from the daily list until a separate, defensible take-first ordering basis exists
+- [x] Replace the permanently hardcoded unknown trigger label with server-backed VWAP/opening-range state and an explicit provider-unavailable state
+- [x] Remove invented UI confidence thresholds; separately label model confidence and decision-critical evidence-count information
+- [x] Isolate typed skip reasons by candidate so input never carries into a different play
+- [x] Make defer session-scoped rather than permanently hiding a play; retain persistent skip as the only retirement decision
+- [x] Surface measured correlated planned-loss context beside play choices without inventing per-play theme classification
+- [x] Preserve the two-audience experience through workspace routing; do not introduce a play-first/thesis-first toggle
 - [x] Add the minimal persistent play-decision record required to retain a trader skip reason; no current table stores this decision

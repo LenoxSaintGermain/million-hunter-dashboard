@@ -1268,6 +1268,8 @@ export const aperturePlayDecisions = mysqlTable("aperture_play_decisions", {
   candidateId: int("candidate_id").notNull(),
   decision: mysqlEnum("decision", ["skipped", "deferred"]).notNull(),
   reason: text("reason").notNull(),
+  /** A defer is temporarily hidden only until the next regular session begins. */
+  resumeAt: bigint("resume_at", { mode: "number" }),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
 }, (table) => ({

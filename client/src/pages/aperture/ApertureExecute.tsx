@@ -423,7 +423,7 @@ function AlphaDashboard({ runId }: { runId: number }) {
     onSuccess: () => { toast.success("Alpha metric refreshed"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
-  const recordedDecisions = (dailyPlays ?? []).filter((play) => play.run.id === runId && play.decision);
+  const recordedDecisions = (dailyPlays?.plays ?? []).filter((play) => play.run.id === runId && play.decision);
 
   return (
     <div className="space-y-4">

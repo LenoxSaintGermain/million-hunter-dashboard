@@ -7,6 +7,7 @@ const requiredColumns = [
   "candidate_id",
   "decision",
   "reason",
+  "resume_at",
   "created_at",
   "updated_at",
 ] as const;
@@ -39,5 +40,12 @@ describe("Capital Aperture trader-decision persistence schema", () => {
        AND INDEX_NAME = 'aperture_play_decision_scope' ORDER BY SEQ_IN_INDEX`,
     );
     expect(indexes.map((index) => index.COLUMN_NAME)).toEqual(["user_id", "run_id", "candidate_id"]);
+
+    const [resumeIndexes] = await connection.query<Array<{ INDEX_NAME: string; COLUMN_NAME: string }>>(
+      `SELECT INDEX_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'aperture_play_decisions'
+       AND INDEX_NAME = 'aperture_play_decision_resume_idx'`,
+    );
+    expect(resumeIndexes.map((index) => index.COLUMN_NAME)).toEqual(["resume_at"]);
   });
 });

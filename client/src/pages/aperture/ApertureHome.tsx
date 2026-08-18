@@ -201,7 +201,7 @@ export default function ApertureHome() {
   const selectedThesis = theses?.find((thesis) => thesis.id === selectedThesisId);
   const selectedAccount = accounts?.find((account) => account.id === selectedAccountId);
   const selectedHorizon = selectedThesis?.graph?.horizons?.[0] ?? null;
-  const thesisProducedPlays = (dailyPlays ?? []).filter((play) => play.run.thesisId === selectedThesisId);
+  const thesisProducedPlays = (dailyPlays?.plays ?? []).filter((play) => play.run.thesisId === selectedThesisId);
   const unprojectedCanonicalTheses = (canonicalTheses ?? []).filter(
     (canonical) => !(theses ?? []).some((projection) => projection.sourceCompilationId === canonical.id),
   );
