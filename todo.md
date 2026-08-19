@@ -1408,3 +1408,13 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Hide per-play reference ceilings and not-measured lines from the collapsed view; explain same-name correlation duplication only when expanded
 - [x] Persist manual expansion preference per user while retaining collapsed-by-default mobile behavior and safety auto-expansion
 - [x] Validate rail hierarchy at desktop and 375px mobile without altering paper-account or order behavior
+
+## Final Semantics & Cockpit Interaction Corrections (Aug 19 2026)
+- [x] Add unique ids, names, and mobile input modes to the intended-trade inputs in Capital setup
+- [x] Guard all loading pulse animations with reduced-motion behavior and preserve a visible static loading state
+- [x] Keep one document-level h1 when research setup is open and preserve a semantic section heading beneath it
+- [x] Replace hardcoded `en-US` money formatting with user-locale-aware formatting across affected Capital surfaces
+- [x] Convert thesis-play navigation from button behavior to a semantic link while preserving candidate selection context
+- [x] Add plain-language touch-readable explanations for derived cockpit constraint values and severity
+- [x] Ensure the cockpit rail’s critical summary remains legible at 375px and make expanded constraint ordering useful without weakening automatic safety expansion
+- [x] Move the external FRED credential assertion behind an opt-in integration flag after a network timeout; default regression now remains deterministic

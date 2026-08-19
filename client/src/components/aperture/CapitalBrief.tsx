@@ -34,7 +34,7 @@ export type CapitalBriefData = {
 };
 
 function money(cents: number) {
-  return `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  return `$${(cents / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
 export function CapitalBrief({

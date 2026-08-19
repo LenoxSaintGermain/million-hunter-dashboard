@@ -10,7 +10,7 @@ type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window";
 
 function money(cents: number | null | undefined) {
   if (cents == null) return "Not modeled";
-  return `$${Math.round(cents / 100).toLocaleString("en-US")}`;
+  return `$${Math.round(cents / 100).toLocaleString()}`;
 }
 
 function safeHoldingPeriod(value: unknown): HoldingPeriod {

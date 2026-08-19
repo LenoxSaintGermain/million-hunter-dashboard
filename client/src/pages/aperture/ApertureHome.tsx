@@ -5,7 +5,7 @@
  * Modeled figures are labeled as such throughout.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -249,7 +249,7 @@ export default function ApertureHome() {
             <span className="text-[0.7rem] font-semibold uppercase tracking-[0.17em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture · Paper research</span>
             <Badge variant="outline" className="text-xs">Human-approved only</Badge>
           </div>
-          <h1 className="font-serif text-3xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Turn one market belief into a clear paper research brief.</h1>
+          <h2 className="font-serif text-3xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Turn one market belief into a clear paper research brief.</h2>
           <p className="mt-3 text-sm leading-6" style={{ color: "var(--sh-text-secondary)" }}>
             Choose what you want to investigate. Aperture prepares the research map, checks your paper safeguards, and shows the next decision—without sending an order.
           </p>
@@ -324,12 +324,12 @@ export default function ApertureHome() {
                   {selectedThesisId && (
                     <div className="rounded-lg border p-3 text-xs" style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
                       <div className="flex items-center gap-2"><Target className="h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} /><span><strong style={{ color: "var(--sh-text-primary)" }}>Ready to frame:</strong> {selectedHorizon ?? "Aperture will prepare this saved belief for securities research when you build the brief."}</span></div>
-                      <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Plays this thesis produced</p>{thesisProducedPlays.length ? <div className="mt-2 flex flex-wrap gap-1.5">{thesisProducedPlays.slice(0, 8).map((play) => <Button key={play.candidate.id} type="button" variant="outline" size="sm" className="h-7 text-[11px]" onClick={() => navigate(`/aperture/run/${play.run.id}?view=play`)}>{play.candidate.symbol} · {play.run.holdingPeriod ?? "research"}</Button>)}</div> : <p className="mt-1 leading-5">No short-horizon play is recorded for this thesis yet. Building a brief creates research, not a paper order.</p>}</div>
+                      <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Plays this thesis produced</p>{thesisProducedPlays.length ? <div className="mt-2 flex flex-wrap gap-1.5">{thesisProducedPlays.slice(0, 8).map((play) => <Link key={play.candidate.id} href={`/aperture/run/${play.run.id}?view=play&candidate=${play.candidate.id}`} className="inline-flex h-7 items-center rounded-md border px-2 text-[11px] hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{play.candidate.symbol} · {play.run.holdingPeriod ?? "research"}</Link>)}</div> : <p className="mt-1 leading-5">No short-horizon play is recorded for this thesis yet. Building a brief creates research, not a paper order.</p>}</div>
                     </div>
                   )}
                   {projectCanonicalThesis.isPending && canonicalThesisId && (
                     <p className="flex items-center gap-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Preparing this saved belief for the brief…
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> Preparing this saved belief for the brief…
                     </p>
                   )}
                 </div>
@@ -441,9 +441,9 @@ export default function ApertureHome() {
                 </details>
 
                 {/* Intended trades */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium">Your starting view <span className="opacity-50">(ideas to re-underwrite, not commitments)</span></Label>
+                <fieldset className="space-y-2">
+                  <legend className="text-xs font-medium">Your starting view <span className="opacity-50">(ideas to re-underwrite, not commitments)</span></legend>
+                  <div className="flex justify-end">
                     <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={addTrade}>
                       <Plus className="h-3 w-3 mr-1" /> Add
                     </Button>
@@ -452,18 +452,31 @@ export default function ApertureHome() {
                     <div key={i} className="flex gap-2 items-center">
                       <Input
                         className="w-24 text-xs"
+                        id={`intended-trade-${i}-symbol`}
+                        name={`intended-trade-${i}-symbol`}
+                        inputMode="text"
+                        autoCapitalize="characters"
+                        aria-label={`Starting view ${i + 1} ticker`}
                         placeholder="TICKER"
                         value={t.symbol}
                         onChange={(e) => updateTrade(i, "symbol", e.target.value.toUpperCase())}
                       />
                       <Input
                         className="w-28 text-xs"
+                        id={`intended-trade-${i}-dollars`}
+                        name={`intended-trade-${i}-dollars`}
+                        inputMode="decimal"
+                        aria-label={`Starting view ${i + 1} dollar amount`}
                         placeholder="$ amount"
                         value={t.dollars}
                         onChange={(e) => updateTrade(i, "dollars", e.target.value)}
                       />
                       <Input
                         className="flex-1 text-xs"
+                        id={`intended-trade-${i}-note`}
+                        name={`intended-trade-${i}-note`}
+                        inputMode="text"
+                        aria-label={`Starting view ${i + 1} note`}
                         placeholder="Note (optional)"
                         value={t.note}
                         onChange={(e) => updateTrade(i, "note", e.target.value)}
@@ -478,7 +491,7 @@ export default function ApertureHome() {
                       No starting ideas — Aperture will map the thesis and research the evidence universe from scratch.
                     </p>
                   )}
-                </div>
+                </fieldset>
 
                 <Separator />
                 <Button

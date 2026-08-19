@@ -29,7 +29,7 @@ const FRED_CONTEXT: Record<string, { label: string; impact: string }> = {
 function formatValue(fact: LedgerFact) {
   if (fact.valueNum == null) return fact.valueText ?? "Not reported";
   if (fact.unit === "pct") return `${fact.valueNum.toFixed(2)}%`;
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(fact.valueNum);
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(fact.valueNum);
 }
 
 function formatDate(value: number | null) {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fredProvider } from "./providers/fred";
 import { statusOf } from "./providers/types";
 
-describe("FRED macro-data connection", () => {
+describe.skipIf(process.env.RUN_FRED_INTEGRATION !== "1")("FRED macro-data connection (external integration)", () => {
   it("authenticates with the configured key and returns a verified macro observation", async () => {
     expect(statusOf(fredProvider).available).toBe(true);
 
