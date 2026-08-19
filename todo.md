@@ -1381,3 +1381,8 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Make Capital Brief explain the lead candidate among the full candidate count and permit deliberate next/previous candidate review
 - [x] Route the trader default workspace through three action verbs—Today, Why, Record—without introducing a mode toggle or changing Jim’s thesis vocabulary
 - [x] Guard expired catalyst windows in direct brief review so historical modeled levels remain visible but cannot become a new paper proposal
+
+## Jim Thesis Visibility Repair (Aug 19 2026)
+- [x] Diagnose the ownership, scope, and saved-list filter that hides Jim’s catalyst-reaction thesis from the signed-in thesis workspace
+- [x] Restore the thesis to the appropriate authorized saved-thesis view without widening cross-user access
+- [x] Add regression coverage for canonical Capital / Trade thesis visibility across authorized users and keep unrelated private theses isolated

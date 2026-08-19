@@ -26,6 +26,7 @@ import {
   apertureEvidenceReviews,
   aperturePlayDecisions,
   apertureSetAside,
+  thesisCompilations,
 } from "../drizzle/schema";
 import { adminProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
@@ -58,6 +59,7 @@ import { fetchIntradayBars } from "./aperture/providers/marketData";
 import { checkVwapHold, openingRange, sessionVwap } from "./aperture/intraday";
 import { REGULAR_OPEN, nextRegularSessionOpen, startOfEtDay } from "./aperture/marketSession";
 import { constructPlay, CONSTRUCTED_PLAY_DISCLOSURE } from "./aperture/playConstructor";
+import { canonicalCapitalValues, needsCanonicalPromotion } from "./aperture/canonicalThesisLink";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -191,15 +193,42 @@ export const apertureRouter = router({
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
         const now = Date.now();
+        const [canonical] = await db!.insert(thesisCompilations).values(canonicalCapitalValues({
+          userId: ctx.user.id,
+          name: input.name,
+          rawText: input.rawText,
+        }));
         const [result] = await db!.insert(capitalTheses).values({
           userId: ctx.user.id,
           name: input.name ?? null,
           rawText: input.rawText,
+          sourceCompilationId: Number((canonical as any).insertId),
           status: "compiling",
           createdAt: now,
           updatedAt: now,
         });
         return { id: (result as any).insertId as number };
+      }),
+
+    /** One-time repair for legacy Capital-only theses created before the canonical-first workflow. */
+    promoteCanonical: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const thesis = await requireThesis(db, input.id, ctx.user.id);
+        if (!needsCanonicalPromotion(thesis.sourceCompilationId)) {
+          return { compilationId: thesis.sourceCompilationId, linked: true };
+        }
+        const [canonical] = await db!.insert(thesisCompilations).values(canonicalCapitalValues({
+          userId: ctx.user.id,
+          name: thesis.name,
+          rawText: thesis.rawText,
+        }));
+        const compilationId = Number((canonical as any).insertId);
+        await db!.update(capitalTheses)
+          .set({ sourceCompilationId: compilationId, updatedAt: Date.now() })
+          .where(and(eq(capitalTheses.id, thesis.id), eq(capitalTheses.userId, ctx.user.id)));
+        return { compilationId, linked: false };
       }),
 
     /** Legacy only: canonical-linked theses are edited in the main Thesis Engine. */
