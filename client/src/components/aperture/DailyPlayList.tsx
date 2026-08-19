@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, ChevronDown, CircleSlash2, FileSearch, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { buildPlayRecipe } from "@shared/playRecipe";
+import { dailyPlayPrimaryDestination } from "@shared/dailyPlayActions";
 import { PlayRecipeCard } from "./PlayRecipeCard";
 
 function money(cents: number | null | undefined) {
@@ -40,12 +41,29 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
     onSuccess: (_, input) => {
       setReasons((current) => ({ ...current, [input.candidateId]: "" }));
       setConfirmSkipCandidateId(null);
+      setExpandedId((current) => current === input.candidateId ? null : current);
       setDecisionAnnouncement(input.decision === "skipped" ? "Permanent skip recorded. The play has been retired and added to the weekly scorecard." : "Defer recorded. This play will return at the next regular market session.");
       void utils.aperture.play.list.invalidate();
     },
   });
   const ranked = useMemo(() => (playList?.plays ?? []).filter((play) => !play.decision), [playList]);
   const correlation = cockpit?.headroom.lines.find((line) => line.key === "correlated_planned_risk");
+  useEffect(() => {
+    const openPrimaryStep = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" || (!event.metaKey && !event.ctrlKey)) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      const item = ranked.find((play) => play.candidate.id === expandedId);
+      if (!item) return;
+      event.preventDefault();
+      const recipe = buildPlayRecipe({ candidate: item.candidate, run: item.run, reviewedChecks: item.reviews.filter((review) => review.status === "reviewed").map((review) => review.checkLabel) });
+      const destination = dailyPlayPrimaryDestination(recipe.readiness);
+      setDecisionAnnouncement(destination === "execute" ? `Opening ${item.candidate.symbol}'s human paper-proposal review. Nothing has been submitted.` : `Opening ${item.candidate.symbol}'s decisive evidence questions.`);
+      onOpenRun(item.run.id, item.candidate.id, destination);
+    };
+    window.addEventListener("keydown", openPrimaryStep);
+    return () => window.removeEventListener("keydown", openPrimaryStep);
+  }, [expandedId, onOpenRun, ranked]);
 
   return <section className="space-y-5">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -65,6 +83,7 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
       <CircleSlash2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} />
       <div><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Cash / no trade is an active outcome.</p><p className="mt-0.5 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Use it when none of today’s recipes clear the trigger, risk, evidence, or correlation conditions. Recording a skip beside a play makes that judgment visible in the scorecard.</p></div>
     </div>
+    {decisionAnnouncement && <div role="status" className="rounded-lg border px-4 py-3 text-sm" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}><strong>Decision recorded.</strong> {decisionAnnouncement}</div>}
 
     {isLoading && <div className="flex items-center gap-2 py-10 text-sm" style={{ color: "var(--sh-fg-muted)" }}><Loader2 className="h-4 w-4 animate-spin" />Building today’s ranked play list…</div>}
     {!isLoading && ranked.length === 0 && <div className="rounded-xl border p-6" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div className="flex gap-3"><CircleSlash2 className="mt-0.5 h-5 w-5" style={{ color: "var(--sh-signal)" }} /><div><p className="font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Cash is the right play today.</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>No completed intraday or catalyst-window research play with a future catalyst deadline is available.{playList?.expiredPlayCount ? ` ${playList.expiredPlayCount} past-catalyst play${playList.expiredPlayCount === 1 ? " was" : "s were"} excluded.` : ""} That is not a missing screen—it is a decision to avoid inventing an actionable setup.</p></div></div></div>}
@@ -87,6 +106,7 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
               <div><p style={{ color: "var(--sh-fg-muted)" }}>Catalyst / time</p><p className="mt-1 font-semibold" style={{ color: "var(--sh-text-primary)" }}>{item.run.catalystDeadlineAt ? <time dateTime={new Date(item.run.catalystDeadlineAt).toISOString()}>{new Date(item.run.catalystDeadlineAt).toLocaleString()}</time> : "Not measured"}</p><p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>Source and catalyst detail remain in the research trail.</p></div>
             </div>
             <PlayRecipeCard candidate={item.candidate} run={item.run} reviewedChecks={item.reviews.filter((review) => review.status === "reviewed").map((review) => review.checkLabel)} alreadyHeld={false} thesisContext={{ name: item.thesisName, rawText: item.thesisRawText }} onReviewEvidence={() => onOpenRun(item.run.id, item.candidate.id, "evidence")} onPrepareProposal={() => onOpenRun(item.run.id, item.candidate.id, "execute")} onOpenResearch={() => onOpenRun(item.run.id, item.candidate.id, "research")} />
+            <p className="mt-3 text-xs" style={{ color: "var(--sh-fg-muted)" }}><kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px]" style={{ borderColor: "var(--sh-border-1)" }}>⌘/Ctrl + Enter</kbd> opens this play’s primary next step. It never records a decision or submits an order.</p>
             <p className="mt-3 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Evidence gate: {item.evidenceSummary}</p>
             <div className="mt-4 rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Not taking this play?</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>A skip retires this play permanently. A defer keeps it out of this session only and returns it at the next regular open. Both are decision data for the weekly scorecard.</p><div className="mt-3 flex flex-col gap-2 sm:flex-row"><div className="flex-1"><label htmlFor={`skip-reason-${item.candidate.id}`} className="sr-only">Reason for skipping or deferring {item.candidate.symbol}</label><Textarea id={`skip-reason-${item.candidate.id}`} aria-describedby={`skip-reason-help-${item.candidate.id}`} value={reasons[item.candidate.id] ?? ""} onChange={(event) => setReasons((current) => ({ ...current, [item.candidate.id]: event.target.value }))} className="min-h-11 text-xs" placeholder="Why cash, delay, or another play is better today…" /><p id={`skip-reason-help-${item.candidate.id}`} className="mt-1 text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>{(reasons[item.candidate.id] ?? "").trim().length < 3 ? "Add at least 3 characters to record a skip or defer." : "Reason ready to record."}</p></div><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" className="min-h-11" disabled={(reasons[item.candidate.id] ?? "").trim().length < 3 || decide.isPending} onClick={() => setConfirmSkipCandidateId(item.candidate.id)}>Record permanent skip</Button><Button type="button" size="sm" variant="ghost" className="min-h-11" disabled={(reasons[item.candidate.id] ?? "").trim().length < 3 || decide.isPending} onClick={() => decide.mutate({ runId: item.run.id, candidateId: item.candidate.id, decision: "deferred", reason: reasons[item.candidate.id] ?? "" })}>Defer to next session</Button></div></div>{confirmSkipCandidateId === item.candidate.id && <div className="mt-3 flex flex-wrap items-center gap-2 rounded border border-amber-500/40 bg-amber-500/5 p-2 text-xs"><span className="flex-1" style={{ color: "var(--sh-text-primary)" }}>Confirm permanent skip for {item.candidate.symbol}? It will leave Today and remain in the record.</span><Button type="button" size="sm" className="min-h-11" disabled={decide.isPending} onClick={() => decide.mutate({ runId: item.run.id, candidateId: item.candidate.id, decision: "skipped", reason: reasons[item.candidate.id] ?? "" })}>Confirm skip</Button><Button type="button" size="sm" variant="ghost" className="min-h-11" onClick={() => setConfirmSkipCandidateId(null)}>Cancel</Button></div>}</div>
           </div>}

@@ -475,16 +475,21 @@ export const apertureRouter = router({
   cockpitPreference: router({
     get: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
-      const [user] = await db!.select({ expanded: users.cockpitRailExpanded })
+      const [user] = await db!.select({ expanded: users.cockpitRailExpanded, acknowledgedSignature: users.cockpitRailAcknowledgedSignature })
         .from(users)
         .where(eq(users.id, ctx.user.id))
         .limit(1);
-      return { expanded: user?.expanded === true };
+      return { expanded: user?.expanded === true, acknowledgedSignature: user?.acknowledgedSignature ?? null };
     }),
     set: adminProcedure.input(z.object({ expanded: z.boolean() })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
       await db!.update(users).set({ cockpitRailExpanded: input.expanded }).where(eq(users.id, ctx.user.id));
       return { expanded: input.expanded };
+    }),
+    acknowledge: adminProcedure.input(z.object({ signature: z.string().min(1).max(255) })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      await db!.update(users).set({ cockpitRailAcknowledgedSignature: input.signature, cockpitRailExpanded: false }).where(eq(users.id, ctx.user.id));
+      return { acknowledgedSignature: input.signature };
     }),
   }),
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCockpitRailSummary, STALE_ACCOUNT_MS, type CockpitHeadroomLine } from "@shared/cockpitRailSummary";
+import { buildCockpitRailSummary, cockpitConstraintSignature, STALE_ACCOUNT_MS, type CockpitHeadroomLine } from "@shared/cockpitRailSummary";
 
 const line = (patch: Partial<CockpitHeadroomLine>): CockpitHeadroomLine => ({
   key: "single_name",
@@ -46,5 +46,13 @@ describe("buildCockpitRailSummary", () => {
     const summary = buildCockpitRailSummary([name, cluster], 0);
     expect(summary.duplicatedUnclassifiedCluster).toBe(true);
     expect(summary.expandedLines).toEqual([name]);
+  });
+
+  it("invalidates a reviewed acknowledgement when the measured constraint changes", () => {
+    const reviewed = line({ usedCents: 975_800, ceilingCents: 989_500 });
+    const changed = line({ usedCents: 976_100, ceilingCents: 989_500 });
+    expect(cockpitConstraintSignature(reviewed)).toBe("single_name|NVDA|975800|989500");
+    expect(cockpitConstraintSignature(changed)).not.toBe(cockpitConstraintSignature(reviewed));
+    expect(cockpitConstraintSignature(line({ usedCents: null }))).toBeNull();
   });
 });

@@ -1425,3 +1425,10 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Remove self-referential decision-record and back-navigation loops from the evidence-review path
 - [x] Preserve the separate human paper-proposal approval gate after answers are recorded
 - [x] Validate that an operator can inspect and answer a decisive question without leaving the current screen, and reach any related detail in no more than two screens
+
+## Proactive Trader Decision Loop (Aug 19 2026)
+- [x] Allow a critical cockpit alert to collapse after explicit acknowledgment while retaining its red compact constraint signal until state changes
+- [x] Explain the immediate next step after all decisive questions are recorded, and expose the safe paper-proposal handoff only when gates are actually satisfied
+- [x] Provide visible immediate confirmation for recorded list decisions and collapse skipped or deferred rows to keep attention on unresolved plays
+- [x] Add a safe keyboard shortcut for the focused primary decision action, excluding editable fields and preserving every confirmation gate
+- [x] Validate 375px space recovery, acknowledgement persistence, accelerated decision feedback, and no autonomous broker action

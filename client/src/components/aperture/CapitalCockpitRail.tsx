@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronDown, Clock3, Info, Landmark, ShieldCheck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { formatMandatePercentPoints } from "@shared/cockpitPresentation";
-import { buildCockpitRailSummary, CRITICAL_CONSTRAINT_PCT, type CockpitHeadroomLine } from "@shared/cockpitRailSummary";
+import { buildCockpitRailSummary, cockpitConstraintSignature, CRITICAL_CONSTRAINT_PCT, type CockpitHeadroomLine } from "@shared/cockpitRailSummary";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type HeadroomLine = CockpitHeadroomLine;
@@ -53,10 +53,12 @@ export function CapitalCockpitRail({ runId }: { runId?: number }) {
   const { data, isLoading } = trpc.aperture.cockpit.useQuery(cockpitInput, { refetchInterval: 60_000, refetchIntervalInBackground: true });
   const preference = trpc.aperture.cockpitPreference.get.useQuery();
   const setPreference = trpc.aperture.cockpitPreference.set.useMutation();
+  const acknowledge = trpc.aperture.cockpitPreference.acknowledge.useMutation();
   const [clockNow, setClockNow] = useState(() => Date.now());
   const responseAt = useRef(Date.now());
   const preferenceApplied = useRef(false);
   const [expanded, setExpanded] = useState(false);
+  const [acknowledgedSignature, setAcknowledgedSignature] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<"severity" | "impact">("severity");
   useEffect(() => {
     const interval = window.setInterval(() => setClockNow(Date.now()), 30_000);
@@ -70,7 +72,10 @@ export function CapitalCockpitRail({ runId }: { runId?: number }) {
     () => data ? buildCockpitRailSummary(data.headroom.lines as HeadroomLine[], data.account.stalenessMs) : null,
     [data],
   );
-  const autoExpanded = summary?.severity === "critical";
+  const bindingSignature = cockpitConstraintSignature(summary?.binding);
+  const persistedAcknowledgement = preference.data?.acknowledgedSignature ?? null;
+  const acknowledgedCurrentConstraint = bindingSignature != null && (acknowledgedSignature === bindingSignature || persistedAcknowledgement === bindingSignature);
+  const autoExpanded = summary?.severity === "critical" && !acknowledgedCurrentConstraint;
   useEffect(() => {
     if (preferenceApplied.current || preference.data == null) return;
     preferenceApplied.current = true;
@@ -84,6 +89,13 @@ export function CapitalCockpitRail({ runId }: { runId?: number }) {
   const elapsedMs = Math.max(0, clockNow - responseAt.current);
   const boundaryMs = data.session.msToNextBoundary == null ? null : data.session.msToNextBoundary - elapsedMs;
   const deadlineMs = data.run?.msToCatalystDeadline == null ? null : data.run.msToCatalystDeadline - elapsedMs;
+  const acknowledgeConstraint = () => {
+    if (!bindingSignature) return;
+    setAcknowledgedSignature(bindingSignature);
+    setExpanded(false);
+    setPreference.mutate({ expanded: false });
+    acknowledge.mutate({ signature: bindingSignature });
+  };
   const changeExpanded = () => {
     if (autoExpanded) return;
     const next = !expanded;
@@ -106,14 +118,15 @@ export function CapitalCockpitRail({ runId }: { runId?: number }) {
     : syncedLabel(data.account.stalenessMs);
   const severityColor = summary.severity === "critical" ? "var(--sh-red)" : summary.severity === "warning" || summary.accountStale ? "var(--sh-signal)" : "var(--sh-fg-muted)";
 
-  return <section className="mb-5 overflow-hidden rounded-xl border" style={{ borderColor: autoExpanded ? severityColor : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+  return <section className="mb-5 overflow-hidden rounded-xl border" style={{ borderColor: summary.severity === "critical" ? severityColor : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
     <div className="flex items-center gap-2 border-b px-4 py-2 text-[11px]" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}><ShieldCheck className="h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} />Internal research tool — not investment advice. Modeled figures are labeled as such.</div>
-    <div className="flex min-h-12 flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:gap-0 sm:py-0" style={{ background: autoExpanded ? "color-mix(in srgb, var(--sh-red) 6%, var(--sh-surface))" : "var(--sh-surface)" }}>
+      <div className="flex min-h-12 flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:gap-0 sm:py-0" style={{ background: summary.severity === "critical" ? "color-mix(in srgb, var(--sh-red) 6%, var(--sh-surface))" : "var(--sh-surface)" }}>
       <div className="flex min-w-0 items-center gap-2 px-1 py-1.5 sm:flex-1 sm:border-r sm:px-3" style={{ borderColor: "var(--sh-border-1)" }}><Clock3 className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} /><span className="truncate text-xs" style={{ color: "var(--sh-text-primary)" }}>{data.session.session.replaceAll("_", " ")} · {data.session.nextBoundary?.label.toLowerCase() ?? "boundary not measured"}{boundaryMs != null ? ` ${duration(boundaryMs)}` : ""}</span><RailHelp label="Explain market boundary">This is the next regular paper-market boundary calculated from the market calendar. It is timing context, not a trade signal.</RailHelp></div>
       <div className="flex min-w-0 items-center gap-2 px-1 py-1.5 sm:flex-1 sm:border-r sm:px-3" style={{ borderColor: "var(--sh-border-1)" }}><Landmark className="h-3.5 w-3.5 shrink-0" style={{ color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-fg-muted)" }} /><span className="truncate text-xs" style={{ color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-text-primary)" }}>{data.account.label || "No paper account"} {money(data.account.equityValueCents) ?? "equity not measured"} · {staleText}</span><RailHelp label="Explain account freshness">Equity and cash come from the latest paper-account sync. If this age exceeds four hours, position and loss ceilings may no longer reflect the broker account.</RailHelp></div>
       <div className="flex min-w-0 items-center gap-2 px-1 py-1.5 sm:flex-[1.25] sm:px-3"><AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: severityColor }} /><span className="min-w-0 flex-1 truncate text-xs font-medium" style={{ color: severityColor }}>{data.mandate.version} · tightest: {bindingText}</span><RailHelp label="Explain tightest constraint">This is the measured operating ceiling closest to its limit: {summary.binding ? `${money(summary.binding.usedCents)} used against a ${money(summary.binding.ceilingCents)} ceiling, derived from ${summary.binding.basis}.` : "No running capital or planned-loss ceiling has a measurable basis."}</RailHelp><button type="button" aria-expanded={expanded} aria-controls="cockpit-rail-detail" aria-label={autoExpanded ? `Pinned open: ${bindingText} is at or above the ${CRITICAL_CONSTRAINT_PCT}% alert threshold` : expanded ? "Collapse cockpit detail" : "Expand cockpit detail"} title={autoExpanded ? `Pinned open while ${bindingText} is at or above ${CRITICAL_CONSTRAINT_PCT}%` : undefined} disabled={autoExpanded} onClick={changeExpanded} className="rounded p-1 disabled:cursor-not-allowed"><ChevronDown className={`h-4 w-4 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} /></button></div>
     </div>
-    {autoExpanded && <div className="border-t px-4 py-2 text-xs" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 35%, var(--sh-border-1))", color: "var(--sh-red)" }}>Attention: {bindingText} is at or above {CRITICAL_CONSTRAINT_PCT}% utilization. The full rail is pinned open until this constraint clears.</div>}
+      {autoExpanded && <div className="flex flex-col gap-2 border-t px-4 py-2 text-xs sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 35%, var(--sh-border-1))", color: "var(--sh-red)" }}><span>Attention: {bindingText} is at or above {CRITICAL_CONSTRAINT_PCT}% utilization. Review the detail, then acknowledge to reclaim this space. A changed constraint will reopen it.</span><button type="button" onClick={acknowledgeConstraint} className="shrink-0 rounded border px-2 py-1 font-medium" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))" }}>Reviewed — collapse rail</button></div>}
+      {summary.severity === "critical" && acknowledgedCurrentConstraint && !expanded && <div className="border-t px-4 py-1.5 text-[11px]" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 35%, var(--sh-border-1))", color: "var(--sh-red)" }}>Reviewed constraint remains active: {bindingText}. It will reopen if the measured state changes.</div>}
     {expanded && <div id="cockpit-rail-detail">
     <div className="grid gap-px lg:grid-cols-3" style={{ background: "var(--sh-border-1)" }}>
       <div className="space-y-2 p-4" style={{ background: "var(--sh-surface)" }}><RailHead>Market clock</RailHead><div className="flex items-center gap-2"><Clock3 className="h-4 w-4" style={{ color: data.session.session === "unknown" ? "var(--sh-red)" : "var(--sh-signal)" }} /><p className="text-sm font-semibold capitalize" style={{ color: "var(--sh-text-primary)" }}>{data.session.session.replaceAll("_", " ")}</p></div>{data.session.unavailableReason ? <p className="text-xs leading-5" style={{ color: "var(--sh-red)" }}>{data.session.unavailableReason}</p> : <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.session.nextBoundary?.label ?? "No next boundary recorded"}{boundaryMs != null ? ` in ${duration(boundaryMs)}` : ""}{data.session.halfDay ? " · half day" : ""}</p>}</div>

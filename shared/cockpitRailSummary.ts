@@ -16,6 +16,12 @@ export type ConstraintSeverity = "quiet" | "warning" | "critical" | "unmeasurabl
 export const STALE_ACCOUNT_MS = 4 * 60 * 60 * 1000;
 export const CRITICAL_CONSTRAINT_PCT = 85;
 
+/** Acknowledgement applies only to this exact measured constraint state. */
+export function cockpitConstraintSignature(line: CockpitHeadroomLine | null | undefined) {
+  if (!line || line.usedCents == null || line.ceilingCents == null) return null;
+  return `${line.key}|${line.subject ?? ""}|${line.usedCents}|${line.ceilingCents}`;
+}
+
 function isReferenceCeiling(line: CockpitHeadroomLine) {
   return line.key === "single_order" || line.key === "planned_risk_per_play";
 }

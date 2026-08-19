@@ -29,6 +29,8 @@ export const users = mysqlTable("users", {
   defaultWorkspace: mysqlEnum("default_workspace", ["command_center", "capital_aperture", "capital_aperture_trader"]).default("command_center").notNull(),
   /** Compact Cockpit Rail preference. A critical measured constraint always overrides this to open the rail. */
   cockpitRailExpanded: boolean("cockpit_rail_expanded").default(false).notNull(),
+  /** Exact measured constraint snapshot the operator has already reviewed; a changed value reopens the rail. */
+  cockpitRailAcknowledgedSignature: varchar("cockpit_rail_acknowledged_signature", { length: 255 }),
   huntingParams: text("hunting_params"), // Free-text agentic command / hunting parameters
   /**
    * Duplicate-account pointer. When one person has signed up twice under two
