@@ -7,7 +7,7 @@ import { buildPlayRecipe } from "@shared/playRecipe";
 import { PlayRecipeCard } from "./PlayRecipeCard";
 
 function money(cents: number | null | undefined) {
-  return cents == null ? "Not set" : `$${Math.round(cents / 100).toLocaleString("en-US")}`;
+  return cents == null ? "Not set" : `$${Math.round(cents / 100).toLocaleString()}`;
 }
 
 function modelConfidence(score: number | null | undefined) {
@@ -34,8 +34,15 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
   const utils = trpc.useUtils();
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [reasons, setReasons] = useState<Record<number, string>>({});
+  const [confirmSkipCandidateId, setConfirmSkipCandidateId] = useState<number | null>(null);
+  const [decisionAnnouncement, setDecisionAnnouncement] = useState("");
   const decide = trpc.aperture.play.decide.useMutation({
-    onSuccess: (_, input) => { setReasons((current) => ({ ...current, [input.candidateId]: "" })); void utils.aperture.play.list.invalidate(); },
+    onSuccess: (_, input) => {
+      setReasons((current) => ({ ...current, [input.candidateId]: "" }));
+      setConfirmSkipCandidateId(null);
+      setDecisionAnnouncement(input.decision === "skipped" ? "Permanent skip recorded. The play has been retired and added to the weekly scorecard." : "Defer recorded. This play will return at the next regular market session.");
+      void utils.aperture.play.list.invalidate();
+    },
   });
   const ranked = useMemo(() => (playList?.plays ?? []).filter((play) => !play.decision), [playList]);
   const correlation = cockpit?.headroom.lines.find((line) => line.key === "correlated_planned_risk");
@@ -68,23 +75,24 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
         const expanded = expandedId === item.candidate.id;
         const mainBlocker = play.blockingReasons[0] ?? "No research blocker was generated; approval is still separate.";
         return <article key={item.candidate.id} className="overflow-hidden rounded-xl border" style={{ borderColor: expanded ? "var(--sh-signal)" : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-          <button className="grid w-full gap-3 p-4 text-left sm:grid-cols-[8rem_1fr_auto] sm:items-center sm:p-5" onClick={() => setExpandedId(expanded ? null : item.candidate.id)} aria-expanded={expanded}>
-            <div><p className="font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{item.candidate.symbol}</p><p className="text-[11px] uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>{item.run.holdingPeriod ?? "research"}</p></div>
+          <button type="button" aria-controls={`daily-play-detail-${item.candidate.id}`} className="grid min-h-11 w-full gap-3 p-4 text-left sm:grid-cols-[8rem_1fr_auto] sm:items-center sm:p-5" onClick={() => setExpandedId(expanded ? null : item.candidate.id)} aria-expanded={expanded}>
+            <div><p className="font-serif text-xl" translate="no" style={{ color: "var(--sh-text-primary)" }}>{item.candidate.symbol}</p><p className="text-[11px] uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>{item.run.holdingPeriod ?? "research"}</p></div>
             <div className="min-w-0"><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{item.thesisName ?? "Capital research play"}</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{play.readiness === "ready_to_prepare" ? "Ready to prepare for human approval." : mainBlocker}</p></div>
             <div className="flex items-center gap-2 sm:text-right"><span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Model research confidence {modelConfidence(item.candidate.confidenceScore)}</span><ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} /></div>
           </button>
-          {expanded && <div className="border-t p-4 sm:p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+          {expanded && <div id={`daily-play-detail-${item.candidate.id}`} className="border-t p-4 sm:p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
             <div className="mb-4 grid gap-3 rounded-lg border p-3 text-xs sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
               <div><p style={{ color: "var(--sh-fg-muted)" }}>Plan amount</p><p className="mt-1 font-semibold" style={{ color: "var(--sh-text-primary)" }}>{money(play.estimatedAmountCents)} <span className="font-normal" style={{ color: "var(--sh-fg-muted)" }}>{play.amountBasis === "modeled_research_range" ? "· modeled" : play.amountBasis === "not_set" ? "· not measured" : "· operator-stated"}</span></p></div>
               <IntradayTrigger runId={item.run.id} candidateId={item.candidate.id} holdingPeriod={item.run.holdingPeriod} />
-              <div><p style={{ color: "var(--sh-fg-muted)" }}>Catalyst / time</p><p className="mt-1 font-semibold" style={{ color: "var(--sh-text-primary)" }}>{item.run.catalystDeadlineAt ? new Date(item.run.catalystDeadlineAt).toLocaleString() : "Not measured"}</p><p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>Source and catalyst detail remain in the research trail.</p></div>
+              <div><p style={{ color: "var(--sh-fg-muted)" }}>Catalyst / time</p><p className="mt-1 font-semibold" style={{ color: "var(--sh-text-primary)" }}>{item.run.catalystDeadlineAt ? <time dateTime={new Date(item.run.catalystDeadlineAt).toISOString()}>{new Date(item.run.catalystDeadlineAt).toLocaleString()}</time> : "Not measured"}</p><p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>Source and catalyst detail remain in the research trail.</p></div>
             </div>
             <PlayRecipeCard candidate={item.candidate} run={item.run} reviewedChecks={item.reviews.filter((review) => review.status === "reviewed").map((review) => review.checkLabel)} alreadyHeld={false} thesisContext={{ name: item.thesisName, rawText: item.thesisRawText }} onReviewEvidence={() => onOpenRun(item.run.id, item.candidate.id, "evidence")} onPrepareProposal={() => onOpenRun(item.run.id, item.candidate.id, "execute")} onOpenResearch={() => onOpenRun(item.run.id, item.candidate.id, "research")} />
             <p className="mt-3 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Evidence gate: {item.evidenceSummary}</p>
-            <div className="mt-4 rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Not taking this play?</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>A skip retires this play. A defer keeps it out of this session only and returns it at the next regular open. Both are decision data for the weekly scorecard.</p><div className="mt-3 flex flex-col gap-2 sm:flex-row"><Textarea value={reasons[item.candidate.id] ?? ""} onChange={(event) => setReasons((current) => ({ ...current, [item.candidate.id]: event.target.value }))} className="min-h-10 text-xs" placeholder="Why cash, delay, or another play is better today…" /><div className="flex gap-2"><Button size="sm" variant="outline" disabled={(reasons[item.candidate.id] ?? "").trim().length < 3 || decide.isPending} onClick={() => decide.mutate({ runId: item.run.id, candidateId: item.candidate.id, decision: "skipped", reason: reasons[item.candidate.id] ?? "" })}>Record skip</Button><Button size="sm" variant="ghost" disabled={(reasons[item.candidate.id] ?? "").trim().length < 3 || decide.isPending} onClick={() => decide.mutate({ runId: item.run.id, candidateId: item.candidate.id, decision: "deferred", reason: reasons[item.candidate.id] ?? "" })}>Defer to next session</Button></div></div></div>
+            <div className="mt-4 rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Not taking this play?</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>A skip retires this play permanently. A defer keeps it out of this session only and returns it at the next regular open. Both are decision data for the weekly scorecard.</p><div className="mt-3 flex flex-col gap-2 sm:flex-row"><div className="flex-1"><label htmlFor={`skip-reason-${item.candidate.id}`} className="sr-only">Reason for skipping or deferring {item.candidate.symbol}</label><Textarea id={`skip-reason-${item.candidate.id}`} aria-describedby={`skip-reason-help-${item.candidate.id}`} value={reasons[item.candidate.id] ?? ""} onChange={(event) => setReasons((current) => ({ ...current, [item.candidate.id]: event.target.value }))} className="min-h-11 text-xs" placeholder="Why cash, delay, or another play is better today…" /><p id={`skip-reason-help-${item.candidate.id}`} className="mt-1 text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>{(reasons[item.candidate.id] ?? "").trim().length < 3 ? "Add at least 3 characters to record a skip or defer." : "Reason ready to record."}</p></div><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" className="min-h-11" disabled={(reasons[item.candidate.id] ?? "").trim().length < 3 || decide.isPending} onClick={() => setConfirmSkipCandidateId(item.candidate.id)}>Record permanent skip</Button><Button type="button" size="sm" variant="ghost" className="min-h-11" disabled={(reasons[item.candidate.id] ?? "").trim().length < 3 || decide.isPending} onClick={() => decide.mutate({ runId: item.run.id, candidateId: item.candidate.id, decision: "deferred", reason: reasons[item.candidate.id] ?? "" })}>Defer to next session</Button></div></div>{confirmSkipCandidateId === item.candidate.id && <div className="mt-3 flex flex-wrap items-center gap-2 rounded border border-amber-500/40 bg-amber-500/5 p-2 text-xs"><span className="flex-1" style={{ color: "var(--sh-text-primary)" }}>Confirm permanent skip for {item.candidate.symbol}? It will leave Today and remain in the record.</span><Button type="button" size="sm" className="min-h-11" disabled={decide.isPending} onClick={() => decide.mutate({ runId: item.run.id, candidateId: item.candidate.id, decision: "skipped", reason: reasons[item.candidate.id] ?? "" })}>Confirm skip</Button><Button type="button" size="sm" variant="ghost" className="min-h-11" onClick={() => setConfirmSkipCandidateId(null)}>Cancel</Button></div>}</div>
           </div>}
         </article>;
       })}
     </div>
+    <p className="sr-only" aria-live="polite">{decisionAnnouncement}</p>
   </section>;
 }

@@ -6,12 +6,12 @@
  * using Claude structured output. Saves compilations to thesis_compilations table.
  */
 import { z } from "zod";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { logActivity } from "./db";
-import { capitalTheses, thesisCompilations, thesisShares, users } from "../drizzle/schema";
+import { apertureCandidates, apertureRuns, capitalTheses, thesisCompilations, thesisShares, users } from "../drizzle/schema";
 import { compileThesis } from "./aperture/thesisGraph";
 import { projectionValues } from "./thesisBridge";
 import { canUseCanonicalThesis } from "./thesisAccess";
@@ -320,6 +320,10 @@ export const thesisRouter = router({
     const rows = await db.execute(sql`
       SELECT tc.*, CASE WHEN tc.user_id = ${ctx.user.id} THEN 'owner' ELSE 'shared' END AS access,
         owner.name AS owner_name, ts.permission AS share_permission
+        ,(SELECT MAX(ar.catalyst_deadline_at)
+          FROM capital_theses cp
+          INNER JOIN aperture_runs ar ON ar.thesis_id = cp.id AND ar.user_id = ${ctx.user.id}
+          WHERE cp.source_compilation_id = tc.id AND cp.user_id = ${ctx.user.id}) AS latest_catalyst_deadline_at
       FROM thesis_compilations tc
       LEFT JOIN thesis_shares ts ON ts.compilation_id = tc.id AND ts.user_id = ${ctx.user.id}
       LEFT JOIN users owner ON owner.id = tc.user_id
@@ -352,9 +356,52 @@ export const thesisRouter = router({
       estimatedTargetsMax: row.estimated_targets_max,
       estimatedCostMin: row.estimated_cost_min,
       estimatedCostMax: row.estimated_cost_max,
+      latestCatalystDeadlineAt: row.latest_catalyst_deadline_at == null ? null : Number(row.latest_catalyst_deadline_at),
       createdAt: row.created_at,
     }));
   }),
+
+  /** Current user’s own Capital runs and candidates for an authorized canonical thesis. Never exposes another owner’s paper history. */
+  playRecipes: protectedProcedure
+    .input(z.object({ compilationId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { workspace: "capital_aperture" as const, runs: [] };
+      const [source] = await db.select().from(thesisCompilations).where(eq(thesisCompilations.id, input.compilationId)).limit(1);
+      if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Saved thesis not found" });
+      const ownsSource = source.userId === ctx.user.id;
+      const [sharedAccess] = ownsSource ? [undefined] : await db.select().from(thesisShares)
+        .where(and(eq(thesisShares.compilationId, input.compilationId), eq(thesisShares.userId, ctx.user.id), eq(thesisShares.permission, "use"))).limit(1);
+      if (!canUseCanonicalThesis({ ownerUserId: source.userId, requesterUserId: ctx.user.id, sharedPermission: sharedAccess?.permission })) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You do not have use access to this thesis" });
+      }
+      const projections = await db.select({ id: capitalTheses.id }).from(capitalTheses)
+        .where(and(eq(capitalTheses.sourceCompilationId, input.compilationId), eq(capitalTheses.userId, ctx.user.id)));
+      if (!projections.length) return { workspace: "capital_aperture" as const, runs: [] };
+      const thesisIds = projections.map((projection) => projection.id);
+      const runs = await db.select({
+        id: apertureRuns.id,
+        catalystDeadlineAt: apertureRuns.catalystDeadlineAt,
+        holdingPeriod: apertureRuns.holdingPeriod,
+        status: apertureRuns.status,
+        createdAt: apertureRuns.createdAt,
+      }).from(apertureRuns).where(and(eq(apertureRuns.userId, ctx.user.id), inArray(apertureRuns.thesisId, thesisIds)))
+        .orderBy(desc(apertureRuns.createdAt)).limit(6);
+      if (!runs.length) return { workspace: "capital_aperture" as const, runs: [] };
+      const runIds = runs.map((run) => run.id);
+      const candidates = await db.select({
+        id: apertureCandidates.id,
+        runId: apertureCandidates.runId,
+        symbol: apertureCandidates.symbol,
+        role: apertureCandidates.role,
+        compositeScore: apertureCandidates.compositeScore,
+        confidenceScore: apertureCandidates.confidenceScore,
+      }).from(apertureCandidates).where(inArray(apertureCandidates.runId, runIds));
+      return {
+        workspace: "capital_aperture" as const,
+        runs: runs.map((run) => ({ ...run, candidates: candidates.filter((candidate) => candidate.runId === run.id) })),
+      };
+    }),
 
   /** Create a canonical thesis for a capital/trade workflow without forcing acquisition filters. */
   createCapital: adminProcedure

@@ -1386,3 +1386,11 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Diagnose the ownership, scope, and saved-list filter that hides Jim’s catalyst-reaction thesis from the signed-in thesis workspace
 - [x] Restore the thesis to the appropriate authorized saved-thesis view without widening cross-user access
 - [x] Add regression coverage for canonical Capital / Trade thesis visibility across authorized users and keep unrelated private theses isolated
+
+## Thesis Recipes & Trader Accessibility Repair (Aug 19 2026)
+- [x] Expose owner-authorized Capital-run recipe summaries and catalyst deadlines to the canonical thesis list without creating duplicate plays
+- [x] Make each saved-thesis row keyboard-accessibly expand in place to show its associated play recipes, workspace context, deadline, and safe action
+- [x] Add a labeled, confirmed, per-play permanent skip flow with a polite result announcement and clear reason-length feedback
+- [x] Repair core form label associations, numeric input semantics, touch-target sizing, and touch-readable inline explanations on Capital setup and daily-play screens
+- [x] Correct daily-play disclosure semantics including button type, aria-controls, ticker language, and time markup
+- [x] Apply cockpit and recipe-card semantic improvements for progress values, reduced-motion behavior, tokenized colors, numeric readability, and heading/list structure

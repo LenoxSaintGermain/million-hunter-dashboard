@@ -87,10 +87,11 @@ const PROVIDER_GUIDANCE: Record<string, { enables: string; activation: string }>
   },
 };
 
-function FieldLabel({ label, help }: { label: string; help: string }) {
+function FieldLabel({ label, help, inputId }: { label: string; help: string; inputId?: string }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <Label className="text-xs font-medium">{label}</Label>
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5">
+      <Label htmlFor={inputId} className="text-xs font-medium">{label}</Label>
       <TooltipProvider delayDuration={120}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -101,6 +102,8 @@ function FieldLabel({ label, help }: { label: string; help: string }) {
           <TooltipContent className="max-w-[280px] text-xs leading-relaxed">{help}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
+      </div>
+      <p className="text-[11px] leading-4 sm:hidden" style={{ color: "var(--sh-fg-muted)" }}>{help}</p>
     </div>
   );
 }
@@ -363,8 +366,9 @@ export default function ApertureHome() {
 
                 <div className="max-w-xs space-y-1.5">
                   <div className="space-y-1.5">
-                    <FieldLabel label="Research budget ($)" help="The maximum simulated capital you are willing to evaluate for this brief. It is not an order and is never sent to a broker automatically." />
+                    <FieldLabel inputId="research-budget" label="Research budget ($)" help="The maximum simulated capital you are willing to evaluate for this brief. It is not an order and is never sent to a broker automatically." />
                     <Input
+                      id="research-budget" name="research-budget" inputMode="decimal" autoComplete="off"
                       placeholder="e.g. 25000"
                       value={deployable}
                       onChange={(e) => setDeployable(e.target.value)}
@@ -379,9 +383,9 @@ export default function ApertureHome() {
                   </summary>
                   <div className="mt-3 grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <FieldLabel label="Holding Period" help="Choose how long the evidence is allowed to work. This determines when Aperture should stop researching the idea and ask for a new decision." />
+                      <FieldLabel inputId="holding-period" label="Holding Period" help="Choose how long the evidence is allowed to work. This determines when Aperture should stop researching the idea and ask for a new decision." />
                       <Select value={holdingPeriod} onValueChange={(period) => { setHoldingPeriod(period); setCatalystDeadline(defaultCatalystDeadline(period)); }}>
-                        <SelectTrigger><SelectValue placeholder="Choose" /></SelectTrigger>
+                        <SelectTrigger id="holding-period"><SelectValue placeholder="Choose" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="intraday">Intraday — flat by 15:55 ET</SelectItem>
                           <SelectItem value="overnight">Overnight — exit by the next close</SelectItem>
@@ -391,16 +395,16 @@ export default function ApertureHome() {
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <FieldLabel label="Catalyst Deadline" help="The latest date when the event or evidence should resolve the premise. If it does not, Aperture treats the research decision as expired rather than quietly extending it." />
-                      <Input type="datetime-local" value={catalystDeadline} onChange={(e) => setCatalystDeadline(e.target.value)} />
+                      <FieldLabel inputId="catalyst-deadline" label="Catalyst Deadline" help="The latest date when the event or evidence should resolve the premise. If it does not, Aperture treats the research decision as expired rather than quietly extending it." />
+                      <Input id="catalyst-deadline" name="catalyst-deadline" type="datetime-local" value={catalystDeadline} onChange={(e) => setCatalystDeadline(e.target.value)} />
                     </div>
                     <div className="space-y-1.5">
-                      <FieldLabel label="Liquidity Floor — 30d ADV ($)" help="Minimum 30-day average daily dollar volume. It helps prevent a paper idea from looking executable when it would be difficult to enter or exit at the planned size." />
-                      <Input value={liquidityFloor} onChange={(e) => setLiquidityFloor(e.target.value)} />
+                      <FieldLabel inputId="liquidity-floor" label="Liquidity Floor — 30d ADV ($)" help="Minimum 30-day average daily dollar volume. It helps prevent a paper idea from looking executable when it would be difficult to enter or exit at the planned size." />
+                      <Input id="liquidity-floor" name="liquidity-floor" inputMode="decimal" autoComplete="off" value={liquidityFloor} onChange={(e) => setLiquidityFloor(e.target.value)} />
                     </div>
                     <div className="space-y-1.5">
-                      <FieldLabel label="Concentration Cap — single name (%)" help="Maximum share of this run’s paper capital assigned to one company. It controls single-name risk even when the thesis looks compelling." />
-                      <Input value={maxSingleName} onChange={(e) => setMaxSingleName(e.target.value)} />
+                      <FieldLabel inputId="concentration-cap" label="Concentration Cap — single name (%)" help="Maximum share of this run’s paper capital assigned to one company. It controls single-name risk even when the thesis looks compelling." />
+                      <Input id="concentration-cap" name="concentration-cap" inputMode="decimal" autoComplete="off" value={maxSingleName} onChange={(e) => setMaxSingleName(e.target.value)} />
                     </div>
                   </div>
                   {horizonGuidance && (
@@ -416,8 +420,9 @@ export default function ApertureHome() {
                     </div>
                   )}
                   <div className="space-y-1.5">
-                    <FieldLabel label="What would make this run invalid?" help="Write the evidence condition—not a price move—that would prove the research premise wrong. This creates a visible stop condition for the thesis, the deadline, and future monitoring." />
+                      <FieldLabel inputId="invalidation-rule" label="What would make this run invalid?" help="Write the evidence condition—not a price move—that would prove the research premise wrong. This creates a visible stop condition for the thesis, the deadline, and future monitoring." />
                     <Input
+                      id="invalidation-rule" name="invalidation-rule"
                       placeholder="Example: if the earnings release cuts guidance or the stated catalyst does not occur by the deadline…"
                       value={invalidationRule}
                       onChange={(e) => setInvalidationRule(e.target.value)}

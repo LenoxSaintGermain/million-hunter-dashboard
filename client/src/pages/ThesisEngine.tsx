@@ -170,6 +170,7 @@ export default function ThesisEngine() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
   const [shareTargets, setShareTargets] = useState<Record<number, string>>({});
+  const [expandedThesisId, setExpandedThesisId] = useState<number | null>(null);
   const renameMutation = trpc.thesis.rename.useMutation({
     onSuccess: () => { toast.success("Renamed"); setEditingId(null); refetchList(); },
     onError: (e) => toast.error(e.message),
@@ -201,6 +202,10 @@ export default function ThesisEngine() {
     onError: (error) => { setIsCompiling(false); toast.error(error.message); },
   });
   const { data: shareCandidates } = trpc.thesis.shareCandidates.useQuery(undefined, { enabled: canUseAperture });
+  const { data: expandedRecipes, isLoading: recipesLoading } = trpc.thesis.playRecipes.useQuery(
+    { compilationId: expandedThesisId ?? 0 },
+    { enabled: expandedThesisId != null },
+  );
   const shareThesis = trpc.thesis.share.useMutation({
     onSuccess: () => toast.success("Thesis shared — it will appear in the recipient's Thesis workspace."),
     onError: (error) => toast.error(error.message),
@@ -442,9 +447,11 @@ export default function ThesisEngine() {
               <div className="space-y-2">
                 <p className="eyebrow text-muted-foreground">Saved theses</p>
                 <div className="space-y-1">
-                  {savedTheses.map((t: any) => (
-                    <div key={t.id}
-                      className="flex items-center justify-between px-3 py-2 rounded-md border border-border hover:bg-muted/20 transition-colors group">
+                  {savedTheses.map((t: any) => {
+                    const expanded = expandedThesisId === t.id;
+                    const deadline = t.latestCatalystDeadlineAt ? new Date(Number(t.latestCatalystDeadlineAt)) : null;
+                    return <div key={t.id} className="rounded-md border border-border transition-colors group">
+                      <div className="flex items-center justify-between px-3 py-2 hover:bg-muted/20">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <div className={cn(
                           "w-1.5 h-1.5 rounded-full shrink-0",
@@ -464,9 +471,13 @@ export default function ThesisEngine() {
                             <button onClick={() => setEditingId(null)} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
                           </div>
                         ) : (
-                          <button
+                          <>
+                          <button type="button"
+                            aria-expanded={expanded}
+                            aria-controls={`thesis-recipes-${t.id}`}
                             className="text-sm text-foreground hover:text-primary truncate text-left flex-1"
                             onClick={() => {
+                              setExpandedThesisId(expanded ? null : t.id);
                               setScope(isHistoricThesisRow(t) ? "property" : t.templateUsed === "capital_trade" ? "capital" : "acquisition");
                               setThesisText(t.thesisText);
                               setCompilationResult({
@@ -489,6 +500,12 @@ export default function ThesisEngine() {
                             {!isHistoricThesisRow(t) && t.templateUsed !== "capital_trade" && <span className="ml-1.5 text-[9px] text-sky-600 font-semibold">ACQUISITION · MARKET SEARCH</span>}
                             {t.access === "shared" && <span className="ml-1.5 text-[9px] text-sky-600 font-semibold">SHARED BY {t.ownerName ?? "OPERATOR"}</span>}
                           </button>
+                          {t.templateUsed === "capital_trade" && (
+                            <span className="hidden shrink-0 text-[10px] text-muted-foreground sm:inline">
+                              {deadline ? <time dateTime={deadline.toISOString()}>Catalyst deadline {deadline.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time> : "No paper brief yet"}
+                            </span>
+                          )}
+                          </>
                         )}
                       </div>
                       {editingId !== t.id && (
@@ -533,8 +550,12 @@ export default function ThesisEngine() {
                           </>}
                         </div>
                       )}
-                    </div>
-                  ))}
+                      </div>
+                      {expanded && <div id={`thesis-recipes-${t.id}`} role="region" aria-label={`${t.name ?? "Thesis"} associated play recipes`} className="border-t border-border bg-muted/10 px-3 py-3">
+                        {t.templateUsed !== "capital_trade" ? <p className="text-xs text-muted-foreground">This thesis uses the {isHistoricThesisRow(t) ? "Wingate property" : "acquisition search"} workspace; it has no Capital Aperture paper-play recipe.</p> : recipesLoading ? <p className="text-xs text-muted-foreground">Loading owner-authorized paper recipes…</p> : expandedRecipes?.runs.length ? <div className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Capital Aperture · associated paper recipes</p><span className="text-[10px] text-muted-foreground">Open a candidate to see its explicitly modelled recipe. This never creates an order.</span></div>{expandedRecipes.runs.map((run: any) => <div key={run.id} className="rounded border border-border bg-background p-2.5"><div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground"><span>Brief #{run.id} · {run.holdingPeriod} · {run.status}</span>{run.catalystDeadlineAt ? <time dateTime={new Date(Number(run.catalystDeadlineAt)).toISOString()}>Deadline {new Date(Number(run.catalystDeadlineAt)).toLocaleString()}</time> : <span>No catalyst deadline recorded</span>}</div><div className="mt-2 flex flex-wrap gap-1.5">{run.candidates.map((candidate: any) => <button type="button" key={candidate.id} translate="no" onClick={() => navigate(`/aperture/run/${run.id}?view=play&candidate=${candidate.id}`)} className="min-h-11 rounded border border-border px-2.5 text-left text-xs hover:border-emerald-500/50 hover:bg-emerald-500/5"><span className="font-semibold text-foreground">{candidate.symbol}</span><span className="ml-1.5 text-muted-foreground">{candidate.role ?? "research candidate"} · open modeled recipe</span></button>)}</div></div>)}</div> : <p className="text-xs text-muted-foreground">No completed paper-research recipes are associated with this thesis yet.</p>}
+                      </div>}
+                    </div>;
+                  })}
                 </div>
               </div>
             )}

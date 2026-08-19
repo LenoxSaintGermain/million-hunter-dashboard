@@ -1,5 +1,5 @@
 /** Capital Aperture — decision-first evidence queue. Paper-only internal research. */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -105,7 +105,7 @@ function RunProgress({ run, candidateCount, stale, retrying, onRefresh, onStartF
 
 export default function CandidateBoard() {
   const [, params] = useRoute("/aperture/run/:id");
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const runId = Number(params?.id);
   const [view, setView] = useState<"play" | "brief" | "evidence" | "ledger">(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
@@ -190,6 +190,12 @@ export default function CandidateBoard() {
     const next = (focusIndex + delta + candidateSequence.length) % candidateSequence.length;
     setSelectedCandidateId(candidateSequence[next]!.id);
   };
+  const requestedCandidateId = Number(new URLSearchParams(location.split("?")[1] ?? "").get("candidate")) || null;
+  useEffect(() => {
+    if (requestedCandidateId && candidateSequence.some((candidate) => candidate.id === requestedCandidateId)) {
+      setSelectedCandidateId(requestedCandidateId);
+    }
+  }, [requestedCandidateId, candidateSequence]);
   const paperPositions = data.paperContext?.positions ?? [];
   const focusChecks = Array.isArray(focusCandidate?.verifyFields) ? focusCandidate.verifyFields as string[] : [];
   const evidenceReadiness = getEvidenceReviewReadiness(focusChecks, (data.evidenceReviews ?? []).filter((review: any) => review.candidateId === focusCandidate?.id));
