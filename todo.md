@@ -1418,3 +1418,10 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Add plain-language touch-readable explanations for derived cockpit constraint values and severity
 - [x] Ensure the cockpit rail’s critical summary remains legible at 375px and make expanded constraint ordering useful without weakening automatic safety expansion
 - [x] Move the external FRED credential assertion behind an opt-in integration flag after a network timeout; default regression now remains deterministic
+
+## In-Context Evidence Review & Two-Screen Decision Path (Aug 19 2026)
+- [x] Surface each decisive evidence question and a recorded human answer control directly on the Capital Brief decision surface
+- [x] Keep the fact-traced decision record available as inline progressive disclosure rather than a navigational detour
+- [x] Remove self-referential decision-record and back-navigation loops from the evidence-review path
+- [x] Preserve the separate human paper-proposal approval gate after answers are recorded
+- [x] Validate that an operator can inspect and answer a decisive question without leaving the current screen, and reach any related detail in no more than two screens
