@@ -57,6 +57,7 @@ import { getEvidenceReviewReadiness } from "../shared/evidenceReview";
 import { fetchIntradayBars } from "./aperture/providers/marketData";
 import { checkVwapHold, openingRange, sessionVwap } from "./aperture/intraday";
 import { REGULAR_OPEN, nextRegularSessionOpen, startOfEtDay } from "./aperture/marketSession";
+import { constructPlay, CONSTRUCTED_PLAY_DISCLOSURE } from "./aperture/playConstructor";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -951,14 +952,84 @@ export const apertureRouter = router({
         const tape = await fetchIntradayBars(row.candidate.symbol, { startMs: dayStart, timeoutMs: 4_000, maxPages: 1 });
         const vwap = sessionVwap(tape.bars, { feed: tape.feed, now });
         const range = openingRange(tape.bars, { sessionOpenAt: dayStart + REGULAR_OPEN * 60_000, minutes: 30, feed: tape.feed, now });
-        const hold = checkVwapHold(tape.bars, vwap, { side: "above", minutesRequired: 15, now });
+        const playSide = row.candidate.playSide ?? "long";
+        const triggerSide = playSide === "long" ? "above" : "below";
+        const sideBasis = row.candidate.playSide
+          ? `candidate direction is explicitly modelled as ${playSide}`
+          : "candidate direction is not modelled; long is an explicit recipe assumption until a direction is recorded";
+        const hold = checkVwapHold(tape.bars, vwap, { side: triggerSide, minutesRequired: 15, now });
         return {
           applicable: true,
           state: hold.state,
-          basis: tape.unavailableReason ?? hold.basis,
-          triggerSide: "above" as const,
+          basis: `${tape.unavailableReason ?? hold.basis} · ${sideBasis}`,
+          playSide,
+          sideBasis,
+          triggerSide,
           vwap: { value: hold.vwap, lastPrice: hold.lastPrice, feed: hold.feed, lagMs: hold.lagMs, needsOperatorConfirmation: hold.needsOperatorConfirmation },
           openingRange: { high: range.high, low: range.low, widthPct: range.widthPct, complete: range.complete, feed: range.feed, lagMs: range.lagMs, unavailableReason: range.unavailableReason },
+        };
+      }),
+
+    construct: adminProcedure
+      .input(z.object({ runId: z.number(), candidateId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [row] = await db!.select({ candidate: apertureCandidates, run: apertureRuns })
+          .from(apertureCandidates)
+          .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
+          .where(and(
+            eq(apertureCandidates.id, input.candidateId),
+            eq(apertureCandidates.runId, input.runId),
+            eq(apertureRuns.userId, ctx.user.id),
+          )).limit(1);
+        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Play not found in your research history" });
+
+        const accounts = await db!.select().from(portfolioAccounts).where(eq(portfolioAccounts.userId, ctx.user.id));
+        const account = row.run.accountId
+          ? accounts.find((item) => item.id === row.run.accountId) ?? null
+          : accounts.find((item) => item.isPaper && item.brokerId === "alpaca_paper")
+            ?? accounts.find((item) => item.isPaper)
+            ?? null;
+        const now = Date.now();
+        const sessionDayStartMs = startOfEtDay(now);
+        const tape = sessionDayStartMs == null
+          ? { bars: [], feed: "unknown" as const, unavailableReason: "the ET session day could not be determined, so no minute tape was requested" }
+          : await fetchIntradayBars(row.candidate.symbol, { startMs: sessionDayStartMs, timeoutMs: 4_000, maxPages: 1 });
+        const vwap = sessionVwap(tape.bars, { feed: tape.feed, now });
+        const range = openingRange(tape.bars, {
+          sessionOpenAt: (sessionDayStartMs ?? now) + REGULAR_OPEN * 60_000,
+          minutes: 30,
+          feed: tape.feed,
+          now,
+        });
+        const side = row.candidate.playSide ?? "long";
+        const trigger = checkVwapHold(tape.bars, vwap, { side: side === "long" ? "above" : "below", minutesRequired: 15, now });
+        const facts = await getFacts(row.candidate.symbol, now);
+        const advUsd = facts.find((fact) => fact.factKey === "adv_usd_30d" && fact.valueNum != null)?.valueNum ?? null;
+        const play = constructPlay({
+          symbol: row.candidate.symbol,
+          side,
+          holdingPeriod: row.run.holdingPeriod as any,
+          bars: tape.bars,
+          vwap,
+          range,
+          trigger,
+          equityCents: account?.equityValueCents ?? null,
+          sessionDayStartMs,
+          catalystDeadlineAt: row.run.catalystDeadlineAt,
+          advUsd,
+          now,
+        });
+        const sideAssumption = row.candidate.playSide == null
+          ? "direction was not modelled on this legacy candidate; this recipe assumes a long setup until an operator records otherwise"
+          : null;
+        return {
+          play: {
+            ...play,
+            assumptions: sideAssumption ? [sideAssumption, ...play.assumptions] : play.assumptions,
+            unavailableReasons: tape.unavailableReason ? [tape.unavailableReason, ...play.unavailableReasons] : play.unavailableReasons,
+          },
+          disclosure: CONSTRUCTED_PLAY_DISCLOSURE,
         };
       }),
 

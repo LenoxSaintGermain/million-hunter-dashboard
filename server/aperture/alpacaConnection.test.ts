@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 const BASE_URL = "https://paper-api.alpaca.markets/v2";
 
-describe("Alpaca Paper credential validation", () => {
+describe.skipIf(process.env.RUN_ALPACA_INTEGRATION !== "1")("Alpaca Paper credential validation (external integration)", () => {
   it("authenticates to the read-only paper account endpoint", async () => {
     const key = process.env.ALPACA_PAPER_KEY;
     const secret = process.env.ALPACA_PAPER_SECRET;

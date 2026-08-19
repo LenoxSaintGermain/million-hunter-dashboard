@@ -4,6 +4,7 @@ import { BookOpen, FileText, Landmark, LayoutDashboard, Route, Wallet } from "lu
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { cn } from "@/lib/utils";
 import { CapitalCockpitRail } from "@/components/aperture/CapitalCockpitRail";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const APERTURE_NAV = [
   { href: "/aperture", label: "Decision Center", icon: LayoutDashboard },
@@ -13,9 +14,17 @@ const APERTURE_NAV = [
   { href: "/aperture/memos", label: "Memo Library", icon: FileText },
 ] as const;
 
+const TRADER_NAV = [
+  { href: "/aperture", label: "Today", icon: LayoutDashboard },
+  { href: "/aperture?setup=1", label: "Why", icon: BookOpen },
+  { href: "/aperture/runs", label: "Record", icon: FileText },
+] as const;
+
 export default function ApertureShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
+  const { user } = useAuth();
   const runId = Number(location.match(/^\/aperture\/run\/(\d+)/)?.[1]) || undefined;
+  const nav = user?.defaultWorkspace === "capital_aperture_trader" ? TRADER_NAV : APERTURE_NAV;
 
   return (
     <EditorialTopNav>
@@ -37,7 +46,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
         </div>
         <div className="max-w-[1280px] mx-auto px-6 lg:px-10 overflow-x-auto">
           <nav className="flex min-w-max gap-5" aria-label="Capital Aperture navigation">
-            {APERTURE_NAV.map((item) => {
+            {nav.map((item) => {
               const Icon = item.icon;
               const active = item.href === "/aperture"
                 ? location === "/aperture"

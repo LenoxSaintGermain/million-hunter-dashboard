@@ -22,7 +22,7 @@ function IntradayTrigger({ runId, candidateId, holdingPeriod }: { runId: number;
   const label = data.state === "confirmed" ? "Confirmed on available tape" : data.state === "rejected" ? "Not holding on available tape" : "Needs terminal confirmation";
   const tone = data.state === "confirmed" ? "oklch(0.55 0.15 145)" : data.state === "rejected" ? "var(--sh-red)" : "var(--sh-signal)";
   const range = data.openingRange;
-  return <div><p style={{ color: "var(--sh-fg-muted)" }}>VWAP trigger · 15m hold above</p><p className="mt-1 font-semibold" style={{ color: tone }}>{label}</p><p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.basis}</p>{range && <p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>Opening range: {range.complete ? `${range.widthPct?.toFixed(2) ?? "not measured"}% wide` : range.unavailableReason ?? "still forming"} · {range.feed.toUpperCase()} tape.</p>}</div>;
+  return <div><p style={{ color: "var(--sh-fg-muted)" }}>VWAP trigger · 15m hold {data.triggerSide}</p><p className="mt-1 font-semibold" style={{ color: tone }}>{label} · {data.playSide} recipe</p><p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.basis}</p>{range && <p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>Opening range: {range.complete ? `${range.widthPct?.toFixed(2) ?? "not measured"}% wide` : range.unavailableReason ?? "still forming"} · {range.feed.toUpperCase()} tape.</p>}</div>;
 }
 
 export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () => void; onOpenRun: (runId: number, candidateId: number, view?: string) => void }) {

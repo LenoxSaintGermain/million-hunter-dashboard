@@ -114,6 +114,7 @@ export default function CandidateBoard() {
   const [activeRole, setActiveRole] = useState<Role | "all">("all");
   const [showSupporting, setShowSupporting] = useState(false);
   const [generatingMemo, setGeneratingMemo] = useState<number | null>(null);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null);
   const { data, isLoading, refetch } = trpc.aperture.run.get.useQuery(
     { id: runId },
     {
@@ -177,8 +178,18 @@ export default function CandidateBoard() {
   const roles: Array<Role | "all"> = ["all", "core", "complementary", "remainder", "alternative_expression"];
   const filtered = (activeRole === "all" ? candidates : candidates.filter((candidate) => candidate.role === activeRole))
     .slice().sort((a, b) => decisionPriority(b) - decisionPriority(a));
-  const focusCandidate = candidates.find((candidate) => candidate.symbol === brief?.priorityCandidate?.symbol)
+  const leadCandidate = candidates.find((candidate) => candidate.id === brief?.priorityCandidate?.id)
     ?? candidates.slice().sort((a, b) => decisionPriority(b) - decisionPriority(a))[0];
+  const candidateSequence = leadCandidate
+    ? [leadCandidate, ...candidates.filter((candidate) => candidate.id !== leadCandidate.id).slice().sort((a, b) => decisionPriority(b) - decisionPriority(a))]
+    : [];
+  const focusCandidate = candidateSequence.find((candidate) => candidate.id === selectedCandidateId) ?? leadCandidate;
+  const focusIndex = focusCandidate ? candidateSequence.findIndex((candidate) => candidate.id === focusCandidate.id) : -1;
+  const selectCandidate = (delta: number) => {
+    if (!candidateSequence.length || focusIndex < 0) return;
+    const next = (focusIndex + delta + candidateSequence.length) % candidateSequence.length;
+    setSelectedCandidateId(candidateSequence[next]!.id);
+  };
   const paperPositions = data.paperContext?.positions ?? [];
   const focusChecks = Array.isArray(focusCandidate?.verifyFields) ? focusCandidate.verifyFields as string[] : [];
   const evidenceReadiness = getEvidenceReviewReadiness(focusChecks, (data.evidenceReviews ?? []).filter((review: any) => review.candidateId === focusCandidate?.id));
@@ -224,6 +235,10 @@ export default function CandidateBoard() {
 
         {view === "play" ? (
           <div className="space-y-5">
+            {focusCandidate && <section className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Candidate review · {focusIndex + 1} of {candidateSequence.length}</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{focusCandidate.id === leadCandidate?.id ? <><strong style={{ color: "var(--sh-text-primary)" }}>{focusCandidate.symbol} leads this brief.</strong> {brief?.priorityCandidate?.leadReason ?? "It is the current lead candidate in the brief's deterministic decision order."}</> : <><strong style={{ color: "var(--sh-text-primary)" }}>{focusCandidate.symbol} is candidate {focusIndex + 1}.</strong> {leadCandidate?.symbol} remains the brief lead; this candidate is available for deliberate comparison, not hidden supporting research.</>}</p></div><div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" disabled={candidateSequence.length < 2} onClick={() => selectCandidate(-1)}>Previous</Button><Button size="sm" variant="outline" disabled={candidateSequence.length < 2} onClick={() => selectCandidate(1)}>Next</Button></div></div>
+              {candidateSequence.length > 1 && <div className="mt-3 flex gap-1 overflow-x-auto pb-1">{candidateSequence.map((candidate, index) => <button key={candidate.id} onClick={() => setSelectedCandidateId(candidate.id)} className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: candidate.id === focusCandidate.id ? "var(--sh-signal)" : "var(--sh-border-1)", background: candidate.id === focusCandidate.id ? "color-mix(in srgb, var(--sh-signal) 10%, var(--sh-surface))" : "transparent", color: candidate.id === focusCandidate.id ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>{index + 1}. {candidate.symbol}{candidate.id === leadCandidate?.id ? " · lead" : ""}</button>)}</div>}
+            </section>}
             {focusCandidate ? <PlayRecipeCard
               candidate={focusCandidate}
               run={run}
@@ -325,9 +340,9 @@ export default function CandidateBoard() {
                         <div><p className="text-[0.64rem] uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Open checks</p><p className="mt-1 text-lg font-semibold" style={{ color: verifyFields.length ? "var(--sh-signal)" : "var(--sh-text-primary)" }}>{verifyFields.length}</p></div>
                       </div>
                       {verifyFields.length > 0 ? <div className="flex flex-wrap gap-1">{verifyFields.slice(0, 4).map((field) => <Badge key={field} variant="outline" className="text-[0.65rem]" style={{ color: "var(--sh-signal)" }}>verify: {field}</Badge>)}</div> : <p className="flex items-center gap-1.5 text-xs" style={{ color: "var(--sh-fg-muted)" }}><SearchCheck className="h-3.5 w-3.5" /> No open evidence checks recorded for this candidate.</p>}
-                      <div className="flex items-center justify-between border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}>
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}>
                         <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{candidate.memoStatus === "ok" ? "Fact-traced memo ready" : "Decision memo not generated"}</span>
-                        {candidate.memoStatus === "ok" ? <Button variant="ghost" size="sm" onClick={() => navigate(`/aperture/memos/${candidate.id}`)}><FileText className="mr-1.5 h-3.5 w-3.5" /> Read decision memo</Button> : <Button variant="outline" size="sm" disabled={generatingMemo === candidate.id} onClick={() => { setGeneratingMemo(candidate.id); genMemo.mutate({ runId, candidateId: candidate.id }); }}>{generatingMemo === candidate.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <TrendingUp className="mr-1.5 h-3.5 w-3.5" />} Generate evidence memo</Button>}
+                        <div className="flex gap-1.5"><Button variant="ghost" size="sm" onClick={() => { setSelectedCandidateId(candidate.id); setView("play"); }}>Review candidate</Button>{candidate.memoStatus === "ok" ? <Button variant="ghost" size="sm" onClick={() => navigate(`/aperture/memos/${candidate.id}`)}><FileText className="mr-1.5 h-3.5 w-3.5" /> Read decision memo</Button> : <Button variant="outline" size="sm" disabled={generatingMemo === candidate.id} onClick={() => { setGeneratingMemo(candidate.id); genMemo.mutate({ runId, candidateId: candidate.id }); }}>{generatingMemo === candidate.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <TrendingUp className="mr-1.5 h-3.5 w-3.5" />} Generate evidence memo</Button>}</div>
                       </div>
                     </CardContent>
                   </Card>

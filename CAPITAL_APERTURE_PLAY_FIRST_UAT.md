@@ -27,3 +27,9 @@ The revised daily list was evaluated after the eight reference intraday plays re
 The expanded intraday ticket now uses a server-backed VWAP/30-minute-opening-range query. The query carries feed, lag, and unavailable state from the live market-data adapter; until current tape is available it asks for terminal confirmation rather than rendering a permanent hardcoded `Unknown` label. Per-play theme classification remains unavailable, while the list now prints the cockpit’s measured correlated planned-loss context and clearly distinguishes that account-wide measurement from an unavailable play-level comparison.
 
 Deferred plays now store a next-regular-session resume time. A skip remains a retirement decision. No proposal, approval, submission, or broker action was created during this validation.
+
+## Constructed Recipe & Candidate Navigation UAT
+
+On August 19, 2026, run `#300001` was reopened after its intraday catalyst deadline. The brief now names **TT** as candidate **1 of 8** and explains that it leads because no direct thesis expression was available, so the documented research-fit and confidence tie-breaker applied. The operator advanced to **SOXL, candidate 2 of 8**, in the same view; all eight candidates remained directly selectable.
+
+The server constructed fully labeled historical levels for both candidates from delayed SIP minute bars, the paper mandate, and stated assumptions. Because the catalyst window had expired, each card displayed **“No paper play — catalyst window expired”** and exposed no paper-ticket handoff. The default legacy direction appeared as an explicit **long assumption**, not an observed setup direction. A read-only database check confirmed run `#300001` still had **zero** broker orders, pending approvals, approvals, and submissions.

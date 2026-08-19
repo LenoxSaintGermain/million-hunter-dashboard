@@ -75,6 +75,7 @@ export type CapitalDecisionBrief = {
     role: string;
     confidenceScore: number;
     verifyCount: number;
+    leadReason: string;
   } | null;
 };
 
@@ -198,6 +199,9 @@ export function buildCapitalDecisionBrief(input: {
       role: priorityCandidate.role,
       confidenceScore: priorityCandidate.confidenceScore ?? 0,
       verifyCount: verifyCount(priorityCandidate.verifyFields),
+      leadReason: priorityCandidate.role === "core"
+        ? "It is a direct thesis expression; direct expressions lead this brief before complementary or reserve ideas, then current research fit and confidence break ties."
+        : "No direct thesis expression was available, so this candidate leads on the current research-fit and confidence tie-breaker.",
     } : null,
   };
 }

@@ -274,6 +274,14 @@ describe("time stop", () => {
     expect(constructPlay(input({ catalystDeadlineAt: early })).timeStopAt).toBe(early);
   });
 
+  it("keeps historical levels visible but makes an expired catalyst window unavailable for a new proposal", () => {
+    const expired = DAY_START + 9 * 60 * MIN;
+    const play = constructPlay(input({ catalystDeadlineAt: expired, now: expired + MIN }));
+    expect(play.readiness).toBe("expired");
+    expect(play.entry).not.toBeNull();
+    expect(play.unavailableReasons.join(" ")).toContain("deadline has passed");
+  });
+
   it("says so when no review time could be set", () => {
     const play = constructPlay(input({ holdingPeriod: "swing", catalystDeadlineAt: null }));
     expect(play.timeStopAt).toBeNull();

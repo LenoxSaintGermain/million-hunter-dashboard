@@ -1373,10 +1373,11 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Add the minimal persistent play-decision record required to retain a trader skip reason; no current table stores this decision
 
 ## Constructed Play, Test Boundary & Trader Routing (Aug 18 2026)
-- [ ] Pull and verify the upstream `constructPlay()` contract, disclosure, and pure regression coverage before wiring it to a client surface
-- [ ] Add an explicit modelled play direction, default long, and carry it to VWAP trigger evaluation; label an unconfigured side as an assumption
-- [ ] Exclude the external Alpaca connectivity assertion from default unit regression while retaining a separately runnable integration test
-- [ ] Expose a constructed, explicitly modelled recipe endpoint and render its entry, stop, slippage, quantity, notional, planned loss, targets, time stop, no-trade conditions, assumptions, unavailable reasons, and tape basis
-- [ ] Prefill the human-review paper ticket from the constructed recipe without removing its explicit human review, acknowledgment, or approval gates
-- [ ] Make Capital Brief explain the lead candidate among the full candidate count and permit deliberate next/previous candidate review
-- [ ] Route the trader default workspace through three action verbs—Today, Why, Record—without introducing a mode toggle or changing Jim’s thesis vocabulary
+- [x] Pull and verify the upstream `constructPlay()` contract, disclosure, and pure regression coverage before wiring it to a client surface
+- [x] Add an explicit modelled play direction, default long, and carry it to VWAP trigger evaluation; label an unconfigured side as an assumption
+- [x] Exclude the external Alpaca connectivity assertion from default unit regression while retaining a separately runnable integration test
+- [x] Expose a constructed, explicitly modelled recipe endpoint and render its entry, stop, slippage, quantity, notional, planned loss, targets, time stop, no-trade conditions, assumptions, unavailable reasons, and tape basis
+- [x] Prefill the human-review paper ticket from the constructed recipe without removing its explicit human review, acknowledgment, or approval gates
+- [x] Make Capital Brief explain the lead candidate among the full candidate count and permit deliberate next/previous candidate review
+- [x] Route the trader default workspace through three action verbs—Today, Why, Record—without introducing a mode toggle or changing Jim’s thesis vocabulary
+- [x] Guard expired catalyst windows in direct brief review so historical modeled levels remain visible but cannot become a new paper proposal

@@ -26,7 +26,7 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
   /** The first authenticated workspace for this user; controls the root-route handoff only. */
-  defaultWorkspace: mysqlEnum("default_workspace", ["command_center", "capital_aperture"]).default("command_center").notNull(),
+  defaultWorkspace: mysqlEnum("default_workspace", ["command_center", "capital_aperture", "capital_aperture_trader"]).default("command_center").notNull(),
   huntingParams: text("hunting_params"), // Free-text agentic command / hunting parameters
   /**
    * Duplicate-account pointer. When one person has signed up twice under two
@@ -1210,6 +1210,8 @@ export const apertureCandidates = mysqlTable("aperture_candidates", {
   id: int("id").autoincrement().primaryKey(),
   runId: int("run_id").notNull(),
   symbol: varchar("symbol", { length: 24 }).notNull(),
+  /** Null means legacy research supplied no directional model; the recipe states its long assumption. */
+  playSide: mysqlEnum("play_side", ["long", "short"]),
   /** core = expresses the thesis directly · complementary = strengthens/diversifies
    *  it · remainder = optimised for capital that would sit idle ·
    *  alternative_expression = a different way to hold the same idea. */

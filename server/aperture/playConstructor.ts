@@ -95,7 +95,8 @@ export type PlayReadiness =
   | "needs_tape"
   | "needs_equity"
   | "needs_range"
-  | "budget_too_small";
+  | "budget_too_small"
+  | "expired";
 
 export interface ConstructedPlay {
   symbol: string;
@@ -353,6 +354,11 @@ export function constructPlay(input: ConstructPlayInput): ConstructedPlay {
     timeStopAt = input.catalystDeadlineAt;
   } else {
     unavailable.push("no catalyst deadline was given, so no review time could be set");
+  }
+
+  if (input.catalystDeadlineAt != null && input.catalystDeadlineAt <= input.now) {
+    unavailable.push("the catalyst deadline has passed, so this historical recipe cannot be prepared as a new paper proposal");
+    readiness = "expired";
   }
 
   // ── No-trade conditions, generated from what would actually fail ──────────

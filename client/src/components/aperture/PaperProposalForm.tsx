@@ -53,6 +53,8 @@ export function PaperProposalForm({
   const [noTradeText, setNoTradeText] = useState("");
   const [paperAcknowledgement, setPaperAcknowledgement] = useState("");
   const [preflightInput, setPreflightInput] = useState<any | null>(null);
+  const [recipePrefilled, setRecipePrefilled] = useState(false);
+  const constructed = trpc.aperture.play.construct.useQuery({ runId, candidateId: candidate?.id ?? 0 }, { enabled: !!candidate?.id, staleTime: 30_000 });
   const create = trpc.aperture.order.create.useMutation({
     onSuccess: () => {
       toast.success("Paper proposal created. It is waiting for your separate approval.");
@@ -61,6 +63,20 @@ export function PaperProposalForm({
     onError: (error) => toast.error(error.message),
   });
 
+  const constructedPlay = constructed.data?.play;
+  const recipeCanPrepare = constructedPlay?.readiness === "constructed";
+  useEffect(() => {
+    if (!candidate || !constructedPlay || recipePrefilled || constructedPlay.readiness !== "constructed") return;
+    setRiskBudgetDollars(constructedPlay.budgetCents == null ? "" : (constructedPlay.budgetCents / 100).toFixed(2));
+    setEntryDollars(constructedPlay.entry == null ? "" : (constructedPlay.entry.priceCents / 100).toFixed(2));
+    setStopDollars(constructedPlay.stop == null ? "" : (constructedPlay.stop.priceCents / 100).toFixed(2));
+    setSlippageDollars(constructedPlay.slippage == null ? "" : (constructedPlay.slippage.priceCents / 100).toFixed(2));
+    setNotionalDollars(constructedPlay.notionalCents == null ? "" : (constructedPlay.notionalCents / 100).toFixed(2));
+    setTimeStop(constructedPlay.timeStopAt == null ? "" : new Date(constructedPlay.timeStopAt).toISOString().slice(0, 16));
+    setNoTradeText(constructedPlay.noTradeConditions.join("\n"));
+    setReason(`Modeled ${constructedPlay.side} paper recipe for ${candidate.symbol}; confirm all derived levels against a real-time terminal before human approval.`);
+    setRecipePrefilled(true);
+  }, [candidate?.symbol, constructedPlay, recipePrefilled]);
   if (!candidate) return null;
   const isIntraday = holdingPeriod === "intraday";
   const entryPriceCents = dollarsToCents(entryDollars);
@@ -89,7 +105,7 @@ export function PaperProposalForm({
       candidateId: candidate?.id,
       accountId: account?.id ?? 0,
       symbol: candidate?.symbol ?? "",
-      side: "buy" as const,
+      side: candidate?.playSide === "short" ? ("sell" as const) : ("buy" as const),
       qty: isIntraday ? intradaySizing?.qty : undefined,
       notionalCents: !isIntraday && Number.isFinite(statedNotionalCents) && statedNotionalCents > 0 ? statedNotionalCents : undefined,
       orderType: isIntraday ? "limit" as const : "market" as const,
@@ -129,6 +145,8 @@ export function PaperProposalForm({
     const timeStopAt = new Date(timeStop).getTime();
     const noTradeConditions = noTradeText.split("\n").map((condition) => condition.trim()).filter(Boolean);
     if (!account) return toast.error("Connect or select a paper account before preparing a proposal.");
+    if (constructed.isLoading) return toast.error("Constructing the modeled recipe. Please wait before preparing a proposal.");
+    if (!recipeCanPrepare) return toast.error(constructedPlay?.unavailableReasons[0] || "There is no measurable paper play to prepare.");
     if (!isIntraday && (!Number.isFinite(notionalCents) || notionalCents <= 0)) return toast.error("Enter a paper notional greater than $0.");
     if (!Number.isFinite(deadlineAt)) return toast.error("Set a valid catalyst deadline.");
     if (paperAcknowledgement !== "PAPER") return toast.error('Type PAPER to record your paper-only acknowledgement.');
@@ -155,7 +173,8 @@ export function PaperProposalForm({
     </CardHeader>
     <CardContent className="space-y-4">
       {!account ? <div className="rounded-lg border p-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>No connected paper account is available for this brief. Return to the research brief, then connect a paper account before preparing a proposal.</div> : <>
-        <div className="rounded-lg border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Portfolio impact: this would be a new <strong style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol}</strong> paper exposure in <strong style={{ color: "var(--sh-text-primary)" }}>{account.label}</strong>. The suggested range is research context, not a recommendation or return forecast.</div>
+        <div className="rounded-lg border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Portfolio impact: this would be a new <strong style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol}</strong> {candidate.playSide === "short" ? "short" : "long"} paper exposure in <strong style={{ color: "var(--sh-text-primary)" }}>{account.label}</strong>. The ticket is prefilled from a <strong style={{ color: "var(--sh-text-primary)" }}>modeled recipe</strong>, not a recommendation or return forecast.</div>
+        {constructed.isLoading ? <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Constructing the modeled entry, risk, and sizing recipe…</div> : !recipeCanPrepare ? <div className="rounded-lg border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--sh-signal)", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>No paper proposal is available.</strong> {constructedPlay?.unavailableReasons[0] || "Required tape or equity context is not measurable."}</div> : <div className="rounded-lg border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--sh-signal)", color: "var(--sh-fg-muted)" }}>{constructed.data?.disclosure}</div>}
         <div className="grid gap-3 sm:grid-cols-2">
           {!isIntraday && <label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Paper notional (USD)<input type="number" min="1" step="100" value={notionalDollars} onChange={(event) => setNotionalDollars(event.target.value)} className="w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>}
           <label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Planned holding period<select value={holdingPeriod} onChange={(event) => setHoldingPeriod(event.target.value as HoldingPeriod)} className="w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }}><option value="intraday">Intraday</option><option value="overnight">Overnight</option><option value="swing">Swing</option><option value="catalyst_window">Catalyst window</option></select></label>
@@ -169,7 +188,7 @@ export function PaperProposalForm({
             <label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Slippage / share (USD)<input type="number" min="0" step="0.01" value={slippageDollars} onChange={(event) => setSlippageDollars(event.target.value)} className="w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>
           </div>
           <div className="rounded-md px-3 py-2 text-xs leading-5" style={{ background: "var(--sh-surface)", color: "var(--sh-fg-muted)" }}>{intradaySizing ? <>Derived paper plan: <strong style={{ color: "var(--sh-text-primary)" }}>{intradaySizing.qty.toLocaleString()} shares</strong> · estimated notional <strong style={{ color: "var(--sh-text-primary)" }}>{money(intradaySizing.notionalCents)}</strong> · planned loss <strong style={{ color: "var(--sh-text-primary)" }}>{money(intradaySizing.plannedRiskCents)}</strong>{account.equityValueCents ? <> · <strong style={{ color: "var(--sh-text-primary)" }}>{((intradaySizing.plannedRiskCents / account.equityValueCents) * 100).toFixed(2)}%</strong> of measured equity</> : " · equity not measured, so planned-loss percentage is not measured"}.</> : "Enter all four values to derive the paper quantity. No proposal can be created until this calculation is complete."}</div>
-          <div className="rounded-md border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>VWAP and opening range: not measured on this ticket.</strong> The intraday calculator is available server-side, but this ticket has no verified tape observation attached yet. It cannot claim a VWAP hold or opening-range trigger; confirm those conditions on a real-time terminal and state them in your no-trade rules.</div>
+          <div className="rounded-md border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Tape basis:</strong> {constructedPlay?.tapeBasis || "Not measured."} {constructedPlay?.trigger?.basis || "Confirm the trigger against a real-time terminal before human approval."}</div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Human close-review time<input type="datetime-local" value={timeStop} onChange={(event) => setTimeStop(event.target.value)} className="w-full rounded-md border bg-transparent px-3 py-2 text-sm font-normal" style={{ borderColor: "var(--sh-border-1)" }} /></label>
             <label className="block space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>No-trade conditions (one per line)<textarea value={noTradeText} onChange={(event) => setNoTradeText(event.target.value)} rows={3} placeholder="e.g., Skip if price cannot hold above VWAP after the catalyst window." className="w-full rounded-md border bg-transparent px-3 py-2 text-sm font-normal" style={{ borderColor: "var(--sh-border-1)" }} /></label>
@@ -181,7 +200,7 @@ export function PaperProposalForm({
         <section className="space-y-2 rounded-lg border p-3" style={{ borderColor: preflight.data?.wouldPass ? "oklch(0.55 0.15 145)" : "var(--sh-border-1)", background: "var(--sh-surface)" }}><div className="flex items-center gap-2">{preflight.isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: "var(--sh-signal)" }} /> : preflight.data?.wouldPass ? <ShieldCheck className="h-3.5 w-3.5" style={{ color: "oklch(0.55 0.15 145)" }} /> : <AlertTriangle className="h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} />}<p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>{preflight.isFetching ? "Checking paper-order guardrails…" : preflight.data?.wouldPass ? "Preflight complete — this can enter the human approval queue." : "Preflight is blocking this proposal."}</p></div>{preflight.data?.notionalBasis === "derived_from_last_price" && <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Modeled figure: the mandate ceiling used a notional derived from the last recorded price.</p>}{preflight.data?.blocking.map((block) => <p key={block} className="text-xs leading-5" style={{ color: "var(--sh-red)" }}>{block}</p>)}{preflight.data?.evaluation.notes.map((note) => <p key={note} className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{note}</p>)}</section>
         <label className="block space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Type <span className="font-mono">PAPER</span> to acknowledge paper-only use<input value={paperAcknowledgement} onChange={(event) => setPaperAcknowledgement(event.target.value)} autoComplete="off" placeholder="PAPER" className="w-full rounded-md border bg-transparent px-3 py-2 text-sm font-normal" style={{ borderColor: "var(--sh-border-1)" }} /></label>
         <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>A paper proposal still requires a separate human approval and a separate human submission to Alpaca Paper. No live capital is involved.</p>
-        <div className="flex flex-wrap gap-2 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}><Button onClick={submitProposal} disabled={create.isPending || preflight.isFetching || !preflight.data?.wouldPass}>{create.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}Create paper proposal</Button><Button variant="outline" onClick={onReturnToBrief}>Return to evidence review</Button></div>
+        <div className="flex flex-wrap gap-2 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}><Button onClick={submitProposal} disabled={create.isPending || constructed.isLoading || !recipeCanPrepare || preflight.isFetching || !preflight.data?.wouldPass}>{create.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}Create paper proposal</Button><Button variant="outline" onClick={onReturnToBrief}>Return to evidence review</Button></div>
       </>}
     </CardContent>
   </Card>;
