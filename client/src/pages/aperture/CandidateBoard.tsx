@@ -123,6 +123,11 @@ export default function CandidateBoard() {
       refetchIntervalInBackground: true,
     },
   );
+  const requestedCandidateId = Number(new URLSearchParams(location.split("?")[1] ?? "").get("candidate")) || null;
+  useEffect(() => {
+    if (!requestedCandidateId || !data?.candidates?.some((candidate: any) => candidate.id === requestedCandidateId)) return;
+    setSelectedCandidateId(requestedCandidateId);
+  }, [data?.candidates, requestedCandidateId]);
   const refreshMacro = trpc.aperture.macro.refresh.useMutation({
     onSuccess: (result) => { toast.success(`Macro ledger refreshed — ${result.factsWritten} FRED observations recorded`); refetch(); },
     onError: (error) => toast.error(`Could not refresh macro evidence: ${error.message}`),
@@ -190,12 +195,6 @@ export default function CandidateBoard() {
     const next = (focusIndex + delta + candidateSequence.length) % candidateSequence.length;
     setSelectedCandidateId(candidateSequence[next]!.id);
   };
-  const requestedCandidateId = Number(new URLSearchParams(location.split("?")[1] ?? "").get("candidate")) || null;
-  useEffect(() => {
-    if (requestedCandidateId && candidateSequence.some((candidate) => candidate.id === requestedCandidateId)) {
-      setSelectedCandidateId(requestedCandidateId);
-    }
-  }, [requestedCandidateId, candidateSequence]);
   const paperPositions = data.paperContext?.positions ?? [];
   const focusChecks = Array.isArray(focusCandidate?.verifyFields) ? focusCandidate.verifyFields as string[] : [];
   const evidenceReadiness = getEvidenceReviewReadiness(focusChecks, (data.evidenceReviews ?? []).filter((review: any) => review.candidateId === focusCandidate?.id));

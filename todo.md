@@ -1394,3 +1394,8 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Repair core form label associations, numeric input semantics, touch-target sizing, and touch-readable inline explanations on Capital setup and daily-play screens
 - [x] Correct daily-play disclosure semantics including button type, aria-controls, ticker language, and time markup
 - [x] Apply cockpit and recipe-card semantic improvements for progress values, reduced-motion behavior, tokenized colors, numeric readability, and heading/list structure
+
+## Constructed Play & Audience Routing Verification (Aug 19 2026)
+- [x] Verify the constructed-play endpoint renders the full explicitly modelled recipe and safely pre-fills the human-review ticket
+- [x] Verify the Capital Brief header explains its lead candidate and steps through all remaining candidates
+- [x] Verify navigation vocabulary routes from `users.default_workspace`, with no play-first/thesis-first mode toggle
