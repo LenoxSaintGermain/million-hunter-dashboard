@@ -1432,3 +1432,12 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Provide visible immediate confirmation for recorded list decisions and collapse skipped or deferred rows to keep attention on unresolved plays
 - [x] Add a safe keyboard shortcut for the focused primary decision action, excluding editable fields and preserving every confirmation gate
 - [x] Validate 375px space recovery, acknowledgement persistence, accelerated decision feedback, and no autonomous broker action
+
+## Compact Prefilled Proposal & State-Change Alerts (Aug 19 2026)
+- [x] Replace the long proposal form with a compact readiness strip that presents modelled prefills, current readiness, and the highest-priority blocking gap first
+- [x] Provide recommendation chips and safe predefined text alternatives for holding period, rationale, invalidation, and catalyst deadline rather than relying on blank free-text entry
+- [x] Keep advanced narrative and risk fields behind progressive disclosure while making the next guarded action persistently visible
+- [x] Render each preflight blocker as a plain-language gap with the next human-controlled corrective action; do not imply a missing external fact can be fixed automatically
+- [x] Add visible transition feedback when a review completes and when the guarded proposal screen becomes available
+- [x] Reopen a previously acknowledged cockpit alert when the exact measured constraint signature changes or a new critical constraint becomes binding
+- [x] Validate compact proposal hierarchy at 375px and desktop without creating, approving, submitting, or modifying a paper order
