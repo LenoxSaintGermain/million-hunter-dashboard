@@ -1399,3 +1399,12 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Verify the constructed-play endpoint renders the full explicitly modelled recipe and safely pre-fills the human-review ticket
 - [x] Verify the Capital Brief header explains its lead candidate and steps through all remaining candidates
 - [x] Verify navigation vocabulary routes from `users.default_workspace`, with no play-first/thesis-first mode toggle
+
+## Constraint-Focused Cockpit Rail (Aug 19 2026)
+- [x] Derive the single tightest measurable capital or planned-loss constraint from the server-provided cockpit headroom lines
+- [x] Replace the full-height default rail with a one-row market, account, and binding-constraint summary plus accessible disclosure control
+- [x] Auto-expand and visually escalate the rail when a measured constraint is at least 85% utilized
+- [x] Warn when account/equity sync is over four hours old and explain that ceilings use stale equity
+- [x] Hide per-play reference ceilings and not-measured lines from the collapsed view; explain same-name correlation duplication only when expanded
+- [x] Persist manual expansion preference per user while retaining collapsed-by-default mobile behavior and safety auto-expansion
+- [x] Validate rail hierarchy at desktop and 375px mobile without altering paper-account or order behavior

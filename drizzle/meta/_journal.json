@@ -218,6 +218,13 @@
       "when": 1787107475212,
       "tag": "0030_white_komodo",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "5",
+      "when": 1787115557449,
+      "tag": "0031_chubby_hobgoblin",
+      "breakpoints": true
     }
   ]
 }

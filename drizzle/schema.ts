@@ -27,6 +27,8 @@ export const users = mysqlTable("users", {
   onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
   /** The first authenticated workspace for this user; controls the root-route handoff only. */
   defaultWorkspace: mysqlEnum("default_workspace", ["command_center", "capital_aperture", "capital_aperture_trader"]).default("command_center").notNull(),
+  /** Compact Cockpit Rail preference. A critical measured constraint always overrides this to open the rail. */
+  cockpitRailExpanded: boolean("cockpit_rail_expanded").default(false).notNull(),
   huntingParams: text("hunting_params"), // Free-text agentic command / hunting parameters
   /**
    * Duplicate-account pointer. When one person has signed up twice under two

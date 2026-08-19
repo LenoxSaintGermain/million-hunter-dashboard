@@ -27,6 +27,7 @@ import {
   aperturePlayDecisions,
   apertureSetAside,
   thesisCompilations,
+  users,
 } from "../drizzle/schema";
 import { adminProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
@@ -470,6 +471,22 @@ export const apertureRouter = router({
         runId: input?.runId ?? null,
       });
     }),
+
+  cockpitPreference: router({
+    get: adminProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      const [user] = await db!.select({ expanded: users.cockpitRailExpanded })
+        .from(users)
+        .where(eq(users.id, ctx.user.id))
+        .limit(1);
+      return { expanded: user?.expanded === true };
+    }),
+    set: adminProcedure.input(z.object({ expanded: z.boolean() })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      await db!.update(users).set({ cockpitRailExpanded: input.expanded }).where(eq(users.id, ctx.user.id));
+      return { expanded: input.expanded };
+    }),
+  }),
 
   // ── Memo library ───────────────────────────────────────────────────────────
   // Memos live on their originating candidate rows so they retain the precise
