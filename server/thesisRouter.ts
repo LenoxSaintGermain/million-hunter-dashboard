@@ -317,6 +317,8 @@ export const thesisRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
+    const [profile] = await db.select({ activeCapitalThesisId: users.activeCapitalThesisId })
+      .from(users).where(eq(users.id, ctx.user.id)).limit(1);
     const rows = await db.execute(sql`
       SELECT tc.*, CASE WHEN tc.user_id = ${ctx.user.id} THEN 'owner' ELSE 'shared' END AS access,
         owner.name AS owner_name, ts.permission AS share_permission
@@ -357,9 +359,47 @@ export const thesisRouter = router({
       estimatedCostMin: row.estimated_cost_min,
       estimatedCostMax: row.estimated_cost_max,
       latestCatalystDeadlineAt: row.latest_catalyst_deadline_at == null ? null : Number(row.latest_catalyst_deadline_at),
+      isActiveCapital: profile?.activeCapitalThesisId === row.id,
       createdAt: row.created_at,
     }));
   }),
+
+  /** The canonical Capital / Trade thesis this profile has chosen for its daily Decision Center. */
+  activeCapital: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return { thesis: null };
+    const [profile] = await db.select({ activeCapitalThesisId: users.activeCapitalThesisId })
+      .from(users).where(eq(users.id, ctx.user.id)).limit(1);
+    if (!profile?.activeCapitalThesisId) return { thesis: null };
+    const [thesis] = await db.select({
+      id: thesisCompilations.id,
+      name: thesisCompilations.name,
+      templateUsed: thesisCompilations.templateUsed,
+      status: thesisCompilations.status,
+    }).from(thesisCompilations).where(eq(thesisCompilations.id, profile.activeCapitalThesisId)).limit(1);
+    return { thesis: thesis ?? null };
+  }),
+
+  /** Assign the profile's daily Capital context. This never transfers, shares, or edits the thesis. */
+  setActiveCapital: protectedProcedure
+    .input(z.object({ compilationId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const [source] = await db.select().from(thesisCompilations).where(eq(thesisCompilations.id, input.compilationId)).limit(1);
+      if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Saved thesis not found" });
+      const ownsSource = source.userId === ctx.user.id;
+      const [sharedAccess] = ownsSource ? [undefined] : await db.select().from(thesisShares)
+        .where(and(eq(thesisShares.compilationId, input.compilationId), eq(thesisShares.userId, ctx.user.id), eq(thesisShares.permission, "use"))).limit(1);
+      if (!canUseCanonicalThesis({ ownerUserId: source.userId, requesterUserId: ctx.user.id, sharedPermission: sharedAccess?.permission })) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You do not have use access to this thesis" });
+      }
+      if (source.templateUsed !== "capital_trade") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Only a Capital / Trade thesis can be the Capital Decision Center context" });
+      }
+      await db.update(users).set({ activeCapitalThesisId: input.compilationId }).where(eq(users.id, ctx.user.id));
+      return { activeCapitalThesisId: input.compilationId, name: source.name ?? "Capital / Trade thesis" };
+    }),
 
   /** Current user’s own Capital runs and candidates for an authorized canonical thesis. Never exposes another owner’s paper history. */
   playRecipes: protectedProcedure
@@ -421,7 +461,9 @@ export const thesisRouter = router({
         confidenceNotes: ["Capital / Trade scope: use the linked Aperture graph for securities analysis."],
         status: "review",
       });
-      return { compilationId: Number((result as any).insertId) };
+      const compilationId = Number((result as any).insertId);
+      await db.update(users).set({ activeCapitalThesisId: compilationId }).where(eq(users.id, ctx.user.id));
+      return { compilationId };
     }),
 
   /** Operator-owned thesis sharing. A share grants visibility/use, never edit or delete rights. */

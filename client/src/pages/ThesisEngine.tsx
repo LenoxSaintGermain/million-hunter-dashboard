@@ -151,6 +151,13 @@ export default function ThesisEngine() {
       : TEMPLATES.filter((template) => template.id !== "wingate");
 
   const { data: savedTheses, refetch: refetchList } = trpc.thesis.list.useQuery();
+  const setActiveCapital = trpc.thesis.setActiveCapital.useMutation({
+    onSuccess: ({ name }) => {
+      toast.success(`${name} now drives your Capital Decision Center.`);
+      refetchList();
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const compileMutation = trpc.thesis.compile.useMutation({
     onSuccess: (data) => {
       setCompilationResult(data.compiled);
@@ -497,13 +504,17 @@ export default function ThesisEngine() {
                             {t.name ?? "Untitled Thesis"}
                             {isHistoricThesisRow(t) && <span className="ml-1.5 text-[9px] text-amber-500 font-semibold">PROPERTY · WINGATE</span>}
                             {t.templateUsed === "capital_trade" && <span className="ml-1.5 text-[9px] text-emerald-600 font-semibold">CAPITAL · PAPER RESEARCH</span>}
+                            {t.isActiveCapital && <span className="ml-1.5 text-[9px] text-emerald-700 font-semibold">DECISION CENTER</span>}
                             {!isHistoricThesisRow(t) && t.templateUsed !== "capital_trade" && <span className="ml-1.5 text-[9px] text-sky-600 font-semibold">ACQUISITION · MARKET SEARCH</span>}
                             {t.access === "shared" && <span className="ml-1.5 text-[9px] text-sky-600 font-semibold">SHARED BY {t.ownerName ?? "OPERATOR"}</span>}
                           </button>
                           {t.templateUsed === "capital_trade" && (
-                            <span className="hidden shrink-0 text-[10px] text-muted-foreground sm:inline">
-                              {deadline ? <time dateTime={deadline.toISOString()}>Catalyst deadline {deadline.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time> : "No paper brief yet"}
-                            </span>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <span className="text-[10px] text-muted-foreground">
+                                {deadline ? <time dateTime={deadline.toISOString()}>Catalyst deadline {deadline.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time> : "No paper brief yet"}
+                              </span>
+                              {!t.isActiveCapital && <button type="button" onClick={(event) => { event.stopPropagation(); setActiveCapital.mutate({ compilationId: t.id }); }} disabled={setActiveCapital.isPending} className="rounded border border-emerald-600/30 px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-600/10 disabled:opacity-50">Use in Decision Center</button>}
+                            </div>
                           )}
                           </>
                         )}

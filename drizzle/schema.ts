@@ -31,6 +31,8 @@ export const users = mysqlTable("users", {
   cockpitRailExpanded: boolean("cockpit_rail_expanded").default(false).notNull(),
   /** Exact measured constraint snapshot the operator has already reviewed; a changed value reopens the rail. */
   cockpitRailAcknowledgedSignature: varchar("cockpit_rail_acknowledged_signature", { length: 255 }),
+  /** Canonical Capital / Trade thesis selected by this profile for its daily Decision Center context. */
+  activeCapitalThesisId: int("active_capital_thesis_id"),
   huntingParams: text("hunting_params"), // Free-text agentic command / hunting parameters
   /**
    * Duplicate-account pointer. When one person has signed up twice under two

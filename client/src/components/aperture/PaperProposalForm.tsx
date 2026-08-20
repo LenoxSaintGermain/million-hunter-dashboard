@@ -63,6 +63,31 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
     setRecipePrefilled(true);
   }, [candidate?.symbol, constructedPlay, recipeCanPrepare, recipePrefilled]);
 
+  useEffect(() => {
+    if (paperAcknowledgement === "PAPER") setShowDetails(false);
+  }, [paperAcknowledgement]);
+
+  const adjustNotional = (multiplier: number) => {
+    const current = Number(notionalDollars);
+    if (!Number.isFinite(current) || current <= 0) return;
+    setNotionalDollars(String(Math.max(1, Math.round(current * multiplier))));
+  };
+
+  const adjustRiskBudget = (multiplier: number) => {
+    const current = Number(riskBudgetDollars);
+    if (!Number.isFinite(current) || current <= 0) return;
+    setRiskBudgetDollars((current * multiplier).toFixed(2));
+  };
+
+  const adjustStopDistance = (multiplier: number) => {
+    const entry = Number(entryDollars);
+    const stop = Number(stopDollars);
+    if (!Number.isFinite(entry) || !Number.isFinite(stop) || entry === stop) return;
+    const distance = Math.abs(entry - stop) * multiplier;
+    const nextStop = candidate?.playSide === "short" ? entry + distance : entry - distance;
+    setStopDollars(nextStop.toFixed(2));
+  };
+
   const isIntraday = holdingPeriod === "intraday";
   const entryPriceCents = dollarsToCents(entryDollars);
   const stopPriceCents = dollarsToCents(stopDollars);
@@ -147,7 +172,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
         {preflightGaps.length > 1 && <details className="mt-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}><summary className="cursor-pointer font-medium">See {preflightGaps.length - 1} supporting gap{preflightGaps.length === 2 ? "" : "s"}</summary><ul className="mt-2 space-y-1 pl-4">{preflightGaps.slice(1).map((gap) => <li key={gap}>{gap}</li>)}</ul></details>}
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"><label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Holding horizon<div className="grid grid-cols-2 gap-1 sm:grid-cols-4" role="group" aria-label="Planned holding horizon">{(["intraday", "overnight", "swing", "catalyst_window"] as HoldingPeriod[]).map((period) => <button key={period} type="button" onClick={() => setHoldingPeriod(period)} className="rounded-md border px-2 py-2 text-xs capitalize" style={{ borderColor: holdingPeriod === period ? "var(--sh-signal)" : "var(--sh-border-1)", background: holdingPeriod === period ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{period.replace("_", " ")}</button>)}</div></label>{!isIntraday && <label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Modelled paper size<input value={notionalDollars} onChange={(event) => setNotionalDollars(event.target.value)} type="number" min="1" inputMode="decimal" className="w-full rounded-md border bg-transparent px-3 py-2 text-sm sm:w-36" style={{ borderColor: "var(--sh-border-1)" }} /></label>}</section>
+      <section className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"><label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Holding horizon<div className="grid grid-cols-2 gap-1 sm:grid-cols-4" role="group" aria-label="Planned holding horizon">{(["intraday", "overnight", "swing", "catalyst_window"] as HoldingPeriod[]).map((period) => <button key={period} type="button" onClick={() => setHoldingPeriod(period)} className="rounded-md border px-2 py-2 text-xs capitalize" style={{ borderColor: holdingPeriod === period ? "var(--sh-signal)" : "var(--sh-border-1)", background: holdingPeriod === period ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{period.replace("_", " ")}</button>)}</div></label>{!isIntraday && <div className="space-y-1.5"><label className="block text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Modelled paper size<input value={notionalDollars} onChange={(event) => setNotionalDollars(event.target.value)} type="number" min="1" inputMode="decimal" className="mt-1 w-full rounded-md border bg-transparent px-3 py-2 text-sm sm:w-36" style={{ borderColor: "var(--sh-border-1)" }} /></label><div className="flex gap-1" aria-label="Quick modelled paper size adjustments"><button type="button" onClick={() => adjustNotional(0.75)} className="rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)" }}>−25%</button><button type="button" onClick={() => setNotionalDollars(String(Math.round(suggestedCents / 100)))} className="rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)" }}>Model</button><button type="button" onClick={() => adjustNotional(1.25)} className="rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)" }}>+25%</button></div></div>}</section>
 
       {recipeCanPrepare && <div className="rounded-md px-3 py-2 text-xs leading-5" style={{ background: "color-mix(in srgb, var(--sh-signal) 7%, var(--sh-surface))", color: "var(--sh-fg-muted)" }}><Sparkles className="mr-1 inline h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} />Prefilled model: {constructedPlay?.side} · entry {money(constructedPlay?.entry?.priceCents)} · stop {money(constructedPlay?.stop?.priceCents)} · planned loss {money(constructedPlay?.plannedLossCents)}. Confirm against a real-time terminal.</div>}
 

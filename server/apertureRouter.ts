@@ -11,7 +11,7 @@
  * so the contract is visible in the server code too.
  */
 import { z } from "zod";
-import { eq, and, inArray, gte, lt } from "drizzle-orm";
+import { eq, and, inArray, gte, lt, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   capitalTheses,
@@ -927,6 +927,17 @@ export const apertureRouter = router({
     list: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const now = Date.now();
+      const [profile] = await db!.select({ activeCapitalThesisId: users.activeCapitalThesisId })
+        .from(users).where(eq(users.id, ctx.user.id)).limit(1);
+      const activeCapitalThesisId = profile?.activeCapitalThesisId ?? null;
+      const [activeCanonicalThesis] = activeCapitalThesisId == null ? [undefined] : await db!.select({
+        id: thesisCompilations.id,
+        name: thesisCompilations.name,
+      }).from(thesisCompilations).where(eq(thesisCompilations.id, activeCapitalThesisId)).limit(1);
+      const activeProjectionRows = activeCapitalThesisId == null ? [] : await db!.select({ id: capitalTheses.id })
+        .from(capitalTheses).where(and(eq(capitalTheses.userId, ctx.user.id), eq(capitalTheses.sourceCompilationId, activeCapitalThesisId)));
+      const activeProjectionIds = activeProjectionRows.map((row) => row.id);
+      const activeRunFilter = activeCapitalThesisId == null ? undefined : activeProjectionIds.length ? inArray(apertureRuns.thesisId, activeProjectionIds) : sql`0 = 1`;
       const rows = await db!.select({ candidate: apertureCandidates, run: apertureRuns, thesisName: capitalTheses.name, thesisRawText: capitalTheses.rawText })
         .from(apertureCandidates)
         .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
@@ -936,6 +947,7 @@ export const apertureRouter = router({
           eq(apertureRuns.status, "completed"),
           inArray(apertureRuns.holdingPeriod, ["intraday", "catalyst_window"]),
           gte(apertureRuns.catalystDeadlineAt, now),
+          ...(activeRunFilter ? [activeRunFilter] : []),
         ))
         .orderBy(apertureRuns.catalystDeadlineAt, desc(apertureRuns.createdAt))
         .limit(40);
@@ -947,6 +959,7 @@ export const apertureRouter = router({
           eq(apertureRuns.status, "completed"),
           inArray(apertureRuns.holdingPeriod, ["intraday", "catalyst_window"]),
           lt(apertureRuns.catalystDeadlineAt, now),
+          ...(activeRunFilter ? [activeRunFilter] : []),
         ));
       const candidateIds = rows.map(({ candidate }) => candidate.id);
       const reviews = candidateIds.length
@@ -964,6 +977,8 @@ export const apertureRouter = router({
         .filter((decision) => decision.decision === "skipped" || (decision.resumeAt != null && decision.resumeAt > now))
         .map((decision) => [decision.candidateId, decision]));
       return {
+        activeCanonicalThesisId: activeCapitalThesisId,
+        activeCanonicalThesis: activeCanonicalThesis ?? null,
         expiredPlayCount: expiredRows.length,
         plays: rows.map(({ candidate, run, thesisName, thesisRawText }) => ({
         candidate,

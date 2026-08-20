@@ -129,6 +129,7 @@ export default function ApertureHome() {
 
   const { data: theses, refetch: refetchTheses } = trpc.aperture.thesis.list.useQuery();
   const { data: canonicalTheses } = trpc.thesis.list.useQuery();
+  const { data: activeCapitalContext } = trpc.thesis.activeCapital.useQuery();
   const { data: accounts } = trpc.aperture.account.list.useQuery();
   const { data: runs, refetch: refetchRuns } = trpc.aperture.run.list.useQuery();
   const { data: providers } = trpc.aperture.providers.useQuery();
@@ -233,7 +234,12 @@ export default function ApertureHome() {
   };
 
   if (!showResearchSetup) {
-    return <DashboardLayout><div className="mx-auto max-w-6xl space-y-5"><DailyPlayList onNewResearch={() => { setShowResearchSetup(true); navigate("/aperture?setup=1"); }} onOpenRun={(runId, candidateId, view) => {
+    return <DashboardLayout><div className="mx-auto max-w-6xl space-y-5">
+      <section className="flex flex-col gap-2 rounded-lg border border-emerald-600/25 bg-emerald-600/5 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+        <div><span className="font-semibold text-foreground">Decision Center thesis: </span><span className="text-muted-foreground">{activeCapitalContext?.thesis?.name ?? "No Capital / Trade thesis assigned"}</span></div>
+        <Link href="/thesis?scope=capital" className="shrink-0 text-xs font-semibold text-emerald-700 hover:underline">Change thesis →</Link>
+      </section>
+      <DailyPlayList onNewResearch={() => { setShowResearchSetup(true); navigate("/aperture?setup=1"); }} onOpenRun={(runId, candidateId, view) => {
       if (view === "execute") navigate(`/aperture/run/${runId}/execute?candidate=${candidateId}`);
       else navigate(`/aperture/run/${runId}?view=${view ?? "play"}`);
     }} /></div></DashboardLayout>;

@@ -1441,3 +1441,12 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Add visible transition feedback when a review completes and when the guarded proposal screen becomes available
 - [x] Reopen a previously acknowledged cockpit alert when the exact measured constraint signature changes or a new critical constraint becomes binding
 - [x] Validate compact proposal hierarchy at 375px and desktop without creating, approving, submitting, or modifying a paper order
+
+## Active Thesis Context & Fast Proposal Controls (Aug 19 2026)
+- [x] Diagnose why Decision Center defaults to the legacy AI thesis rather than the user’s selected canonical thesis
+- [x] Persist one active canonical thesis per authorized user and make the active context visible in both Thesis Workspace and Decision Center
+- [x] Add one-click active-thesis switching that updates the decision context without hiding ownership, scope, or prior research history
+- [x] Add safe one-click adjustments for modelled quantity and stop distance that recalculate planned risk and never bypass preflight, paper acknowledgement, or human approval
+- [x] Color-code state-aware cockpit alerts by measured severity while keeping the active constraint text accessible without color alone
+- [x] Auto-collapse reviewed proposal detail into a compact status and retain only the critical guarded action as a sticky control
+- [x] Validate profile isolation, active-context consistency, rapid adjustment guardrails, compact review behavior, and no paper-order mutation
