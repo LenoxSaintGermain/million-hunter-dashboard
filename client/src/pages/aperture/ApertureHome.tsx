@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { formatDistanceToNow } from "date-fns";
 import { buildResearchJourneys } from "@shared/runWorkspace";
+import { addDaysToEasternDate, easternDateTimeInputFromEpoch, easternDateTimeInputToEpoch } from "@shared/easternMarketTime";
 import { DailyPlayList } from "@/components/aperture/DailyPlayList";
 
 function dollarsToCents(v: string): number {
@@ -28,9 +29,15 @@ function dollarsToCents(v: string): number {
 
 function defaultCatalystDeadline(holdingPeriod = "swing"): string {
   const daysByPeriod: Record<string, number> = { intraday: 1, overnight: 1, swing: 10, catalyst_window: 20 };
-  const deadline = new Date(Date.now() + (daysByPeriod[holdingPeriod] ?? 10) * 86_400_000);
+  const now = Date.now();
+  if (holdingPeriod === "intraday") {
+    let candidate = `${easternDateTimeInputFromEpoch(now).slice(0, 10)}T15:55`;
+    if ((easternDateTimeInputToEpoch(candidate) ?? 0) <= now) candidate = `${addDaysToEasternDate(candidate, 1)}T15:55`;
+    return candidate;
+  }
+  const deadline = new Date(now + (daysByPeriod[holdingPeriod] ?? 10) * 86_400_000);
   deadline.setMinutes(0, 0, 0);
-  return deadline.toISOString().slice(0, 16);
+  return easternDateTimeInputFromEpoch(deadline.getTime());
 }
 
 const HORIZON_GUIDANCE = {
@@ -175,8 +182,8 @@ export default function ApertureHome() {
     if (!holdingPeriod) return toast.error("Choose a holding period — it is part of the mandate");
     if (!catalystDeadline) return toast.error("Set a catalyst deadline — a short-horizon run without one is a hold");
     if (!invalidationRule.trim()) return toast.error("State what would make this run wrong");
-    const deadlineMs = Date.parse(catalystDeadline);
-    if (!Number.isFinite(deadlineMs)) return toast.error("Catalyst deadline is not a valid date");
+    const deadlineMs = easternDateTimeInputToEpoch(catalystDeadline);
+    if (deadlineMs == null || !Number.isFinite(deadlineMs)) return toast.error("Catalyst deadline is not a valid Eastern-market time");
     setStarting(true);
     startRun.mutate({
       thesisId: selectedThesisId,
@@ -401,7 +408,7 @@ export default function ApertureHome() {
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <FieldLabel inputId="catalyst-deadline" label="Catalyst Deadline" help="The latest date when the event or evidence should resolve the premise. If it does not, Aperture treats the research decision as expired rather than quietly extending it." />
+                      <FieldLabel inputId="catalyst-deadline" label="Catalyst Deadline (ET)" help="This field is Eastern Time. The latest date when the event or evidence should resolve the premise. If it does not, Aperture treats the research decision as expired rather than quietly extending it." />
                       <Input id="catalyst-deadline" name="catalyst-deadline" type="datetime-local" value={catalystDeadline} onChange={(e) => setCatalystDeadline(e.target.value)} />
                     </div>
                     <div className="space-y-1.5">

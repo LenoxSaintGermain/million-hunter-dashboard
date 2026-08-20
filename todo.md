@@ -1465,3 +1465,11 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Add configurable named decision windows to a daily slate so premium access can support multiple timed research checkpoints without duplicating or overwriting the morning record
 - [x] State the premium offering as recurring decision intelligence and evidence capture, not a promise of recommendations, returns, or autonomous trading
 - [x] Validate the retrospective and recurring multi-window controls without submitting, approving, or modifying a paper order
+
+## First Valid Post-Open Paper Cohort (Aug 20 2026)
+- [x] Confirm the active canonical Capital thesis, current ET session, and post-open window before generating an intraday cohort
+- [x] Correct the intraday deadline field so a time displayed and labeled as ET is serialized as the same Eastern-market instant rather than the browser host timezone
+- [x] Prepare a new paper-only intraday Capital Brief only if the active thesis has an eligible, non-expired opportunity set
+- [x] Capture a named Opening or Mid-session slate after the opening-range measurement is available, preserving all surfaced plays and the exact active portfolio boundary
+- [x] Record an explicit cash or selected-paper posture without producing a proposal, approval, submission, or broker-order mutation
+- [x] Validate the captured slate and document the source-timed next-session outcome refresh checkpoint
