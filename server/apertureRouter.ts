@@ -58,6 +58,7 @@ import { buildCapitalDecisionBrief } from "./aperture/decisionBrief";
 import { ensureThesisReady } from "./aperture/thesisReadiness";
 import { buildBriefResearchPlan, isRunStale, nextFollowUpOffset } from "./aperture/runRecovery";
 import { getEvidenceReviewReadiness } from "../shared/evidenceReview";
+import { missingIntradayRecipeMessage } from "../shared/intradayRecipeGuard";
 import { fetchIntradayBars } from "./aperture/providers/marketData";
 import { checkVwapHold, openingRange, sessionVwap } from "./aperture/intraday";
 import { REGULAR_OPEN, etClock, nextRegularSessionOpen, startOfEtDay } from "./aperture/marketSession";
@@ -144,8 +145,8 @@ const orderCreateInput = z.object({
   reason: z.string().min(MIN_NARRATIVE_CHARS),
   invalidationCondition: z.string().min(MIN_NARRATIVE_CHARS),
   invalidationPriceCents: z.number().optional(),
-  entryPriceCents: z.number().positive().optional(),
-  stopPriceCents: z.number().positive().optional(),
+  entryPriceCents: z.number().optional(),
+  stopPriceCents: z.number().optional(),
   slippageCents: z.number().min(0).optional(),
   timeStopAt: z.number().optional(),
   noTradeConditions: z.array(z.string().min(2).max(300)).max(8).optional(),
@@ -1661,6 +1662,8 @@ export const apertureRouter = router({
     create: adminProcedure
       .input(orderCreateInput)
       .mutation(async ({ ctx, input }) => {
+        const recipeGap = missingIntradayRecipeMessage(input);
+        if (recipeGap) throw new TRPCError({ code: "PRECONDITION_FAILED", message: recipeGap });
         const db = await getDb();
         await requireAccount(db, input.accountId, ctx.user.id);
 
@@ -1742,7 +1745,8 @@ export const apertureRouter = router({
           },
         });
 
-        const blocking = [...evaluation.failures, ...schemaErrors, ...(evidenceBlock ? [evidenceBlock] : [])];
+        const recipeGap = missingIntradayRecipeMessage(input);
+        const blocking = [...evaluation.failures, ...schemaErrors, ...(recipeGap ? [recipeGap] : []), ...(evidenceBlock ? [evidenceBlock] : [])];
         return {
           wouldPass: blocking.length === 0,
           blocking,

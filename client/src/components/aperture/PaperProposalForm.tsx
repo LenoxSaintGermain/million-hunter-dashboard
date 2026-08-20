@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, ClipboardCheck, Loader2, Shie
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { buildProposalReadiness } from "@shared/proposalReadiness";
+import { dollarsToCents } from "@shared/proposalTicketFields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,11 +17,6 @@ const money = (cents: number | null | undefined) => cents == null
 function safeHoldingPeriod(value: unknown): HoldingPeriod {
   return ["intraday", "overnight", "swing", "catalyst_window"].includes(String(value)) ? value as HoldingPeriod : "swing";
 }
-
-const dollarsToCents = (value: string) => {
-  const dollars = Number(value);
-  return Number.isFinite(dollars) && dollars >= 0 ? Math.round(dollars * 100) : null;
-};
 
 export function PaperProposalForm({ runId, candidate, account, run, onReturnToBrief, onProposalCreated }: {
   runId: number; candidate: any; account: any; run: any; onReturnToBrief: () => void; onProposalCreated: () => void;
@@ -49,6 +45,11 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   });
   const constructedPlay = constructed.data?.play;
   const recipeCanPrepare = constructedPlay?.readiness === "constructed";
+  const portfolioImpactReady = recipeCanPrepare
+    && constructedPlay?.qty != null
+    && constructedPlay?.notionalCents != null
+    && constructedPlay?.plannedLossCents != null
+    && constructedPlay?.plannedLossPctOfEquity != null;
 
   useEffect(() => {
     if (!candidate || !constructedPlay || recipePrefilled || !recipeCanPrepare) return;
@@ -91,7 +92,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   const isIntraday = holdingPeriod === "intraday";
   const entryPriceCents = dollarsToCents(entryDollars);
   const stopPriceCents = dollarsToCents(stopDollars);
-  const slippageCents = dollarsToCents(slippageDollars);
+  const slippageCents = dollarsToCents(slippageDollars, { allowZero: true });
   const riskBudgetCents = dollarsToCents(riskBudgetDollars);
   const intradaySizing = useMemo(() => {
     if (!isIntraday || entryPriceCents == null || stopPriceCents == null || slippageCents == null || riskBudgetCents == null) return null;
@@ -124,10 +125,10 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   }, [account?.id, candidate?.id, candidate?.symbol, deadline, entryPriceCents, invalidationCondition, intradaySizing?.qty, isIntraday, noTradeText, notionalDollars, paperAcknowledgement, reason, runId, slippageCents, stopPriceCents, timeStop, holdingPeriod]);
 
   useEffect(() => {
-    if (!account || !candidate) { setPreflightInput(null); return; }
+    if (!account || !candidate || !recipeCanPrepare) { setPreflightInput(null); return; }
     const timer = window.setTimeout(() => setPreflightInput(ticket), 400);
     return () => window.clearTimeout(timer);
-  }, [account, candidate, ticket]);
+  }, [account, candidate, recipeCanPrepare, ticket]);
   const preflight = trpc.aperture.order.preflight.useQuery(preflightInput ?? ticket, { enabled: preflightInput != null, staleTime: 0, retry: false });
   const readiness = buildProposalReadiness({
     recipeReady: recipeCanPrepare,
@@ -175,6 +176,11 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
       <section className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"><label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Holding horizon<div className="grid grid-cols-2 gap-1 sm:grid-cols-4" role="group" aria-label="Planned holding horizon">{(["intraday", "overnight", "swing", "catalyst_window"] as HoldingPeriod[]).map((period) => <button key={period} type="button" onClick={() => setHoldingPeriod(period)} className="rounded-md border px-2 py-2 text-xs capitalize" style={{ borderColor: holdingPeriod === period ? "var(--sh-signal)" : "var(--sh-border-1)", background: holdingPeriod === period ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{period.replace("_", " ")}</button>)}</div></label>{!isIntraday && <div className="space-y-1.5"><label className="block text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Modelled paper size<input value={notionalDollars} onChange={(event) => setNotionalDollars(event.target.value)} type="number" min="1" inputMode="decimal" className="mt-1 w-full rounded-md border bg-transparent px-3 py-2 text-sm sm:w-36" style={{ borderColor: "var(--sh-border-1)" }} /></label><div className="flex gap-1" aria-label="Quick modelled paper size adjustments"><button type="button" onClick={() => adjustNotional(0.75)} className="rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)" }}>−25%</button><button type="button" onClick={() => setNotionalDollars(String(Math.round(suggestedCents / 100)))} className="rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)" }}>Model</button><button type="button" onClick={() => adjustNotional(1.25)} className="rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)" }}>+25%</button></div></div>}</section>
 
       {recipeCanPrepare && <div className="rounded-md px-3 py-2 text-xs leading-5" style={{ background: "color-mix(in srgb, var(--sh-signal) 7%, var(--sh-surface))", color: "var(--sh-fg-muted)" }}><Sparkles className="mr-1 inline h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} />Prefilled model: {constructedPlay?.side} · entry {money(constructedPlay?.entry?.priceCents)} · stop {money(constructedPlay?.stop?.priceCents)} · planned loss {money(constructedPlay?.plannedLossCents)}. Confirm against a real-time terminal.</div>}
+
+      <section className="rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }} aria-live="polite">
+        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Portfolio impact</p>
+        {portfolioImpactReady ? <p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-text-primary)" }}>If you later approve this **modeled** paper proposal: {constructedPlay?.qty?.toLocaleString()} shares · {money(constructedPlay?.notionalCents)} gross exposure · {money(constructedPlay?.plannedLossCents)} planned loss ({constructedPlay?.plannedLossPctOfEquity?.toFixed(2)}% of the last synced equity). This is not a broker fill.</p> : <p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>Portfolio impact is not measured yet. This intraday setup has no source-backed entry and stop from current session tape, so quantity, exposure, and planned loss would be invented.</p>}
+      </section>
 
       <details open={showDetails} onToggle={(event) => setShowDetails((event.target as HTMLDetailsElement).open)} className="rounded-lg border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Review modelled plan &amp; advanced fields<ChevronDown className="h-4 w-4" /></summary><div className="space-y-3 border-t p-3" style={{ borderColor: "var(--sh-border-1)" }}>
         {isIntraday && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label className="text-xs font-medium">Maximum planned loss<input value={riskBudgetDollars} onChange={(event) => setRiskBudgetDollars(event.target.value)} type="number" min="0.01" step="0.01" inputMode="decimal" className="mt-1 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label><label className="text-xs font-medium">Entry<input value={entryDollars} onChange={(event) => setEntryDollars(event.target.value)} type="number" min="0.01" step="0.01" inputMode="decimal" className="mt-1 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label><label className="text-xs font-medium">Stop<input value={stopDollars} onChange={(event) => setStopDollars(event.target.value)} type="number" min="0.01" step="0.01" inputMode="decimal" className="mt-1 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label><label className="text-xs font-medium">Slippage / share<input value={slippageDollars} onChange={(event) => setSlippageDollars(event.target.value)} type="number" min="0" step="0.01" inputMode="decimal" className="mt-1 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label></div>}

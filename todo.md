@@ -1480,3 +1480,10 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Add an operator-controlled daily-refresh schedule and clear status in Record, including pause or resume behavior
 - [x] Test schedule idempotency, ownership isolation, unavailable-tape treatment, and the zero-order-mutation boundary
 - [ ] Deploy the endpoint, activate the daily refresh, and verify the first scheduled outcome cycle can be inspected and managed
+
+## LEN Proposal Boundary & Portfolio Impact Clarity (Aug 20 2026)
+- [x] Prevent a missing modeled entry or stop from reaching paper-proposal validation and expose one plain-language source-data gap instead of raw Zod errors
+- [x] Collapse the competing “Create fact record,” “Prepare proposal,” and “Return to evidence” actions into one explicit next decision with a secondary evidence detail affordance
+- [x] Display portfolio impact only when modeled entry, stop, quantity, and current portfolio equity are source-backed; otherwise state exactly what is not measured
+- [x] Add regression tests for no-recipe proposal attempts and conditional portfolio-impact presentation
+- [x] Browser-validate the repaired LEN decision flow without creating, approving, or modifying a paper order
