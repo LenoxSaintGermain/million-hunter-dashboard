@@ -24,6 +24,13 @@ export type SessionPayload = {
   name: string;
 };
 
+const CRON_OPEN_ID_PREFIX = "cron_";
+
+export type AuthenticatedUser = User & {
+  taskUid?: string;
+  isCron?: boolean;
+};
+
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
 const GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
 const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt`;
@@ -256,7 +263,7 @@ class SDKServer {
     } as GetUserInfoWithJwtResponse;
   }
 
-  async authenticateRequest(req: Request): Promise<User> {
+  async authenticateRequest(req: Request): Promise<AuthenticatedUser> {
     // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
@@ -264,6 +271,27 @@ class SDKServer {
 
     if (!session) {
       throw ForbiddenError("Invalid session cookie");
+    }
+
+    if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
+      const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
+      if (!userInfo.taskUid) {
+        throw ForbiddenError("Scheduled callback is missing its task identity");
+      }
+      const now = new Date();
+      return {
+        id: -1,
+        openId: userInfo.openId,
+        name: userInfo.name || "Manus Scheduled Task",
+        email: null,
+        loginMethod: null,
+        role: "user",
+        createdAt: now,
+        updatedAt: now,
+        lastSignedIn: now,
+        taskUid: userInfo.taskUid,
+        isCron: true,
+      } as AuthenticatedUser;
     }
 
     const sessionUserId = session.openId;

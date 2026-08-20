@@ -33,6 +33,11 @@ export const users = mysqlTable("users", {
   cockpitRailAcknowledgedSignature: varchar("cockpit_rail_acknowledged_signature", { length: 255 }),
   /** Canonical Capital / Trade thesis selected by this profile for its daily Decision Center context. */
   activeCapitalThesisId: int("active_capital_thesis_id"),
+  /** Immutable Heartbeat identity for this owner's paper-only daily outcome refresh. */
+  dailyOutcomeRefreshTaskUid: varchar("daily_outcome_refresh_task_uid", { length: 65 }),
+  dailyOutcomeRefreshEnabled: boolean("daily_outcome_refresh_enabled").default(false).notNull(),
+  dailyOutcomeRefreshLastRunAt: bigint("daily_outcome_refresh_last_run_at", { mode: "number" }),
+  dailyOutcomeRefreshLastResult: text("daily_outcome_refresh_last_result"),
   huntingParams: text("hunting_params"), // Free-text agentic command / hunting parameters
   /**
    * Duplicate-account pointer. When one person has signed up twice under two
@@ -42,7 +47,9 @@ export const users = mysqlTable("users", {
    * same account. NULL for every ordinary user.
    */
   mergedIntoUserId: int("merged_into_user_id"),
-});
+}, (table) => ({
+  dailyOutcomeRefreshTaskUidIdx: uniqueIndex("users_daily_outcome_refresh_task_uid_uq").on(table.dailyOutcomeRefreshTaskUid),
+}));
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;

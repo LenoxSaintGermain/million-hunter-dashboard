@@ -65,6 +65,10 @@ import { constructPlay, CONSTRUCTED_PLAY_DISCLOSURE } from "./aperture/playConst
 import { canonicalCapitalValues, needsCanonicalPromotion } from "./aperture/canonicalThesisLink";
 import { buildTrustCalibration, calculatePaperPlayOutcome } from "../shared/playOutcomeLedger";
 import { evaluateIntradayPaperOutcome } from "./aperture/playOutcomeEvaluator";
+import { createHeartbeatJob, updateHeartbeatJob } from "./_core/heartbeat";
+import { COOKIE_NAME } from "../shared/const";
+import { parse as parseCookie } from "cookie";
+import { DAILY_OUTCOME_REFRESH_CRON, DAILY_OUTCOME_REFRESH_PATH, refreshLiveSlateOutcomes } from "./aperture/dailyOutcomeRefresh";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1172,6 +1176,59 @@ export const apertureRouter = router({
       });
     }),
 
+    dailyRefreshSchedule: adminProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      const [profile] = await db!.select({
+        enabled: users.dailyOutcomeRefreshEnabled,
+        taskUid: users.dailyOutcomeRefreshTaskUid,
+        lastRunAt: users.dailyOutcomeRefreshLastRunAt,
+        lastResult: users.dailyOutcomeRefreshLastResult,
+      }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
+      return {
+        enabled: profile?.enabled === true,
+        configured: Boolean(profile?.taskUid),
+        lastRunAt: profile?.lastRunAt ?? null,
+        lastResult: profile?.lastResult ?? null,
+        cadence: "Daily after the US regular-session close; only live paper captures are eligible.",
+      };
+    }),
+
+    configureDailyRefresh: adminProcedure
+      .input(z.object({ enabled: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [profile] = await db!.select({ taskUid: users.dailyOutcomeRefreshTaskUid })
+          .from(users).where(eq(users.id, ctx.user.id)).limit(1);
+        const rawCookie = typeof ctx.req.headers.cookie === "string" ? ctx.req.headers.cookie : "";
+        const sessionToken = parseCookie(rawCookie)[COOKIE_NAME] ?? "";
+        if (!sessionToken) throw new TRPCError({ code: "UNAUTHORIZED", message: "Your session could not be verified for the daily refresh schedule." });
+        let taskUid = profile?.taskUid ?? null;
+        let nextExecutionAt: string | null | undefined;
+        if (!taskUid) {
+          if (!input.enabled) {
+            await db!.update(users).set({ dailyOutcomeRefreshEnabled: false }).where(eq(users.id, ctx.user.id));
+            return { enabled: false, configured: false, nextExecutionAt: null };
+          }
+          const created = await createHeartbeatJob({
+            name: `capital-daily-outcome-refresh-${ctx.user.id}`,
+            cron: DAILY_OUTCOME_REFRESH_CRON,
+            path: DAILY_OUTCOME_REFRESH_PATH,
+            payload: {},
+            description: "Refreshes due live Capital paper-play outcome records after their source session. Never creates broker orders.",
+          }, sessionToken);
+          taskUid = created.taskUid;
+          nextExecutionAt = created.nextExecutionAt;
+        } else {
+          const updated = await updateHeartbeatJob(taskUid, { enable: input.enabled }, sessionToken);
+          nextExecutionAt = updated.nextExecutionAt;
+        }
+        await db!.update(users).set({
+          dailyOutcomeRefreshTaskUid: taskUid,
+          dailyOutcomeRefreshEnabled: input.enabled,
+        }).where(eq(users.id, ctx.user.id));
+        return { enabled: input.enabled, configured: true, nextExecutionAt: nextExecutionAt ?? null };
+      }),
+
     availableCohorts: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const rows = await db!.select({ run: apertureRuns, thesisName: capitalTheses.name, canonicalThesisId: capitalTheses.sourceCompilationId })
@@ -1399,65 +1456,7 @@ export const apertureRouter = router({
         if (slate.snapshotBasis !== "live_capture") {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Historical reconstructions are already fixed postmortems. Only live-captured slates can refresh observed outcomes." });
         }
-        const sessionStartAt = startOfEtDay(slate.capturedAt);
-        if (sessionStartAt == null) throw new TRPCError({ code: "BAD_REQUEST", message: "The captured ET session cannot be determined, so no outcome was refreshed." });
-        const sessionEndAt = sessionStartAt + 24 * 60 * 60_000;
-        const now = Date.now();
-        const items = await db!.select().from(aperturePlaySlateItems).where(eq(aperturePlaySlateItems.slateId, slate.id));
-        let terminalCount = 0;
-        for (const item of items) {
-          const snapshot = item.recommendationSnapshot as any;
-          const play = snapshot?.play;
-          if (!play) continue;
-          const tape = await fetchIntradayBars(item.symbol, { startMs: slate.capturedAt, timeoutMs: 5_000, maxPages: 3 });
-          const windowBars = tape.bars.filter((bar) => bar.t >= slate.capturedAt && bar.t < sessionEndAt);
-          const evaluation = evaluateIntradayPaperOutcome({
-            side: play.side === "short" ? "short" : "long",
-            entryPriceCents: play.entry?.priceCents ?? null,
-            stopPriceCents: play.stop?.priceCents ?? null,
-            timeStopAt: play.timeStopAt ?? null,
-          }, windowBars, now);
-          const outcome = calculatePaperPlayOutcome({
-            side: play.side === "short" ? "short" : "long",
-            entryPriceCents: play.entry?.priceCents ?? null,
-            stopPriceCents: play.stop?.priceCents ?? null,
-            slippageCents: play.slippage?.priceCents ?? null,
-            plannedRiskCents: play.plannedLossCents ?? null,
-            notionalCents: play.notionalCents ?? null,
-            timeStopAt: play.timeStopAt ?? null,
-            noTradeConditions: Array.isArray(play.noTradeConditions) ? play.noTradeConditions : [],
-          }, {
-            ...evaluation,
-            basis: windowBars.length && !tape.unavailableReason ? "verified" : "unknown",
-            providerId: windowBars.length ? "alpaca" : null,
-            sourceUrl: windowBars.length ? `https://app.alpaca.markets/trade/${encodeURIComponent(item.symbol)}` : null,
-            observedAt: windowBars.length ? windowBars[windowBars.length - 1]!.t : null,
-            unavailableReason: evaluation.unavailableReason ?? tape.unavailableReason,
-          });
-          if (outcome.status !== "pending") terminalCount++;
-          await db!.update(aperturePlaySlateItems).set({
-            outcomeStatus: outcome.status,
-            outcomeResult: outcome.result,
-            triggerObservation: evaluation.trigger,
-            exitObservation: evaluation.exit,
-            entryPriceCents: outcome.entryPriceCents,
-            settlementPriceCents: outcome.settlementPriceCents,
-            returnBps: outcome.returnBps,
-            rMultiple: outcome.rMultiple,
-            outcomeBasis: outcome.basis,
-            outcomeProviderId: windowBars.length ? "alpaca" : null,
-            outcomeSourceUrl: windowBars.length ? `https://app.alpaca.markets/trade/${encodeURIComponent(item.symbol)}` : null,
-            observedAt: windowBars.length ? windowBars[windowBars.length - 1]!.t : null,
-            outcomeExplanation: outcome.explanation,
-            computedAt: now,
-            updatedAt: now,
-          }).where(eq(aperturePlaySlateItems.id, item.id));
-        }
-        await db!.update(aperturePlaySlates).set({
-          status: terminalCount === items.length ? "complete" : "awaiting_outcome",
-          updatedAt: now,
-        }).where(eq(aperturePlaySlates.id, slate.id));
-        return { refreshed: items.length, terminalCount };
+        return refreshLiveSlateOutcomes(db!, slate);
       }),
 
     reconstructRecentRun: adminProcedure

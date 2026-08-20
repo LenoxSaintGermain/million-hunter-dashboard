@@ -31,6 +31,7 @@ export default function ApertureRecord() {
   const { data: slates = [], isLoading: loadingSlates } = trpc.aperture.ledger.list.useQuery();
   const { data: cohorts = [], isLoading: loadingCohorts } = trpc.aperture.ledger.availableCohorts.useQuery();
   const { data: activePlays } = trpc.aperture.play.list.useQuery();
+  const { data: dailyRefresh } = trpc.aperture.ledger.dailyRefreshSchedule.useQuery();
   const canCaptureLiveSlate = (activePlays?.plays?.length ?? 0) > 0;
   const reconstruct = trpc.aperture.ledger.reconstructRecentRun.useMutation({
     onSuccess: async ({ slateId, created }) => {
@@ -62,6 +63,13 @@ export default function ApertureRecord() {
     },
     onError: (error) => toast.error(error.message),
   });
+  const configureDailyRefresh = trpc.aperture.ledger.configureDailyRefresh.useMutation({
+    onSuccess: async ({ enabled }) => {
+      await utils.aperture.ledger.dailyRefreshSchedule.invalidate();
+      toast.success(enabled ? "Daily paper-outcome refresh is on" : "Daily paper-outcome refresh is paused");
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const selectedSlate = useMemo(
     () => slates.find((slate) => slate.id === selectedSlateId) ?? slates[0] ?? null,
     [selectedSlateId, slates],
@@ -90,6 +98,15 @@ export default function ApertureRecord() {
                   ["mid_session", "Mid-session"],
                   ["catalyst", "Catalyst"],
                 ].map(([windowKey, label]) => <Button key={windowKey} size="sm" variant="outline" className="px-1.5 text-[11px]" disabled={captureWindow.isPending || !canCaptureLiveSlate} onClick={() => captureWindow.mutate({ windowKey })}>{captureWindow.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : label}</Button>)}</div>
+              </div>
+              <div className="rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+                <div className="flex items-center gap-2"><Clock3 className="h-4 w-4" style={{ color: dailyRefresh?.enabled ? "oklch(0.55 0.15 145)" : "var(--sh-fg-muted)" }} /><h2 className="font-medium" style={{ color: "var(--sh-text-primary)" }}>Daily outcome refresh</h2></div>
+                <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{dailyRefresh?.enabled ? "On — after each regular session, the system refreshes only due live paper captures from source-timed tape. It never creates an order." : "Off — turn on to refresh future live paper captures after the regular session closes. Historical reconstructions remain excluded."}</p>
+                {dailyRefresh?.lastResult && <p className="mt-2 text-[11px] leading-5" style={{ color: "var(--sh-fg-muted)" }}>Last run: {dailyRefresh.lastResult}{dailyRefresh.lastRunAt ? ` · ${new Date(dailyRefresh.lastRunAt).toLocaleString()}` : ""}</p>}
+                <Button className="mt-3 w-full" size="sm" variant="outline" disabled={configureDailyRefresh.isPending} onClick={() => configureDailyRefresh.mutate({ enabled: !dailyRefresh?.enabled })}>
+                  {configureDailyRefresh.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Clock3 className="mr-1.5 h-3.5 w-3.5" />}
+                  {dailyRefresh?.enabled ? "Pause daily refresh" : "Turn on daily refresh"}
+                </Button>
               </div>
               <div>
                 <div className="flex items-center gap-2"><FileClock className="h-4 w-4" style={{ color: "var(--sh-signal)" }} /><h2 className="font-medium" style={{ color: "var(--sh-text-primary)" }}>Start a recent postmortem</h2></div>

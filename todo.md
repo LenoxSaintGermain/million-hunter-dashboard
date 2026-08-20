@@ -1473,3 +1473,10 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Capture a named Opening or Mid-session slate after the opening-range measurement is available, preserving all surfaced plays and the exact active portfolio boundary
 - [x] Record an explicit cash or selected-paper posture without producing a proposal, approval, submission, or broker-order mutation
 - [x] Validate the captured slate and document the source-timed next-session outcome refresh checkpoint
+
+## In-Product Daily Paper-Outcome Refresh (Aug 20 2026)
+- [x] Define the daily refresh eligibility, Eastern-market timing, and retention rules for live-capture slates while excluding historical reconstructions
+- [x] Persist the owner-scoped scheduled-job identity and implement an idempotent cron-only refresh endpoint that updates outcomes without touching broker orders
+- [x] Add an operator-controlled daily-refresh schedule and clear status in Record, including pause or resume behavior
+- [x] Test schedule idempotency, ownership isolation, unavailable-tape treatment, and the zero-order-mutation boundary
+- [ ] Deploy the endpoint, activate the daily refresh, and verify the first scheduled outcome cycle can be inspected and managed

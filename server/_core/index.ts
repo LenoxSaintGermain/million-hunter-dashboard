@@ -8,6 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { handleDailyOutcomeRefresh } from "../aperture/dailyOutcomeRefreshScheduled";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -47,6 +48,8 @@ async function startServer() {
   registerStorageProxy(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  // Heartbeat callbacks must be registered before tRPC and the Vite/static fallthrough.
+  app.post("/api/scheduled/capital-daily-outcome-refresh", handleDailyOutcomeRefresh);
   // tRPC API
   app.use(
     "/api/trpc",
