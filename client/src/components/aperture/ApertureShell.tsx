@@ -17,7 +17,7 @@ const APERTURE_NAV = [
 const TRADER_NAV = [
   { href: "/aperture", label: "Today", icon: LayoutDashboard },
   { href: "/aperture?setup=1", label: "Why", icon: BookOpen },
-  { href: "/aperture/runs", label: "Record", icon: FileText },
+  { href: "/aperture/record", label: "Record", icon: FileText },
 ] as const;
 
 export default function ApertureShell({ children }: { children: ReactNode }) {

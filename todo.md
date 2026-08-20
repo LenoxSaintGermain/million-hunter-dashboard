@@ -1450,3 +1450,18 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Color-code state-aware cockpit alerts by measured severity while keeping the active constraint text accessible without color alone
 - [x] Auto-collapse reviewed proposal detail into a compact status and retain only the critical guarded action as a sticky control
 - [x] Validate profile isolation, active-context consistency, rapid adjustment guardrails, compact review behavior, and no paper-order mutation
+
+## Paper-Play Outcome Ledger & Trust Calibration (Aug 20 2026)
+- [x] Define immutable daily paper-play snapshots that retain the exact recommendation, modeled recipe, evidence state, active thesis, portfolio boundary, and data freshness known at decision time
+- [x] Record the operator’s actual selection, skip, defer, or cash decision separately from the system opportunity set without retroactively changing the recommendation record
+- [x] Capture only verifiable post-window outcomes and market-event context, labeling incomplete tape, open positions, and unavailable outcomes rather than backfilling assumptions
+- [x] Build a replay surface that compares yesterday’s recommendation set, the operator’s actual choice, and the counterfactual paper outcome in one decision screen
+- [x] Add trust calibration by declared setup conditions, measured hit rate, break-even rate, realized-risk distribution, and sample size; never market an unvalidated accuracy claim
+- [x] Keep the ledger paper-only, prohibit autonomous action, preserve human approval boundaries, and add deterministic regression coverage for snapshot immutability and outcome calculations
+
+## Recent Catalyst Postmortem & Premium Multi-Window POC (Aug 20 2026)
+- [x] Identify a recent completed Capital catalyst or intraday cohort with source-traceable tape and preserve any unavailable evidence rather than selecting a favorable example
+- [x] Produce an auditable retrospective that separates the system’s surfaced set, the operator’s recorded choice or cash posture, the counterfactual paper outcome, and market-event context
+- [x] Add configurable named decision windows to a daily slate so premium access can support multiple timed research checkpoints without duplicating or overwriting the morning record
+- [x] State the premium offering as recurring decision intelligence and evidence capture, not a promise of recommendations, returns, or autonomous trading
+- [x] Validate the retrospective and recurring multi-window controls without submitting, approving, or modifying a paper order

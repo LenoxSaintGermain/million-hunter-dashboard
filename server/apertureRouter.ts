@@ -25,6 +25,8 @@ import {
   securityFacts,
   apertureEvidenceReviews,
   aperturePlayDecisions,
+  aperturePlaySlates,
+  aperturePlaySlateItems,
   apertureSetAside,
   thesisCompilations,
   users,
@@ -58,9 +60,11 @@ import { buildBriefResearchPlan, isRunStale, nextFollowUpOffset } from "./apertu
 import { getEvidenceReviewReadiness } from "../shared/evidenceReview";
 import { fetchIntradayBars } from "./aperture/providers/marketData";
 import { checkVwapHold, openingRange, sessionVwap } from "./aperture/intraday";
-import { REGULAR_OPEN, nextRegularSessionOpen, startOfEtDay } from "./aperture/marketSession";
+import { REGULAR_OPEN, etClock, nextRegularSessionOpen, startOfEtDay } from "./aperture/marketSession";
 import { constructPlay, CONSTRUCTED_PLAY_DISCLOSURE } from "./aperture/playConstructor";
 import { canonicalCapitalValues, needsCanonicalPromotion } from "./aperture/canonicalThesisLink";
+import { buildTrustCalibration, calculatePaperPlayOutcome } from "../shared/playOutcomeLedger";
+import { evaluateIntradayPaperOutcome } from "./aperture/playOutcomeEvaluator";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1124,6 +1128,522 @@ export const apertureRouter = router({
           await db!.insert(aperturePlayDecisions).values({ userId: ctx.user.id, ...input, resumeAt, createdAt: now, updatedAt: now });
         }
         return { ok: true };
+      }),
+  }),
+
+  // ── Paper-play replay ledger ───────────────────────────────────────────────
+  // Reconstructing a past run is explicitly marked historical. It is useful for
+  // a postmortem, but cannot be represented as a live recommendation capture.
+  ledger: router({
+    list: adminProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      const slates = await db!.select().from(aperturePlaySlates)
+        .where(eq(aperturePlaySlates.userId, ctx.user.id))
+        .orderBy(desc(aperturePlaySlates.capturedAt));
+      if (!slates.length) return [];
+      const items = await db!.select().from(aperturePlaySlateItems)
+        .where(inArray(aperturePlaySlateItems.slateId, slates.map((slate) => slate.id)))
+        .orderBy(aperturePlaySlateItems.id);
+      const itemsBySlate = new Map<number, typeof items>();
+      for (const item of items) itemsBySlate.set(item.slateId, [...(itemsBySlate.get(item.slateId) ?? []), item]);
+      const slateById = new Map(slates.map((slate) => [slate.id, slate]));
+      const trustCalibration = buildTrustCalibration(items
+        .filter((item) => slateById.get(item.slateId)?.snapshotBasis === "live_capture")
+        .map((item) => ({
+          conditionKey: item.conditionKey,
+          result: item.outcomeResult,
+          basis: item.outcomeBasis,
+          countsTowardTrust: item.outcomeStatus === "resolved" && item.outcomeBasis === "verified",
+        })));
+      return slates.map((slate) => {
+        const slateItems = itemsBySlate.get(slate.id) ?? [];
+        const unresolved = slateItems.filter((item) => item.outcomeResult === "unresolved");
+        const preOpenRecipeGap = unresolved.length > 0 && unresolved.every((item) =>
+          item.outcomeExplanation?.includes("session has not opened yet") || item.outcomeExplanation?.includes("no minute bars for this session"),
+        );
+        return {
+          ...slate,
+          items: slateItems,
+          trustCalibration,
+          postmortemFinding: preOpenRecipeGap
+            ? "This cohort completed before the regular session produced an opening range. It tests thesis generation, not an executable day-trade recipe; capture a named post-open decision window before measuring play quality."
+            : null,
+        };
+      });
+    }),
+
+    availableCohorts: adminProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      const rows = await db!.select({ run: apertureRuns, thesisName: capitalTheses.name, canonicalThesisId: capitalTheses.sourceCompilationId })
+        .from(apertureRuns)
+        .leftJoin(capitalTheses, eq(apertureRuns.thesisId, capitalTheses.id))
+        .where(and(
+          eq(apertureRuns.userId, ctx.user.id),
+          eq(apertureRuns.status, "completed"),
+          inArray(apertureRuns.holdingPeriod, ["intraday", "catalyst_window"]),
+        ))
+        .orderBy(desc(apertureRuns.completedAt), desc(apertureRuns.createdAt))
+        .limit(12);
+      return rows.map(({ run, thesisName, canonicalThesisId }) => ({
+        id: run.id,
+        holdingPeriod: run.holdingPeriod,
+        candidateCount: run.candidateCount,
+        completedAt: run.completedAt,
+        createdAt: run.createdAt,
+        catalystDeadlineAt: run.catalystDeadlineAt,
+        thesisName: thesisName ?? "Capital thesis",
+        canonicalThesisId,
+      }));
+    }),
+
+    captureCurrentWindow: adminProcedure
+      .input(z.object({ windowKey: z.string().trim().min(2).max(64) }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const now = Date.now();
+        const sessionStartAt = startOfEtDay(now);
+        const sessionDateEt = etClock(now)?.dateEt;
+        if (sessionStartAt == null || sessionDateEt == null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "The current ET session cannot be determined, so no live slate was captured." });
+        }
+        const [profile] = await db!.select({ activeCapitalThesisId: users.activeCapitalThesisId })
+          .from(users).where(eq(users.id, ctx.user.id)).limit(1);
+        const canonicalThesisId = profile?.activeCapitalThesisId ?? null;
+        if (canonicalThesisId == null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Choose an active Capital thesis before capturing a decision window." });
+        }
+        const projectionRows = await db!.select({ id: capitalTheses.id, name: capitalTheses.name })
+          .from(capitalTheses).where(and(eq(capitalTheses.userId, ctx.user.id), eq(capitalTheses.sourceCompilationId, canonicalThesisId)));
+        if (!projectionRows.length) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "The active canonical thesis has no Capital projection yet, so no daily slate can be captured." });
+        }
+        const [existing] = await db!.select().from(aperturePlaySlates).where(and(
+          eq(aperturePlaySlates.userId, ctx.user.id),
+          eq(aperturePlaySlates.canonicalThesisId, canonicalThesisId),
+          eq(aperturePlaySlates.sessionDateEt, sessionDateEt),
+          eq(aperturePlaySlates.windowKey, input.windowKey),
+        )).limit(1);
+        if (existing) return { slateId: existing.id, created: false };
+
+        const projectionIds = projectionRows.map((projection) => projection.id);
+        const rows = await db!.select({ candidate: apertureCandidates, run: apertureRuns })
+          .from(apertureCandidates)
+          .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
+          .where(and(
+            eq(apertureRuns.userId, ctx.user.id),
+            eq(apertureRuns.status, "completed"),
+            inArray(apertureRuns.thesisId, projectionIds),
+            inArray(apertureRuns.holdingPeriod, ["intraday", "catalyst_window"]),
+            gte(apertureRuns.catalystDeadlineAt, now),
+          ))
+          .orderBy(apertureRuns.catalystDeadlineAt, desc(apertureRuns.createdAt))
+          .limit(40);
+        if (!rows.length) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "There are no active, non-expired Capital plays for this thesis to capture in this window." });
+        }
+        const accounts = await db!.select().from(portfolioAccounts).where(eq(portfolioAccounts.userId, ctx.user.id));
+        const account = accounts.find((item) => item.isPaper && item.brokerId === "alpaca_paper") ?? accounts.find((item) => item.isPaper) ?? null;
+        const held = account ? await db!.select().from(positions).where(eq(positions.accountId, account.id)) : [];
+        const candidateIds = rows.map(({ candidate }) => candidate.id);
+        const reviews = await db!.select().from(apertureEvidenceReviews).where(and(
+          eq(apertureEvidenceReviews.userId, ctx.user.id),
+          inArray(apertureEvidenceReviews.candidateId, candidateIds),
+        ));
+        const decisions = await db!.select().from(aperturePlayDecisions).where(and(
+          eq(aperturePlayDecisions.userId, ctx.user.id),
+          inArray(aperturePlayDecisions.candidateId, candidateIds),
+        ));
+        const reviewsByCandidate = new Map<number, typeof reviews>();
+        for (const review of reviews) reviewsByCandidate.set(review.candidateId, [...(reviewsByCandidate.get(review.candidateId) ?? []), review]);
+        const decisionByCandidate = new Map(decisions.map((decision) => [decision.candidateId, decision]));
+
+        const items = await Promise.all(rows.map(async ({ candidate, run }) => {
+          const tape = await fetchIntradayBars(candidate.symbol, { startMs: sessionStartAt, timeoutMs: 5_000, maxPages: 2 });
+          const vwap = sessionVwap(tape.bars, { feed: tape.feed, now });
+          const range = openingRange(tape.bars, { sessionOpenAt: sessionStartAt + REGULAR_OPEN * 60_000, minutes: 30, feed: tape.feed, now });
+          const side = candidate.playSide ?? "long";
+          const trigger = checkVwapHold(tape.bars, vwap, { side: side === "long" ? "above" : "below", minutesRequired: 15, now });
+          const facts = await getFacts(candidate.symbol, now);
+          const advUsd = facts.find((fact) => fact.factKey === "adv_usd_30d" && fact.valueNum != null)?.valueNum ?? null;
+          const play = constructPlay({
+            symbol: candidate.symbol,
+            side,
+            holdingPeriod: run.holdingPeriod as any,
+            bars: tape.bars,
+            vwap,
+            range,
+            trigger,
+            equityCents: account?.equityValueCents ?? null,
+            sessionDayStartMs: sessionStartAt,
+            catalystDeadlineAt: run.catalystDeadlineAt,
+            advUsd,
+            now,
+          });
+          const priorDecision = decisionByCandidate.get(candidate.id) ?? null;
+          const operatorDecision: "not_recorded" | "skipped" | "deferred" = priorDecision?.decision === "skipped"
+            ? "skipped"
+            : priorDecision?.decision === "deferred"
+              ? "deferred"
+              : "not_recorded";
+          return {
+            sourceRunId: run.id,
+            sourceCandidateId: candidate.id,
+            symbol: candidate.symbol,
+            conditionKey: `${run.holdingPeriod}:${side}:${trigger.state}:${tape.feed}`,
+            recommendationSnapshot: {
+              version: 1,
+              snapshotBasis: "live_capture",
+              capturedAt: now,
+              candidate,
+              run: { id: run.id, holdingPeriod: run.holdingPeriod, catalystDeadlineAt: run.catalystDeadlineAt, mandateVersion: run.mandateVersion },
+              play,
+              evidenceReviews: reviewsByCandidate.get(candidate.id) ?? [],
+              recordedDecision: priorDecision,
+              tape: { feed: tape.feed, unavailableReason: tape.unavailableReason, barCount: tape.bars.length },
+            },
+            operatorDecision,
+            operatorReason: priorDecision?.reason ?? null,
+            decidedAt: priorDecision?.updatedAt ?? null,
+            outcomeStatus: "pending" as const,
+            outcomeResult: "unresolved" as const,
+            triggerObservation: "not_observed" as const,
+            exitObservation: "not_observed" as const,
+            outcomeBasis: "unknown" as const,
+            createdAt: now,
+            updatedAt: now,
+          };
+        }));
+        const [created] = await db!.insert(aperturePlaySlates).values({
+          userId: ctx.user.id,
+          canonicalThesisId,
+          accountId: account?.id ?? null,
+          sessionDateEt,
+          windowKey: input.windowKey,
+          snapshotBasis: "live_capture",
+          status: "awaiting_outcome",
+          portfolioSnapshot: {
+            account: account ? { id: account.id, label: account.label, equityValueCents: account.equityValueCents, lastSyncedAt: account.lastSyncedAt } : null,
+            positions: held.map((position) => ({ symbol: position.symbol, qty: position.qty, marketValueCents: position.marketValueCents, priceAsOf: position.priceAsOf })),
+          },
+          contextSnapshot: {
+            canonicalThesisId,
+            capitalThesisName: projectionRows[0]!.name,
+            windowKey: input.windowKey,
+            captureMode: "live_capture",
+            paperOnly: true,
+            disclosure: CONSTRUCTED_PLAY_DISCLOSURE,
+          },
+          capturedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        });
+        const slateId = (created as any).insertId as number;
+        await db!.insert(aperturePlaySlateItems).values(items.map((item) => ({ ...item, slateId })));
+        return { slateId, created: true };
+      }),
+
+    recordSlateDecision: adminProcedure
+      .input(z.object({
+        slateId: z.number(),
+        decision: z.enum(["cash", "selected"]),
+        itemId: z.number().optional(),
+        reason: z.string().trim().max(1_000).default("No additional note recorded."),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [slate] = await db!.select().from(aperturePlaySlates).where(and(
+          eq(aperturePlaySlates.id, input.slateId),
+          eq(aperturePlaySlates.userId, ctx.user.id),
+        )).limit(1);
+        if (!slate) throw new TRPCError({ code: "NOT_FOUND", message: "Paper-play slate not found" });
+        if (slate.snapshotBasis !== "live_capture") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Historical reconstructions are read-only. Only a live-captured slate can record a contemporaneous operator choice." });
+        }
+        if (input.decision === "selected" && input.itemId == null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a captured play before recording a selected posture." });
+        }
+        if (input.itemId != null) {
+          const [item] = await db!.select().from(aperturePlaySlateItems).where(and(
+            eq(aperturePlaySlateItems.id, input.itemId),
+            eq(aperturePlaySlateItems.slateId, slate.id),
+          )).limit(1);
+          if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "Captured play not found in this paper slate" });
+        }
+        const now = Date.now();
+        await db!.update(aperturePlaySlates).set({
+          operatorDecision: input.decision,
+          operatorReason: input.reason,
+          decidedAt: now,
+          updatedAt: now,
+        }).where(eq(aperturePlaySlates.id, slate.id));
+        if (input.decision === "selected" && input.itemId != null) {
+          await db!.update(aperturePlaySlateItems).set({
+            operatorDecision: "selected",
+            operatorReason: input.reason,
+            decidedAt: now,
+            updatedAt: now,
+          }).where(eq(aperturePlaySlateItems.id, input.itemId));
+        }
+        return { ok: true };
+      }),
+
+    refreshLiveOutcomes: adminProcedure
+      .input(z.object({ slateId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [slate] = await db!.select().from(aperturePlaySlates).where(and(
+          eq(aperturePlaySlates.id, input.slateId),
+          eq(aperturePlaySlates.userId, ctx.user.id),
+        )).limit(1);
+        if (!slate) throw new TRPCError({ code: "NOT_FOUND", message: "Paper-play slate not found" });
+        if (slate.snapshotBasis !== "live_capture") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Historical reconstructions are already fixed postmortems. Only live-captured slates can refresh observed outcomes." });
+        }
+        const sessionStartAt = startOfEtDay(slate.capturedAt);
+        if (sessionStartAt == null) throw new TRPCError({ code: "BAD_REQUEST", message: "The captured ET session cannot be determined, so no outcome was refreshed." });
+        const sessionEndAt = sessionStartAt + 24 * 60 * 60_000;
+        const now = Date.now();
+        const items = await db!.select().from(aperturePlaySlateItems).where(eq(aperturePlaySlateItems.slateId, slate.id));
+        let terminalCount = 0;
+        for (const item of items) {
+          const snapshot = item.recommendationSnapshot as any;
+          const play = snapshot?.play;
+          if (!play) continue;
+          const tape = await fetchIntradayBars(item.symbol, { startMs: slate.capturedAt, timeoutMs: 5_000, maxPages: 3 });
+          const windowBars = tape.bars.filter((bar) => bar.t >= slate.capturedAt && bar.t < sessionEndAt);
+          const evaluation = evaluateIntradayPaperOutcome({
+            side: play.side === "short" ? "short" : "long",
+            entryPriceCents: play.entry?.priceCents ?? null,
+            stopPriceCents: play.stop?.priceCents ?? null,
+            timeStopAt: play.timeStopAt ?? null,
+          }, windowBars, now);
+          const outcome = calculatePaperPlayOutcome({
+            side: play.side === "short" ? "short" : "long",
+            entryPriceCents: play.entry?.priceCents ?? null,
+            stopPriceCents: play.stop?.priceCents ?? null,
+            slippageCents: play.slippage?.priceCents ?? null,
+            plannedRiskCents: play.plannedLossCents ?? null,
+            notionalCents: play.notionalCents ?? null,
+            timeStopAt: play.timeStopAt ?? null,
+            noTradeConditions: Array.isArray(play.noTradeConditions) ? play.noTradeConditions : [],
+          }, {
+            ...evaluation,
+            basis: windowBars.length && !tape.unavailableReason ? "verified" : "unknown",
+            providerId: windowBars.length ? "alpaca" : null,
+            sourceUrl: windowBars.length ? `https://app.alpaca.markets/trade/${encodeURIComponent(item.symbol)}` : null,
+            observedAt: windowBars.length ? windowBars[windowBars.length - 1]!.t : null,
+            unavailableReason: evaluation.unavailableReason ?? tape.unavailableReason,
+          });
+          if (outcome.status !== "pending") terminalCount++;
+          await db!.update(aperturePlaySlateItems).set({
+            outcomeStatus: outcome.status,
+            outcomeResult: outcome.result,
+            triggerObservation: evaluation.trigger,
+            exitObservation: evaluation.exit,
+            entryPriceCents: outcome.entryPriceCents,
+            settlementPriceCents: outcome.settlementPriceCents,
+            returnBps: outcome.returnBps,
+            rMultiple: outcome.rMultiple,
+            outcomeBasis: outcome.basis,
+            outcomeProviderId: windowBars.length ? "alpaca" : null,
+            outcomeSourceUrl: windowBars.length ? `https://app.alpaca.markets/trade/${encodeURIComponent(item.symbol)}` : null,
+            observedAt: windowBars.length ? windowBars[windowBars.length - 1]!.t : null,
+            outcomeExplanation: outcome.explanation,
+            computedAt: now,
+            updatedAt: now,
+          }).where(eq(aperturePlaySlateItems.id, item.id));
+        }
+        await db!.update(aperturePlaySlates).set({
+          status: terminalCount === items.length ? "complete" : "awaiting_outcome",
+          updatedAt: now,
+        }).where(eq(aperturePlaySlates.id, slate.id));
+        return { refreshed: items.length, terminalCount };
+      }),
+
+    reconstructRecentRun: adminProcedure
+      .input(z.object({ runId: z.number(), windowKey: z.string().trim().min(2).max(64).default("historical_postmortem") }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [row] = await db!.select({ run: apertureRuns, thesis: capitalTheses })
+          .from(apertureRuns)
+          .innerJoin(capitalTheses, eq(apertureRuns.thesisId, capitalTheses.id))
+          .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id), eq(apertureRuns.status, "completed")))
+          .limit(1);
+        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Completed research cohort not found" });
+        if (row.run.holdingPeriod !== "intraday") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This proof-of-concept reconstructs intraday cohorts only; a longer catalyst window needs its stated exit horizon before it can be evaluated." });
+        }
+        const sessionStartAt = startOfEtDay(row.run.createdAt);
+        const sessionDateEt = etClock(row.run.createdAt)?.dateEt;
+        if (sessionStartAt == null || sessionDateEt == null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "The original ET trading session cannot be determined, so the postmortem was not reconstructed." });
+        }
+        const now = Date.now();
+        const existingSlates = await db!.select().from(aperturePlaySlates).where(and(
+          eq(aperturePlaySlates.userId, ctx.user.id),
+          eq(aperturePlaySlates.sessionDateEt, sessionDateEt),
+          eq(aperturePlaySlates.windowKey, input.windowKey),
+        ));
+        const existing = existingSlates.find((slate) => slate.canonicalThesisId === row.thesis.sourceCompilationId);
+        if (existing) return { slateId: existing.id, created: false };
+
+        const accounts = await db!.select().from(portfolioAccounts).where(eq(portfolioAccounts.userId, ctx.user.id));
+        const account = row.run.accountId
+          ? accounts.find((item) => item.id === row.run.accountId) ?? null
+          : accounts.find((item) => item.isPaper && item.brokerId === "alpaca_paper") ?? accounts.find((item) => item.isPaper) ?? null;
+        const held = account
+          ? await db!.select().from(positions).where(eq(positions.accountId, account.id))
+          : [];
+        const candidates = await db!.select().from(apertureCandidates).where(eq(apertureCandidates.runId, row.run.id));
+        if (!candidates.length) throw new TRPCError({ code: "BAD_REQUEST", message: "This completed research cohort has no candidate rows to reconstruct." });
+        const candidateIds = candidates.map((candidate) => candidate.id);
+        const reviews = await db!.select().from(apertureEvidenceReviews).where(and(
+          eq(apertureEvidenceReviews.userId, ctx.user.id),
+          inArray(apertureEvidenceReviews.candidateId, candidateIds),
+        ));
+        const decisions = await db!.select().from(aperturePlayDecisions).where(and(
+          eq(aperturePlayDecisions.userId, ctx.user.id),
+          inArray(aperturePlayDecisions.candidateId, candidateIds),
+        ));
+        const reviewsByCandidate = new Map<number, typeof reviews>();
+        for (const review of reviews) reviewsByCandidate.set(review.candidateId, [...(reviewsByCandidate.get(review.candidateId) ?? []), review]);
+        const decisionByCandidate = new Map(decisions.map((decision) => [decision.candidateId, decision]));
+        const constructionAt = row.run.completedAt ?? row.run.createdAt;
+
+        const capturedItems = await Promise.all(candidates.map(async (candidate) => {
+          const tape = await fetchIntradayBars(candidate.symbol, { startMs: sessionStartAt, timeoutMs: 8_000, maxPages: 6 });
+          // A provider can return later bars despite a historical start request.
+          // Keep the historical reconstruction inside its recorded session so a
+          // current print cannot validate an old play.
+          const sessionEndAt = sessionStartAt + 24 * 60 * 60_000;
+          const sourceSessionBars = tape.bars.filter((bar) => bar.t >= sessionStartAt && bar.t < sessionEndAt);
+          const decisionTimeBars = sourceSessionBars.filter((bar) => bar.t <= constructionAt);
+          const sourceWindowReason = sourceSessionBars.length
+            ? null
+            : "The provider returned no minute bars within the original captured ET session; this outcome remains unavailable.";
+          const vwap = sessionVwap(decisionTimeBars, { feed: tape.feed, now: constructionAt });
+          const range = openingRange(decisionTimeBars, { sessionOpenAt: sessionStartAt + REGULAR_OPEN * 60_000, minutes: 30, feed: tape.feed, now: constructionAt });
+          const side = candidate.playSide ?? "long";
+          const trigger = checkVwapHold(decisionTimeBars, vwap, { side: side === "long" ? "above" : "below", minutesRequired: 15, now: constructionAt });
+          const play = constructPlay({
+            symbol: candidate.symbol,
+            side,
+            holdingPeriod: "intraday",
+            bars: decisionTimeBars,
+            vwap,
+            range,
+            trigger,
+            equityCents: null,
+            sessionDayStartMs: sessionStartAt,
+            catalystDeadlineAt: row.run.catalystDeadlineAt,
+            advUsd: null,
+            now: constructionAt,
+          });
+          const evaluation = evaluateIntradayPaperOutcome({
+            side,
+            entryPriceCents: play.entry?.priceCents ?? null,
+            stopPriceCents: play.stop?.priceCents ?? null,
+            timeStopAt: play.timeStopAt,
+          }, sourceSessionBars, now);
+          const observationBasis = sourceSessionBars.length && decisionTimeBars.length && !tape.unavailableReason
+            ? "verified" as const
+            : "unknown" as const;
+          const recipeUnavailableReason = play.unavailableReasons[0] ?? null;
+          const outcome = calculatePaperPlayOutcome({
+            side,
+            entryPriceCents: play.entry?.priceCents ?? null,
+            stopPriceCents: play.stop?.priceCents ?? null,
+            slippageCents: play.slippage?.priceCents ?? null,
+            plannedRiskCents: play.plannedLossCents,
+            notionalCents: play.notionalCents,
+            timeStopAt: play.timeStopAt,
+            noTradeConditions: play.noTradeConditions,
+          }, {
+            ...evaluation,
+            basis: observationBasis,
+            providerId: sourceSessionBars.length ? "alpaca" : null,
+            sourceUrl: sourceSessionBars.length ? `https://app.alpaca.markets/trade/${encodeURIComponent(candidate.symbol)}` : null,
+            observedAt: sourceSessionBars.length ? sourceSessionBars[sourceSessionBars.length - 1]!.t : null,
+            unavailableReason: recipeUnavailableReason ?? evaluation.unavailableReason ?? sourceWindowReason ?? tape.unavailableReason,
+          });
+          const decision = decisionByCandidate.get(candidate.id) ?? null;
+          const operatorDecision: "not_recorded" | "skipped" | "deferred" = decision?.decision === "skipped"
+            ? "skipped"
+            : decision?.decision === "deferred"
+              ? "deferred"
+              : "not_recorded";
+          return {
+            sourceRunId: row.run.id,
+            sourceCandidateId: candidate.id,
+            symbol: candidate.symbol,
+            conditionKey: `${row.run.holdingPeriod}:${side}:${trigger.state}:${tape.feed}`,
+            recommendationSnapshot: {
+              version: 1,
+              snapshotBasis: "historical_reconstruction",
+              reconstructedFrom: { runCompletedAt: constructionAt, sessionStartAt },
+              candidate,
+              run: {
+                id: row.run.id,
+                holdingPeriod: row.run.holdingPeriod,
+                catalystDeadlineAt: row.run.catalystDeadlineAt,
+                invalidationRule: row.run.invalidationRule,
+                mandateVersion: row.run.mandateVersion,
+              },
+              play,
+              evidenceReviews: reviewsByCandidate.get(candidate.id) ?? [],
+              recordedDecision: decision,
+              tape: { feed: tape.feed, unavailableReason: tape.unavailableReason ?? sourceWindowReason, decisionTimeBarCount: decisionTimeBars.length, sourceSessionBarCount: sourceSessionBars.length, returnedBarCount: tape.bars.length },
+            },
+            operatorDecision,
+            operatorReason: decision?.reason ?? null,
+            decidedAt: decision?.updatedAt ?? null,
+            outcomeStatus: outcome.status,
+            outcomeResult: outcome.result,
+            triggerObservation: evaluation.trigger,
+            exitObservation: evaluation.exit,
+            entryPriceCents: outcome.entryPriceCents,
+            settlementPriceCents: outcome.settlementPriceCents,
+            returnBps: outcome.returnBps,
+            rMultiple: outcome.rMultiple,
+            outcomeBasis: outcome.basis,
+            outcomeProviderId: sourceSessionBars.length ? "alpaca" : null,
+            outcomeSourceUrl: sourceSessionBars.length ? `https://app.alpaca.markets/trade/${encodeURIComponent(candidate.symbol)}` : null,
+            observedAt: sourceSessionBars.length ? sourceSessionBars[sourceSessionBars.length - 1]!.t : null,
+            outcomeExplanation: outcome.explanation,
+            computedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          };
+        }));
+
+        const [created] = await db!.insert(aperturePlaySlates).values({
+          userId: ctx.user.id,
+          canonicalThesisId: row.thesis.sourceCompilationId,
+          accountId: account?.id ?? null,
+          sessionDateEt,
+          windowKey: input.windowKey,
+          snapshotBasis: "historical_reconstruction",
+          status: "complete",
+          portfolioSnapshot: {
+            reconstructedAt: now,
+            account: account ? { id: account.id, label: account.label, equityValueCents: account.equityValueCents, lastSyncedAt: account.lastSyncedAt } : null,
+            positions: held.map((position) => ({ symbol: position.symbol, qty: position.qty, marketValueCents: position.marketValueCents, priceAsOf: position.priceAsOf })),
+            warning: "This portfolio context is current-account context, not a contemporaneous historical account snapshot.",
+          },
+          contextSnapshot: {
+            canonicalThesisId: row.thesis.sourceCompilationId,
+            capitalThesisName: row.thesis.name,
+            runId: row.run.id,
+            snapshotBasis: "historical_reconstruction",
+            warning: "This slate was reconstructed after the fact from a completed run and source bars. It is not a live-captured recommendation record.",
+          },
+          capturedAt: constructionAt,
+          createdAt: now,
+          updatedAt: now,
+        });
+        const slateId = (created as any).insertId as number;
+        await db!.insert(aperturePlaySlateItems).values(capturedItems.map((item) => ({ ...item, slateId })));
+        return { slateId, created: true };
       }),
   }),
 

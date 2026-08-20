@@ -1287,6 +1287,89 @@ export const aperturePlayDecisions = mysqlTable("aperture_play_decisions", {
 export type AperturePlayDecision = typeof aperturePlayDecisions.$inferSelect;
 export type InsertAperturePlayDecision = typeof aperturePlayDecisions.$inferInsert;
 
+/**
+ * A daily decision-time snapshot of the system's paper opportunity set.
+ *
+ * A slate is deliberately separate from a research run: the same completed run
+ * can be relevant on several days, but a historical replay needs to preserve
+ * exactly what was surfaced, which canonical thesis and account boundary were
+ * active, and what the operator knew at that specific point in time.
+ */
+export const aperturePlaySlates = mysqlTable("aperture_play_slates", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  canonicalThesisId: int("canonical_thesis_id"),
+  accountId: int("account_id"),
+  /** ET calendar date that the daily decision surface represented. */
+  sessionDateEt: varchar("session_date_et", { length: 10 }).notNull(),
+  /** Named decision checkpoint: e.g. opening, mid_session, catalyst. */
+  windowKey: varchar("window_key", { length: 64 }).notNull().default("opening"),
+  /** Historical reconstruction is useful for review but never treated as a live captured recommendation. */
+  snapshotBasis: mysqlEnum("snapshot_basis", ["live_capture", "historical_reconstruction"]).default("live_capture").notNull(),
+  status: mysqlEnum("status", ["captured", "awaiting_outcome", "complete"]).default("captured").notNull(),
+  /** A slate-level cash decision is distinct from declining an individual play. */
+  operatorDecision: mysqlEnum("operator_decision", ["not_recorded", "cash", "selected"]).default("not_recorded").notNull(),
+  operatorReason: text("operator_reason"),
+  decidedAt: bigint("decided_at", { mode: "number" }),
+  /** Immutable account/equity/freshness state available during the decision. */
+  portfolioSnapshot: json("portfolio_snapshot").$type<Record<string, unknown>>().notNull(),
+  /** Market clock, data-provider availability, and active-thesis presentation context. */
+  contextSnapshot: json("context_snapshot").$type<Record<string, unknown>>().notNull(),
+  capturedAt: bigint("captured_at", { mode: "number" }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  oneSlatePerThesisSession: uniqueIndex("aperture_play_slate_user_thesis_date_window_unique").on(table.userId, table.canonicalThesisId, table.sessionDateEt, table.windowKey),
+  byUserCapture: index("aperture_play_slate_user_capture_idx").on(table.userId, table.capturedAt),
+}));
+export type AperturePlaySlate = typeof aperturePlaySlates.$inferSelect;
+export type InsertAperturePlaySlate = typeof aperturePlaySlates.$inferInsert;
+
+/**
+ * One immutable recommended play within a captured daily slate.
+ *
+ * `recommendationSnapshot` carries the fully rendered, modelled recipe and its
+ * assumptions. It is never updated from a later rerun. `outcome*` fields state
+ * a counterfactual, not a fill or performance result; unknown or ambiguous tape
+ * remains explicitly unresolved and is excluded from trust calibration.
+ */
+export const aperturePlaySlateItems = mysqlTable("aperture_play_slate_items", {
+  id: int("id").autoincrement().primaryKey(),
+  slateId: int("slate_id").notNull(),
+  sourceRunId: int("source_run_id").notNull(),
+  sourceCandidateId: int("source_candidate_id").notNull(),
+  symbol: varchar("symbol", { length: 24 }).notNull(),
+  conditionKey: varchar("condition_key", { length: 160 }).notNull(),
+  /** Exact candidate, evidence, and constructed recipe available at capture. */
+  recommendationSnapshot: json("recommendation_snapshot").$type<Record<string, unknown>>().notNull(),
+  /** Choice at play level; cash remains a slate-level decision. */
+  operatorDecision: mysqlEnum("operator_decision", ["not_recorded", "selected", "skipped", "deferred"]).default("not_recorded").notNull(),
+  operatorReason: text("operator_reason"),
+  decidedAt: bigint("decided_at", { mode: "number" }),
+  outcomeStatus: mysqlEnum("outcome_status", ["pending", "resolved", "unavailable"]).default("pending").notNull(),
+  outcomeResult: mysqlEnum("outcome_result", ["win", "breakeven", "loss", "not_triggered", "unresolved"]).default("unresolved").notNull(),
+  triggerObservation: mysqlEnum("trigger_observation", ["met", "not_met", "not_observed"]).default("not_observed").notNull(),
+  exitObservation: mysqlEnum("exit_observation", ["time_stop", "stop_hit", "ambiguous", "not_observed"]).default("not_observed").notNull(),
+  entryPriceCents: bigint("entry_price_cents", { mode: "number" }),
+  settlementPriceCents: bigint("settlement_price_cents", { mode: "number" }),
+  returnBps: int("return_bps"),
+  rMultiple: float("r_multiple"),
+  outcomeBasis: mysqlEnum("outcome_basis", ["verified", "modeled", "unknown"]).default("unknown").notNull(),
+  outcomeProviderId: varchar("outcome_provider_id", { length: 32 }),
+  outcomeSourceUrl: text("outcome_source_url"),
+  observedAt: bigint("observed_at", { mode: "number" }),
+  outcomeExplanation: text("outcome_explanation"),
+  computedAt: bigint("computed_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  oneCandidatePerSlate: uniqueIndex("aperture_play_slate_item_unique").on(table.slateId, table.sourceCandidateId),
+  bySlate: index("aperture_play_slate_item_slate_idx").on(table.slateId),
+  byTrustCondition: index("aperture_play_slate_item_condition_idx").on(table.conditionKey, table.outcomeStatus, table.outcomeBasis),
+}));
+export type AperturePlaySlateItem = typeof aperturePlaySlateItems.$inferSelect;
+export type InsertAperturePlaySlateItem = typeof aperturePlaySlateItems.$inferInsert;
+
 /** Competing deployment strategies — the output is a choice, not a list. */
 export const apertureStrategies = mysqlTable("aperture_strategies", {
   id: int("id").autoincrement().primaryKey(),
