@@ -34,6 +34,9 @@ import { marketSession, startOfEtDay, type SessionState } from "./marketSession"
 import {
   evaluateOrderGates,
   plannedRiskCentsFor,
+  resolveOrderIntent,
+  type OrderIntent,
+  type ResolvedIntent,
   gateFailureMessage,
   type GateEvaluation,
   type NotionalBasis,
@@ -50,6 +53,8 @@ export interface CreateOrderInput {
   userId: number;
   symbol: string;
   side: "buy" | "sell";
+  /** Opens or closes exposure. Inferred from the held position when absent. */
+  intent?: OrderIntent | null;
   qty?: number;
   notionalCents?: number;
   orderType?: "market" | "limit";
@@ -109,6 +114,8 @@ export class OrderGateError extends Error {
  */
 export interface OrderEvaluation {
   evaluation: GateEvaluation;
+  /** What the order does to exposure, and how that was established. */
+  resolvedIntent: ResolvedIntent;
   session: SessionState;
   mandate: Mandate;
   accountState: OrderAccountState;
@@ -145,12 +152,22 @@ async function evaluateOrder(input: CreateOrderInput): Promise<OrderEvaluation> 
     symbol, qty: input.qty, notionalCents: input.notionalCents, limitPriceCents: input.limitPriceCents,
   });
 
+  // The same resolver the gates use, on the same inputs, so the intent stored on
+  // the row cannot differ from the one the ceilings were applied under.
+  const resolvedIntent = resolveOrderIntent({
+    side: input.side,
+    statedIntent: input.intent,
+    positionQty: accountState.positionQty,
+    qty: input.qty,
+  });
+
   const evaluation = evaluateOrderGates({
     input: {
       symbol,
       side: input.side,
       orderType,
       timeInForce,
+      intent: input.intent ?? null,
       holdingPeriod: input.holdingPeriod ?? "",
       reason: input.reason,
       invalidationCondition: input.invalidationCondition,
@@ -172,7 +189,7 @@ async function evaluateOrder(input: CreateOrderInput): Promise<OrderEvaluation> 
   });
 
   return {
-    evaluation, session, mandate, accountState,
+    evaluation, resolvedIntent, session, mandate, accountState,
     gatedNotionalCents, notionalBasis,
     symbol, orderType, timeInForce, now, account,
   };
@@ -194,7 +211,7 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
   if (!db) throw new Error("database unavailable");
 
   const {
-    evaluation, session, gatedNotionalCents, symbol, orderType, timeInForce, now,
+    evaluation, resolvedIntent, session, gatedNotionalCents, symbol, orderType, timeInForce, now,
   } = await evaluateOrder(input);
 
   const holdingPeriod = isStoredHoldingPeriod(input.holdingPeriod) ? input.holdingPeriod : null;
@@ -209,6 +226,7 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
     userId: input.userId,
     symbol,
     side: input.side,
+    intent: resolvedIntent.intent,
     qty: input.qty ?? null,
     notionalCents: input.notionalCents ?? null,
     orderType,
@@ -311,9 +329,11 @@ async function loadOrderAccountState(args: {
   const { db, account, symbol, runId, userId, now } = args;
 
   const held = await db.select().from(positionsTable).where(eq(positionsTable.accountId, account.id));
-  const positionValueCents = held
-    .filter((p) => normSymbol(p.symbol) === symbol)
-    .reduce((s, p) => s + (p.marketValueCents ?? 0), 0);
+  const ownRows = held.filter((p) => normSymbol(p.symbol) === symbol);
+  const positionValueCents = ownRows.reduce((s, p) => s + (p.marketValueCents ?? 0), 0);
+  // Signed: positive long, negative short, zero flat. This is what decides
+  // whether a sell closes a position or opens a short — see resolveOrderIntent.
+  const positionQty = ownRows.reduce((s, p) => s + (p.qty ?? 0), 0);
 
   // Sector for the order symbol and for everything held, from the fact ledger.
   const heldSymbols = Array.from(new Set(held.map((p) => normSymbol(p.symbol))));
@@ -381,6 +401,7 @@ async function loadOrderAccountState(args: {
     isPaper: account.isPaper === true,
     // Equity, not cash: a ceiling measured against cash shrinks as you deploy.
     equityCents: account.equityValueCents ?? null,
+    positionQty,
     positionValueCents,
     clusterValueCents,
     clusterLabel: orderSector ?? `${symbol} (unclassified)`,

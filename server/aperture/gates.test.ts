@@ -9,7 +9,7 @@
  * Everything here is pure — no database, no clock, no network.
  */
 import { describe, it, expect } from "vitest";
-import { evaluateOrderGates, evaluateRunPreset, measurePctCeiling, plannedRiskCentsFor, type OrderAccountState, type OrderGateInput } from "./gates";
+import { evaluateOrderGates, evaluateRunPreset, measurePctCeiling, plannedRiskCentsFor, resolveOrderIntent, type OrderAccountState, type OrderGateInput } from "./gates";
 import { marketSession, type SessionState } from "./marketSession";
 import { CURRENT_MANDATE, MANDATE_V1, MANDATE_V2, effectiveMandate, PAPER_ACKNOWLEDGEMENT } from "./mandate";
 
@@ -41,6 +41,7 @@ const account = (over: Partial<OrderAccountState> = {}): OrderAccountState => ({
   positionValueCents: 0,
   clusterValueCents: 0,
   clusterLabel: "Semiconductors",
+  positionQty: 0,
   sectorKnown: true,
   newNotionalTodayCents: 0,
   runGrossDeployedCents: 0,
@@ -318,9 +319,11 @@ describe("notional and concentration ceilings", () => {
 
 describe("sell orders", () => {
   it("skips the exposure-increasing ceilings", () => {
+    // A genuine exit: there is a long to sell. Without positionQty this would be
+    // a short ENTRY, and the ceilings would correctly apply — see the intent tests.
     const ev = evalOrder(
       { side: "sell" },
-      { positionValueCents: 5_000_000, clusterValueCents: 5_000_000, runGrossDeployedCents: 3_900_000 },
+      { positionQty: 500, positionValueCents: 5_000_000, clusterValueCents: 5_000_000, runGrossDeployedCents: 3_900_000 },
     );
     expect(gate(ev, "position_concentration")).toBeUndefined();
     expect(gate(ev, "run_gross_deployed")).toBeUndefined();
@@ -666,5 +669,100 @@ describe("planned-loss gates", () => {
   it("stamps mandate v2", () => {
     expect(evalOrder(play()).mandateVersion).toBe(MANDATE_V2.version);
     expect(MANDATE_V2.version).toBe("v2");
+  });
+});
+
+// ── Order intent: does this order add exposure, or remove it? ─────────────────
+//
+// `side` cannot answer that. A sell exits a long OR opens a short, and the two
+// are opposites for every concentration ceiling. Before resolveOrderIntent, all
+// sells skipped the position, cluster, per-run and daily-new gates — correct for
+// an exit, and a hole a short entry would have walked straight through.
+
+describe("resolveOrderIntent", () => {
+  it("closes when a sell has a long to close", () => {
+    const r = resolveOrderIntent({ side: "sell", positionQty: 100 });
+    expect(r.intent).toBe("close");
+    expect(r.inferred).toBe(true);
+  });
+
+  it("OPENS when a sell has nothing to close — that is a short", () => {
+    const r = resolveOrderIntent({ side: "sell", positionQty: 0 });
+    expect(r.intent).toBe("open");
+    expect(r.basis).toContain("opens a short");
+  });
+
+  it("closes when a buy covers a short", () => {
+    expect(resolveOrderIntent({ side: "buy", positionQty: -100 }).intent).toBe("close");
+  });
+
+  it("opens when a buy adds to a long", () => {
+    expect(resolveOrderIntent({ side: "buy", positionQty: 100 }).intent).toBe("open");
+  });
+
+  it("refuses a stated close that has nothing to close, and says so", () => {
+    const r = resolveOrderIntent({ side: "sell", statedIntent: "close", positionQty: 0 });
+    expect(r.intent).toBe("open");
+    expect(r.conflict).toContain("no long position");
+  });
+
+  it("gates a sell larger than the long it claims to close as opening", () => {
+    // 150 against 100 held: the extra 50 flips the position short.
+    const r = resolveOrderIntent({ side: "sell", statedIntent: "close", positionQty: 100, qty: 150 });
+    expect(r.intent).toBe("open");
+    expect(r.basis).toContain("excess opens new exposure");
+  });
+
+  it("honours a stated close that the position supports", () => {
+    const r = resolveOrderIntent({ side: "sell", statedIntent: "close", positionQty: 100, qty: 100 });
+    expect(r.intent).toBe("close");
+    expect(r.inferred).toBe(false);
+  });
+
+  it("takes a stated open at its word", () => {
+    expect(resolveOrderIntent({ side: "sell", statedIntent: "open", positionQty: 500 }).intent).toBe("open");
+  });
+});
+
+describe("intent drives the exposure ceilings", () => {
+  it("applies concentration to a SHORT entry — the hole this closes", () => {
+    // A sell with nothing to close, sized past the single-name cap.
+    const ev = evalOrder(
+      { side: "sell", gatedNotionalCents: 400_000 },
+      { positionQty: 0, positionValueCents: 700_000, clusterValueCents: 700_000 },
+    );
+    expect(gate(ev, "position_concentration")).toBeDefined();
+    expect(gate(ev, "position_concentration")!.passed).toBe(false);
+  });
+
+  it("still skips those ceilings for a genuine exit", () => {
+    const ev = evalOrder(
+      { side: "sell", gatedNotionalCents: 400_000 },
+      { positionQty: 100, positionValueCents: 700_000, clusterValueCents: 700_000 },
+    );
+    expect(gate(ev, "position_concentration")).toBeUndefined();
+    expect(ev.notes.join(" ")).toContain("closing order");
+  });
+
+  it("records the intent and how it was established", () => {
+    const ev = evalOrder({ side: "sell" }, { positionQty: 0 });
+    expect(gate(ev, "order_intent")!.detail).toContain("opens exposure");
+    expect(ev.notes.join(" ")).toContain("inferred");
+  });
+
+  it("blocks an order whose stated intent contradicts the account", () => {
+    const ev = evalOrder({ side: "sell", intent: "close" }, { positionQty: 0 });
+    expect(gate(ev, "order_intent")!.passed).toBe(false);
+    expect(ev.passed).toBe(false);
+  });
+
+  it("measures a short position's concentration on absolute exposure", () => {
+    // A broker reports a short at negative market value. Netting it would make a
+    // growing short read as shrinking concentration.
+    const ev = evalOrder(
+      { side: "sell", gatedNotionalCents: 400_000 },
+      { positionQty: -100, positionValueCents: -700_000, clusterValueCents: -700_000 },
+    );
+    expect(gate(ev, "position_concentration")!.passed).toBe(false);
   });
 });

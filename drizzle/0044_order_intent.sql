@@ -1,0 +1,12 @@
+-- 0044 — order intent: does this order open exposure, or close it?
+--
+-- `side` alone cannot answer that. A sell exits a long OR establishes a short,
+-- and the two are opposites for every concentration ceiling in the mandate.
+-- Before this, gates.ts treated every sell as exposure-reducing and skipped the
+-- position, cluster, per-run and daily-new ceilings — correct for an exit, and
+-- wrong for a short entry, which would have passed three gates unchecked.
+--
+-- Nullable: rows written before this carry null and are not reinterpreted. The
+-- resolver infers intent from the held position when a caller does not state it,
+-- and anything that cannot be PROVEN to close is gated as opening.
+ALTER TABLE `broker_orders` ADD COLUMN `intent` enum('open','close');

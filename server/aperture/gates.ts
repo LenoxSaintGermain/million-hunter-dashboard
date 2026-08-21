@@ -168,6 +168,99 @@ export function plannedRiskCentsFor(input: {
 /** Holding periods where a stated planned loss is mandatory, not optional. */
 const PLANNED_RISK_REQUIRED: ReadonlySet<string> = new Set(["intraday", "overnight"]);
 
+// ── Order intent ──────────────────────────────────────────────────────────────
+//
+// `side` alone cannot say whether an order adds risk or removes it. A sell is a
+// closing trade when it exits a long, and an OPENING trade when it establishes a
+// short — and the two are opposites for every concentration ceiling in the
+// mandate. Before this existed, every sell skipped the position, cluster,
+// per-run and daily-new gates, which was correct for an exit and would have let
+// a short entry past three ceilings unchecked.
+
+export type OrderIntent = "open" | "close";
+
+export interface ResolvedIntent {
+  intent: OrderIntent;
+  /** True when nothing stated it and the position was used to work it out. */
+  inferred: boolean;
+  /** What the resolution was based on — recorded on the gate. */
+  basis: string;
+  /** Set when a stated intent contradicts the account. */
+  conflict: string | null;
+}
+
+/**
+ * Resolve what an order actually does to exposure.
+ *
+ * The rule is fail-closed: anything that cannot be PROVEN to close an existing
+ * position is treated as opening, so the exposure ceilings apply. An unproven
+ * close is not a safe default — it is the one that skips three gates.
+ *
+ * `positionQty` is signed the way a broker reports it: positive long, negative
+ * short, zero flat.
+ */
+export function resolveOrderIntent(args: {
+  side: "buy" | "sell";
+  statedIntent?: OrderIntent | null;
+  positionQty: number;
+  qty?: number | null;
+}): ResolvedIntent {
+  const { side, statedIntent, positionQty } = args;
+  const flat = positionQty === 0;
+  const long = positionQty > 0;
+  const short = positionQty < 0;
+
+  // What the position permits, regardless of what was stated.
+  const couldClose = (side === "sell" && long) || (side === "buy" && short);
+  const heldDescription = flat
+    ? "no position is held"
+    : `${Math.abs(positionQty)} ${long ? "long" : "short"} held`;
+
+  if (statedIntent === "close") {
+    if (!couldClose) {
+      return {
+        intent: "open",
+        inferred: false,
+        basis: `stated intent "close" but ${heldDescription} — treated as opening so the exposure ceilings apply`,
+        conflict: `this order was marked closing, but there is no ${side === "sell" ? "long" : "short"} position for it to close`,
+      };
+    }
+    // A sell larger than the long it closes flips into a short. The excess is
+    // new exposure, so the whole order is gated as opening.
+    if (args.qty != null && args.qty > Math.abs(positionQty)) {
+      return {
+        intent: "open",
+        inferred: false,
+        basis: `stated intent "close" but ${args.qty} exceeds the ${Math.abs(positionQty)} held — the excess opens new exposure, so the order is gated as opening`,
+        conflict: null,
+      };
+    }
+    return { intent: "close", inferred: false, basis: `closing against ${heldDescription}`, conflict: null };
+  }
+
+  if (statedIntent === "open") {
+    return { intent: "open", inferred: false, basis: `stated intent "open" (${heldDescription})`, conflict: null };
+  }
+
+  // Nothing stated. Infer, and only ever infer "close" when it is provable.
+  if (couldClose && (args.qty == null || args.qty <= Math.abs(positionQty))) {
+    return {
+      intent: "close",
+      inferred: true,
+      basis: `no intent stated; ${heldDescription}, so this ${side} reduces exposure`,
+      conflict: null,
+    };
+  }
+  return {
+    intent: "open",
+    inferred: true,
+    basis: flat && side === "sell"
+      ? "no intent stated and no long position is held — a sell with nothing to close opens a short, so the exposure ceilings apply"
+      : `no intent stated; ${heldDescription}, so this ${side} adds exposure`,
+    conflict: null,
+  };
+}
+
 /**
  * The single-order ceiling: a percentage of equity and an absolute cap,
  * whichever binds first.
@@ -183,6 +276,11 @@ export type NotionalBasis = "stated" | "derived_from_last_price" | "unknown";
 export interface OrderGateInput {
   symbol: string;
   side: "buy" | "sell";
+  /**
+   * Whether this order opens exposure or closes it. When absent it is inferred
+   * from the held position, and an unprovable close is treated as an open.
+   */
+  intent?: OrderIntent | null;
   orderType: "market" | "limit";
   timeInForce: "day" | "gtc";
   holdingPeriod: HoldingPeriod | string;
@@ -212,7 +310,15 @@ export interface OrderAccountState {
   isPaper: boolean;
   /** Account equity in cents. Null when the account has never synced. */
   equityCents: number | null;
-  /** Market value already held in the order's symbol. */
+  /**
+   * Signed quantity held in the order's symbol — positive long, negative short,
+   * zero flat. This is what decides whether a sell closes or opens.
+   */
+  positionQty: number;
+  /**
+   * Market value already held in the order's symbol. May be negative for a
+   * short; concentration is measured on the absolute exposure.
+   */
   positionValueCents: number;
   /** Market value of the symbol's sector cluster, including positionValueCents. */
   clusterValueCents: number;
@@ -244,7 +350,23 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
   const { input, account, session, now } = args;
   const mandate = args.mandate ?? CURRENT_MANDATE;
   const g = new GateCollector();
-  const isBuy = input.side === "buy";
+
+  // What this order does to exposure — not what side it is. See resolveOrderIntent.
+  const resolved = resolveOrderIntent({
+    side: input.side,
+    statedIntent: input.intent,
+    positionQty: account.positionQty,
+    qty: input.qty,
+  });
+  const isOpening = resolved.intent === "open";
+  g.add(
+    "order_intent",
+    resolved.conflict == null,
+    resolved.conflict ?? `${resolved.intent === "open" ? "opens" : "closes"} exposure — ${resolved.basis}`,
+  );
+  if (resolved.inferred) {
+    g.note(`order intent was not stated and was inferred as "${resolved.intent}": ${resolved.basis}`);
+  }
 
   // ── Structural ──────────────────────────────────────────────────────────────
   g.add(
@@ -487,8 +609,14 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
       ceiling,
     );
 
-    if (isBuy) {
-      const pos = measurePctCeiling(account.positionValueCents, n, e, mandate.maxPositionPctOfEquity);
+    if (isOpening) {
+      // Absolute exposure. A short's market value is negative at the broker, and
+      // netting it against the order would make a growing short position read as
+      // shrinking concentration — the opposite of the truth.
+      const heldAbs = Math.abs(account.positionValueCents);
+      const clusterAbs = Math.abs(account.clusterValueCents);
+
+      const pos = measurePctCeiling(heldAbs, n, e, mandate.maxPositionPctOfEquity);
       g.add(
         "position_concentration",
         pos.ok,
@@ -499,7 +627,7 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
         mandate.maxPositionPctOfEquity,
       );
 
-      const clu = measurePctCeiling(account.clusterValueCents, n, e, mandate.maxClusterPctOfEquity);
+      const clu = measurePctCeiling(clusterAbs, n, e, mandate.maxClusterPctOfEquity);
       g.add(
         "cluster_concentration",
         clu.ok,
@@ -538,7 +666,7 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
         mandate.maxDailyNewNotionalPctOfEquity,
       );
     } else {
-      g.note("sell order — concentration, per-run and daily-new ceilings do not apply to exposure reduction");
+      g.note(`closing order — concentration, per-run and daily-new ceilings do not apply to exposure reduction (${resolved.basis})`);
     }
   }
 

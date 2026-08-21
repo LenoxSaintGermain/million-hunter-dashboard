@@ -1470,6 +1470,10 @@ export const brokerOrders = mysqlTable("broker_orders", {
   userId: int("user_id").notNull(),
   symbol: varchar("symbol", { length: 24 }).notNull(),
   side: mysqlEnum("side", ["buy", "sell"]).notNull(),
+  /** Whether the order opens exposure or closes it. `side` alone cannot say:
+   *  a sell exits a long OR establishes a short, and those are opposites for
+   *  every concentration ceiling. Null on rows written before this existed. */
+  intent: mysqlEnum("intent", ["open", "close"]),
   /** Whole or fractional shares. Exactly one of qty / notionalCents. */
   qty: float("qty"),
   notionalCents: bigint("notional_cents", { mode: "number" }),
