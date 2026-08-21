@@ -71,6 +71,7 @@ import { createHeartbeatJob, updateHeartbeatJob } from "./_core/heartbeat";
 import { COOKIE_NAME } from "../shared/const";
 import { parse as parseCookie } from "cookie";
 import { DAILY_OUTCOME_REFRESH_CRON, DAILY_OUTCOME_REFRESH_PATH, refreshLiveSlateOutcomes } from "./aperture/dailyOutcomeRefresh";
+import { ONE_TIME_GLP1_RESEARCH_PATH, oneTimeResearchCron } from "./aperture/oneTimeGlp1Research";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -88,6 +89,69 @@ async function requireAccount(db: Awaited<ReturnType<typeof getDb>>, accountId: 
     .limit(1);
   if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Account not found" });
   return rows[0];
+}
+
+/**
+ * Cron-safe research-only counterpart to `run.start`. It reads an owner-authorized
+ * projected thesis and paper account, applies the same run mandate, then starts
+ * the existing research worker. It cannot reach proposal or broker-order code.
+ */
+export async function startScheduledCapitalResearch(input: {
+  userId: number;
+  canonicalThesisId: number;
+  targetAt: number;
+}): Promise<{ runId: number }> {
+  const db = await getDb();
+  const [thesis] = await db!.select().from(capitalTheses).where(and(
+    eq(capitalTheses.userId, input.userId),
+    eq(capitalTheses.sourceCompilationId, input.canonicalThesisId),
+  )).limit(1);
+  if (!thesis) throw new Error("The scheduled canonical thesis is no longer available in Capital Aperture.");
+  if (!thesis.graph) throw new Error("The scheduled thesis needs a prepared Capital graph before its post-open research brief can run.");
+  const [account] = await db!.select().from(portfolioAccounts).where(and(
+    eq(portfolioAccounts.userId, input.userId),
+    eq(portfolioAccounts.isPaper, true),
+  )).limit(1);
+  if (!account) throw new Error("A paper account is required before scheduled Capital research can apply a portfolio boundary.");
+  const dayStart = startOfEtDay(input.targetAt);
+  if (dayStart == null) throw new Error("The scheduled Eastern-market session could not be determined.");
+  const runInput = {
+    thesisId: thesis.id,
+    accountId: account.id,
+    deployableCapitalCents: 2_000_000,
+    intendedTrades: [] as Array<{ symbol: string; dollarsCents: number; note?: string }>,
+    holdingPeriod: "intraday",
+    liquidityFloorAdvUsd: 50_000_000,
+    catalystDeadlineAt: dayStart + (15 * 60 + 55) * 60_000,
+    maxSingleNamePct: 5,
+    invalidationRule: "Invalidate if the GLP-1 demand catalyst does not occur by the stated deadline, or its disclosed result contradicts the thesis.",
+  };
+  const preset = evaluateRunPreset(runInput, {
+    accountLinked: true,
+    equityCents: account.equityValueCents ?? null,
+  }, CURRENT_MANDATE, input.targetAt);
+  if (!preset.passed) throw new Error(`Scheduled research preset rejected by the mandate: ${preset.failures.join("; ")}`);
+  const [result] = await db!.insert(apertureRuns).values({
+    userId: input.userId,
+    thesisId: thesis.id,
+    accountId: account.id,
+    deployableCapitalCents: runInput.deployableCapitalCents,
+    intendedTrades: runInput.intendedTrades,
+    hurdleRateBps: null,
+    holdingPeriod: runInput.holdingPeriod as any,
+    catalystDeadlineAt: runInput.catalystDeadlineAt,
+    liquidityFloorAdvUsd: runInput.liquidityFloorAdvUsd,
+    maxSingleNamePct: runInput.maxSingleNamePct,
+    invalidationRule: runInput.invalidationRule,
+    mandateVersion: preset.mandateVersion,
+    status: "queued",
+    createdAt: input.targetAt,
+  });
+  const runId = (result as any).insertId as number;
+  executeRun(runId, input.userId, thesis, runInput).catch((error) => {
+    console.error(`[aperture] scheduled research run ${runId} failed:`, error?.message ?? error);
+  });
+  return { runId };
 }
 
 /**
@@ -1268,6 +1332,89 @@ export const apertureRouter = router({
           dailyOutcomeRefreshEnabled: input.enabled,
         }).where(eq(users.id, ctx.user.id));
         return { enabled: input.enabled, configured: true, nextExecutionAt: nextExecutionAt ?? null };
+      }),
+
+    oneTimeResearchSchedule: adminProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      const [profile] = await db!.select({
+        enabled: users.oneTimeResearchEnabled,
+        taskUid: users.oneTimeResearchTaskUid,
+        status: users.oneTimeResearchStatus,
+        targetAt: users.oneTimeResearchTargetAt,
+        canonicalThesisId: users.oneTimeResearchThesisId,
+        runId: users.oneTimeResearchRunId,
+        lastResult: users.oneTimeResearchLastResult,
+      }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
+      return {
+        enabled: profile?.enabled === true,
+        configured: Boolean(profile?.taskUid),
+        status: profile?.status ?? null,
+        targetAt: profile?.targetAt ?? null,
+        canonicalThesisId: profile?.canonicalThesisId ?? null,
+        runId: profile?.runId ?? null,
+        lastResult: profile?.lastResult ?? null,
+        scope: "One paper-only post-open research brief. It cannot record a posture, create a proposal, or submit an order.",
+      };
+    }),
+
+    configureOneTimeGlp1Research: adminProcedure
+      .input(z.object({ enabled: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [profile] = await db!.select({
+          taskUid: users.oneTimeResearchTaskUid,
+          activeCapitalThesisId: users.activeCapitalThesisId,
+        }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
+        const rawCookie = typeof ctx.req.headers.cookie === "string" ? ctx.req.headers.cookie : "";
+        const sessionToken = parseCookie(rawCookie)[COOKIE_NAME] ?? "";
+        if (!sessionToken) throw new TRPCError({ code: "UNAUTHORIZED", message: "Your session could not be verified for the scheduled GLP-1 brief." });
+        if (!input.enabled) {
+          if (profile?.taskUid) await updateHeartbeatJob(profile.taskUid, { enable: false }, sessionToken);
+          await db!.update(users).set({
+            oneTimeResearchEnabled: false,
+            oneTimeResearchStatus: "paused",
+            oneTimeResearchLastResult: "Scheduled GLP-1 research is paused. No research brief was created.",
+          }).where(eq(users.id, ctx.user.id));
+          return { enabled: false, configured: Boolean(profile?.taskUid), targetAt: null };
+        }
+        if (!profile?.activeCapitalThesisId) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Choose the GLP-1 canonical thesis in the Decision Center before scheduling its research brief." });
+        }
+        const [projection] = await db!.select({ id: capitalTheses.id }).from(capitalTheses).where(and(
+          eq(capitalTheses.userId, ctx.user.id),
+          eq(capitalTheses.sourceCompilationId, profile.activeCapitalThesisId),
+        )).limit(1);
+        if (!projection) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The active canonical thesis is not available in Capital Aperture." });
+        const nextOpen = nextRegularSessionOpen(Date.now());
+        if (nextOpen == null) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The next regular market session is outside the maintained calendar, so research was not scheduled." });
+        const targetAt = nextOpen + 30 * 60_000;
+        const cron = oneTimeResearchCron(targetAt);
+        let taskUid = profile.taskUid ?? null;
+        let nextExecutionAt: string | null | undefined;
+        if (!taskUid) {
+          const created = await createHeartbeatJob({
+            name: `capital-one-time-glp1-research-${ctx.user.id}-${targetAt}`,
+            cron,
+            path: ONE_TIME_GLP1_RESEARCH_PATH,
+            payload: {},
+            description: "One post-open GLP-1 Capital research brief. Research only; never records a posture, proposal, or broker order.",
+          }, sessionToken);
+          taskUid = created.taskUid;
+          nextExecutionAt = created.nextExecutionAt;
+        } else {
+          const updated = await updateHeartbeatJob(taskUid, { cron, enable: true }, sessionToken);
+          nextExecutionAt = updated.nextExecutionAt;
+        }
+        await db!.update(users).set({
+          oneTimeResearchTaskUid: taskUid,
+          oneTimeResearchEnabled: true,
+          oneTimeResearchStatus: "queued",
+          oneTimeResearchTargetAt: targetAt,
+          oneTimeResearchThesisId: profile.activeCapitalThesisId,
+          oneTimeResearchRunId: null,
+          oneTimeResearchLastResult: "Queued for the first measurable post-open window. The resulting opportunity set will require a human paper-posture decision.",
+        }).where(eq(users.id, ctx.user.id));
+        return { enabled: true, configured: true, targetAt, nextExecutionAt: nextExecutionAt ?? null };
       }),
 
     availableCohorts: adminProcedure.query(async ({ ctx }) => {

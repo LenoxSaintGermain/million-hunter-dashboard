@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +34,7 @@ export default function ApertureRecord() {
   const { data: cohorts = [], isLoading: loadingCohorts } = trpc.aperture.ledger.availableCohorts.useQuery();
   const { data: activePlays } = trpc.aperture.play.list.useQuery();
   const { data: dailyRefresh } = trpc.aperture.ledger.dailyRefreshSchedule.useQuery();
+  const { data: oneTimeResearch } = trpc.aperture.ledger.oneTimeResearchSchedule.useQuery();
   const { data: portfolioImpactTrend } = trpc.aperture.ledger.portfolioImpactTrend.useQuery();
   const canCaptureLiveSlate = (activePlays?.plays?.length ?? 0) > 0;
   const reconstruct = trpc.aperture.ledger.reconstructRecentRun.useMutation({
@@ -69,6 +71,13 @@ export default function ApertureRecord() {
     onSuccess: async ({ enabled }) => {
       await utils.aperture.ledger.dailyRefreshSchedule.invalidate();
       toast.success(enabled ? "Daily paper-outcome refresh is on" : "Daily paper-outcome refresh is paused");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const configureOneTimeResearch = trpc.aperture.ledger.configureOneTimeGlp1Research.useMutation({
+    onSuccess: async ({ enabled }) => {
+      await utils.aperture.ledger.oneTimeResearchSchedule.invalidate();
+      toast.success(enabled ? "GLP-1 post-open research is queued" : "GLP-1 post-open research is paused");
     },
     onError: (error) => toast.error(error.message),
   });
@@ -126,6 +135,16 @@ export default function ApertureRecord() {
                   {configureDailyRefresh.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Clock3 className="mr-1.5 h-3.5 w-3.5" />}
                   {dailyRefresh?.enabled ? "Pause daily refresh" : "Turn on daily refresh"}
                 </Button>
+              </div>
+              <div className="rounded-lg border p-3" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 35%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 5%, var(--sh-surface))" }}>
+                <div className="flex items-center gap-2"><PlayCircle className="h-4 w-4" style={{ color: oneTimeResearch?.enabled ? "oklch(0.55 0.15 145)" : "var(--sh-signal)" }} /><h2 className="font-medium" style={{ color: "var(--sh-text-primary)" }}>GLP-1 post-open research</h2></div>
+                <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{oneTimeResearch?.enabled ? `Queued for ${oneTimeResearch.targetAt ? new Date(oneTimeResearch.targetAt).toLocaleString() : "the next measurable opening-range window"}. It creates research only; you will still choose a paper posture.` : oneTimeResearch?.status === "completed" ? "Research is complete. Review the opportunity set, then choose a paper posture yourself—no order was created." : "One paper-only GLP-1 research brief can run after the opening range. It cannot record a posture, create a proposal, or submit an order."}</p>
+                {oneTimeResearch?.lastResult && <p className="mt-2 text-[11px] leading-5" style={{ color: "var(--sh-fg-muted)" }}>{oneTimeResearch.lastResult}</p>}
+                {oneTimeResearch?.runId && <Link href={`/aperture/run/${oneTimeResearch.runId}`} className="mt-3 inline-flex text-xs font-medium underline underline-offset-4" style={{ color: "var(--sh-signal)" }}>Open the research brief</Link>}
+                {oneTimeResearch?.status !== "completed" && <Button className="mt-3 w-full" size="sm" variant="outline" disabled={configureOneTimeResearch.isPending} onClick={() => configureOneTimeResearch.mutate({ enabled: !oneTimeResearch?.enabled })}>
+                  {configureOneTimeResearch.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="mr-1.5 h-3.5 w-3.5" />}
+                  {oneTimeResearch?.enabled ? "Pause GLP-1 research" : "Queue GLP-1 post-open research"}
+                </Button>}
               </div>
               <div>
                 <div className="flex items-center gap-2"><FileClock className="h-4 w-4" style={{ color: "var(--sh-signal)" }} /><h2 className="font-medium" style={{ color: "var(--sh-text-primary)" }}>Start a recent postmortem</h2></div>

@@ -1501,3 +1501,10 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [ ] Capture a named live decision window that preserves the full opportunity set, modelled risk boundary, active thesis, and portfolio state
 - [ ] Record one explicit paper-only operator posture, then allow only the scheduled source-timed outcome refresh to resolve results
 - [ ] Compare cross-thesis portfolio-impact evidence, including exposure, planned loss, observed paper impact, non-triggers, unavailable tape, and sample limits without claiming edge
+
+## One-Time Automated GLP-1 Post-Open Research (Aug 21 2026)
+- [x] Define a one-time 10:00 AM EDT research-only trigger for the active GLP-1 thesis, including a future intraday cutoff and explicit no-order scope
+- [x] Persist the owner-scoped scheduled job and expose its queued, running, completed, or failed state without creating a proposal or broker-order path
+- [x] Trigger the existing Capital research workflow after the opening-range gate, then direct the completed opportunity set to a human-only paper-posture decision
+- [x] Add deterministic coverage for one-time schedule ownership, thesis binding, idempotency, failure persistence, and structural broker-order exclusion
+- [ ] Publish, activate, and browser-validate the scheduled GLP-1 research path before its target window

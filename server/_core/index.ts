@@ -9,6 +9,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleDailyOutcomeRefresh } from "../aperture/dailyOutcomeRefreshScheduled";
+import { handleOneTimeGlp1Research } from "../aperture/oneTimeGlp1ResearchScheduled";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -50,6 +51,7 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Heartbeat callbacks must be registered before tRPC and the Vite/static fallthrough.
   app.post("/api/scheduled/capital-daily-outcome-refresh", handleDailyOutcomeRefresh);
+  app.post("/api/scheduled/capital-one-time-glp1-research", handleOneTimeGlp1Research);
   // tRPC API
   app.use(
     "/api/trpc",

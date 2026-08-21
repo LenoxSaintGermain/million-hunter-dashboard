@@ -38,6 +38,14 @@ export const users = mysqlTable("users", {
   dailyOutcomeRefreshEnabled: boolean("daily_outcome_refresh_enabled").default(false).notNull(),
   dailyOutcomeRefreshLastRunAt: bigint("daily_outcome_refresh_last_run_at", { mode: "number" }),
   dailyOutcomeRefreshLastResult: text("daily_outcome_refresh_last_result"),
+  /** Immutable Heartbeat identity for one owner-scoped post-open research brief. */
+  oneTimeResearchTaskUid: varchar("one_time_research_task_uid", { length: 65 }),
+  oneTimeResearchEnabled: boolean("one_time_research_enabled").default(false).notNull(),
+  oneTimeResearchStatus: mysqlEnum("one_time_research_status", ["queued", "running", "completed", "failed", "paused"]).default("queued"),
+  oneTimeResearchTargetAt: bigint("one_time_research_target_at", { mode: "number" }),
+  oneTimeResearchThesisId: int("one_time_research_thesis_id"),
+  oneTimeResearchRunId: int("one_time_research_run_id"),
+  oneTimeResearchLastResult: text("one_time_research_last_result"),
   huntingParams: text("hunting_params"), // Free-text agentic command / hunting parameters
   /**
    * Duplicate-account pointer. When one person has signed up twice under two
@@ -49,6 +57,7 @@ export const users = mysqlTable("users", {
   mergedIntoUserId: int("merged_into_user_id"),
 }, (table) => ({
   dailyOutcomeRefreshTaskUidIdx: uniqueIndex("users_daily_outcome_refresh_task_uid_uq").on(table.dailyOutcomeRefreshTaskUid),
+  oneTimeResearchTaskUidIdx: uniqueIndex("users_one_time_research_task_uid_uq").on(table.oneTimeResearchTaskUid),
 }));
 
 export type User = typeof users.$inferSelect;
