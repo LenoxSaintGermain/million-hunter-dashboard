@@ -1494,3 +1494,10 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Add a compact Record trend surface that shows cumulative modeled exposure, bounded planned risk, observed paper impact, and an evidence-quality breakdown without claiming predictive accuracy
 - [x] Add deterministic aggregation tests for mixed resolved, non-triggered, unavailable, and historical-reconstruction cohorts
 - [x] Browser-validate the trend view against the first LEN cohort without creating, approving, submitting, or modifying a paper order
+
+## Distinct-Thesis Comparative Paper Cohort (Aug 21 2026)
+- [x] Select the strongest contrasting canonical Capital thesis based on a different sector or catalyst driver, clear ownership, and a feasible paper-only post-open window
+- [ ] Set the selected thesis as an explicit decision context and prepare an intraday brief with a future Eastern-market cutoff
+- [ ] Capture a named live decision window that preserves the full opportunity set, modelled risk boundary, active thesis, and portfolio state
+- [ ] Record one explicit paper-only operator posture, then allow only the scheduled source-timed outcome refresh to resolve results
+- [ ] Compare cross-thesis portfolio-impact evidence, including exposure, planned loss, observed paper impact, non-triggers, unavailable tape, and sample limits without claiming edge
