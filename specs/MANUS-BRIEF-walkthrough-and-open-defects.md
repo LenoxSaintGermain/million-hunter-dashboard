@@ -1,8 +1,8 @@
-# Manus brief — the demo walkthrough, and the three defects still open
+# Manus brief — the demo walkthrough, and two remaining defects
 
-Two parts. **Part one is three defects from the previous brief that have not
-landed** — I verified against `main` before writing this. Part two is the
-onboarding/demo walkthrough, which is the priority for today.
+Two parts. **Part one is defect status** — three were briefed previously, one is
+now fixed upstream and two remain. Part two is the onboarding/demo walkthrough,
+which is the priority for today.
 
 The walkthrough can be built in parallel with the defects: it replays a captured
 session and does not depend on them. But the capture must be taken **after** the
