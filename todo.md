@@ -1479,7 +1479,7 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Persist the owner-scoped scheduled-job identity and implement an idempotent cron-only refresh endpoint that updates outcomes without touching broker orders
 - [x] Add an operator-controlled daily-refresh schedule and clear status in Record, including pause or resume behavior
 - [x] Test schedule idempotency, ownership isolation, unavailable-tape treatment, and the zero-order-mutation boundary
-- [ ] Deploy the endpoint, activate the daily refresh, and verify the first scheduled outcome cycle can be inspected and managed
+- [x] Deploy the endpoint, activate the daily refresh, and verify the first scheduled outcome cycle can be inspected and managed
 
 ## LEN Proposal Boundary & Portfolio Impact Clarity (Aug 20 2026)
 - [x] Prevent a missing modeled entry or stop from reaching paper-proposal validation and expose one plain-language source-data gap instead of raw Zod errors
