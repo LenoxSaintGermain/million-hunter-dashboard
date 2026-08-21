@@ -11,7 +11,7 @@ import { getDb } from "./db";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { logActivity } from "./db";
-import { apertureCandidates, apertureRuns, capitalTheses, thesisCompilations, thesisShares, users } from "../drizzle/schema";
+import { apertureCandidates, aperturePlayDecisions, aperturePlaySlateItems, apertureRuns, apertureSetAside, capitalTheses, thesisCompilations, thesisShares, users } from "../drizzle/schema";
 import { compileThesis } from "./aperture/thesisGraph";
 import { projectionValues } from "./thesisBridge";
 import { canUseCanonicalThesis } from "./thesisAccess";
@@ -437,9 +437,37 @@ export const thesisRouter = router({
         compositeScore: apertureCandidates.compositeScore,
         confidenceScore: apertureCandidates.confidenceScore,
       }).from(apertureCandidates).where(inArray(apertureCandidates.runId, runIds));
+      const candidateIds = candidates.map((candidate) => candidate.id);
+      const [decisions, outcomes, setAside] = await Promise.all([
+        candidateIds.length
+          ? db.select({ candidateId: aperturePlayDecisions.candidateId, decision: aperturePlayDecisions.decision, reason: aperturePlayDecisions.reason, updatedAt: aperturePlayDecisions.updatedAt })
+            .from(aperturePlayDecisions)
+            .where(and(eq(aperturePlayDecisions.userId, ctx.user.id), inArray(aperturePlayDecisions.candidateId, candidateIds)))
+          : [],
+        candidateIds.length
+          ? db.select({ sourceCandidateId: aperturePlaySlateItems.sourceCandidateId, outcomeStatus: aperturePlaySlateItems.outcomeStatus, outcomeResult: aperturePlaySlateItems.outcomeResult, outcomeBasis: aperturePlaySlateItems.outcomeBasis, outcomeExplanation: aperturePlaySlateItems.outcomeExplanation, updatedAt: aperturePlaySlateItems.updatedAt })
+            .from(aperturePlaySlateItems)
+            .where(inArray(aperturePlaySlateItems.sourceCandidateId, candidateIds))
+            .orderBy(desc(aperturePlaySlateItems.updatedAt))
+          : [],
+        db.select({ id: apertureSetAside.id, runId: apertureSetAside.runId, symbol: apertureSetAside.symbol, reason: apertureSetAside.reason })
+          .from(apertureSetAside)
+          .where(inArray(apertureSetAside.runId, runIds)),
+      ]);
+      const decisionByCandidate = new Map(decisions.map((decision) => [decision.candidateId, decision]));
+      const latestOutcomeByCandidate = new Map<number, typeof outcomes[number]>();
+      for (const outcome of outcomes) if (!latestOutcomeByCandidate.has(outcome.sourceCandidateId)) latestOutcomeByCandidate.set(outcome.sourceCandidateId, outcome);
       return {
         workspace: "capital_aperture" as const,
-        runs: runs.map((run) => ({ ...run, candidates: candidates.filter((candidate) => candidate.runId === run.id) })),
+        runs: runs.map((run) => ({
+          ...run,
+          candidates: candidates.filter((candidate) => candidate.runId === run.id).map((candidate) => ({
+            ...candidate,
+            decision: decisionByCandidate.get(candidate.id) ?? null,
+            outcome: latestOutcomeByCandidate.get(candidate.id) ?? null,
+          })),
+          setAside: setAside.filter((record) => record.runId === run.id),
+        })),
       };
     }),
 

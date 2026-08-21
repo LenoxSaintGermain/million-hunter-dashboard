@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import ApertureShell from "@/components/aperture/ApertureShell";
 import { AlertTriangle, CheckCircle2, Clock3, FileClock, Loader2, PlayCircle, TrendingDown, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
+import { buildWeeklyPaperScorecard } from "@shared/weeklyPaperScorecard";
 
 const outcomeTone = (result: string) => result === "win"
   ? "oklch(0.55 0.15 145)"
@@ -85,6 +86,7 @@ export default function ApertureRecord() {
     () => slates.find((slate) => slate.id === selectedSlateId) ?? slates[0] ?? null,
     [selectedSlateId, slates],
   );
+  const weeklyScorecard = useMemo(() => buildWeeklyPaperScorecard(slates), [slates]);
 
   return (
     <ApertureShell>
@@ -97,6 +99,11 @@ export default function ApertureRecord() {
           </div>
           <Badge variant="outline" className="w-fit text-[10px]" style={{ color: "var(--sh-signal)", borderColor: "color-mix(in srgb, var(--sh-signal) 35%, var(--sh-border-1))" }}>NO AUTONOMOUS ACTION</Badge>
         </div>
+
+        <section className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }} aria-labelledby="weekly-paper-scorecard-title">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-eyebrow text-[10px] uppercase tracking-widest" style={{ color: "var(--sh-signal)" }}>Weekly review · live captures only</p><h2 id="weekly-paper-scorecard-title" className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>What the system surfaced—and what you chose</h2><p className="mt-1 max-w-3xl text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{weeklyScorecard.sampleLimit}</p></div><Badge variant="outline" className="w-fit text-[10px]" style={{ color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}>{weeklyScorecard.historicalExcluded} historical cohort{weeklyScorecard.historicalExcluded === 1 ? "" : "s"} excluded</Badge></div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-lg p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Opportunity record</p><p className="mt-1 text-xl font-semibold" style={{ color: "var(--sh-text-primary)" }}>{weeklyScorecard.opportunityCount}</p><p className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>{weeklyScorecard.liveCohortCount} live cohort{weeklyScorecard.liveCohortCount === 1 ? "" : "s"}</p></div><div className="rounded-lg p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Recorded choice</p><p className="mt-1 text-xl font-semibold" style={{ color: "var(--sh-text-primary)" }}>{weeklyScorecard.selectedCount} selected</p><p className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>{weeklyScorecard.skipped} skipped · {weeklyScorecard.deferred} deferred</p></div><div className="rounded-lg p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Verified selected outcomes</p><p className="mt-1 text-xl font-semibold" style={{ color: "var(--sh-text-primary)" }}>{weeklyScorecard.wins} / {weeklyScorecard.breakevens} / {weeklyScorecard.losses}</p><p className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>wins / near break-even / losses</p></div><div className="rounded-lg p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Still not measured</p><p className="mt-1 text-xl font-semibold" style={{ color: "var(--sh-text-primary)" }}>{weeklyScorecard.pending + weeklyScorecard.unavailable}</p><p className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>{weeklyScorecard.pending} pending · {weeklyScorecard.unavailable} unavailable</p></div></div>
+        </section>
 
         <section className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }} aria-labelledby="portfolio-impact-trend-title">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

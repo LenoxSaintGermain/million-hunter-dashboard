@@ -1520,3 +1520,11 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Update research compilation and constructed recipes so Long/Short are execution directions, indicators are confirmation signals, and strategy never masquerades as the market play
 - [x] Refine the decision UI to narrate the hierarchy from market opportunity through risk controls while preserving paper-only, human-approval boundaries
 - [x] Add legacy-record compatibility and regression coverage for taxonomy validation and source-backed portfolio-impact integrity
+
+## Play-First Journey — Two Audiences, One System (Aug 21 2026)
+- [x] Audit `/aperture`, decision detail, thesis review, and scorecard surfaces against the attached wife-trader and Jim-thesis-author journey
+- [x] Make the trader front door a ranked, play-first daily list with cash, readiness, confidence rationale, and list-level correlated-risk context
+- [x] Keep play review in place with an ordered decision hierarchy, terminal-actionable VWAP state, plain-language invalidation, and compact progressive disclosure
+- [x] Add thesis-to-produced-plays provenance and set-aside review in Jim’s thesis workflow
+- [x] Add a skip-aware weekly scorecard that leads with honest sample limits and includes wins, breakevens, losses, and recorded skips
+- [x] Validate the 375px trader surface, direct return paths, paper-only controls, no-local-preview seam, and full regression suite
