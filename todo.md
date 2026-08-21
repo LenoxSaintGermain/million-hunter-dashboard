@@ -1507,4 +1507,4 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Persist the owner-scoped scheduled job and expose its queued, running, completed, or failed state without creating a proposal or broker-order path
 - [x] Trigger the existing Capital research workflow after the opening-range gate, then direct the completed opportunity set to a human-only paper-posture decision
 - [x] Add deterministic coverage for one-time schedule ownership, thesis binding, idempotency, failure persistence, and structural broker-order exclusion
-- [ ] Publish, activate, and browser-validate the scheduled GLP-1 research path before its target window
+- [x] Publish, activate, and browser-validate the scheduled GLP-1 research path before its target window
