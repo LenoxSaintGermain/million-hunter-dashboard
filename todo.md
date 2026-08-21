@@ -1497,9 +1497,9 @@ anywhere in the codebase; those IDs fail on the current production key.
 
 ## Distinct-Thesis Comparative Paper Cohort (Aug 21 2026)
 - [x] Select the strongest contrasting canonical Capital thesis based on a different sector or catalyst driver, clear ownership, and a feasible paper-only post-open window
-- [ ] Set the selected thesis as an explicit decision context and prepare an intraday brief with a future Eastern-market cutoff
-- [ ] Capture a named live decision window that preserves the full opportunity set, modelled risk boundary, active thesis, and portfolio state
-- [ ] Record one explicit paper-only operator posture, then allow only the scheduled source-timed outcome refresh to resolve results
+- [x] Set the selected thesis as an explicit decision context and prepare an intraday brief with a future Eastern-market cutoff
+- [x] Capture a named live decision window that preserves the full opportunity set, modelled risk boundary, active thesis, and portfolio state
+- [x] Record one explicit paper-only operator posture, then allow only the scheduled source-timed outcome refresh to resolve results
 - [ ] Compare cross-thesis portfolio-impact evidence, including exposure, planned loss, observed paper impact, non-triggers, unavailable tape, and sample limits without claiming edge
 
 ## One-Time Automated GLP-1 Post-Open Research (Aug 21 2026)
@@ -1508,7 +1508,11 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Trigger the existing Capital research workflow after the opening-range gate, then direct the completed opportunity set to a human-only paper-posture decision
 - [x] Add deterministic coverage for one-time schedule ownership, thesis binding, idempotency, failure persistence, and structural broker-order exclusion
 - [x] Publish, activate, and browser-validate the scheduled GLP-1 research path before its target window
-- [ ] Repair the missing scheduled Capital research helper export so the queued GLP-1 callback can load and run research-only at its post-open window
+- [x] Repair the missing scheduled Capital research helper export so the queued GLP-1 callback can load and run research-only at its post-open window
+
+## GLP-1 LLY Paper-Only Posture Capture (Aug 21 2026)
+- [x] Record Lenox’s explicit LLY posture from completed GLP-1 brief #360001 as an immutable live paper slate, with no broker-order mutation
+- [x] Verify the captured slate preserves the complete opportunity set, exact active thesis, modeled recipe, account boundary, and no-order state
 
 ## Play-versus-Strategy Trading Ontology (Aug 21 2026)
 - [x] Audit existing Capital candidate, recipe, strategy, direction, horizon, catalyst, and signal fields against the required separation of market opportunity from trade execution
