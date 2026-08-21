@@ -10,7 +10,9 @@ import { commercialAssets } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
 // ─── scrapeListing unit tests ─────────────────────────────────────────────────
-describe("scrapeListing — URL scraper", () => {
+const describeExternalUrl = process.env.RUN_EXTERNAL_URL_IMPORT === "1" ? describe : describe.skip;
+
+describeExternalUrl("scrapeListing — URL scraper (external connectivity)", () => {
   it("falls back to URL-only mode for an unreachable URL (no throw)", async () => {
     const { scrapeListing } = await import("./listingScraper");
     // Scraper now never throws — falls back to URL-only mode when all strategies fail

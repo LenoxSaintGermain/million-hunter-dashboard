@@ -1534,6 +1534,10 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Make the new-paper-position interface state declared `open` intent; the upstream gate refuses a declared close without a provable closing position
 - [x] Add an account-sync scheduling contract so Capital ceilings use a documented recent paper-account snapshot
 - [x] Make Capital candidate scoring holding-period aware so intraday plays do not use trailing valuation multiples as a gate
-- [ ] Define a versioned, admin-only frozen-session fixture format and guarded capture procedure with no overwrite path
-- [ ] Build the walkthrough replay surface from the frozen fixture only, preserving captured stale/unknown trigger state and a deliberately refused proposal
-- [ ] Prove offline replay has zero provider, broker, and database calls; validate admin gating, fixture immutability, paper-only boundaries, and full regression
+- [x] Define a versioned, admin-only frozen-session fixture format and guarded capture procedure with no overwrite path
+- [x] Build the walkthrough replay surface from the frozen fixture only, preserving captured stale/unknown trigger state and a deliberately refused proposal
+- [x] Prove offline replay has zero provider, broker, and database calls; validate admin gating, fixture immutability, paper-only boundaries, and full regression
+- [x] Preserve every required captured input: cash/expired queue context, cockpit rail, recipe bases, trigger lag, set-aside reasons, preflight outcomes, and ledger sample limit
+- [x] Build all seven walkthrough steps with a persistent recorded-session and freshness disclosure plus explicit not-measured reasons
+- [x] Add a versioned capture index with stable `capture` and `step` deep links while retaining all existing fixture versions
+- [x] Validate every replay step under blocked live transports, at 375px, and in the full default regression suite
