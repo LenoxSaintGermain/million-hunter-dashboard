@@ -10,6 +10,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleDailyOutcomeRefresh } from "../aperture/dailyOutcomeRefreshScheduled";
 import { handleOneTimeGlp1Research } from "../aperture/oneTimeGlp1ResearchScheduled";
+import { handlePaperAccountSync } from "../aperture/paperAccountSyncScheduled";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -52,6 +53,7 @@ async function startServer() {
   // Heartbeat callbacks must be registered before tRPC and the Vite/static fallthrough.
   app.post("/api/scheduled/capital-daily-outcome-refresh", handleDailyOutcomeRefresh);
   app.post("/api/scheduled/capital-one-time-glp1-research", handleOneTimeGlp1Research);
+  app.post("/api/scheduled/capital-paper-account-sync", handlePaperAccountSync);
   // tRPC API
   app.use(
     "/api/trpc",

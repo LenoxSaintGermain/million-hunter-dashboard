@@ -37,6 +37,10 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   const [preflightInput, setPreflightInput] = useState<any | null>(null);
   const [recipePrefilled, setRecipePrefilled] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  // This form only prepares a new research-backed paper position. Closing an
+  // existing position belongs to its own account-position flow, where the held
+  // quantity and closing side can be proven before we state intent: "close".
+  const orderIntent = "open" as const;
   const acknowledgementRef = useRef<HTMLInputElement>(null);
   const constructed = trpc.aperture.play.construct.useQuery({ runId, candidateId: candidate?.id ?? 0 }, { enabled: !!candidate?.id, staleTime: 30_000 });
   const create = trpc.aperture.order.create.useMutation({
@@ -110,6 +114,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
     return {
       runId, candidateId: candidate?.id, accountId: account?.id ?? 0, symbol: candidate?.symbol ?? "",
       side: candidate?.playSide === "short" ? "sell" as const : "buy" as const,
+      intent: orderIntent,
       qty: isIntraday ? intradaySizing?.qty : undefined,
       notionalCents: !isIntraday && Number.isFinite(statedNotionalCents) && statedNotionalCents > 0 ? statedNotionalCents : undefined,
       orderType: isIntraday ? "limit" as const : "market" as const,
@@ -122,7 +127,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
       noTradeConditions: noTradeConditions.length ? noTradeConditions : undefined,
       holdingPeriod, catalystDeadlineAt: Number.isFinite(deadlineAt) ? deadlineAt : undefined, paperAcknowledgement: paperAcknowledgement || undefined,
     };
-  }, [account?.id, candidate?.id, candidate?.symbol, deadline, entryPriceCents, invalidationCondition, intradaySizing?.qty, isIntraday, noTradeText, notionalDollars, paperAcknowledgement, reason, runId, slippageCents, stopPriceCents, timeStop, holdingPeriod]);
+  }, [account?.id, candidate?.id, candidate?.symbol, deadline, entryPriceCents, invalidationCondition, intradaySizing?.qty, isIntraday, noTradeText, notionalDollars, orderIntent, paperAcknowledgement, reason, runId, slippageCents, stopPriceCents, timeStop, holdingPeriod]);
 
   useEffect(() => {
     if (!account || !candidate || !recipeCanPrepare) { setPreflightInput(null); return; }
@@ -164,7 +169,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   return <Card id="paper-proposal" className="scroll-mt-6 border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
     <CardContent className="space-y-4 pt-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper proposal · human approval required</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol} · decide the next safe step</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The plan is prefilled from research. You only edit a modelled value when you can verify a change.</p></div><Badge variant="outline" style={{ color: "var(--sh-signal)" }}>Modelled range {suggestedRange}</Badge>
+        <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper proposal · human approval required</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol} · decide the next safe step</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The plan is prefilled from research. You only edit a modelled value when you can verify a change.</p></div><div className="flex flex-wrap gap-1"><Badge variant="outline" style={{ color: "var(--sh-signal)" }}>Modelled range {suggestedRange}</Badge><Badge variant="outline" style={{ color: "var(--sh-text-primary)" }}>Intent · open paper exposure</Badge></div>
       </div>
 
       <section className="rounded-lg border p-3" style={{ borderColor: readiness.action === "create_proposal" ? "oklch(0.55 0.15 145)" : "var(--sh-signal)", background: "var(--sh-surface)" }} aria-live="polite">

@@ -36,12 +36,28 @@ export interface ThesisFitScore {
 
 /** Facts that carry weight. Missing ones lower confidence rather than the score. */
 const SCORING_FACTS = ["revenue_ttm", "pe_ratio", "price_to_sales", "adv_usd_30d", "last_price", "market_cap"];
+export type ScoreHoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window";
+
+function normalizeHoldingPeriod(value: unknown): ScoreHoldingPeriod {
+  return ["intraday", "overnight", "swing", "catalyst_window"].includes(String(value))
+    ? value as ScoreHoldingPeriod
+    : "swing";
+}
+
+function scoringFactsFor(holdingPeriod: ScoreHoldingPeriod): string[] {
+  // Valuation multiples describe a longer-horizon ownership question. They do
+  // not confirm or invalidate a same-session tape setup, so they cannot block
+  // an intraday candidate through the evidence-review gate.
+  return holdingPeriod === "intraday"
+    ? SCORING_FACTS.filter((key) => key !== "pe_ratio" && key !== "price_to_sales")
+    : SCORING_FACTS;
+}
 
 /**
  * Dimensions are fixed in shape but their thresholds come from the thesis: a
  * liquidity floor the investor stated becomes the gate on D.
  */
-export function dimensionsFor(graph: ThesisGraph): ScorableDimension[] {
+export function dimensionsFor(graph: ThesisGraph, holdingPeriod: ScoreHoldingPeriod = "swing"): ScorableDimension[] {
   const minAdv = graph.portfolioRules.minAvgDailyVolumeUsd;
   return [
     {
@@ -59,16 +75,18 @@ export function dimensionsFor(graph: ThesisGraph): ScorableDimension[] {
           bands: [{ gte: 80, points: 25 }, { gte: 60, points: 19 }, { gte: 40, points: 12 }, { gte: 20, points: 6 }, { gte: 0, points: 0 }] },
       ],
     },
-    {
-      key: "C", label: "Valuation", max: 20,
-      factors: [
-        // No sourced multiple → mid-range points, not a bonus. Absence is not cheapness.
-        { key: "pe", label: "Price / earnings", max: 12, field: "pe_ratio", missing: 4, verifyWhenMissing: true,
-          bands: [{ lte: 15, points: 12 }, { lte: 25, points: 9 }, { lte: 40, points: 5 }, { gt: 40, points: 1 }] },
-        { key: "ps", label: "Price / sales", max: 8, field: "price_to_sales", missing: 3, verifyWhenMissing: true,
-          bands: [{ lte: 3, points: 8 }, { lte: 8, points: 5 }, { lte: 15, points: 2 }, { gt: 15, points: 0 }] },
-      ],
-    },
+    holdingPeriod === "intraday"
+      ? { key: "C", label: "Valuation (not used for intraday)", max: 0, factors: [] }
+      : {
+        key: "C", label: "Valuation", max: 20,
+        factors: [
+          // No sourced multiple → mid-range points, not a bonus. Absence is not cheapness.
+          { key: "pe", label: "Price / earnings", max: 12, field: "pe_ratio", missing: 4, verifyWhenMissing: true,
+            bands: [{ lte: 15, points: 12 }, { lte: 25, points: 9 }, { lte: 40, points: 5 }, { gt: 40, points: 1 }] },
+          { key: "ps", label: "Price / sales", max: 8, field: "price_to_sales", missing: 3, verifyWhenMissing: true,
+            bands: [{ lte: 3, points: 8 }, { lte: 8, points: 5 }, { lte: 15, points: 2 }, { gt: 15, points: 0 }] },
+        ],
+      },
     {
       key: "D", label: "Tradability", max: 15, gate: minAdv != null ? 6 : undefined,
       factors: [
@@ -118,10 +136,13 @@ export interface ScoreInput {
   nodeLabels: string[];
   /** Sector supplied by a provider, if any. */
   sector?: string | null;
+  /** Intraday scoring deliberately excludes trailing valuation multiples. */
+  holdingPeriod?: ScoreHoldingPeriod | null;
 }
 
 export function scoreThesisFit(input: ScoreInput): ThesisFitScore {
   const { symbol, facts, graph, nodeLabels } = input;
+  const holdingPeriod = normalizeHoldingPeriod(input.holdingPeriod);
 
   const byKey = new Map<string, SecurityFact>();
   for (const f of facts) if (f.basis !== "unknown") byKey.set(f.factKey, f);
@@ -132,8 +153,9 @@ export function scoreThesisFit(input: ScoreInput): ThesisFitScore {
     sectorFact && graph.sectors.some((s) => s.toLowerCase().trim() && sectorFact.toLowerCase().includes(s.toLowerCase().trim())),
   );
 
-  const present = SCORING_FACTS.filter((k) => byKey.has(k));
-  const factCoveragePct = (present.length / SCORING_FACTS.length) * 100;
+  const scoringFacts = scoringFactsFor(holdingPeriod);
+  const present = scoringFacts.filter((k) => byKey.has(k));
+  const factCoveragePct = (present.length / scoringFacts.length) * 100;
 
   const derived: Record<string, unknown> = {
     nodeMatchCount: matchedNodes.length,
@@ -147,9 +169,10 @@ export function scoreThesisFit(input: ScoreInput): ThesisFitScore {
     return f.valueNum ?? f.valueText ?? undefined;
   };
 
-  const dims = dimensionsFor(graph);
+  const dims = dimensionsFor(graph, holdingPeriod);
   const { dimResults, rawSum, verifyFields } = scoreDimensions(dims, get);
-  const compositeScore = clamp(Math.round(rawSum), 0, 100);
+  const maxAvailablePoints = dims.reduce((sum, dimension) => sum + dimension.max, 0);
+  const compositeScore = clamp(Math.round(maxAvailablePoints > 0 ? (rawSum / maxAvailablePoints) * 100 : 0), 0, 100);
 
   const confidenceScore = present.length / SCORING_FACTS.length;
   const rankScore = Math.round(compositeScore * (0.5 + 0.5 * confidenceScore) * 10) / 10;
@@ -166,7 +189,7 @@ export function scoreThesisFit(input: ScoreInput): ThesisFitScore {
   if (hardStopFailed) risks.push(hardStopFailed);
   if (!passes) risks.push(`Gate not met on ${failedGates(dimResults).map((d) => d.key).join(", ")}`);
   if (confidenceScore < 0.5) {
-    risks.push(`Only ${present.length}/${SCORING_FACTS.length} scoring facts are sourced — this score rests on thin evidence`);
+    risks.push(`Only ${present.length}/${scoringFacts.length} scoring facts are sourced — this score rests on thin evidence`);
   }
   if (!matchedNodes.length) risks.push("No exposure node matched — the thesis link is asserted, not evidenced");
 

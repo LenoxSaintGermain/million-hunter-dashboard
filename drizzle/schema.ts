@@ -1111,9 +1111,16 @@ export const portfolioAccounts = mysqlTable("portfolio_accounts", {
   lastSyncedAt: bigint("last_synced_at", { mode: "number" }),
   syncSource: varchar("sync_source", { length: 64 }),
   syncError: text("sync_error"),
+  /** Immutable Heartbeat identity for the paper-account freshness callback. */
+  syncScheduleTaskUid: varchar("sync_schedule_task_uid", { length: 96 }),
+  syncScheduleEnabled: boolean("sync_schedule_enabled").default(false).notNull(),
+  syncScheduleLastRunAt: bigint("sync_schedule_last_run_at", { mode: "number" }),
+  syncScheduleLastResult: text("sync_schedule_last_result"),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
-});
+}, (table) => ({
+  syncScheduleTaskUidIdx: index("portfolio_accounts_sync_schedule_task_uid_idx").on(table.syncScheduleTaskUid),
+}));
 export type PortfolioAccount = typeof portfolioAccounts.$inferSelect;
 export type InsertPortfolioAccount = typeof portfolioAccounts.$inferInsert;
 

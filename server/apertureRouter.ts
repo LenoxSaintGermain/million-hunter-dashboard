@@ -72,6 +72,7 @@ import { COOKIE_NAME } from "../shared/const";
 import { parse as parseCookie } from "cookie";
 import { DAILY_OUTCOME_REFRESH_CRON, DAILY_OUTCOME_REFRESH_PATH, refreshLiveSlateOutcomes } from "./aperture/dailyOutcomeRefresh";
 import { ONE_TIME_GLP1_RESEARCH_PATH, oneTimeResearchCron } from "./aperture/oneTimeGlp1Research";
+import { PAPER_ACCOUNT_SYNC_CRON, PAPER_ACCOUNT_SYNC_PATH } from "./aperture/paperAccountSyncScheduled";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -459,6 +460,45 @@ export const apertureRouter = router({
         }
 
         return { synced: posData.length, cashCents: acctData.cashCents };
+      }),
+
+    configureSyncSchedule: adminProcedure
+      .input(z.object({ id: z.number(), enabled: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const account = await requireAccount(db, input.id, ctx.user.id);
+        if (!account.isPaper || account.brokerId !== "alpaca_paper") {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Scheduled freshness is available only for configured Alpaca Paper accounts." });
+        }
+        const rawCookie = typeof ctx.req.headers.cookie === "string" ? ctx.req.headers.cookie : "";
+        const sessionToken = parseCookie(rawCookie)[COOKIE_NAME] ?? "";
+        if (!sessionToken) throw new TRPCError({ code: "UNAUTHORIZED", message: "Your session could not be verified for the paper-account sync schedule." });
+
+        let taskUid = account.syncScheduleTaskUid ?? null;
+        let nextExecutionAt: string | null | undefined;
+        if (!taskUid) {
+          if (!input.enabled) {
+            await db!.update(portfolioAccounts).set({ syncScheduleEnabled: false }).where(eq(portfolioAccounts.id, account.id));
+            return { enabled: false, configured: false, nextExecutionAt: null };
+          }
+          const created = await createHeartbeatJob({
+            name: `capital-paper-account-sync-${account.id}`,
+            cron: PAPER_ACCOUNT_SYNC_CRON,
+            path: PAPER_ACCOUNT_SYNC_PATH,
+            payload: {},
+            description: "Refreshes a named Alpaca Paper account during an active US market session. Reads account and position context only; never creates broker orders.",
+          }, sessionToken);
+          taskUid = created.taskUid;
+          nextExecutionAt = created.nextExecutionAt;
+        } else {
+          const updated = await updateHeartbeatJob(taskUid, { enable: input.enabled }, sessionToken);
+          nextExecutionAt = updated.nextExecutionAt;
+        }
+        await db!.update(portfolioAccounts).set({
+          syncScheduleTaskUid: taskUid,
+          syncScheduleEnabled: input.enabled,
+        }).where(eq(portfolioAccounts.id, account.id));
+        return { enabled: input.enabled, configured: true, nextExecutionAt: nextExecutionAt ?? null };
       }),
 
     getPositions: adminProcedure
@@ -2147,6 +2187,9 @@ async function executeRun(
       deployableCapitalCents: input.deployableCapitalCents,
       intendedTrades: input.intendedTrades,
       hurdleRateBps: input.hurdleRateBps,
+      holdingPeriod: input.holdingPeriod != null && ["intraday", "overnight", "swing", "catalyst_window"].includes(input.holdingPeriod)
+        ? input.holdingPeriod as "intraday" | "overnight" | "swing" | "catalyst_window"
+        : null,
     });
 
     // ── 6. Persist candidates ──────────────────────────────────────────────

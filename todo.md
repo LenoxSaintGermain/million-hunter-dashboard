@@ -1530,10 +1530,10 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Validate the 375px trader surface, direct return paths, paper-only controls, no-local-preview seam, and full regression suite
 
 ## Order Intent Safety and Offline Capital Walkthrough (Aug 21 2026)
-- [ ] Pull upstream commit `2fd7ada` and apply the additive broker-order intent migration without re-implementing the resolved sell-intent gate
-- [ ] Make the paper-order interface state a declared `open` or `close` intent, and refuse a declared close without a provable closing position
-- [ ] Add an account-sync scheduling contract so Capital ceilings use a documented recent paper-account snapshot
-- [ ] Make Capital candidate scoring holding-period aware so intraday plays do not use trailing valuation multiples as a gate
+- [x] Pull upstream commit `2fd7ada` and apply the additive broker-order intent migration without re-implementing the resolved sell-intent gate
+- [x] Make the new-paper-position interface state declared `open` intent; the upstream gate refuses a declared close without a provable closing position
+- [x] Add an account-sync scheduling contract so Capital ceilings use a documented recent paper-account snapshot
+- [x] Make Capital candidate scoring holding-period aware so intraday plays do not use trailing valuation multiples as a gate
 - [ ] Define a versioned, admin-only frozen-session fixture format and guarded capture procedure with no overwrite path
 - [ ] Build the walkthrough replay surface from the frozen fixture only, preserving captured stale/unknown trigger state and a deliberately refused proposal
 - [ ] Prove offline replay has zero provider, broker, and database calls; validate admin gating, fixture immutability, paper-only boundaries, and full regression

@@ -53,6 +53,11 @@ export default function ApertureAccounts() {
     onError: (e) => toast.error(e.message),
   });
 
+  const configureSyncSchedule = trpc.aperture.account.configureSyncSchedule.useMutation({
+    onSuccess: ({ enabled }) => { toast.success(enabled ? "Paper-account freshness schedule enabled" : "Paper-account freshness schedule paused"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
   const importCsv = trpc.aperture.account.importCsv.useMutation({
     onSuccess: ({ imported }) => {
       toast.success(`${imported} position(s) imported`);
@@ -118,7 +123,7 @@ export default function ApertureAccounts() {
             <button onClick={() => navigate("/aperture/runs")} className="inline-flex shrink-0 items-center gap-1 text-xs text-amber hover:underline">Open research journeys <ArrowRight className="h-3 w-3" /></button>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2 border-t border-rule pt-4 sm:grid-cols-4">
-            {["1 · Sync context", "2 · Review decisive checks", "3 · Approve paper order", "4 · Track fill & follow-up"].map((step, index) => <div key={step} className="min-w-0"><p className="font-eyebrow text-eyebrow text-muted-foreground">{step}</p><p className="mt-1 text-xs leading-5 text-ink/70">{["Connected accounts sync automatically; manual accounts use CSV.", "Only decision-critical evidence gates order review.", "Approval and submission are separate human actions.", "Filled paper orders enter monitoring and outcome analysis."][index]}</p></div>)}
+            {["1 · Sync context", "2 · Review decisive checks", "3 · Approve paper order", "4 · Track fill & follow-up"].map((step, index) => <div key={step} className="min-w-0"><p className="font-eyebrow text-eyebrow text-muted-foreground">{step}</p><p className="mt-1 text-xs leading-5 text-ink/70">{["Refresh a connected Alpaca Paper account now, or opt in to bounded freshness checks; manual accounts use CSV.", "Only decision-critical evidence gates order review.", "Approval and submission are separate human actions.", "Filled paper orders enter monitoring and outcome analysis."][index]}</p></div>)}
           </div>
         </section>
 
@@ -222,7 +227,7 @@ export default function ApertureAccounts() {
                 <div className="flex items-center gap-2 text-xs">
                   {brokers.find((b) => b.id === account.brokerId)!.available ? (
                     <><CheckCircle2 className="h-3.5 w-3.5" style={{ color: "oklch(0.55 0.15 145)" }} />
-                    <span style={{ color: "oklch(0.55 0.15 145)" }}><strong>Connected:</strong> positions sync automatically from this paper broker. Research still requires human evidence review, order approval, and a separate paper submission.</span></>
+                    <span style={{ color: "oklch(0.55 0.15 145)" }}><strong>Connected:</strong> sync now, or enable a bounded freshness schedule below. Research still requires human evidence review, order approval, and a separate paper submission.</span></>
                   ) : (
                     <><XCircle className="h-3.5 w-3.5" style={{ color: "var(--sh-fg-muted)" }} />
                     <span style={{ color: "var(--sh-fg-muted)" }}>
@@ -240,6 +245,26 @@ export default function ApertureAccounts() {
                   ))}
                 </div>
               ) : null}
+
+              {account.brokerId === "alpaca_paper" && account.isPaper && (
+                <div className="rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Paper-account freshness</p>
+                      <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>When enabled, this account is read every 15 minutes during active US market sessions. It updates the research denominator only; it cannot create, approve, or submit an order.</p>
+                      {account.syncScheduleLastResult && <p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Last check: {account.syncScheduleLastResult}</p>}
+                    </div>
+                    <Button
+                      variant={account.syncScheduleEnabled ? "outline" : "default"}
+                      size="sm"
+                      onClick={() => configureSyncSchedule.mutate({ id: account.id, enabled: !account.syncScheduleEnabled })}
+                      disabled={configureSyncSchedule.isPending || !brokers?.find((b) => b.id === account.brokerId)?.available}
+                    >
+                      {account.syncScheduleEnabled ? "Pause freshness" : "Enable freshness"}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <Separator />
 

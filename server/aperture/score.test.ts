@@ -111,6 +111,18 @@ describe("scoreThesisFit", () => {
     expect(noPe.verifyFields.join(" ")).toMatch(/Price \/ earnings/);
   });
 
+  it("does not make trailing valuation multiples decision-critical for intraday plays", () => {
+    const intraday = scoreThesisFit({
+      symbol: "FAST",
+      graph: GRAPH,
+      nodeLabels: NODES,
+      holdingPeriod: "intraday",
+      facts: WELL_COVERED.filter((item) => !["pe_ratio", "price_to_sales"].includes(item.factKey)),
+    });
+    expect(intraday.dimensions.find((dimension) => dimension.key === "C")?.label).toMatch(/not used for intraday/i);
+    expect(intraday.verifyFields.join(" ")).not.toMatch(/Price \/ earnings|Price \/ sales/);
+  });
+
   it("uses the investor's stated liquidity floor as the tradability gate", () => {
     const strict: ThesisGraph = { ...GRAPH, portfolioRules: { minAvgDailyVolumeUsd: 500e6 } };
     expect(dimensionsFor(strict).find((d) => d.key === "D")!.gate).toBe(6);
