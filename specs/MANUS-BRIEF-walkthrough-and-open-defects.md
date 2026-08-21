@@ -25,10 +25,10 @@ defects land, or the demo will show an intraday play gated on Price/Sales.
 
 ---
 
-# Part one — still open
+# Part one — defect status
 
-Verified on `main` at the time of writing. All three were briefed previously
-and remain unimplemented.
+Two open, one fixed upstream. **Pull `main` before starting** — defect 3 is
+already done and re-implementing it would collide.
 
 **1. Nothing syncs the paper account.** `lastSyncedAt` is written only by the
 manual `account.sync` mutation; `server/scheduler.ts` has no account job.
@@ -40,12 +40,20 @@ references. `pe_ratio` and `price_to_sales` carry `verifyWhenMissing`, so an
 intraday play is gated on a trailing sales multiple and `evidenceReviewBlock`
 refuses the proposal until a human records a review of it.
 
-**3. `gates.ts` treats every sell as exposure-reducing** — `isBuy` at line 247
-skips the concentration, per-run and daily-new ceilings for `side: "sell"`.
-That is correct for closing a long and **wrong for opening a short**.
-`playConstructor` already accepts `side: "short"`, so the first short entry
-would bypass three ceilings. The model needs `intent: open | close` alongside
-`side`, because "sell" currently means both. Treat this as a safety defect.
+**3. ~~`gates.ts` treats every sell as exposure-reducing~~ — FIXED upstream in
+`6ff338b`. Do not implement.** `resolveOrderIntent()` in `gates.ts` now decides
+from the signed position quantity whether an order opens or closes exposure, and
+is fail-closed: anything that cannot be proven to close is gated as opening.
+Concentration also now measures absolute exposure, because a broker reports a
+short at negative market value and netting it made a growing short read as
+shrinking concentration. Migration `0044` adds a nullable `broker_orders.intent`.
+
+  What this means for you: `order.create` and `order.preflight` accept an
+  optional `intent: "open" | "close"`. **The ticket should state it rather than
+  relying on inference** — inference is a safety net, not the interface. When the
+  operator is closing a position, pass `"close"`; otherwise pass `"open"`. The
+  gate records whether the value was stated or inferred, and a stated `"close"`
+  with no position to close is refused outright.
 
 ---
 
