@@ -18,8 +18,17 @@
  * dropped and SAID to be dropped.
  */
 import { impactOf, round, type Holding, type ImpactDelta } from "./portfolioMath";
+import { PORTFOLIO_POSTURE_LABELS, type PortfolioPostureKind } from "../../shared/tradingOntology";
 
-export type StrategyKind = "concentrated" | "expanded" | "risk_balanced" | "dry_powder" | "human_baseline";
+/**
+ * These are allocation postures, not entry/exit strategies. Trade execution
+ * strategy now lives in the constructed paper recipe under `execution.strategy`.
+ */
+export type StrategyKind = PortfolioPostureKind;
+
+export function portfolioPostureLabel(kind: StrategyKind) {
+  return PORTFOLIO_POSTURE_LABELS[kind];
+}
 
 export interface PortfolioRules {
   /** Cap on any single position as a % of total portfolio value after deployment. */
@@ -55,6 +64,8 @@ export interface Allocation {
 }
 
 export interface Strategy {
+  /** Deliberately names this object as an allocation model rather than a trade strategy. */
+  category: "portfolio_posture";
   kind: StrategyKind;
   label: string;
   rationale: string;
@@ -214,6 +225,7 @@ function build(
   const advOf = new Map(input.candidates.map((c) => [c.symbol, c.advUsd ?? null]));
 
   return {
+    category: "portfolio_posture",
     kind,
     label,
     rationale,
@@ -242,6 +254,7 @@ export function humanBaseline(input: BuildInput): Strategy {
   const spent = intended.reduce((s, t) => s + t.dollarsCents, 0);
   const sectorOf = new Map(input.candidates.map((c) => [c.symbol, c.sector ?? null]));
   return {
+    category: "portfolio_posture",
     kind: "human_baseline",
     label: "Your plan",
     rationale: "The trades you were already considering, left exactly as you set them.",

@@ -1508,3 +1508,11 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Trigger the existing Capital research workflow after the opening-range gate, then direct the completed opportunity set to a human-only paper-posture decision
 - [x] Add deterministic coverage for one-time schedule ownership, thesis binding, idempotency, failure persistence, and structural broker-order exclusion
 - [x] Publish, activate, and browser-validate the scheduled GLP-1 research path before its target window
+- [ ] Repair the missing scheduled Capital research helper export so the queued GLP-1 callback can load and run research-only at its post-open window
+
+## Play-versus-Strategy Trading Ontology (Aug 21 2026)
+- [x] Audit existing Capital candidate, recipe, strategy, direction, horizon, catalyst, and signal fields against the required separation of market opportunity from trade execution
+- [x] Define normalized, backward-compatible taxonomy contracts for play family, specific play, direction, strategy, instrument, horizon, catalyst, signals, entry, invalidation, targets, size, risk/reward, and confidence
+- [x] Update research compilation and constructed recipes so Long/Short are execution directions, indicators are confirmation signals, and strategy never masquerades as the market play
+- [x] Refine the decision UI to narrate the hierarchy from market opportunity through risk controls while preserving paper-only, human-approval boundaries
+- [x] Add legacy-record compatibility and regression coverage for taxonomy validation and source-backed portfolio-impact integrity

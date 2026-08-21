@@ -3,6 +3,12 @@ export type PlayReadiness = "needs_evidence" | "needs_risk_plan" | "ready_to_pre
 export type PlayRecipe = {
   symbol: string;
   readiness: PlayReadiness;
+  /**
+   * This compatibility helper has no source-timed opening-range or VWAP input.
+   * It must therefore never label a market setup; use the constructed recipe
+   * for a classified market play, direction, and execution strategy.
+   */
+  marketOpportunityStatus: "not_classified";
   estimatedAmountCents: number | null;
   amountBasis: "operator_stated" | "modeled_research_range" | "not_set";
   requiredChecks: string[];
@@ -64,29 +70,30 @@ export function buildPlayRecipe({
   return {
     symbol: candidate.symbol,
     readiness,
+    marketOpportunityStatus: "not_classified",
     estimatedAmountCents,
     amountBasis,
     requiredChecks: checks,
     blockingReasons,
     steps: [
       {
-        label: "Confirm the starting signal",
+        label: "Review market evidence",
         detail: unreviewed.length
           ? `${unreviewed.length} evidence question${unreviewed.length === 1 ? " remains" : "s remain"} open.`
           : "Required evidence review is recorded.",
         complete: unreviewed.length === 0,
       },
       {
-        label: "Set the risk plan",
+        label: "Design the execution plan",
         detail: intraday
-          ? "State entry, stop, slippage, time window, and no-trade conditions from current market evidence."
+          ? "Use the constructed recipe to confirm entry, stop, slippage, time window, and no-trade conditions from current market evidence."
           : estimatedAmountCents == null
             ? "Choose an operator-stated paper amount or wait for a modeled research range."
             : "A paper amount is available for human review.",
         complete: !intraday && estimatedAmountCents != null,
       },
       {
-        label: "Prepare the paper proposal",
+        label: "Review the paper ticket",
         detail: "A proposal is a record for separate human approval; it never submits itself.",
         complete: readiness === "ready_to_prepare",
       },

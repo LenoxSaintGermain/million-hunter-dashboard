@@ -44,6 +44,7 @@ import { CURRENT_MANDATE, type HoldingPeriod, type Mandate } from "./mandate";
 import { singleOrderCeilingCents } from "./gates";
 import type { MinuteBar, OpeningRange, SessionVwap, TapeFeed, VwapHoldCheck } from "./intraday";
 import { describeTape } from "./intraday";
+import { buildOpeningRangeTradingOntology, type TradingOntology } from "../../shared/tradingOntology";
 
 // ── Stated assumptions ────────────────────────────────────────────────────────
 
@@ -102,6 +103,8 @@ export interface ConstructedPlay {
   symbol: string;
   side: PlaySide;
   holdingPeriod: HoldingPeriod;
+  /** The market opportunity, execution choice, horizon, catalyst, and signals are separate objects. */
+  taxonomy: TradingOntology;
   readiness: PlayReadiness;
 
   entry: PlayLevel | null;
@@ -180,11 +183,24 @@ export function constructPlay(input: ConstructPlayInput): ConstructedPlay {
   const unavailable: string[] = [];
   const assumptions: string[] = [];
   const noTrade: string[] = [];
+  const taxonomy = buildOpeningRangeTradingOntology({
+    side,
+    holdingPeriod: input.holdingPeriod,
+    openingRange: {
+      complete: input.range.complete,
+      minutes: input.range.minutes ?? null,
+      unavailableReason: input.range.unavailableReason,
+    },
+    vwapHold: input.trigger ?? null,
+    catalystDeadlineAt: input.catalystDeadlineAt ?? null,
+    now: input.now,
+  });
 
   const base: ConstructedPlay = {
     symbol: input.symbol,
     side,
     holdingPeriod: input.holdingPeriod,
+    taxonomy,
     readiness: "needs_tape",
     entry: null,
     stop: null,
