@@ -24,6 +24,7 @@ const outcomeLabel = (result: string) => ({
 }[result] ?? result.replaceAll("_", " "));
 
 const cents = (value: number | null | undefined) => value == null ? "—" : `$${(value / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+const signedCents = (value: number | null | undefined) => value == null ? "Not measured" : `${value >= 0 ? "+" : "−"}${cents(Math.abs(value))}`;
 
 export default function ApertureRecord() {
   const utils = trpc.useUtils();
@@ -32,6 +33,7 @@ export default function ApertureRecord() {
   const { data: cohorts = [], isLoading: loadingCohorts } = trpc.aperture.ledger.availableCohorts.useQuery();
   const { data: activePlays } = trpc.aperture.play.list.useQuery();
   const { data: dailyRefresh } = trpc.aperture.ledger.dailyRefreshSchedule.useQuery();
+  const { data: portfolioImpactTrend } = trpc.aperture.ledger.portfolioImpactTrend.useQuery();
   const canCaptureLiveSlate = (activePlays?.plays?.length ?? 0) > 0;
   const reconstruct = trpc.aperture.ledger.reconstructRecentRun.useMutation({
     onSuccess: async ({ slateId, created }) => {
@@ -86,6 +88,23 @@ export default function ApertureRecord() {
           </div>
           <Badge variant="outline" className="w-fit text-[10px]" style={{ color: "var(--sh-signal)", borderColor: "color-mix(in srgb, var(--sh-signal) 35%, var(--sh-border-1))" }}>NO AUTONOMOUS ACTION</Badge>
         </div>
+
+        <section className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }} aria-labelledby="portfolio-impact-trend-title">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="font-eyebrow text-[10px] uppercase tracking-widest" style={{ color: "var(--sh-signal)" }}>Live paper cohorts only</p>
+              <h2 id="portfolio-impact-trend-title" className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>Portfolio impact trend</h2>
+              <p className="mt-1 max-w-3xl text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{portfolioImpactTrend?.evidenceNote ?? "Loading captured cohort evidence…"}</p>
+            </div>
+            <Badge variant="outline" className="w-fit text-[10px]" style={{ color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}>{portfolioImpactTrend?.historicalCohortCountExcluded ?? 0} historical cohort{portfolioImpactTrend?.historicalCohortCountExcluded === 1 ? "" : "s"} excluded</Badge>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Cohort evidence</p><p className="mt-1 text-xl font-semibold" style={{ color: "var(--sh-text-primary)" }}>{portfolioImpactTrend?.measuredSelectedOutcomeCount ?? 0} / {portfolioImpactTrend?.selectedPaperPlayCount ?? 0}</p><p className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>verified selected outcomes</p></div>
+            <div className="rounded-lg p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Modelled exposure</p><p className="mt-1 text-xl font-semibold" style={{ color: "var(--sh-text-primary)" }}>{cents(portfolioImpactTrend?.modeledExposureCents)}</p><p className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>cumulative; not simultaneous</p></div>
+            <div className="rounded-lg p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Bounded planned loss</p><p className="mt-1 text-xl font-semibold" style={{ color: "var(--sh-text-primary)" }}>{cents(portfolioImpactTrend?.plannedLossCents)}</p><p className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>from captured recipes</p></div>
+            <div className="rounded-lg p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Observed paper impact</p><p className="mt-1 text-xl font-semibold" style={{ color: portfolioImpactTrend?.observedImpactCents != null && portfolioImpactTrend.observedImpactCents < 0 ? "var(--sh-red)" : "var(--sh-text-primary)" }}>{signedCents(portfolioImpactTrend?.observedImpactCents)}</p><p className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>{portfolioImpactTrend?.nonTriggeredSelectedCount ?? 0} non-triggered · {portfolioImpactTrend?.unavailableSelectedCount ?? 0} unavailable</p></div>
+          </div>
+        </section>
 
         <div className="grid gap-3 lg:grid-cols-[1.05fr_1.95fr]">
           <Card style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>

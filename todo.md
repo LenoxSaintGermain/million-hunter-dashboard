@@ -1487,3 +1487,10 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Display portfolio impact only when modeled entry, stop, quantity, and current portfolio equity are source-backed; otherwise state exactly what is not measured
 - [x] Add regression tests for no-recipe proposal attempts and conditional portfolio-impact presentation
 - [x] Browser-validate the repaired LEN decision flow without creating, approving, or modifying a paper order
+
+## Portfolio-Impact Trend View Across Cohorts (Aug 21 2026)
+- [x] Define cohort-level portfolio-impact metrics from immutable live-capture records: selected exposure, planned loss, observed paper P&L, non-triggers, unavailable outcomes, and evidence sample size
+- [x] Add an owner-scoped trend aggregation that excludes historical reconstructions, unresolved outcomes, and any unmeasured portfolio fields from performance totals
+- [x] Add a compact Record trend surface that shows cumulative modeled exposure, bounded planned risk, observed paper impact, and an evidence-quality breakdown without claiming predictive accuracy
+- [x] Add deterministic aggregation tests for mixed resolved, non-triggered, unavailable, and historical-reconstruction cohorts
+- [x] Browser-validate the trend view against the first LEN cohort without creating, approving, submitting, or modifying a paper order

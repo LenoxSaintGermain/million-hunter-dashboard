@@ -65,6 +65,7 @@ import { REGULAR_OPEN, etClock, nextRegularSessionOpen, startOfEtDay } from "./a
 import { constructPlay, CONSTRUCTED_PLAY_DISCLOSURE } from "./aperture/playConstructor";
 import { canonicalCapitalValues, needsCanonicalPromotion } from "./aperture/canonicalThesisLink";
 import { buildTrustCalibration, calculatePaperPlayOutcome } from "../shared/playOutcomeLedger";
+import { buildPortfolioImpactTrend, type PortfolioImpactTrendRow } from "../shared/portfolioImpactTrend";
 import { evaluateIntradayPaperOutcome } from "./aperture/playOutcomeEvaluator";
 import { createHeartbeatJob, updateHeartbeatJob } from "./_core/heartbeat";
 import { COOKIE_NAME } from "../shared/const";
@@ -1175,6 +1176,45 @@ export const apertureRouter = router({
             : null,
         };
       });
+    }),
+
+    portfolioImpactTrend: adminProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      const slates = await db!.select().from(aperturePlaySlates)
+        .where(eq(aperturePlaySlates.userId, ctx.user.id));
+      if (!slates.length) return buildPortfolioImpactTrend([]);
+      const items = await db!.select().from(aperturePlaySlateItems)
+        .where(inArray(aperturePlaySlateItems.slateId, slates.map((slate) => slate.id)));
+      const slateById = new Map(slates.map((slate) => [slate.id, slate]));
+      const rows: PortfolioImpactTrendRow[] = items.flatMap((item) => {
+        const slate = slateById.get(item.slateId);
+        if (!slate) return [];
+        const snapshot = item.recommendationSnapshot as { play?: unknown } | null;
+        const sourcePlay = snapshot?.play as Record<string, unknown> | undefined;
+        const side: "long" | "short" | null = sourcePlay?.side === "short" ? "short" : sourcePlay?.side === "long" ? "long" : null;
+        const numberOrNull = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
+        const play = side
+          ? {
+              side,
+              qty: numberOrNull(sourcePlay?.qty),
+              notionalCents: numberOrNull(sourcePlay?.notionalCents),
+              plannedLossCents: numberOrNull(sourcePlay?.plannedLossCents),
+            }
+          : null;
+        return [{
+          slateId: slate.id,
+          snapshotBasis: slate.snapshotBasis,
+          slateStatus: slate.status,
+          itemDecision: item.operatorDecision,
+          outcomeStatus: item.outcomeStatus,
+          outcomeResult: item.outcomeResult,
+          outcomeBasis: item.outcomeBasis,
+          entryPriceCents: item.entryPriceCents,
+          settlementPriceCents: item.settlementPriceCents,
+          play,
+        }];
+      });
+      return buildPortfolioImpactTrend(rows);
     }),
 
     dailyRefreshSchedule: adminProcedure.query(async ({ ctx }) => {
