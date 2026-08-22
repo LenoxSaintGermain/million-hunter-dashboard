@@ -1,5 +1,6 @@
 import type { CapitalWalkthroughFixture } from "@shared/capitalWalkthrough";
 import { CAPITAL_WALKTHROUGH_CAPTURE as GLP1_POSTFIX_V2 } from "./captures/2026-08-21-glp1-postfix-v2";
+import { CAPITAL_WALKTHROUGH_CAPTURE as GLP1_POSTFIX_V3 } from "./captures/2026-08-21-glp1-postfix-v3";
 
 /**
  * Written only by scripts/capture-capital-walkthrough.mts. Never overwrite an
@@ -138,4 +139,4 @@ export const CAPITAL_WALKTHROUGH_FIXTURES: readonly CapitalWalkthroughFixture[] 
     absentReason: "No live slate or outcome-ledger row existed for this source run at capture time.",
     sampleSufficiency: "0 closed trades: this validates the decision process, not an edge.",
   },
-}, GLP1_POSTFIX_V2];
+}, GLP1_POSTFIX_V2, GLP1_POSTFIX_V3];

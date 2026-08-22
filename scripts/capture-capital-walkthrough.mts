@@ -7,9 +7,10 @@
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { eq } from "drizzle-orm";
-import { apertureCandidates, aperturePlayDecisions, apertureRuns, capitalTheses, portfolioAccounts, positions } from "../drizzle/schema";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import { apertureCandidates, aperturePlayDecisions, aperturePlaySlateItems, aperturePlaySlates, apertureRuns, apertureSetAside, capitalTheses, portfolioAccounts, positions } from "../drizzle/schema";
 import { getDb } from "../server/db";
+import { buildCockpit } from "../server/aperture/cockpit";
 import { fetchIntradayBars } from "../server/aperture/providers/marketData";
 import { checkVwapHold, openingRange, sessionVwap } from "../server/aperture/intraday";
 import { REGULAR_OPEN, startOfEtDay } from "../server/aperture/marketSession";
@@ -34,10 +35,20 @@ if (!account?.isPaper) throw new Error("Capture requires the run's recorded pape
 const [thesis] = await db.select().from(capitalTheses).where(eq(capitalTheses.id, run.thesisId)).limit(1);
 const candidates = await db.select().from(apertureCandidates).where(eq(apertureCandidates.runId, run.id));
 const decisions = await db.select().from(aperturePlayDecisions).where(eq(aperturePlayDecisions.runId, run.id));
+const setAside = await db.select().from(apertureSetAside).where(eq(apertureSetAside.runId, run.id));
 const heldPositions = await db.select().from(positions).where(eq(positions.accountId, account.id));
 if (!candidates.length) throw new Error("The completed run has no candidates to capture.");
 const selected = [...candidates].sort((a, b) => Number(b.compositeScore ?? 0) - Number(a.compositeScore ?? 0))[0]!;
 const now = Date.now();
+const cockpit = await buildCockpit({ userId: run.userId, accountId: account.id, runId: run.id, now });
+const expiredRows = await db.select({ id: apertureCandidates.id }).from(apertureCandidates)
+  .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
+  .where(and(eq(apertureRuns.userId, run.userId), eq(apertureRuns.thesisId, run.thesisId), eq(apertureRuns.status, "completed"), inArray(apertureRuns.holdingPeriod, ["intraday", "catalyst_window"]), lt(apertureRuns.catalystDeadlineAt, now)));
+const outcomeItems = await db.select().from(aperturePlaySlateItems)
+  .where(and(eq(aperturePlaySlateItems.sourceRunId, run.id), eq(aperturePlaySlateItems.sourceCandidateId, selected.id)))
+  .orderBy(desc(aperturePlaySlateItems.createdAt));
+const outcomeItem = outcomeItems[0] ?? null;
+const [outcomeSlate] = outcomeItem ? await db.select().from(aperturePlaySlates).where(eq(aperturePlaySlates.id, outcomeItem.slateId)).limit(1) : [];
 const dayStart = startOfEtDay(now);
 if (dayStart == null) throw new Error("The ET session day could not be determined for capture.");
 const tape = await fetchIntradayBars(selected.symbol, { startMs: dayStart, timeoutMs: 4_000, maxPages: 1 });
@@ -55,15 +66,15 @@ const fixture: CapitalWalkthroughFixture = {
   disclosure: CAPITAL_WALKTHROUGH_DISCLOSURE,
   account: { equityValueCents: account.equityValueCents, cashCents: account.cashCents, lastSyncedAt: account.lastSyncedAt, syncSource: account.syncSource, positionCount: heldPositions.length },
   thesis: { name: thesis?.name ?? "Captured Capital thesis", holdingPeriod: run.holdingPeriod, catalystDeadlineAt: run.catalystDeadlineAt },
-  today: { cashOutcome: "Cash is the explicit control outcome in the captured session.", expiredPlayCount: null, expiredPlayBasis: "Not measured by this capture source.", queueOrderingBasis: "Captured source queue order." },
-  rail: { marketSession: openPreflight.session.session, marketSessionBasis: openPreflight.session.basis, mandateVersion: openPreflight.evaluation.mandateVersion, tightestConstraint: "Not measured by the capture generator.", tightestConstraintBasis: "The capture did not retrieve a cockpit payload.", headroom: {} },
+  today: { cashOutcome: "Cash is the explicit control outcome in the captured session.", expiredPlayCount: expiredRows.length, expiredPlayBasis: "Same-thesis completed intraday and catalyst-window candidates whose deadline had passed at capture.", queueOrderingBasis: "Captured source queue order.", capturedAt: now, source: "aperture.play.list expiry predicate" },
+  rail: { marketSession: cockpit.session.session, marketSessionBasis: cockpit.session.basis, mandateVersion: cockpit.mandate.version, tightestConstraint: "Captured full headroom payload; use the smallest remaining measure with its source reason.", tightestConstraintBasis: "server/aperture/cockpit.buildCockpit", headroom: cockpit.headroom as unknown as Record<string, unknown>, capturedAt: cockpit.generatedAt, source: "persisted Capital cockpit rail" },
   queue: candidates.map((candidate) => ({ symbol: candidate.symbol, company: candidate.companyName ?? null, compositeScore: candidate.compositeScore == null ? null : Number(candidate.compositeScore), playSide: candidate.playSide ?? null, evidenceSummary: Array.isArray(candidate.verifyFields) && candidate.verifyFields.length ? `${candidate.verifyFields.length} decision-critical evidence check(s) captured.` : "No generated decision-critical check was captured.", decision: decisions.find((decision) => decision.candidateId === candidate.id)?.decision ?? null })),
   selectedPlay: { id: selected.id, symbol: selected.symbol, companyName: selected.companyName ?? null, compositeScore: selected.compositeScore, verifyFields: selected.verifyFields, playSide: selected.playSide ?? null },
   trigger: { ...trigger, captureNow: now, tapeUnavailableReason: tape.unavailableReason ?? null, note: "Preserved exactly as captured; the walkthrough never recomputes this trigger." },
   recipe: recipe as unknown as Record<string, unknown>,
-  evidence: { verifiedFields: Array.isArray(selected.verifyFields) ? selected.verifyFields : [], setAside: [], setAsideBasis: "Set-aside rows were not retrieved by this capture version." },
+  evidence: { verifiedFields: Array.isArray(selected.verifyFields) ? selected.verifyFields : [], setAside: setAside.map((row) => ({ symbol: row.symbol, reason: row.reason })), setAsideBasis: "Persisted scorer hard stops from aperture_set_aside for the captured source run.", capturedAt: now, source: "aperture_set_aside" },
   proposal: { allowed: { evaluation: openPreflight.evaluation, resolvedIntent: openPreflight.resolvedIntent, session: openPreflight.session, note: "Preflight-only capture; no order row was created." }, refused: { evaluation: refusedClose.evaluation, resolvedIntent: refusedClose.resolvedIntent, session: refusedClose.session, note: "Preflight-only capture; no order row was created." }, refusalReason: "A stated close with no provable closing position is deliberately gated as an opening-risk violation or refused outright." },
-  outcome: { captured: null, absentReason: "No outcome-ledger row was captured for this source run.", sampleSufficiency: "0 closed trades: this validates the decision process, not an edge." },
+  outcome: { captured: outcomeItem ? { slateId: outcomeSlate?.id ?? outcomeItem.slateId, slateStatus: outcomeSlate?.status ?? null, snapshotBasis: outcomeSlate?.snapshotBasis ?? null, operatorDecision: outcomeItem.operatorDecision, operatorReason: outcomeItem.operatorReason, outcomeStatus: outcomeItem.outcomeStatus, outcomeResult: outcomeItem.outcomeResult, triggerObservation: outcomeItem.triggerObservation, exitObservation: outcomeItem.exitObservation, returnBps: outcomeItem.returnBps, rMultiple: outcomeItem.rMultiple, outcomeBasis: outcomeItem.outcomeBasis, outcomeProviderId: outcomeItem.outcomeProviderId, outcomeSourceUrl: outcomeItem.outcomeSourceUrl, observedAt: outcomeItem.observedAt, outcomeExplanation: outcomeItem.outcomeExplanation } : null, absentReason: outcomeItem ? null : "No outcome-ledger row was captured for this source run.", sampleSufficiency: outcomeItem ? "One captured paper outcome is process evidence only; it is not proof of an edge." : "0 closed trades: this validates the decision process, not an edge.", capturedAt: now, source: "aperture_play_slates and aperture_play_slate_items" },
 };
 mkdirSync(captureDirectory, { recursive: true });
 writeFileSync(capturePath, `import type { CapitalWalkthroughFixture } from "@shared/capitalWalkthrough";\n\nexport const CAPITAL_WALKTHROUGH_CAPTURE: CapitalWalkthroughFixture = ${JSON.stringify(fixture, null, 2)};\n`, { encoding: "utf8", flag: "wx" });

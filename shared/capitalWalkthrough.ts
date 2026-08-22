@@ -28,6 +28,8 @@ export interface CapitalWalkthroughFixture {
     expiredPlayCount: number | null;
     expiredPlayBasis: string;
     queueOrderingBasis: string;
+    capturedAt?: number;
+    source?: string;
   };
   rail: {
     marketSession: string;
@@ -36,6 +38,8 @@ export interface CapitalWalkthroughFixture {
     tightestConstraint: string;
     tightestConstraintBasis: string;
     headroom: Record<string, unknown>;
+    capturedAt?: number;
+    source?: string;
   };
   queue: Array<{
     symbol: string;
@@ -52,6 +56,8 @@ export interface CapitalWalkthroughFixture {
     verifiedFields: string[];
     setAside: Array<{ symbol: string; reason: string }>;
     setAsideBasis: string;
+    capturedAt?: number;
+    source?: string;
   };
   proposal: {
     allowed: Record<string, unknown>;
@@ -62,6 +68,8 @@ export interface CapitalWalkthroughFixture {
     captured: Record<string, unknown> | null;
     absentReason: string | null;
     sampleSufficiency: string;
+    capturedAt?: number;
+    source?: string;
   };
 }
 

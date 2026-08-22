@@ -1541,3 +1541,9 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Build all seven walkthrough steps with a persistent recorded-session and freshness disclosure plus explicit not-measured reasons
 - [x] Add a versioned capture index with stable `capture` and `step` deep links while retaining all existing fixture versions
 - [x] Validate every replay step under blocked live transports, at 375px, and in the full default regression suite
+
+## Walkthrough Capture Enrichment (Aug 21 2026)
+- [x] Capture expired-play counts, the full cockpit headroom payload, source set-aside rows, and live-ledger outcome state into every future immutable fixture
+- [x] Preserve structured source and timestamp metadata for each enriched field rather than recomputing it during replay
+- [x] Render the richer captured evidence in the seven-step replay while retaining explicit not-measured states for legacy fixture versions
+- [x] Add enrichment and immutability coverage, validate zero-API replay, and publish the upgraded capture path
