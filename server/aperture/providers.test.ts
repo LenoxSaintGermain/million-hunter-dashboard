@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { vi } from "vitest";
 import { PROVIDERS, describeAvailability, availabilityMap, uncoveredCapabilities, providerById } from "./providers";
 import { statusOf, unknownFact, num } from "./providers/types";
 import { __marketDataInternals } from "./providers/marketData";
@@ -190,6 +191,34 @@ describe("brokers — nothing in this build trades real money", () => {
     process.env.ALPACA_API_KEY_ID = "k";
     process.env.ALPACA_API_SECRET_KEY = "s";
     expect(alpacaPaperBroker.available()).toBe(true);
+  });
+
+  it("retries a transient read-only Alpaca network failure before returning an account", async () => {
+    process.env.ALPACA_PAPER_KEY = "k";
+    process.env.ALPACA_PAPER_SECRET = "s";
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError("socket closed"))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "paper", cash: "10", buying_power: "10", equity: "10" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await expect(alpacaPaperBroker.getAccount()).resolves.toMatchObject({ externalAccountId: "paper", equityValueCents: 1000 });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("reports rejected Alpaca credentials without retrying or hiding the account-sync cause", async () => {
+    process.env.ALPACA_PAPER_KEY = "k";
+    process.env.ALPACA_PAPER_SECRET = "s";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: "forbidden" }), { status: 403 }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await expect(alpacaPaperBroker.getAccount()).rejects.toThrow(/credentials were not accepted/);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   // The constraint that reshaped the design.

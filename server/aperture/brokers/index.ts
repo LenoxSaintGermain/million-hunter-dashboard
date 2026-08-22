@@ -113,6 +113,7 @@ const ALPACA_PAPER_BASE = "https://paper-api.alpaca.markets/v2";
 
 const ALPACA_KEY_ID_ENV = ["ALPACA_PAPER_KEY", "ALPACA_API_KEY_ID"] as const;
 const ALPACA_SECRET_ENV = ["ALPACA_PAPER_SECRET", "ALPACA_API_SECRET_KEY"] as const;
+const ALPACA_READ_ATTEMPTS = 3;
 
 function firstConfiguredEnv(names: readonly string[]): string | null {
   return names.map((name) => process.env[name]).find((value): value is string => Boolean(value)) ?? null;
@@ -132,6 +133,43 @@ function alpacaHeaders(): Record<string, string> {
     "APCA-API-SECRET-KEY": credentials.secret ?? "",
     "Content-Type": "application/json",
   };
+}
+
+/**
+ * Account and position reads can fail transiently at the TLS/network edge. The
+ * sync must never turn that into a blank or stale-looking "successful" result:
+ * retry a bounded number of read-only times, then report a usable reason.
+ */
+async function alpacaReadJson<T>(path: "/account" | "/positions"): Promise<T> {
+  let lastFailure = "network connection failure";
+  for (let attempt = 1; attempt <= ALPACA_READ_ATTEMPTS; attempt += 1) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12_000);
+    try {
+      const res = await fetch(`${ALPACA_PAPER_BASE}${path}`, {
+        signal: ctrl.signal,
+        headers: {
+          ...alpacaHeaders(),
+          Accept: "application/json",
+          "User-Agent": "SignalHunterOS/1.0 (paper account sync)",
+        },
+      });
+      if (res.ok) return (await res.json()) as T;
+      if (res.status === 401 || res.status === 403) {
+        throw new BrokerUnavailableError(`Alpaca Paper credentials were not accepted (HTTP ${res.status}). Update the configured paper key and secret, then retry.`);
+      }
+      lastFailure = `Alpaca Paper returned HTTP ${res.status}`;
+    } catch (error) {
+      if (error instanceof BrokerUnavailableError) throw error;
+      lastFailure = error instanceof DOMException && error.name === "AbortError"
+        ? "Alpaca Paper timed out"
+        : "Alpaca Paper network/TLS connection failed";
+    } finally {
+      clearTimeout(timer);
+    }
+    if (attempt < ALPACA_READ_ATTEMPTS) await new Promise((resolve) => setTimeout(resolve, attempt * 120));
+  }
+  throw new BrokerUnavailableError(`${lastFailure} after ${ALPACA_READ_ATTEMPTS} read-only attempts. No account snapshot was changed; try Sync again.`);
 }
 
 export const alpacaPaperBroker: BrokerAdapter = {
@@ -162,8 +200,7 @@ export const alpacaPaperBroker: BrokerAdapter = {
   },
 
   async getAccount(): Promise<BrokerAccount> {
-    const data = await httpJson<any>(`${ALPACA_PAPER_BASE}/account`, { headers: alpacaHeaders() });
-    if (!data) throw new BrokerUnavailableError("Alpaca paper account request failed");
+    const data = await alpacaReadJson<any>("/account");
     const d = (v: unknown) => {
       const n = num(v);
       return n == null ? null : dollarsToCents(n);
@@ -179,8 +216,8 @@ export const alpacaPaperBroker: BrokerAdapter = {
   },
 
   async getPositions(): Promise<BrokerPosition[]> {
-    const data = await httpJson<any[]>(`${ALPACA_PAPER_BASE}/positions`, { headers: alpacaHeaders() });
-    if (!Array.isArray(data)) return [];
+    const data = await alpacaReadJson<any[]>("/positions");
+    if (!Array.isArray(data)) throw new BrokerUnavailableError("Alpaca Paper positions response was not an array. No account snapshot was changed; try Sync again.");
     return data.map((p) => {
       const cents = (v: unknown) => {
         const n = num(v);

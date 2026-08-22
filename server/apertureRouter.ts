@@ -425,10 +425,22 @@ export const apertureRouter = router({
           });
         }
 
-        const [acctData, posData] = await Promise.all([
-          broker.getAccount(),
-          broker.getPositions(),
-        ]);
+        let acctData: Awaited<ReturnType<typeof broker.getAccount>>;
+        let posData: Awaited<ReturnType<typeof broker.getPositions>>;
+        try {
+          [acctData, posData] = await Promise.all([
+            broker.getAccount(),
+            broker.getPositions(),
+          ]);
+        } catch (error) {
+          const now = Date.now();
+          const detail = error instanceof Error ? error.message : "Broker account read failed";
+          await db!.update(portfolioAccounts).set({
+            syncError: detail,
+            updatedAt: now,
+          }).where(eq(portfolioAccounts.id, input.id));
+          throw new TRPCError({ code: "BAD_GATEWAY", message: detail });
+        }
 
         const now = Date.now();
         await db!.update(portfolioAccounts).set({

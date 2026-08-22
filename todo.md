@@ -1547,3 +1547,8 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Preserve structured source and timestamp metadata for each enriched field rather than recomputing it during replay
 - [x] Render the richer captured evidence in the seven-step replay while retaining explicit not-measured states for legacy fixture versions
 - [x] Add enrichment and immutability coverage, validate zero-API replay, and publish the upgraded capture path
+
+## Accounts — Alpaca Paper Sync Failure (Aug 22 2026)
+- [x] Diagnose the failing read-only Alpaca Paper account request on `/aperture/accounts` and preserve its actionable upstream error detail
+- [x] Repair the narrowest safe adapter or credential-path defect without adding any order capability
+- [ ] Verify manual sync and the scheduled freshness callback both persist a current account snapshot once Alpaca Paper TLS connectivity is available, then run regression coverage

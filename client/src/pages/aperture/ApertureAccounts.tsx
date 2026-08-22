@@ -34,6 +34,7 @@ export default function ApertureAccounts() {
   const [cashCents, setCashCents] = useState("");
   const [csvAccountId, setCsvAccountId] = useState<number | null>(null);
   const [csvText, setCsvText] = useState("");
+  const [syncFeedback, setSyncFeedback] = useState<{ accountId: number; message: string; tone: "success" | "error" } | null>(null);
 
   const { data: accounts, refetch } = trpc.aperture.account.list.useQuery();
   const { data: brokers } = trpc.aperture.brokers.useQuery();
@@ -49,8 +50,17 @@ export default function ApertureAccounts() {
   });
 
   const syncAccount = trpc.aperture.account.sync.useMutation({
-    onSuccess: () => { toast.success("Account synced"); refetch(); },
-    onError: (e) => toast.error(e.message),
+    onSuccess: (_, variables) => {
+      const message = "Paper account snapshot refreshed. No order was created or changed.";
+      setSyncFeedback({ accountId: variables.id, message, tone: "success" });
+      toast.success("Account synced");
+      refetch();
+    },
+    onError: (e, variables) => {
+      setSyncFeedback({ accountId: variables.id, message: e.message, tone: "error" });
+      toast.error(e.message);
+      refetch();
+    },
   });
 
   const configureSyncSchedule = trpc.aperture.account.configureSyncSchedule.useMutation({
@@ -132,7 +142,7 @@ export default function ApertureAccounts() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">New Account</CardTitle>
-              <CardDescription>Alpaca paper accounts sync positions automatically when keys are configured.</CardDescription>
+              <CardDescription>Alpaca Paper can refresh this account on demand when the broker is reachable; no order is created by a sync.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -215,6 +225,11 @@ export default function ApertureAccounts() {
                   {account.brokerId === "manual" ? "Imported context" : "Sync"}
                 </Button>
               </div>
+              {syncFeedback?.accountId === account.id && (
+                <div role={syncFeedback.tone === "error" ? "alert" : "status"} className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${syncFeedback.tone === "error" ? "border-clay/45 bg-clay/5 text-ink" : "border-sage/45 bg-sage/5 text-ink"}`}>
+                  {syncFeedback.message}
+                </div>
+              )}
             </CardHeader>
             <CardContent className="space-y-3">
               {/* Broker availability */}
