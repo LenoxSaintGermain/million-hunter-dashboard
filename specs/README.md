@@ -34,3 +34,16 @@ Source-of-truth build specs for Signal Hunter OS. When a spec conflicts with a `
 
 ### TSL-BUILD-2026-007 — Wingate Bespoke Demo Rails
 - ⬜ BLOCKED on operator inputs (§1): confirmed Wingate thesis, selected real deal with a blind-spot signal, captured live-run fixture. Shell + flagged placeholders allowed; never invent deal data. Builds after 006 acceptance passes.
+
+### TSL-BUILD-2026-008 — Capital Aperture Disclosure Intelligence Rail
+- 🟣 PROPOSED — accelerated pre-30 pilot decisions recorded; implementation is not authorized.
+- Borrow Public Agents' natural-language-to-visible-workflow grammar while preserving Capital Aperture's paper-only, human-approved order path.
+- Approved MVP scope is House PTR primary-source evidence for supported equities/ETFs, with immutable provenance, `DISCLOSURE_MANDATE_V1`, conservative public-availability timestamps, entity/collision gates, and no score uplift or “congressional alpha” claim.
+- Accelerated pre-30 pilot: deterministic qualification first, then 5/10/20/30 closed-paper-trade checkpoints; 30 is an evidence threshold, not permission to test.
+- Jim and his wife share the `Capital Operator` user type with separate audit identities. Recommended prohibited-language reviewer: Lenox, pending confirmation.
+- The Manus report and primary findings are now archived. Manus references `Public Agents: Automate Your Trading Strategy with AI` (`o8pbbIqB2gg`); Public's guide separately embeds `AI Agents for Investing | Public Agentic Brokerage` (`2hS2eX4Cs0Y`).
+- Data continuity and purpose-built operator UX are prerequisites: recover/reconcile the Jim catalyst-reaction and owner GLP-1 test theses, simplify Today/candidate/evidence/thesis journeys, and do not replace the workflow with chat UI.
+- Remaining gates: confirm the language reviewer, authorize dry-run-first thesis recovery after manifest review, reconcile duplicate migration prefix `0024`, and authorize WP-DIR0/WP-DIR1.
+- Full spec: `TSL-BUILD-2026-008_Capital_Aperture_Disclosure_Intelligence_Rail_Spec.md`.
+- Test plan: `TSL-BUILD-2026-008_ACCELERATED_PAPER_PILOT_TEST_PLAN.md`.
+- UX/recovery addendum: `TSL-BUILD-2026-008A_CAPITAL_OPERATOR_UX_RESEARCH_AND_RECOVERY_ADDENDUM.md`.
