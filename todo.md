@@ -1567,3 +1567,8 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Stress-test the congressional-disclosure signal concept for latency, data provenance, risk controls, and differentiation
 - [x] Produce a borrow / adapt / avoid product-pattern matrix for Capital Aperture
 - [x] Define a staged implementation roadmap that preserves human approval and paper-only boundaries
+
+## Alpaca Enhanced Market Data Entitlement Verification (Aug 25 2026)
+- [x] Verify configured Alpaca credentials against read-only enhanced market-data endpoints
+- [x] Document verified market-data coverage, feed availability, and remaining endpoint limits
+- [x] Map verified enhanced data to safe Capital Aperture research and paper-monitoring use cases
