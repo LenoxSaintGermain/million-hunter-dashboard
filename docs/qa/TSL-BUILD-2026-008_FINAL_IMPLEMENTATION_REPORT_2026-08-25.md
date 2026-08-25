@@ -122,8 +122,8 @@ The full Stage 1 two-operator procedure and exact local-preview seam cleanup are
 
 **No broker order was created, approved, submitted, rejected, modified, mirrored, or canceled by this implementation.** No broker adapter was called by WP-DIR1. The only read-only market/account context already present in Capital Aperture remained unchanged. The database ended with `broker_orders = 0`.
 
-## Remaining Required Sign-off and Deliberate Non-Scope
+## Approved Language Review and Deliberate Non-Scope
 
-Lenox is the named reviewer for prohibited disclosure-product language. The implementation blocks prohibited phrasing in the deterministic compiler, but the formal reviewer sign-off is still required before broader rollout.
+Lenox, the named reviewer for prohibited disclosure-product language, **explicitly approved WP-DIR1 in task chat on 2026-08-25**. The deterministic compiler continues to reject prohibited copy, prediction, and insider-framing language; the approval does not widen the product scope or weaken any paper-only, human-approval, provenance, or broker-order boundary.
 
 The following remain deliberately out of scope: new paid data providers, a live recurring disclosure-refresh schedule, filer ranking, trade direction, return prediction, options/derivatives expansion, broker execution, autonomous order action, and outcome measurement before `eligibleFrom`.

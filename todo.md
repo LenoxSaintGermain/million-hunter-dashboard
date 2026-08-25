@@ -1592,4 +1592,4 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Build a provenance-complete official House PTR fixture corpus and identify Lenox as prohibited-language reviewer
 - [x] Implement only the bounded WP-DIR1 grammar and provenance foundation after Stage 1 passes
 - [x] Validate WP-DIR1, capture before/after evidence, commit/push, and prepare the requested report-back
-- [ ] Obtain Lenox’s explicit prohibited-language reviewer sign-off before any disclosure-rail expansion
+- [x] Obtain Lenox’s explicit prohibited-language reviewer sign-off before any disclosure-rail expansion — approved by Lenox in task chat on 2026-08-25
