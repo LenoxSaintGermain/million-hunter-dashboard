@@ -45,7 +45,7 @@ button { color: inherit; }
 .ap-context-warning { padding: 10px 14px; display: flex; align-items: center; gap: 9px; border: 0; background: var(--ap-amber-soft); color: #82400f; text-align: left; font-size: 11px; cursor: pointer; }
 .ap-context-warning span { margin-left: auto; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 
-.ap-stage-rail { display: grid; grid-template-columns: repeat(8, 1fr); margin: 22px 0; padding: 0; list-style: none; }
+.ap-stage-rail { display: grid; grid-template-columns: repeat(7, 1fr); margin: 22px 0; padding: 0; list-style: none; }
 .ap-stage-rail li { position: relative; }
 .ap-stage-rail li::before { content: ""; position: absolute; left: 0; right: 0; top: 14px; height: 1px; background: var(--ap-rule); }
 .ap-stage-rail li:first-child::before { left: 50%; }
@@ -86,6 +86,18 @@ button { color: inherit; }
 .ap-amendment span { color: var(--ap-muted); font-size: 11px; line-height: 1.5; }
 .ap-amendment strong { color: var(--ap-ink); font-size: 12px; }
 
+.ap-mission-statement, .ap-payoff-strip { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--ap-rule); }
+.ap-mission-statement > div, .ap-payoff-strip > div { min-height: 96px; padding: 15px; border-right: 1px solid var(--ap-rule); }
+.ap-mission-statement > div:last-child, .ap-payoff-strip > div:last-child { border-right: 0; }
+.ap-mission-statement span, .ap-mission-statement small, .ap-payoff-strip span, .ap-payoff-strip small { display: block; color: var(--ap-muted); font-size: 9px; }
+.ap-mission-statement strong, .ap-payoff-strip strong { display: block; margin-top: 8px; font: 500 23px/1.05 "IBM Plex Serif", serif; font-variant-numeric: tabular-nums; }
+.ap-mission-statement small, .ap-payoff-strip small { margin-top: 7px; line-height: 1.35; }
+.ap-target-boundary { margin-top: 12px; padding: 13px 15px; display: flex; align-items: flex-start; gap: 12px; border-left: 3px solid var(--ap-clay); background: var(--ap-clay-soft); }
+.ap-target-boundary.is-neutral { border-left-color: var(--ap-amber); background: var(--ap-amber-soft); }
+.ap-target-boundary strong, .ap-target-boundary span { display: block; }
+.ap-target-boundary strong { font-size: 11px; }
+.ap-target-boundary span { margin-top: 4px; color: var(--ap-muted); font-size: 10px; line-height: 1.5; }
+
 .ap-research-meter { height: 5px; margin: 30px 0 14px; background: var(--ap-paper-deep); }
 .ap-research-meter span { display: block; height: 100%; background: var(--ap-green); }
 .ap-research-stats { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--ap-rule); padding-bottom: 24px; }
@@ -98,6 +110,13 @@ button { color: inherit; }
 .ap-shortlist span { grid-row: 1 / span 2; font: 9px/1 "JetBrains Mono", monospace; color: var(--ap-muted); }
 .ap-shortlist strong { font-size: 13px; }
 .ap-shortlist small { color: var(--ap-muted); font-size: 10px; }
+.ap-play-slate { margin-top: 18px; display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; }
+.ap-play-slate button { min-height: 138px; padding: 15px; display: flex; flex-direction: column; align-items: flex-start; border: 1px solid var(--ap-rule); background: transparent; text-align: left; cursor: pointer; }
+.ap-play-slate button.is-top { border-color: var(--ap-amber); background: var(--ap-amber-soft); }
+.ap-play-slate button > strong { margin-top: 9px; font: 500 18px/1.2 "IBM Plex Serif", serif; }
+.ap-play-slate button > p { margin: 8px 0 0; color: var(--ap-ink); font-size: 10px; line-height: 1.5; }
+.ap-play-slate button > small { margin-top: auto; padding-top: 12px; color: var(--ap-muted); font-size: 9px; }
+.ap-parked-link { margin-top: 12px; padding: 0; border: 0; background: transparent; color: var(--ap-muted); font-size: 9px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
 .ap-evidence-anchors { display: grid; gap: 8px; }
 .ap-evidence-anchors button { min-height: 58px; padding: 11px 14px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; border: 1px solid var(--ap-rule); background: transparent; text-align: left; cursor: pointer; }
@@ -110,6 +129,9 @@ button { color: inherit; }
 .ap-decision-callout { margin-top: 18px; padding: 17px 19px; border-left: 3px solid var(--ap-amber); background: #faf5ec; }
 .ap-decision-callout strong { display: block; margin-top: 6px; font-size: 14px; }
 .ap-decision-callout p { margin: 7px 0 0; color: var(--ap-muted); font-size: 10px; }
+.ap-analysis-fork { width: 100%; margin-top: 12px; padding: 13px 14px; display: flex; align-items: center; gap: 11px; border: 1px solid var(--ap-rule); background: transparent; text-align: left; cursor: pointer; }
+.ap-analysis-fork > span { flex: 1; color: var(--ap-muted); font-size: 10px; line-height: 1.5; }
+.ap-analysis-fork strong { display: block; color: var(--ap-ink); font-size: 11px; }
 
 .ap-source-card { margin: 0 0 18px; border-color: var(--ap-rule); background: transparent; }
 .ap-source-icon { width: 42px; height: 42px; display: grid; place-items: center; background: var(--ap-paper-deep); }
@@ -271,11 +293,11 @@ button { color: inherit; }
   .ap-packet-header { min-height: 76px; padding: 16px 18px; }
   .ap-packet-header h1 { font-size: 22px; }
   .ap-stage-content > h2 { font-size: 29px; }
-  .ap-charter-grid, .ap-plan-hero { grid-template-columns: 1fr 1fr; }
-  .ap-charter-grid > div:nth-child(2), .ap-plan-hero > div:nth-child(2) { border-right: 0; }
-  .ap-charter-grid > div:nth-child(-n+2), .ap-plan-hero > div:nth-child(-n+2) { border-bottom: 1px solid var(--ap-rule); }
+  .ap-charter-grid, .ap-plan-hero, .ap-mission-statement, .ap-payoff-strip { grid-template-columns: 1fr 1fr; }
+  .ap-charter-grid > div:nth-child(2), .ap-plan-hero > div:nth-child(2), .ap-mission-statement > div:nth-child(2), .ap-payoff-strip > div:nth-child(2) { border-right: 0; }
+  .ap-charter-grid > div:nth-child(-n+2), .ap-plan-hero > div:nth-child(-n+2), .ap-mission-statement > div:nth-child(-n+2), .ap-payoff-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--ap-rule); }
   .ap-research-stats { grid-template-columns: 1fr 1fr; gap: 18px; }
-  .ap-shortlist, .ap-answer-set, .ap-outcomes, .ap-monitor-grid { grid-template-columns: 1fr; }
+  .ap-shortlist, .ap-play-slate, .ap-answer-set, .ap-outcomes, .ap-monitor-grid { grid-template-columns: 1fr; }
   .ap-monitor-grid > div { min-height: 96px; border-right: 0; border-bottom: 1px solid var(--ap-rule); }
   .ap-monitor-grid > div:last-child { border-bottom: 0; }
   .ap-approval-receipt { grid-template-columns: 1fr; }

@@ -32,7 +32,6 @@ import {
 } from "lucide-react";
 
 type VariantKey = "A" | "B" | "C";
-type EvidenceAnswer = "confirmed" | "not_confirmed" | "need_more" | null;
 type OutcomeChoice = "thesis_held" | "mixed" | "invalidated" | null;
 
 type Stage = {
@@ -44,10 +43,9 @@ type Stage = {
 };
 
 const STAGES: Stage[] = [
-  { id: "charter", short: "Thesis", label: "Thesis Charter", eyebrow: "Define the aperture", question: "Is this the market belief we intend to test?" },
-  { id: "research", short: "Research", label: "Research Progress", eyebrow: "Machine work", question: "Has enough evidence accumulated to review a lead?" },
-  { id: "decision", short: "Decision", label: "Decision Packet", eyebrow: "Human judgment", question: "Should CRDO remain under consideration?" },
-  { id: "evidence", short: "Evidence", label: "Evidence Resolution", eyebrow: "One decisive check", question: "Does CRDO clear the liquidity requirement?" },
+  { id: "thesis", short: "Thesis", label: "Day-Trade Thesis", eyebrow: "Set the capital mission", question: "What are we trying to deploy, by when, and under what thesis?" },
+  { id: "slate", short: "Plays", label: "Today’s Play Slate", eyebrow: "Compress the universe", question: "Where is the strongest evidence-backed deployment today?" },
+  { id: "decision", short: "Top play", label: "Top Play", eyebrow: "Decision-sized answer", question: "Is this the best available deployment for the stated mission?" },
   { id: "plan", short: "Plan", label: "Paper Plan", eyebrow: "Modeled, not submitted", question: "Does this bounded paper plan fit the thesis and mandate?" },
   { id: "approval", short: "Approve", label: "Human Approval", eyebrow: "Explicit authorization", question: "Do you approve this paper-only plan for tracking?" },
   { id: "monitor", short: "Monitor", label: "Monitoring Record", eyebrow: "Watch what could change", question: "Has the thesis, catalyst, or invalidation changed?" },
@@ -61,10 +59,10 @@ const VARIANTS: Record<VariantKey, { name: string; description: string }> = {
 };
 
 const CANDIDATES = [
-  { symbol: "CRDO", state: "2 blockers", tone: "amber" },
-  { symbol: "ANET", state: "watch", tone: "muted" },
-  { symbol: "NVDA", state: "held", tone: "muted" },
-  { symbol: "AVGO", state: "stale", tone: "clay" },
+  { symbol: "CRDO", state: "top play", tone: "amber" },
+  { symbol: "ANET", state: "alternative", tone: "muted" },
+  { symbol: "CASH", state: "control", tone: "muted" },
+  { symbol: "WATCH", state: "5 plays", tone: "clay" },
 ];
 
 function readVariant(): VariantKey {
@@ -143,29 +141,18 @@ function StatusPill({ children, tone = "amber" }: { children: React.ReactNode; t
   return <span className="ap-status" data-tone={tone}>{children}</span>;
 }
 
-function DecisionEvidence({ onInspect }: { onInspect: () => void }) {
+function PlayEvidence({ onInspect }: { onInspect: () => void }) {
   return (
     <div className="ap-evidence-anchors">
-      <button onClick={onInspect}><CheckCircle2 size={16} /><span><strong>Thesis fit</strong>Inference networking demand is directly expressed.</span><small>3 sources</small></button>
-      <button onClick={onInspect}><CheckCircle2 size={16} /><span><strong>Catalyst</strong>Next earnings window falls inside the thesis horizon.</span><small>verified</small></button>
-      <button className="is-blocker" onClick={onInspect}><AlertTriangle size={16} /><span><strong>Liquidity</strong>Required 30-day dollar-volume source is missing.</span><small>blocks plan</small></button>
+      <button onClick={onInspect}><CheckCircle2 size={16} /><span><strong>Thesis fit</strong>Inference-networking demand is directly expressed.</span><small>3 sources</small></button>
+      <button onClick={onInspect}><CheckCircle2 size={16} /><span><strong>Tradable setup</strong>Opening range and liquidity checks are complete.</span><small>verified</small></button>
+      <button onClick={onInspect}><ShieldCheck size={16} /><span><strong>Risk boundary</strong>Planned loss stays below the $150 mission ceiling.</span><small>passes</small></button>
     </div>
   );
 }
 
-function StageContent({
-  step,
-  evidenceAnswer,
-  setEvidenceAnswer,
-  acknowledgement,
-  setAcknowledgement,
-  outcome,
-  setOutcome,
-  onInspect,
-}: {
+function StageContent({ step, acknowledgement, setAcknowledgement, outcome, setOutcome, onInspect }: {
   step: number;
-  evidenceAnswer: EvidenceAnswer;
-  setEvidenceAnswer: (value: EvidenceAnswer) => void;
   acknowledgement: string;
   setAcknowledgement: (value: string) => void;
   outcome: OutcomeChoice;
@@ -174,100 +161,78 @@ function StageContent({
 }) {
   if (step === 0) return (
     <div className="ap-stage-content">
-      <StatusPill tone="amber">2 assumptions to confirm</StatusPill>
-      <h2>AI infrastructure is the dominant capital cycle of the next five years.</h2>
-      <p className="ap-lede">Aperture converted the operator’s market belief into a bounded research charter. Review the interpretation—not a twelve-field intake form.</p>
-      <div className="ap-charter-grid">
-        <div><span>Research horizon</span><strong>3–5 years</strong></div>
-        <div><span>Paper-study horizon</span><strong>Intraday catalyst windows</strong></div>
-        <div><span>Eligible expression</span><strong>Liquid U.S. equities</strong></div>
-        <div><span>Maximum planned loss</span><strong>0.75% per play</strong></div>
+      <StatusPill tone="ink">Today · flat by close</StatusPill>
+      <h2>Where can I best deploy $5,000 against my AI-infrastructure thesis today?</h2>
+      <p className="ap-lede">Start with the operator’s capital mission and thesis. Aperture can search for the strongest qualifying paper play; it will not manufacture a promise to satisfy the desired return.</p>
+      <div className="ap-mission-statement">
+        <div><span>Capital available</span><strong>$5,000</strong></div>
+        <div><span>Desired ending value</span><strong>$8,000</strong><small>Aspiration · not forecast</small></div>
+        <div><span>Time boundary</span><strong>Today</strong><small>Flat by market close</small></div>
+        <div><span>Maximum planned loss</span><strong>$150</strong><small>Hard paper ceiling</small></div>
       </div>
-      <button className="ap-amendment" onClick={onInspect}><Sparkles size={16} /><span><strong>One definition needs review</strong>What event ends the thesis if demand continues but multiples compress?</span><PanelRightOpen size={16} /></button>
+      <div className="ap-target-boundary"><AlertTriangle size={17} /><div><strong>The target requires a 60% same-day gain.</strong><span>Aperture will rank qualifying plays, but it will explicitly say when no credible setup reaches the target inside the loss ceiling.</span></div></div>
+      <button className="ap-amendment" onClick={onInspect}><Sparkles size={16} /><span><strong>Thesis expression</strong>Look for liquid equities benefiting from AI infrastructure demand. Use shares for today’s flow; longer-dated options remain a separate paper-research expression.</span><PanelRightOpen size={16} /></button>
     </div>
   );
 
   if (step === 1) return (
     <div className="ap-stage-content">
-      <StatusPill tone="ink">Research complete</StatusPill>
-      <h2>One lead is ready for operator review.</h2>
-      <p className="ap-lede">The machine searched broadly, then reduced the result to a bounded slate. The candidate universe stays available without becoming the interface.</p>
-      <div className="ap-research-meter"><span style={{ width: "100%" }} /></div>
+      <StatusPill tone="green">Play slate ready</StatusPill>
+      <h2>57 candidates became three operator choices.</h2>
+      <p className="ap-lede">The operator reviews plays, not every ticker. Correlated names, failed triggers and weaker expressions are parked with reasons.</p>
       <div className="ap-research-stats">
-        <div><strong>57</strong><span>screened</span></div>
-        <div><strong>18</strong><span>mandate-eligible</span></div>
-        <div><strong>3</strong><span>decision slate</span></div>
-        <div><strong>1</strong><span>lead</span></div>
+        <div><strong>57</strong><span>researched</span></div>
+        <div><strong>8</strong><span>cleared hard gates</span></div>
+        <div><strong>2 + cash</strong><span>operator choices</span></div>
+        <div><strong>49</strong><span>parked with reasons</span></div>
       </div>
-      <div className="ap-shortlist">
-        <div className="is-lead"><span>01</span><strong>CRDO</strong><small>Best research fit · 2 blockers</small></div>
-        <div><span>02</span><strong>ANET</strong><small>Alternative expression</small></div>
-        <div><span>03</span><strong>AVGO</strong><small>Existing exposure overlap</small></div>
+      <div className="ap-play-slate">
+        <button className="is-top"><span className="ap-mono-label">TOP PLAY</span><strong>CRDO · Opening-range breakout</strong><p>Deploy up to $4,643 · $145 planned loss · all required evidence present</p><small>Best thesis fit and risk-adjusted setup</small></button>
+        <button><span className="ap-mono-label">ALTERNATIVE</span><strong>ANET · Momentum continuation</strong><p>Deploy up to $4,910 · $150 planned loss</p><small>Lower setup quality · same factor exposure</small></button>
+        <button><span className="ap-mono-label">CONTROL</span><strong>Preserve cash</strong><p>Deploy $0 · planned loss $0</p><small>Correct outcome if the live trigger fails</small></button>
       </div>
+      <button className="ap-parked-link" onClick={onInspect}>View grouped reasons, watchlist and parked universe</button>
     </div>
   );
 
   if (step === 2) return (
     <div className="ap-stage-content">
-      <StatusPill tone="amber">Keep researching</StatusPill>
-      <h2>Should CRDO remain under consideration?</h2>
-      <p className="ap-lede">CRDO is the strongest current research lead, but it is not yet eligible for a paper plan.</p>
-      <DecisionEvidence onInspect={onInspect} />
-      <div className="ap-decision-callout">
-        <span className="ap-mono-label">ONE THING TO RESOLVE</span>
-        <strong>Confirm whether 30-day average dollar volume clears the mandate.</strong>
-        <p>Missing source · blocks paper-plan preparation · existing paper positions unchanged</p>
+      <StatusPill tone="green">Top qualifying play</StatusPill>
+      <h2>CRDO is the best available deployment—without pretending it turns $5K into $8K.</h2>
+      <p className="ap-lede">The top-level answer includes the play, the risk, the modeled payoff range and the gap to the operator’s aspiration. Deep evidence is optional because all required gates are source-backed.</p>
+      <div className="ap-payoff-strip">
+        <div><span>Deploy</span><strong>$4,643</strong><small>$357 remains cash</small></div>
+        <div><span>Planned loss</span><strong>−$145</strong><small>0.15% account equity</small></div>
+        <div><span>1.5R outcome</span><strong>$4,860</strong><small>+$217 modeled gain</small></div>
+        <div><span>2.5R outcome</span><strong>$5,005</strong><small>+$362 modeled gain</small></div>
       </div>
+      <div className="ap-target-boundary is-neutral"><Target size={17} /><div><strong>No qualifying play credibly models the requested $8,000 ending value.</strong><span>Meeting that target would require violating the stated loss ceiling or inventing unsupported probability.</span></div></div>
+      <PlayEvidence onInspect={onInspect} />
+      <button className="ap-analysis-fork" onClick={onInspect}><FileSearch size={17} /><span><strong>Want to inspect the logic?</strong>Open the analysis, opposing evidence, calculations and 12 source records.</span><PanelRightOpen size={16} /></button>
     </div>
   );
 
   if (step === 3) return (
     <div className="ap-stage-content">
-      <StatusPill tone={evidenceAnswer === "confirmed" ? "green" : "amber"}>{evidenceAnswer === "confirmed" ? "Evidence resolved" : "Plan remains locked"}</StatusPill>
-      <h2>Does CRDO clear the liquidity requirement?</h2>
-      <p className="ap-lede">One question, its reason, its source and its readiness consequence live in the same working surface.</p>
-      <button className="ap-source-card" onClick={onInspect}>
-        <div className="ap-source-icon"><FileSearch size={20} /></div>
-        <div><span className="ap-mono-label">SIP CONSOLIDATED TAPE · AS OF AUG 25, 2026</span><strong>30-day median dollar volume: $186.4M</strong><p>Current source clears the minimum liquidity requirement of $25M.</p></div>
-        <PanelRightOpen size={18} />
-      </button>
-      <fieldset className="ap-answer-set">
-        <legend>Record the human review</legend>
-        {[
-          ["confirmed", "Confirmed", "Source is current and requirement passes"],
-          ["not_confirmed", "Not confirmed", "Source fails or contradicts the requirement"],
-          ["need_more", "Need more evidence", "Keep the case open without advancing"],
-        ].map(([value, label, detail]) => (
-          <button key={value} type="button" data-selected={evidenceAnswer === value} onClick={() => setEvidenceAnswer(value as EvidenceAnswer)}>
-            <span className="ap-radio">{evidenceAnswer === value && <Check size={12} />}</span><span><strong>{label}</strong><small>{detail}</small></span>
-          </button>
-        ))}
-      </fieldset>
-      <p className="ap-consequence">{evidenceAnswer === "confirmed" ? "Consequence: liquidity gate clears; VWAP confirmation will remain a live preflight condition." : "Consequence: paper-plan preparation remains unavailable."}</p>
-    </div>
-  );
-
-  if (step === 4) return (
-    <div className="ap-stage-content">
       <StatusPill tone="green">Plan eligible</StatusPill>
       <h2>CRDO · bounded opening-range paper plan</h2>
-      <p className="ap-lede">Only the decision-sized summary is open. Assumptions, arithmetic and provenance remain one deliberate reveal away.</p>
+      <p className="ap-lede">The operator can reach this plan directly from the trusted summary. Assumptions, arithmetic and provenance remain available without becoming mandatory reading.</p>
       <div className="ap-plan-hero">
         <div><span>Entry condition</span><strong>$232.14</strong><small>30m range + 6 bps</small></div>
         <div><span>Protective stop</span><strong>$224.96</strong><small>opening-range low</small></div>
         <div><span>Paper size</span><strong>20 shares</strong><small>$4,643 notional</small></div>
         <div><span>Planned loss</span><strong>$145</strong><small>0.15% equity</small></div>
       </div>
-      <div className="ap-mandate-line"><ShieldCheck size={17} /><div><strong>Within modeled mandate</strong><span>$145 planned loss / $731 per-play ceiling</span></div><button onClick={onInspect}>Inspect math</button></div>
-      <div className="ap-stop-line"><Target size={17} /><div><strong>Do not stage when</strong><span>VWAP hold is unconfirmed, price gaps more than 1%, or liquidity evidence becomes stale.</span></div></div>
+      <div className="ap-mandate-line"><ShieldCheck size={17} /><div><strong>All required gates source-backed</strong><span>Thesis fit · liquidity · horizon · loss ceiling · invalidation</span></div><button onClick={onInspect}>Inspect evidence</button></div>
+      <div className="ap-stop-line"><Target size={17} /><div><strong>Live refusal condition</strong><span>Do not stage if VWAP hold fails, price gaps more than 1%, or the liquidity record becomes stale.</span></div></div>
     </div>
   );
 
-  if (step === 5) return (
+  if (step === 4) return (
     <div className="ap-stage-content">
       <StatusPill tone="ink">Human approval required</StatusPill>
       <h2>Approve the version you reviewed—not a moving target.</h2>
-      <p className="ap-lede">The approved receipt binds to Decision Packet v4 and Paper Plan v1. This creates a paper-tracking record only.</p>
+      <p className="ap-lede">The approved receipt binds to Top Play v1 and Paper Plan v1. This creates a paper-tracking record only.</p>
       <div className="ap-approval-receipt">
         <div><span>Decision</span><strong>CRDO · opening-range paper study</strong></div>
         <div><span>Maximum planned loss</span><strong>$145 · 0.15% equity</strong></div>
@@ -282,13 +247,13 @@ function StageContent({
     </div>
   );
 
-  if (step === 6) return (
+  if (step === 5) return (
     <div className="ap-stage-content">
       <StatusPill tone="green">Paper study active</StatusPill>
-      <h2>Monitor only what can change the decision.</h2>
-      <p className="ap-lede">No wall of market data. The record watches the catalyst, invalidation, time stop and material evidence changes.</p>
+      <h2>Monitor only what can change the play.</h2>
+      <p className="ap-lede">No wall of market data. The record watches the trigger, invalidation, time stop and material evidence changes.</p>
       <div className="ap-monitor-grid">
-        <div><Clock3 size={18} /><span>Catalyst clock</span><strong>6d 04h</strong><small>earnings window</small></div>
+        <div><Clock3 size={18} /><span>Time boundary</span><strong>3h 18m</strong><small>flat by market close</small></div>
         <div><Activity size={18} /><span>Trigger</span><strong>Watching</strong><small>VWAP hold not yet met</small></div>
         <div><ShieldCheck size={18} /><span>Invalidation</span><strong>Intact</strong><small>no material breach</small></div>
       </div>
@@ -299,29 +264,28 @@ function StageContent({
   return (
     <div className="ap-stage-content">
       <StatusPill tone={outcome ? "green" : "ink"}>{outcome ? "Closure ready" : "Outcome required"}</StatusPill>
-      <h2>Close the loop while the decision is still legible.</h2>
-      <p className="ap-lede">Record what happened to the thesis—not just whether the modeled price moved up or down.</p>
+      <h2>Close the loop while the play is still legible.</h2>
+      <p className="ap-lede">Record what happened to the thesis and setup—not just whether the modeled price moved up or down.</p>
       <fieldset className="ap-outcomes">
-        <legend>What did the study show?</legend>
+        <legend>What did the paper study show?</legend>
         {[
-          ["thesis_held", "Thesis held", "Evidence and price behavior supported the original case"],
-          ["mixed", "Mixed", "Some conditions held; the decision needs refinement"],
-          ["invalidated", "Invalidated", "A named condition broke the original case"],
+          ["thesis_held", "Thesis and setup held", "Evidence and price behavior supported the original play"],
+          ["mixed", "Mixed", "Thesis held but the intraday setup needs refinement"],
+          ["invalidated", "Invalidated", "A named condition broke the original play"],
         ].map(([value, label, detail]) => (
           <button type="button" key={value} data-selected={outcome === value} onClick={() => setOutcome(value as OutcomeChoice)}><span>{outcome === value ? <CheckCircle2 size={18} /> : <Circle size={18} />}</span><strong>{label}</strong><small>{detail}</small></button>
         ))}
       </fieldset>
-      <div className="ap-learning-record"><FileCheck2 size={18} /><div><span className="ap-mono-label">PROPOSED LEARNING RECORD</span><p>{outcome === "thesis_held" ? "The liquidity gate and opening-range structure were decision-useful; keep both in the next trial." : outcome === "mixed" ? "Separate thesis evidence from intraday trigger quality in the next trial." : outcome === "invalidated" ? "Retire this expression and preserve the source-backed invalidation as a future exclusion." : "Choose an outcome to preview the durable learning record."}</p></div></div>
+      <div className="ap-learning-record"><FileCheck2 size={18} /><div><span className="ap-mono-label">PROPOSED LEARNING RECORD</span><p>{outcome === "thesis_held" ? "The thesis-to-play compression was useful; retain the opening-range and liquidity gates." : outcome === "mixed" ? "Separate long-horizon thesis confidence from same-day trigger quality in the next trial." : outcome === "invalidated" ? "Park this expression and preserve the source-backed invalidation as a future exclusion." : "Choose an outcome to preview the durable learning record."}</p></div></div>
     </div>
   );
 }
 
 function Inspector({ step, onClose }: { step: number; onClose?: () => void }) {
   const items = [
-    ["Compiler diff", "Aperture added a paper-study horizon and separated it from the long-term thesis horizon."],
-    ["Research diagnostics", "57 screened · 18 mandate-eligible · 3 shortlisted. Fourteen extra exposure nodes were deferred, not silently discarded."],
-    ["Decision provenance", "CRDO leads on thesis fit and current evidence confidence. It is not a return forecast."],
-    ["Liquidity source", "SIP consolidated bars · 30 sessions · median daily dollar volume · observed Aug 25, 2026."],
+    ["Mission compiler", "Aperture separated the operator’s desired ending value from the evidence-backed outcome range and treated $150 as a hard loss ceiling."],
+    ["Universe compression", "57 researched names became three distinct plays. Correlated duplicates, failed triggers and lower-quality expressions remain parked with reasons."],
+    ["Full play logic", "CRDO leads on thesis fit, live setup quality and bounded loss. Twelve source records support the required gates; none represents a return guarantee."],
     ["Modeled arithmetic", "20 × $232.14 = $4,642.80 notional. Stop distance plus slippage models $144.80 planned loss."],
     ["Approval boundary", "Paper Plan v1 is bound to Decision Packet v4. No live brokerage action is represented."],
     ["Monitoring scope", "Only catalyst, invalidation, time stop and decision-changing evidence trigger attention."],
@@ -332,19 +296,19 @@ function Inspector({ step, onClose }: { step: number; onClose?: () => void }) {
       <header><div><span className="ap-mono-label">CONTEXT INSPECTOR</span><strong>{items[0]}</strong></div>{onClose && <button onClick={onClose} aria-label="Close inspector"><X size={16} /></button>}</header>
       <section><span className="ap-mono-label">WHY THIS MATTERS</span><p>{items[1]}</p></section>
       <section><span className="ap-mono-label">PROVENANCE</span><p>Fixture-backed prototype record · viewed locally · no external request</p></section>
-      <section><span className="ap-mono-label">READINESS EFFECT</span><p>{step === 3 ? "A confirmed human review clears only the liquidity evidence gate." : "Inspecting this record does not change readiness."}</p></section>
+      <section><span className="ap-mono-label">READINESS EFFECT</span><p>Inspecting the analysis adds understanding but does not change a gate. Required gates are evaluated before the top play is presented as plan-eligible.</p></section>
       <div className="ap-inspector-stamp"><LockKeyhole size={15} /> Audit detail remains attached to the decision</div>
     </aside>
   );
 }
 
-function PrimaryAction({ step, evidenceAnswer, acknowledgement, outcome, onAdvance, onBack }: {
-  step: number; evidenceAnswer: EvidenceAnswer; acknowledgement: string; outcome: OutcomeChoice; onAdvance: () => void; onBack: () => void;
+function PrimaryAction({ step, acknowledgement, outcome, onAdvance, onBack }: {
+  step: number; acknowledgement: string; outcome: OutcomeChoice; onAdvance: () => void; onBack: () => void;
 }) {
-  const labels = ["Confirm Thesis Charter", "Review the lead", "Resolve liquidity evidence", "Continue to paper plan", "Review paper approval", "Approve for paper tracking", "Close paper study", "Restart prototype"];
-  const disabled = (step === 3 && evidenceAnswer !== "confirmed") || (step === 5 && acknowledgement !== "PAPER") || (step === 7 && !outcome);
+  const labels = ["Compile day-trade thesis", "Open the top play", "Review paper plan", "Review paper approval", "Approve for paper tracking", "Close paper study", "Restart prototype"];
+  const disabled = (step === 4 && acknowledgement !== "PAPER") || (step === 6 && !outcome);
   const hints = [
-    "Creates a research charter, not an order.", "Moves one candidate into human review.", "Paper plan remains locked.", "Only confirmed evidence can advance.",
+    "Captures a target and risk boundary; it does not promise a return.", "Opens one play, not 57 candidate reviews.", "Deep analysis is optional because required gates pass.",
     "No proposal is submitted.", "Creates a fixture-only approval receipt.", "Outcome is recorded separately.", "The local fixture resets.",
   ];
   return (
@@ -361,8 +325,6 @@ function PrimaryAction({ step, evidenceAnswer, acknowledgement, outcome, onAdvan
 type VariantProps = {
   step: number;
   setStep: (step: number) => void;
-  evidenceAnswer: EvidenceAnswer;
-  setEvidenceAnswer: (value: EvidenceAnswer) => void;
   acknowledgement: string;
   setAcknowledgement: (value: string) => void;
   outcome: OutcomeChoice;
@@ -374,7 +336,7 @@ type VariantProps = {
 };
 
 function CurrentStage(props: VariantProps) {
-  return <StageContent step={props.step} evidenceAnswer={props.evidenceAnswer} setEvidenceAnswer={props.setEvidenceAnswer} acknowledgement={props.acknowledgement} setAcknowledgement={props.setAcknowledgement} outcome={props.outcome} setOutcome={props.setOutcome} onInspect={() => props.setInspectorOpen(true)} />;
+  return <StageContent step={props.step} acknowledgement={props.acknowledgement} setAcknowledgement={props.setAcknowledgement} outcome={props.outcome} setOutcome={props.setOutcome} onInspect={() => props.setInspectorOpen(true)} />;
 }
 
 function VariantA(props: VariantProps) {
@@ -402,7 +364,7 @@ function VariantB(props: VariantProps) {
         <aside className="ap-workset">
           <header><span className="ap-mono-label">ACTIVE WORKSET</span><button aria-label="Search candidates"><Search size={15} /></button></header>
           {CANDIDATES.map((candidate, index) => <button key={candidate.symbol} data-active={index === 0}><span className="ap-workset-symbol">{candidate.symbol}</span><small data-tone={candidate.tone}>{candidate.state}</small></button>)}
-          <button className="ap-view-all">View 53 parked candidates</button>
+          <button className="ap-view-all">Open grouped universe</button>
         </aside>
         <article className="ap-desk-canvas">
           <StageRail current={props.step} onSelect={props.setStep} />
@@ -466,20 +428,19 @@ function PrototypeSwitcher({ variant, setVariant }: { variant: VariantKey; setVa
 export function ApertureRunwayPrototype() {
   const [variant, setVariant] = useState<VariantKey>(readVariant);
   const [step, setStep] = useState(0);
-  const [evidenceAnswer, setEvidenceAnswer] = useState<EvidenceAnswer>(null);
   const [acknowledgement, setAcknowledgement] = useState("");
   const [outcome, setOutcome] = useState<OutcomeChoice>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
 
   const updateVariant = (next: VariantKey) => { setVariant(next); setVariantInUrl(next); };
-  const restart = () => { setStep(0); setEvidenceAnswer(null); setAcknowledgement(""); setOutcome(null); setInspectorOpen(false); };
+  const restart = () => { setStep(0); setAcknowledgement(""); setOutcome(null); setInspectorOpen(false); };
   const onAdvance = () => {
-    if (step === 7) return restart();
+    if (step === STAGES.length - 1) return restart();
     setInspectorOpen(false);
     setStep((current) => Math.min(current + 1, STAGES.length - 1));
   };
   const onBack = () => { setInspectorOpen(false); setStep((current) => Math.max(current - 1, 0)); };
-  const props = useMemo<VariantProps>(() => ({ step, setStep, evidenceAnswer, setEvidenceAnswer, acknowledgement, setAcknowledgement, outcome, setOutcome, inspectorOpen, setInspectorOpen, onAdvance, onBack }), [step, evidenceAnswer, acknowledgement, outcome, inspectorOpen]);
+  const props = useMemo<VariantProps>(() => ({ step, setStep, acknowledgement, setAcknowledgement, outcome, setOutcome, inspectorOpen, setInspectorOpen, onAdvance, onBack }), [step, acknowledgement, outcome, inspectorOpen]);
 
   return (
     <div className="ap-runway">
