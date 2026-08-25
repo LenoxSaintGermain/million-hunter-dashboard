@@ -1561,3 +1561,9 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Confirm current Alpaca Paper equity and durable sync timestamp from the persisted account snapshot
 - [x] Run pnpm check, DATABASE_URL= pnpm test, walkthrough captures, authenticated play-to-trigger pass, and remove/verify the local auth seam
 - [ ] Verify a post-secret scheduled paper-account callback reaches the deployed handler with HTTP 200 and persists a schedule-run result
+
+## Capital Aperture — Public Agents Pattern Research (Aug 25 2026)
+- [x] Analyze the referenced Public Agents product and extract its verified interaction model
+- [x] Stress-test the congressional-disclosure signal concept for latency, data provenance, risk controls, and differentiation
+- [x] Produce a borrow / adapt / avoid product-pattern matrix for Capital Aperture
+- [x] Define a staged implementation roadmap that preserves human approval and paper-only boundaries
