@@ -1580,9 +1580,9 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Add tests for SIP default, IEX fallback, and correct source metadata
 
 ## TSL-BUILD-2026-008 — Capital Operator and Disclosure Intelligence Rail
-- [ ] Pull and inspect the latest `origin/main` implementation contract plus every listed prerequisite
-- [ ] Pull commit `590591f`, read the restored `AGENTS.md`, and resume the read-only recovery manifest
-- [ ] Produce a read-only Jim/owner thesis recovery inventory and pre-write manifest
+- [x] Pull and inspect the latest `origin/main` implementation contract plus every listed prerequisite
+- [x] Pull commit `590591f`, read the restored `AGENTS.md`, and resume the read-only recovery manifest
+- [x] Produce a read-only Jim/owner thesis recovery inventory and pre-write manifest
 - [ ] Recover only unambiguous missing theses without broad reseeding, outcome backfill, or unrelated-user changes
 - [ ] Refine the Capital Operator journey around Orient → Choose → Verify → Stage/Decline → Record
 - [ ] Validate Stage 1 with the specified two-operator UAT evidence and database/broker-order checks
