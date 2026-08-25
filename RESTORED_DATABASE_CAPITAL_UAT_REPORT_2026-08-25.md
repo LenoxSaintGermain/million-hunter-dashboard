@@ -15,7 +15,7 @@
 | Alpaca Paper current account snapshot | **Complete** | Read-only validator synchronized seven positions and persisted a current snapshot. |
 | Frozen walkthrough UAT | **Complete** | Both versioned captures rendered; authenticated replay completed Today → One play → Trigger. |
 | Investor gate / scorecard regression | **Complete** | 41 focused tests passed; investor-shell source contains no Aperture navigation entry. |
-| Scheduled callback success | **Blocked** | Platform attempts are visible, but the deployed callback service returned `503` for account sync and `404` for daily outcome refresh. A publish/redeploy is required before success can be proven. |
+| Scheduled callback success | **Partially complete** | Recovered account sync returned HTTP `200` and persisted its result. Daily outcome refresh remains pending its next post-publish run. |
 
 ---
 
@@ -52,15 +52,15 @@ All three Heartbeat jobs remain registered with the platform and use the expecte
 
 | Job | Platform state | Latest observed result | Action taken |
 |---|---|---|---|
-| `capital-paper-account-sync-1` | Enabled; 15-minute callback | `500` while the restored DB had no task binding / secret, then `503 Service Unavailable` at `2026-08-25T13:52:59Z` | Restored `portfolio_accounts.sync_schedule_task_uid` and enabled flag. |
+| `capital-paper-account-sync-1-recovered-20260825` | Enabled; 15-minute callback | **HTTP `200`** at `2026-08-25T14:55:36Z` (1,595 ms) | Replaced the stale schedule, bound the new task to the Paper account, and confirmed it persisted a seven-position sync result. |
 | `capital-daily-outcome-refresh-1` | Enabled; daily 22:15 UTC callback | `404` at `2026-08-24T22:18:07Z` | Restored the owner-level task binding and enabled flag. |
 | `capital-one-time-glp1-research-*` | **Paused** after its one-time completion | `200` at `2026-08-21T14:08:14Z` | Paused intentionally to prevent an unintended annual rerun. |
 
 ### What remains unverified
 
-The platform is attempting the account-sync callback, but the **published service** returned `503`; the daily outcome callback’s last attempt returned `404`. The local project contains all three route registrations, and the local read-only sync works with the corrected secret. Therefore the remaining problem is **published-service reachability/deployment freshness**, not the database binding or the Alpaca credential.
+The recovered account-sync callback is now healthy. Its persisted account record shows a fresh scheduled timestamp, no error, and `Synced 7 position(s) from alpaca_paper; paper account context only.` The daily outcome callback’s most recent result remains the pre-publish `404` at `2026-08-24T22:18:07Z`; its route now resolves to the expected cron-cookie `403` when probed without scheduler authorization, but the next real scheduled execution has not yet occurred.
 
-**Required next step:** publish checkpoint after this report, then observe one successful 15-minute account-sync callback and the next daily outcome callback. This is the only remaining UAT blocker.
+**Required final observation:** confirm one post-publish daily outcome callback returns HTTP `200` after its next scheduled run. No order activity is involved.
 
 ---
 
@@ -78,10 +78,10 @@ The platform is attempting the account-sync callback, but the **published servic
 | Field | Value |
 |---|---:|
 | Account | `Alpaca Paper — AI Thesis` (`portfolio_accounts.id = 1`) |
-| Equity | **$97,682.08** |
+| Equity | **$97,442.68** |
 | Cash | **$59,998.06** |
 | Buying power | **$345,507.49** |
-| Persisted sync timestamp | **2026-08-25T13:50:58.208Z** |
+| Persisted sync timestamp | **2026-08-25T14:55:34.929Z** |
 | Sync source | `alpaca_paper` |
 | Sync error | None |
 
@@ -103,9 +103,7 @@ The account snapshot came from the shared read-only `syncPaperAccount` path used
 
 ## Recommended UAT Sequence After Publish
 
-1. Click **Publish** for the checkpoint containing the restored migration runner and migration rename.
-2. Wait for the next `capital-paper-account-sync-1` Heartbeat run; confirm HTTP `200` and that `sync_schedule_last_run_at` / `sync_schedule_last_result` are populated.
-3. Confirm the next `capital-daily-outcome-refresh-1` callback returns HTTP `200` rather than `404`.
-4. Re-run `npx tsx scripts/validate-alpaca-paper-sync.mjs` only as a read-only freshness check if needed.
+1. Confirm the next `capital-daily-outcome-refresh-1` callback returns HTTP `200` rather than its pre-publish `404`.
+2. Re-run `npx tsx scripts/validate-alpaca-paper-sync.mjs` only as a read-only freshness check if needed.
 
 No order creation, approval, submission, or broker-side trading action is part of this sequence.

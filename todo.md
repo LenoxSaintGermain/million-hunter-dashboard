@@ -1551,7 +1551,7 @@ anywhere in the codebase; those IDs fail on the current production key.
 ## Accounts — Alpaca Paper Sync Failure (Aug 22 2026)
 - [x] Diagnose the failing read-only Alpaca Paper account request on `/aperture/accounts` and preserve its actionable upstream error detail
 - [x] Repair the narrowest safe adapter or credential-path defect without adding any order capability
-- [ ] Verify manual sync and the scheduled freshness callback both persist a current account snapshot once Alpaca Paper TLS connectivity is available, then run regression coverage
+- [x] Verify manual sync and the scheduled freshness callback both persist a current account snapshot once Alpaca Paper TLS connectivity is available, then run regression coverage
 
 ## Restored Database — Jim Capital UAT Verification (Aug 25 2026)
 - [x] Inventory migrations 0032–0049 against the restored database schema, including both duplicate-numbered 0044 files
@@ -1560,7 +1560,8 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Run the current Jim UAT provisioner and both UAT/Alpaca validation scripts without creating, approving, or submitting orders
 - [x] Confirm current Alpaca Paper equity and durable sync timestamp from the persisted account snapshot
 - [x] Run pnpm check, DATABASE_URL= pnpm test, walkthrough captures, authenticated play-to-trigger pass, and remove/verify the local auth seam
-- [ ] Verify a post-secret scheduled paper-account callback reaches the deployed handler with HTTP 200 and persists a schedule-run result
+- [x] Verify a post-secret scheduled paper-account callback reaches the deployed handler with HTTP 200 and persists a schedule-run result
+- [ ] Verify the next daily-outcome scheduled callback reaches the deployed handler with HTTP 200 after its earlier pre-publish 404
 
 ## Capital Aperture — Public Agents Pattern Research (Aug 25 2026)
 - [x] Analyze the referenced Public Agents product and extract its verified interaction model
