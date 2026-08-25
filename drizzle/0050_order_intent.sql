@@ -1,4 +1,4 @@
--- 0044 — order intent: does this order open exposure, or close it?
+-- 0050 — order intent: does this order open exposure, or close it?
 --
 -- `side` alone cannot answer that. A sell exits a long OR establishes a short,
 -- and the two are opposites for every concentration ceiling in the mandate.
