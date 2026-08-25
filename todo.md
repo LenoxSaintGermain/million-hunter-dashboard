@@ -1572,3 +1572,8 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Verify configured Alpaca credentials against read-only enhanced market-data endpoints
 - [x] Document verified market-data coverage, feed availability, and remaining endpoint limits
 - [x] Map verified enhanced data to safe Capital Aperture research and paper-monitoring use cases
+
+## Capital Aperture — Verified SIP Feed Integration (Aug 25 2026)
+- [x] Switch daily Alpaca facts from hardcoded IEX to the configured verified feed (SIP by default)
+- [x] Make market-data provider labels and fact provenance identify the actual selected feed
+- [x] Add tests for SIP default, IEX fallback, and correct source metadata

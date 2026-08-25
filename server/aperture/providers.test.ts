@@ -9,7 +9,7 @@ import { alpacaPaperBroker, robinhoodMcpBroker, listBrokers, brokerFor, assertPa
 
 const PAID_ENV = [
   "POLYGON_API_KEY", "FMP_API_KEY", "BENZINGA_API_KEY", "FRED_API_KEY",
-  "ALPACA_PAPER_KEY", "ALPACA_PAPER_SECRET", "ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY",
+  "ALPACA_PAPER_KEY", "ALPACA_PAPER_SECRET", "ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY", "ALPACA_DATA_FEED",
 ];
 const saved: Record<string, string | undefined> = {};
 
@@ -106,6 +106,17 @@ describe("num — provider values coerce safely", () => {
 describe("market data derivations", () => {
   const bars = Array.from({ length: 30 }, (_, i) => ({ c: 100 + i, v: 1_000_000, t: i }));
 
+  it("defaults to SIP and names the consolidated feed in provenance", () => {
+    expect(__marketDataInternals.intradayFeed()).toBe("sip");
+    expect(__marketDataInternals.alpacaFeedSource("sip")).toMatch(/SIP.*consolidated/i);
+  });
+
+  it("honors an explicit IEX fallback and names the partial feed in provenance", () => {
+    process.env.ALPACA_DATA_FEED = "iex";
+    expect(__marketDataInternals.intradayFeed()).toBe("iex");
+    expect(__marketDataInternals.alpacaFeedSource("iex")).toMatch(/IEX-only/i);
+  });
+
   it("computes average daily DOLLAR volume, not share count", () => {
     const adv = __marketDataInternals.advUsd(bars)!;
     expect(adv).toBeCloseTo(114.5 * 1_000_000, -3);
@@ -127,6 +138,13 @@ describe("market data derivations", () => {
     const facts = __marketDataInternals.barsToFacts(bars, "alpaca", "Alpaca IEX", "https://x", 45, 0);
     expect(facts.find((f) => f.factKey === "last_price")!.basis).toBe("verified");
     expect(facts.find((f) => f.factKey === "volatility_30d")!.basis).toBe("modeled");
+  });
+
+  it("carries the selected feed into every generated fact's source metadata", () => {
+    const source = __marketDataInternals.alpacaFeedSource("sip");
+    const facts = __marketDataInternals.barsToFacts(bars, "alpaca", source, "https://example.test?feed=sip", 45, 0);
+    expect(facts.every((fact) => fact.sourceName === source)).toBe(true);
+    expect(facts.every((fact) => fact.sourceUrl?.includes("feed=sip"))).toBe(true);
   });
 
   it("emits unknowns rather than zeros when there are no bars", () => {

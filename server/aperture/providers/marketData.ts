@@ -3,9 +3,11 @@
  * whether a thesis-perfect name can actually be sized.
  *
  * Two adapters behind one shape:
- *   alpaca  — free IEX tier. Real, but IEX-only and delayed; every price it
- *             writes says so in its source name, because a delayed print
- *             presented as a live quote is a lie of omission.
+ *   alpaca  — configured Trading API feed. SIP is the default when the
+ *             entitlement is available; IEX remains an explicit fallback.
+ *             Every fact records the actual feed, because a partial or
+ *             delayed print presented as consolidated market data is a lie
+ *             of omission.
  *   polygon — full-market consolidated quotes when a key exists.
  *
  * ADV is computed from daily bars rather than taken on faith, and is labelled
@@ -36,6 +38,12 @@ import { DAY, httpJson, num, unknownFact, type FetchCtx, type ProviderAdapter } 
 export function intradayFeed(): TapeFeed {
   const raw = (process.env.ALPACA_DATA_FEED ?? "sip").trim().toLowerCase();
   return raw === "iex" ? "iex" : raw === "sip" ? "sip" : "unknown";
+}
+
+function alpacaFeedSource(feed: TapeFeed): string {
+  if (feed === "sip") return "Alpaca SIP (consolidated market data)";
+  if (feed === "iex") return "Alpaca IEX (IEX-only market data)";
+  return "Alpaca market data (unknown configured feed)";
 }
 
 export interface IntradayBarsResult {
@@ -214,10 +222,10 @@ function barsToFacts(
   return out;
 }
 
-// ── Alpaca (free IEX tier) ───────────────────────────────────────────────────
+// ── Alpaca (configured Trading API feed) ─────────────────────────────────────
 export const alpacaDataProvider: ProviderAdapter = {
   id: "alpaca",
-  label: "Alpaca market data (free IEX tier — delayed, IEX only)",
+  label: "Alpaca market data (SIP default; IEX fallback via ALPACA_DATA_FEED)",
   kind: "security",
   requiredEnv: [],
   isAvailable: () => missingAlpacaCredentials().length === 0,
@@ -227,10 +235,11 @@ export const alpacaDataProvider: ProviderAdapter = {
 
   async fetchSecurityFacts(symbol, ctx: FetchCtx): Promise<Fact[]> {
     const credentials = alpacaCredentials();
+    const feed = intradayFeed();
     const start = new Date(ctx.now - 45 * DAY).toISOString().slice(0, 10);
     const url =
       `https://data.alpaca.markets/v2/stocks/${encodeURIComponent(symbol)}/bars` +
-      `?timeframe=1Day&start=${start}&limit=45&feed=iex&adjustment=raw`;
+      `?timeframe=1Day&start=${start}&limit=45&feed=${feed}&adjustment=raw`;
     const data = await httpJson<{ bars?: Array<{ c: number; v: number; t: string }> }>(url, {
       timeoutMs: ctx.timeoutMs,
       headers: {
@@ -244,8 +253,8 @@ export const alpacaDataProvider: ProviderAdapter = {
     return barsToFacts(
       bars,
       "alpaca",
-      "Alpaca IEX (delayed, IEX-only feed)",
-      `https://app.alpaca.markets/trade/${encodeURIComponent(symbol)}`,
+      alpacaFeedSource(feed),
+      `https://app.alpaca.markets/trade/${encodeURIComponent(symbol)}?feed=${feed}`,
       45,
       ctx.now,
     );
@@ -275,4 +284,4 @@ export const polygonProvider: ProviderAdapter = {
   },
 };
 
-export const __marketDataInternals = { advUsd, volatility, barsToFacts };
+export const __marketDataInternals = { advUsd, volatility, barsToFacts, intradayFeed, alpacaFeedSource };
