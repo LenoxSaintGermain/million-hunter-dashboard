@@ -11,7 +11,8 @@
  * so the contract is visible in the server code too.
  */
 import { z } from "zod";
-import { eq, and, inArray, gte, lt, sql } from "drizzle-orm";
+import { eq, and, inArray, gte, lt, sql, asc } from "drizzle-orm";
+import { createHash } from "node:crypto";
 import { getDb } from "./db";
 import {
   capitalTheses,
@@ -28,6 +29,13 @@ import {
   aperturePlaySlates,
   aperturePlaySlateItems,
   apertureSetAside,
+  disclosurePlans,
+  disclosurePlanRevisions,
+  disclosureFilings,
+  disclosureRetrievals,
+  disclosureTransactions,
+  disclosureMatches,
+  disclosureEntityAliases,
   thesisCompilations,
   users,
 } from "../drizzle/schema";
@@ -73,6 +81,8 @@ import { parse as parseCookie } from "cookie";
 import { DAILY_OUTCOME_REFRESH_CRON, DAILY_OUTCOME_REFRESH_PATH, refreshLiveSlateOutcomes } from "./aperture/dailyOutcomeRefresh";
 import { ONE_TIME_GLP1_RESEARCH_PATH, oneTimeResearchCron } from "./aperture/oneTimeGlp1Research";
 import { PAPER_ACCOUNT_SYNC_CRON, PAPER_ACCOUNT_SYNC_PATH } from "./aperture/paperAccountSyncScheduled";
+import { compileDisclosureIntent, evaluateDisclosureTransaction, tightenControls, type DisclosureControls } from "../shared/disclosure";
+import { DisclosureDocumentStore, housePtrFixtureDocument } from "./aperture/disclosureRail";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -684,6 +694,155 @@ export const apertureRouter = router({
     }),
   }),
 
+  // ── Disclosure Intelligence Rail (WP-DIR1) ─────────────────────────────────
+  // This namespace is evidence and paper-stage preparation only. It never calls
+  // a broker adapter and never creates, approves, or submits an order.
+  disclosure: router({
+    compileIntent: adminProcedure
+      .input(z.object({ rawIntent: z.string().min(20).max(12_000) }))
+      .mutation(({ input }) => compileDisclosureIntent(input.rawIntent)),
+
+    plan: router({
+      list: adminProcedure.query(async ({ ctx }) => {
+        const db = await getDb();
+        return db!.select().from(disclosurePlans)
+          .where(eq(disclosurePlans.userId, ctx.user.id))
+          .orderBy(desc(disclosurePlans.updatedAt));
+      }),
+
+      createRevision: adminProcedure
+        .input(z.object({
+          planId: z.number().optional(),
+          rawIntent: z.string().min(20).max(12_000),
+          controls: z.object({
+            maximumLagDays: z.number().int().positive().optional(),
+            minimumDisclosedRangeFloorUsd: z.number().int().positive().optional(),
+            maximumObservationsPerPlanDay: z.number().int().positive().optional(),
+            allowedAssetTypes: z.array(z.enum(["equity", "etf"])).optional(),
+          }).optional(),
+          operatorResolutions: z.array(z.string().min(1).max(500)).default([]),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const db = await getDb();
+          const now = Date.now();
+          const compiled = compileDisclosureIntent(input.rawIntent);
+          const controls = tightenControls(input.controls as Partial<DisclosureControls> ?? {});
+          const finalCompiled = { ...compiled, controls, unresolved: compiled.unresolved.filter((note) => !input.operatorResolutions.includes(note)) };
+          let planId = input.planId;
+          if (planId) {
+            const [owned] = await db!.select().from(disclosurePlans)
+              .where(and(eq(disclosurePlans.id, planId), eq(disclosurePlans.userId, ctx.user.id))).limit(1);
+            if (!owned) throw new TRPCError({ code: "NOT_FOUND", message: "Disclosure plan not found" });
+          } else {
+            const inserted = await db!.insert(disclosurePlans).values({ userId: ctx.user.id, status: "draft", createdAt: now, updatedAt: now });
+            planId = Number(inserted[0].insertId);
+          }
+          const [latest] = await db!.select({ revisionNumber: disclosurePlanRevisions.revisionNumber }).from(disclosurePlanRevisions)
+            .where(eq(disclosurePlanRevisions.planId, planId)).orderBy(desc(disclosurePlanRevisions.revisionNumber)).limit(1);
+          const contentHash = createHash("sha256").update(JSON.stringify({ rawIntent: input.rawIntent, finalCompiled, operatorResolutions: input.operatorResolutions })).digest("hex");
+          const revisionNumber = (latest?.revisionNumber ?? 0) + 1;
+          const inserted = await db!.insert(disclosurePlanRevisions).values({
+            planId, revisionNumber, rawIntent: input.rawIntent, compiledPlan: finalCompiled, compilerRole: "deterministic_wp_dir1_compiler",
+            promptVersion: "wp-dir1-v1", confidenceNotes: finalCompiled.confidenceNotes, operatorResolutions: input.operatorResolutions,
+            contentHash, compiledAt: now, createdAt: now,
+          });
+          const revisionId = Number(inserted[0].insertId);
+          await db!.update(disclosurePlans).set({ currentRevisionId: revisionId, status: "review", updatedAt: now })
+            .where(eq(disclosurePlans.id, planId));
+          return { planId, revisionId, revisionNumber, compiledPlan: finalCompiled };
+        }),
+
+      approveRevision: adminProcedure
+        .input(z.object({ planId: z.number(), revisionId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const db = await getDb();
+          const [plan] = await db!.select().from(disclosurePlans)
+            .where(and(eq(disclosurePlans.id, input.planId), eq(disclosurePlans.userId, ctx.user.id))).limit(1);
+          const [revision] = await db!.select().from(disclosurePlanRevisions)
+            .where(and(eq(disclosurePlanRevisions.id, input.revisionId), eq(disclosurePlanRevisions.planId, input.planId))).limit(1);
+          if (!plan || !revision) throw new TRPCError({ code: "NOT_FOUND", message: "Plan revision not found" });
+          const compiled = revision.compiledPlan as { unresolved?: string[] };
+          if (compiled.unresolved?.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Resolve every plan ambiguity before monitoring may begin" });
+          const now = Date.now();
+          await db!.update(disclosurePlans).set({ status: "monitoring", currentRevisionId: revision.id, approvedAt: now, updatedAt: now }).where(eq(disclosurePlans.id, plan.id));
+          return { approved: true, planId: plan.id, revisionId: revision.id };
+        }),
+
+      pause: adminProcedure.input(z.object({ planId: z.number() })).mutation(async ({ ctx, input }) => {
+        const db = await getDb(); const now = Date.now();
+        await db!.update(disclosurePlans).set({ status: "paused", pausedAt: now, updatedAt: now })
+          .where(and(eq(disclosurePlans.id, input.planId), eq(disclosurePlans.userId, ctx.user.id)));
+        return { paused: true };
+      }),
+    }),
+
+    replayOfficialFixture: adminProcedure
+      .input(z.object({ planId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [plan] = await db!.select().from(disclosurePlans)
+          .where(and(eq(disclosurePlans.id, input.planId), eq(disclosurePlans.userId, ctx.user.id))).limit(1);
+        if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Disclosure plan not found" });
+        if (plan.status !== "monitoring") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Monitoring requires explicit approval of an immutable revision" });
+        const [revision] = await db!.select().from(disclosurePlanRevisions).where(eq(disclosurePlanRevisions.id, plan.currentRevisionId!)).limit(1);
+        if (!revision) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Active revision unavailable" });
+        const document = housePtrFixtureDocument(); const stored = await new DisclosureDocumentStore().put(document.bytes); const now = Date.now();
+        const [existing] = await db!.select().from(disclosureFilings).where(and(eq(disclosureFilings.source, document.source), eq(disclosureFilings.stableSourceDocumentId, document.stableSourceDocumentId), eq(disclosureFilings.contentHash, stored.contentHash))).limit(1);
+        let filingId = existing?.id;
+        const sourceVersions = await db!.select().from(disclosureFilings).where(and(eq(disclosureFilings.source, document.source), eq(disclosureFilings.stableSourceDocumentId, document.stableSourceDocumentId))).orderBy(desc(disclosureFilings.id));
+        if (!filingId) {
+          const inserted = await db!.insert(disclosureFilings).values({
+            source: document.source, stableSourceDocumentId: document.stableSourceDocumentId, canonicalUrl: document.canonicalUrl,
+            filerId: document.filer.id, filerName: document.filer.name, chamber: document.filer.chamber, filedAt: document.filedAt,
+            firstObservedAt: document.retrievedAt, retrievedAt: document.retrievedAt, storageKey: stored.storageKey, contentHash: stored.contentHash,
+            mediaType: document.mediaType, byteSize: stored.byteSize, parserVersion: document.parserVersion,
+            supersedesFilingId: sourceVersions[0]?.id ?? null, createdAt: now,
+          }); filingId = Number(inserted[0].insertId);
+        }
+        await db!.insert(disclosureRetrievals).values({ filingId, source: document.source, stableSourceDocumentId: document.stableSourceDocumentId, retrievedAt: document.retrievedAt, observedHash: stored.contentHash, result: stored.repeated ? "repeat" : sourceVersions.length ? "source_changed" : "stored", transportMetadata: { fixture: true }, createdAt: now });
+        const compiled = revision.compiledPlan as { controls: DisclosureControls };
+        const observations = [] as Array<{ transactionId: number; state: string; reasons: string[] }>;
+        for (const transaction of document.transactions) {
+          let [row] = await db!.select().from(disclosureTransactions).where(and(eq(disclosureTransactions.filingId, filingId), eq(disclosureTransactions.sourceRowIdentity, transaction.sourceRowIdentity))).limit(1);
+          if (!row) {
+            const evaluated = evaluateDisclosureTransaction(transaction, compiled.controls, now);
+            const inserted = await db!.insert(disclosureTransactions).values({ filingId, sourceRowIdentity: transaction.sourceRowIdentity, ownerAsStated: transaction.ownerAsStated, rawAssetName: transaction.rawAssetName, transactionType: transaction.transactionType, transactionDate: transaction.transactionDate, amountMinUsd: transaction.amountMinUsd, amountMaxUsd: transaction.amountMaxUsd, resolutionGrade: transaction.resolutionGrade, resolutionBasis: ["Official House fixture replay; no ticker is inferred."], publicationBasis: transaction.publicationAt ? "source_timestamp" : "first_observed", eligibleFrom: evaluated.eligibleFrom, disclosureLagDays: evaluated.disclosureLagDays, createdAt: now });
+            row = { id: Number(inserted[0].insertId) } as typeof row;
+          }
+          const evaluated = evaluateDisclosureTransaction(transaction, compiled.controls, now);
+          const [match] = await db!.select().from(disclosureMatches).where(and(eq(disclosureMatches.planRevisionId, revision.id), eq(disclosureMatches.transactionId, row.id))).limit(1);
+          if (!match) await db!.insert(disclosureMatches).values({ planRevisionId: revision.id, transactionId: row.id, gateSnapshot: evaluated, disclosureMandateVersion: "DISCLOSURE_MANDATE_V1", effectiveControls: evaluated.effectiveControls, state: evaluated.state, reasons: evaluated.reasons, createdAt: now, updatedAt: now });
+          observations.push({ transactionId: row.id, state: evaluated.state, reasons: evaluated.reasons });
+        }
+        return { filingId, contentHash: stored.contentHash, storageKey: stored.storageKey, repeated: stored.repeated, observations };
+      }),
+
+    match: router({
+      list: adminProcedure.input(z.object({ planId: z.number() })).query(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [plan] = await db!.select().from(disclosurePlans).where(and(eq(disclosurePlans.id, input.planId), eq(disclosurePlans.userId, ctx.user.id))).limit(1);
+        if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Disclosure plan not found" });
+        return db!.select({ match: disclosureMatches, transaction: disclosureTransactions, filing: disclosureFilings }).from(disclosureMatches)
+          .innerJoin(disclosureTransactions, eq(disclosureMatches.transactionId, disclosureTransactions.id))
+          .innerJoin(disclosureFilings, eq(disclosureTransactions.filingId, disclosureFilings.id))
+          .where(eq(disclosureMatches.planRevisionId, plan.currentRevisionId!)).orderBy(asc(disclosureMatches.createdAt));
+      }),
+      promoteEvidence: adminProcedure.input(z.object({ matchId: z.number(), note: z.string().min(1).max(2_000) })).mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [match] = await db!.select({ match: disclosureMatches, plan: disclosurePlans, transaction: disclosureTransactions, filing: disclosureFilings }).from(disclosureMatches)
+          .innerJoin(disclosurePlanRevisions, eq(disclosureMatches.planRevisionId, disclosurePlanRevisions.id))
+          .innerJoin(disclosurePlans, eq(disclosurePlanRevisions.planId, disclosurePlans.id))
+          .innerJoin(disclosureTransactions, eq(disclosureMatches.transactionId, disclosureTransactions.id))
+          .innerJoin(disclosureFilings, eq(disclosureTransactions.filingId, disclosureFilings.id))
+          .where(and(eq(disclosureMatches.id, input.matchId), eq(disclosurePlans.userId, ctx.user.id))).limit(1);
+        if (!match) throw new TRPCError({ code: "NOT_FOUND", message: "Disclosure observation not found" });
+        if (match.match.state !== "reviewable") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only a reviewable observation can be promoted as cited research evidence" });
+        await db!.update(disclosureMatches).set({ state: "promoted", reviewedByUserId: ctx.user.id, reviewedAt: Date.now(), reviewNote: input.note, updatedAt: Date.now() }).where(eq(disclosureMatches.id, match.match.id));
+        return { promoted: true, citedEvidence: { sourceUrl: match.filing.canonicalUrl, filingId: match.filing.stableSourceDocumentId, rawAssetName: match.transaction.rawAssetName, amountRange: { minUsd: match.transaction.amountMinUsd, maxUsd: match.transaction.amountMaxUsd }, eligibleFrom: match.transaction.eligibleFrom, nextRequiredStep: "Existing paper recipe readiness and preflight remain separate; no broker order was created." } };
+      }),
+    }),
+  }),
+
   run: router({
     list: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
@@ -774,7 +933,7 @@ export const apertureRouter = router({
           runId: z.number(),
           candidateId: z.number(),
           checkLabel: z.string().min(2).max(255),
-          status: z.enum(["reviewed", "needs_follow_up"]),
+          status: z.enum(["reviewed", "confirmed", "not_confirmed", "not_applicable", "needs_follow_up"]),
           note: z.string().max(1_000).optional(),
         }))
         .mutation(async ({ ctx, input }) => {

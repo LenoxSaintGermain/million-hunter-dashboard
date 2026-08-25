@@ -77,8 +77,8 @@ const PROVIDER_GUIDANCE: Record<string, { enables: string; activation: string }>
     activation: "Add a free FRED API key in Settings to enable macro evidence.",
   },
   alpaca: {
-    enables: "Delayed IEX price, 30-day dollar liquidity, and modeled volatility for paper research.",
-    activation: "Uses your Alpaca Paper credentials. Data is delayed and IEX-only, so it is never presented as a consolidated live quote.",
+    enables: "SIP price, 30-day dollar liquidity, and modeled volatility for paper research when the verified entitlement is available.",
+    activation: "Uses your Alpaca Paper credentials. The recorded fact names its actual feed (SIP by default; IEX only as an explicit fallback) and is never presented as an execution instruction.",
   },
   polygon: {
     enables: "Consolidated daily price and volume evidence across the broader market.",

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { BookOpen, FileText, Landmark, LayoutDashboard, Route, Wallet } from "lucide-react";
+import { BookOpen, FileSearch, FileText, Landmark, LayoutDashboard, Route, Wallet } from "lucide-react";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { cn } from "@/lib/utils";
 import { CapitalCockpitRail } from "@/components/aperture/CapitalCockpitRail";
@@ -9,7 +9,9 @@ import { useAuth } from "@/_core/hooks/useAuth";
 const APERTURE_NAV = [
   { href: "/aperture", label: "Decision Center", icon: LayoutDashboard },
   { href: "/aperture/runs", label: "Research Journeys", icon: Route },
-  { href: "/aperture/thesis/new", label: "Theses", icon: BookOpen },
+  { href: "/aperture/theses", label: "Saved theses", icon: BookOpen },
+  { href: "/aperture/disclosures", label: "Disclosure plans", icon: FileSearch },
+  { href: "/thesis", label: "New thesis", icon: BookOpen },
   { href: "/aperture/accounts", label: "Accounts", icon: Wallet },
   { href: "/aperture/memos", label: "Memo Library", icon: FileText },
 ] as const;

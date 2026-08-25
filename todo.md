@@ -1583,8 +1583,13 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Pull and inspect the latest `origin/main` implementation contract plus every listed prerequisite
 - [x] Pull commit `590591f`, read the restored `AGENTS.md`, and resume the read-only recovery manifest
 - [x] Produce a read-only Jim/owner thesis recovery inventory and pre-write manifest
-- [ ] Recover only unambiguous missing theses without broad reseeding, outcome backfill, or unrelated-user changes
-- [ ] Refine the Capital Operator journey around Orient → Choose → Verify → Stage/Decline → Record
-- [ ] Validate Stage 1 with the specified two-operator UAT evidence and database/broker-order checks
-- [ ] Implement only the bounded WP-DIR1 grammar and provenance foundation after Stage 1 passes
-- [ ] Validate WP-DIR1, capture before/after evidence, commit/push, and prepare the requested report-back
+- [x] Verify the confirmed Jim Butler owner mapping and verbatim GLP-1 text in a dry-run recovery manifest
+- [x] Recover only unambiguous missing theses without broad reseeding, outcome backfill, or unrelated-user changes
+- [x] Refine the Capital Operator journey around Orient → Choose → Verify → Stage/Decline → Record
+- [x] Add source-contextual evidence answer states without backfilling existing reviews
+- [x] Validate Stage 1 with the specified two-operator UAT evidence and database/broker-order checks
+- [x] Resolve the remaining duplicate migration prefix and add a deterministic duplicate-prefix test
+- [x] Build a provenance-complete official House PTR fixture corpus and identify Lenox as prohibited-language reviewer
+- [x] Implement only the bounded WP-DIR1 grammar and provenance foundation after Stage 1 passes
+- [x] Validate WP-DIR1, capture before/after evidence, commit/push, and prepare the requested report-back
+- [ ] Obtain Lenox’s explicit prohibited-language reviewer sign-off before any disclosure-rail expansion

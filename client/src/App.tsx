@@ -56,6 +56,8 @@ import SourcingSchedules from "./pages/SourcingSchedules";
 import OffMarketDiscovery from "./pages/OffMarketDiscovery";
 import ApertureHome from "./pages/aperture/ApertureHome";
 import ThesisGraphEditor from "./pages/aperture/ThesisGraphEditor";
+import ApertureTheses from "./pages/aperture/ApertureTheses";
+import ApertureDisclosure from "./pages/aperture/ApertureDisclosure";
 import ExposureMap from "./pages/aperture/ExposureMap";
 import CandidateBoard from "./pages/aperture/CandidateBoard";
 import StrategyCompare from "./pages/aperture/StrategyCompare";
@@ -246,6 +248,8 @@ function Router() {
 
         {/* ── Capital Aperture — liquid securities engine ── */}
         <Route path="/aperture">{() => <ApertureRoute component={ApertureHome} />}</Route>
+        <Route path="/aperture/theses">{() => <ApertureRoute component={ApertureTheses} />}</Route>
+        <Route path="/aperture/disclosures">{() => <ApertureRoute component={ApertureDisclosure} />}</Route>
         <Route path="/aperture/thesis/new">{() => <ApertureRoute component={ThesisGraphEditor} />}</Route>
         <Route path="/aperture/thesis/:id">{() => <ApertureRoute component={ThesisGraphEditor} />}</Route>
         <Route path="/aperture/runs">{() => <ApertureRoute component={ApertureRuns} />}</Route>

@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { AlertTriangle, ArrowLeft, CheckCircle2, CircleAlert, ClipboardCheck, FileText, Loader2, RefreshCw, SearchCheck, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -114,6 +115,7 @@ export default function CandidateBoard() {
   const [activeRole, setActiveRole] = useState<Role | "all">("all");
   const [showSupporting, setShowSupporting] = useState(false);
   const [showInlineRecord, setShowInlineRecord] = useState(false);
+  const [evidenceNote, setEvidenceNote] = useState("");
   const [reviewProgressMessage, setReviewProgressMessage] = useState("");
   const [reviewCompletedAt, setReviewCompletedAt] = useState<number | null>(null);
   const nextActionRef = useRef<HTMLDivElement>(null);
@@ -212,6 +214,13 @@ export default function CandidateBoard() {
   const reviewedChecks = new Set(evidenceReadiness.reviewedChecks);
   const unreviewedChecks = evidenceReadiness.unreviewedChecks;
   const paperProposalReady = evidenceReadiness.paperProposalReady;
+  const currentEvidenceQuestion = unreviewedChecks[0] ?? null;
+  const focusMemo = (focusCandidate as any)?.memo;
+  const sourceExcerpt = typeof focusMemo === "string"
+    ? focusMemo.slice(0, 420)
+    : focusMemo && typeof focusMemo === "object"
+      ? Object.values(focusMemo as Record<string, unknown>).flatMap((value) => Array.isArray(value) ? value : [value]).filter((value): value is string => typeof value === "string").join(" ").slice(0, 420)
+      : null;
   const alreadyHeld = Boolean(focusCandidate && paperPositions.some((position: any) => position.symbol === focusCandidate.symbol));
 
   const openEvidence = () => { setView("evidence"); setActiveRole("all"); };
@@ -253,7 +262,7 @@ export default function CandidateBoard() {
           <div className="space-y-5">
             {focusCandidate && <section className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Candidate review · {focusIndex + 1} of {candidateSequence.length}</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{focusCandidate.id === leadCandidate?.id ? <><strong style={{ color: "var(--sh-text-primary)" }}>{focusCandidate.symbol} leads this brief.</strong> {brief?.priorityCandidate?.leadReason ?? "It is the current lead candidate in the brief's deterministic decision order."}</> : <><strong style={{ color: "var(--sh-text-primary)" }}>{focusCandidate.symbol} is candidate {focusIndex + 1}.</strong> {leadCandidate?.symbol} remains the brief lead; this candidate is available for deliberate comparison, not hidden supporting research.</>}</p></div><div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" disabled={candidateSequence.length < 2} onClick={() => selectCandidate(-1)}>Previous</Button><Button size="sm" variant="outline" disabled={candidateSequence.length < 2} onClick={() => selectCandidate(1)}>Next</Button></div></div>
-              {candidateSequence.length > 1 && <div className="mt-3 flex gap-1 overflow-x-auto pb-1">{candidateSequence.map((candidate, index) => <button key={candidate.id} onClick={() => setSelectedCandidateId(candidate.id)} className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: candidate.id === focusCandidate.id ? "var(--sh-signal)" : "var(--sh-border-1)", background: candidate.id === focusCandidate.id ? "color-mix(in srgb, var(--sh-signal) 10%, var(--sh-surface))" : "transparent", color: candidate.id === focusCandidate.id ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>{index + 1}. {candidate.symbol}{candidate.id === leadCandidate?.id ? " · lead" : ""}</button>)}</div>}
+              {candidateSequence.length > 1 && <div className="mt-3 flex flex-wrap gap-1"><span className="mr-1 self-center text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>Lead + alternatives</span>{candidateSequence.slice(0, 3).map((candidate, index) => <button key={candidate.id} onClick={() => setSelectedCandidateId(candidate.id)} className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: candidate.id === focusCandidate.id ? "var(--sh-signal)" : "var(--sh-border-1)", background: candidate.id === focusCandidate.id ? "color-mix(in srgb, var(--sh-signal) 10%, var(--sh-surface))" : "transparent", color: candidate.id === focusCandidate.id ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>{index + 1}. {candidate.symbol}{candidate.id === leadCandidate?.id ? " · lead" : ""}</button>)}{candidateSequence.length > 3 && <button type="button" className="rounded-full border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} onClick={() => { setView("evidence"); setShowSupporting(true); }}>View all ({candidateSequence.length})</button>}</div>}
             </section>}
             {focusCandidate ? <PlayRecipeCard
               candidate={focusCandidate}
@@ -325,6 +334,12 @@ export default function CandidateBoard() {
                 <Button variant="ghost" size="sm" onClick={() => setView("brief")}>Recommendation</Button>
               </div>
             </div>
+            {focusCandidate && currentEvidenceQuestion && <Card className="border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><CardContent className="space-y-4 pt-5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Current decision-critical question</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{currentEvidenceQuestion}</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Why this matters: a confirmed answer can clear this gate; a not-confirmed answer declines the current paper stage rather than quietly passing it.</p></div><Badge variant="outline" style={{ color: "var(--sh-signal)" }}>{unreviewedChecks.length} open</Badge></div>
+              <div className="rounded-lg border p-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Source record · provenance</p><p className="mt-1" style={{ color: "var(--sh-fg-muted)" }}>{sourceExcerpt ? `${sourceExcerpt}${sourceExcerpt.length >= 420 ? "…" : ""}` : "No fact-traced source record is available yet. Build it inline before resolving this question; no paper order is created."}</p><div className="mt-2 flex gap-2"><Button type="button" variant="ghost" size="sm" onClick={() => setShowInlineRecord(true)}><FileText className="mr-1.5 h-3.5 w-3.5" />View source record</Button>{focusCandidate.memoStatus !== "ok" && <Button type="button" variant="outline" size="sm" disabled={generatingMemo === focusCandidate.id} onClick={() => { setGeneratingMemo(focusCandidate.id); genMemo.mutate({ runId, candidateId: focusCandidate.id }); }}>{generatingMemo === focusCandidate.id ? "Building source…" : "Build source record"}</Button>}</div></div>
+              <div><label htmlFor="current-evidence-note" className="text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Optional review note</label><Textarea id="current-evidence-note" value={evidenceNote} onChange={(event) => setEvidenceNote(event.target.value)} placeholder="Record the observable fact, uncertainty, or reason for this answer…" className="mt-1 min-h-20 text-xs" /></div>
+              <div className="flex flex-wrap gap-2"><Button type="button" size="sm" className="min-h-11" disabled={reviewEvidence.isPending} onClick={() => reviewEvidence.mutate({ runId, candidateId: focusCandidate.id, checkLabel: currentEvidenceQuestion, status: "confirmed", note: evidenceNote || undefined })}>Confirmed · clear this gate</Button><Button type="button" variant="outline" size="sm" className="min-h-11" disabled={reviewEvidence.isPending} onClick={() => reviewEvidence.mutate({ runId, candidateId: focusCandidate.id, checkLabel: currentEvidenceQuestion, status: "not_confirmed", note: evidenceNote || undefined })}>Not confirmed · decline paper stage</Button><Button type="button" variant="outline" size="sm" className="min-h-11" disabled={reviewEvidence.isPending} onClick={() => reviewEvidence.mutate({ runId, candidateId: focusCandidate.id, checkLabel: currentEvidenceQuestion, status: "not_applicable", note: evidenceNote || undefined })}>Not applicable</Button><Button type="button" variant="ghost" size="sm" className="min-h-11" disabled={reviewEvidence.isPending} onClick={() => reviewEvidence.mutate({ runId, candidateId: focusCandidate.id, checkLabel: currentEvidenceQuestion, status: "needs_follow_up", note: evidenceNote || undefined })}>Need more evidence</Button></div>
+            </CardContent></Card>}
             {focusCandidate && (() => {
               const checks = Array.isArray(focusCandidate.verifyFields) ? focusCandidate.verifyFields as string[] : [];
               const path = buildDecisionPath({ symbol: focusCandidate.symbol, memoStatus: focusCandidate.memoStatus, decisionCriticalChecks: checks.length });

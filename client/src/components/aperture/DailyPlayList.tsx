@@ -26,11 +26,14 @@ function IntradayTrigger({ runId, candidateId, holdingPeriod }: { runId: number;
 export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () => void; onOpenRun: (runId: number, candidateId: number, view?: string) => void }) {
   const { data: playList, isLoading } = trpc.aperture.play.list.useQuery();
   const { data: accounts } = trpc.aperture.account.list.useQuery();
-  const preferredAccountId = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")?.id
-    ?? accounts?.find((account) => account.isPaper)?.id;
+  const { data: activeCapitalContext } = trpc.thesis.activeCapital.useQuery();
+  const preferredAccount = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")
+    ?? accounts?.find((account) => account.isPaper);
+  const preferredAccountId = preferredAccount?.id;
   const { data: cockpit } = trpc.aperture.cockpit.useQuery(preferredAccountId ? { accountId: preferredAccountId } : undefined);
   const utils = trpc.useUtils();
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [showAllPlays, setShowAllPlays] = useState(false);
   const [reasons, setReasons] = useState<Record<number, string>>({});
   const [confirmSkipCandidateId, setConfirmSkipCandidateId] = useState<number | null>(null);
   const [decisionAnnouncement, setDecisionAnnouncement] = useState("");
@@ -88,6 +91,12 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
       <Button variant="outline" onClick={onNewResearch}><FileSearch className="mr-2 h-4 w-4" />New research brief</Button>
     </header>
 
+    <div className="grid gap-px overflow-hidden rounded-xl border sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
+      <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Active thesis</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{activeCapitalContext?.thesis?.name ?? "No active Capital thesis"}</p></div>
+      <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Paper account · as of</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{preferredAccount ? `${preferredAccount.label} · ${preferredAccount.lastSyncedAt ? new Date(preferredAccount.lastSyncedAt).toLocaleString() : "not synced"}` : "No paper account selected"}</p></div>
+      <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Operating state</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Paper-only · human approval required</p></div>
+    </div>
+
     <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}>
       <strong style={{ color: "var(--sh-text-primary)" }}>Correlated planned-loss budget:</strong> {correlation?.usedCents != null && correlation.ceilingCents != null ? `${money(correlation.usedCents)} committed${correlation.subject ? ` in ${correlation.subject}` : ""} of ${money(correlation.ceilingCents)}.` : correlation?.reason ?? "Not measured."} Theme overlap is not assigned until factual preflight; the system will not imply that two names share risk without a measured cluster.
     </div>
@@ -103,7 +112,7 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
 
     {ranked.length > 0 && <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Queue order reflects readiness, then the nearest live catalyst deadline. It is not a predicted return ranking or a claim that the first play should be taken.</p>}
     <div className="space-y-3">
-      {ranked.map(({ item, recipe: play }) => {
+      {(showAllPlays ? ranked : ranked.slice(0, 3)).map(({ item, recipe: play }) => {
         const expanded = expandedId === item.candidate.id;
         const mainBlocker = play.blockingReasons[0] ?? "No research blocker was generated; approval is still separate.";
         const reviewedChecks = new Set(item.reviews.filter((review) => review.status === "reviewed").map((review) => review.checkLabel));
@@ -127,6 +136,9 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
         </article>;
       })}
     </div>
+    {ranked.length > 3 && <Button type="button" variant="outline" size="sm" className="w-full min-h-11" onClick={() => setShowAllPlays((value) => !value)}>
+      {showAllPlays ? "Show decision priorities only" : `View ${ranked.length - 3} more research candidates`}
+    </Button>}
     <p className="sr-only" aria-live="polite">{decisionAnnouncement}</p>
   </section>;
 }

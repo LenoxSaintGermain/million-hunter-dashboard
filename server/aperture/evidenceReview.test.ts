@@ -31,4 +31,27 @@ describe("getEvidenceReviewReadiness", () => {
     expect(result.paperProposalReady).toBe(true);
     expect(result.unreviewedChecks).toEqual([]);
   });
+
+  it("allows confirmed and not-applicable answers to resolve their respective gates", () => {
+    const result = getEvidenceReviewReadiness(
+      ["Confirm catalyst date", "Check sector exposure"],
+      [
+        { candidateId: 9, checkLabel: "Confirm catalyst date", status: "confirmed" },
+        { candidateId: 9, checkLabel: "Check sector exposure", status: "not_applicable" },
+      ],
+    );
+    expect(result.paperProposalReady).toBe(true);
+    expect(result.paperStageDeclined).toBe(false);
+  });
+
+  it("keeps a not-confirmed answer in the audit record but declines the current paper stage", () => {
+    const result = getEvidenceReviewReadiness(
+      ["Confirm catalyst date"],
+      [{ candidateId: 9, checkLabel: "Confirm catalyst date", status: "not_confirmed" }],
+    );
+    expect(result.unreviewedChecks).toEqual([]);
+    expect(result.negativeChecks).toEqual(["Confirm catalyst date"]);
+    expect(result.paperProposalReady).toBe(false);
+    expect(result.paperStageDeclined).toBe(true);
+  });
 });

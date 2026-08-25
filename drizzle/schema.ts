@@ -1192,6 +1192,139 @@ export const securityFacts = mysqlTable("security_facts", {
 export type SecurityFact = typeof securityFacts.$inferSelect;
 export type InsertSecurityFact = typeof securityFacts.$inferInsert;
 
+/**
+ * Disclosure Intelligence Rail — raw public-disclosure truth stays separate from
+ * symbol-scoped `security_facts`. All rows are append-only; correction is a new
+ * row or supersession link, never an overwrite of source history.
+ */
+export const disclosurePlans = mysqlTable("disclosure_plans", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  status: mysqlEnum("status", ["draft", "review", "monitoring", "paused", "archived"]).default("draft").notNull(),
+  currentRevisionId: int("current_revision_id"),
+  approvedAt: bigint("approved_at", { mode: "number" }),
+  pausedAt: bigint("paused_at", { mode: "number" }),
+  archivedAt: bigint("archived_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  ownerStatus: index("disclosure_plans_owner_status_idx").on(table.userId, table.status),
+}));
+
+export const disclosurePlanRevisions = mysqlTable("disclosure_plan_revisions", {
+  id: int("id").autoincrement().primaryKey(),
+  planId: int("plan_id").notNull(),
+  revisionNumber: int("revision_number").notNull(),
+  rawIntent: text("raw_intent").notNull(),
+  compiledPlan: json("compiled_plan").notNull(),
+  compilerRole: varchar("compiler_role", { length: 96 }).notNull(),
+  promptVersion: varchar("prompt_version", { length: 64 }).notNull(),
+  confidenceNotes: json("confidence_notes").$type<string[]>().default([]),
+  operatorResolutions: json("operator_resolutions").$type<string[]>().default([]),
+  contentHash: varchar("content_hash", { length: 64 }).notNull(),
+  compiledAt: bigint("compiled_at", { mode: "number" }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  revisionUnique: uniqueIndex("disclosure_plan_revision_unique").on(table.planId, table.revisionNumber),
+  contentHashIdx: index("disclosure_plan_revision_hash_idx").on(table.contentHash),
+}));
+
+export const disclosureFilings = mysqlTable("disclosure_filings", {
+  id: int("id").autoincrement().primaryKey(),
+  source: mysqlEnum("source", ["house_clerk"]).notNull(),
+  stableSourceDocumentId: varchar("stable_source_document_id", { length: 128 }).notNull(),
+  canonicalUrl: text("canonical_url").notNull(),
+  filerId: varchar("filer_id", { length: 160 }).notNull(),
+  filerName: varchar("filer_name", { length: 255 }).notNull(),
+  chamber: mysqlEnum("chamber", ["house"]).notNull(),
+  filedAt: bigint("filed_at", { mode: "number" }),
+  firstObservedAt: bigint("first_observed_at", { mode: "number" }).notNull(),
+  retrievedAt: bigint("retrieved_at", { mode: "number" }).notNull(),
+  storageKey: varchar("storage_key", { length: 512 }).notNull(),
+  contentHash: varchar("content_hash", { length: 64 }).notNull(),
+  mediaType: varchar("media_type", { length: 128 }).notNull(),
+  byteSize: bigint("byte_size", { mode: "number" }).notNull(),
+  parserVersion: varchar("parser_version", { length: 96 }).notNull(),
+  supersedesFilingId: int("supersedes_filing_id"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  sourceHashUnique: uniqueIndex("disclosure_filing_source_hash_unique").on(table.source, table.stableSourceDocumentId, table.contentHash),
+  sourceIdIdx: index("disclosure_filing_source_id_idx").on(table.source, table.stableSourceDocumentId),
+}));
+
+export const disclosureRetrievals = mysqlTable("disclosure_retrievals", {
+  id: int("id").autoincrement().primaryKey(),
+  filingId: int("filing_id"),
+  source: mysqlEnum("source", ["house_clerk"]).notNull(),
+  stableSourceDocumentId: varchar("stable_source_document_id", { length: 128 }).notNull(),
+  retrievedAt: bigint("retrieved_at", { mode: "number" }).notNull(),
+  observedHash: varchar("observed_hash", { length: 64 }),
+  result: mysqlEnum("result", ["stored", "repeat", "source_changed", "failed"]).notNull(),
+  transportMetadata: json("transport_metadata"),
+  error: text("error"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => ({ sourceIdIdx: index("disclosure_retrieval_source_id_idx").on(table.source, table.stableSourceDocumentId) }));
+
+export const disclosureTransactions = mysqlTable("disclosure_transactions", {
+  id: int("id").autoincrement().primaryKey(),
+  filingId: int("filing_id").notNull(),
+  sourceRowIdentity: varchar("source_row_identity", { length: 255 }).notNull(),
+  ownerAsStated: mysqlEnum("owner_as_stated", ["self", "spouse", "dependent", "unknown"]).notNull(),
+  rawAssetName: text("raw_asset_name").notNull(),
+  rawAssetDescription: text("raw_asset_description"),
+  transactionType: mysqlEnum("transaction_type", ["purchase", "sale", "exchange", "unknown"]).notNull(),
+  transactionDate: bigint("transaction_date", { mode: "number" }),
+  amountMinUsd: bigint("amount_min_usd", { mode: "number" }),
+  amountMaxUsd: bigint("amount_max_usd", { mode: "number" }),
+  assetTypeAsStated: varchar("asset_type_as_stated", { length: 64 }),
+  securityId: int("security_id"),
+  normalizedIssuer: varchar("normalized_issuer", { length: 255 }),
+  resolutionGrade: mysqlEnum("resolution_grade", ["exact", "strong", "ambiguous", "none"]).default("none").notNull(),
+  resolutionBasis: json("resolution_basis").$type<string[]>().default([]),
+  publicationBasis: mysqlEnum("publication_basis", ["source_timestamp", "first_observed"]),
+  eligibleFrom: bigint("eligible_from", { mode: "number" }),
+  disclosureLagDays: int("disclosure_lag_days"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  filingRowUnique: uniqueIndex("disclosure_transaction_filing_row_unique").on(table.filingId, table.sourceRowIdentity),
+  filingIdx: index("disclosure_transaction_filing_idx").on(table.filingId),
+}));
+
+export const disclosureMatches = mysqlTable("disclosure_matches", {
+  id: int("id").autoincrement().primaryKey(),
+  planRevisionId: int("plan_revision_id").notNull(),
+  transactionId: int("transaction_id").notNull(),
+  gateSnapshot: json("gate_snapshot").notNull(),
+  disclosureMandateVersion: varchar("disclosure_mandate_version", { length: 32 }).notNull(),
+  effectiveControls: json("effective_controls").notNull(),
+  state: mysqlEnum("state", ["held", "reviewable", "promoted", "set_aside"]).notNull(),
+  reasons: json("reasons").$type<string[]>().default([]),
+  reviewedByUserId: int("reviewed_by_user_id"),
+  reviewedAt: bigint("reviewed_at", { mode: "number" }),
+  reviewNote: text("review_note"),
+  thesisId: int("thesis_id"),
+  runId: int("run_id"),
+  candidateId: int("candidate_id"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  planTransactionUnique: uniqueIndex("disclosure_match_plan_transaction_unique").on(table.planRevisionId, table.transactionId),
+  stateIdx: index("disclosure_match_state_idx").on(table.state),
+}));
+
+export const disclosureEntityAliases = mysqlTable("disclosure_entity_aliases", {
+  id: int("id").autoincrement().primaryKey(),
+  rawAssetText: text("raw_asset_text").notNull(),
+  rawAssetHash: varchar("raw_asset_hash", { length: 64 }).notNull(),
+  securityId: int("security_id").notNull(),
+  status: mysqlEnum("status", ["active", "revoked"]).default("active").notNull(),
+  basis: text("basis").notNull(),
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  revokedByUserId: int("revoked_by_user_id"),
+  revokedAt: bigint("revoked_at", { mode: "number" }),
+}, (table) => ({ rawHashIdx: index("disclosure_alias_raw_hash_idx").on(table.rawAssetHash, table.status) }));
+
 /** One capital-deployment analysis. */
 export const apertureRuns = mysqlTable("aperture_runs", {
   id: int("id").autoincrement().primaryKey(),
@@ -1276,7 +1409,7 @@ export const apertureEvidenceReviews = mysqlTable("aperture_evidence_reviews", {
   runId: int("run_id").notNull(),
   candidateId: int("candidate_id").notNull(),
   checkLabel: varchar("check_label", { length: 255 }).notNull(),
-  status: mysqlEnum("status", ["reviewed", "needs_follow_up"]).default("reviewed").notNull(),
+  status: mysqlEnum("status", ["reviewed", "confirmed", "not_confirmed", "not_applicable", "needs_follow_up"]).default("reviewed").notNull(),
   note: text("note"),
   reviewedAt: bigint("reviewed_at", { mode: "number" }).notNull(),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
