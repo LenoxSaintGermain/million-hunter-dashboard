@@ -34,6 +34,7 @@ import {
 type VariantKey = "A" | "B" | "C";
 type OutcomeChoice = "thesis_held" | "mixed" | "invalidated" | null;
 type HorizonKey = "today" | "week" | "thirty_days" | "long_term";
+type ThesisEntryMode = "assigned" | "new";
 
 type CapitalMission = {
   prompt: string;
@@ -74,13 +75,19 @@ const STAGES: Stage[] = [
   { id: "outcome", short: "Outcome", label: "Outcome Queue", eyebrow: "Wait, then learn", question: "When is this paper study ready to evaluate?" },
 ];
 
-const DEFAULT_MISSION: CapitalMission = {
-  prompt: "",
+const ASSIGNED_MISSION: CapitalMission = {
+  prompt: "Where can I best deploy $5,000 against my AI-infrastructure thesis today?",
   thesis: "Look for liquid equities benefiting from AI infrastructure demand. Use shares for today’s flow; keep longer-dated options as a separate paper-research expression.",
   capital: 5000,
   target: 8000,
   maxLoss: 150,
   horizon: "today",
+};
+
+const NEW_MISSION: CapitalMission = {
+  ...ASSIGNED_MISSION,
+  prompt: "",
+  thesis: "",
 };
 
 const HORIZONS: Record<HorizonKey, { label: string; detail: string; due: string }> = {
@@ -172,12 +179,12 @@ function PrototypeHeader({ onRestart }: { onRestart: () => void }) {
   );
 }
 
-function ContextBar({ onInspector }: { onInspector: () => void }) {
+function ContextBar({ thesisMode, onInspector }: { thesisMode: ThesisEntryMode; onInspector: () => void }) {
   return (
     <section className="ap-context-bar" aria-label="Active Capital Aperture context">
       <div className="ap-context-primary">
-        <span className="ap-mono-label">ACTIVE THESIS</span>
-        <strong>AI Infrastructure Cycle</strong>
+        <span className="ap-mono-label">{thesisMode === "assigned" ? "ASSIGNED THESIS" : "THESIS STATUS"}</span>
+        <strong>{thesisMode === "assigned" ? "AI Infrastructure Cycle" : "No thesis assigned · builder open"}</strong>
       </div>
       <div><span className="ap-mono-label">PAPER ACCOUNT</span><strong>Alpaca Paper · $97,429</strong></div>
       <div><span className="ap-mono-label">FRESHNESS</span><strong>Market data · 6m ago</strong></div>
@@ -274,12 +281,17 @@ function AnimatedPromptEditor({ mission, onChange }: { mission: CapitalMission; 
   );
 }
 
-function MissionBuilder({ mission, onChange }: { mission: CapitalMission; onChange: (value: CapitalMission) => void }) {
+function MissionBuilder({ mission, thesisMode, onChange, onChangeMode }: { mission: CapitalMission; thesisMode: ThesisEntryMode; onChange: (value: CapitalMission) => void; onChangeMode: (mode: ThesisEntryMode) => void }) {
   const setNumber = (key: "capital" | "target" | "maxLoss", value: string) => onChange({ ...mission, [key]: Math.max(0, Number(value) || 0) });
   return (
     <>
+      <div className="ap-thesis-source" data-mode={thesisMode}>
+        <div className="ap-thesis-source-icon">{thesisMode === "assigned" ? <BookOpen size={17} /> : <Sparkles size={17} />}</div>
+        <div><span className="ap-mono-label">{thesisMode === "assigned" ? "ASSIGNED THESIS LOADED" : "NO THESIS ASSIGNED"}</span><strong>{thesisMode === "assigned" ? "AI Infrastructure Cycle" : "Build a thesis in this surface"}</strong><p>{thesisMode === "assigned" ? "Thesis, horizon and mandate defaults were prefilled. Edits create a run-specific version; the saved thesis remains unchanged." : "Use the animated question, mission boundaries and thesis expression below. No separate intake is required."}</p></div>
+        <button type="button" onClick={() => onChangeMode(thesisMode === "assigned" ? "new" : "assigned")}>{thesisMode === "assigned" ? "Start a new thesis" : "Load assigned thesis"}</button>
+      </div>
       <AnimatedPromptEditor mission={mission} onChange={onChange} />
-      <p className="ap-lede">This is the thesis builder. Edit the question and boundaries here; Aperture compiles them into a small paper-play slate without promising the requested return.</p>
+      <p className="ap-lede">This is the thesis builder. {thesisMode === "assigned" ? "Review or edit the loaded thesis for this run" : "Build the thesis directly here"}; Aperture compiles it into a small paper-play slate without promising the requested return.</p>
       <div className="ap-mission-statement">
         <label><span>Capital available</span><div className="ap-money-input"><b>$</b><input aria-label="Capital available" type="number" min="0" step="500" value={mission.capital} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setNumber("capital", event.target.value)} /></div><small>Available for this mission</small></label>
         <label><span>Desired ending value</span><div className="ap-money-input"><b>$</b><input aria-label="Desired ending value" type="number" min="0" step="500" value={mission.target} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setNumber("target", event.target.value)} /></div><small>Aspiration · not forecast</small></label>
@@ -305,10 +317,12 @@ function PlayEvidence({ onInspect, plannedLoss }: { onInspect: () => void; plann
   );
 }
 
-function StageContent({ step, mission, setMission, missionMath, acknowledgement, setAcknowledgement, outcome, setOutcome, outcomeReady, onInspect }: {
+function StageContent({ step, mission, setMission, thesisMode, setThesisMode, missionMath, acknowledgement, setAcknowledgement, outcome, setOutcome, outcomeReady, onInspect }: {
   step: number;
   mission: CapitalMission;
   setMission: (value: CapitalMission) => void;
+  thesisMode: ThesisEntryMode;
+  setThesisMode: (value: ThesisEntryMode) => void;
   missionMath: MissionMath;
   acknowledgement: string;
   setAcknowledgement: (value: string) => void;
@@ -319,10 +333,14 @@ function StageContent({ step, mission, setMission, missionMath, acknowledgement,
 }) {
   const horizon = HORIZONS[mission.horizon];
   const targetGap = mission.target - missionMath.endingAtTwoFiveR;
+  const changeThesisMode = (mode: ThesisEntryMode) => {
+    setThesisMode(mode);
+    setMission(mode === "assigned" ? ASSIGNED_MISSION : NEW_MISSION);
+  };
   if (step === 0) return (
     <div className="ap-stage-content">
       <StatusPill tone="ink">{horizon.label} · {horizon.detail}</StatusPill>
-      <MissionBuilder mission={mission} onChange={setMission} />
+      <MissionBuilder mission={mission} thesisMode={thesisMode} onChange={setMission} onChangeMode={changeThesisMode} />
       <div className="ap-target-boundary"><AlertTriangle size={17} /><div><strong>The target requires a {missionMath.requiredReturn.toFixed(0)}% return inside this horizon.</strong><span>Aperture will rank qualifying plays, but it will explicitly say when no credible setup reaches the target inside the loss ceiling.</span></div></div>
     </div>
   );
@@ -468,11 +486,11 @@ function Inspector({ step, missionMath, onClose }: { step: number; missionMath: 
   );
 }
 
-function PrimaryAction({ step, acknowledgement, outcome, outcomeReady, onAdvance, onBack }: {
-  step: number; acknowledgement: string; outcome: OutcomeChoice; outcomeReady: boolean; onAdvance: () => void; onBack: () => void;
+function PrimaryAction({ step, mission, acknowledgement, outcome, outcomeReady, onAdvance, onBack }: {
+  step: number; mission: CapitalMission; acknowledgement: string; outcome: OutcomeChoice; outcomeReady: boolean; onAdvance: () => void; onBack: () => void;
 }) {
   const labels = ["Compile capital thesis", "Open the top play", "Review paper plan", "Review paper approval", "Approve for paper tracking", "Queue outcome review", outcomeReady ? "Save outcome & restart" : "Prototype: simulate review time"];
-  const disabled = (step === 4 && acknowledgement !== "PAPER") || (step === 6 && outcomeReady && !outcome);
+  const disabled = (step === 0 && (!mission.prompt.trim() || !mission.thesis.trim())) || (step === 4 && acknowledgement !== "PAPER") || (step === 6 && outcomeReady && !outcome);
   const hints = [
     "Captures a target and risk boundary; it does not promise a return.", "Opens one play, not 57 candidate reviews.", "Deep analysis is optional because required gates pass.",
     "No proposal is submitted.", "Creates a fixture-only approval receipt.", "Schedules the review at the declared horizon.", outcomeReady ? "The local fixture resets after closure." : "Production users leave and return; this advances the local fixture.",
@@ -493,6 +511,8 @@ type VariantProps = {
   setStep: (step: number) => void;
   mission: CapitalMission;
   setMission: (value: CapitalMission) => void;
+  thesisMode: ThesisEntryMode;
+  setThesisMode: (value: ThesisEntryMode) => void;
   missionMath: MissionMath;
   acknowledgement: string;
   setAcknowledgement: (value: string) => void;
@@ -507,13 +527,13 @@ type VariantProps = {
 };
 
 function CurrentStage(props: VariantProps) {
-  return <StageContent step={props.step} mission={props.mission} setMission={props.setMission} missionMath={props.missionMath} acknowledgement={props.acknowledgement} setAcknowledgement={props.setAcknowledgement} outcome={props.outcome} setOutcome={props.setOutcome} outcomeReady={props.outcomeReady} onInspect={() => props.setInspectorOpen(true)} />;
+  return <StageContent step={props.step} mission={props.mission} setMission={props.setMission} thesisMode={props.thesisMode} setThesisMode={props.setThesisMode} missionMath={props.missionMath} acknowledgement={props.acknowledgement} setAcknowledgement={props.setAcknowledgement} outcome={props.outcome} setOutcome={props.setOutcome} outcomeReady={props.outcomeReady} onInspect={() => props.setInspectorOpen(true)} />;
 }
 
 function VariantA(props: VariantProps) {
   return (
     <main className="ap-variant ap-variant-runway">
-      <ContextBar onInspector={() => props.setInspectorOpen(true)} />
+      <ContextBar thesisMode={props.thesisMode} onInspector={() => props.setInspectorOpen(true)} />
       <StageRail current={props.step} onSelect={props.setStep} />
       <div className="ap-runway-layout" data-inspector={props.inspectorOpen}>
         <article className="ap-decision-packet">
@@ -530,7 +550,7 @@ function VariantA(props: VariantProps) {
 function VariantB(props: VariantProps) {
   return (
     <main className="ap-variant ap-variant-desk">
-      <ContextBar onInspector={() => props.setInspectorOpen(true)} />
+      <ContextBar thesisMode={props.thesisMode} onInspector={() => props.setInspectorOpen(true)} />
       <div className="ap-desk-grid">
         <aside className="ap-workset">
           <header><span className="ap-mono-label">ACTIVE WORKSET</span><button aria-label="Search candidates"><Search size={15} /></button></header>
@@ -552,7 +572,7 @@ function VariantB(props: VariantProps) {
 function VariantC(props: VariantProps) {
   return (
     <main className="ap-variant ap-variant-file">
-      <ContextBar onInspector={() => props.setInspectorOpen(true)} />
+      <ContextBar thesisMode={props.thesisMode} onInspector={() => props.setInspectorOpen(true)} />
       <div className="ap-case-layout">
         <aside className="ap-artifact-stack">
           <span className="ap-mono-label">APERTURE CASE FILE</span>
@@ -599,7 +619,8 @@ function PrototypeSwitcher({ variant, setVariant }: { variant: VariantKey; setVa
 export function ApertureRunwayPrototype() {
   const [variant, setVariant] = useState<VariantKey>(readVariant);
   const [step, setStep] = useState(0);
-  const [mission, setMission] = useState<CapitalMission>(DEFAULT_MISSION);
+  const [mission, setMission] = useState<CapitalMission>(ASSIGNED_MISSION);
+  const [thesisMode, setThesisMode] = useState<ThesisEntryMode>("assigned");
   const [acknowledgement, setAcknowledgement] = useState("");
   const [outcome, setOutcome] = useState<OutcomeChoice>(null);
   const [outcomeReady, setOutcomeReady] = useState(false);
@@ -607,9 +628,8 @@ export function ApertureRunwayPrototype() {
   const missionMath = useMemo(() => deriveMissionMath(mission), [mission]);
 
   const updateVariant = (next: VariantKey) => { setVariant(next); setVariantInUrl(next); };
-  const restart = () => { setStep(0); setMission(DEFAULT_MISSION); setAcknowledgement(""); setOutcome(null); setOutcomeReady(false); setInspectorOpen(false); };
+  const restart = () => { setStep(0); setMission(ASSIGNED_MISSION); setThesisMode("assigned"); setAcknowledgement(""); setOutcome(null); setOutcomeReady(false); setInspectorOpen(false); };
   const onAdvance = () => {
-    if (step === 0 && !mission.prompt.trim()) setMission({ ...mission, prompt: `Where can I best deploy ${formatCurrency(mission.capital)} against my AI-infrastructure thesis ${HORIZONS[mission.horizon].label.toLowerCase()}?` });
     if (step === STAGES.length - 1) {
       if (!outcomeReady) return setOutcomeReady(true);
       return restart();
@@ -618,7 +638,7 @@ export function ApertureRunwayPrototype() {
     setStep((current) => Math.min(current + 1, STAGES.length - 1));
   };
   const onBack = () => { setInspectorOpen(false); setStep((current) => Math.max(current - 1, 0)); };
-  const props = useMemo<VariantProps>(() => ({ step, setStep, mission, setMission, missionMath, acknowledgement, setAcknowledgement, outcome, setOutcome, outcomeReady, setOutcomeReady, inspectorOpen, setInspectorOpen, onAdvance, onBack }), [step, mission, missionMath, acknowledgement, outcome, outcomeReady, inspectorOpen]);
+  const props = useMemo<VariantProps>(() => ({ step, setStep, mission, setMission, thesisMode, setThesisMode, missionMath, acknowledgement, setAcknowledgement, outcome, setOutcome, outcomeReady, setOutcomeReady, inspectorOpen, setInspectorOpen, onAdvance, onBack }), [step, mission, thesisMode, missionMath, acknowledgement, outcome, outcomeReady, inspectorOpen]);
 
   return (
     <div className="ap-runway">
