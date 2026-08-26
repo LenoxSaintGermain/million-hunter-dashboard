@@ -1593,3 +1593,12 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Implement only the bounded WP-DIR1 grammar and provenance foundation after Stage 1 passes
 - [x] Validate WP-DIR1, capture before/after evidence, commit/push, and prepare the requested report-back
 - [x] Obtain Lenox’s explicit prohibited-language reviewer sign-off before any disclosure-rail expansion — approved by Lenox in task chat on 2026-08-25
+
+## Capital Aperture — Decision Runway (Approved Production Build)
+- [x] Reconcile the production component/data map and recoverable thesis evidence against the Decision Runway contract — fixture-only prototype path is absent from origin/main; production contracts will be reused directly
+- [x] Implement one dominant Capital Mission with accessible formatted input replacement and durable run-scoped mission state
+- [x] Implement contextual Mission Library ranking, reason visibility, and tune-this-run controls without operator gate overrides
+- [x] Implement compressed Play Slate with eligible, conditional, and cash/no-trade branches as durable decision state
+- [x] Implement workspace-aware 3 → 2 → 1 pane Decision Runway responsiveness and accessible action dock behavior
+- [x] Run the required 375/768/900/1024/1162/1280/1440 width, keyboard, reduced-motion, two-operator, test, and no-order UAT evidence
+- [x] Assemble implementation evidence and stop for owner review without deployment or merge

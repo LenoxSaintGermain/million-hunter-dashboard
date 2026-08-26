@@ -1368,6 +1368,33 @@ export const apertureRuns = mysqlTable("aperture_runs", {
 export type ApertureRun = typeof apertureRuns.$inferSelect;
 export type InsertApertureRun = typeof apertureRuns.$inferInsert;
 
+/**
+ * A durable operator decision context created before a Capital research run.
+ *
+ * This records the mission and its selected branch (research, conditional or
+ * cash) without creating any broker instruction. `runId` is linked only after
+ * an operator explicitly starts paper research; a cash branch therefore has no
+ * candidate or order path to promote.
+ */
+export const apertureRunwayStates = mysqlTable("aperture_runway_states", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  canonicalThesisId: int("canonical_thesis_id"),
+  accountId: int("account_id"),
+  runId: int("run_id"),
+  missionText: text("mission_text").notNull(),
+  missionHash: varchar("mission_hash", { length: 64 }).notNull(),
+  branch: mysqlEnum("branch", ["research", "eligible", "conditional", "cash"]).default("research").notNull(),
+  reason: text("reason"),
+  selectedAt: bigint("selected_at", { mode: "number" }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  byUserUpdated: index("aperture_runway_state_user_updated_idx").on(table.userId, table.updatedAt),
+  runUnique: uniqueIndex("aperture_runway_state_run_unique").on(table.runId),
+}));
+export type ApertureRunwayState = typeof apertureRunwayStates.$inferSelect;
+
 export const apertureCandidates = mysqlTable("aperture_candidates", {
   id: int("id").autoincrement().primaryKey(),
   runId: int("run_id").notNull(),

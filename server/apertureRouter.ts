@@ -28,6 +28,7 @@ import {
   aperturePlayDecisions,
   aperturePlaySlates,
   aperturePlaySlateItems,
+  apertureRunwayStates,
   apertureSetAside,
   disclosurePlans,
   disclosurePlanRevisions,
@@ -692,6 +693,94 @@ export const apertureRouter = router({
         errors: result.errors,
       };
     }),
+  }),
+
+  // ── Decision Runway ──────────────────────────────────────────────────────
+  // Durable operator context only. A cash branch cannot be attached to a run
+  // and is separately checked when a paper-order proposal is attempted.
+  runway: router({
+    latest: adminProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      const [latest] = await db!.select().from(apertureRunwayStates)
+        .where(eq(apertureRunwayStates.userId, ctx.user.id))
+        .orderBy(desc(apertureRunwayStates.updatedAt))
+        .limit(1);
+      const [profile] = await db!.select({ activeCapitalThesisId: users.activeCapitalThesisId })
+        .from(users).where(eq(users.id, ctx.user.id)).limit(1);
+      return { latest: latest ?? null, activeCanonicalThesisId: profile?.activeCapitalThesisId ?? null };
+    }),
+    begin: adminProcedure
+      .input(z.object({
+        missionText: z.string().trim().min(MIN_NARRATIVE_CHARS).max(12_000),
+        canonicalThesisId: z.number().nullable().optional(),
+        accountId: z.number().nullable().optional(),
+        branch: z.enum(["research", "eligible", "conditional", "cash"]).default("research"),
+        reason: z.string().trim().max(1_000).nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const now = Date.now();
+        const [profile] = await db!.select({ activeCapitalThesisId: users.activeCapitalThesisId })
+          .from(users).where(eq(users.id, ctx.user.id)).limit(1);
+        const canonicalThesisId = input.canonicalThesisId ?? profile?.activeCapitalThesisId ?? null;
+        if (canonicalThesisId != null) {
+          const [projection] = await db!.select({ id: capitalTheses.id }).from(capitalTheses)
+            .where(and(eq(capitalTheses.userId, ctx.user.id), eq(capitalTheses.sourceCompilationId, canonicalThesisId)))
+            .limit(1);
+          if (!projection) throw new TRPCError({ code: "FORBIDDEN", message: "This saved thesis is not available in your Capital workspace." });
+        }
+        if (input.accountId != null) await requireAccount(db, input.accountId, ctx.user.id);
+        if (input.branch === "cash" && (!input.reason || input.reason.trim().length < 3)) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Record why cash is the correct decision for this mission." });
+        }
+        const missionHash = createHash("sha256").update(input.missionText).digest("hex");
+        const [existing] = await db!.select().from(apertureRunwayStates).where(and(
+          eq(apertureRunwayStates.userId, ctx.user.id),
+          eq(apertureRunwayStates.missionHash, missionHash),
+          eq(apertureRunwayStates.branch, input.branch),
+        )).orderBy(desc(apertureRunwayStates.updatedAt)).limit(1);
+        if (existing) return { state: existing, created: false };
+        const result = await db!.insert(apertureRunwayStates).values({
+          userId: ctx.user.id,
+          canonicalThesisId,
+          accountId: input.accountId ?? null,
+          missionText: input.missionText,
+          missionHash,
+          branch: input.branch,
+          reason: input.reason ?? null,
+          selectedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        });
+        const id = Number(result[0].insertId);
+        const [state] = await db!.select().from(apertureRunwayStates).where(eq(apertureRunwayStates.id, id)).limit(1);
+        return { state: state!, created: true };
+      }),
+    attachRun: adminProcedure
+      .input(z.object({ stateId: z.number(), runId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [state] = await db!.select().from(apertureRunwayStates)
+          .where(and(eq(apertureRunwayStates.id, input.stateId), eq(apertureRunwayStates.userId, ctx.user.id))).limit(1);
+        if (!state) throw new TRPCError({ code: "NOT_FOUND", message: "Decision Runway context not found" });
+        if (state.branch === "cash") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash is recorded for this mission; start a new mission before researching or promoting a candidate." });
+        const [run] = await db!.select().from(apertureRuns)
+          .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id))).limit(1);
+        if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Research run not found" });
+        await db!.update(apertureRunwayStates).set({ runId: run.id, updatedAt: Date.now() })
+          .where(eq(apertureRunwayStates.id, state.id));
+        return { ok: true };
+      }),
+    setBranch: adminProcedure
+      .input(z.object({ stateId: z.number(), branch: z.enum(["research", "eligible", "conditional", "cash"]), reason: z.string().trim().max(1_000).nullable().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (input.branch === "cash" && (!input.reason || input.reason.length < 3)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Record why cash is the correct decision." });
+        const result = await db!.update(apertureRunwayStates).set({ branch: input.branch, reason: input.reason ?? null, selectedAt: Date.now(), updatedAt: Date.now() })
+          .where(and(eq(apertureRunwayStates.id, input.stateId), eq(apertureRunwayStates.userId, ctx.user.id)));
+        if (!result[0].affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "Decision Runway context not found" });
+        return { ok: true };
+      }),
   }),
 
   // ── Disclosure Intelligence Rail (WP-DIR1) ─────────────────────────────────
@@ -2071,6 +2160,13 @@ export const apertureRouter = router({
           .limit(1);
         if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
 
+        const [runwayState] = await db!.select().from(apertureRunwayStates)
+          .where(and(eq(apertureRunwayStates.runId, run.id), eq(apertureRunwayStates.userId, ctx.user.id)))
+          .limit(1);
+        if (runwayState?.branch === "cash") {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash was recorded for this Decision Runway mission. Candidate and order promotion are fail-closed." });
+        }
+
         // A candidate-originated proposal cannot skip the operator's recorded review
         // of the evidence questions that can change the decision. Manual paper orders
         // remain possible for operational uses without a research-candidate link.
@@ -2125,6 +2221,13 @@ export const apertureRouter = router({
           .limit(1);
         if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
 
+        const [runwayState] = await db!.select().from(apertureRunwayStates)
+          .where(and(eq(apertureRunwayStates.runId, run.id), eq(apertureRunwayStates.userId, ctx.user.id)))
+          .limit(1);
+        const runwayCashBlock = runwayState?.branch === "cash"
+          ? "Cash was recorded for this Decision Runway mission. Candidate and order promotion are fail-closed."
+          : null;
+
         const evidenceBlock = await evidenceReviewBlock(db, ctx.user.id, input.runId, input.candidateId);
 
         // Everything create's own zod would refuse, as messages rather than a
@@ -2144,7 +2247,7 @@ export const apertureRouter = router({
         });
 
         const recipeGap = missingIntradayRecipeMessage(input);
-        const blocking = [...evaluation.failures, ...schemaErrors, ...(recipeGap ? [recipeGap] : []), ...(evidenceBlock ? [evidenceBlock] : [])];
+        const blocking = [...evaluation.failures, ...schemaErrors, ...(recipeGap ? [recipeGap] : []), ...(evidenceBlock ? [evidenceBlock] : []), ...(runwayCashBlock ? [runwayCashBlock] : [])];
         return {
           wouldPass: blocking.length === 0,
           blocking,

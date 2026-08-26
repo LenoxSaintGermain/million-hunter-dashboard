@@ -22,6 +22,7 @@ import { formatDistanceToNow } from "date-fns";
 import { buildResearchJourneys } from "@shared/runWorkspace";
 import { addDaysToEasternDate, easternDateTimeInputFromEpoch, easternDateTimeInputToEpoch } from "@shared/easternMarketTime";
 import { DailyPlayList } from "@/components/aperture/DailyPlayList";
+import { DecisionRunway } from "@/components/aperture/DecisionRunway";
 
 function dollarsToCents(v: string): number {
   return Math.round(parseFloat(v.replace(/[^0-9.]/g, "")) * 100);
@@ -141,6 +142,8 @@ export default function ApertureHome() {
   const { data: runs, refetch: refetchRuns } = trpc.aperture.run.list.useQuery();
   const { data: providers } = trpc.aperture.providers.useQuery();
   const { data: dailyPlays } = trpc.aperture.play.list.useQuery();
+  const { data: runwayState } = trpc.aperture.runway.latest.useQuery();
+  const attachRunwayRun = trpc.aperture.runway.attachRun.useMutation();
 
   useEffect(() => {
     if (selectedAccountId || !accounts?.length) return;
@@ -152,6 +155,9 @@ export default function ApertureHome() {
 
   const startRun = trpc.aperture.run.start.useMutation({
     onSuccess: ({ runId }) => {
+      if (runwayState?.latest?.id && runwayState.latest.branch !== "cash") {
+        attachRunwayRun.mutate({ stateId: runwayState.latest.id, runId });
+      }
       toast.success("Run started — polling for results");
       refetchRuns();
       navigate(`/aperture/run/${runId}`);
@@ -241,15 +247,10 @@ export default function ApertureHome() {
   };
 
   if (!showResearchSetup) {
-    return <DashboardLayout><div className="mx-auto max-w-6xl space-y-5">
-      <section className="flex flex-col gap-2 rounded-lg border border-emerald-600/25 bg-emerald-600/5 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-        <div><span className="font-semibold text-foreground">Decision Center thesis: </span><span className="text-muted-foreground">{activeCapitalContext?.thesis?.name ?? "No Capital / Trade thesis assigned"}</span></div>
-        <Link href="/thesis?scope=capital" className="shrink-0 text-xs font-semibold text-emerald-700 hover:underline">Change thesis →</Link>
-      </section>
-      <DailyPlayList onNewResearch={() => { setShowResearchSetup(true); navigate("/aperture?setup=1"); }} onOpenRun={(runId, candidateId, view) => {
+    return <DashboardLayout><DecisionRunway onNewResearch={() => { setShowResearchSetup(true); navigate("/aperture?setup=1"); }} onOpenRun={(runId, candidateId, view) => {
       if (view === "execute") navigate(`/aperture/run/${runId}/execute?candidate=${candidateId}`);
       else navigate(`/aperture/run/${runId}?view=${view ?? "play"}`);
-    }} /></div></DashboardLayout>;
+    }} /></DashboardLayout>;
   }
 
   return (
