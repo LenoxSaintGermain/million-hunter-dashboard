@@ -94,13 +94,14 @@ button { color: inherit; }
 .ap-stage-content > h2 { max-width: 820px; margin: 18px 0 10px; font: 500 clamp(26px, 4vw, 42px)/1.06 "IBM Plex Serif", serif; letter-spacing: -.035em; }
 .ap-lede { max-width: 760px; margin: 0 0 26px; color: var(--ap-muted); font-size: 13px; line-height: 1.65; }
 
-.ap-thesis-start-row { margin: 18px 0 20px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, .92fr); gap: 8px; }
+.ap-thesis-start-row { margin: 18px 0 20px; display: grid; grid-template-columns: minmax(250px, .8fr) minmax(320px, 1.2fr); gap: 8px; }
 .ap-thesis-source { min-width: 0; min-height: 112px; padding: 14px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 13px; border: 1px solid var(--ap-rule-dark); background: var(--ap-green-soft); }
 .ap-thesis-source[data-mode="new"] { background: var(--ap-paper-deep); }
 .ap-thesis-source-icon { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--ap-rule-dark); background: var(--ap-paper); color: var(--ap-green); }
 .ap-thesis-source[data-mode="new"] .ap-thesis-source-icon { color: var(--ap-amber); }
 .ap-thesis-source strong { display: block; margin-top: 4px; font-size: 12px; }
 .ap-thesis-source p { margin: 4px 0 0; color: var(--ap-muted); font-size: 9px; line-height: 1.45; }
+.ap-thesis-source strong, .ap-thesis-source p, .ap-mission-library p, .ap-mission-question h2 { overflow-wrap: anywhere; }
 .ap-thesis-source > button { min-height: 34px; padding: 7px 10px; border: 1px solid var(--ap-rule-dark); background: transparent; font-size: 9px; font-weight: 600; cursor: pointer; }
 .ap-thesis-source > button:hover, .ap-thesis-source > button:focus-visible { border-color: var(--ap-amber); outline: 0; }
 .ap-mission-library { min-width: 0; min-height: 112px; padding: 14px; display: flex; flex-direction: column; border: 1px solid #ddb98f; background: #fff9ef; }
@@ -291,7 +292,7 @@ button { color: inherit; }
 .ap-action-dock { min-height: 72px; padding: 13px 18px 13px 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-top: 1px solid var(--ap-rule); background: #f7f3eb; }
 .ap-action-dock p { margin: 3px 0 0; color: var(--ap-muted); font-size: 10px; }
 .ap-action-buttons { display: flex; gap: 8px; }
-.ap-button-primary, .ap-button-secondary { min-height: 42px; padding: 10px 15px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--ap-ink); font-size: 11px; font-weight: 600; cursor: pointer; }
+.ap-button-primary, .ap-button-secondary { min-height: 44px; padding: 10px 15px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--ap-ink); font-size: 11px; font-weight: 600; cursor: pointer; }
 .ap-button-primary { background: var(--ap-ink); color: #fff; }
 .ap-button-primary:hover:not(:disabled) { background: #2d343b; }
 .ap-button-primary:disabled { border-color: var(--ap-rule); background: var(--ap-paper-deep); color: var(--ap-faint); cursor: not-allowed; }
@@ -320,11 +321,32 @@ button { color: inherit; }
 .ap-workset small[data-tone="clay"] { color: var(--ap-clay); background: var(--ap-clay-soft); }
 .ap-view-all { margin: 12px; border: 0; background: transparent; color: var(--ap-muted); font-size: 9px; text-decoration: underline; cursor: pointer; }
 .ap-desk-canvas { box-shadow: none; }
+.ap-desk-canvas { container: aperture-desk / inline-size; }
 .ap-desk-canvas .ap-stage-rail { margin: 0; padding: 11px 8px 7px; border-bottom: 1px solid var(--ap-rule); background: #faf7f0; }
 .ap-desk-canvas .ap-packet-header { min-height: 82px; }
 .ap-desk-canvas .ap-stage-content { min-height: 463px; padding: 27px 30px; }
 .ap-desk-canvas .ap-stage-content > h2 { font-size: clamp(24px, 3vw, 34px); }
+.ap-desk-canvas .ap-mission-question h2 { font-size: clamp(27px, 4cqw, 38px); }
 .ap-desk-grid > .ap-inspector { border-left: 0; box-shadow: none; animation: none; }
+
+@container aperture-desk (max-width: 780px) {
+  .ap-thesis-start-row { grid-template-columns: 1fr; }
+  .ap-thesis-source { grid-template-columns: auto 1fr; align-items: start; }
+  .ap-thesis-source > button { grid-column: 2; justify-self: start; }
+  .ap-run-tuner { margin-top: -12px; grid-template-columns: 1fr; }
+  .ap-run-tuner > div, .ap-run-tuner > p { grid-column: auto; }
+  .ap-mission-question { min-height: 0; grid-template-columns: 1fr; gap: 12px; }
+  .ap-mission-question > button { justify-self: start; }
+  .ap-mission-statement, .ap-payoff-strip { grid-template-columns: 1fr 1fr; }
+  .ap-mission-statement > label:nth-child(2), .ap-payoff-strip > div:nth-child(2) { border-right: 0; }
+  .ap-mission-statement > label:nth-child(-n+2), .ap-payoff-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--ap-rule); }
+}
+
+@container aperture-desk (max-width: 480px) {
+  .ap-mission-statement, .ap-payoff-strip { grid-template-columns: 1fr; }
+  .ap-mission-statement > label, .ap-payoff-strip > div { border-right: 0; border-bottom: 1px solid var(--ap-rule); }
+  .ap-mission-statement > label:last-child, .ap-payoff-strip > div:last-child { border-bottom: 0; }
+}
 
 /* Variant C — durable artifact case file */
 .ap-case-layout { width: min(1180px, 100%); margin: 24px auto 0; display: grid; grid-template-columns: 250px minmax(0, 1fr); align-items: start; gap: 18px; }
@@ -361,6 +383,14 @@ button { color: inherit; }
 .ap-prototype-switcher strong { font-size: 11px; }
 .ap-prototype-switcher span { margin-top: 3px; color: #aeb2b7; font-size: 9px; }
 
+@media (max-width: 1280px) {
+  .ap-desk-grid { grid-template-columns: 170px minmax(0, 1fr); }
+  .ap-desk-grid > .ap-inspector { grid-column: 1 / -1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-left: 1px solid var(--ap-rule-dark); }
+  .ap-desk-grid > .ap-inspector > header, .ap-desk-grid > .ap-inspector > .ap-inspector-stamp { grid-column: 1 / -1; }
+  .ap-desk-grid > .ap-inspector > section { min-width: 0; }
+  .ap-prototype-switcher { position: relative; left: auto; bottom: auto; margin: 32px auto 0; transform: none; }
+}
+
 @media (max-width: 1080px) {
   .ap-global-header nav { display: none; }
   .ap-context-bar { grid-template-columns: 1fr 1fr; }
@@ -371,7 +401,14 @@ button { color: inherit; }
   .ap-run-tuner { margin-top: -12px; grid-template-columns: 1fr 1fr 1fr; }
   .ap-run-tuner > div { grid-column: 1 / -1; }
   .ap-desk-grid { grid-template-columns: 160px minmax(0, 1fr); }
-  .ap-desk-grid > .ap-inspector { grid-column: 1 / -1; border-left: 1px solid var(--ap-rule-dark); }
+}
+
+@media (max-width: 900px) {
+  .ap-desk-grid { grid-template-columns: 1fr; }
+  .ap-workset { display: flex; overflow-x: auto; border-right: 1px solid var(--ap-rule-dark); }
+  .ap-workset header, .ap-view-all { display: none; }
+  .ap-workset > button:not(.ap-view-all) { min-width: 120px; border-right: 1px solid var(--ap-rule); border-bottom: 0; }
+  .ap-desk-grid > .ap-inspector { grid-column: auto; grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 760px) {
@@ -425,7 +462,7 @@ button { color: inherit; }
   .ap-workset { display: flex; overflow-x: auto; border-right: 1px solid var(--ap-rule-dark); }
   .ap-workset header, .ap-view-all { display: none; }
   .ap-workset > button:not(.ap-view-all) { min-width: 120px; border-right: 1px solid var(--ap-rule); border-bottom: 0; }
-  .ap-desk-grid > .ap-inspector { grid-column: auto; }
+  .ap-desk-grid > .ap-inspector { grid-column: auto; display: block; }
   .ap-case-layout { grid-template-columns: 1fr; }
   .ap-artifact-stack { position: static; padding: 14px; }
   .ap-artifact-stack > .ap-mono-label, .ap-artifact-stack > h2, .ap-context-capsule { display: none; }
@@ -436,6 +473,13 @@ button { color: inherit; }
   .ap-document-header h1 { font-size: 27px; }
   .ap-document-stamp { min-width: 86px; }
   .ap-case-document > .ap-inspector { margin: 0 18px 18px; }
+}
+
+@media (max-width: 480px) {
+  .ap-desk-canvas .ap-mission-question h2 { font-size: clamp(24px, 7.5vw, 27px); }
+  .ap-mission-statement, .ap-payoff-strip { grid-template-columns: 1fr; }
+  .ap-mission-statement > label, .ap-payoff-strip > div { border-right: 0; border-bottom: 1px solid var(--ap-rule); }
+  .ap-mission-statement > label:last-child, .ap-payoff-strip > div:last-child { border-bottom: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

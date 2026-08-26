@@ -85,6 +85,17 @@ Reconcile the production component/data map first. Reuse existing contracts wher
 
 Use existing `--sh-*` tokens and editorial identity. No chat transcript, giant form, new visual language, or new dependency.
 
+### 6. Scale by available workspace, not only viewport
+
+- Keep the three-pane Review Desk only while the workset, decision canvas, and inspector each retain a readable minimum width.
+- At intermediate widths, preserve the workset + decision canvas and move the inspector into a compact evidence band below. Do not squeeze the Capital Mission into a narrow newspaper column.
+- At tablet widths, turn the workset into a horizontal selector above the decision and let the canvas use the full width.
+- At mobile widths, use one column and progressive disclosure; the active decision and next action appear before inspector detail.
+- Reflow the assigned-thesis block and Mission Library from two columns to one based on the decision canvas width, not just `window.innerWidth`.
+- Scale the Capital Mission headline from its container and allow long thesis names, mission reasons, and horizon labels to wrap without clipping, overlap, or single-word vertical stacks.
+- Financial inputs move 4 → 2 → 1 columns as space contracts. Preserve tabular figures and grouped currency values.
+- The action dock must never cover editable fields or the final decision. Prototype-only controls must remain visually separate from production navigation.
+
 ## Required UAT
 
 Run observed UAT with Jim and Lenox as the same `Capital Operator` type under separate identities. At minimum cover:
@@ -112,5 +123,6 @@ For the concentration-collision case, assert exactly:
 - Run `DATABASE_URL= pnpm check`, targeted tests, and the appropriate production build. Never run bare tests against the production-bound `.env`.
 - Prove no prototype route, fixture, API call, or visual-only state became production truth.
 - Browser-test 375, 768, 1024, and 1440 widths; keyboard flow, reduced motion, focus, labels, and no horizontal overflow.
+- Add intermediate-width checks at 900, 1162, and 1280 pixels. At 1162px the assigned-thesis block, Mission Library, full Capital Mission, financial inputs, and next action must remain readable without overlap or a single-word vertical stack.
 - Report the recovery manifests, exact routes/components reused, migrations if any, tests/build results, UAT evidence, screenshots, explicit order-activity statement, and every unverified gap.
 - Do not deploy or merge solely because the code builds. Stop for owner review after implementation evidence is assembled.

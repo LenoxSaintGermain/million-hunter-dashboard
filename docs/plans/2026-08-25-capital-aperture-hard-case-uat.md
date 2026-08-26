@@ -54,6 +54,8 @@ This case combines a large capital mission, an assigned long-horizon thesis, two
 - Primary actions are `Review the cash decision` then `Record no-trade`.
 - Lifecycle is Thesis → Plays → Top play → Outcome. Plan, Approval, and Monitor are absent, not shown as completed.
 - Final record states `Cash preserved. The workflow still produced a decision`, preserves the cluster blocker, and shows `$0 at risk`.
+- Responsive sweep passes at 375, 768, 900, 1162, 1280, and 1440 pixels with no horizontal document overflow. The Review Desk moves from three panes to two, then one; the inspector becomes a lower evidence band; the workset becomes horizontal; thesis/library cards stack from canvas width; financial fields reflow 4 → 2 → 1.
+- At the annotated 1162px width, the full assigned thesis, Mission Library, Capital Mission, four financial fields, thesis expression, and constraint remain readable without overlap or a single-word vertical stack. The prototype switcher moves into document flow and no longer covers editable fields.
 - `DATABASE_URL= pnpm check`, `DATABASE_URL= pnpm build`, `git diff --check`, and local HTTP 200 pass.
 - No API, database, brokerage, or order path was invoked.
 

@@ -86,6 +86,7 @@ The set includes three eligible, four conditional, and three no-trade outcomes. 
 - A generic stage question must never compete with the operator's actual capital mission. Use the compact stage label as orientation and reserve the large question treatment for the mission itself.
 - Currency inputs remain editable but render grouped values such as `$250,000`, `$300,000`, and `$12,500`; replacement input must not append to the prior formatted value.
 - The Mission Library may rank an outcome the fixture did not initially lead with. The downstream flow must use the effective operator-selected disposition while preserving all system-computed gates.
+- Review Desk density scales in stages: three panes only when all remain readable; at intermediate widths the inspector becomes an evidence band below the workset and decision canvas; below tablet width the workset becomes a horizontal selector. Thesis/library and financial grids reflow from their own canvas width so a narrow decision column cannot inherit desktop typography.
 
 ## Validation
 
@@ -98,5 +99,6 @@ The prototype must pass:
 - non-empty plays, gate, no-trade condition, prompt starters, and acceptance assertion for every fixture;
 - zero API, database, or brokerage calls;
 - browser UAT for one eligible, one conditional, one no-trade, one no-thesis, and one large-capital scenario.
+- responsive UAT at 375, 768, 900, 1162, 1280, and 1440 pixels with no horizontal document overflow, content overlap, single-word vertical stacks, or fixed prototype controls covering editable fields.
 
 Browser UAT remains a human validation gate for the prototype. Passing a fixture assertion does not authorize production implementation, broker execution, or live release.
