@@ -1,5 +1,7 @@
 # Capital Aperture — Decision Runway Validation
 
+> **Superseded by the corrective validation report dated 2026-08-26.** Review after checkpoint `e31bf3f3` found that asynchronous latest-state attachment, mutable branches, and router-only cash checks did not satisfy the stated safety contract. Do not use this earlier report as release evidence.
+
 **Build window:** 2026-08-26 UTC  
 **Scope:** Approved production Decision Runway contract.  
 **Release posture:** Implementation complete; saved for owner review only. No independent deployment or merge action was performed.

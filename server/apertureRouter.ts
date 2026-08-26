@@ -11,7 +11,7 @@
  * so the contract is visible in the server code too.
  */
 import { z } from "zod";
-import { eq, and, inArray, gte, lt, sql, asc } from "drizzle-orm";
+import { eq, and, inArray, gte, lt, sql, asc, isNull } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { getDb } from "./db";
 import {
@@ -29,6 +29,9 @@ import {
   aperturePlaySlates,
   aperturePlaySlateItems,
   apertureRunwayStates,
+  apertureDecisionRuns,
+  apertureDecisionRevisions,
+  aperturePendingOutcomes,
   apertureSetAside,
   disclosurePlans,
   disclosurePlanRevisions,
@@ -84,6 +87,11 @@ import { ONE_TIME_GLP1_RESEARCH_PATH, oneTimeResearchCron } from "./aperture/one
 import { PAPER_ACCOUNT_SYNC_CRON, PAPER_ACCOUNT_SYNC_PATH } from "./aperture/paperAccountSyncScheduled";
 import { compileDisclosureIntent, evaluateDisclosureTransaction, tightenControls, type DisclosureControls } from "../shared/disclosure";
 import { DisclosureDocumentStore, housePtrFixtureDocument } from "./aperture/disclosureRail";
+import {
+  DecisionRunwayBlockedError,
+  outcomeReviewAt,
+  rankMissionLibrary,
+} from "./aperture/decisionRunway";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -701,86 +709,361 @@ export const apertureRouter = router({
   runway: router({
     latest: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
-      const [latest] = await db!.select().from(apertureRunwayStates)
-        .where(eq(apertureRunwayStates.userId, ctx.user.id))
-        .orderBy(desc(apertureRunwayStates.updatedAt))
+      const [decisionRun] = await db!.select().from(apertureDecisionRuns)
+        .where(eq(apertureDecisionRuns.userId, ctx.user.id))
+        .orderBy(desc(apertureDecisionRuns.updatedAt))
         .limit(1);
+      const [revision] = decisionRun?.currentRevisionId == null ? [undefined] : await db!.select().from(apertureDecisionRevisions)
+        .where(and(
+          eq(apertureDecisionRevisions.id, decisionRun.currentRevisionId),
+          eq(apertureDecisionRevisions.decisionRunId, decisionRun.id),
+        )).limit(1);
+      const [legacy] = decisionRun ? [undefined] : await db!.select().from(apertureRunwayStates)
+        .where(eq(apertureRunwayStates.userId, ctx.user.id))
+        .orderBy(desc(apertureRunwayStates.updatedAt)).limit(1);
       const [profile] = await db!.select({ activeCapitalThesisId: users.activeCapitalThesisId })
         .from(users).where(eq(users.id, ctx.user.id)).limit(1);
-      return { latest: latest ?? null, activeCanonicalThesisId: profile?.activeCapitalThesisId ?? null };
+      return {
+        latest: revision && decisionRun ? {
+          ...revision,
+          id: decisionRun.id,
+          branch: revision.effectiveBranch,
+          runId: decisionRun.researchRunId,
+          accountId: decisionRun.accountId,
+          canonicalThesisId: decisionRun.canonicalThesisId,
+          capitalThesisId: decisionRun.capitalThesisId,
+          lifecycle: decisionRun.lifecycle,
+          authority: "authoritative" as const,
+        } : legacy ? { ...legacy, authority: "legacy" as const } : null,
+        activeCanonicalThesisId: profile?.activeCapitalThesisId ?? null,
+      };
     }),
+    library: adminProcedure
+      .input(z.object({
+        canonicalThesisId: z.number().nullable().optional(),
+        capitalThesisId: z.number().nullable().optional(),
+        accountId: z.number().nullable().optional(),
+        deployableCapitalCents: z.number().positive().default(500_000),
+        holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]).default("intraday"),
+        objective: z.enum(["best_qualified_play", "deploy_today", "verify_catalyst", "portfolio_gap", "preserve_optionality"]).default("best_qualified_play"),
+      }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [profile] = await db!.select({ activeCapitalThesisId: users.activeCapitalThesisId })
+          .from(users).where(eq(users.id, ctx.user.id)).limit(1);
+        const canonicalThesisId = input.canonicalThesisId ?? profile?.activeCapitalThesisId ?? null;
+        const [projection] = input.capitalThesisId != null
+          ? await db!.select().from(capitalTheses).where(and(eq(capitalTheses.id, input.capitalThesisId), eq(capitalTheses.userId, ctx.user.id))).limit(1)
+          : canonicalThesisId == null ? [undefined] : await db!.select().from(capitalTheses).where(and(eq(capitalTheses.userId, ctx.user.id), eq(capitalTheses.sourceCompilationId, canonicalThesisId))).limit(1);
+        const [canonical] = canonicalThesisId == null ? [undefined] : await db!.select({ name: thesisCompilations.name })
+          .from(thesisCompilations).where(and(eq(thesisCompilations.id, canonicalThesisId), eq(thesisCompilations.userId, ctx.user.id))).limit(1);
+        const [account] = input.accountId != null
+          ? await db!.select().from(portfolioAccounts).where(and(eq(portfolioAccounts.id, input.accountId), eq(portfolioAccounts.userId, ctx.user.id), eq(portfolioAccounts.isPaper, true))).limit(1)
+          : await db!.select().from(portfolioAccounts).where(and(eq(portfolioAccounts.userId, ctx.user.id), eq(portfolioAccounts.isPaper, true))).limit(1);
+        const held = account ? await db!.select().from(positions).where(eq(positions.accountId, account.id)) : [];
+        const largestPositionCents = held.reduce((largest, row) => Math.max(largest, row.marketValueCents ?? 0), 0);
+        const allowedSingleNameCents = account?.equityValueCents
+          ? account.equityValueCents * CURRENT_MANDATE.maxPositionPctOfEquity / 100
+          : null;
+        const concentrationUtilizationPct = allowedSingleNameCents && allowedSingleNameCents > 0
+          ? largestPositionCents / allowedSingleNameCents * 100
+          : null;
+        return rankMissionLibrary({
+          thesisName: canonical?.name ?? projection?.name ?? "my active thesis",
+          deployableCapitalCents: input.deployableCapitalCents,
+          holdingPeriod: input.holdingPeriod as any,
+          objective: input.objective,
+          concentrationUtilizationPct,
+          accountFreshnessMinutes: account?.lastSyncedAt ? Math.max(0, (Date.now() - account.lastSyncedAt) / 60_000) : null,
+          // A mission is not labeled catalyst-ready unless a verified catalyst
+          // record is actually attached. This initial corrective build has no
+          // such binding, so the option remains visible but conditional.
+          hasVerifiedCatalyst: false,
+        });
+      }),
     begin: adminProcedure
       .input(z.object({
         missionText: z.string().trim().min(MIN_NARRATIVE_CHARS).max(12_000),
-        canonicalThesisId: z.number().nullable().optional(),
-        accountId: z.number().nullable().optional(),
-        branch: z.enum(["research", "eligible", "conditional", "cash"]).default("research"),
+        canonicalThesisId: z.number(),
+        capitalThesisId: z.number(),
+        accountId: z.number(),
+        /** Append to an exact active Decision Run instead of opening a new one. */
+        decisionRunId: z.number().nullable().optional(),
+        branch: z.enum(["research", "conditional", "cash"]).default("research"),
+        missionSource: z.enum(["assigned", "inline", "library", "edited"]).default("assigned"),
+        objective: z.enum(["best_qualified_play", "deploy_today", "verify_catalyst", "portfolio_gap", "preserve_optionality"]).default("best_qualified_play"),
+        instrumentPreference: z.enum(["shares", "options", "either"]).default("either"),
+        includeHeldResearch: z.boolean().default(false),
+        deployableCapitalCents: z.number().positive(),
+        desiredEndingValueCents: z.number().positive().nullable().optional(),
+        maxPlannedLossCents: z.number().positive(),
+        holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]),
+        invalidationRule: z.string().trim().min(MIN_NARRATIVE_CHARS).max(2_000),
         reason: z.string().trim().max(1_000).nullable().optional(),
+        blocker: z.string().trim().max(1_000).nullable().optional(),
+        reopenCondition: z.string().trim().max(1_000).nullable().optional(),
+        reviewAt: z.number().nullable().optional(),
+        namedGateKey: z.string().trim().max(96).nullable().optional(),
+        namedGateLabel: z.string().trim().max(240).nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
         const now = Date.now();
-        const [profile] = await db!.select({ activeCapitalThesisId: users.activeCapitalThesisId })
-          .from(users).where(eq(users.id, ctx.user.id)).limit(1);
-        const canonicalThesisId = input.canonicalThesisId ?? profile?.activeCapitalThesisId ?? null;
-        if (canonicalThesisId != null) {
-          const [projection] = await db!.select({ id: capitalTheses.id }).from(capitalTheses)
-            .where(and(eq(capitalTheses.userId, ctx.user.id), eq(capitalTheses.sourceCompilationId, canonicalThesisId)))
-            .limit(1);
-          if (!projection) throw new TRPCError({ code: "FORBIDDEN", message: "This saved thesis is not available in your Capital workspace." });
+        const [projection] = await db!.select().from(capitalTheses).where(and(
+          eq(capitalTheses.id, input.capitalThesisId),
+          eq(capitalTheses.userId, ctx.user.id),
+          eq(capitalTheses.sourceCompilationId, input.canonicalThesisId),
+        )).limit(1);
+        if (!projection) throw new TRPCError({ code: "FORBIDDEN", message: "The assigned thesis and Capital projection do not match." });
+        const account = await requireAccount(db, input.accountId, ctx.user.id);
+        if (!account.isPaper) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Decision Runway requires a paper account." });
+        if (input.branch !== "research" && (!input.reason || !input.blocker || !input.reopenCondition)) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash and conditional decisions require a reason, blocker, and reopening condition." });
         }
-        if (input.accountId != null) await requireAccount(db, input.accountId, ctx.user.id);
-        if (input.branch === "cash" && (!input.reason || input.reason.trim().length < 3)) {
-          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Record why cash is the correct decision for this mission." });
+        if (input.branch === "conditional" && (!input.namedGateKey || !input.namedGateLabel || !input.reviewAt)) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "A conditional decision requires a named gate and review time." });
         }
-        const missionHash = createHash("sha256").update(input.missionText).digest("hex");
-        const [existing] = await db!.select().from(apertureRunwayStates).where(and(
-          eq(apertureRunwayStates.userId, ctx.user.id),
-          eq(apertureRunwayStates.missionHash, missionHash),
-          eq(apertureRunwayStates.branch, input.branch),
-        )).orderBy(desc(apertureRunwayStates.updatedAt)).limit(1);
-        if (existing) return { state: existing, created: false };
-        const result = await db!.insert(apertureRunwayStates).values({
-          userId: ctx.user.id,
-          canonicalThesisId,
-          accountId: input.accountId ?? null,
+        const systemLossCeiling = account.equityValueCents == null
+          ? input.maxPlannedLossCents
+          : Math.floor(account.equityValueCents * CURRENT_MANDATE.maxPlannedRiskPctPerPlay / 100);
+        const maxPlannedLossCents = Math.min(input.maxPlannedLossCents, systemLossCeiling);
+        const missionHash = createHash("sha256").update(JSON.stringify({
+          missionText: input.missionText,
+          canonicalThesisId: input.canonicalThesisId,
+          capitalThesisId: input.capitalThesisId,
+          accountId: input.accountId,
+          branch: input.branch,
+          objective: input.objective,
+          instrumentPreference: input.instrumentPreference,
+          deployableCapitalCents: input.deployableCapitalCents,
+          desiredEndingValueCents: input.desiredEndingValueCents ?? null,
+          maxPlannedLossCents,
+          holdingPeriod: input.holdingPeriod,
+        })).digest("hex");
+        const revisionValues = {
           missionText: input.missionText,
           missionHash,
-          branch: input.branch,
+          missionSource: input.missionSource,
+          objective: input.objective,
+          instrumentPreference: input.instrumentPreference,
+          includeHeldResearch: input.includeHeldResearch,
+          deployableCapitalCents: input.deployableCapitalCents,
+          desiredEndingValueCents: input.desiredEndingValueCents ?? null,
+          maxPlannedLossCents,
+          holdingPeriod: input.holdingPeriod as any,
+          invalidationRule: input.invalidationRule,
+          operatorChoice: input.branch,
+          effectiveBranch: input.branch,
+          plannedRiskCents: 0,
           reason: input.reason ?? null,
-          selectedAt: now,
+          blocker: input.blocker ?? null,
+          reopenCondition: input.reopenCondition ?? null,
+          reviewAt: input.reviewAt ?? null,
+          namedGateKey: input.namedGateKey ?? null,
+          namedGateLabel: input.namedGateLabel ?? null,
+          contextSnapshot: {
+            canonicalThesisId: input.canonicalThesisId,
+            capitalThesisId: input.capitalThesisId,
+            accountId: input.accountId,
+            accountLastSyncedAt: account.lastSyncedAt,
+          },
+          gateSnapshot: {
+            mandateVersion: CURRENT_MANDATE.version,
+            paperOnly: true,
+            humanApprovalRequired: true,
+            maxPlannedLossCents,
+          },
+          createdByUserId: ctx.user.id,
           createdAt: now,
-          updatedAt: now,
+        };
+        if (input.decisionRunId != null) {
+          const [head] = await db!.select().from(apertureDecisionRuns).where(and(
+            eq(apertureDecisionRuns.id, input.decisionRunId),
+            eq(apertureDecisionRuns.userId, ctx.user.id),
+            eq(apertureDecisionRuns.canonicalThesisId, input.canonicalThesisId),
+            eq(apertureDecisionRuns.capitalThesisId, input.capitalThesisId),
+            eq(apertureDecisionRuns.accountId, input.accountId),
+          )).limit(1);
+          if (!head?.currentRevisionId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The Decision Run binding changed. Open the current mission before recording a new outcome." });
+          const expectedRevisionId = head.currentRevisionId;
+          const appended = await db!.transaction(async (tx) => {
+            const [lockedHead] = await tx.select().from(apertureDecisionRuns).where(and(
+              eq(apertureDecisionRuns.id, head.id),
+              eq(apertureDecisionRuns.currentRevisionId, expectedRevisionId),
+              eq(apertureDecisionRuns.lockVersion, head.lockVersion),
+            )).for("update").limit(1);
+            if (!lockedHead?.currentRevisionId) throw new TRPCError({ code: "CONFLICT", message: "The Decision Run changed while this revision was being recorded." });
+            const [inFlightDispatch] = await tx.select({ id: brokerOrders.id }).from(brokerOrders).where(and(
+              eq(brokerOrders.userId, ctx.user.id),
+              eq(brokerOrders.decisionRunId, lockedHead.id),
+              eq(brokerOrders.status, "submitted"),
+              isNull(brokerOrders.brokerOrderId),
+            )).for("update").limit(1);
+            if (inFlightDispatch) {
+              throw new TRPCError({
+                code: "PRECONDITION_FAILED",
+                message: "A paper order dispatch is still resolving for this Decision Run. Record a new disposition after the broker response is persisted.",
+              });
+            }
+            const [current] = await tx.select().from(apertureDecisionRevisions).where(and(
+              eq(apertureDecisionRevisions.id, lockedHead.currentRevisionId),
+              eq(apertureDecisionRevisions.decisionRunId, lockedHead.id),
+            )).limit(1);
+            if (!current) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The current Decision Run revision is unavailable." });
+            const [revisionResult] = await tx.insert(apertureDecisionRevisions).values({
+              decisionRunId: lockedHead.id,
+              version: current.version + 1,
+              previousRevisionId: current.id,
+              ...revisionValues,
+            });
+            const revisionId = Number((revisionResult as any).insertId);
+            const update = await tx.update(apertureDecisionRuns).set({
+              currentRevisionId: revisionId,
+              lifecycle: input.branch === "cash" ? "cash" : input.branch === "conditional" ? "conditional" : head.lifecycle,
+              lockVersion: lockedHead.lockVersion + 1,
+              updatedAt: now,
+            }).where(and(
+              eq(apertureDecisionRuns.id, lockedHead.id),
+              eq(apertureDecisionRuns.currentRevisionId, current.id),
+              eq(apertureDecisionRuns.lockVersion, lockedHead.lockVersion),
+            ));
+            if (!update[0].affectedRows) throw new TRPCError({ code: "CONFLICT", message: "The Decision Run changed while this revision was being recorded." });
+            if (input.branch === "conditional" && input.reviewAt) {
+              await tx.insert(aperturePendingOutcomes).values({
+                userId: ctx.user.id,
+                decisionRunId: lockedHead.id,
+                revisionId,
+                kind: "gate_review",
+                status: "pending",
+                dueAt: input.reviewAt,
+                gateKey: input.namedGateKey ?? null,
+                reviewBasis: input.reopenCondition!,
+                createdAt: now,
+                updatedAt: now,
+              });
+            }
+            return { decisionRunId: lockedHead.id, revisionId };
+          });
+          return { ...appended, created: false, branch: input.branch, maxPlannedLossCents };
+        }
+        const receipt = await db!.transaction(async (tx) => {
+          const [runResult] = await tx.insert(apertureDecisionRuns).values({
+            userId: ctx.user.id,
+            canonicalThesisId: input.canonicalThesisId,
+            capitalThesisId: input.capitalThesisId,
+            accountId: input.accountId,
+            lifecycle: input.branch === "cash" ? "cash" : input.branch === "conditional" ? "conditional" : "mission",
+            lockVersion: 0,
+            createdAt: now,
+            updatedAt: now,
+          });
+          const decisionRunId = Number((runResult as any).insertId);
+          const [revisionResult] = await tx.insert(apertureDecisionRevisions).values({
+            decisionRunId,
+            version: 1,
+            ...revisionValues,
+          });
+          const revisionId = Number((revisionResult as any).insertId);
+          await tx.update(apertureDecisionRuns).set({ currentRevisionId: revisionId })
+            .where(eq(apertureDecisionRuns.id, decisionRunId));
+          if (input.branch === "conditional" && input.reviewAt) {
+            await tx.insert(aperturePendingOutcomes).values({
+              userId: ctx.user.id,
+              decisionRunId,
+              revisionId,
+              kind: "gate_review",
+              status: "pending",
+              dueAt: input.reviewAt,
+              gateKey: input.namedGateKey ?? null,
+              reviewBasis: input.reopenCondition!,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+          return { decisionRunId, revisionId };
         });
-        const id = Number(result[0].insertId);
-        const [state] = await db!.select().from(apertureRunwayStates).where(eq(apertureRunwayStates.id, id)).limit(1);
-        return { state: state!, created: true };
+        return { ...receipt, created: true, branch: input.branch, maxPlannedLossCents };
       }),
-    attachRun: adminProcedure
-      .input(z.object({ stateId: z.number(), runId: z.number() }))
+    startResearch: adminProcedure
+      .input(z.object({ decisionRunId: z.number(), revisionId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
-        const [state] = await db!.select().from(apertureRunwayStates)
-          .where(and(eq(apertureRunwayStates.id, input.stateId), eq(apertureRunwayStates.userId, ctx.user.id))).limit(1);
-        if (!state) throw new TRPCError({ code: "NOT_FOUND", message: "Decision Runway context not found" });
-        if (state.branch === "cash") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash is recorded for this mission; start a new mission before researching or promoting a candidate." });
-        const [run] = await db!.select().from(apertureRuns)
-          .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id))).limit(1);
-        if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Research run not found" });
-        await db!.update(apertureRunwayStates).set({ runId: run.id, updatedAt: Date.now() })
-          .where(eq(apertureRunwayStates.id, state.id));
-        return { ok: true };
+        const [decisionRun] = await db!.select().from(apertureDecisionRuns).where(and(
+          eq(apertureDecisionRuns.id, input.decisionRunId),
+          eq(apertureDecisionRuns.userId, ctx.user.id),
+        )).limit(1);
+        if (!decisionRun || decisionRun.currentRevisionId !== input.revisionId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current mission revision before starting research." });
+        if (decisionRun.researchRunId != null) throw new TRPCError({ code: "CONFLICT", message: "This mission already has an exact research run." });
+        const [revision] = await db!.select().from(apertureDecisionRevisions).where(and(
+          eq(apertureDecisionRevisions.id, input.revisionId),
+          eq(apertureDecisionRevisions.decisionRunId, decisionRun.id),
+        )).limit(1);
+        if (!revision || revision.effectiveBranch !== "research") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash and conditional branches cannot start research." });
+        let thesis = await requireThesis(db, decisionRun.capitalThesisId, ctx.user.id);
+        if (!thesis.graph) {
+          thesis = await ensureThesisReady(thesis, {
+            compile: compileThesis,
+            persist: async ({ graph, confidenceNotes }) => {
+              await db!.update(capitalTheses).set({ graph, confidenceNotes, status: "review", updatedAt: Date.now() }).where(eq(capitalTheses.id, thesis.id));
+            },
+          });
+        }
+        const account = await requireAccount(db, decisionRun.accountId, ctx.user.id);
+        if (!account.isPaper) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Decision Runway can only research against a paper account." });
+        const now = Date.now();
+        const catalystDeadlineAt = outcomeReviewAt(revision.holdingPeriod, revision.reviewAt, now);
+        const runInput = {
+          thesisId: thesis.id,
+          accountId: account.id,
+          deployableCapitalCents: revision.deployableCapitalCents,
+          intendedTrades: [] as Array<{ symbol: string; dollarsCents: number; note?: string }>,
+          holdingPeriod: revision.holdingPeriod,
+          liquidityFloorAdvUsd: CURRENT_MANDATE.minAdvUsd30d,
+          catalystDeadlineAt,
+          maxSingleNamePct: CURRENT_MANDATE.maxPositionPctOfEquity,
+          invalidationRule: revision.invalidationRule,
+        };
+        const preset = evaluateRunPreset(runInput, { accountLinked: true, equityCents: account.equityValueCents ?? null }, CURRENT_MANDATE, now);
+        if (!preset.passed) throw new TRPCError({ code: "PRECONDITION_FAILED", message: `run preset rejected by the mandate: ${preset.failures.join("; ")}` });
+        const runId = await db!.transaction(async (tx) => {
+          const [runResult] = await tx.insert(apertureRuns).values({
+            userId: ctx.user.id,
+            thesisId: thesis.id,
+            accountId: account.id,
+            deployableCapitalCents: revision.deployableCapitalCents,
+            intendedTrades: [],
+            holdingPeriod: revision.holdingPeriod,
+            catalystDeadlineAt,
+            liquidityFloorAdvUsd: CURRENT_MANDATE.minAdvUsd30d,
+            maxSingleNamePct: CURRENT_MANDATE.maxPositionPctOfEquity,
+            invalidationRule: revision.invalidationRule,
+            mandateVersion: preset.mandateVersion,
+            status: "queued",
+            createdAt: now,
+          });
+          const exactRunId = Number((runResult as any).insertId);
+          const update = await tx.update(apertureDecisionRuns).set({
+            researchRunId: exactRunId,
+            lifecycle: "researching",
+            lockVersion: decisionRun.lockVersion + 1,
+            updatedAt: now,
+          }).where(and(
+            eq(apertureDecisionRuns.id, decisionRun.id),
+            eq(apertureDecisionRuns.currentRevisionId, revision.id),
+            eq(apertureDecisionRuns.lockVersion, decisionRun.lockVersion),
+          ));
+          if (!update[0].affectedRows) throw new TRPCError({ code: "CONFLICT", message: "This mission changed before research could be bound. Review the current revision." });
+          return exactRunId;
+        });
+        executeRun(runId, ctx.user.id, thesis, runInput).catch((error) => console.error(`[aperture] Decision Runway research ${runId} failed:`, error?.message ?? error));
+        return { runId, decisionRunId: decisionRun.id, revisionId: revision.id };
       }),
-    setBranch: adminProcedure
-      .input(z.object({ stateId: z.number(), branch: z.enum(["research", "eligible", "conditional", "cash"]), reason: z.string().trim().max(1_000).nullable().optional() }))
-      .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (input.branch === "cash" && (!input.reason || input.reason.length < 3)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Record why cash is the correct decision." });
-        const result = await db!.update(apertureRunwayStates).set({ branch: input.branch, reason: input.reason ?? null, selectedAt: Date.now(), updatedAt: Date.now() })
-          .where(and(eq(apertureRunwayStates.id, input.stateId), eq(apertureRunwayStates.userId, ctx.user.id)));
-        if (!result[0].affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "Decision Runway context not found" });
-        return { ok: true };
-      }),
+    attachRun: adminProcedure.input(z.object({ stateId: z.number(), runId: z.number() })).mutation(() => {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Arbitrary run attachment is retired. Start research from the exact Decision Run revision." });
+    }),
+    setBranch: adminProcedure.input(z.object({ stateId: z.number(), branch: z.enum(["research", "eligible", "conditional", "cash"]), reason: z.string().nullable().optional() })).mutation(() => {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Decision history is immutable. Record a new mission revision instead of rewriting a branch." });
+    }),
   }),
 
   // ── Disclosure Intelligence Rail (WP-DIR1) ─────────────────────────────────
@@ -1342,6 +1625,22 @@ export const apertureRouter = router({
       const decisions = candidateIds.length
         ? await db!.select().from(aperturePlayDecisions).where(and(eq(aperturePlayDecisions.userId, ctx.user.id), inArray(aperturePlayDecisions.candidateId, candidateIds)))
         : [];
+      const researchRunIds = Array.from(new Set(rows.map(({ run }) => run.id)));
+      const decisionRuns = researchRunIds.length
+        ? await db!.select().from(apertureDecisionRuns).where(and(
+            eq(apertureDecisionRuns.userId, ctx.user.id),
+            inArray(apertureDecisionRuns.researchRunId, researchRunIds),
+          ))
+        : [];
+      const revisionIds = decisionRuns.flatMap((run) => run.currentRevisionId == null ? [] : [run.currentRevisionId]);
+      const decisionRevisions = revisionIds.length
+        ? await db!.select().from(apertureDecisionRevisions).where(inArray(apertureDecisionRevisions.id, revisionIds))
+        : [];
+      const revisionById = new Map(decisionRevisions.map((revision) => [revision.id, revision]));
+      const decisionByResearchRun = new Map(decisionRuns.map((decisionRun) => [decisionRun.researchRunId, {
+        run: decisionRun,
+        revision: decisionRun.currentRevisionId == null ? null : revisionById.get(decisionRun.currentRevisionId) ?? null,
+      }]));
       const reviewsByCandidate = new Map<number, typeof reviews>();
       for (const review of reviews) reviewsByCandidate.set(review.candidateId, [...(reviewsByCandidate.get(review.candidateId) ?? []), review]);
       // Skip retires the current play. Defer is a next-regular-session pause;
@@ -1354,17 +1653,26 @@ export const apertureRouter = router({
         activeCanonicalThesisId: activeCapitalThesisId,
         activeCanonicalThesis: activeCanonicalThesis ?? null,
         expiredPlayCount: expiredRows.length,
-        plays: rows.map(({ candidate, run, thesisName, thesisRawText }) => ({
-        candidate,
-        run,
-        thesisName,
-        thesisRawText,
-        reviews: reviewsByCandidate.get(candidate.id) ?? [],
-        decision: decisionByCandidate.get(candidate.id) ?? null,
-        evidenceSummary: Array.isArray(candidate.verifyFields) && candidate.verifyFields.length
-          ? `${candidate.verifyFields.length} decision-critical evidence check${candidate.verifyFields.length === 1 ? " remains" : "s remain"}.`
-          : "No decision-critical evidence field was generated; current market conditions still require human confirmation.",
-        })),
+        plays: rows.map(({ candidate, run, thesisName, thesisRawText }) => {
+          const authority = decisionByResearchRun.get(run.id);
+          const revision = authority?.revision ?? null;
+          return {
+            candidate,
+            run,
+            thesisName,
+            thesisRawText,
+            reviews: reviewsByCandidate.get(candidate.id) ?? [],
+            decision: decisionByCandidate.get(candidate.id) ?? null,
+            decisionAuthority: authority && revision ? "authoritative" as const : "unbound" as const,
+            decisionBranch: revision?.effectiveBranch ?? null,
+            decisionReason: revision?.reason ?? null,
+            decisionBlocker: revision?.blocker ?? null,
+            decisionReopenCondition: revision?.reopenCondition ?? null,
+            evidenceSummary: Array.isArray(candidate.verifyFields) && candidate.verifyFields.length
+              ? `${candidate.verifyFields.length} decision-critical evidence check${candidate.verifyFields.length === 1 ? " remains" : "s remain"}.`
+              : "No decision-critical evidence field was generated; current market conditions still require human confirmation.",
+          };
+        }),
       };
     }),
 
@@ -2160,13 +2468,6 @@ export const apertureRouter = router({
           .limit(1);
         if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
 
-        const [runwayState] = await db!.select().from(apertureRunwayStates)
-          .where(and(eq(apertureRunwayStates.runId, run.id), eq(apertureRunwayStates.userId, ctx.user.id)))
-          .limit(1);
-        if (runwayState?.branch === "cash") {
-          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash was recorded for this Decision Runway mission. Candidate and order promotion are fail-closed." });
-        }
-
         // A candidate-originated proposal cannot skip the operator's recorded review
         // of the evidence questions that can change the decision. Manual paper orders
         // remain possible for operational uses without a research-candidate link.
@@ -2190,6 +2491,9 @@ export const apertureRouter = router({
               message: e.message,
               cause: e,
             });
+          }
+          if (e instanceof DecisionRunwayBlockedError) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: e.message, cause: e });
           }
           throw e;
         }
@@ -2221,13 +2525,6 @@ export const apertureRouter = router({
           .limit(1);
         if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
 
-        const [runwayState] = await db!.select().from(apertureRunwayStates)
-          .where(and(eq(apertureRunwayStates.runId, run.id), eq(apertureRunwayStates.userId, ctx.user.id)))
-          .limit(1);
-        const runwayCashBlock = runwayState?.branch === "cash"
-          ? "Cash was recorded for this Decision Runway mission. Candidate and order promotion are fail-closed."
-          : null;
-
         const evidenceBlock = await evidenceReviewBlock(db, ctx.user.id, input.runId, input.candidateId);
 
         // Everything create's own zod would refuse, as messages rather than a
@@ -2237,17 +2534,26 @@ export const apertureRouter = router({
           ? []
           : parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`);
 
-        const { evaluation, gatedNotionalCents, notionalBasis, session } = await preflightOrder({
-          ...input,
-          userId: ctx.user.id,
-          portfolioRules: {
-            maxSingleNamePct: run.maxSingleNamePct ?? null,
-            minAvgDailyVolumeUsd: run.liquidityFloorAdvUsd ?? null,
-          },
-        });
+        let preflight;
+        try {
+          preflight = await preflightOrder({
+            ...input,
+            userId: ctx.user.id,
+            portfolioRules: {
+              maxSingleNamePct: run.maxSingleNamePct ?? null,
+              minAvgDailyVolumeUsd: run.liquidityFloorAdvUsd ?? null,
+            },
+          });
+        } catch (error) {
+          if (error instanceof DecisionRunwayBlockedError) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message, cause: error });
+          }
+          throw error;
+        }
+        const { evaluation, gatedNotionalCents, notionalBasis, session } = preflight;
 
         const recipeGap = missingIntradayRecipeMessage(input);
-        const blocking = [...evaluation.failures, ...schemaErrors, ...(recipeGap ? [recipeGap] : []), ...(evidenceBlock ? [evidenceBlock] : []), ...(runwayCashBlock ? [runwayCashBlock] : [])];
+        const blocking = [...evaluation.failures, ...schemaErrors, ...(recipeGap ? [recipeGap] : []), ...(evidenceBlock ? [evidenceBlock] : [])];
         return {
           wouldPass: blocking.length === 0,
           blocking,

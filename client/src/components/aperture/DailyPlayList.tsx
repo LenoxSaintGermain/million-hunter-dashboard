@@ -23,7 +23,10 @@ function IntradayTrigger({ runId, candidateId, holdingPeriod }: { runId: number;
   return <div><p style={{ color: "var(--sh-fg-muted)" }}>VWAP trigger · 15m hold {data.triggerSide}</p><p className="mt-1 font-semibold" style={{ color: tone }}>{label} · {data.playSide} recipe</p><p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.basis}</p>{range && <p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>Opening range: {range.complete ? `${range.widthPct?.toFixed(2) ?? "not measured"}% wide` : range.unavailableReason ?? "still forming"} · {range.feed.toUpperCase()} tape.</p>}</div>;
 }
 
-export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () => void; onOpenRun: (runId: number, candidateId: number, view?: string) => void }) {
+export function DailyPlayList({ onNewResearch, onOpenRun }: {
+  onNewResearch: () => void;
+  onOpenRun: (runId: number, candidateId: number, view?: string) => void;
+}) {
   const { data: playList, isLoading } = trpc.aperture.play.list.useQuery();
   const { data: accounts } = trpc.aperture.account.list.useQuery();
   const { data: activeCapitalContext } = trpc.thesis.activeCapital.useQuery();
@@ -73,8 +76,9 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
       const item = queued.item;
       event.preventDefault();
       const recipe = queued.recipe;
-      const destination = dailyPlayPrimaryDestination(recipe.readiness);
-      setDecisionAnnouncement(destination === "execute" ? `Opening ${item.candidate.symbol}'s human paper-proposal review. Nothing has been submitted.` : `Opening ${item.candidate.symbol}'s decisive evidence questions.`);
+      const promotionBlocked = item.decisionAuthority !== "authoritative" || item.decisionBranch === "cash" || item.decisionBranch === "conditional";
+      const destination = promotionBlocked ? "evidence" : dailyPlayPrimaryDestination(recipe.readiness);
+      setDecisionAnnouncement(promotionBlocked ? `Opening ${item.candidate.symbol}'s research evidence. This run cannot prepare a paper proposal under its own receipt.` : destination === "execute" ? `Opening ${item.candidate.symbol}'s human paper-proposal review. Nothing has been submitted.` : `Opening ${item.candidate.symbol}'s decisive evidence questions.`);
       onOpenRun(item.run.id, item.candidate.id, destination);
     };
     window.addEventListener("keydown", openPrimaryStep);
@@ -103,7 +107,7 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
 
     <div className="flex gap-3 rounded-xl border px-4 py-3" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 5%, var(--sh-surface))" }}>
       <CircleSlash2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} />
-      <div><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Cash · preserve optionality</p><p className="mt-0.5 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>This is the standing control outcome—not a missing recommendation. Keep cash when no setup clears its trigger, risk, evidence, and correlation conditions. Record a reason beside a specific play so the weekly record can learn from it.</p></div>
+      <div><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Cash · preserve optionality</p><p className="mt-0.5 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>This is the standing control outcome—not a missing recommendation. Each play below carries its own mission receipt; one run’s cash or conditional decision never governs another run.</p></div>
     </div>
     {decisionAnnouncement && <div role="status" className="rounded-lg border px-4 py-3 text-sm" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}><strong>Decision recorded.</strong> {decisionAnnouncement}</div>}
 
@@ -114,6 +118,13 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
     <div className="space-y-3">
       {(showAllPlays ? ranked : ranked.slice(0, 3)).map(({ item, recipe: play }) => {
         const expanded = expandedId === item.candidate.id;
+        const proposalBlockedReason = item.decisionAuthority !== "authoritative"
+          ? "Research-only legacy run. Start from Capital Mission to create an exact thesis, account, and revision binding."
+          : item.decisionBranch === "cash"
+            ? item.decisionReason ?? "Cash / no-trade is recorded for this run at $0 planned risk."
+            : item.decisionBranch === "conditional"
+              ? `${item.decisionBlocker ?? "A named gate remains unresolved."}${item.decisionReopenCondition ? ` Reopen when: ${item.decisionReopenCondition}` : ""}`
+              : null;
         const mainBlocker = play.blockingReasons[0] ?? "No research blocker was generated; approval is still separate.";
         const reviewedChecks = new Set(item.reviews.filter((review) => review.status === "reviewed").map((review) => review.checkLabel));
         const openChecks = play.requiredChecks.filter((check) => !reviewedChecks.has(check)).length;
@@ -124,7 +135,8 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
             <div className="flex items-center gap-2 sm:text-right"><span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{researchCoverageLabel(item.candidate.confidenceScore, openChecks)}</span><ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} /></div>
           </button>
           {expanded && <div id={`daily-play-detail-${item.candidate.id}`} className="border-t p-4 sm:p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
-            <PlayRecipeCard candidate={item.candidate} run={item.run} reviewedChecks={item.reviews.filter((review) => review.status === "reviewed").map((review) => review.checkLabel)} alreadyHeld={false} thesisContext={{ name: item.thesisName, rawText: item.thesisRawText }} onReviewEvidence={() => onOpenRun(item.run.id, item.candidate.id, "evidence")} onPrepareProposal={() => onOpenRun(item.run.id, item.candidate.id, "execute")} onOpenResearch={() => onOpenRun(item.run.id, item.candidate.id, "research")} />
+            {proposalBlockedReason && <div className="mb-3 flex gap-3 rounded-lg border px-3 py-3 text-xs leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 42%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))", color: "var(--sh-fg-muted)" }}><CircleSlash2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><strong style={{ color: "var(--sh-text-primary)" }}>{item.decisionAuthority !== "authoritative" ? "Research-only · no authoritative receipt" : item.decisionBranch === "cash" ? "Cash · $0 planned risk" : "Conditional · proposal held"}</strong><p className="mt-0.5">{proposalBlockedReason}</p></div></div>}
+            <PlayRecipeCard candidate={item.candidate} run={item.run} reviewedChecks={item.reviews.filter((review) => review.status === "reviewed").map((review) => review.checkLabel)} alreadyHeld={false} thesisContext={{ name: item.thesisName, rawText: item.thesisRawText }} proposalBlockedReason={proposalBlockedReason} onReviewEvidence={() => onOpenRun(item.run.id, item.candidate.id, "evidence")} onPrepareProposal={() => onOpenRun(item.run.id, item.candidate.id, "execute")} onOpenResearch={() => onOpenRun(item.run.id, item.candidate.id, "research")} />
             <div className="mt-3 grid gap-3 rounded-lg border p-3 text-xs sm:grid-cols-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
               <IntradayTrigger runId={item.run.id} candidateId={item.candidate.id} holdingPeriod={item.run.holdingPeriod} />
               <div><p style={{ color: "var(--sh-fg-muted)" }}>Catalyst window</p><p className="mt-1 font-semibold" style={{ color: "var(--sh-text-primary)" }}>{item.run.catalystDeadlineAt ? <time dateTime={new Date(item.run.catalystDeadlineAt).toISOString()}>{new Date(item.run.catalystDeadlineAt).toLocaleString()}</time> : "Not measured"}</p><p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>The deadline bounds this research path; it does not authorize a trade.</p></div>
@@ -136,9 +148,7 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: { onNewResearch: () 
         </article>;
       })}
     </div>
-    {ranked.length > 3 && <Button type="button" variant="outline" size="sm" className="w-full min-h-11" onClick={() => setShowAllPlays((value) => !value)}>
-      {showAllPlays ? "Show decision priorities only" : `View ${ranked.length - 3} more research candidates`}
-    </Button>}
+    {ranked.length > 3 && <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)" }} open={showAllPlays} onToggle={(event) => setShowAllPlays(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Grouped remainder · {ranked.length - 3} candidates</summary><div className="border-t px-4 py-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Open only when you need the long tail. The lead play and two alternatives stay above; evidence depth remains inside each packet.</div></details>}
     <p className="sr-only" aria-live="polite">{decisionAnnouncement}</p>
   </section>;
 }

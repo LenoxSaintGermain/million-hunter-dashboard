@@ -1602,3 +1602,15 @@ anywhere in the codebase; those IDs fail on the current production key.
 - [x] Implement workspace-aware 3 → 2 → 1 pane Decision Runway responsiveness and accessible action dock behavior
 - [x] Run the required 375/768/900/1024/1162/1280/1440 width, keyboard, reduced-motion, two-operator, test, and no-order UAT evidence
 - [x] Assemble implementation evidence and stop for owner review without deployment or merge
+
+## Capital Aperture — Decision Runway Corrective Hardening (Aug 26 2026)
+- [x] Mark the `e31bf3f3` validation report superseded after owner review exposed unsafe latest-state attachment and incomplete lifecycle guards
+- [x] Add exact owner/thesis/projection/account/revision/run authority without fabricating legacy history
+- [x] Replace mutable branch changes with append-only mission revisions and retire arbitrary run attachment
+- [x] Enforce cash/conditional refusal inside preflight, proposal creation, approval, and submission
+- [x] Fail-close unbound legacy opening actions, gate each Play Slate candidate by its own receipt, and serialize revisions behind unresolved broker dispatches
+- [x] Auto-populate assigned theses, support inline thesis creation, rank contextual missions, format money, and compress candidate overflow
+- [x] Add human outcome and conditional-gate queues without autonomous exits
+- [x] Pass typecheck, focused tests, build, and diff checks
+- [ ] Apply migration 0055 only in an isolated or explicitly authorized database environment
+- [ ] Run authenticated two-operator responsive UAT after migration; no broker-order action without separate authorization

@@ -1395,6 +1395,96 @@ export const apertureRunwayStates = mysqlTable("aperture_runway_states", {
 }));
 export type ApertureRunwayState = typeof apertureRunwayStates.$inferSelect;
 
+/**
+ * Authoritative Decision Run head.
+ *
+ * `aperture_runway_states` above is retained as legacy evidence only. New
+ * operator work is bound through this row and an immutable revision. A
+ * research run can be assigned once; it is never attached later by guessing
+ * which mission was "latest".
+ */
+export const apertureDecisionRuns = mysqlTable("aperture_decision_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  canonicalThesisId: int("canonical_thesis_id").notNull(),
+  capitalThesisId: int("capital_thesis_id").notNull(),
+  accountId: int("account_id").notNull(),
+  researchRunId: int("research_run_id"),
+  currentRevisionId: int("current_revision_id"),
+  lifecycle: mysqlEnum("lifecycle", [
+    "mission", "researching", "conditional", "eligible", "cash", "pending_outcome", "closed",
+  ]).default("mission").notNull(),
+  lockVersion: int("lock_version").default(0).notNull(),
+  closedAt: bigint("closed_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  byOwnerUpdated: index("aperture_decision_runs_owner_updated_idx").on(table.userId, table.updatedAt),
+  researchRunUnique: uniqueIndex("aperture_decision_runs_research_run_uq").on(table.researchRunId),
+}));
+export type ApertureDecisionRun = typeof apertureDecisionRuns.$inferSelect;
+
+/** Immutable operator mission receipt. Edits append a new version. */
+export const apertureDecisionRevisions = mysqlTable("aperture_decision_revisions", {
+  id: int("id").autoincrement().primaryKey(),
+  decisionRunId: int("decision_run_id").notNull(),
+  version: int("version").notNull(),
+  previousRevisionId: int("previous_revision_id"),
+  missionText: text("mission_text").notNull(),
+  missionHash: varchar("mission_hash", { length: 64 }).notNull(),
+  missionSource: mysqlEnum("mission_source", ["assigned", "inline", "library", "edited"]).default("assigned").notNull(),
+  objective: mysqlEnum("objective", [
+    "best_qualified_play", "deploy_today", "verify_catalyst", "portfolio_gap", "preserve_optionality",
+  ]).default("best_qualified_play").notNull(),
+  instrumentPreference: mysqlEnum("instrument_preference", ["shares", "options", "either"]).default("either").notNull(),
+  includeHeldResearch: boolean("include_held_research").default(false).notNull(),
+  deployableCapitalCents: bigint("deployable_capital_cents", { mode: "number" }).notNull(),
+  desiredEndingValueCents: bigint("desired_ending_value_cents", { mode: "number" }),
+  maxPlannedLossCents: bigint("max_planned_loss_cents", { mode: "number" }).notNull(),
+  holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window"]).notNull(),
+  invalidationRule: text("invalidation_rule").notNull(),
+  operatorChoice: mysqlEnum("operator_choice", ["research", "conditional", "cash", "selected_play"]).default("research").notNull(),
+  effectiveBranch: mysqlEnum("effective_branch", ["research", "eligible", "conditional", "cash"]).default("research").notNull(),
+  selectedCandidateId: int("selected_candidate_id"),
+  plannedRiskCents: bigint("planned_risk_cents", { mode: "number" }).default(0).notNull(),
+  reason: text("reason"),
+  blocker: text("blocker"),
+  reopenCondition: text("reopen_condition"),
+  reviewAt: bigint("review_at", { mode: "number" }),
+  namedGateKey: varchar("named_gate_key", { length: 96 }),
+  namedGateLabel: varchar("named_gate_label", { length: 240 }),
+  contextSnapshot: json("context_snapshot").$type<Record<string, unknown>>(),
+  gateSnapshot: json("gate_snapshot").$type<Record<string, unknown>>(),
+  rankingSnapshot: json("ranking_snapshot").$type<Record<string, unknown>>(),
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  versionUnique: uniqueIndex("aperture_decision_revisions_version_uq").on(table.decisionRunId, table.version),
+  byDecisionCreated: index("aperture_decision_revisions_decision_created_idx").on(table.decisionRunId, table.createdAt),
+}));
+export type ApertureDecisionRevision = typeof apertureDecisionRevisions.$inferSelect;
+
+/** Horizon-aware review queue. It prompts a human; it never exits a position. */
+export const aperturePendingOutcomes = mysqlTable("aperture_pending_outcomes", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  decisionRunId: int("decision_run_id").notNull(),
+  revisionId: int("revision_id").notNull(),
+  orderId: int("order_id"),
+  kind: mysqlEnum("kind", ["gate_review", "play_outcome"]).notNull(),
+  status: mysqlEnum("status", ["pending", "due", "resolved", "cancelled"]).default("pending").notNull(),
+  dueAt: bigint("due_at", { mode: "number" }).notNull(),
+  gateKey: varchar("gate_key", { length: 96 }),
+  reviewBasis: text("review_basis").notNull(),
+  result: json("result").$type<Record<string, unknown>>(),
+  resolvedAt: bigint("resolved_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  orderKindUnique: uniqueIndex("aperture_pending_outcomes_order_kind_uq").on(table.orderId, table.kind),
+  byOwnerDue: index("aperture_pending_outcomes_owner_due_idx").on(table.userId, table.status, table.dueAt),
+}));
+
 export const apertureCandidates = mysqlTable("aperture_candidates", {
   id: int("id").autoincrement().primaryKey(),
   runId: int("run_id").notNull(),
@@ -1635,6 +1725,9 @@ export const brokerOrders = mysqlTable("broker_orders", {
   candidateId: int("candidate_id"),
   accountId: int("account_id").notNull(),
   userId: int("user_id").notNull(),
+  /** Exact Decision Run binding for proposals created from the Runway. */
+  decisionRunId: int("decision_run_id"),
+  decisionRevisionId: int("decision_revision_id"),
   symbol: varchar("symbol", { length: 24 }).notNull(),
   side: mysqlEnum("side", ["buy", "sell"]).notNull(),
   /** Whether the order opens exposure or closes it. `side` alone cannot say:
@@ -1653,6 +1746,10 @@ export const brokerOrders = mysqlTable("broker_orders", {
   ]).default("pending_approval").notNull(),
   /** Broker-assigned order ID, set after submission. */
   brokerOrderId: varchar("broker_order_id", { length: 128 }),
+  /** Stable idempotency key persisted before dispatch for ambiguous-response recovery. */
+  clientOrderId: varchar("client_order_id", { length: 64 }),
+  /** Transport failure that requires reconciliation; it is not a broker rejection. */
+  dispatchError: text("dispatch_error"),
   /** Fill details, mirrored from the broker after the order settles. */
   filledQty: float("filled_qty"),
   filledAvgPriceCents: bigint("filled_avg_price_cents", { mode: "number" }),

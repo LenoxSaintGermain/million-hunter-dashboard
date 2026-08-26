@@ -80,6 +80,9 @@ export function manualBroker(accountId: number): BrokerAdapter {
     async getOrder(): Promise<OrderResult | null> {
       return null;
     },
+    async getOrderByClientOrderId(): Promise<OrderResult | null> {
+      return null;
+    },
   };
 }
 
@@ -244,6 +247,7 @@ export const alpacaPaperBroker: BrokerAdapter = {
       type: order.type,
       time_in_force: order.timeInForce,
     };
+    if (order.clientOrderId) body.client_order_id = order.clientOrderId;
     if (order.qty != null) body.qty = String(order.qty);
     else if (order.notionalCents != null) body.notional = String(order.notionalCents / 100);
     else throw new BrokerUnavailableError("an order needs either qty or notionalCents");
@@ -288,6 +292,16 @@ export const alpacaPaperBroker: BrokerAdapter = {
     );
     return data ? toOrderResult(data) : null;
   },
+
+  async getOrderByClientOrderId(clientOrderId: string): Promise<OrderResult | null> {
+    if (!clientOrderId) return null;
+    const res = await fetch(`${ALPACA_PAPER_BASE}/orders:by_client_order_id?client_order_id=${encodeURIComponent(clientOrderId)}`, {
+      headers: alpacaHeaders(),
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new BrokerUnavailableError(`Alpaca Paper order reconciliation returned HTTP ${res.status}.`);
+    return toOrderResult(await res.json());
+  },
 };
 
 // ── Robinhood (declared, not usable server-side) ─────────────────────────────
@@ -322,6 +336,9 @@ export const robinhoodMcpBroker: BrokerAdapter = {
     throw new BrokerUnavailableError(robinhoodMcpBroker.unavailableReason()!);
   },
   async getOrder(): Promise<OrderResult | null> {
+    throw new BrokerUnavailableError(robinhoodMcpBroker.unavailableReason()!);
+  },
+  async getOrderByClientOrderId(): Promise<OrderResult | null> {
     throw new BrokerUnavailableError(robinhoodMcpBroker.unavailableReason()!);
   },
 };

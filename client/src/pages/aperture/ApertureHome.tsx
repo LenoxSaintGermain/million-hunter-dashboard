@@ -142,8 +142,6 @@ export default function ApertureHome() {
   const { data: runs, refetch: refetchRuns } = trpc.aperture.run.list.useQuery();
   const { data: providers } = trpc.aperture.providers.useQuery();
   const { data: dailyPlays } = trpc.aperture.play.list.useQuery();
-  const { data: runwayState } = trpc.aperture.runway.latest.useQuery();
-  const attachRunwayRun = trpc.aperture.runway.attachRun.useMutation();
 
   useEffect(() => {
     if (selectedAccountId || !accounts?.length) return;
@@ -155,9 +153,6 @@ export default function ApertureHome() {
 
   const startRun = trpc.aperture.run.start.useMutation({
     onSuccess: ({ runId }) => {
-      if (runwayState?.latest?.id && runwayState.latest.branch !== "cash") {
-        attachRunwayRun.mutate({ stateId: runwayState.latest.id, runId });
-      }
       toast.success("Run started — polling for results");
       refetchRuns();
       navigate(`/aperture/run/${runId}`);
@@ -247,7 +242,7 @@ export default function ApertureHome() {
   };
 
   if (!showResearchSetup) {
-    return <DashboardLayout><DecisionRunway onNewResearch={() => { setShowResearchSetup(true); navigate("/aperture?setup=1"); }} onOpenRun={(runId, candidateId, view) => {
+    return <DashboardLayout><DecisionRunway onNewResearch={() => { setShowResearchSetup(true); navigate("/aperture?setup=1"); }} onOpenResearchRun={(runId) => navigate(`/aperture/run/${runId}`)} onOpenRun={(runId, candidateId, view) => {
       if (view === "execute") navigate(`/aperture/run/${runId}/execute?candidate=${candidateId}`);
       else navigate(`/aperture/run/${runId}?view=${view ?? "play"}`);
     }} /></DashboardLayout>;
@@ -265,16 +260,16 @@ export default function ApertureHome() {
           </div>
           <h2 className="font-serif text-3xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Turn one market belief into a clear paper research brief.</h2>
           <p className="mt-3 text-sm leading-6" style={{ color: "var(--sh-text-secondary)" }}>
-            Choose what you want to investigate. Aperture prepares the research map, checks your paper safeguards, and shows the next decision—without sending an order.
+            Choose what you want to investigate. This advanced path is research-only: it prepares evidence but cannot create a paper proposal. Start from Capital Mission when you want an exact decision receipt and a guarded proposal path.
           </p>
         </header>
 
         <Card className="overflow-hidden border-amber-500/25 bg-amber-500/[0.035]">
           <CardContent className="grid gap-4 p-4 sm:grid-cols-[1.1fr_1fr] sm:items-center">
             <div>
-              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-amber-700">New operator · the happy path</p>
-              <p className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Ask one question. Watch the evidence arrive. Decide with a human in the loop.</p>
-              <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Use this workspace to test a dated catalyst, identify a portfolio gap, or challenge overlap in a paper portfolio. It does not propose or submit a live trade.</p>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-amber-700">Advanced research-only setup</p>
+              <p className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Ask one research question and inspect the evidence.</p>
+              <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Use this workspace to test a dated catalyst, identify a portfolio gap, or challenge overlap. Runs created here remain research-only and cannot prepare a paper proposal.</p>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs">
               {[

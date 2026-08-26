@@ -45,6 +45,8 @@ export interface BrokerPosition {
 }
 
 export interface OrderRequest {
+  /** Stable idempotency/reconciliation key generated before broker dispatch. */
+  clientOrderId?: string;
   symbol: string;
   side: "buy" | "sell";
   /** Whole or fractional shares. Exactly one of qty / notionalCents. */
@@ -84,6 +86,8 @@ export interface BrokerAdapter {
   getOrders(opts?: { limit?: number }): Promise<OrderResult[]>;
   /** One order by broker id. Null when the broker has no record of it. */
   getOrder(brokerOrderId: string): Promise<OrderResult | null>;
+  /** One order by our stable client id, used after an ambiguous dispatch. */
+  getOrderByClientOrderId(clientOrderId: string): Promise<OrderResult | null>;
 }
 
 /** The single gate every adapter routes order submission through. */

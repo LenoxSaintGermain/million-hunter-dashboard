@@ -24,7 +24,7 @@
 import { eq, and, inArray, gte } from "drizzle-orm";
 import { getDb } from "../db";
 import {
-  brokerOrders, positionSnapshots, portfolioAccounts, positions as positionsTable,
+  apertureDecisionRuns, brokerOrders, positionSnapshots, portfolioAccounts, positions as positionsTable,
   type BrokerOrder,
 } from "../../drizzle/schema";
 import { brokerFor } from "./brokers/index";
@@ -43,6 +43,13 @@ import {
   type OrderAccountState,
 } from "./gates";
 import { CURRENT_MANDATE, effectiveMandate, type HoldingPeriod, type Mandate } from "./mandate";
+import {
+  authorizeDecisionAction,
+  DecisionRunwayBlockedError,
+  queuePaperOutcome,
+  type DecisionAuthorizationSnapshot,
+  type PaperDecisionAction,
+} from "./decisionRunway";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -101,6 +108,26 @@ export class OrderGateError extends Error {
   }
 }
 
+/**
+ * Serialize an order transition with the authoritative Decision Run head.
+ * Cash/conditional revisions update the same row, so the first committed lock
+ * defines whether the paper action or the blocking decision happened first.
+ */
+async function lockCurrentDecisionRevision(tx: any, authorization: DecisionAuthorizationSnapshot | null) {
+  if (authorization?.source !== "authoritative" || authorization.decisionRunId == null || authorization.revisionId == null) return;
+  const [head] = await tx.select({ currentRevisionId: apertureDecisionRuns.currentRevisionId })
+    .from(apertureDecisionRuns)
+    .where(eq(apertureDecisionRuns.id, authorization.decisionRunId))
+    .for("update")
+    .limit(1);
+  if (!head || head.currentRevisionId !== authorization.revisionId) {
+    throw new DecisionRunwayBlockedError(
+      "Decision Runway changed before this action could be recorded. Review the current cash or conditional receipt.",
+      "DECISION_BINDING_MISMATCH",
+    );
+  }
+}
+
 // ── Gate evaluation (shared by create and preflight) ──────────────────────────
 
 /**
@@ -126,9 +153,11 @@ export interface OrderEvaluation {
   timeInForce: "day" | "gtc";
   now: number;
   account: { id: number; isPaper: boolean; equityValueCents: number | null; cashCents: number | null };
+  /** Exact authoritative binding when the proposal originated in Decision Runway. */
+  decisionAuthorization: DecisionAuthorizationSnapshot | null;
 }
 
-async function evaluateOrder(input: CreateOrderInput): Promise<OrderEvaluation> {
+async function evaluateOrder(input: CreateOrderInput, action: Extract<PaperDecisionAction, "preflight" | "create_proposal">): Promise<OrderEvaluation> {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
 
@@ -161,6 +190,14 @@ async function evaluateOrder(input: CreateOrderInput): Promise<OrderEvaluation> 
     qty: input.qty,
   });
 
+  const decisionAuthorization = await authorizeDecisionAction({
+    action,
+    userId: input.userId,
+    runId: input.runId,
+    accountId: input.accountId,
+    intent: resolvedIntent.intent,
+  });
+
   const evaluation = evaluateOrderGates({
     input: {
       symbol,
@@ -191,7 +228,7 @@ async function evaluateOrder(input: CreateOrderInput): Promise<OrderEvaluation> 
   return {
     evaluation, resolvedIntent, session, mandate, accountState,
     gatedNotionalCents, notionalBasis,
-    symbol, orderType, timeInForce, now, account,
+    symbol, orderType, timeInForce, now, account, decisionAuthorization,
   };
 }
 
@@ -201,7 +238,7 @@ async function evaluateOrder(input: CreateOrderInput): Promise<OrderEvaluation> 
  * createOrder's evaluation, by construction.
  */
 export async function preflightOrder(input: CreateOrderInput): Promise<OrderEvaluation> {
-  return evaluateOrder(input);
+  return evaluateOrder(input, "preflight");
 }
 
 // ── Create (gate → pending_approval) ──────────────────────────────────────────
@@ -211,8 +248,8 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
   if (!db) throw new Error("database unavailable");
 
   const {
-    evaluation, resolvedIntent, session, gatedNotionalCents, symbol, orderType, timeInForce, now,
-  } = await evaluateOrder(input);
+    evaluation, resolvedIntent, session, gatedNotionalCents, symbol, orderType, timeInForce, now, decisionAuthorization,
+  } = await evaluateOrder(input, "create_proposal");
 
   const holdingPeriod = isStoredHoldingPeriod(input.holdingPeriod) ? input.holdingPeriod : null;
   // Same helper the planned-loss gates decide on, so the number persisted on the
@@ -224,6 +261,8 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
     candidateId: input.candidateId ?? null,
     accountId: input.accountId,
     userId: input.userId,
+    decisionRunId: decisionAuthorization?.decisionRunId ?? null,
+    decisionRevisionId: decisionAuthorization?.revisionId ?? null,
     symbol,
     side: input.side,
     intent: resolvedIntent.intent,
@@ -264,12 +303,15 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
     throw new OrderGateError(evaluation, ((blocked as any)?.insertId as number) ?? null);
   }
 
-  const [result] = await db.insert(brokerOrders).values({
-    ...base,
-    status: "pending_approval",
-    paperAckAt: now,
+  return db.transaction(async (tx) => {
+    await lockCurrentDecisionRevision(tx, decisionAuthorization);
+    const [result] = await tx.insert(brokerOrders).values({
+      ...base,
+      status: "pending_approval",
+      paperAckAt: now,
+    });
+    return (result as any).insertId as number;
   });
-  return (result as any).insertId as number;
 }
 
 const STORED_HOLDING_PERIODS = ["intraday", "overnight", "swing", "catalyst_window"] as const;
@@ -427,8 +469,21 @@ export async function approveOrder(orderId: number, userId: number): Promise<Bro
   if (order.status !== "pending_approval") throw new Error(`cannot approve an order in status ${order.status}`);
 
   const now = Date.now();
-  await db.update(brokerOrders).set({ status: "approved", approvedAt: now, updatedAt: now })
-    .where(eq(brokerOrders.id, orderId));
+  await db.transaction(async (tx) => {
+    const authorization = await authorizeDecisionAction({
+      action: "approve",
+      userId,
+      runId: order.runId,
+      accountId: order.accountId,
+      intent: order.intent,
+      decisionRunId: order.decisionRunId,
+      decisionRevisionId: order.decisionRevisionId,
+    });
+    await lockCurrentDecisionRevision(tx, authorization);
+    const update = await tx.update(brokerOrders).set({ status: "approved", approvedAt: now, updatedAt: now })
+      .where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.status, "pending_approval")));
+    if (!update[0].affectedRows) throw new Error("order changed before approval could be recorded");
+  });
   return { ...order, status: "approved", approvedAt: now, updatedAt: now };
 }
 
@@ -471,6 +526,16 @@ export async function submitOrder(orderId: number, userId: number): Promise<Brok
   if (!order) throw new Error("order not found");
   if (order.status !== "approved") throw new Error(`order must be approved before submission (current: ${order.status})`);
 
+  const decisionAuthorization = await authorizeDecisionAction({
+    action: "submit",
+    userId,
+    runId: order.runId,
+    accountId: order.accountId,
+    intent: order.intent,
+    decisionRunId: order.decisionRunId,
+    decisionRevisionId: order.decisionRevisionId,
+  });
+
   // Load the account to get the broker rail and isPaper flag
   const acctRows = await db.select().from(portfolioAccounts)
     .where(eq(portfolioAccounts.id, order.accountId)).limit(1);
@@ -483,11 +548,20 @@ export async function submitOrder(orderId: number, userId: number): Promise<Brok
   }
 
   const now = Date.now();
-  // Mark as submitted before the broker call — if we crash, the record shows intent
-  await db.update(brokerOrders).set({ status: "submitted", submittedAt: now, updatedAt: now })
-    .where(eq(brokerOrders.id, orderId));
+  const clientOrderId = order.clientOrderId ?? `sh-paper-${order.id}`;
+  // Mark as submitted at the serialized authorization point, before the broker
+  // call. Cash recorded first blocks this transition. Until the broker response
+  // persists an external order id (or a rejection), this row is also the durable
+  // dispatch lease that prevents a new Decision Run revision from overtaking it.
+  await db.transaction(async (tx) => {
+    await lockCurrentDecisionRevision(tx, decisionAuthorization);
+    const update = await tx.update(brokerOrders).set({ status: "submitted", clientOrderId, dispatchError: null, submittedAt: now, updatedAt: now })
+      .where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.status, "approved")));
+    if (!update[0].affectedRows) throw new Error("order changed before submission could be authorized");
+  });
 
   const req: OrderRequest = {
+    clientOrderId,
     symbol: order.symbol,
     side: order.side,
     qty: order.qty ?? undefined,
@@ -501,13 +575,15 @@ export async function submitOrder(orderId: number, userId: number): Promise<Brok
   try {
     result = await broker.submitOrder(req, { isPaper: account.isPaper });
   } catch (e: any) {
-    // Submission failed — record the rejection
+    // Transport failures are ambiguous: Alpaca may have accepted the stable
+    // client order id before the response was lost. Keep the dispatch lease
+    // until mirrorFills reconciles that id; never invite an unsafe resubmit.
     await db.update(brokerOrders).set({
-      status: "rejected",
-      rejectionReason: e?.message ?? String(e),
+      status: "submitted",
+      dispatchError: e?.message ?? String(e),
       updatedAt: Date.now(),
     }).where(eq(brokerOrders.id, orderId));
-    throw e;
+    throw new Error("Paper dispatch outcome is unknown. The order remains locked for broker reconciliation; do not resubmit it.");
   }
 
   // Update with broker result
@@ -516,6 +592,7 @@ export async function submitOrder(orderId: number, userId: number): Promise<Brok
   const updates: Partial<BrokerOrder> = {
     status: newStatus as any,
     brokerOrderId: result.brokerOrderId || null,
+    dispatchError: null,
     filledQty: result.filledQty ?? null,
     filledAvgPriceCents: result.filledAvgPriceCents ?? null,
     updatedAt: Date.now(),
@@ -523,6 +600,17 @@ export async function submitOrder(orderId: number, userId: number): Promise<Brok
   if (newStatus === "filled") updates.filledAt = Date.now();
 
   await db.update(brokerOrders).set(updates).where(eq(brokerOrders.id, orderId));
+
+  if (decisionAuthorization?.source === "authoritative" && decisionAuthorization.decisionRunId != null && decisionAuthorization.revisionId != null) {
+    await queuePaperOutcome({
+      userId,
+      decisionRunId: decisionAuthorization.decisionRunId,
+      revisionId: decisionAuthorization.revisionId,
+      orderId,
+      holdingPeriod: isStoredHoldingPeriod(order.holdingPeriod) ? order.holdingPeriod : null,
+      catalystDeadlineAt: order.catalystDeadlineAt,
+    });
+  }
 
   // If filled immediately, write a position snapshot
   if (newStatus === "filled" && result.filledQty && result.filledAvgPriceCents) {
@@ -551,7 +639,6 @@ export async function mirrorFills(userId: number): Promise<number> {
 
   let updated = 0;
   for (const order of pending) {
-    if (!order.brokerOrderId) continue;
     const acctRows = await db.select().from(portfolioAccounts)
       .where(eq(portfolioAccounts.id, order.accountId)).limit(1);
     const account = acctRows[0];
@@ -561,15 +648,21 @@ export async function mirrorFills(userId: number): Promise<number> {
     if (!broker.available()) continue;
 
     try {
-      const result = await broker.getOrder(order.brokerOrderId);
+      const result = order.brokerOrderId
+        ? await broker.getOrder(order.brokerOrderId)
+        : order.clientOrderId
+          ? await broker.getOrderByClientOrderId(order.clientOrderId)
+          : null;
       if (!result) continue;
-      if (result.status === order.status) continue; // no change
 
       const newStatus = result.status === "filled" ? "filled" :
         result.status === "rejected" ? "rejected" : "submitted";
+      if (newStatus === order.status && (result.brokerOrderId || null) === order.brokerOrderId && !order.dispatchError) continue;
       const now = Date.now();
       await db.update(brokerOrders).set({
         status: newStatus as any,
+        brokerOrderId: result.brokerOrderId || order.brokerOrderId,
+        dispatchError: null,
         filledQty: result.filledQty ?? order.filledQty,
         filledAvgPriceCents: result.filledAvgPriceCents ?? order.filledAvgPriceCents,
         filledAt: newStatus === "filled" ? now : order.filledAt,

@@ -155,6 +155,9 @@ function OrderQueue({ runId }: { runId: number }) {
               {o.rejectionReason && (
                 <p className="text-xs mt-1" style={{ color: "var(--sh-red)" }}>Reason: {o.rejectionReason}</p>
               )}
+              {o.dispatchError && (
+                <p className="mt-2 rounded border px-3 py-2 text-xs leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 45%, var(--sh-border-1))", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Broker response unresolved.</strong> The stable paper-order ID is being reconciled. Do not submit another order or change this mission disposition yet.</p>
+              )}
             </CardContent>
           </Card>
         ))}
