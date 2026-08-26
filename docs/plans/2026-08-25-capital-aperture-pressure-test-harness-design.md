@@ -82,6 +82,10 @@ The set includes three eligible, four conditional, and three no-trade outcomes. 
 - Disclosure record count must not hide deduplicated actor count.
 - Options research must not invent contracts or substitute shares when entitlement is missing.
 - A no-thesis path preserves capital, horizon, and loss inputs while the operator builds the thesis in place.
+- The selected mission is durable run state, not display copy. If the operator selects cash, the Play Slate, workset focus, arithmetic, primary action, stage rail, and outcome must all switch to the no-trade branch.
+- A generic stage question must never compete with the operator's actual capital mission. Use the compact stage label as orientation and reserve the large question treatment for the mission itself.
+- Currency inputs remain editable but render grouped values such as `$250,000`, `$300,000`, and `$12,500`; replacement input must not append to the prior formatted value.
+- The Mission Library may rank an outcome the fixture did not initially lead with. The downstream flow must use the effective operator-selected disposition while preserving all system-computed gates.
 
 ## Validation
 

@@ -42,6 +42,7 @@ import {
 type VariantKey = "A" | "B" | "C";
 type OutcomeChoice = "thesis_held" | "mixed" | "invalidated" | null;
 type ThesisEntryMode = "assigned" | "new";
+type MissionDisposition = "deploy" | "cash";
 
 type MissionPreset = {
   id: "research" | "common" | "mandate" | "cash";
@@ -174,14 +175,14 @@ function missionPresetsFor(scenario: PressureTestScenario, mission: CapitalMissi
   return presets.sort((a, b) => b.score - a.score);
 }
 
-function deriveMissionMath(mission: CapitalMission, scenario: PressureTestScenario): MissionMath {
+function deriveMissionMath(mission: CapitalMission, scenario: PressureTestScenario, result: ScenarioResult): MissionMath {
   const capital = Math.max(0, mission.capital || 0);
   const target = Math.max(0, mission.target || 0);
   const maxLoss = Math.max(0, mission.maxLoss || 0);
   const lead = scenario.plays[0];
   const notionalPerUnit = Math.max(0.01, lead?.notionalPerUnit ?? 1);
   const riskPerUnit = Math.max(0.01, lead?.riskPerUnit ?? maxLoss);
-  const units = scenario.result === "no_trade" ? 0 : Math.max(0, Math.min(Math.floor(capital / notionalPerUnit), Math.floor(maxLoss / riskPerUnit)));
+  const units = result === "no_trade" ? 0 : Math.max(0, Math.min(Math.floor(capital / notionalPerUnit), Math.floor(maxLoss / riskPerUnit)));
   const notional = units * notionalPerUnit;
   const plannedLoss = units * riskPerUnit;
   const gainAtOneFiveR = plannedLoss * 1.5;
@@ -318,6 +319,18 @@ function StatusPill({ children, tone = "amber" }: { children: React.ReactNode; t
   return <span className="ap-status" data-tone={tone}>{children}</span>;
 }
 
+function CurrencyInput({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+  const rendered = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+  return <input
+    aria-label={label}
+    type="text"
+    inputMode="numeric"
+    value={rendered}
+    onFocus={(event) => event.currentTarget.select()}
+    onChange={(event) => onChange(Math.max(0, Number(event.target.value.replace(/[^0-9]/g, "")) || 0))}
+  />;
+}
+
 function AnimatedPromptEditor({ mission, scenario, onChange }: { mission: CapitalMission; scenario: PressureTestScenario; onChange: (value: CapitalMission) => void }) {
   const [animatedText, setAnimatedText] = useState("");
   const [phraseIndex, setPhraseIndex] = useState(0);
@@ -392,7 +405,7 @@ function AnimatedPromptEditor({ mission, scenario, onChange }: { mission: Capita
   );
 }
 
-function MissionBuilder({ mission, scenario, thesisMode, onChange, onChangeMode }: { mission: CapitalMission; scenario: PressureTestScenario; thesisMode: ThesisEntryMode; onChange: (value: CapitalMission) => void; onChangeMode: (mode: ThesisEntryMode) => void }) {
+function MissionBuilder({ mission, scenario, thesisMode, onChange, onChangeMode, onDisposition }: { mission: CapitalMission; scenario: PressureTestScenario; thesisMode: ThesisEntryMode; onChange: (value: CapitalMission) => void; onChangeMode: (mode: ThesisEntryMode) => void; onDisposition: (value: MissionDisposition) => void }) {
   const [preferences, setPreferences] = useState<RunPreferences>(DEFAULT_RUN_PREFERENCES);
   const [tuning, setTuning] = useState(false);
   const presets = useMemo(() => missionPresetsFor(scenario, mission, preferences), [scenario, mission.capital, mission.target, mission.maxLoss, mission.horizon, preferences]);
@@ -403,7 +416,7 @@ function MissionBuilder({ mission, scenario, thesisMode, onChange, onChangeMode 
     setSelectedPreset(missionPresetsFor(scenario, mission, DEFAULT_RUN_PREFERENCES).find((preset) => preset.mission.prompt === mission.prompt)?.id ?? "common");
     setTuning(false);
   }, [scenario.id]);
-  const setNumber = (key: "capital" | "target" | "maxLoss", value: string) => onChange({ ...mission, [key]: Math.max(0, Number(value) || 0) });
+  const setNumber = (key: "capital" | "target" | "maxLoss", value: number) => onChange({ ...mission, [key]: value });
   const hasAssignedThesis = Boolean(scenario.thesisTitle);
   const sourceAction = () => {
     if (hasAssignedThesis) return onChangeMode(thesisMode === "assigned" ? "new" : "assigned");
@@ -412,6 +425,7 @@ function MissionBuilder({ mission, scenario, thesisMode, onChange, onChangeMode 
   const choosePreset = (id: MissionPreset["id"]) => {
     const preset = presets.find((item) => item.id === id) ?? presets[0];
     setSelectedPreset(preset.id);
+    onDisposition(preset.id === "cash" ? "cash" : "deploy");
     onChange({ ...preset.mission, thesis: mission.thesis });
   };
   const updatePreference = (key: keyof RunPreferences, value: string) => {
@@ -420,6 +434,7 @@ function MissionBuilder({ mission, scenario, thesisMode, onChange, onChangeMode 
     const top = nextPresets[0];
     setPreferences(next);
     setSelectedPreset(top.id);
+    onDisposition(top.id === "cash" ? "cash" : "deploy");
     onChange({ ...top.mission, thesis: mission.thesis });
   };
   return (
@@ -448,10 +463,10 @@ function MissionBuilder({ mission, scenario, thesisMode, onChange, onChangeMode 
       <AnimatedPromptEditor mission={mission} scenario={scenario} onChange={onChange} />
       <p className="ap-lede">This is the thesis builder. {thesisMode === "assigned" ? "Review or edit the loaded thesis for this run" : "Build the thesis directly here"}; Aperture compiles it into a small paper-play slate without promising the requested return.</p>
       <div className="ap-mission-statement">
-        <label><span>Capital available</span><div className="ap-money-input"><b>$</b><input aria-label="Capital available" type="number" min="0" step="500" value={mission.capital} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setNumber("capital", event.target.value)} /></div><small>Available for this mission</small></label>
-        <label><span>Desired ending value</span><div className="ap-money-input"><b>$</b><input aria-label="Desired ending value" type="number" min="0" step="500" value={mission.target} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setNumber("target", event.target.value)} /></div><small>Aspiration · not forecast</small></label>
+        <label><span>Capital available</span><div className="ap-money-input"><b>$</b><CurrencyInput label="Capital available" value={mission.capital} onChange={(value) => setNumber("capital", value)} /></div><small>Available for this mission</small></label>
+        <label><span>Desired ending value</span><div className="ap-money-input"><b>$</b><CurrencyInput label="Desired ending value" value={mission.target} onChange={(value) => setNumber("target", value)} /></div><small>Aspiration · not forecast</small></label>
         <label><span>Time boundary</span><select aria-label="Time boundary" value={mission.horizon} onChange={(event) => onChange({ ...mission, horizon: event.target.value as HorizonKey })}>{Object.entries(HORIZONS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select><small>{HORIZONS[mission.horizon].detail}</small></label>
-        <label><span>Maximum planned loss</span><div className="ap-money-input"><b>$</b><input aria-label="Maximum planned loss" type="number" min="0" step="25" value={mission.maxLoss} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setNumber("maxLoss", event.target.value)} /></div><small>Hard paper ceiling</small></label>
+        <label><span>Maximum planned loss</span><div className="ap-money-input"><b>$</b><CurrencyInput label="Maximum planned loss" value={mission.maxLoss} onChange={(value) => setNumber("maxLoss", value)} /></div><small>Hard paper ceiling</small></label>
       </div>
       <label className="ap-thesis-expression-editor">
         <Sparkles size={16} />
@@ -462,21 +477,23 @@ function MissionBuilder({ mission, scenario, thesisMode, onChange, onChangeMode 
   );
 }
 
-function PlayEvidence({ scenario, onInspect }: { scenario: PressureTestScenario; onInspect: () => void }) {
+function PlayEvidence({ scenario, result, onInspect }: { scenario: PressureTestScenario; result: ScenarioResult; onInspect: () => void }) {
   return (
     <div className="ap-evidence-anchors">
-      {scenario.requiredNow.slice(0, 3).map((item, index) => <button key={item} onClick={onInspect}>{index === 2 ? <ShieldCheck size={16} /> : <CheckCircle2 size={16} />}<span><strong>{["Decision evidence", "Current gate", "Risk boundary"][index]}</strong>{item}</span><small>{scenario.result === "eligible" ? "verified" : scenario.result === "conditional" ? "review" : "blocked"}</small></button>)}
+      {scenario.requiredNow.slice(0, 3).map((item, index) => <button key={item} onClick={onInspect}>{index === 2 ? <ShieldCheck size={16} /> : <CheckCircle2 size={16} />}<span><strong>{["Decision evidence", "Current gate", "Risk boundary"][index]}</strong>{item}</span><small>{result === "eligible" ? "verified" : result === "conditional" ? "review" : "blocked"}</small></button>)}
     </div>
   );
 }
 
-function StageContent({ step, scenario, mission, setMission, thesisMode, setThesisMode, missionMath, acknowledgement, setAcknowledgement, outcome, setOutcome, outcomeReady, onInspect }: {
+function StageContent({ step, scenario, result, mission, setMission, thesisMode, setThesisMode, setMissionDisposition, missionMath, acknowledgement, setAcknowledgement, outcome, setOutcome, outcomeReady, onInspect }: {
   step: number;
   scenario: PressureTestScenario;
+  result: ScenarioResult;
   mission: CapitalMission;
   setMission: (value: CapitalMission) => void;
   thesisMode: ThesisEntryMode;
   setThesisMode: (value: ThesisEntryMode) => void;
+  setMissionDisposition: (value: MissionDisposition) => void;
   missionMath: MissionMath;
   acknowledgement: string;
   setAcknowledgement: (value: string) => void;
@@ -494,30 +511,36 @@ function StageContent({ step, scenario, mission, setMission, thesisMode, setThes
   if (step === 0) return (
     <div className="ap-stage-content">
       <StatusPill tone="ink">{horizon.label} · {horizon.detail}</StatusPill>
-      <MissionBuilder mission={mission} scenario={scenario} thesisMode={thesisMode} onChange={setMission} onChangeMode={changeThesisMode} />
-      <div className="ap-target-boundary"><AlertTriangle size={17} /><div><strong>The target requires a {missionMath.requiredReturn.toFixed(0)}% return inside this horizon.</strong><span>Aperture will rank qualifying plays, but it will explicitly say when no credible setup reaches the target inside the loss ceiling.</span></div></div>
+      <MissionBuilder mission={mission} scenario={scenario} thesisMode={thesisMode} onChange={setMission} onChangeMode={changeThesisMode} onDisposition={setMissionDisposition} />
+      <div className={`ap-target-boundary${missionMath.requiredReturn <= 0 ? " is-neutral" : ""}`}>
+        {missionMath.requiredReturn <= 0 ? <ShieldCheck size={17} /> : <AlertTriangle size={17} />}
+        <div>
+          <strong>{missionMath.requiredReturn <= 0 ? "This mission preserves capital until a setup qualifies." : `The target requires a ${missionMath.requiredReturn.toFixed(0)}% return inside this horizon.`}</strong>
+          <span>{missionMath.requiredReturn <= 0 ? "No return target is being inferred; cash remains an explicit decision." : "Aperture will rank qualifying plays, but it will explicitly say when no credible setup reaches the target inside the loss ceiling."}</span>
+        </div>
+      </div>
     </div>
   );
 
   if (step === 1) return (
     <div className="ap-stage-content">
-      <StatusPill tone={scenario.result === "eligible" ? "green" : scenario.result === "conditional" ? "amber" : "clay"}>{scenario.result === "eligible" ? "Play slate ready" : scenario.result === "conditional" ? "Condition review" : "No qualifying play"}</StatusPill>
-      <h2>{scenario.universe.researched} candidates became {scenario.result === "no_trade" ? "one capital decision" : `${scenario.plays.length + 1} operator choices`}.</h2>
+      <StatusPill tone={result === "eligible" ? "green" : result === "conditional" ? "amber" : "clay"}>{result === "eligible" ? "Play slate ready" : result === "conditional" ? "Condition review" : "Cash selected"}</StatusPill>
+      <h2>{scenario.universe.researched} candidates became {result === "no_trade" ? "one capital decision" : `${scenario.plays.length + 1} operator choices`}.</h2>
       <p className="ap-lede">The operator reviews decision-distinct plays, not every ticker. Correlated names, failed triggers and weaker expressions are parked with explicit reasons.</p>
       <div className="ap-research-stats">
         <div><strong>{scenario.universe.researched}</strong><span>researched</span></div>
         <div><strong>{scenario.universe.cleared}</strong><span>cleared hard gates</span></div>
-        <div><strong>{scenario.result === "no_trade" ? "cash" : `${scenario.plays.length} + cash`}</strong><span>operator choices</span></div>
+        <div><strong>{result === "no_trade" ? "cash" : `${scenario.plays.length} + cash`}</strong><span>operator choices</span></div>
         <div><strong>{scenario.universe.parked}</strong><span>parked with reasons</span></div>
       </div>
-      {scenario.result === "no_trade" ? (
+      {result === "no_trade" ? (
         <>
           <div className="ap-control-decision"><ShieldCheck size={20} /><div><span className="ap-mono-label">PRIMARY OUTCOME</span><strong>Preserve cash</strong><p>{scenario.summary}</p></div><StatusPill tone="clay">no trade</StatusPill></div>
           <div className="ap-blocked-candidates">{scenario.plays.map((play) => <button key={`${play.symbol}-${play.title}`} onClick={onInspect}><span><strong>{play.symbol} · {play.title}</strong><small>{play.evidenceLabel}</small></span><StatusPill tone="clay">blocked</StatusPill></button>)}</div>
         </>
       ) : (
         <div className="ap-play-slate">
-          {scenario.plays.map((play, index) => <button key={`${play.symbol}-${play.title}`} className={index === 0 ? "is-top" : undefined}><span className="ap-mono-label">{index === 0 ? (scenario.result === "conditional" ? "LEADING CONDITION" : "TOP PLAY") : "ALTERNATIVE"}</span><strong>{play.symbol} · {play.title}</strong><p>{play.playType} · {formatCurrency(play.plannedLoss)} planned loss</p><small>{play.evidenceLabel}</small></button>)}
+          {scenario.plays.map((play, index) => <button key={`${play.symbol}-${play.title}`} className={index === 0 ? "is-top" : undefined}><span className="ap-mono-label">{index === 0 ? (result === "conditional" ? "LEADING CONDITION" : "TOP PLAY") : "ALTERNATIVE"}</span><strong>{play.symbol} · {play.title}</strong><p>{play.playType} · {formatCurrency(play.plannedLoss)} planned loss</p><small>{play.evidenceLabel}</small></button>)}
           <button><span className="ap-mono-label">CONTROL</span><strong>Preserve cash</strong><p>Deploy $0 · planned loss $0</p><small>{scenario.noTradeCondition}</small></button>
         </div>
       )}
@@ -527,33 +550,33 @@ function StageContent({ step, scenario, mission, setMission, thesisMode, setThes
 
   if (step === 2) return (
     <div className="ap-stage-content">
-      <StatusPill tone={scenario.result === "eligible" ? "green" : scenario.result === "conditional" ? "amber" : "clay"}>{scenario.result === "eligible" ? "Top qualifying play" : scenario.result === "conditional" ? "Best available condition" : "No-trade decision"}</StatusPill>
-      <h2>{scenario.result === "no_trade" ? `Preserve cash—${scenario.blockingGate}` : `${scenario.plays[0].symbol} ${scenario.result === "eligible" ? "is the best available deployment" : "leads, but is not ready"}—without pretending it turns ${formatCurrency(mission.capital)} into ${formatCurrency(mission.target)}.`}</h2>
+      <StatusPill tone={result === "eligible" ? "green" : result === "conditional" ? "amber" : "clay"}>{result === "eligible" ? "Top qualifying play" : result === "conditional" ? "Best available condition" : "Cash decision"}</StatusPill>
+      <h2>{result === "no_trade" ? `Preserve cash—${scenario.blockingGate}` : `${scenario.plays[0].symbol} ${result === "eligible" ? "is the best available deployment" : "leads, but is not ready"}—without treating ${formatCurrency(mission.target)} as a promised outcome.`}</h2>
       <p className="ap-lede">{scenario.summary} Deep evidence remains optional; the decisive gate is visible here.</p>
-      {scenario.result !== "no_trade" && <div className="ap-payoff-strip">
+      {result !== "no_trade" && <div className="ap-payoff-strip">
         <div><span>Deploy</span><strong>{formatCurrency(missionMath.notional)}</strong><small>{formatCurrency(missionMath.cash)} remains cash</small></div>
         <div><span>Planned loss</span><strong>−{formatCurrency(missionMath.plannedLoss)}</strong><small>{formatCurrency(mission.maxLoss)} hard ceiling</small></div>
         <div><span>1.5R mission value</span><strong>{formatCurrency(missionMath.endingAtOneFiveR)}</strong><small>+{formatCurrency(missionMath.gainAtOneFiveR)} modeled gain</small></div>
         <div><span>2.5R mission value</span><strong>{formatCurrency(missionMath.endingAtTwoFiveR)}</strong><small>+{formatCurrency(missionMath.gainAtTwoFiveR)} modeled gain</small></div>
       </div>}
-      <div className="ap-target-boundary is-neutral"><Target size={17} /><div><strong>{scenario.result === "no_trade" ? scenario.blockingGate : targetGap > 0 ? `The 2.5R model remains ${formatCurrency(targetGap)} below the requested ending value.` : "The modeled range reaches the aspiration, but it is not a forecast."}</strong><span>{scenario.result === "no_trade" ? scenario.noTradeCondition : targetGap > 0 ? "Closing that gap would require violating the stated loss ceiling or inventing unsupported probability." : "The outcome still depends on the named trigger, stop and evidence remaining valid."}</span></div></div>
-      <PlayEvidence scenario={scenario} onInspect={onInspect} />
+      <div className="ap-target-boundary is-neutral"><Target size={17} /><div><strong>{result === "no_trade" ? scenario.blockingGate : targetGap > 0 ? `The 2.5R model remains ${formatCurrency(targetGap)} below the requested ending value.` : "The modeled range reaches the aspiration, but it is not a forecast."}</strong><span>{result === "no_trade" ? scenario.noTradeCondition : targetGap > 0 ? "Closing that gap would require violating the stated loss ceiling or inventing unsupported probability." : "The outcome still depends on the named trigger, stop and evidence remaining valid."}</span></div></div>
+      <PlayEvidence scenario={scenario} result={result} onInspect={onInspect} />
       <button className="ap-analysis-fork" onClick={onInspect}><FileSearch size={17} /><span><strong>Want to inspect the logic?</strong>Open the analysis, opposing evidence, calculations and 12 source records.</span><PanelRightOpen size={16} /></button>
     </div>
   );
 
   if (step === 3) return (
     <div className="ap-stage-content">
-      <StatusPill tone={scenario.result === "eligible" ? "green" : "amber"}>{scenario.result === "eligible" ? "Plan eligible" : "Plan held"}</StatusPill>
+      <StatusPill tone={result === "eligible" ? "green" : "amber"}>{result === "eligible" ? "Plan eligible" : "Plan held"}</StatusPill>
       <h2>{scenario.plays[0].symbol} · {scenario.plays[0].title}</h2>
-      <p className="ap-lede">{scenario.result === "eligible" ? "The operator can reach this plan directly from the trusted summary." : `This plan remains visible for review, but cannot advance: ${scenario.blockingGate}`} Assumptions and provenance remain optional depth.</p>
+      <p className="ap-lede">{result === "eligible" ? "The operator can reach this plan directly from the trusted summary." : `This plan remains visible for review, but cannot advance: ${scenario.blockingGate}`} Assumptions and provenance remain optional depth.</p>
       <div className="ap-plan-hero">
         <div><span>Entry condition</span><strong>{scenario.plays[0].playType}</strong><small>{scenario.plays[0].entry}</small></div>
         <div><span>Invalidation</span><strong>{scenario.plays[0].evidenceState}</strong><small>{scenario.plays[0].stop}</small></div>
         <div><span>Paper size</span><strong>{missionMath.units} {scenario.plays[0].unitLabel}</strong><small>{formatCurrency(missionMath.notional)} notional</small></div>
         <div><span>Planned loss</span><strong>{formatCurrency(missionMath.plannedLoss)}</strong><small>{formatCurrency(mission.maxLoss)} ceiling</small></div>
       </div>
-      <div className="ap-mandate-line"><ShieldCheck size={17} /><div><strong>{scenario.result === "eligible" ? "All required gates source-backed" : "Approval remains unavailable"}</strong><span>{scenario.result === "eligible" ? "Thesis fit · liquidity · horizon · loss ceiling · invalidation" : scenario.blockingGate}</span></div><button onClick={onInspect}>Inspect evidence</button></div>
+      <div className="ap-mandate-line"><ShieldCheck size={17} /><div><strong>{result === "eligible" ? "All required gates source-backed" : "Approval remains unavailable"}</strong><span>{result === "eligible" ? "Thesis fit · liquidity · horizon · loss ceiling · invalidation" : scenario.blockingGate}</span></div><button onClick={onInspect}>Inspect evidence</button></div>
       <div className="ap-stop-line"><Target size={17} /><div><strong>Refusal condition</strong><span>{scenario.noTradeCondition}</span></div></div>
     </div>
   );
@@ -591,7 +614,7 @@ function StageContent({ step, scenario, mission, setMission, thesisMode, setThes
     </div>
   );
 
-  if (scenario.result === "no_trade") return (
+  if (result === "no_trade") return (
     <div className="ap-stage-content">
       <StatusPill tone="green">No-trade record ready</StatusPill>
       <h2>Cash preserved. The workflow still produced a decision.</h2>
@@ -601,7 +624,7 @@ function StageContent({ step, scenario, mission, setMission, thesisMode, setThes
     </div>
   );
 
-  if (scenario.result === "conditional") return (
+  if (result === "conditional") return (
     <div className="ap-stage-content">
       <StatusPill tone="amber">Pending condition</StatusPill>
       <h2>Queue the gate—not a premature approval.</h2>
@@ -649,15 +672,15 @@ function StageContent({ step, scenario, mission, setMission, thesisMode, setThes
   );
 }
 
-function Inspector({ step, scenario, missionMath, onClose }: { step: number; scenario: PressureTestScenario; missionMath: MissionMath; onClose?: () => void }) {
+function Inspector({ step, scenario, result, missionMath, onClose }: { step: number; scenario: PressureTestScenario; result: ScenarioResult; missionMath: MissionMath; onClose?: () => void }) {
   const items = [
     ["Mission compiler", "Aperture separates the operator’s desired ending value from the evidence-backed outcome range and treats the edited loss value as a hard ceiling."],
-    ["Universe compression", `${scenario.universe.researched} researched candidates became ${scenario.result === "no_trade" ? "one cash decision" : `${scenario.plays.length} modeled expressions plus cash`}. ${scenario.universe.parked} remain parked with reasons.`],
+    ["Universe compression", `${scenario.universe.researched} researched candidates became ${result === "no_trade" ? "one cash decision" : `${scenario.plays.length} modeled expressions plus cash`}. ${scenario.universe.parked} remain parked with reasons.`],
     ["Full decision logic", scenario.summary],
     ["Modeled arithmetic", `${missionMath.units} ${scenario.plays[0].unitLabel} represent ${formatCurrency(missionMath.notional, 2)} notional and ${formatCurrency(missionMath.plannedLoss, 2)} planned loss. These are fixture calculations, not quotes.`],
-    ["Approval boundary", scenario.result === "eligible" ? "Paper Plan v1 is bound to Top Play v1. No live brokerage action is represented." : `Approval is unavailable while this fixture remains ${scenario.result.replace("_", " ")}.`],
+    ["Approval boundary", result === "eligible" ? "Paper Plan v1 is bound to Top Play v1. No live brokerage action is represented." : `Approval is unavailable while this run remains ${result.replace("_", " ")}.`],
     ["Monitoring scope", `Only the trigger, invalidation and time boundary matter: ${scenario.plays[0].timeBoundary}.`],
-    ["Outcome queue", scenario.result === "eligible" ? "The approved study waits until its declared horizon." : "The held or no-trade decision skips brokerage approval and keeps its blocker attached."],
+    ["Outcome queue", result === "eligible" ? "The approved study waits until its declared horizon." : "The held or no-trade decision skips brokerage approval and keeps its blocker attached."],
   ][step];
   return (
     <aside className="ap-inspector" aria-label="Context inspector">
@@ -672,19 +695,19 @@ function Inspector({ step, scenario, missionMath, onClose }: { step: number; sce
   );
 }
 
-function PrimaryAction({ step, scenario, mission, acknowledgement, outcome, outcomeReady, onAdvance, onBack }: {
-  step: number; scenario: PressureTestScenario; mission: CapitalMission; acknowledgement: string; outcome: OutcomeChoice; outcomeReady: boolean; onAdvance: () => void; onBack: () => void;
+function PrimaryAction({ step, scenario, result, mission, acknowledgement, outcome, outcomeReady, onAdvance, onBack }: {
+  step: number; scenario: PressureTestScenario; result: ScenarioResult; mission: CapitalMission; acknowledgement: string; outcome: OutcomeChoice; outcomeReady: boolean; onAdvance: () => void; onBack: () => void;
 }) {
   const eligibleLabels = ["Compile capital thesis", "Open the top play", "Review paper plan", "Review paper approval", "Approve for paper tracking", "Queue outcome review", outcomeReady ? "Save outcome & restart" : "Prototype: simulate review time"];
   const conditionalLabels: Record<number, string> = { 0: "Compile capital thesis", 1: "Open the leading condition", 2: "Review held paper plan", 3: "Queue gate review", 6: "Restart scenario" };
   const noTradeLabels: Record<number, string> = { 0: "Compile capital thesis", 1: "Review the cash decision", 2: "Record no-trade", 6: "Restart scenario" };
-  const label = scenario.result === "eligible" ? eligibleLabels[step] : scenario.result === "conditional" ? conditionalLabels[step] : noTradeLabels[step];
-  const disabled = (step === 0 && (!mission.prompt.trim() || !mission.thesis.trim())) || (scenario.result === "eligible" && step === 4 && acknowledgement !== "PAPER") || (scenario.result === "eligible" && step === 6 && outcomeReady && !outcome);
+  const label = result === "eligible" ? eligibleLabels[step] : result === "conditional" ? conditionalLabels[step] : noTradeLabels[step];
+  const disabled = (step === 0 && (!mission.prompt.trim() || !mission.thesis.trim())) || (result === "eligible" && step === 4 && acknowledgement !== "PAPER") || (result === "eligible" && step === 6 && outcomeReady && !outcome);
   const eligibleHints = [
     "Captures a target and risk boundary; it does not promise a return.", "Opens one play, not 57 candidate reviews.", "Deep analysis is optional because required gates pass.",
     "No proposal is submitted.", "Creates a fixture-only approval receipt.", "Schedules the review at the declared horizon.", outcomeReady ? "The local fixture resets after closure." : "Production users leave and return; this advances the local fixture.",
   ];
-  const hint = scenario.result === "eligible" ? eligibleHints[step] : step === 0 ? "Compile the mission without inventing a thesis or promised return." : step === 6 ? "The fixture resets; no order or database record is created." : scenario.result === "conditional" ? "The unresolved gate stays visible and approval remains unavailable." : "Cash is recorded as an intentional, controlled outcome.";
+  const hint = result === "eligible" ? eligibleHints[step] : step === 0 ? "Compile the mission without inventing a thesis or promised return." : step === 6 ? "The fixture resets; no order or database record is created." : result === "conditional" ? "The unresolved gate stays visible and approval remains unavailable." : "Cash is recorded as an intentional, controlled outcome.";
   return (
     <footer className="ap-action-dock">
       <div><span className="ap-mono-label">NEXT GUARDED ACTION</span><p>{hint}</p></div>
@@ -700,6 +723,9 @@ type VariantProps = {
   step: number;
   setStep: (step: number) => void;
   scenario: PressureTestScenario;
+  result: ScenarioResult;
+  missionDisposition: MissionDisposition;
+  setMissionDisposition: (value: MissionDisposition) => void;
   mission: CapitalMission;
   setMission: (value: CapitalMission) => void;
   thesisMode: ThesisEntryMode;
@@ -718,21 +744,21 @@ type VariantProps = {
 };
 
 function CurrentStage(props: VariantProps) {
-  return <StageContent step={props.step} scenario={props.scenario} mission={props.mission} setMission={props.setMission} thesisMode={props.thesisMode} setThesisMode={props.setThesisMode} missionMath={props.missionMath} acknowledgement={props.acknowledgement} setAcknowledgement={props.setAcknowledgement} outcome={props.outcome} setOutcome={props.setOutcome} outcomeReady={props.outcomeReady} onInspect={() => props.setInspectorOpen(true)} />;
+  return <StageContent step={props.step} scenario={props.scenario} result={props.result} mission={props.mission} setMission={props.setMission} thesisMode={props.thesisMode} setThesisMode={props.setThesisMode} setMissionDisposition={props.setMissionDisposition} missionMath={props.missionMath} acknowledgement={props.acknowledgement} setAcknowledgement={props.setAcknowledgement} outcome={props.outcome} setOutcome={props.setOutcome} outcomeReady={props.outcomeReady} onInspect={() => props.setInspectorOpen(true)} />;
 }
 
 function VariantA(props: VariantProps) {
   return (
     <main className="ap-variant ap-variant-runway">
       <ContextBar scenario={props.scenario} thesisMode={props.thesisMode} onInspector={() => props.setInspectorOpen(true)} />
-      <StageRail current={props.step} result={props.scenario.result} onSelect={props.setStep} />
+      <StageRail current={props.step} result={props.result} onSelect={props.setStep} />
       <div className="ap-runway-layout" data-inspector={props.inspectorOpen}>
         <article className="ap-decision-packet">
           <header className="ap-packet-header"><div><span className="ap-mono-label">{STAGES[props.step].eyebrow}</span><h1>{STAGES[props.step].label}</h1></div><span className="ap-version">VERSION {props.step < 2 ? 1 : 4}</span></header>
           <CurrentStage {...props} />
           <PrimaryAction {...props} />
         </article>
-        {props.inspectorOpen && <Inspector step={props.step} scenario={props.scenario} missionMath={props.missionMath} onClose={() => props.setInspectorOpen(false)} />}
+        {props.inspectorOpen && <Inspector step={props.step} scenario={props.scenario} result={props.result} missionMath={props.missionMath} onClose={() => props.setInspectorOpen(false)} />}
       </div>
     </main>
   );
@@ -745,17 +771,17 @@ function VariantB(props: VariantProps) {
       <div className="ap-desk-grid">
         <aside className="ap-workset">
           <header><span className="ap-mono-label">ACTIVE WORKSET</span><button aria-label="Search candidates"><Search size={15} /></button></header>
-          {props.scenario.plays.map((play, index) => <button key={`${play.symbol}-${play.title}`} data-active={index === 0}><span className="ap-workset-symbol">{play.symbol}</span><small data-tone={play.evidenceState === "verified" ? "amber" : play.evidenceState === "blocked" ? "clay" : "muted"}>{play.evidenceState}</small></button>)}
-          <button><span className="ap-workset-symbol">CASH</span><small data-tone="muted">control</small></button>
+          {props.scenario.plays.map((play, index) => <button key={`${play.symbol}-${play.title}`} data-active={props.missionDisposition !== "cash" && index === 0}><span className="ap-workset-symbol">{play.symbol}</span><small data-tone={play.evidenceState === "verified" ? "amber" : play.evidenceState === "blocked" ? "clay" : "muted"}>{play.evidenceState}</small></button>)}
+          <button data-active={props.missionDisposition === "cash"}><span className="ap-workset-symbol">CASH</span><small data-tone="muted">control</small></button>
           <button className="ap-view-all">Open grouped universe</button>
         </aside>
         <article className="ap-desk-canvas">
-          <StageRail current={props.step} result={props.scenario.result} onSelect={props.setStep} />
-          <header className="ap-packet-header"><div><span className="ap-mono-label">{STAGES[props.step].eyebrow}</span><h1>{STAGES[props.step].question}</h1></div><span className="ap-version">{props.scenario.plays[0].symbol}</span></header>
+          <StageRail current={props.step} result={props.result} onSelect={props.setStep} />
+          <header className="ap-packet-header ap-packet-header-compact"><div><span className="ap-mono-label">{STAGES[props.step].eyebrow}</span><h1>{STAGES[props.step].label}</h1></div><span className="ap-version">{props.missionDisposition === "cash" ? "CASH" : props.scenario.plays[0].symbol}</span></header>
           <CurrentStage {...props} />
           <PrimaryAction {...props} />
         </article>
-        <Inspector step={props.step} scenario={props.scenario} missionMath={props.missionMath} />
+        <Inspector step={props.step} scenario={props.scenario} result={props.result} missionMath={props.missionMath} />
       </div>
     </main>
   );
@@ -769,13 +795,13 @@ function VariantC(props: VariantProps) {
         <aside className="ap-artifact-stack">
           <span className="ap-mono-label">APERTURE CASE FILE</span>
           <h2>{props.scenario.thesisTitle ?? "Thesis builder"}</h2>
-          <ol>{stageIndexesFor(props.scenario.result).map((index, position) => { const stage = STAGES[index]; const currentPosition = stageIndexesFor(props.scenario.result).indexOf(props.step); return <li key={stage.id} data-state={position < currentPosition ? "complete" : position === currentPosition ? "current" : "future"}><button disabled={position > currentPosition} onClick={() => props.setStep(index)}><span>{position < currentPosition ? <Check size={13} /> : position + 1}</span><div><strong>{stage.label}</strong><small>{position < currentPosition ? "receipt saved" : position === currentPosition ? "open now" : "locked"}</small></div></button></li>; })}</ol>
+          <ol>{stageIndexesFor(props.result).map((index, position) => { const stage = STAGES[index]; const currentPosition = stageIndexesFor(props.result).indexOf(props.step); return <li key={stage.id} data-state={position < currentPosition ? "complete" : position === currentPosition ? "current" : "future"}><button disabled={position > currentPosition} onClick={() => props.setStep(index)}><span>{position < currentPosition ? <Check size={13} /> : position + 1}</span><div><strong>{stage.label}</strong><small>{position < currentPosition ? "receipt saved" : position === currentPosition ? "open now" : "locked"}</small></div></button></li>; })}</ol>
           <button className="ap-context-capsule" onClick={() => props.setInspectorOpen(!props.inspectorOpen)}><Landmark size={16} /><span><strong>Context capsule</strong><small>Account, mandate, provenance</small></span><PanelRightOpen size={15} /></button>
         </aside>
         <article className="ap-case-document">
-          <header className="ap-document-header"><div><span className="ap-mono-label">{STAGES[props.step].eyebrow}</span><h1>{STAGES[props.step].label}</h1><p>{STAGES[props.step].question}</p></div><div className="ap-document-stamp">PAPER ONLY<br /><small>VERSION {props.step < 2 ? 1 : 4}</small></div></header>
+          <header className="ap-document-header"><div><span className="ap-mono-label">{STAGES[props.step].eyebrow}</span><h1>{STAGES[props.step].label}</h1></div><div className="ap-document-stamp">PAPER ONLY<br /><small>VERSION {props.step < 2 ? 1 : 4}</small></div></header>
           <CurrentStage {...props} />
-          {props.inspectorOpen && <Inspector step={props.step} scenario={props.scenario} missionMath={props.missionMath} onClose={() => props.setInspectorOpen(false)} />}
+          {props.inspectorOpen && <Inspector step={props.step} scenario={props.scenario} result={props.result} missionMath={props.missionMath} onClose={() => props.setInspectorOpen(false)} />}
           <PrimaryAction {...props} />
         </article>
       </div>
@@ -818,24 +844,26 @@ export function ApertureRunwayPrototype() {
   const [outcome, setOutcome] = useState<OutcomeChoice>(null);
   const [outcomeReady, setOutcomeReady] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const missionMath = useMemo(() => deriveMissionMath(mission, scenario), [mission, scenario]);
+  const [missionDisposition, setMissionDisposition] = useState<MissionDisposition>("deploy");
+  const result: ScenarioResult = missionDisposition === "cash" ? "no_trade" : scenario.result;
+  const missionMath = useMemo(() => deriveMissionMath(mission, scenario, result), [mission, scenario, result]);
 
   const updateVariant = (next: VariantKey) => { setVariant(next); setVariantInUrl(next); };
-  const resetScenario = (next: PressureTestScenario) => { const mode = next.thesisTitle ? "assigned" : "new"; setStep(0); setMission(missionForScenario(next, mode)); setThesisMode(mode); setAcknowledgement(""); setOutcome(null); setOutcomeReady(false); setInspectorOpen(false); };
+  const resetScenario = (next: PressureTestScenario) => { const mode = next.thesisTitle ? "assigned" : "new"; setStep(0); setMission(missionForScenario(next, mode)); setThesisMode(mode); setMissionDisposition("deploy"); setAcknowledgement(""); setOutcome(null); setOutcomeReady(false); setInspectorOpen(false); };
   const updateScenario = (next: PressureTestScenario) => { setScenario(next); setScenarioInUrl(next); resetScenario(next); };
   const restart = () => resetScenario(scenario);
   const onAdvance = () => {
-    const activeIndexes = stageIndexesFor(scenario.result);
+    const activeIndexes = stageIndexesFor(result);
     const position = activeIndexes.indexOf(step);
     if (position === activeIndexes.length - 1) {
-      if (scenario.result === "eligible" && !outcomeReady) return setOutcomeReady(true);
+      if (result === "eligible" && !outcomeReady) return setOutcomeReady(true);
       return restart();
     }
     setInspectorOpen(false);
     setStep(activeIndexes[position + 1]);
   };
-  const onBack = () => { const activeIndexes = stageIndexesFor(scenario.result); const position = activeIndexes.indexOf(step); setInspectorOpen(false); setStep(activeIndexes[Math.max(0, position - 1)]); };
-  const props = useMemo<VariantProps>(() => ({ step, setStep, scenario, mission, setMission, thesisMode, setThesisMode, missionMath, acknowledgement, setAcknowledgement, outcome, setOutcome, outcomeReady, setOutcomeReady, inspectorOpen, setInspectorOpen, onAdvance, onBack }), [step, scenario, mission, thesisMode, missionMath, acknowledgement, outcome, outcomeReady, inspectorOpen]);
+  const onBack = () => { const activeIndexes = stageIndexesFor(result); const position = activeIndexes.indexOf(step); setInspectorOpen(false); setStep(activeIndexes[Math.max(0, position - 1)]); };
+  const props = useMemo<VariantProps>(() => ({ step, setStep, scenario, result, missionDisposition, setMissionDisposition, mission, setMission, thesisMode, setThesisMode, missionMath, acknowledgement, setAcknowledgement, outcome, setOutcome, outcomeReady, setOutcomeReady, inspectorOpen, setInspectorOpen, onAdvance, onBack }), [step, scenario, result, missionDisposition, mission, thesisMode, missionMath, acknowledgement, outcome, outcomeReady, inspectorOpen]);
 
   return (
     <div className="ap-runway">
