@@ -8,7 +8,13 @@
 
 Keep scenario selection inside the dark local-prototype chrome, clearly labelled as a test-case control. It must never appear inside the operator runway or read as a customer preset feature. A scenario changes the full fixture, not only the mission fields. It controls the assigned-thesis state, capital mission, data freshness, warning, universe size, candidate plays, evidence state, binding gate, branch, and acceptance assertion.
 
+Separately, place a user-facing **Mission Library** beside the active thesis. This preserves the useful preset interaction without exposing test fixtures. Selecting a mission starter may prefill the question, capital, target, horizon, and paper-loss ceiling, but it must not replace account context, mutate the saved thesis, or create an order.
+
+Mission ranking must be contextual and explainable, not a static list. Rank a verified research-pattern match first when it aligns with the active thesis and clears its evidence gates. Otherwise rank actual user-history frequency, then account and mandate fit, then generic playbooks. Every ranked option must show why it appears where it does. Fixture-only prototypes may model common-playbook and account-fit signals, but must not claim real user history. Congressional or disclosure patterns appear only when primary-source, entity-confidence, lag, and collision gates qualify them.
+
 The capital mission is presentation-first. A populated mission renders as a readable question with an explicit **Edit mission** action. Editing opens a compact, normal-sized composer; it must not turn the question into an always-on oversized textarea.
+
+The framing pills remain visible beneath the readable question. They teach the operator to ask “Where can I…”, “How can I…”, or “What must…”, then open the compact editor with the selected frame prefilled.
 
 The harness remains local, deterministic, paper-only, and zero-API. Every fixture is illustrative or modelled. No fixture represents a current market claim, quote, recommendation, or promised return.
 

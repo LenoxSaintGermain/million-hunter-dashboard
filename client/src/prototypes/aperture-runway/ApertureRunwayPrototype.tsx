@@ -43,6 +43,14 @@ type VariantKey = "A" | "B" | "C";
 type OutcomeChoice = "thesis_held" | "mixed" | "invalidated" | null;
 type ThesisEntryMode = "assigned" | "new";
 
+type MissionPreset = {
+  id: "smart" | "mandate" | "cash";
+  label: string;
+  badge: string;
+  reason: string;
+  mission: CapitalMission;
+};
+
 type MissionMath = {
   requiredReturn: number;
   units: number;
@@ -91,6 +99,44 @@ function missionForScenario(scenario: PressureTestScenario, mode: ThesisEntryMod
   return mode === "assigned" && scenario.thesisTitle
     ? { ...scenario.mission }
     : { ...scenario.mission, thesis: scenario.thesisTitle ? "" : scenario.mission.thesis };
+}
+
+function missionPresetsFor(scenario: PressureTestScenario): MissionPreset[] {
+  const groupLabels: Record<PressureTestScenario["group"], string> = {
+    Intraday: "Thesis-aligned day trade",
+    Swing: "Catalyst swing",
+    Options: "Defined-risk options study",
+    Portfolio: "Portfolio-gap deployment",
+    Disclosure: "Disclosure-pattern follow-through",
+    Novice: "Guardrailed first paper play",
+  };
+  const researchAligned = scenario.group === "Disclosure";
+  const boundedTarget = scenario.mission.capital + (scenario.mission.maxLoss * 2.5);
+  return [
+    {
+      id: "smart",
+      label: groupLabels[scenario.group],
+      badge: researchAligned ? "research match" : "common playbook",
+      reason: researchAligned
+        ? "Ranked first because the active research fixture contains a thesis-aligned disclosure pattern. Production still requires verified sources and collision gates."
+        : `A common ${HORIZONS[scenario.mission.horizon].label.toLowerCase()} frame filtered by the active thesis, available capital, and the ${formatCurrency(scenario.mission.maxLoss)} paper-loss ceiling.`,
+      mission: { ...scenario.mission },
+    },
+    {
+      id: "mandate",
+      label: "Mandate-first deployment",
+      badge: "account fit",
+      reason: `Uses the fixture account size and loss ceiling, then bounds the modeled ending value at 2.5R instead of promising the requested return.`,
+      mission: { ...scenario.mission, prompt: scenario.promptStarters[1], target: Math.round(boundedTarget) },
+    },
+    {
+      id: "cash",
+      label: "Cash until the setup qualifies",
+      badge: "risk check",
+      reason: `Starts from the binding gate—${scenario.blockingGate}—and keeps no-trade visible as a valid answer.`,
+      mission: { ...scenario.mission, prompt: scenario.promptStarters[2], target: scenario.mission.capital },
+    },
+  ];
 }
 
 function deriveMissionMath(mission: CapitalMission, scenario: PressureTestScenario): MissionMath {
@@ -294,28 +340,54 @@ function AnimatedPromptEditor({ mission, scenario, onChange }: { mission: Capita
           </div>
         </div>
       ) : (
-        <div className="ap-mission-question">
-          <div><span className="ap-mono-label">CAPITAL MISSION</span><h2>{mission.prompt || <>{animatedText}<i /></>}</h2></div>
-          <button type="button" onClick={() => setEditing(true)}>Edit mission</button>
-        </div>
+        <>
+          <div className="ap-mission-question">
+            <div><span className="ap-mono-label">CAPITAL MISSION</span><h2>{mission.prompt || <>{animatedText}<i /></>}</h2></div>
+            <button type="button" onClick={() => setEditing(true)}>Edit mission</button>
+          </div>
+          <div className="ap-prompt-starters" aria-label="Capital mission starters">
+            <span>Frame it as</span>
+            <button type="button" onClick={() => chooseStarter(0)}>Where can I…</button>
+            <button type="button" onClick={() => chooseStarter(1)}>How can I…</button>
+            <button type="button" onClick={() => chooseStarter(2)}>What must…</button>
+          </div>
+        </>
       )}
     </div>
   );
 }
 
 function MissionBuilder({ mission, scenario, thesisMode, onChange, onChangeMode }: { mission: CapitalMission; scenario: PressureTestScenario; thesisMode: ThesisEntryMode; onChange: (value: CapitalMission) => void; onChangeMode: (mode: ThesisEntryMode) => void }) {
+  const presets = useMemo(() => missionPresetsFor(scenario), [scenario]);
+  const [selectedPreset, setSelectedPreset] = useState<MissionPreset["id"]>("smart");
+  const activePreset = presets.find((preset) => preset.id === selectedPreset) ?? presets[0];
+  useEffect(() => setSelectedPreset("smart"), [scenario.id]);
   const setNumber = (key: "capital" | "target" | "maxLoss", value: string) => onChange({ ...mission, [key]: Math.max(0, Number(value) || 0) });
   const hasAssignedThesis = Boolean(scenario.thesisTitle);
   const sourceAction = () => {
     if (hasAssignedThesis) return onChangeMode(thesisMode === "assigned" ? "new" : "assigned");
     onChange({ ...mission, thesis: mission.thesis ? "" : scenario.draftThesis ?? "" });
   };
+  const choosePreset = (id: MissionPreset["id"]) => {
+    const preset = presets.find((item) => item.id === id) ?? presets[0];
+    setSelectedPreset(preset.id);
+    onChange({ ...preset.mission, thesis: mission.thesis });
+  };
   return (
     <>
-      <div className="ap-thesis-source" data-mode={thesisMode}>
-        <div className="ap-thesis-source-icon">{thesisMode === "assigned" ? <BookOpen size={17} /> : <Sparkles size={17} />}</div>
-        <div><span className="ap-mono-label">{thesisMode === "assigned" ? "ASSIGNED THESIS LOADED" : "NO THESIS ASSIGNED"}</span><strong>{thesisMode === "assigned" ? scenario.thesisTitle : "Build a thesis in this surface"}</strong><p>{thesisMode === "assigned" ? "Thesis, horizon and mandate defaults were prefilled. Edits create a run-specific version; the saved thesis remains unchanged." : "The capital, loss and horizon remain intact while the thesis is built here. No separate intake is required."}</p></div>
-        <button type="button" onClick={sourceAction}>{hasAssignedThesis ? (thesisMode === "assigned" ? "Start a new thesis" : "Reload assigned thesis") : (mission.thesis ? "Clear fixture draft" : "Use fixture draft")}</button>
+      <div className="ap-thesis-start-row">
+        <div className="ap-thesis-source" data-mode={thesisMode}>
+          <div className="ap-thesis-source-icon">{thesisMode === "assigned" ? <BookOpen size={17} /> : <Sparkles size={17} />}</div>
+          <div><span className="ap-mono-label">{thesisMode === "assigned" ? "ASSIGNED THESIS LOADED" : "NO THESIS ASSIGNED"}</span><strong>{thesisMode === "assigned" ? scenario.thesisTitle : "Build a thesis in this surface"}</strong><p>{thesisMode === "assigned" ? "Run-specific edits leave the saved thesis unchanged." : "Build here without losing the capital mission."}</p></div>
+          <button type="button" onClick={sourceAction}>{hasAssignedThesis ? (thesisMode === "assigned" ? "New thesis" : "Reload thesis") : (mission.thesis ? "Clear draft" : "Use draft")}</button>
+        </div>
+        <label className="ap-mission-library">
+          <span className="ap-mono-label">MISSION LIBRARY · RANKED FOR THIS RUN</span>
+          <select aria-label="Choose a contextual capital mission" value={selectedPreset} onChange={(event) => choosePreset(event.target.value as MissionPreset["id"])}>
+            {presets.map((preset, index) => <option key={preset.id} value={preset.id}>{index + 1}. {preset.label}</option>)}
+          </select>
+          <div><span>{activePreset.badge}</span><p>{activePreset.reason}</p></div>
+        </label>
       </div>
       <AnimatedPromptEditor mission={mission} scenario={scenario} onChange={onChange} />
       <p className="ap-lede">This is the thesis builder. {thesisMode === "assigned" ? "Review or edit the loaded thesis for this run" : "Build the thesis directly here"}; Aperture compiles it into a small paper-play slate without promising the requested return.</p>
