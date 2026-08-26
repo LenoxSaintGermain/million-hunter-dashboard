@@ -154,7 +154,7 @@ function AppMark() {
   );
 }
 
-function PrototypeHeader({ onRestart }: { onRestart: () => void }) {
+function PrototypeHeader({ scenario, onSelectScenario, onRestart }: { scenario: PressureTestScenario; onSelectScenario: (scenario: PressureTestScenario) => void; onRestart: () => void }) {
   return (
     <>
       <header className="ap-global-header">
@@ -165,29 +165,28 @@ function PrototypeHeader({ onRestart }: { onRestart: () => void }) {
         <button className="ap-icon-button" onClick={onRestart} aria-label="Restart prototype"><RefreshCcw size={15} /></button>
       </header>
       <div className="ap-prototype-banner">
-        <span><Sparkles size={13} /> LOCAL PROTOTYPE</span>
-        Fixture-only interaction study · no API · no database · no order path
+        <div className="ap-prototype-banner-copy"><span><Sparkles size={13} /> LOCAL PROTOTYPE</span><small>Fixture-only interaction study · no API · no database · no order path</small></div>
+        <details className="ap-test-case-menu">
+          <summary><span>TEST CASE</span>{scenario.name}</summary>
+          <div className="ap-test-case-popover">
+            <span className="ap-mono-label">PROTOTYPE-ONLY PRESSURE TEST</span>
+            <strong>Switch the simulated operator and gate outcome</strong>
+            <label>
+              <span className="ap-sr-only">Pressure test scenario</span>
+              <select aria-label="Pressure test scenario" value={scenario.id} onChange={(event) => onSelectScenario(findApertureScenario(event.target.value))}>
+                {Array.from(new Set(APERTURE_PRESSURE_TEST_SCENARIOS.map((item) => item.group))).map((group) => (
+                  <optgroup key={group} label={group}>
+                    {APERTURE_PRESSURE_TEST_SCENARIOS.filter((item) => item.group === group).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            <div className="ap-scenario-meta"><span>{scenario.group}</span><span>{HORIZONS[scenario.mission.horizon].label}</span><span data-result={scenario.result}>{scenario.result.replace("_", " ")}</span></div>
+            <p>This control belongs to the test harness. It is not a customer preset or product navigation.</p>
+          </div>
+        </details>
       </div>
     </>
-  );
-}
-
-function ScenarioLab({ scenario, onSelect }: { scenario: PressureTestScenario; onSelect: (scenario: PressureTestScenario) => void }) {
-  return (
-    <section className="ap-scenario-lab" aria-label="Pressure test scenario">
-      <div><span className="ap-mono-label">PRESSURE TEST · 10 FIXTURES</span><strong>Switch the operator, thesis, horizon and gate outcome</strong></div>
-      <label>
-        <span className="ap-sr-only">Pressure test scenario</span>
-        <select aria-label="Pressure test scenario" value={scenario.id} onChange={(event) => onSelect(findApertureScenario(event.target.value))}>
-          {Array.from(new Set(APERTURE_PRESSURE_TEST_SCENARIOS.map((item) => item.group))).map((group) => (
-            <optgroup key={group} label={group}>
-              {APERTURE_PRESSURE_TEST_SCENARIOS.filter((item) => item.group === group).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </optgroup>
-          ))}
-        </select>
-      </label>
-      <div className="ap-scenario-meta"><span>{scenario.group}</span><span>{HORIZONS[scenario.mission.horizon].label}</span><span data-result={scenario.result}>{scenario.result.replace("_", " ")}</span></div>
-    </section>
   );
 }
 
@@ -242,11 +241,15 @@ function AnimatedPromptEditor({ mission, scenario, onChange }: { mission: Capita
   const [animatedText, setAnimatedText] = useState("");
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [deleting, setDeleting] = useState(false);
-  const [focused, setFocused] = useState(false);
+  const [editing, setEditing] = useState(false);
   const phrases = scenario.promptStarters;
 
   useEffect(() => {
-    if (mission.prompt || focused) return;
+    setEditing(false);
+  }, [scenario.id]);
+
+  useEffect(() => {
+    if (mission.prompt || editing) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reducedMotion) {
       setAnimatedText(phrases[0]);
@@ -267,31 +270,35 @@ function AnimatedPromptEditor({ mission, scenario, onChange }: { mission: Capita
       }
     }, !deleting && animatedText.length === phrase.length ? 1600 : delay);
     return () => window.clearTimeout(timer);
-  }, [animatedText, deleting, focused, mission.prompt, phraseIndex, phrases]);
+  }, [animatedText, deleting, editing, mission.prompt, phraseIndex, phrases]);
 
-  const chooseStarter = (index: number) => onChange({ ...mission, prompt: phrases[index] });
+  const chooseStarter = (index: number) => {
+    onChange({ ...mission, prompt: phrases[index] });
+    setEditing(true);
+  };
 
   return (
     <div className="ap-prompt-composer">
-      <label className="ap-prompt-editor" data-idle={!mission.prompt && !focused}>
-        <span className="ap-sr-only">Describe the capital mission</span>
-        <textarea
-          aria-label="Describe the capital mission"
-          value={mission.prompt}
-          rows={2}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onChange={(event) => onChange({ ...mission, prompt: event.target.value })}
-          placeholder={focused ? "Ask Aperture what you want this capital to do…" : ""}
-        />
-        {!mission.prompt && !focused && <span className="ap-animated-prompt" aria-hidden="true">{animatedText}<i /></span>}
-      </label>
-      <div className="ap-prompt-starters" aria-label="Capital mission starters">
-        <span>Start with</span>
-        <button type="button" onClick={() => chooseStarter(0)}>Where can I…</button>
-        <button type="button" onClick={() => chooseStarter(1)}>How can I…</button>
-        <button type="button" onClick={() => chooseStarter(2)}>What will…</button>
-      </div>
+      {editing ? (
+        <div className="ap-prompt-edit-panel">
+          <div className="ap-prompt-edit-heading"><div><span className="ap-mono-label">EDIT CAPITAL MISSION</span><strong>What do you want this capital to do?</strong></div><button type="button" disabled={!mission.prompt.trim()} onClick={() => setEditing(false)}><Check size={14} /> Done</button></div>
+          <label>
+            <span className="ap-sr-only">Describe the capital mission</span>
+            <textarea aria-label="Describe the capital mission" value={mission.prompt} rows={3} autoFocus onChange={(event) => onChange({ ...mission, prompt: event.target.value })} placeholder="Ask Aperture what you want this capital to do…" />
+          </label>
+          <div className="ap-prompt-starters" aria-label="Capital mission starters">
+            <span>Try a frame</span>
+            <button type="button" onClick={() => chooseStarter(0)}>Where can I…</button>
+            <button type="button" onClick={() => chooseStarter(1)}>How can I…</button>
+            <button type="button" onClick={() => chooseStarter(2)}>What must…</button>
+          </div>
+        </div>
+      ) : (
+        <div className="ap-mission-question">
+          <div><span className="ap-mono-label">CAPITAL MISSION</span><h2>{mission.prompt || <>{animatedText}<i /></>}</h2></div>
+          <button type="button" onClick={() => setEditing(true)}>Edit mission</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -704,8 +711,7 @@ export function ApertureRunwayPrototype() {
 
   return (
     <div className="ap-runway">
-      <PrototypeHeader onRestart={restart} />
-      <ScenarioLab scenario={scenario} onSelect={updateScenario} />
+      <PrototypeHeader scenario={scenario} onSelectScenario={updateScenario} onRestart={restart} />
       {variant === "A" ? <VariantA {...props} /> : variant === "B" ? <VariantB {...props} /> : <VariantC {...props} />}
       {import.meta.env.DEV && <PrototypeSwitcher variant={variant} setVariant={updateVariant} />}
     </div>

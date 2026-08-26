@@ -6,7 +6,9 @@
 
 ## Decision
 
-Use one compact scenario selector above the existing runway. A scenario changes the full fixture, not only the mission fields. It controls the assigned-thesis state, capital mission, data freshness, warning, universe size, candidate plays, evidence state, binding gate, branch, and acceptance assertion.
+Keep scenario selection inside the dark local-prototype chrome, clearly labelled as a test-case control. It must never appear inside the operator runway or read as a customer preset feature. A scenario changes the full fixture, not only the mission fields. It controls the assigned-thesis state, capital mission, data freshness, warning, universe size, candidate plays, evidence state, binding gate, branch, and acceptance assertion.
+
+The capital mission is presentation-first. A populated mission renders as a readable question with an explicit **Edit mission** action. Editing opens a compact, normal-sized composer; it must not turn the question into an always-on oversized textarea.
 
 The harness remains local, deterministic, paper-only, and zero-API. Every fixture is illustrative or modelled. No fixture represents a current market claim, quote, recommendation, or promised return.
 
