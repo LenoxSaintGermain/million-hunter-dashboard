@@ -12,6 +12,18 @@ Separately, place a user-facing **Mission Library** beside the active thesis. Th
 
 Mission ranking must be contextual and explainable, not a static list. Rank a verified research-pattern match first when it aligns with the active thesis and clears its evidence gates. Otherwise rank actual user-history frequency, then account and mandate fit, then generic playbooks. Every ranked option must show why it appears where it does. Fixture-only prototypes may model common-playbook and account-fit signals, but must not claim real user history. Congressional or disclosure patterns appear only when primary-source, entity-confidence, lag, and collision gates qualify them.
 
+The operator sets ranking inputs, never gate outcomes. A compact **Tune this run** control may set objective, instrument preference, and whether held research should remain visible. Capital, desired ending value, horizon, and loss ceiling remain editable in the mission. Hard gates—entitlement, freshness, liquidity, concentration, disclosure lag, collision, and evidence completeness—remain system-computed and cannot be overridden through the library.
+
+Without the pressure-test harness, ranking refreshes when any of these events occur:
+
+- Capital Aperture opens with an assigned thesis and current paper-account state;
+- the operator changes a mission or Tune-this-run input;
+- an account or mandate sync changes cash, exposure, entitlement, or ceilings;
+- a source-qualified research pattern clears or fails its evidence gates;
+- the assigned thesis or market-session state changes.
+
+Each refresh follows one visible loop: **operator inputs → rerank library → prefill selected mission → compute gates → eligible, held, or cash outcome**. The ranking receipt names which operator and system inputs moved the result.
+
 The capital mission is presentation-first. A populated mission renders as a readable question with an explicit **Edit mission** action. Editing opens a compact, normal-sized composer; it must not turn the question into an always-on oversized textarea.
 
 The framing pills remain visible beneath the readable question. They teach the operator to ask “Where can I…”, “How can I…”, or “What must…”, then open the compact editor with the selected frame prefilled.

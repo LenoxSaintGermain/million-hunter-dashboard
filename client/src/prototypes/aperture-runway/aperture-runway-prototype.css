@@ -102,11 +102,20 @@ button { color: inherit; }
 .ap-thesis-source > button { min-height: 34px; padding: 7px 10px; border: 1px solid var(--ap-rule-dark); background: transparent; font-size: 9px; font-weight: 600; cursor: pointer; }
 .ap-thesis-source > button:hover, .ap-thesis-source > button:focus-visible { border-color: var(--ap-amber); outline: 0; }
 .ap-mission-library { min-width: 0; min-height: 112px; padding: 14px; display: flex; flex-direction: column; border: 1px solid #ddb98f; background: #fff9ef; }
+.ap-mission-library-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ap-mission-library-heading > button { padding: 0; border: 0; background: transparent; color: var(--ap-amber); font-size: 8px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; white-space: nowrap; }
 .ap-mission-library select { width: 100%; min-height: 34px; margin-top: 6px; padding: 0 30px 0 8px; border: 1px solid var(--ap-rule-dark); border-radius: 0; background: var(--ap-paper); color: var(--ap-ink); font-size: 10px; font-weight: 600; cursor: pointer; }
 .ap-mission-library select:focus-visible { border-color: var(--ap-amber); outline: 2px solid rgba(190,100,24,.12); }
-.ap-mission-library > div { min-width: 0; margin-top: 8px; display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 8px; }
-.ap-mission-library > div > span { padding: 4px 5px; border: 1px solid var(--ap-amber); color: var(--ap-amber); font: 7px/1 "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.ap-mission-library > div:last-child { min-width: 0; margin-top: 8px; display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 8px; }
+.ap-mission-library > div:last-child > span { padding: 4px 5px; border: 1px solid var(--ap-amber); color: var(--ap-amber); font: 7px/1 "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
 .ap-mission-library p { margin: 0; color: var(--ap-muted); font-size: 8px; line-height: 1.45; }
+.ap-run-tuner { margin: -12px 0 18px; padding: 13px 14px; display: grid; grid-template-columns: minmax(180px, 1.2fr) repeat(3, minmax(120px, .75fr)); align-items: end; gap: 10px; border: 1px solid var(--ap-rule-dark); border-top: 0; background: var(--ap-paper-deep); }
+.ap-run-tuner > div strong { display: block; margin-top: 4px; font-size: 11px; }
+.ap-run-tuner > label > span { display: block; margin-bottom: 5px; color: var(--ap-muted); font-size: 8px; }
+.ap-run-tuner select { width: 100%; min-height: 34px; padding: 0 26px 0 8px; border: 1px solid var(--ap-rule-dark); border-radius: 0; background: var(--ap-paper); color: var(--ap-ink); font-size: 9px; }
+.ap-run-tuner select:focus-visible { border-color: var(--ap-amber); outline: 2px solid rgba(190,100,24,.12); }
+.ap-run-tuner > p { grid-column: 1 / -1; margin: 2px 0 0; padding-top: 9px; border-top: 1px solid var(--ap-rule); color: var(--ap-muted); font-size: 8px; line-height: 1.45; }
+.ap-run-tuner > p strong { color: var(--ap-ink); }
 .ap-prompt-composer { margin: 18px 0 12px; }
 .ap-mission-question { min-height: 118px; padding: 2px 0 16px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 20px; border-bottom: 1px solid var(--ap-rule-dark); }
 .ap-mission-question h2 { max-width: 850px; margin: 7px 0 0; font: 500 clamp(27px, 4vw, 42px)/1.06 "IBM Plex Serif", serif; letter-spacing: -.035em; }
@@ -357,6 +366,8 @@ button { color: inherit; }
   .ap-context-warning { border-top: 1px solid var(--ap-rule); }
   .ap-runway-layout[data-inspector="true"] { grid-template-columns: 1fr; }
   .ap-thesis-start-row { grid-template-columns: 1fr; }
+  .ap-run-tuner { margin-top: -12px; grid-template-columns: 1fr 1fr 1fr; }
+  .ap-run-tuner > div { grid-column: 1 / -1; }
   .ap-desk-grid { grid-template-columns: 160px minmax(0, 1fr); }
   .ap-desk-grid > .ap-inspector { grid-column: 1 / -1; border-left: 1px solid var(--ap-rule-dark); }
 }
@@ -385,6 +396,8 @@ button { color: inherit; }
   .ap-stage-content > h2 { font-size: 29px; }
   .ap-thesis-source { grid-template-columns: auto 1fr; align-items: start; }
   .ap-thesis-source > button { grid-column: 2; justify-self: start; }
+  .ap-run-tuner { grid-template-columns: 1fr; }
+  .ap-run-tuner > div, .ap-run-tuner > p { grid-column: auto; }
   .ap-mission-question { min-height: 0; grid-template-columns: 1fr; gap: 12px; }
   .ap-mission-question > button { justify-self: start; }
   .ap-prompt-starters { align-items: flex-start; flex-wrap: wrap; padding-top: 7px; }

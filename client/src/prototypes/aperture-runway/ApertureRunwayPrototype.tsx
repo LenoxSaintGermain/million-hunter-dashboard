@@ -44,11 +44,18 @@ type OutcomeChoice = "thesis_held" | "mixed" | "invalidated" | null;
 type ThesisEntryMode = "assigned" | "new";
 
 type MissionPreset = {
-  id: "smart" | "mandate" | "cash";
+  id: "research" | "common" | "mandate" | "cash";
   label: string;
   badge: string;
   reason: string;
+  score: number;
   mission: CapitalMission;
+};
+
+type RunPreferences = {
+  objective: "best_fit" | "intraday" | "swing" | "portfolio" | "disclosure";
+  instrument: "best_fit" | "shares" | "options";
+  eligibility: "approval_ready" | "include_held";
 };
 
 type MissionMath = {
@@ -101,7 +108,9 @@ function missionForScenario(scenario: PressureTestScenario, mode: ThesisEntryMod
     : { ...scenario.mission, thesis: scenario.thesisTitle ? "" : scenario.mission.thesis };
 }
 
-function missionPresetsFor(scenario: PressureTestScenario): MissionPreset[] {
+const DEFAULT_RUN_PREFERENCES: RunPreferences = { objective: "best_fit", instrument: "best_fit", eligibility: "include_held" };
+
+function missionPresetsFor(scenario: PressureTestScenario, mission: CapitalMission, preferences: RunPreferences): MissionPreset[] {
   const groupLabels: Record<PressureTestScenario["group"], string> = {
     Intraday: "Thesis-aligned day trade",
     Swing: "Catalyst swing",
@@ -110,33 +119,59 @@ function missionPresetsFor(scenario: PressureTestScenario): MissionPreset[] {
     Disclosure: "Disclosure-pattern follow-through",
     Novice: "Guardrailed first paper play",
   };
+  const objectiveGroup: Partial<Record<RunPreferences["objective"], PressureTestScenario["group"]>> = {
+    intraday: "Intraday",
+    swing: "Swing",
+    portfolio: "Portfolio",
+    disclosure: "Disclosure",
+  };
+  const requestedGroup = objectiveGroup[preferences.objective];
   const researchAligned = scenario.group === "Disclosure";
-  const boundedTarget = scenario.mission.capital + (scenario.mission.maxLoss * 2.5);
-  return [
+  const objectiveAligned = !requestedGroup || requestedGroup === scenario.group;
+  const leadType = scenario.plays[0]?.playType.toLowerCase() ?? "";
+  const instrumentAligned = preferences.instrument === "best_fit"
+    || (preferences.instrument === "options" && leadType.includes("option"))
+    || (preferences.instrument === "shares" && !leadType.includes("option"));
+  const heldPenalty = preferences.eligibility === "approval_ready" && scenario.result !== "eligible" ? 60 : 0;
+  const requiredReturn = mission.capital > 0 ? ((mission.target - mission.capital) / mission.capital) * 100 : 0;
+  const boundedTarget = mission.capital + (mission.maxLoss * 2.5);
+  const presets: MissionPreset[] = [
     {
-      id: "smart",
-      label: groupLabels[scenario.group],
-      badge: researchAligned ? "research match" : "common playbook",
+      id: "research",
+      label: researchAligned ? "Disclosure-pattern follow-through" : "Thesis-aligned research pattern",
+      badge: researchAligned ? "research match" : "no verified match",
       reason: researchAligned
         ? "Ranked first because the active research fixture contains a thesis-aligned disclosure pattern. Production still requires verified sources and collision gates."
-        : `A common ${HORIZONS[scenario.mission.horizon].label.toLowerCase()} frame filtered by the active thesis, available capital, and the ${formatCurrency(scenario.mission.maxLoss)} paper-loss ceiling.`,
-      mission: { ...scenario.mission },
+        : "No qualifying disclosure-pattern match is asserted in this fixture. This starter remains available for research, not approval.",
+      score: (researchAligned ? 95 : 20) + (preferences.objective === "disclosure" ? 12 : 0) - heldPenalty - (instrumentAligned ? 0 : 35),
+      mission: { ...mission, prompt: researchAligned ? scenario.mission.prompt : `What verified research pattern best aligns with this thesis inside my ${formatCurrency(mission.maxLoss)} loss ceiling?` },
+    },
+    {
+      id: "common",
+      label: groupLabels[scenario.group],
+      badge: "common playbook",
+      reason: `A common ${HORIZONS[mission.horizon].label.toLowerCase()} frame filtered by the active thesis, ${formatCurrency(mission.capital)} mission capital, and the ${formatCurrency(mission.maxLoss)} paper-loss ceiling.`,
+      score: 70 + (objectiveAligned ? 15 : -25) - heldPenalty - (instrumentAligned ? 0 : 35),
+      mission: { ...mission, prompt: scenario.mission.prompt },
     },
     {
       id: "mandate",
       label: "Mandate-first deployment",
       badge: "account fit",
       reason: `Uses the fixture account size and loss ceiling, then bounds the modeled ending value at 2.5R instead of promising the requested return.`,
-      mission: { ...scenario.mission, prompt: scenario.promptStarters[1], target: Math.round(boundedTarget) },
+      score: 62 + (instrumentAligned ? 8 : -20) + (preferences.eligibility === "approval_ready" ? 10 : 0),
+      mission: { ...mission, prompt: scenario.promptStarters[1], target: Math.round(boundedTarget) },
     },
     {
       id: "cash",
       label: "Cash until the setup qualifies",
       badge: "risk check",
       reason: `Starts from the binding gate—${scenario.blockingGate}—and keeps no-trade visible as a valid answer.`,
-      mission: { ...scenario.mission, prompt: scenario.promptStarters[2], target: scenario.mission.capital },
+      score: 45 + (scenario.result === "no_trade" ? 55 : scenario.result === "conditional" ? 25 : 0) + (requiredReturn > 20 ? 20 : 0) + (preferences.eligibility === "approval_ready" && scenario.result !== "eligible" ? 35 : 0),
+      mission: { ...mission, prompt: scenario.promptStarters[2], target: mission.capital },
     },
   ];
+  return presets.sort((a, b) => b.score - a.score);
 }
 
 function deriveMissionMath(mission: CapitalMission, scenario: PressureTestScenario): MissionMath {
@@ -358,10 +393,16 @@ function AnimatedPromptEditor({ mission, scenario, onChange }: { mission: Capita
 }
 
 function MissionBuilder({ mission, scenario, thesisMode, onChange, onChangeMode }: { mission: CapitalMission; scenario: PressureTestScenario; thesisMode: ThesisEntryMode; onChange: (value: CapitalMission) => void; onChangeMode: (mode: ThesisEntryMode) => void }) {
-  const presets = useMemo(() => missionPresetsFor(scenario), [scenario]);
-  const [selectedPreset, setSelectedPreset] = useState<MissionPreset["id"]>("smart");
+  const [preferences, setPreferences] = useState<RunPreferences>(DEFAULT_RUN_PREFERENCES);
+  const [tuning, setTuning] = useState(false);
+  const presets = useMemo(() => missionPresetsFor(scenario, mission, preferences), [scenario, mission.capital, mission.target, mission.maxLoss, mission.horizon, preferences]);
+  const [selectedPreset, setSelectedPreset] = useState<MissionPreset["id"]>(() => presets.find((preset) => preset.mission.prompt === mission.prompt)?.id ?? presets[0].id);
   const activePreset = presets.find((preset) => preset.id === selectedPreset) ?? presets[0];
-  useEffect(() => setSelectedPreset("smart"), [scenario.id]);
+  useEffect(() => {
+    setPreferences(DEFAULT_RUN_PREFERENCES);
+    setSelectedPreset(missionPresetsFor(scenario, mission, DEFAULT_RUN_PREFERENCES).find((preset) => preset.mission.prompt === mission.prompt)?.id ?? "common");
+    setTuning(false);
+  }, [scenario.id]);
   const setNumber = (key: "capital" | "target" | "maxLoss", value: string) => onChange({ ...mission, [key]: Math.max(0, Number(value) || 0) });
   const hasAssignedThesis = Boolean(scenario.thesisTitle);
   const sourceAction = () => {
@@ -373,6 +414,14 @@ function MissionBuilder({ mission, scenario, thesisMode, onChange, onChangeMode 
     setSelectedPreset(preset.id);
     onChange({ ...preset.mission, thesis: mission.thesis });
   };
+  const updatePreference = (key: keyof RunPreferences, value: string) => {
+    const next = { ...preferences, [key]: value } as RunPreferences;
+    const nextPresets = missionPresetsFor(scenario, mission, next);
+    const top = nextPresets[0];
+    setPreferences(next);
+    setSelectedPreset(top.id);
+    onChange({ ...top.mission, thesis: mission.thesis });
+  };
   return (
     <>
       <div className="ap-thesis-start-row">
@@ -381,14 +430,21 @@ function MissionBuilder({ mission, scenario, thesisMode, onChange, onChangeMode 
           <div><span className="ap-mono-label">{thesisMode === "assigned" ? "ASSIGNED THESIS LOADED" : "NO THESIS ASSIGNED"}</span><strong>{thesisMode === "assigned" ? scenario.thesisTitle : "Build a thesis in this surface"}</strong><p>{thesisMode === "assigned" ? "Run-specific edits leave the saved thesis unchanged." : "Build here without losing the capital mission."}</p></div>
           <button type="button" onClick={sourceAction}>{hasAssignedThesis ? (thesisMode === "assigned" ? "New thesis" : "Reload thesis") : (mission.thesis ? "Clear draft" : "Use draft")}</button>
         </div>
-        <label className="ap-mission-library">
-          <span className="ap-mono-label">MISSION LIBRARY · RANKED FOR THIS RUN</span>
-          <select aria-label="Choose a contextual capital mission" value={selectedPreset} onChange={(event) => choosePreset(event.target.value as MissionPreset["id"])}>
+        <div className="ap-mission-library">
+          <div className="ap-mission-library-heading"><span className="ap-mono-label">MISSION LIBRARY · RANKED FOR THIS RUN</span><button type="button" onClick={() => setTuning((value) => !value)}>{tuning ? "Close" : "Tune this run"}</button></div>
+          <label><span className="ap-sr-only">Choose a contextual capital mission</span><select aria-label="Choose a contextual capital mission" value={selectedPreset} onChange={(event) => choosePreset(event.target.value as MissionPreset["id"])}>
             {presets.map((preset, index) => <option key={preset.id} value={preset.id}>{index + 1}. {preset.label}</option>)}
-          </select>
+          </select></label>
           <div><span>{activePreset.badge}</span><p>{activePreset.reason}</p></div>
-        </label>
+        </div>
       </div>
+      {tuning && <div className="ap-run-tuner">
+        <div><span className="ap-mono-label">OPERATOR INPUTS · GATES REMAIN SYSTEM-COMPUTED</span><strong>What should influence this run?</strong></div>
+        <label><span>Objective</span><select value={preferences.objective} onChange={(event) => updatePreference("objective", event.target.value)}><option value="best_fit">Best fit</option><option value="intraday">Intraday deployment</option><option value="swing">Swing setup</option><option value="portfolio">Portfolio gap</option><option value="disclosure">Disclosure pattern</option></select></label>
+        <label><span>Instrument</span><select value={preferences.instrument} onChange={(event) => updatePreference("instrument", event.target.value)}><option value="best_fit">Best fit</option><option value="shares">Shares</option><option value="options">Options</option></select></label>
+        <label><span>Show in library</span><select value={preferences.eligibility} onChange={(event) => updatePreference("eligibility", event.target.value)}><option value="approval_ready">Approval-ready only</option><option value="include_held">Include held research</option></select></label>
+        <p><strong>Ranking receipt:</strong> changing these inputs reranks and prefills the library. Account state, thesis, horizon and evidence still determine eligibility. The operator cannot choose or override the gate result.</p>
+      </div>}
       <AnimatedPromptEditor mission={mission} scenario={scenario} onChange={onChange} />
       <p className="ap-lede">This is the thesis builder. {thesisMode === "assigned" ? "Review or edit the loaded thesis for this run" : "Build the thesis directly here"}; Aperture compiles it into a small paper-play slate without promising the requested return.</p>
       <div className="ap-mission-statement">
