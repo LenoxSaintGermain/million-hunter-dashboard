@@ -4,6 +4,7 @@ import {
   missingDecisionAuthorityBlock,
   outcomeReviewAt,
   rankMissionLibrary,
+  requiresCurrentDecisionBinding,
   type DecisionAuthorizationSnapshot,
 } from "./decisionRunway";
 
@@ -31,6 +32,14 @@ describe("Decision Runway authorization", () => {
     expect(decisionActionBlock(conditional, "submit", "close")).toBeNull();
   });
 
+  it.each(["preflight", "create_proposal", "approve", "submit"] as const)(
+    "blocks each opening action at %s while a named conditional gate remains unresolved",
+    (action) => {
+      expect(decisionActionBlock({ ...eligible, effectiveBranch: "conditional" }, action, "open"))
+        .toMatch(/conditional/i);
+    },
+  );
+
   it("fails closed when an authoritative binding no longer matches the run or account", () => {
     expect(decisionActionBlock({ ...eligible, researchRunId: 23 }, "create_proposal", "open", { runId: 22, accountId: 4 }))
       .toMatch(/binding/i);
@@ -42,6 +51,20 @@ describe("Decision Runway authorization", () => {
     expect(missingDecisionAuthorityBlock("open")).toMatch(/no authoritative Decision Run binding/i);
     expect(missingDecisionAuthorityBlock("unknown")).toMatch(/fail-closed/i);
     expect(missingDecisionAuthorityBlock("close")).toBeNull();
+  });
+
+  it("preserves a proven close even when a newer authority binding makes an opening action stale", () => {
+    const stale = { ...eligible, researchRunId: 23, accountId: 5 };
+    expect(decisionActionBlock(stale, "submit", "open", { runId: 22, accountId: 4 })).toMatch(/binding/i);
+    expect(decisionActionBlock(stale, "submit", "unknown", { runId: 22, accountId: 4 })).toMatch(/binding/i);
+    expect(decisionActionBlock(stale, "submit", "close", { runId: 22, accountId: 4 })).toBeNull();
+  });
+
+  it("requires the current exact binding for every opening or unknown intent, never for a proven close", () => {
+    expect(requiresCurrentDecisionBinding("open")).toBe(true);
+    expect(requiresCurrentDecisionBinding("unknown")).toBe(true);
+    expect(requiresCurrentDecisionBinding(null)).toBe(true);
+    expect(requiresCurrentDecisionBinding("close")).toBe(false);
   });
 });
 
@@ -73,6 +96,37 @@ describe("contextual Mission Library", () => {
     });
     expect(ranked.find((mission) => mission.key === "dated_catalyst")?.readiness).toBe("conditional");
   });
+
+  it("puts a stale account behind the preserve-cash control rather than treating it as deployment-ready", () => {
+    const ranked = rankMissionLibrary({
+      thesisName: "Congressional disclosure follow-through",
+      deployableCapitalCents: 10_000_000,
+      holdingPeriod: "catalyst_window",
+      objective: "deploy_today",
+      concentrationUtilizationPct: 12,
+      accountFreshnessMinutes: 31,
+      hasVerifiedCatalyst: true,
+    });
+    expect(ranked[0].key).toBe("preserve_cash");
+    expect(ranked.find((mission) => mission.key === "best_play")?.readiness).toBe("conditional");
+    expect(ranked.find((mission) => mission.key === "deploy_today")?.readiness).toBe("conditional");
+  });
+
+  it("keeps a long-horizon disclosure investigation bounded to a catalyst question, not a same-day prediction", () => {
+    const ranked = rankMissionLibrary({
+      thesisName: "Congressional disclosure follow-through",
+      deployableCapitalCents: 10_000_000,
+      holdingPeriod: "catalyst_window",
+      objective: "verify_catalyst",
+      concentrationUtilizationPct: null,
+      accountFreshnessMinutes: 5,
+      hasVerifiedCatalyst: true,
+    });
+    const catalyst = ranked.find((mission) => mission.key === "dated_catalyst");
+    expect(catalyst?.readiness).toBe("researchable");
+    expect(catalyst?.missionText).toMatch(/verified/i);
+    expect(catalyst?.missionText).not.toMatch(/return|profit|forecast/i);
+  });
 });
 
 describe("outcome queue timing", () => {
@@ -82,5 +136,11 @@ describe("outcome queue timing", () => {
 
   it("queues a swing review instead of asking for an immediate outcome", () => {
     expect(outcomeReviewAt("swing", null, 1_000)).toBe(1_000 + 7 * 24 * 60 * 60 * 1_000);
+  });
+
+  it("uses declared intraday and long-horizon review points without creating an automatic exit", () => {
+    const now = 1_000;
+    expect(outcomeReviewAt("intraday", null, now)).toBe(now + 8 * 60 * 60 * 1_000);
+    expect(outcomeReviewAt("catalyst_window", null, now)).toBe(now + 30 * 24 * 60 * 60 * 1_000);
   });
 });

@@ -30,20 +30,32 @@ export class DecisionRunwayBlockedError extends Error {
   }
 }
 
+/**
+ * A stored order may reduce an already-held paper position after a later
+ * mission revision. Every other intent requires the current exact binding;
+ * `unknown` is intentionally classified with opening exposure.
+ */
+export function requiresCurrentDecisionBinding(intent: DecisionOrderIntent | null | undefined): boolean {
+  return intent !== "close";
+}
+
 export function decisionActionBlock(
   snapshot: DecisionAuthorizationSnapshot,
   action: PaperDecisionAction,
   intent: DecisionOrderIntent,
   expected?: { runId: number; accountId: number },
 ): string | null {
+  // A proven closing order must remain possible even if a newer mission
+  // revision was recorded after the position was opened. Exposure-reducing
+  // intent is resolved from the held position before this helper is reached;
+  // unknown intent remains fail-closed below.
+  if (!requiresCurrentDecisionBinding(intent)) return null;
   if (snapshot.source === "authoritative" && expected) {
     if (snapshot.researchRunId !== expected.runId || snapshot.accountId !== expected.accountId) {
       return "Decision Runway binding mismatch: the mission revision, research run, and paper account must match exactly.";
     }
   }
-  // A closing order must remain possible so a cash decision cannot trap an
-  // existing paper position. Unknown intent is treated as opening exposure.
-  if (intent === "close") return null;
+  // Unknown intent is treated as opening exposure.
   if (snapshot.effectiveBranch === "cash") {
     return `Cash is the current Decision Runway outcome. ${action} is fail-closed until a new mission revision is recorded.`;
   }
@@ -54,7 +66,7 @@ export function decisionActionBlock(
 }
 
 export function missingDecisionAuthorityBlock(intent: DecisionOrderIntent): string | null {
-  if (intent === "close") return null;
+  if (!requiresCurrentDecisionBinding(intent)) return null;
   return "This research run has no authoritative Decision Run binding. Opening paper actions are fail-closed; start from Capital Mission.";
 }
 
@@ -69,13 +81,14 @@ export async function authorizeDecisionAction(input: {
 }): Promise<DecisionAuthorizationSnapshot | null> {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
+  const requiresCurrentBinding = requiresCurrentDecisionBinding(input.intent);
 
   const [decisionRun] = await db.select().from(apertureDecisionRuns).where(and(
     eq(apertureDecisionRuns.userId, input.userId),
     eq(apertureDecisionRuns.researchRunId, input.runId),
   )).limit(1);
 
-  if (input.decisionRunId != null && (!decisionRun || decisionRun.id !== input.decisionRunId)) {
+  if (requiresCurrentBinding && input.decisionRunId != null && (!decisionRun || decisionRun.id !== input.decisionRunId)) {
     throw new DecisionRunwayBlockedError(
       "Decision Runway binding mismatch: this order is not attached to its authoritative Decision Run.",
       "DECISION_BINDING_MISMATCH",
@@ -84,13 +97,39 @@ export async function authorizeDecisionAction(input: {
 
   if (decisionRun) {
     if (decisionRun.currentRevisionId == null) {
-      throw new DecisionRunwayBlockedError("Decision Runway has no current mission revision.", "DECISION_BINDING_MISMATCH");
+      if (requiresCurrentBinding) {
+        throw new DecisionRunwayBlockedError("Decision Runway has no current mission revision.", "DECISION_BINDING_MISMATCH");
+      }
+      return {
+        source: "authoritative",
+        decisionRunId: decisionRun.id,
+        revisionId: null,
+        effectiveBranch: "cash",
+        accountId: decisionRun.accountId,
+        researchRunId: decisionRun.researchRunId,
+      };
     }
     const [revision] = await db.select().from(apertureDecisionRevisions).where(and(
       eq(apertureDecisionRevisions.id, decisionRun.currentRevisionId),
       eq(apertureDecisionRevisions.decisionRunId, decisionRun.id),
     )).limit(1);
-    if (!revision || (input.decisionRevisionId != null && revision.id !== input.decisionRevisionId)) {
+    if (!revision) {
+      if (!requiresCurrentBinding) {
+        return {
+          source: "authoritative",
+          decisionRunId: decisionRun.id,
+          revisionId: null,
+          effectiveBranch: "cash",
+          accountId: decisionRun.accountId,
+          researchRunId: decisionRun.researchRunId,
+        };
+      }
+      throw new DecisionRunwayBlockedError(
+        "Decision Runway revision mismatch: re-open the current mission before continuing.",
+        "DECISION_BINDING_MISMATCH",
+      );
+    }
+    if (requiresCurrentBinding && input.decisionRevisionId != null && revision.id !== input.decisionRevisionId) {
       throw new DecisionRunwayBlockedError(
         "Decision Runway revision mismatch: re-open the current mission before continuing.",
         "DECISION_BINDING_MISMATCH",

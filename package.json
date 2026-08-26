@@ -10,6 +10,8 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
+    "test:unit": "DATABASE_URL= vitest run --config vitest.unit.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:alpaca": "RUN_ALPACA_INTEGRATION=1 vitest run server/aperture/alpacaConnection.test.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
