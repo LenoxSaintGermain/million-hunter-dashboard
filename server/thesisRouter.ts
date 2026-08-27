@@ -17,6 +17,7 @@ import { projectionValues } from "./thesisBridge";
 import { canUseCanonicalThesis } from "./thesisAccess";
 import { GEMINI_FAST } from "../shared/models";
 import { normalizeCanonicalThesisRead } from "../shared/thesisReadContract";
+import { isCapitalThesisEligible } from "../shared/capitalThesisEligibility";
 
 function isQualifiedPlayIsolatedUat(ctx: { req: { header(name: string): string | undefined } }) {
   return process.env.NODE_ENV === "development"
@@ -376,7 +377,8 @@ export const thesisRouter = router({
       estimatedCostMin: row.estimated_cost_min,
       estimatedCostMax: row.estimated_cost_max,
       latestCatalystDeadlineAt: row.latest_catalyst_deadline_at == null ? null : Number(row.latest_catalyst_deadline_at),
-      isActiveCapital: profile?.activeCapitalThesisId === row.id,
+      isActiveCapital: isCapitalThesisEligible({ templateUsed: row.template_used })
+        && profile?.activeCapitalThesisId === row.id,
       createdAt: row.created_at,
       };
     });
@@ -395,7 +397,7 @@ export const thesisRouter = router({
       templateUsed: thesisCompilations.templateUsed,
       status: thesisCompilations.status,
     }).from(thesisCompilations).where(eq(thesisCompilations.id, profile.activeCapitalThesisId)).limit(1);
-    return { thesis: thesis ?? null };
+    return { thesis: thesis && isCapitalThesisEligible(thesis) ? thesis : null };
   }),
 
   /** Assign the profile's daily Capital context. This never transfers, shares, or edits the thesis. */
@@ -412,7 +414,7 @@ export const thesisRouter = router({
       if (!canUseCanonicalThesis({ ownerUserId: source.userId, requesterUserId: ctx.user.id, sharedPermission: sharedAccess?.permission })) {
         throw new TRPCError({ code: "FORBIDDEN", message: "You do not have use access to this thesis" });
       }
-      if (source.templateUsed !== "capital_trade") {
+      if (!isCapitalThesisEligible(source)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Only a Capital / Trade thesis can be the Capital Decision Center context" });
       }
       await db.update(users).set({ activeCapitalThesisId: input.compilationId }).where(eq(users.id, ctx.user.id));

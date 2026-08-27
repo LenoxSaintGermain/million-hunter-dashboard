@@ -4,6 +4,7 @@ import { ArrowRight, ChevronDown, FileCheck2, Loader2, Pencil, Save, ShieldCheck
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolatedUatIdentity";
+import { isCapitalThesisEligible } from "@shared/capitalThesisEligibility";
 
 type Purpose = "capital" | "acquisition" | "property";
 
@@ -30,12 +31,13 @@ export function CapitalThesisWorkspace() {
   const [choosing, setChoosing] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [missionError, setMissionError] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftText, setDraftText] = useState(STARTER);
   const [detail, setDetail] = useState({ belief: "", evidence: "", seeks: "", avoids: "", horizon: "", invalidation: "", risk: "" });
 
   const capitalTheses = useMemo(
-    () => (theses ?? []).filter((thesis: any) => thesis.templateUsed === "capital_trade" || thesis.isActiveCapital),
+    () => (theses ?? []).filter(isCapitalThesisEligible),
     [theses],
   );
   const active = capitalTheses.find((thesis: any) => thesis.isActiveCapital) ?? capitalTheses[0] ?? null;
@@ -76,10 +78,15 @@ export function CapitalThesisWorkspace() {
     if (openMission) await useInMissionFor(result.compilationId);
   };
   const useInMissionFor = async (compilationId: number) => {
-    await activate.mutateAsync({ compilationId });
-    await project.mutateAsync({ compilationId });
-    await utils.thesis.list.invalidate();
-    navigate(route("/aperture"));
+    setMissionError(null);
+    try {
+      await activate.mutateAsync({ compilationId });
+      await project.mutateAsync({ compilationId });
+      await utils.thesis.list.invalidate();
+      navigate(route("/aperture"));
+    } catch (error) {
+      setMissionError(error instanceof Error ? error.message : "This thesis could not be bound to a Capital Mission. Review its type and try again.");
+    }
   };
   const useInMission = async () => { if (selected) await useInMissionFor(selected.id); };
 
@@ -141,7 +148,8 @@ export function CapitalThesisWorkspace() {
 
           <section className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-paper)" }}><div className="flex items-center justify-between gap-3"><div><p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Contextual Thesis Library</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Owner-scoped Capital alternatives. Ranking is descriptive, never approval.</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-3">{visibleAlternatives.map((thesis: any) => <button key={thesis.id} type="button" onClick={() => { setSelectedId(thesis.id); setEditing(false); }} className="min-h-16 rounded border p-3 text-left text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><span className="block font-semibold">{thesis.name ?? "Untitled thesis"}</span><span className="mt-1 block" style={{ color: "var(--sh-fg-muted)" }}>{thesis.status ?? "review"} · v{thesis.id}</span></button>)}</div>{alternatives.length > 3 && <button type="button" onClick={() => setShowMore((current) => !current)} className="mt-3 inline-flex min-h-10 items-center gap-1 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}><ChevronDown className="h-3.5 w-3.5" /> {showMore ? "Show less" : `Show ${alternatives.length - 3} more`}</button>}</section>
 
-          <div className="flex flex-col gap-2 sm:flex-row"><Button className="min-h-11 flex-1" onClick={() => void useInMission()} disabled={activate.isPending || project.isPending}>{activate.isPending || project.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}Use in Capital Mission</Button><Button variant="outline" className="min-h-11" onClick={() => { setCreating(true); setDraftName(""); setDraftText(STARTER); setDetail({ belief: "", evidence: "", seeks: "", avoids: "", horizon: "", invalidation: "", risk: "" }); setEditing(false); }}>Create new Capital thesis</Button></div>
+          {missionError && <p role="alert" className="rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-red)", color: "var(--sh-red)" }}>{missionError}</p>}
+          <div className="flex flex-col gap-2 sm:flex-row"><Button className="min-h-11 flex-1" onClick={() => void useInMission()} disabled={activate.isPending || project.isPending}>{activate.isPending || project.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}Use in Capital Mission</Button><Button variant="outline" className="min-h-11" onClick={() => { setMissionError(null); setCreating(true); setDraftName(""); setDraftText(STARTER); setDetail({ belief: "", evidence: "", seeks: "", avoids: "", horizon: "", invalidation: "", risk: "" }); setEditing(false); }}>Create new Capital thesis</Button></div>
         </>
       ) : <section className="rounded-lg border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-paper)" }}><p className="font-mono text-[0.65rem] uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>New Capital thesis</p><h2 className="mt-2 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>Frame the decision in one statement.</h2><Composer /></section>}
     </main>
