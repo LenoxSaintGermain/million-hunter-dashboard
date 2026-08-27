@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { SetAsideHistory } from "@/components/aperture/SetAsideHistory";
+import { CapitalThesisWorkspace } from "@/components/aperture/CapitalThesisWorkspace";
 import {
   Sparkles, ChevronRight, Loader2, Trash2, Lock, Play, Pencil, Check, X,
   AlertTriangle, CheckCircle2, Target, Scale, FileSearch,
@@ -136,7 +137,9 @@ export default function ThesisEngine() {
   const { user } = useAuth();
   const canUseAperture = user?.role === "admin";
   const [location, navigate] = useLocation();
-  const requestedScope = new URLSearchParams(location.split("?")[1] ?? "").get("scope");
+  const routeSearch = typeof window === "undefined" ? "" : window.location.search;
+  const requestedScope = new URLSearchParams(routeSearch).get("scope");
+  const requestedUatCase = new URLSearchParams(routeSearch).get("uat_case");
   const initialScope: ThesisScope = requestedScope === "capital" ? "capital" : requestedScope === "property" ? "property" : "acquisition";
   const [thesisText, setThesisText] = useState(initialScope === "capital" ? CAPITAL_TRADE_STARTER : "");
   const [scope, setScope] = useState<ThesisScope>(initialScope);
@@ -303,6 +306,10 @@ export default function ThesisEngine() {
   const evidence: string[] = compilationResult?.evidenceRequirements ?? [];
   const disqualifiers: string[] = compilationResult?.autoDisqualifiers ?? [];
   const notes: string[] = compilationResult?.confidenceNotes ?? [];
+
+  if (requestedScope === "capital" || requestedUatCase === "qualified-play") {
+    return <CapitalThesisWorkspace />;
+  }
 
   return (
     <EditorialTopNav>

@@ -4,6 +4,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
+import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolatedUatIdentity";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -108,7 +109,7 @@ function NavLink({
   onClick?: () => void;
 }) {
   return (
-    <Link href={href} onClick={onClick}>
+    <Link href={aperturePathForFixture(href, readIsolatedUatIdentity())} onClick={onClick}>
       <span
         className={cn(
           "relative text-[13px] font-medium tracking-wide transition-colors duration-200 cursor-pointer",
@@ -440,7 +441,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                   const Icon = item.icon;
                   return (
                     <DropdownMenuItem key={item.href} asChild>
-                      <Link href={item.href}>
+                      <Link href={aperturePathForFixture(item.href, readIsolatedUatIdentity())}>
                         <span className={cn(
                           "flex items-center gap-2.5 w-full text-[13px] cursor-pointer",
                           isActive(item.href) ? "text-[var(--ink)] font-medium" : "text-[var(--sh-fg-2)]"
@@ -481,7 +482,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                   const Icon = item.icon;
                   return (
                     <DropdownMenuItem key={item.href} asChild>
-                      <Link href={item.href}>
+                      <Link href={aperturePathForFixture(item.href, readIsolatedUatIdentity())}>
                         <span className={cn(
                           "flex items-center gap-2.5 w-full text-[13px] cursor-pointer",
                           isActive(item.href) ? "text-[var(--ink)] font-medium" : "text-[var(--sh-fg-2)]"
@@ -502,7 +503,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                   const Icon = item.icon;
                   return (
                     <DropdownMenuItem key={item.href} asChild>
-                      <Link href={item.href}>
+                      <Link href={aperturePathForFixture(item.href, readIsolatedUatIdentity())}>
                         <span className={cn(
                           "flex items-center gap-2.5 w-full text-[13px] cursor-pointer",
                           isActive(item.href) ? "text-[var(--ink)] font-medium" : "text-[var(--sh-fg-4)]"

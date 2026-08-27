@@ -5,6 +5,7 @@ import EditorialTopNav from "@/components/EditorialTopNav";
 import { cn } from "@/lib/utils";
 import { CapitalCockpitRail } from "@/components/aperture/CapitalCockpitRail";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolatedUatIdentity";
 
 const APERTURE_NAV = [
   { href: "/aperture", label: "Decision Center", icon: LayoutDashboard },
@@ -46,7 +47,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
             <span className="font-eyebrow text-eyebrow text-amber uppercase tracking-widest">Paper only · operator workspace</span>
           </div>
         </div>
-        <div className="max-w-[1280px] mx-auto px-6 lg:px-10 overflow-x-auto">
+        <div className="w-full min-w-0 max-w-[1280px] mx-auto px-6 lg:px-10 overflow-x-auto">
           <nav className="flex min-w-max gap-5" aria-label="Capital Aperture navigation">
             {nav.map((item) => {
               const Icon = item.icon;
@@ -54,7 +55,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
                 ? location === "/aperture"
                 : location.startsWith(item.href);
               return (
-                <Link key={item.href} href={item.href}>
+                <Link key={item.href} href={aperturePathForFixture(item.href, readIsolatedUatIdentity())}>
                   <span className={cn(
                     "flex items-center gap-1.5 border-b-2 py-3 text-[12px] font-medium transition-colors",
                     active ? "border-ink text-ink" : "border-transparent text-muted-foreground hover:text-ink"

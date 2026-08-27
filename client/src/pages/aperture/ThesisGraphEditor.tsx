@@ -36,7 +36,7 @@ export default function ThesisGraphEditor() {
   const [rawText, setRawText] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const { data: thesis } = trpc.aperture.thesis.get.useQuery(
+  const { data: thesis, error: thesisError, refetch: refetchThesis } = trpc.aperture.thesis.get.useQuery(
     { id: thesisId! },
     { enabled: !isNew && !!thesisId },
   );
@@ -113,6 +113,10 @@ export default function ThesisGraphEditor() {
         </div>
       </DashboardLayout>
     );
+  }
+
+  if (thesisError) {
+    return <DashboardLayout><div className="mx-auto max-w-2xl"><Card><CardContent className="space-y-4 pt-6"><div><p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>This thesis context could not load.</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>No graph, assignment, or decision binding has been substituted. Retry the read or return to the Decision Center.</p></div><p className="text-xs font-medium" style={{ color: "var(--sh-fg-muted)" }}>Diagnostic: THESIS-READ-{thesisId}</p><div className="flex flex-wrap gap-2"><Button onClick={() => refetchThesis()}><Loader2 className="mr-2 h-4 w-4" />Retry</Button><Button variant="outline" onClick={() => navigate("/aperture")}>Return to Decision Center</Button></div>{import.meta.env.DEV ? <details className="text-xs" style={{ color: "var(--sh-fg-muted)" }}><summary>Development diagnostic</summary><pre className="mt-2 whitespace-pre-wrap">{thesisError.message}</pre></details> : null}</CardContent></Card></div></DashboardLayout>;
   }
 
   return (
@@ -249,7 +253,8 @@ export default function ThesisGraphEditor() {
                         </div>
                       </div>
                     )}
-                    {thesis?.confidenceNotes?.length ? (
+                    {thesis?.readDiagnostics.confidenceNotes.status === "unknown" ? <div className="rounded border p-2 text-xs" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}>Compiler notes are unavailable for this legacy record. Diagnostic: {thesis.readDiagnostics.confidenceNotes.code}</div> : null}
+                    {thesis?.confidenceNotes.length ? (
                       <div className="p-2 rounded" style={{ background: "var(--sh-surface-2)" }}>
                         <p className="font-medium mb-1" style={{ color: "var(--sh-signal)" }}>Compiler Notes</p>
                         {thesis.confidenceNotes.map((n, i) => (

@@ -232,15 +232,15 @@ export default function CandidateBoard() {
         </div>
 
         <header className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between" style={{ borderColor: "var(--sh-border-1)" }}>
-          <div className="flex items-start gap-2">
+          <div className="flex min-w-0 items-start gap-2">
             <Button variant="ghost" size="icon" className="mt-0.5 h-8 w-8 shrink-0" onClick={() => navigate("/aperture")}><ArrowLeft className="h-4 w-4" /></Button>
             <div>
               <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-fg-muted)" }}>Capital Aperture · run #{runId}</p>
               <h1 className="mt-1 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>Start with the play. Work backward to the evidence.</h1>
-              <p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>{run.candidateCount ?? candidates.length} evidence candidates · {run.status} {run.droppedNote ? `· ${run.droppedNote}` : ""}</p>
+              <p className="mt-1 break-all text-sm" style={{ color: "var(--sh-fg-muted)" }}>{run.candidateCount ?? candidates.length} evidence candidates · {run.status} {run.droppedNote ? `· ${run.droppedNote}` : ""}</p>
             </div>
           </div>
-          <div className="flex max-w-full overflow-x-auto rounded-lg border p-1" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+          <div className="flex w-full min-w-0 max-w-full overflow-x-auto rounded-lg border p-1 sm:w-auto" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
             <button onClick={() => setView("play")} className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "play" ? "var(--sh-surface)" : "transparent", color: view === "play" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Your play</button>
             <button onClick={() => setView("brief")} className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "brief" ? "var(--sh-surface)" : "transparent", color: view === "brief" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Decision detail</button>
             <button onClick={() => setView("evidence")} className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "evidence" ? "var(--sh-surface)" : "transparent", color: view === "evidence" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Evidence</button>

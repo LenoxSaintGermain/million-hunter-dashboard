@@ -16,6 +16,24 @@ import { compileThesis } from "./aperture/thesisGraph";
 import { projectionValues } from "./thesisBridge";
 import { canUseCanonicalThesis } from "./thesisAccess";
 import { GEMINI_FAST } from "../shared/models";
+import { normalizeCanonicalThesisRead } from "../shared/thesisReadContract";
+
+function isQualifiedPlayIsolatedUat(ctx: { req: { header(name: string): string | undefined } }) {
+  return process.env.NODE_ENV === "development"
+    && process.env.ISOLATED_UAT_MODE === "true"
+    && process.env.DATABASE_URL?.includes("127.0.0.1:3307/capital_aperture_uat_9c18799")
+    && ctx.req.header("x-isolated-uat-identity") === "jim"
+    && ctx.req.header("x-isolated-uat-case") === "qualified-play";
+}
+
+function illustrativeUatGraph(thesisText: string, name: string | null) {
+  return {
+    beliefs: [thesisText], seek: [], avoid: [], horizons: ["Unknown — operator has not specified a horizon."], sectors: [], exclusions: [],
+    portfolioRules: {}, behavior: {}, exposureTree: [],
+    confidenceNotes: ["Illustrative UAT compilation — not current market data. No provider, market-data, or broker path was invoked."],
+    suggestedName: name ?? "Capital / Trade Thesis",
+  };
+}
 
 // ── STRATEGIST System Prompt ──────────────────────────────────────────────────
 const STRATEGIST_SYSTEM_PROMPT = `You are STRATEGIST, the thesis compiler for Signal Hunter — an AI-powered acquisition intelligence platform.
@@ -332,13 +350,16 @@ export const thesisRouter = router({
       WHERE tc.user_id = ${ctx.user.id} OR ts.user_id = ${ctx.user.id}
       ORDER BY tc.created_at DESC LIMIT 50
     `) as any;
-    const parseCol = (value: any, fallback: any) => {
-      if (value === null || value === undefined) return fallback;
-      if (typeof value !== "string") return value;
-      try { return JSON.parse(value); } catch { return fallback; }
-    };
     const rawRows = rows[0] as any[];
-    return rawRows.map((row: any) => ({
+    return rawRows.map((row: any) => {
+      const normalized = normalizeCanonicalThesisRead({
+        confidenceNotes: row.confidence_notes,
+        compiledFilters: row.compiled_filters,
+        scoringWeights: row.scoring_weights,
+        evidenceRequirements: row.evidence_requirements,
+        autoDisqualifiers: row.auto_disqualifiers,
+      });
+      return {
       id: row.id,
       userId: row.user_id,
       access: row.access ?? "owner",
@@ -349,11 +370,7 @@ export const thesisRouter = router({
       name: row.name,
       status: row.status,
       scanJobId: row.scan_job_id ?? null,
-      compiledFilters: parseCol(row.compiled_filters, {}),
-      scoringWeights: parseCol(row.scoring_weights, []),
-      evidenceRequirements: parseCol(row.evidence_requirements, []),
-      autoDisqualifiers: parseCol(row.auto_disqualifiers, []),
-      confidenceNotes: parseCol(row.confidence_notes, []),
+      ...normalized,
       estimatedTargetsMin: row.estimated_targets_min,
       estimatedTargetsMax: row.estimated_targets_max,
       estimatedCostMin: row.estimated_cost_min,
@@ -361,7 +378,8 @@ export const thesisRouter = router({
       latestCatalystDeadlineAt: row.latest_catalyst_deadline_at == null ? null : Number(row.latest_catalyst_deadline_at),
       isActiveCapital: profile?.activeCapitalThesisId === row.id,
       createdAt: row.created_at,
-    }));
+      };
+    });
   }),
 
   /** The canonical Capital / Trade thesis this profile has chosen for its daily Decision Center. */
@@ -592,10 +610,14 @@ export const thesisRouter = router({
         .limit(1);
 
       let graph;
-      try {
-        graph = await compileThesis(source.thesisText);
-      } catch (error: any) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Capital projection failed: ${error?.message ?? "unknown compiler error"}` });
+      if (isQualifiedPlayIsolatedUat(ctx)) {
+        graph = illustrativeUatGraph(source.thesisText, source.name);
+      } else {
+        try {
+          graph = await compileThesis(source.thesisText);
+        } catch (error: any) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Capital projection failed: ${error?.message ?? "unknown compiler error"}` });
+        }
       }
 
       const now = Date.now();
