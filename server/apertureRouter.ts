@@ -94,6 +94,7 @@ import {
   rankMissionLibrary,
 } from "./aperture/decisionRunway";
 import { immutableReceiptBindingIssue } from "./aperture/decisionReceiptBinding";
+import { extractCapitalMissionDefaults } from "../shared/capitalMissionDefaults";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -360,7 +361,10 @@ export const apertureRouter = router({
       const rows = await db!.select().from(capitalTheses)
         .where(eq(capitalTheses.userId, ctx.user.id))
         .orderBy(desc(capitalTheses.updatedAt));
-      return rows.map(normalizeCapitalThesisRead);
+      return rows.map((row) => {
+        const normalized = normalizeCapitalThesisRead(row);
+        return { ...normalized, missionDefaults: extractCapitalMissionDefaults(normalized.rawText) };
+      });
     }),
 
     get: adminProcedure
@@ -839,6 +843,7 @@ export const apertureRouter = router({
         status: aperturePendingOutcomes.status,
         dueAt: aperturePendingOutcomes.dueAt,
         gateKey: aperturePendingOutcomes.gateKey,
+        gateLabel: apertureDecisionRevisions.namedGateLabel,
         reviewBasis: aperturePendingOutcomes.reviewBasis,
         decisionRunId: apertureDecisionRuns.id,
         revisionId: apertureDecisionRevisions.id,
@@ -1250,6 +1255,12 @@ export const apertureRouter = router({
         if (!account.isPaper) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Decision Runway can only research against a paper account." });
         const now = Date.now();
         const catalystDeadlineAt = outcomeReviewAt(revision.holdingPeriod, revision.reviewAt, now);
+        if (catalystDeadlineAt == null) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Catalyst-window research requires a declared review or look-back time. Return to Capital Mission and set it before starting research.",
+          });
+        }
         const runInput = {
           thesisId: thesis.id,
           accountId: account.id,

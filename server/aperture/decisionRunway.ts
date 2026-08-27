@@ -261,12 +261,15 @@ export function rankMissionLibrary(input: {
   return missions.sort((a, b) => b.score - a.score || a.label.localeCompare(b.label));
 }
 
-export function outcomeReviewAt(holdingPeriod: HoldingPeriod | null, catalystDeadlineAt: number | null, now = Date.now()): number {
-  if (catalystDeadlineAt != null && catalystDeadlineAt > now) return catalystDeadlineAt;
+export function outcomeReviewAt(holdingPeriod: HoldingPeriod | null, catalystDeadlineAt: number | null, now = Date.now()): number | null {
+  // Preserve a declared instant even when it is stale. The run preset will
+  // reject a past deadline; replacing it with a synthetic future horizon would
+  // silently change the operator's thesis.
+  if (catalystDeadlineAt != null) return catalystDeadlineAt;
   if (holdingPeriod === "intraday") return now + 8 * 60 * 60 * 1_000;
   if (holdingPeriod === "overnight") return now + 24 * 60 * 60 * 1_000;
   if (holdingPeriod === "swing") return now + 7 * 24 * 60 * 60 * 1_000;
-  return now + 30 * 24 * 60 * 60 * 1_000;
+  return null;
 }
 
 export async function queuePaperOutcome(input: {
@@ -286,6 +289,10 @@ export async function queuePaperOutcome(input: {
   )).limit(1);
   if (existing) return;
   const now = input.now ?? Date.now();
+  const dueAt = outcomeReviewAt(input.holdingPeriod, input.catalystDeadlineAt, now);
+  if (dueAt == null) {
+    throw new DecisionRunwayBlockedError("A catalyst-window paper play requires an explicit outcome review time.");
+  }
   await db.insert(aperturePendingOutcomes).values({
     userId: input.userId,
     decisionRunId: input.decisionRunId,
@@ -293,7 +300,7 @@ export async function queuePaperOutcome(input: {
     orderId: input.orderId,
     kind: "play_outcome",
     status: "pending",
-    dueAt: outcomeReviewAt(input.holdingPeriod, input.catalystDeadlineAt, now),
+    dueAt,
     reviewBasis: input.holdingPeriod === "intraday"
       ? "Prompt the operator after the declared intraday review point. No automatic exit."
       : "Prompt the operator at the declared horizon. No automatic exit.",

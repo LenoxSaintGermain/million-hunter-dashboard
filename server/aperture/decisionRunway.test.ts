@@ -134,6 +134,10 @@ describe("outcome queue timing", () => {
     expect(outcomeReviewAt("catalyst_window", 2_000, 1_000)).toBe(2_000);
   });
 
+  it("preserves a stale declared deadline so the mandate rejects it instead of moving it", () => {
+    expect(outcomeReviewAt("intraday", 1_000, 2_000)).toBe(1_000);
+  });
+
   it("queues a swing review instead of asking for an immediate outcome", () => {
     expect(outcomeReviewAt("swing", null, 1_000)).toBe(1_000 + 7 * 24 * 60 * 60 * 1_000);
   });
@@ -141,6 +145,6 @@ describe("outcome queue timing", () => {
   it("uses declared intraday and long-horizon review points without creating an automatic exit", () => {
     const now = 1_000;
     expect(outcomeReviewAt("intraday", null, now)).toBe(now + 8 * 60 * 60 * 1_000);
-    expect(outcomeReviewAt("catalyst_window", null, now)).toBe(now + 30 * 24 * 60 * 60 * 1_000);
+    expect(outcomeReviewAt("catalyst_window", null, now)).toBeNull();
   });
 });

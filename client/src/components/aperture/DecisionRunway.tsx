@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowRight, BookOpen, CalendarClock, CheckCircle2, ChevronDown, CircleSlash2, FileSearch, Pencil, ShieldCheck, Sparkles, Target } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { missionLibraryBindingState } from "@shared/missionLibraryQuery";
 import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolatedUatIdentity";
+import { easternDateTimeInputFromEpoch, easternDateTimeInputToEpoch } from "@shared/easternMarketTime";
 import { DailyPlayList } from "./DailyPlayList";
 import { ArgumentRail, BasisMark, RiskBudgetBar, StateMark, TypedStatusStrip, type WorkflowState } from "./DecisionVisualLanguage";
 
@@ -75,9 +76,9 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
     : (accounts ?? []).find((item) => item.isPaper && item.brokerId === "alpaca_paper") ?? (accounts ?? []).find((item) => item.isPaper) ?? null, [accounts, immutableReceipt]);
   const cockpit = trpc.aperture.cockpit.useQuery(paperAccount ? { accountId: paperAccount.id } : undefined, { enabled: Boolean(paperAccount) });
 
-  const [capital, setCapital] = useState("5000");
-  const [desiredEnding, setDesiredEnding] = useState("8000");
-  const [maxLoss, setMaxLoss] = useState("150");
+  const [capital, setCapital] = useState("");
+  const [desiredEnding, setDesiredEnding] = useState("");
+  const [maxLoss, setMaxLoss] = useState("");
   const [holdingPeriod, setHoldingPeriod] = useState<HoldingPeriod>("intraday");
   const [objective, setObjective] = useState<Objective>("deploy_today");
   const [instrument, setInstrument] = useState<"shares" | "options" | "either">("shares");
@@ -95,11 +96,33 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
   const [newTitle, setNewTitle] = useState("");
   const [newBelief, setNewBelief] = useState("");
   const [revisingReceipt, setRevisingReceipt] = useState(false);
+  const [declaredCatalystAt, setDeclaredCatalystAt] = useState<number | null>(null);
+  const [eligibilityReviewAt, setEligibilityReviewAt] = useState("");
+  const [outcomeReviewAtInput, setOutcomeReviewAtInput] = useState("");
+  const hydratedProjectionId = useRef<number | null>(null);
   const libraryBindings = missionLibraryBindingState({
     canonicalThesisId: activeCanonicalId,
     capitalThesisId: projection?.id ?? null,
     accountId: paperAccount?.id ?? null,
   });
+
+  useEffect(() => {
+    if (!projection || immutableReceipt || hydratedProjectionId.current === projection.id) return;
+    hydratedProjectionId.current = projection.id;
+    const defaults = projection.missionDefaults;
+    setCapital(defaults.deployableCapitalCents == null ? "" : String(defaults.deployableCapitalCents / 100));
+    setDesiredEnding(defaults.desiredEndingValueCents == null ? "" : String(defaults.desiredEndingValueCents / 100));
+    setMaxLoss(defaults.maxPlannedLossCents == null ? "" : String(defaults.maxPlannedLossCents / 100));
+    setHoldingPeriod(defaults.holdingPeriod ?? "intraday");
+    setInstrument(defaults.instrumentPreference ?? "either");
+    setDeclaredCatalystAt(defaults.catalystAt);
+    setEligibilityReviewAt(defaults.eligibilityReviewAt == null ? "" : easternDateTimeInputFromEpoch(defaults.eligibilityReviewAt));
+    setOutcomeReviewAtInput(defaults.outcomeReviewAt == null ? "" : easternDateTimeInputFromEpoch(defaults.outcomeReviewAt));
+    setObjective(defaults.holdingPeriod === "intraday" ? "deploy_today" : "best_qualified_play");
+    setBranch("research");
+    setMissionDirty(false);
+    setRevisingReceipt(false);
+  }, [projection, immutableReceipt]);
 
   useEffect(() => {
     if (!activeThesis || missionDirty) return;
@@ -161,6 +184,17 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
 
   const commit = async () => {
     if (!activeCanonicalId || !projection || !paperAccount) return toast.error("Assign a thesis projection and paper account first.");
+    const reviewAt = branch === "conditional"
+      ? easternDateTimeInputToEpoch(eligibilityReviewAt)
+      : branch === "research"
+        ? easternDateTimeInputToEpoch(outcomeReviewAtInput)
+        : null;
+    if (holdingPeriod === "catalyst_window" && reviewAt == null) {
+      return toast.error("Set an ET review / look-back time for this catalyst-window decision.");
+    }
+    if (branch === "conditional" && reviewAt == null) {
+      return toast.error("Set the ET time when this named gate should be reviewed.");
+    }
     try {
       const receipt = await saveMission.mutateAsync({
         missionText: mission.trim(),
@@ -183,7 +217,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
         reason: branch === "research" ? null : reason.trim(),
         blocker: branch === "research" ? null : blocker.trim(),
         reopenCondition: branch === "research" ? null : reopen.trim(),
-        reviewAt: branch === "conditional" ? Date.now() + (holdingPeriod === "intraday" ? 1 : holdingPeriod === "swing" ? 7 : 30) * 86_400_000 : null,
+        reviewAt,
         namedGateKey: branch === "conditional" ? "operator-" + objective : null,
         namedGateLabel: branch === "conditional" ? gateLabel.trim() : null,
       });
@@ -247,6 +281,9 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
     setBlocker(receipt.blocker ?? "");
     setReopen(receipt.reopenCondition ?? "");
     setGateLabel(receipt.namedGateLabel ?? "");
+    const receiptReview = receipt.reviewAt == null ? "" : easternDateTimeInputFromEpoch(receipt.reviewAt);
+    setEligibilityReviewAt(receipt.branch === "conditional" ? receiptReview : "");
+    setOutcomeReviewAtInput(receipt.branch === "research" ? receiptReview : "");
     setRevisingReceipt(true);
   };
 
@@ -294,7 +331,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
             {editing ? <><Textarea value={mission} onChange={(event) => { setMission(event.target.value); setMissionDirty(true); }} className="mt-2 min-h-28 font-serif text-lg leading-snug sm:text-xl" /><div className="mt-2 flex flex-wrap items-center gap-2"><span className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Frame it as</span>{["Where can I…", "How can I…", "What must…"].map((starter) => <button key={starter} type="button" className="min-h-9 rounded-md border px-2.5 text-xs" style={{ borderColor: "var(--sh-border-1)" }} onClick={() => { setMission(starter + " "); setMissionDirty(true); }}>{starter}</button>)}</div></> : <h1 className="mt-2 max-w-3xl font-serif text-[1.45rem] leading-[1.18] sm:text-[1.85rem] lg:text-[2.1rem]" style={{ color: "var(--sh-text-primary)" }}>{mission}</h1>}
           </div>
 
-          <TypedStatusStrip state={visualWorkflowState} horizon={horizonLabel(holdingPeriod)} operatorCapCents={parseMoney(maxLoss) || null} syncedAt={paperAccount?.lastSyncedAt ?? null} catalystLabel={latestGate} />
+          <TypedStatusStrip state={visualWorkflowState} horizon={horizonLabel(holdingPeriod)} operatorCapCents={parseMoney(maxLoss) || null} syncedAt={paperAccount?.lastSyncedAt ?? null} catalystLabel={(currentBindingMatches ? latestGate : null) ?? (declaredCatalystAt == null ? null : `Declared ${new Date(declaredCatalystAt).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}`)} />
           <ArgumentRail state={visualWorkflowState} operatorCapCents={parseMoney(maxLoss) || null} evidenceLabel={latestGate ?? "—"} gateLabel={latestBranch === "conditional" ? "Conditional / opening held" : latestBranch === "cash" ? "Cash / opening held" : "Research only"} />
 
           <div><div className="mb-2 flex items-center justify-between gap-3"><p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Mission Math</p><span className="text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Measured inputs only</span></div><div className="grid overflow-hidden rounded-xl border sm:grid-cols-2 lg:grid-cols-4" style={{ borderColor: "var(--sh-border-1)" }}>
@@ -305,6 +342,11 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
           </div></div>
           {branch === "research" && targetStretchPct != null && <div className="flex flex-col gap-2 rounded-lg border px-3 py-3 text-xs" style={{ borderColor: sameSessionStretch ? "var(--sh-red)" : "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-serif text-lg" style={{ color: "var(--sh-text-primary)" }}>+{formatCents(desiredCents - capitalCents)} · +{targetStretchPct.toFixed(0)}% · aspiration</p><BasisMark basis="aspirational" label="Aspirational" /></div><p>Research may conclude that no qualifying play reaches this value within the declared risk limit.{sameSessionStretch ? " Same-session stretch requires horizon verification." : ""}</p></div>}
           <RiskBudgetBar operatorCapCents={parseMoney(maxLoss) || null} perPlayCeilingCents={plannedRiskCeiling} concentrationBlocked={concentrationBlocked} />
+
+          <div className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+            <div><p className="text-xs font-semibold">Declared catalyst</p><p className="mt-1 text-sm" style={{ color: "var(--sh-text-primary)" }}>{declaredCatalystAt == null ? "Not declared in thesis" : new Date(declaredCatalystAt).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" }) + " ET"}</p><p className="mt-1 text-[10px]" style={{ color: "var(--sh-fg-muted)" }}>Source-preserved from the assigned thesis; declaration is not verification.</p></div>
+            <DateTimeField label={branch === "conditional" ? "Gate review (ET)" : "Outcome look-back (ET)"} value={branch === "conditional" ? eligibilityReviewAt : outcomeReviewAtInput} onChange={branch === "conditional" ? setEligibilityReviewAt : setOutcomeReviewAtInput} help={branch === "conditional" ? "When the named gate reopens for operator review." : "When the operator should record what happened; never an automatic exit."} />
+          </div>
 
           <details open={showTune} onToggle={(event) => setShowTune(event.currentTarget.open)} className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold"><span>Tune this run</span><ChevronDown className={"h-4 w-4 transition-transform " + (showTune ? "rotate-180" : "")} /></summary><div className="grid gap-4 border-t p-4 sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)" }}>
             <label className="text-xs font-semibold">Objective<select className="mt-1 min-h-10 w-full rounded-md border bg-transparent px-2" style={{ borderColor: "var(--sh-border-1)" }} value={objective} onChange={(event) => setObjective(event.target.value as Objective)}><option value="best_qualified_play">Best qualified play</option><option value="deploy_today">Deploy today</option><option value="verify_catalyst">Verify catalyst</option><option value="portfolio_gap">Portfolio gap</option><option value="preserve_optionality">Preserve optionality</option></select></label>
@@ -355,4 +397,8 @@ function MoneyField({ label, value, onChange, help }: { label: string; value: st
 
 function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return <label className="text-xs font-semibold">{label}<input value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>;
+}
+
+function DateTimeField({ label, value, onChange, help }: { label: string; value: string; onChange: (value: string) => void; help: string }) {
+  return <label className="text-xs font-semibold">{label}<input type="datetime-local" value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /><span className="mt-1 block text-[10px] font-normal" style={{ color: "var(--sh-fg-muted)" }}>{help}</span></label>;
 }
