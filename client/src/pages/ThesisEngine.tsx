@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { SetAsideHistory } from "@/components/aperture/SetAsideHistory";
 import { CapitalThesisWorkspace } from "@/components/aperture/CapitalThesisWorkspace";
+import { resolveThesisEntryWorkspace } from "@shared/thesisEntryRoute";
 import {
   Sparkles, ChevronRight, Loader2, Trash2, Lock, Play, Pencil, Check, X,
   AlertTriangle, CheckCircle2, Target, Scale, FileSearch,
@@ -307,7 +308,7 @@ export default function ThesisEngine() {
   const disqualifiers: string[] = compilationResult?.autoDisqualifiers ?? [];
   const notes: string[] = compilationResult?.confidenceNotes ?? [];
 
-  if (requestedScope === "capital" || requestedUatCase === "qualified-play") {
+  if (resolveThesisEntryWorkspace(requestedScope, requestedUatCase) === "capital") {
     return <CapitalThesisWorkspace />;
   }
 
@@ -342,10 +343,13 @@ export default function ThesisEngine() {
                 <button
                   key={scopeId}
                   onClick={() => {
+                    if (scopeId === "capital") {
+                      navigate("/thesis?scope=capital");
+                      return;
+                    }
                     setScope(scopeId);
                     setCompilationResult(null);
                     setCompilationId(null);
-                    if (scopeId === "capital" && !thesisText) setThesisText(CAPITAL_TRADE_STARTER);
                   }}
                   className={cn(
                     "text-left rounded-md px-3 py-2 transition-colors",

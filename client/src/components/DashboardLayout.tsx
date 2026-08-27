@@ -41,7 +41,7 @@ const navSections = [
     label: "Operations",
     items: [
       { href: "/", icon: LayoutDashboard, label: "Command Center", badge: null },
-      { href: "/thesis", icon: Sparkles, label: "Thesis Engine", badge: { label: "New", color: "amber" } },
+      { href: "/thesis?scope=acquisition", icon: Sparkles, label: "Acquisition Thesis", badge: { label: "New", color: "amber" } },
       { href: "/scout", icon: Building2, label: "Asset Scout", badge: { label: "New", color: "amber" } },
       { href: "/wingate", icon: Landmark, label: "Wingate Thesis", badge: { label: "Historic", color: "amber" } },
       { href: "/opportunity-radar", icon: Radar, label: "Opportunity Radar", badge: { label: "Live", color: "amber" } },

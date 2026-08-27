@@ -466,7 +466,7 @@ export default function Home() {
                   <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">Thesis-linked acquisition search</p>
                   <p className="font-card-title text-[16px] text-ink">{linkedAcquisitionSearch.name ?? "Untitled acquisition thesis"}</p>
                 </div>
-                <Link href="/thesis"><span className="font-eyebrow text-eyebrow text-amber hover:underline">Open thesis workspace →</span></Link>
+                <Link href="/thesis?scope=acquisition"><span className="font-eyebrow text-eyebrow text-amber hover:underline">Open acquisition thesis →</span></Link>
               </div>
             )}
             <ScanProgress jobId={visibleScanJobId} onComplete={() => {

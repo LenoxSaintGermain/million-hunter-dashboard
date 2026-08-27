@@ -107,7 +107,13 @@ export function CapitalThesisWorkspace() {
 
       <section className="rounded-lg border p-1" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }} aria-label="Purpose">
         <div className="grid grid-cols-3 gap-1">
-          {PURPOSES.map((item) => <button key={item.id} type="button" onClick={() => setPurpose(item.id)} aria-pressed={purpose === item.id} className="min-h-10 rounded px-2 text-left text-xs font-semibold transition-colors" style={purpose === item.id ? { background: "var(--sh-paper)", color: "var(--sh-text-primary)", boxShadow: "0 1px 2px rgb(0 0 0 / .08)" } : { color: "var(--sh-fg-muted)" }}>{item.label}</button>)}
+          {PURPOSES.map((item) => <button key={item.id} type="button" onClick={() => {
+            if (item.id === "capital") {
+              setPurpose("capital");
+              return;
+            }
+            navigate(route(`/thesis?scope=${item.id}`));
+          }} aria-pressed={purpose === item.id} className="min-h-10 rounded px-2 text-left text-xs font-semibold transition-colors" style={purpose === item.id ? { background: "var(--sh-paper)", color: "var(--sh-text-primary)", boxShadow: "0 1px 2px rgb(0 0 0 / .08)" } : { color: "var(--sh-fg-muted)" }}>{item.label}</button>)}
         </div>
       </section>
 
