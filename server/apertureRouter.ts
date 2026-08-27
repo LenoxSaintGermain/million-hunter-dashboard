@@ -76,6 +76,7 @@ import { checkVwapHold, openingRange, sessionVwap } from "./aperture/intraday";
 import { REGULAR_OPEN, etClock, nextRegularSessionOpen, startOfEtDay } from "./aperture/marketSession";
 import { constructPlay, CONSTRUCTED_PLAY_DISCLOSURE } from "./aperture/playConstructor";
 import { canonicalCapitalValues, needsCanonicalPromotion } from "./aperture/canonicalThesisLink";
+import { normalizeCapitalThesisRead } from "../shared/thesisReadContract";
 import { buildTrustCalibration, calculatePaperPlayOutcome } from "../shared/playOutcomeLedger";
 import { buildPortfolioImpactTrend, type PortfolioImpactTrendRow } from "../shared/portfolioImpactTrend";
 import { evaluateIntradayPaperOutcome } from "./aperture/playOutcomeEvaluator";
@@ -92,6 +93,7 @@ import {
   outcomeReviewAt,
   rankMissionLibrary,
 } from "./aperture/decisionRunway";
+import { immutableReceiptBindingIssue } from "./aperture/decisionReceiptBinding";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -100,7 +102,7 @@ async function requireThesis(db: Awaited<ReturnType<typeof getDb>>, thesisId: nu
     .where(and(eq(capitalTheses.id, thesisId), eq(capitalTheses.userId, userId)))
     .limit(1);
   if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Thesis not found" });
-  return rows[0];
+  return normalizeCapitalThesisRead(rows[0]);
 }
 
 async function requireAccount(db: Awaited<ReturnType<typeof getDb>>, accountId: number, userId: number) {
@@ -109,6 +111,93 @@ async function requireAccount(db: Awaited<ReturnType<typeof getDb>>, accountId: 
     .limit(1);
   if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Account not found" });
   return rows[0];
+}
+
+function receiptBindingUnavailable(): never {
+  throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Decision binding unavailable" });
+}
+
+function snapshotRecord(value: unknown): Record<string, unknown> | null {
+  let candidate: unknown = value;
+  // Older rows arrived from MariaDB as a JSON string containing JSON text. Decode
+  // at most twice; any other representation remains unavailable rather than guessed.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) return candidate as Record<string, unknown>;
+    if (typeof candidate !== "string") return null;
+    try {
+      candidate = JSON.parse(candidate);
+    } catch {
+      return null;
+    }
+  }
+  return candidate && typeof candidate === "object" && !Array.isArray(candidate) ? candidate as Record<string, unknown> : null;
+}
+
+function isExactIsolatedUatRuntime() {
+  if (process.env.NODE_ENV !== "development" || process.env.ISOLATED_UAT_MODE !== "true") return false;
+  try {
+    const url = new URL(process.env.DATABASE_URL ?? "");
+    return url.protocol === "mysql:"
+      && url.hostname === "127.0.0.1"
+      && url.port === "3307"
+      && url.pathname === "/capital_aperture_uat_9c18799"
+      && url.username === "uat_app";
+  } catch {
+    return false;
+  }
+}
+
+async function readImmutableDecisionReceipt(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  userId: number,
+  decisionRun: typeof apertureDecisionRuns.$inferSelect,
+  revision: typeof apertureDecisionRevisions.$inferSelect,
+) {
+  const context = snapshotRecord(revision.contextSnapshot);
+  const gateSnapshot = snapshotRecord(revision.gateSnapshot);
+  if (!context || !gateSnapshot) receiptBindingUnavailable();
+  if (immutableReceiptBindingIssue({
+    requestedOwnerId: userId,
+    run: {
+      ownerId: decisionRun.userId,
+      canonicalThesisId: decisionRun.canonicalThesisId,
+      capitalThesisId: decisionRun.capitalThesisId,
+      accountId: decisionRun.accountId,
+    },
+    contextSnapshot: context,
+    gateSnapshot,
+  })) receiptBindingUnavailable();
+
+  const [[canonical], [projection], [account]] = await Promise.all([
+    db.select({ id: thesisCompilations.id, name: thesisCompilations.name }).from(thesisCompilations).where(and(eq(thesisCompilations.id, decisionRun.canonicalThesisId), eq(thesisCompilations.userId, userId))).limit(1),
+    db.select({ id: capitalTheses.id, name: capitalTheses.name, sourceCompilationId: capitalTheses.sourceCompilationId }).from(capitalTheses).where(and(eq(capitalTheses.id, decisionRun.capitalThesisId), eq(capitalTheses.userId, userId))).limit(1),
+    db.select({ id: portfolioAccounts.id, label: portfolioAccounts.label, isPaper: portfolioAccounts.isPaper }).from(portfolioAccounts).where(and(eq(portfolioAccounts.id, decisionRun.accountId), eq(portfolioAccounts.userId, userId))).limit(1),
+  ]);
+  if (!canonical || !projection || projection.sourceCompilationId !== canonical.id || !account?.isPaper) receiptBindingUnavailable();
+  return {
+    ...revision,
+    id: decisionRun.id,
+    decisionRunId: decisionRun.id,
+    decisionRevisionId: revision.id,
+    branch: revision.effectiveBranch,
+    runId: decisionRun.researchRunId,
+    accountId: decisionRun.accountId,
+    canonicalThesisId: decisionRun.canonicalThesisId,
+    capitalThesisId: decisionRun.capitalThesisId,
+    lifecycle: decisionRun.lifecycle,
+    authority: "authoritative" as const,
+    binding: {
+      ownerId: decisionRun.userId,
+      canonicalThesisId: canonical.id,
+      canonicalThesisName: canonical.name ?? "Unnamed thesis",
+      capitalThesisId: projection.id,
+      capitalThesisName: projection.name ?? "Unnamed Capital thesis",
+      accountId: account.id,
+      accountLabel: account.label,
+      mandateVersion: gateSnapshot.mandateVersion as string,
+      decisionVersion: revision.version,
+    },
+  };
 }
 
 /**
@@ -268,9 +357,10 @@ export const apertureRouter = router({
   thesis: router({
     list: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
-      return db!.select().from(capitalTheses)
+      const rows = await db!.select().from(capitalTheses)
         .where(eq(capitalTheses.userId, ctx.user.id))
         .orderBy(desc(capitalTheses.updatedAt));
+      return rows.map(normalizeCapitalThesisRead);
     }),
 
     get: adminProcedure
@@ -707,36 +797,66 @@ export const apertureRouter = router({
   // Durable operator context only. A cash branch cannot be attached to a run
   // and is separately checked when a paper-order proposal is attempted.
   runway: router({
-    latest: adminProcedure.query(async ({ ctx }) => {
+    latest: adminProcedure.input(z.object({
+      decisionRunId: z.number().positive().optional(),
+      revisionId: z.number().positive().optional(),
+    }).optional()).query(async ({ ctx, input }) => {
       const db = await getDb();
-      const [decisionRun] = await db!.select().from(apertureDecisionRuns)
-        .where(eq(apertureDecisionRuns.userId, ctx.user.id))
-        .orderBy(desc(apertureDecisionRuns.updatedAt))
-        .limit(1);
-      const [revision] = decisionRun?.currentRevisionId == null ? [undefined] : await db!.select().from(apertureDecisionRevisions)
+      if ((input?.decisionRunId == null) !== (input?.revisionId == null)) receiptBindingUnavailable();
+      const [decisionRun] = input?.decisionRunId != null
+        ? await db!.select().from(apertureDecisionRuns).where(and(
+          eq(apertureDecisionRuns.id, input.decisionRunId),
+          eq(apertureDecisionRuns.userId, ctx.user.id),
+        )).limit(1)
+        : await db!.select().from(apertureDecisionRuns)
+          .where(eq(apertureDecisionRuns.userId, ctx.user.id))
+          .orderBy(desc(apertureDecisionRuns.updatedAt))
+          .limit(1);
+      if (input?.decisionRunId != null && !decisionRun) receiptBindingUnavailable();
+      const revisionId = input?.revisionId ?? decisionRun?.currentRevisionId ?? null;
+      const [revision] = decisionRun == null || revisionId == null ? [undefined] : await db!.select().from(apertureDecisionRevisions)
         .where(and(
-          eq(apertureDecisionRevisions.id, decisionRun.currentRevisionId),
+          eq(apertureDecisionRevisions.id, revisionId),
           eq(apertureDecisionRevisions.decisionRunId, decisionRun.id),
         )).limit(1);
+      if (input?.revisionId != null && !revision) receiptBindingUnavailable();
       const [legacy] = decisionRun ? [undefined] : await db!.select().from(apertureRunwayStates)
         .where(eq(apertureRunwayStates.userId, ctx.user.id))
         .orderBy(desc(apertureRunwayStates.updatedAt)).limit(1);
       const [profile] = await db!.select({ activeCapitalThesisId: users.activeCapitalThesisId })
         .from(users).where(eq(users.id, ctx.user.id)).limit(1);
       return {
-        latest: revision && decisionRun ? {
-          ...revision,
-          id: decisionRun.id,
-          branch: revision.effectiveBranch,
-          runId: decisionRun.researchRunId,
-          accountId: decisionRun.accountId,
-          canonicalThesisId: decisionRun.canonicalThesisId,
-          capitalThesisId: decisionRun.capitalThesisId,
-          lifecycle: decisionRun.lifecycle,
-          authority: "authoritative" as const,
-        } : legacy ? { ...legacy, authority: "legacy" as const } : null,
+        latest: revision && decisionRun ? await readImmutableDecisionReceipt(db!, ctx.user.id, decisionRun, revision)
+          : legacy ? { ...legacy, authority: "legacy" as const } : null,
         activeCanonicalThesisId: profile?.activeCapitalThesisId ?? null,
       };
+    }),
+    pending: adminProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      return db!.select({
+        id: aperturePendingOutcomes.id,
+        kind: aperturePendingOutcomes.kind,
+        status: aperturePendingOutcomes.status,
+        dueAt: aperturePendingOutcomes.dueAt,
+        gateKey: aperturePendingOutcomes.gateKey,
+        reviewBasis: aperturePendingOutcomes.reviewBasis,
+        decisionRunId: apertureDecisionRuns.id,
+        revisionId: apertureDecisionRevisions.id,
+        revisionVersion: apertureDecisionRevisions.version,
+        branch: apertureDecisionRevisions.effectiveBranch,
+        thesisName: thesisCompilations.name,
+      }).from(aperturePendingOutcomes)
+        .innerJoin(apertureDecisionRuns, eq(aperturePendingOutcomes.decisionRunId, apertureDecisionRuns.id))
+        .innerJoin(apertureDecisionRevisions, and(
+          eq(aperturePendingOutcomes.revisionId, apertureDecisionRevisions.id),
+          eq(aperturePendingOutcomes.decisionRunId, apertureDecisionRevisions.decisionRunId),
+        ))
+        .leftJoin(thesisCompilations, eq(apertureDecisionRuns.canonicalThesisId, thesisCompilations.id))
+        .where(and(
+          eq(aperturePendingOutcomes.userId, ctx.user.id),
+          inArray(aperturePendingOutcomes.status, ["pending", "due"]),
+        ))
+        .orderBy(asc(aperturePendingOutcomes.dueAt));
     }),
     library: adminProcedure
       .input(z.object({
@@ -985,9 +1105,127 @@ export const apertureRouter = router({
         return { ...receipt, created: true, branch: input.branch, maxPlannedLossCents };
       }),
     startResearch: adminProcedure
-      .input(z.object({ decisionRunId: z.number(), revisionId: z.number() }))
+      .input(z.object({ decisionRunId: z.number(), revisionId: z.number(), uatCase: z.literal("qualified-play").optional() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
+        const isolatedUatResearchBlocked = isExactIsolatedUatRuntime();
+        const qualifiedPlayFixture = isolatedUatResearchBlocked
+          && input.uatCase === "qualified-play"
+          && ctx.user.openId === "uat_jim_9c18799";
+        if (input.uatCase && !qualifiedPlayFixture) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The qualified-play fixture is available only to the Jim identity in the exact isolated development UAT environment." });
+        }
+        if (qualifiedPlayFixture) {
+          const [decisionRun] = await db!.select().from(apertureDecisionRuns).where(and(
+            eq(apertureDecisionRuns.id, input.decisionRunId), eq(apertureDecisionRuns.userId, ctx.user.id),
+          )).limit(1);
+          if (!decisionRun || decisionRun.currentRevisionId !== input.revisionId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current Jim mission revision before compiling the illustrative UAT fixture." });
+          if (decisionRun.researchRunId != null) return { status: "started" as const, runId: decisionRun.researchRunId, decisionRunId: decisionRun.id, revisionId: input.revisionId, fixture: "qualified-play" as const };
+          const [revision] = await db!.select().from(apertureDecisionRevisions).where(and(eq(apertureDecisionRevisions.id, input.revisionId), eq(apertureDecisionRevisions.decisionRunId, decisionRun.id))).limit(1);
+          if (!revision || revision.effectiveBranch !== "research") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash and conditional branches cannot compile the illustrative fixture." });
+          const thesis = await requireThesis(db, decisionRun.capitalThesisId, ctx.user.id);
+          const account = await requireAccount(db, decisionRun.accountId, ctx.user.id);
+          if (!account.isPaper) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The illustrative fixture requires Jim’s paper account." });
+          const now = Date.now();
+          const deadline = now + 2 * 60 * 60 * 1000;
+          const marker = "ILLUSTRATIVE_UAT_QUALIFIED_PLAY_ZERO_NETWORK_NOT_CURRENT_MARKET_DATA";
+          let created: number;
+          try {
+            created = await db!.transaction(async (tx) => {
+            const [runResult] = await tx.insert(apertureRuns).values({ userId: ctx.user.id, thesisId: thesis.id, accountId: account.id, deployableCapitalCents: revision.deployableCapitalCents, intendedTrades: [], holdingPeriod: "intraday", catalystDeadlineAt: deadline, liquidityFloorAdvUsd: CURRENT_MANDATE.minAdvUsd30d, maxSingleNamePct: CURRENT_MANDATE.maxPositionPctOfEquity, invalidationRule: "Illustrative UAT fixture invalidates if the named catalyst evidence, paper-only boundary, or modeled risk cap is not confirmed by a human.", mandateVersion: CURRENT_MANDATE.version, status: "completed", universeCount: 2, candidateCount: 2, droppedNote: marker, providerAvailability: { illustrative_uat_fixture: true, provider_network_invoked: false }, startedAt: now, completedAt: now, createdAt: now });
+            const runId = Number((runResult as any).insertId);
+            await tx.insert(apertureCandidates).values([
+              { runId, symbol: "UATQ", playSide: "long", role: "core", compositeScore: 91, confidenceScore: 0.74, rankScore: 0.91, dimensions: { thesisFit: "modeled", evidenceFreshness: "unknown", liquidity: "illustrative" }, verifyFields: ["Confirm the named catalyst evidence is still current before any paper proposal."], exposureNodeIds: [], memo: { basis: "Illustrative UAT fixture — not current market data.", whyRanked: "Highest modeled thesis fit within Jim’s declared paper-risk cap; no return is promised." }, memoStatus: "ok", citations: ["illustrative-uat-fixture://qualified-play"], suggestedSizeLowCents: 240000, suggestedSizeHighCents: 300000, createdAt: now },
+              { runId, symbol: "UATC", playSide: "long", role: "alternative_expression", compositeScore: 72, confidenceScore: 0.52, rankScore: 0.72, dimensions: { thesisFit: "modeled", evidenceFreshness: "unknown", liquidity: "illustrative" }, verifyFields: ["Confirm this alternative’s catalyst and liquidity before it can replace the lead."], exposureNodeIds: [], memo: { basis: "Illustrative UAT fixture — not current market data.", whyRanked: "Conditional alternative: lower modeled thesis fit and incomplete evidence." }, memoStatus: "ok", citations: ["illustrative-uat-fixture://conditional-alternative"], suggestedSizeLowCents: null, suggestedSizeHighCents: null, createdAt: now },
+            ]);
+            const [slateResult] = await tx.insert(aperturePlaySlates).values({ userId: ctx.user.id, canonicalThesisId: decisionRun.canonicalThesisId, accountId: account.id, sessionDateEt: new Date(now).toISOString().slice(0, 10), windowKey: `illustrative_qualified_play_${decisionRun.id}`, snapshotBasis: "historical_reconstruction", status: "captured", operatorDecision: "not_recorded", portfolioSnapshot: { label: "Illustrative UAT fixture — not current market data", equityCents: account.equityValueCents ?? null, measured: false }, contextSnapshot: { label: "Illustrative UAT fixture — not current market data", providerNetworkCalls: 0, brokerOrdersCreated: 0 }, capturedAt: now, createdAt: now, updatedAt: now });
+            const slateId = Number((slateResult as any).insertId);
+            const candidates = await tx.select().from(apertureCandidates).where(eq(apertureCandidates.runId, runId)).orderBy(desc(apertureCandidates.rankScore));
+            await tx.insert(aperturePlaySlateItems).values(candidates.map((candidate, index) => ({ slateId, sourceRunId: runId, sourceCandidateId: candidate.id, symbol: candidate.symbol, conditionKey: index === 0 ? "illustrative-qualified-lead" : "illustrative-conditional-alternative", recommendationSnapshot: { label: "Illustrative UAT fixture — not current market data", rank: index + 1, thesisFit: "modeled", evidenceFreshness: "unknown", riskCapCents: revision.maxPlannedLossCents }, outcomeStatus: "unavailable" as const, outcomeResult: "unresolved" as const, triggerObservation: "not_observed" as const, exitObservation: "not_observed" as const, outcomeBasis: "unknown" as const, outcomeExplanation: "Illustrative UAT fixture. No price, outcome, or current-market claim exists.", createdAt: now, updatedAt: now })));
+            const update = await tx.update(apertureDecisionRuns).set({ researchRunId: runId, lifecycle: "researching", lockVersion: decisionRun.lockVersion + 1, updatedAt: now }).where(and(eq(apertureDecisionRuns.id, decisionRun.id), eq(apertureDecisionRuns.currentRevisionId, revision.id), eq(apertureDecisionRuns.lockVersion, decisionRun.lockVersion)));
+            if (!update[0].affectedRows) throw new TRPCError({ code: "CONFLICT", message: "Jim’s mission changed before the fixture could be bound." });
+              return runId;
+            });
+          } catch (error) {
+            console.warn("[aperture] isolated illustrative fixture write did not complete", error instanceof Error ? error.message : error);
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Illustrative UAT Play Slate could not be recorded. No provider, proposal, or broker action occurred. Reload and retry the isolated fixture." });
+          }
+          return { status: "started" as const, runId: created, decisionRunId: decisionRun.id, revisionId: revision.id, fixture: "qualified-play" as const };
+        }
+        if (isolatedUatResearchBlocked) {
+          const [decisionRun] = await db!.select().from(apertureDecisionRuns).where(and(
+            eq(apertureDecisionRuns.id, input.decisionRunId),
+            eq(apertureDecisionRuns.userId, ctx.user.id),
+          )).limit(1);
+          if (!decisionRun) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Decision binding unavailable" });
+          if (decisionRun.currentRevisionId !== input.revisionId) {
+            const [replayed] = await db!.select().from(apertureDecisionRevisions).where(and(
+              eq(apertureDecisionRevisions.decisionRunId, decisionRun.id),
+              eq(apertureDecisionRevisions.previousRevisionId, input.revisionId),
+              eq(apertureDecisionRevisions.namedGateKey, "research-provider-unavailable"),
+            )).limit(1);
+            if (replayed) return { status: "blocked" as const, decisionRunId: decisionRun.id, revisionId: replayed.id, message: "Research provider unavailable in this environment" };
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current mission revision before starting research." });
+          }
+          const [current] = await db!.select().from(apertureDecisionRevisions).where(and(
+            eq(apertureDecisionRevisions.id, input.revisionId),
+            eq(apertureDecisionRevisions.decisionRunId, decisionRun.id),
+          )).limit(1);
+          if (!current || current.effectiveBranch !== "research") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash and conditional branches cannot start research." });
+          const now = Date.now();
+          const result = await db!.transaction(async (tx) => {
+            const [locked] = await tx.select().from(apertureDecisionRuns).where(and(
+              eq(apertureDecisionRuns.id, decisionRun.id),
+              eq(apertureDecisionRuns.userId, ctx.user.id),
+              eq(apertureDecisionRuns.currentRevisionId, current.id),
+              eq(apertureDecisionRuns.lockVersion, decisionRun.lockVersion),
+            )).for("update").limit(1);
+            if (!locked) throw new TRPCError({ code: "CONFLICT", message: "The Decision Run changed while research availability was checked." });
+            const { id: _id, decisionRunId: _runId, version: _version, previousRevisionId: _previousRevisionId, createdAt: _createdAt, ...copy } = current;
+            const reviewAt = now + 60 * 60 * 1000;
+            const [inserted] = await tx.insert(apertureDecisionRevisions).values({
+              ...copy,
+              decisionRunId: locked.id,
+              version: current.version + 1,
+              previousRevisionId: current.id,
+              operatorChoice: "conditional",
+              effectiveBranch: "conditional",
+              reason: "Research provider unavailable in this environment.",
+              blocker: "Provider-backed research dispatch is disabled in this isolated UAT environment.",
+              reopenCondition: "Enable an approved research provider, then record a new decision revision before research begins.",
+              reviewAt,
+              namedGateKey: "research-provider-unavailable",
+              namedGateLabel: "Research provider unavailable",
+              createdAt: now,
+            });
+            const revisionId = Number((inserted as any).insertId);
+            const updated = await tx.update(apertureDecisionRuns).set({
+              currentRevisionId: revisionId,
+              lifecycle: "conditional",
+              lockVersion: locked.lockVersion + 1,
+              updatedAt: now,
+            }).where(and(
+              eq(apertureDecisionRuns.id, locked.id),
+              eq(apertureDecisionRuns.currentRevisionId, current.id),
+              eq(apertureDecisionRuns.lockVersion, locked.lockVersion),
+            ));
+            if (!updated[0].affectedRows) throw new TRPCError({ code: "CONFLICT", message: "The Decision Run changed while the fail-closed receipt was being written." });
+            await tx.insert(aperturePendingOutcomes).values({
+              userId: ctx.user.id,
+              decisionRunId: locked.id,
+              revisionId,
+              kind: "gate_review",
+              status: "pending",
+              dueAt: reviewAt,
+              gateKey: "research-provider-unavailable",
+              reviewBasis: "Enable an approved research provider, then record a new decision revision before research begins.",
+              createdAt: now,
+              updatedAt: now,
+            });
+            return { revisionId };
+          });
+          return { status: "blocked" as const, decisionRunId: decisionRun.id, revisionId: result.revisionId, message: "Research provider unavailable in this environment" };
+        }
         const [decisionRun] = await db!.select().from(apertureDecisionRuns).where(and(
           eq(apertureDecisionRuns.id, input.decisionRunId),
           eq(apertureDecisionRuns.userId, ctx.user.id),
@@ -1056,7 +1294,7 @@ export const apertureRouter = router({
           return exactRunId;
         });
         executeRun(runId, ctx.user.id, thesis, runInput).catch((error) => console.error(`[aperture] Decision Runway research ${runId} failed:`, error?.message ?? error));
-        return { runId, decisionRunId: decisionRun.id, revisionId: revision.id };
+        return { status: "started" as const, runId, decisionRunId: decisionRun.id, revisionId: revision.id };
       }),
     attachRun: adminProcedure.input(z.object({ stateId: z.number(), runId: z.number() })).mutation(() => {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Arbitrary run attachment is retired. Start research from the exact Decision Run revision." });
@@ -1731,6 +1969,31 @@ export const apertureRouter = router({
             eq(apertureRuns.userId, ctx.user.id),
           )).limit(1);
         if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Play not found in your research history" });
+
+        const illustrativeFixtureRecipe = isExactIsolatedUatRuntime()
+          && ctx.user.openId === "uat_jim_9c18799"
+          && row.run.droppedNote === "ILLUSTRATIVE_UAT_QUALIFIED_PLAY_ZERO_NETWORK_NOT_CURRENT_MARKET_DATA";
+        if (illustrativeFixtureRecipe) {
+          const isLead = row.candidate.symbol === "UATQ";
+          return {
+            play: {
+              symbol: row.candidate.symbol, side: "long" as const, holdingPeriod: "intraday" as const,
+              taxonomy: { marketPlay: { specificPlay: isLead ? "illustrative catalyst review" : "conditional alternative review", basis: "Illustrative UAT fixture — not current market data." }, execution: { direction: "long", strategy: "human-reviewed paper plan", instrument: "shares" }, horizon: { label: "Same-session human review", basis: "Modeled UAT horizon; no current market claim." }, signals: [{ label: "Named catalyst evidence", status: "unknown" }] },
+              readiness: "constructed" as const,
+              entry: { priceCents: isLead ? 2500 : 1800, modeled: true as const, basis: "Modeled illustrative level; not a quote or current market price." },
+              stop: { priceCents: isLead ? 2425 : 1746, modeled: true as const, basis: "Modeled risk boundary for UAT review only." },
+              slippage: { priceCents: 2, modeled: true as const, basis: "Illustrative slippage assumption." },
+              targets: [{ priceCents: isLead ? 2615 : 1890, modeled: true as const, rMultiple: 1.5, basis: "Modeled R-multiple illustration; not a return promise." }],
+              budgetCents: 15000, qty: isLead ? 55 : 45, notionalCents: isLead ? 137500 : 81000, plannedLossCents: isLead ? 4235 : 2520, plannedLossPctOfEquity: isLead ? 0.042 : 0.025, sizeLimitedByNotionalCeiling: false, timeStopAt: null,
+              noTradeConditions: ["Do not take this illustrative recipe unless the named catalyst evidence is independently confirmed.", "No current quote, tape, or provider fact was requested or supplied."],
+              trigger: { state: "unknown", basis: "Illustrative UAT fixture — live trigger observation intentionally unavailable.", vwap: null, lastPrice: null, feed: "unknown", lagMs: null, needsOperatorConfirmation: true },
+              tapeBasis: "Illustrative UAT fixture — not current market data; zero network provider calls.", feed: "unknown" as const,
+              unavailableReasons: ["Current tape and live pricing are intentionally unavailable in this isolated fixture."],
+              assumptions: ["Named values are modeled for a UAT review path only.", "No return, fill, or current-price outcome is represented."],
+            },
+            disclosure: "Illustrative UAT fixture — not current market data. This paper-review surface cannot create, approve, or submit an order.",
+          };
+        }
 
         const accounts = await db!.select().from(portfolioAccounts).where(eq(portfolioAccounts.userId, ctx.user.id));
         const account = row.run.accountId
@@ -2467,6 +2730,9 @@ export const apertureRouter = router({
           .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id)))
           .limit(1);
         if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+        if (run.droppedNote === "ILLUSTRATIVE_UAT_QUALIFIED_PLAY_ZERO_NETWORK_NOT_CURRENT_MARKET_DATA") {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Illustrative UAT fixtures may be reviewed but can never create a paper-order proposal." });
+        }
 
         // A candidate-originated proposal cannot skip the operator's recorded review
         // of the evidence questions that can change the decision. Manual paper orders
@@ -2524,6 +2790,7 @@ export const apertureRouter = router({
           .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id)))
           .limit(1);
         if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+        const illustrativeFixture = run.droppedNote === "ILLUSTRATIVE_UAT_QUALIFIED_PLAY_ZERO_NETWORK_NOT_CURRENT_MARKET_DATA";
 
         const evidenceBlock = await evidenceReviewBlock(db, ctx.user.id, input.runId, input.candidateId);
 
@@ -2553,7 +2820,8 @@ export const apertureRouter = router({
         const { evaluation, gatedNotionalCents, notionalBasis, session } = preflight;
 
         const recipeGap = missingIntradayRecipeMessage(input);
-        const blocking = [...evaluation.failures, ...schemaErrors, ...(recipeGap ? [recipeGap] : []), ...(evidenceBlock ? [evidenceBlock] : [])];
+        const fixtureBlock = illustrativeFixture ? ["Illustrative UAT fixtures may be reviewed but can never create a paper-order proposal."] : [];
+        const blocking = [...fixtureBlock, ...evaluation.failures, ...schemaErrors, ...(recipeGap ? [recipeGap] : []), ...(evidenceBlock ? [evidenceBlock] : [])];
         return {
           wouldPass: blocking.length === 0,
           blocking,

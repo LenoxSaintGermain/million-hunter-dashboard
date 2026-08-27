@@ -5,7 +5,7 @@
  * Modeled figures are labeled as such throughout.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -118,7 +118,11 @@ function FieldLabel({ label, help, inputId }: { label: string; help: string; inp
 
 export default function ApertureHome() {
   const [, navigate] = useLocation();
-  const [showResearchSetup, setShowResearchSetup] = useState(() => new URLSearchParams(window.location.search).get("setup") === "1");
+  const [isReceiptRoute, receiptParams] = useRoute("/aperture/decision/:decisionRunId/revision/:revisionId");
+  const receiptTarget = isReceiptRoute && Number.isInteger(Number(receiptParams?.decisionRunId)) && Number.isInteger(Number(receiptParams?.revisionId))
+    ? { decisionRunId: Number(receiptParams?.decisionRunId), revisionId: Number(receiptParams?.revisionId) }
+    : null;
+  const [showResearchSetup, setShowResearchSetup] = useState(() => !receiptTarget && new URLSearchParams(window.location.search).get("setup") === "1");
   const [selectedThesisId, setSelectedThesisId] = useState<number | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [deployable, setDeployable] = useState("20000");
@@ -242,7 +246,7 @@ export default function ApertureHome() {
   };
 
   if (!showResearchSetup) {
-    return <DashboardLayout><DecisionRunway onNewResearch={() => { setShowResearchSetup(true); navigate("/aperture?setup=1"); }} onOpenResearchRun={(runId) => navigate(`/aperture/run/${runId}`)} onOpenRun={(runId, candidateId, view) => {
+    return <DashboardLayout><DecisionRunway receiptTarget={receiptTarget} onNewResearch={() => { setShowResearchSetup(true); navigate("/aperture?setup=1&draft=1"); }} onOpenResearchRun={(runId) => navigate(`/aperture/run/${runId}`)} onOpenRun={(runId, candidateId, view) => {
       if (view === "execute") navigate(`/aperture/run/${runId}/execute?candidate=${candidateId}`);
       else navigate(`/aperture/run/${runId}?view=${view ?? "play"}`);
     }} /></DashboardLayout>;

@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowRight, CheckCircle2, CircleAlert, Clock3, FlaskConical, Layers3, PlayCircle } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, CircleAlert, Clock3, FlaskConical, Layers3, PlayCircle } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { buildResearchJourneys, type ResearchJourney } from "@shared/runWorkspace";
 import { formatDistanceToNow } from "date-fns";
@@ -45,14 +45,16 @@ const actionFor = (journey: ResearchJourney) => {
 export default function ApertureRuns() {
   const [, navigate] = useLocation();
   const { data: runs, isLoading, refetch } = trpc.aperture.run.list.useQuery();
+  const { data: pendingOutcomes } = trpc.aperture.runway.pending.useQuery();
   const journeys = buildResearchJourneys((runs ?? []) as any[]);
 
   return <DashboardLayout><div className="mx-auto max-w-6xl space-y-6 pb-12">
     <div className="flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}><AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} />Internal research tool — not investment advice. Research journeys never create or submit an order.</div>
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture · Research journeys</p><h1 className="mt-1 font-serif text-3xl" style={{ color: "var(--sh-text-primary)" }}>One question. One connected research trail.</h1><p className="mt-2 max-w-2xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>A follow-up batch belongs to the same decision. Start with the journey that has a clear next human action—not a raw list of brief IDs.</p></div>
-      <Button onClick={() => navigate("/aperture")}>Start a research brief <ArrowRight className="ml-2 h-4 w-4" /></Button>
+      <Button onClick={() => navigate("/aperture?setup=1&draft=1")}>Start a research brief <ArrowRight className="ml-2 h-4 w-4" /></Button>
     </header>
+    {(pendingOutcomes?.length ?? 0) > 0 && <section className="overflow-hidden rounded-xl border" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "var(--sh-surface)" }}><div className="flex items-center gap-2 border-b px-5 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><CalendarClock className="h-4 w-4" style={{ color: "var(--sh-signal)" }} /><div><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Pending decisions and outcomes</p><p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Durable gates and outcome reviews. These are not research journeys.</p></div></div><div className="divide-y" style={{ borderColor: "var(--sh-border-1)" }}>{(pendingOutcomes ?? []).map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" style={{ color: "var(--sh-signal)", borderColor: "var(--sh-signal)" }}>{item.kind === "gate_review" ? "Named gate" : "Outcome review"}</Badge><span className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>Owner scoped · revision v{item.revisionVersion}</span></div><p className="mt-2 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{item.gateKey ?? item.thesisName ?? "Decision review"}</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{item.thesisName ?? "Assigned thesis"} · due <time dateTime={new Date(item.dueAt).toISOString()}>{new Date(item.dueAt).toLocaleString()}</time> · {item.reviewBasis}</p></div><Button variant="outline" size="sm" className="min-h-11" onClick={() => navigate(`/aperture/decision/${item.decisionRunId}/revision/${item.revisionId}`)}>Open decision <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button></div>)}</div></section>}
     {isLoading && <p className="py-12 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Loading your research journeys…</p>}
     <div className="grid gap-4">
       {journeys.map((journey) => {

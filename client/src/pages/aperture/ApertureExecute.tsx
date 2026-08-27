@@ -769,7 +769,7 @@ export default function ApertureExecute() {
         {proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(`/aperture/run/${runId}?view=evidence`)} onProposalCreated={() => navigate(`/aperture/run/${runId}/execute`)} />}
 
         <Tabs defaultValue="orders">
-          <TabsList>
+          <TabsList className="flex h-auto w-full min-w-0 max-w-full justify-start overflow-x-auto sm:inline-flex sm:w-fit">
             <TabsTrigger value="orders">Paper order review</TabsTrigger>
             <TabsTrigger value="monitoring">Thesis monitoring</TabsTrigger>
             <TabsTrigger value="alpha">Measured outcomes</TabsTrigger>

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronDown, Clock3, Info, Landmark, ShieldCheck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { formatMandatePercentPoints } from "@shared/cockpitPresentation";
-import { buildCockpitRailSummary, cockpitConstraintSignature, CRITICAL_CONSTRAINT_PCT, type CockpitHeadroomLine } from "@shared/cockpitRailSummary";
+import { buildCockpitRailSummary, type CockpitHeadroomLine } from "@shared/cockpitRailSummary";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { BasisMark, StateMark } from "./DecisionVisualLanguage";
 
 type HeadroomLine = CockpitHeadroomLine;
 
@@ -53,12 +54,10 @@ export function CapitalCockpitRail({ runId }: { runId?: number }) {
   const { data, isLoading } = trpc.aperture.cockpit.useQuery(cockpitInput, { refetchInterval: 60_000, refetchIntervalInBackground: true });
   const preference = trpc.aperture.cockpitPreference.get.useQuery();
   const setPreference = trpc.aperture.cockpitPreference.set.useMutation();
-  const acknowledge = trpc.aperture.cockpitPreference.acknowledge.useMutation();
   const [clockNow, setClockNow] = useState(() => Date.now());
   const responseAt = useRef(Date.now());
   const preferenceApplied = useRef(false);
   const [expanded, setExpanded] = useState(false);
-  const [acknowledgedSignature, setAcknowledgedSignature] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<"severity" | "impact">("severity");
   useEffect(() => {
     const interval = window.setInterval(() => setClockNow(Date.now()), 30_000);
@@ -72,32 +71,17 @@ export function CapitalCockpitRail({ runId }: { runId?: number }) {
     () => data ? buildCockpitRailSummary(data.headroom.lines as HeadroomLine[], data.account.stalenessMs) : null,
     [data],
   );
-  const bindingSignature = cockpitConstraintSignature(summary?.binding);
-  const persistedAcknowledgement = preference.data?.acknowledgedSignature ?? null;
-  const acknowledgedCurrentConstraint = bindingSignature != null && (acknowledgedSignature === bindingSignature || persistedAcknowledgement === bindingSignature);
-  const autoExpanded = summary?.severity === "critical" && !acknowledgedCurrentConstraint;
   useEffect(() => {
     if (preferenceApplied.current || preference.data == null) return;
     preferenceApplied.current = true;
-    setExpanded(autoExpanded || preference.data.expanded);
-  }, [autoExpanded, preference.data]);
-  useEffect(() => {
-    if (autoExpanded) setExpanded(true);
-  }, [autoExpanded]);
+    setExpanded(preference.data.expanded);
+  }, [preference.data]);
   if (isLoading || !data || !summary) return <section className="mb-5 animate-pulse motion-reduce:animate-none rounded-xl border px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Loading paper-research context…</span></section>;
 
   const elapsedMs = Math.max(0, clockNow - responseAt.current);
   const boundaryMs = data.session.msToNextBoundary == null ? null : data.session.msToNextBoundary - elapsedMs;
   const deadlineMs = data.run?.msToCatalystDeadline == null ? null : data.run.msToCatalystDeadline - elapsedMs;
-  const acknowledgeConstraint = () => {
-    if (!bindingSignature) return;
-    setAcknowledgedSignature(bindingSignature);
-    setExpanded(false);
-    setPreference.mutate({ expanded: false });
-    acknowledge.mutate({ signature: bindingSignature });
-  };
   const changeExpanded = () => {
-    if (autoExpanded) return;
     const next = !expanded;
     setExpanded(next);
     setPreference.mutate({ expanded: next });
@@ -117,16 +101,17 @@ export function CapitalCockpitRail({ runId }: { runId?: number }) {
     ? `ceilings are measured against ${syncedLabel(data.account.stalenessMs)} equity`
     : syncedLabel(data.account.stalenessMs);
   const severityColor = summary.severity === "critical" ? "var(--sh-red)" : summary.severity === "warning" || summary.accountStale ? "var(--sh-signal)" : "var(--sh-fg-muted)";
+  const bindingUtilization = Math.min(100, Math.max(0, summary.bindingUtilizationPct ?? 0));
+  const bindingHeadroom = Math.max(0, 100 - bindingUtilization);
 
   return <section className="mb-5 overflow-hidden rounded-xl border" style={{ borderColor: summary.severity === "critical" ? severityColor : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-    <div className="flex items-center gap-2 border-b px-4 py-2 text-[11px]" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}><ShieldCheck className="h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} />Internal research tool — not investment advice. Modeled figures are labeled as such.</div>
-      <div className="flex min-h-12 flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:gap-0 sm:py-0" style={{ background: summary.severity === "critical" ? "color-mix(in srgb, var(--sh-red) 6%, var(--sh-surface))" : "var(--sh-surface)" }}>
-      <div className="flex min-w-0 items-center gap-2 px-1 py-1.5 sm:flex-1 sm:border-r sm:px-3" style={{ borderColor: "var(--sh-border-1)" }}><Clock3 className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} /><span className="truncate text-xs" style={{ color: "var(--sh-text-primary)" }}>{data.session.session.replaceAll("_", " ")} · {data.session.nextBoundary?.label.toLowerCase() ?? "boundary not measured"}{boundaryMs != null ? ` ${duration(boundaryMs)}` : ""}</span><RailHelp label="Explain market boundary">This is the next regular paper-market boundary calculated from the market calendar. It is timing context, not a trade signal.</RailHelp></div>
-      <div className="flex min-w-0 items-center gap-2 px-1 py-1.5 sm:flex-1 sm:border-r sm:px-3" style={{ borderColor: "var(--sh-border-1)" }}><Landmark className="h-3.5 w-3.5 shrink-0" style={{ color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-fg-muted)" }} /><span className="truncate text-xs" style={{ color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-text-primary)" }}>{data.account.label || "No paper account"} {money(data.account.equityValueCents) ?? "equity not measured"} · {staleText}</span><RailHelp label="Explain account freshness">Equity and cash come from the latest paper-account sync. If this age exceeds four hours, position and loss ceilings may no longer reflect the broker account.</RailHelp></div>
-      <div className="flex min-w-0 items-center gap-2 px-1 py-1.5 sm:flex-[1.25] sm:px-3"><AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: severityColor }} /><span className="min-w-0 flex-1 truncate text-xs font-medium" style={{ color: severityColor }}>{data.mandate.version} · tightest: {bindingText}</span><RailHelp label="Explain tightest constraint">This is the measured operating ceiling closest to its limit: {summary.binding ? `${money(summary.binding.usedCents)} used against a ${money(summary.binding.ceilingCents)} ceiling, derived from ${summary.binding.basis}.` : "No running capital or planned-loss ceiling has a measurable basis."}</RailHelp><button type="button" aria-expanded={expanded} aria-controls="cockpit-rail-detail" aria-label={autoExpanded ? `Pinned open: ${bindingText} is at or above the ${CRITICAL_CONSTRAINT_PCT}% alert threshold` : expanded ? "Collapse cockpit detail" : "Expand cockpit detail"} title={autoExpanded ? `Pinned open while ${bindingText} is at or above ${CRITICAL_CONSTRAINT_PCT}%` : undefined} disabled={autoExpanded} onClick={changeExpanded} className="rounded p-1 disabled:cursor-not-allowed"><ChevronDown className={`h-4 w-4 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} /></button></div>
+    <div className="flex min-h-11 items-center gap-2 border-b px-3 text-[11px]" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}><StateMark state="rule_qualified" label="Paper-only operator instrument" compact /><RailHelp label="Explain paper-only boundary">This operator surface records research context and human review. It does not submit an order.</RailHelp></div>
+    <div className="flex min-h-12 flex-col gap-1 px-3 py-2 sm:flex-row sm:items-center sm:gap-0 sm:py-0" style={{ background: summary.severity === "critical" ? "color-mix(in srgb, var(--sh-red) 5%, var(--sh-surface))" : "var(--sh-surface)" }}>
+      <div className="flex min-w-0 items-center gap-2 py-1 sm:flex-1 sm:border-r sm:px-3" style={{ borderColor: "var(--sh-border-1)" }}><StateMark state={data.session.session === "unknown" ? "unknown" : "researchable"} label={data.session.session.replaceAll("_", " ")} compact /><span className="truncate text-xs" style={{ color: "var(--sh-text-primary)" }}>· {data.session.nextBoundary?.label.toLowerCase() ?? "boundary —"}{boundaryMs != null ? ` ${duration(boundaryMs)}` : ""}</span><RailHelp label="Explain market boundary">Market timing context only; it is not a trade signal.</RailHelp></div>
+      <div className="flex min-w-0 items-center gap-2 py-1 sm:flex-1 sm:border-r sm:px-3" style={{ borderColor: "var(--sh-border-1)" }}><StateMark state={summary.accountStale ? "stale" : "rule_qualified"} label={data.account.label || "Paper account —"} compact /><span className="truncate text-xs" style={{ color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-text-primary)" }}>· {staleText}</span><RailHelp label="Explain account freshness">Paper-account freshness controls the quality of measured ceilings.</RailHelp></div>
+      <div className="flex min-w-0 items-center gap-2 py-1 sm:flex-[1.35] sm:px-3"><StateMark state={summary.severity === "critical" ? "blocked" : summary.severity === "unmeasurable" ? "unknown" : "rule_qualified"} label={summary.binding?.label ?? "Tightest constraint"} compact /><div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full" style={{ background: "var(--sh-border-1)" }} role="progressbar" aria-label="Tightest constraint utilization" aria-valuemin={0} aria-valuemax={100} aria-valuenow={bindingUtilization} aria-valuetext={`${bindingUtilization.toFixed(0)}% used; ${bindingHeadroom.toFixed(0)}% headroom`}><div className="h-full rounded-full" style={{ width: `${bindingUtilization}%`, background: severityColor }} /></div><BasisMark basis="measured" label={`${bindingUtilization.toFixed(0)}% / ${bindingHeadroom.toFixed(0)}%`} /><RailHelp label="Explain tightest constraint">{summary.binding ? `${money(summary.binding.usedCents)} used against ${money(summary.binding.ceilingCents)} from ${summary.binding.basis}.` : "No measurable running ceiling."}</RailHelp><button type="button" aria-expanded={expanded} aria-controls="cockpit-rail-detail" aria-label={expanded ? "Hide instrument detail" : "Show instrument detail"} onClick={changeExpanded} className="rounded px-1.5 py-1 text-[11px] font-semibold" style={{ color: "var(--sh-text-primary)" }}>{expanded ? "Hide" : "Detail"}<ChevronDown className={`ml-1 inline h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} /></button></div>
     </div>
-      {autoExpanded && <div className="flex flex-col gap-2 border-t px-4 py-2 text-xs sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 35%, var(--sh-border-1))", color: "var(--sh-red)" }}><span>Constraint active: {bindingText} is at or above {CRITICAL_CONSTRAINT_PCT}% utilization. New paper exposure that relies on this headroom is blocked until the measured position changes. Existing paper positions are unchanged.</span><button type="button" onClick={acknowledgeConstraint} className="shrink-0 rounded border px-2 py-1 font-medium" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))" }}>Review exposure detail</button></div>}
-      {summary.severity === "critical" && acknowledgedCurrentConstraint && !expanded && <div className="border-t px-4 py-1.5 text-[11px]" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 35%, var(--sh-border-1))", color: "var(--sh-red)" }}>Reviewed constraint remains active: {bindingText}. It will reopen if the measured state changes.</div>}
+    {summary.severity === "critical" && !expanded && <div className="border-t px-4 py-1.5 text-[11px]" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 35%, var(--sh-border-1))", color: "var(--sh-red)" }}>Constraint blocks new exposure that relies on this headroom. Existing paper positions are unchanged.</div>}
     {expanded && <div id="cockpit-rail-detail">
     <div className="grid gap-px lg:grid-cols-3" style={{ background: "var(--sh-border-1)" }}>
       <div className="space-y-2 p-4" style={{ background: "var(--sh-surface)" }}><RailHead>Market clock</RailHead><div className="flex items-center gap-2"><Clock3 className="h-4 w-4" style={{ color: data.session.session === "unknown" ? "var(--sh-red)" : "var(--sh-signal)" }} /><p className="text-sm font-semibold capitalize" style={{ color: "var(--sh-text-primary)" }}>{data.session.session.replaceAll("_", " ")}</p></div>{data.session.unavailableReason ? <p className="text-xs leading-5" style={{ color: "var(--sh-red)" }}>{data.session.unavailableReason}</p> : <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.session.nextBoundary?.label ?? "No next boundary recorded"}{boundaryMs != null ? ` in ${duration(boundaryMs)}` : ""}{data.session.halfDay ? " · half day" : ""}</p>}</div>

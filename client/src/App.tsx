@@ -247,6 +247,7 @@ function Router() {
         <Route path="/wingate/asset/:id">{() => <ProtectedRoute component={AssetDossier} />}</Route>
 
         {/* ── Capital Aperture — liquid securities engine ── */}
+        <Route path="/aperture/decision/:decisionRunId/revision/:revisionId">{() => <ApertureRoute component={ApertureHome} />}</Route>
         <Route path="/aperture">{() => <ApertureRoute component={ApertureHome} />}</Route>
         <Route path="/aperture/theses">{() => <ApertureRoute component={ApertureTheses} />}</Route>
         <Route path="/aperture/disclosures">{() => <ApertureRoute component={ApertureDisclosure} />}</Route>

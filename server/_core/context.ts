@@ -44,11 +44,27 @@ export async function createContext(
 ): Promise<TrpcContext> {
   let user: User | null = null;
 
-  try {
-    user = await sdk.authenticateRequest(opts.req);
-  } catch (error) {
-    // Authentication is optional for public procedures.
-    user = null;
+  const isolatedPreviewOpenId = process.env.LOCAL_PREVIEW_OPENID;
+  const isIsolatedUat = process.env.NODE_ENV === "development"
+    && process.env.ISOLATED_UAT_MODE === "true"
+    && process.env.DATABASE_URL?.includes("127.0.0.1:3307/capital_aperture_uat_9c18799");
+
+  if (isIsolatedUat && isolatedPreviewOpenId) {
+    const requestedFixture = opts.req.header("x-isolated-uat-identity");
+    const jimFixtureOpenId = process.env.LOCAL_PREVIEW_JIM_OPENID ?? "uat_jim_9c18799";
+    const fixtureOpenId = requestedFixture === "jim" ? jimFixtureOpenId : isolatedPreviewOpenId;
+    const db = await getDb();
+    const rows = db
+      ? await db.select().from(users).where(eq(users.openId, fixtureOpenId)).limit(1)
+      : [];
+    user = rows[0] ?? null;
+  } else {
+    try {
+      user = await sdk.authenticateRequest(opts.req);
+    } catch (error) {
+      // Authentication is optional for public procedures.
+      user = null;
+    }
   }
 
   if (user) user = await resolveMergedUser(user);
