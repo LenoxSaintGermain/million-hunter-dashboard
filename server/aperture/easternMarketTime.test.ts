@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { easternDateTimeInputFromEpoch, easternDateTimeInputToEpoch } from "../../shared/easternMarketTime";
+import { easternDateKeyFromEpoch, easternDateTimeInputFromEpoch, easternDateTimeInputToEpoch } from "../../shared/easternMarketTime";
 
 describe("Eastern market datetime conversion", () => {
   it("serializes an EDT afternoon deadline as the same absolute instant", () => {
@@ -14,5 +14,9 @@ describe("Eastern market datetime conversion", () => {
     const epoch = Date.UTC(2026, 7, 20, 19, 55);
     expect(easternDateTimeInputFromEpoch(epoch)).toBe("2026-08-20T15:55");
     expect(easternDateTimeInputToEpoch(easternDateTimeInputFromEpoch(epoch))).toBe(epoch);
+  });
+
+  it("returns the ET date even when UTC has crossed into the next day", () => {
+    expect(easternDateKeyFromEpoch(Date.UTC(2026, 7, 29, 1, 0))).toBe("2026-08-28");
   });
 });

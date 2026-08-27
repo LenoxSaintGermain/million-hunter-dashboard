@@ -8,6 +8,7 @@ import ApertureShell from "@/components/aperture/ApertureShell";
 import { AlertTriangle, CheckCircle2, Clock3, FileClock, Loader2, PlayCircle, TrendingDown, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { buildWeeklyPaperScorecard } from "@shared/weeklyPaperScorecard";
+import { easternDateKeyFromEpoch } from "@shared/easternMarketTime";
 
 const outcomeTone = (result: string) => result === "win"
   ? "oklch(0.55 0.15 145)"
@@ -37,7 +38,9 @@ export default function ApertureRecord() {
   const { data: dailyRefresh } = trpc.aperture.ledger.dailyRefreshSchedule.useQuery();
   const { data: oneTimeResearch } = trpc.aperture.ledger.oneTimeResearchSchedule.useQuery();
   const { data: portfolioImpactTrend } = trpc.aperture.ledger.portfolioImpactTrend.useQuery();
-  const canCaptureLiveSlate = (activePlays?.plays?.length ?? 0) > 0;
+  const todayEt = easternDateKeyFromEpoch(Date.now());
+  const canCaptureLiveSlate = (activePlays?.plays ?? []).some((play) => play.run.catalystDeadlineAt != null
+    && easternDateKeyFromEpoch(play.run.catalystDeadlineAt) === todayEt);
   const reconstruct = trpc.aperture.ledger.reconstructRecentRun.useMutation({
     onSuccess: async ({ slateId, created }) => {
       await utils.aperture.ledger.list.invalidate();

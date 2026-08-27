@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, ChevronDown, CircleSlash2, FileSearch, Loader2 } from "lucide-react";
+import { ArrowRight, ChevronDown, CircleSlash2, FileSearch, GitCompareArrows, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { buildPlayRecipe } from "@shared/playRecipe";
 import { orderDailyPlayQueue, researchCoverageLabel } from "@shared/dailyPlayQueue";
 import { dailyPlayPrimaryDestination } from "@shared/dailyPlayActions";
+import { easternDateKeyFromEpoch } from "@shared/easternMarketTime";
 import { PlayRecipeCard } from "./PlayRecipeCard";
 
 function money(cents: number | null | undefined) {
@@ -51,6 +52,15 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: {
       void utils.aperture.play.list.invalidate();
     },
   });
+  const captureComparison = trpc.aperture.ledger.captureCurrentWindow.useMutation({
+    onSuccess: async ({ created }) => {
+      await utils.aperture.ledger.list.invalidate();
+      setDecisionAnnouncement(created
+        ? "Outcome comparison started. Submit, reject, skip, or defer actions from this captured slate will remain in the paper record."
+        : "The existing outcome comparison is active for this thesis and session.");
+    },
+    onError: (error) => setDecisionAnnouncement(`Outcome comparison was not started: ${error.message}`),
+  });
   const ranked = useMemo(() => orderDailyPlayQueue((playList?.plays ?? [])
     .filter((play) => !play.decision)
     .map((item) => ({
@@ -67,6 +77,9 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: {
       }).readiness,
       catalystDeadlineAt: item.run.catalystDeadlineAt,
     }))), [playList]);
+  const todayEt = easternDateKeyFromEpoch(Date.now());
+  const hasTodayPlay = ranked.some(({ item }) => item.run.catalystDeadlineAt != null
+    && easternDateKeyFromEpoch(item.run.catalystDeadlineAt) === todayEt);
   const correlation = cockpit?.headroom.lines.find((line) => line.key === "correlated_planned_risk");
   useEffect(() => {
     const openPrimaryStep = (event: KeyboardEvent) => {
@@ -94,7 +107,7 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: {
         <h1 className="mt-1 font-serif text-3xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Today’s paper plays</h1>
         <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Start with the decision. Open one setup, record a skip, or preserve cash. Provenance stays one click away, never in the way.</p>
       </div>
-      <Button variant="outline" onClick={onNewResearch}><FileSearch className="mr-2 h-4 w-4" />New research brief</Button>
+      <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={!hasTodayPlay || captureComparison.isPending} title={hasTodayPlay ? "Capture today's eligible paper plays before choosing a disposition" : "Available on the declared ET decision date"} onClick={() => captureComparison.mutate({ windowKey: "operator_decision" })}>{captureComparison.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitCompareArrows className="mr-2 h-4 w-4" />}Start today’s comparison</Button><Button variant="outline" onClick={onNewResearch}><FileSearch className="mr-2 h-4 w-4" />New research brief</Button></div>
     </header>
 
     <div className="grid gap-px overflow-hidden rounded-xl border sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>

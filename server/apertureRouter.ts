@@ -118,6 +118,50 @@ function receiptBindingUnavailable(): never {
   throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Decision binding unavailable" });
 }
 
+async function syncCapturedPlayDecision(input: {
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>;
+  userId: number;
+  runId: number;
+  candidateId: number;
+  decision: "selected" | "skipped" | "deferred";
+  reason: string;
+  decidedAt?: number;
+}) {
+  const decidedAt = input.decidedAt ?? Date.now();
+  const captured = await input.db.select({
+    itemId: aperturePlaySlateItems.id,
+    slateId: aperturePlaySlates.id,
+  }).from(aperturePlaySlateItems)
+    .innerJoin(aperturePlaySlates, eq(aperturePlaySlateItems.slateId, aperturePlaySlates.id))
+    .where(and(
+      eq(aperturePlaySlates.userId, input.userId),
+      eq(aperturePlaySlates.snapshotBasis, "live_capture"),
+      eq(aperturePlaySlateItems.sourceRunId, input.runId),
+      eq(aperturePlaySlateItems.sourceCandidateId, input.candidateId),
+    ))
+    .orderBy(desc(aperturePlaySlates.capturedAt))
+    .limit(1);
+  if (!captured.length) return { updatedItems: 0, updatedSlates: 0 };
+
+  const capturedDecision = captured[0];
+  await input.db.update(aperturePlaySlateItems).set({
+    operatorDecision: input.decision,
+    operatorReason: input.reason,
+    decidedAt,
+    updatedAt: decidedAt,
+  }).where(eq(aperturePlaySlateItems.id, capturedDecision.itemId));
+
+  if (input.decision === "selected") {
+    await input.db.update(aperturePlaySlates).set({
+      operatorDecision: "selected",
+      operatorReason: input.reason,
+      decidedAt,
+      updatedAt: decidedAt,
+    }).where(eq(aperturePlaySlates.id, capturedDecision.slateId));
+  }
+  return { updatedItems: 1, updatedSlates: input.decision === "selected" ? 1 : 0 };
+}
+
 function snapshotRecord(value: unknown): Record<string, unknown> | null {
   let candidate: unknown = value;
   // Older rows arrived from MariaDB as a JSON string containing JSON text. Decode
@@ -1053,6 +1097,15 @@ export const apertureRouter = router({
               eq(apertureDecisionRuns.lockVersion, lockedHead.lockVersion),
             ));
             if (!update[0].affectedRows) throw new TRPCError({ code: "CONFLICT", message: "The Decision Run changed while this revision was being recorded." });
+            await tx.update(aperturePendingOutcomes).set({
+              status: "cancelled",
+              updatedAt: now,
+            }).where(and(
+              eq(aperturePendingOutcomes.userId, ctx.user.id),
+              eq(aperturePendingOutcomes.decisionRunId, lockedHead.id),
+              eq(aperturePendingOutcomes.revisionId, current.id),
+              inArray(aperturePendingOutcomes.status, ["pending", "due"]),
+            ));
             if (input.branch === "conditional" && input.reviewAt) {
               await tx.insert(aperturePendingOutcomes).values({
                 userId: ctx.user.id,
@@ -2079,7 +2132,16 @@ export const apertureRouter = router({
         } else {
           await db!.insert(aperturePlayDecisions).values({ userId: ctx.user.id, ...input, resumeAt, createdAt: now, updatedAt: now });
         }
-        return { ok: true };
+        const ledger = await syncCapturedPlayDecision({
+          db: db!,
+          userId: ctx.user.id,
+          runId: input.runId,
+          candidateId: input.candidateId,
+          decision: input.decision,
+          reason: input.reason,
+          decidedAt: now,
+        });
+        return { ok: true, ledger };
       }),
   }),
 
@@ -2365,13 +2427,14 @@ export const apertureRouter = router({
           ))
           .orderBy(apertureRuns.catalystDeadlineAt, desc(apertureRuns.createdAt))
           .limit(40);
-        if (!rows.length) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "There are no active, non-expired Capital plays for this thesis to capture in this window." });
+        const sessionRows = rows.filter(({ run }) => etClock(run.catalystDeadlineAt ?? 0)?.dateEt === sessionDateEt);
+        if (!sessionRows.length) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "There are no Capital plays whose declared decision window falls in today's ET session. Future catalyst plays remain visible but cannot capture today's tape." });
         }
         const accounts = await db!.select().from(portfolioAccounts).where(eq(portfolioAccounts.userId, ctx.user.id));
         const account = accounts.find((item) => item.isPaper && item.brokerId === "alpaca_paper") ?? accounts.find((item) => item.isPaper) ?? null;
         const held = account ? await db!.select().from(positions).where(eq(positions.accountId, account.id)) : [];
-        const candidateIds = rows.map(({ candidate }) => candidate.id);
+        const candidateIds = sessionRows.map(({ candidate }) => candidate.id);
         const reviews = await db!.select().from(apertureEvidenceReviews).where(and(
           eq(apertureEvidenceReviews.userId, ctx.user.id),
           inArray(apertureEvidenceReviews.candidateId, candidateIds),
@@ -2384,7 +2447,7 @@ export const apertureRouter = router({
         for (const review of reviews) reviewsByCandidate.set(review.candidateId, [...(reviewsByCandidate.get(review.candidateId) ?? []), review]);
         const decisionByCandidate = new Map(decisions.map((decision) => [decision.candidateId, decision]));
 
-        const items = await Promise.all(rows.map(async ({ candidate, run }) => {
+        const items = await Promise.all(sessionRows.map(async ({ candidate, run }) => {
           const tape = await fetchIntradayBars(candidate.symbol, { startMs: sessionStartAt, timeoutMs: 5_000, maxPages: 2 });
           const vwap = sessionVwap(tape.bars, { feed: tape.feed, now });
           const range = openingRange(tape.bars, { sessionOpenAt: sessionStartAt + REGULAR_OPEN * 60_000, minutes: 30, feed: tape.feed, now });
@@ -2856,13 +2919,38 @@ export const apertureRouter = router({
       .input(z.object({ orderId: z.number(), reason: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
         await rejectOrder(input.orderId, ctx.user.id, input.reason);
-        return { ok: true };
+        const db = await getDb();
+        const [order] = await db!.select().from(brokerOrders).where(and(
+          eq(brokerOrders.id, input.orderId),
+          eq(brokerOrders.userId, ctx.user.id),
+        )).limit(1);
+        const ledger = order?.candidateId == null ? null : await syncCapturedPlayDecision({
+          db: db!,
+          userId: ctx.user.id,
+          runId: order.runId,
+          candidateId: order.candidateId,
+          decision: "skipped",
+          reason: input.reason?.trim() || "Paper proposal rejected by the operator.",
+        });
+        return { ok: true, ledger };
       }),
 
     submit: adminProcedure
       .input(z.object({ orderId: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        return submitBrokerOrder(input.orderId, ctx.user.id);
+        const submitted = await submitBrokerOrder(input.orderId, ctx.user.id);
+        if (submitted.candidateId != null) {
+          const db = await getDb();
+          await syncCapturedPlayDecision({
+            db: db!,
+            userId: ctx.user.id,
+            runId: submitted.runId,
+            candidateId: submitted.candidateId,
+            decision: "selected",
+            reason: `Submitted ${submitted.symbol} to the named paper broker for the captured outcome comparison.`,
+          });
+        }
+        return submitted;
       }),
 
     mirrorFills: adminProcedure

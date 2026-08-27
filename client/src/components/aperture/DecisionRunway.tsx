@@ -201,7 +201,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
         canonicalThesisId: activeCanonicalId,
         capitalThesisId: projection.id,
         accountId: paperAccount.id,
-        decisionRunId: branch !== "research" && runway?.latest?.authority === "authoritative" && runway.latest.runId != null
+        decisionRunId: runway?.latest?.authority === "authoritative" && runway.latest.runId != null
           && runway.latest.canonicalThesisId === activeCanonicalId && runway.latest.capitalThesisId === projection.id && runway.latest.accountId === paperAccount.id
           ? runway.latest.id : null,
         branch,

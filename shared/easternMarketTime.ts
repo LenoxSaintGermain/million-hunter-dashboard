@@ -18,6 +18,11 @@ function etPartsAt(epochMs: number): EtParts {
 
 function pad(value: number) { return value.toString().padStart(2, "0"); }
 
+export function easternDateKeyFromEpoch(epochMs: number): string {
+  const part = etPartsAt(epochMs);
+  return `${part.year}-${pad(part.month)}-${pad(part.day)}`;
+}
+
 export function easternDateTimeInputFromEpoch(epochMs: number): string {
   const part = etPartsAt(epochMs);
   return `${part.year}-${pad(part.month)}-${pad(part.day)}T${pad(part.hour)}:${pad(part.minute)}`;
