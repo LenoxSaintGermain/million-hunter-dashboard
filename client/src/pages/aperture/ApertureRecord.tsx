@@ -9,6 +9,7 @@ import { AlertTriangle, CheckCircle2, Clock3, FileClock, Loader2, PlayCircle, Tr
 import { toast } from "sonner";
 import { buildWeeklyPaperScorecard } from "@shared/weeklyPaperScorecard";
 import { easternDateKeyFromEpoch } from "@shared/easternMarketTime";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const outcomeTone = (result: string) => result === "win"
   ? "oklch(0.55 0.15 145)"
@@ -30,13 +31,14 @@ const cents = (value: number | null | undefined) => value == null ? "—" : `$${
 const signedCents = (value: number | null | undefined) => value == null ? "Not measured" : `${value >= 0 ? "+" : "−"}${cents(Math.abs(value))}`;
 
 export default function ApertureRecord() {
+  const { user } = useAuth();
   const utils = trpc.useUtils();
   const [selectedSlateId, setSelectedSlateId] = useState<number | null>(null);
   const { data: slates = [], isLoading: loadingSlates } = trpc.aperture.ledger.list.useQuery();
   const { data: cohorts = [], isLoading: loadingCohorts } = trpc.aperture.ledger.availableCohorts.useQuery();
   const { data: activePlays } = trpc.aperture.play.list.useQuery();
   const { data: dailyRefresh } = trpc.aperture.ledger.dailyRefreshSchedule.useQuery();
-  const { data: oneTimeResearch } = trpc.aperture.ledger.oneTimeResearchSchedule.useQuery();
+  const { data: oneTimeResearch } = trpc.aperture.ledger.oneTimeResearchSchedule.useQuery(undefined, { enabled: user?.role === "admin" });
   const { data: portfolioImpactTrend } = trpc.aperture.ledger.portfolioImpactTrend.useQuery();
   const todayEt = easternDateKeyFromEpoch(Date.now());
   const canCaptureLiveSlate = (activePlays?.plays ?? []).some((play) => play.run.catalystDeadlineAt != null
@@ -128,7 +130,7 @@ export default function ApertureRecord() {
         <div className="grid gap-3 lg:grid-cols-[1.05fr_1.95fr]">
           <Card style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
             <CardContent className="space-y-4 p-4">
-              <div className="rounded-lg border p-3" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 35%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 5%, var(--sh-surface))" }}>
+              {user?.role === "admin" && <div className="rounded-lg border p-3" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 35%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 5%, var(--sh-surface))" }}>
                 <div className="flex items-center gap-2"><Clock3 className="h-4 w-4" style={{ color: "var(--sh-signal)" }} /><h2 className="font-medium" style={{ color: "var(--sh-text-primary)" }}>Capture today’s decision windows</h2></div>
                 <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{canCaptureLiveSlate ? "Each button preserves the active thesis, paper-account boundary, evidence state, modelled recipe, and tape basis exactly as they are now. It never prepares or submits an order." : "No active, non-expired play is currently available under this thesis, so capture is disabled rather than creating an empty record."}</p>
                 <div className="mt-3 grid grid-cols-3 gap-2">{[
@@ -136,7 +138,7 @@ export default function ApertureRecord() {
                   ["mid_session", "Mid-session"],
                   ["catalyst", "Catalyst"],
                 ].map(([windowKey, label]) => <Button key={windowKey} size="sm" variant="outline" className="px-1.5 text-[11px]" disabled={captureWindow.isPending || !canCaptureLiveSlate} onClick={() => captureWindow.mutate({ windowKey })}>{captureWindow.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : label}</Button>)}</div>
-              </div>
+              </div>}
               <div className="rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
                 <div className="flex items-center gap-2"><Clock3 className="h-4 w-4" style={{ color: dailyRefresh?.enabled ? "oklch(0.55 0.15 145)" : "var(--sh-fg-muted)" }} /><h2 className="font-medium" style={{ color: "var(--sh-text-primary)" }}>Daily outcome refresh</h2></div>
                 <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{dailyRefresh?.enabled ? "On — after each regular session, the system refreshes only due live paper captures from source-timed tape. It never creates an order." : "Off — turn on to refresh future live paper captures after the regular session closes. Historical reconstructions remain excluded."}</p>
@@ -146,7 +148,7 @@ export default function ApertureRecord() {
                   {dailyRefresh?.enabled ? "Pause daily refresh" : "Turn on daily refresh"}
                 </Button>
               </div>
-              <div className="rounded-lg border p-3" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 35%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 5%, var(--sh-surface))" }}>
+              {user?.role === "admin" && <div className="rounded-lg border p-3" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 35%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 5%, var(--sh-surface))" }}>
                 <div className="flex items-center gap-2"><PlayCircle className="h-4 w-4" style={{ color: oneTimeResearch?.enabled ? "oklch(0.55 0.15 145)" : "var(--sh-signal)" }} /><h2 className="font-medium" style={{ color: "var(--sh-text-primary)" }}>GLP-1 post-open research</h2></div>
                 <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{oneTimeResearch?.enabled ? `Queued for ${oneTimeResearch.targetAt ? new Date(oneTimeResearch.targetAt).toLocaleString() : "the next measurable opening-range window"}. It creates research only; you will still choose a paper posture.` : oneTimeResearch?.status === "completed" ? "Research is complete. Review the opportunity set, then choose a paper posture yourself—no order was created." : "One paper-only GLP-1 research brief can run after the opening range. It cannot record a posture, create a proposal, or submit an order."}</p>
                 {oneTimeResearch?.lastResult && <p className="mt-2 text-[11px] leading-5" style={{ color: "var(--sh-fg-muted)" }}>{oneTimeResearch.lastResult}</p>}
@@ -155,7 +157,7 @@ export default function ApertureRecord() {
                   {configureOneTimeResearch.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="mr-1.5 h-3.5 w-3.5" />}
                   {oneTimeResearch?.enabled ? "Pause GLP-1 research" : "Queue GLP-1 post-open research"}
                 </Button>}
-              </div>
+              </div>}
               <div>
                 <div className="flex items-center gap-2"><FileClock className="h-4 w-4" style={{ color: "var(--sh-signal)" }} /><h2 className="font-medium" style={{ color: "var(--sh-text-primary)" }}>Start a recent postmortem</h2></div>
                 <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>A reconstruction retains the full cohort and is clearly labelled as after-the-fact. It cannot be used as a live recommendation capture or a trust-rate observation.</p>

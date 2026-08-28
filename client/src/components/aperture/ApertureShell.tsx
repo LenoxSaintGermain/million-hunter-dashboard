@@ -19,7 +19,9 @@ const APERTURE_NAV = [
 
 const TRADER_NAV = [
   { href: "/aperture", label: "Today", icon: LayoutDashboard },
-  { href: "/aperture?setup=1", label: "Why", icon: BookOpen },
+  { href: "/aperture/runs", label: "Follow-ups", icon: Route },
+  { href: "/aperture/accounts", label: "Portfolio", icon: Wallet },
+  { href: "/thesis", label: "Theses", icon: BookOpen },
   { href: "/aperture/record", label: "Record", icon: FileText },
 ] as const;
 

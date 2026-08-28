@@ -12,7 +12,6 @@ import { useEffect, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Loader2, ShieldCheck, AlertTriangle, CheckCircle2, Link2 } from "lucide-react";
 
@@ -37,14 +36,14 @@ export default function InviteAccept() {
   const [, navigate] = useLocation();
   const token = params?.token ?? "";
 
-  const { user, loading: authLoading, isAuthenticated } = useAuth();
+  const { loading: authLoading, isAuthenticated } = useAuth();
   const [consumed, setConsumed] = useState(false);
   const [consumeError, setConsumeError] = useState<string | null>(null);
 
   // Validate the token (works even before login)
   const { data: validation, isLoading: validating } = trpc.invite.validate.useQuery(
     { token },
-    { enabled: !!token && isAuthenticated, retry: false }
+    { enabled: !!token, retry: false }
   );
 
   // Consume mutation
@@ -52,7 +51,7 @@ export default function InviteAccept() {
     onSuccess: (data) => {
       setConsumed(true);
       // Brief pause so the user sees the success state, then redirect
-      setTimeout(() => navigate("/"), 2000);
+      setTimeout(() => navigate(data.role === "capital_operator" ? "/aperture" : "/"), 1500);
     },
     onError: (e) => {
       setConsumeError(e.message);
@@ -76,21 +75,26 @@ export default function InviteAccept() {
   const loginUrl = (() => {
     const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
     const appId = import.meta.env.VITE_APP_ID;
+    if (!oauthPortalUrl || !appId) return null;
     const redirectUri = `${window.location.origin}/api/oauth/callback`;
     // Encode origin + returnPath in state so the callback redirects back here
     const statePayload = btoa(
       JSON.stringify({ origin: window.location.origin, returnPath: `/invite/${token}` })
     );
-    const url = new URL(`${oauthPortalUrl}/app-auth`);
-    url.searchParams.set("appId", appId);
-    url.searchParams.set("redirectUri", redirectUri);
-    url.searchParams.set("state", statePayload);
-    url.searchParams.set("type", "signIn");
-    return url.toString();
+    try {
+      const url = new URL("/app-auth", oauthPortalUrl);
+      url.searchParams.set("appId", appId);
+      url.searchParams.set("redirectUri", redirectUri);
+      url.searchParams.set("state", statePayload);
+      url.searchParams.set("type", "signIn");
+      return url.toString();
+    } catch {
+      return null;
+    }
   })();
 
   // ── Loading ──────────────────────────────────────────────────────────────────
-  if (authLoading || (isAuthenticated && validating)) {
+  if (authLoading || validating) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--background)" }}>
         <div className="flex flex-col items-center gap-4">
@@ -116,11 +120,11 @@ export default function InviteAccept() {
           </h1>
           <p className="text-sm text-muted-foreground">
             You've been granted <strong className="text-foreground">{ROLE_LABELS[role] ?? role}</strong> access.
-            Redirecting you to the platform…
+            Redirecting you to {role === "capital_operator" ? "Capital Aperture" : "the platform"}…
           </p>
           <div className="flex items-center justify-center gap-2 pt-2">
             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Loading dashboard…</span>
+            <span className="text-xs text-muted-foreground">Loading your workspace…</span>
           </div>
         </div>
       </div>
@@ -128,7 +132,7 @@ export default function InviteAccept() {
   }
 
   // ── Error states ─────────────────────────────────────────────────────────────
-  if (isAuthenticated && validation && !validation.valid) {
+  if (validation && !validation.valid) {
     const reasonMessages: Record<string, string> = {
       not_found: "This invite link doesn't exist or has been revoked.",
       already_used: "This invite link has already been used.",
@@ -176,8 +180,8 @@ export default function InviteAccept() {
   }
 
   // ── Pre-login: show invite preview ───────────────────────────────────────────
-  // We don't know the role until after login (token validation requires auth),
-  // so show a generic welcome with the platform branding.
+  const invitedRole = validation?.valid ? (validation.assignRole ?? "user") : "user";
+  const capitalInvite = invitedRole === "capital_operator";
   return (
     <div
       className="min-h-screen flex items-center justify-center p-6"
@@ -224,8 +228,9 @@ export default function InviteAccept() {
             <p className="text-xs text-muted-foreground font-mono truncate">{token.slice(0, 16)}…</p>
           </div>
           <p className="text-sm text-foreground leading-relaxed">
-            You've been granted access to the <strong>Signal Hunter acquisition intelligence platform</strong>. 
-            Sign in with your Google account to activate your access.
+            You've been invited to <strong>{capitalInvite ? "Capital Aperture" : "Signal Hunter"}</strong>.
+            {validation?.valid && validation.label ? ` Your workspace will display as ${validation.label}.` : ""}
+            {validation?.valid && validation.recipientHint ? ` Sign in with ${validation.recipientHint}.` : " Sign in with the invited Google account."}
           </p>
         </div>
 
@@ -233,11 +238,15 @@ export default function InviteAccept() {
         <div className="space-y-2">
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">What you'll access</p>
           <ul className="space-y-1.5">
-            {[
-              "Live deal pipeline — ranked acquisition opportunities",
-              "Insurance Prospector — commercial prospect scoring",
-              "Capital flow intelligence — TIDE macro signals",
-            ].map((item) => (
+            {(capitalInvite ? [
+              "Start with a thesis, or build one in the workspace",
+              "Mirror current holdings and plays without creating an order",
+              "Review researched paper plays with explicit risk gates",
+              "Approve and submit only to a named paper account",
+            ] : [
+              "Signal Hunter workspace access",
+              ROLE_DESCRIPTIONS[invitedRole] ?? ROLE_DESCRIPTIONS.user,
+            ]).map((item) => (
               <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
                 <span className="mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "var(--sh-amber)" }} />
                 {item}
@@ -247,7 +256,7 @@ export default function InviteAccept() {
         </div>
 
         {/* CTA */}
-        <a href={loginUrl} className="block">
+        {loginUrl ? <a href={loginUrl} className="block">
           <Button
             className="w-full h-11 font-semibold text-sm"
             style={{
@@ -256,13 +265,13 @@ export default function InviteAccept() {
               border: "none",
             }}
           >
-            Accept Invite & Sign In
+            Continue with Google
           </Button>
-        </a>
+        </a> : <div className="space-y-2"><Button className="w-full h-11 font-semibold text-sm" disabled>Sign-in temporarily unavailable</Button><p role="alert" className="text-center text-xs text-muted-foreground">This invite is still valid and has not been consumed. Ask the sender to finish sign-in setup, then reopen this link.</p></div>}
 
         <p className="text-[11px] text-muted-foreground text-center">
-          By accepting, you agree to use this platform in accordance with the operator's terms.
-          This invite is single-use and expires in 30 days.
+          {capitalInvite ? "Paper research only — not investment advice. No real-money trading is enabled. " : ""}
+          This invite is single-use{validation?.valid && validation.expiresAt ? ` and expires ${new Date(validation.expiresAt).toLocaleDateString()}` : ""}.
         </p>
       </div>
     </div>

@@ -29,4 +29,12 @@ describe("Capital Aperture research journeys", () => {
     expect(journeys[0].runs.map((run) => run.id)).toEqual([30, 31]);
     expect(journeys[0]).toMatchObject({ state: "more_research_available", symbolsReviewed: 12 });
   });
+
+  it("keeps a declined paper stage closed in the journey queue", () => {
+    const [journey] = buildResearchJourneys([
+      { id: 40, thesisId: 12, thesisName: "Rates confirmation", status: "completed", universeCount: 2, candidateCount: 2, paperStageDeclined: true, createdAt: 400 },
+    ]);
+    expect(journey.state).toBe("paper_stage_declined");
+    expect(journey.nextLabel).toBe("Review declined paper stage");
+  });
 });

@@ -13,4 +13,9 @@ describe("isolated UAT fixture route preservation", () => {
     expect(aperturePathForFixture("/wingate", "jim")).toBe("/wingate");
     expect(aperturePathForFixture("/aperture", null)).toBe("/aperture");
   });
+
+  it("carries the isolated CH Capital identity without granting production impersonation", () => {
+    expect(aperturePathForFixture("/thesis", "ch_capital")).toBe("/thesis?uat_identity=ch_capital");
+    expect(aperturePathForFixture("/aperture/accounts", "ch_capital")).toBe("/aperture/accounts?uat_identity=ch_capital");
+  });
 });

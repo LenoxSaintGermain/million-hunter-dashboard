@@ -18,12 +18,14 @@ import { canUseCanonicalThesis } from "./thesisAccess";
 import { GEMINI_FAST } from "../shared/models";
 import { normalizeCanonicalThesisRead } from "../shared/thesisReadContract";
 import { isCapitalThesisEligible } from "../shared/capitalThesisEligibility";
+import { manualThesisProjection } from "../shared/manualThesisProjection";
 
 function isQualifiedPlayIsolatedUat(ctx: { req: { header(name: string): string | undefined } }) {
+  const identity = ctx.req.header("x-isolated-uat-identity");
   return process.env.NODE_ENV === "development"
     && process.env.ISOLATED_UAT_MODE === "true"
     && process.env.DATABASE_URL?.includes("127.0.0.1:3307/capital_aperture_uat_9c18799")
-    && ctx.req.header("x-isolated-uat-identity") === "jim"
+    && (identity === "jim" || identity === "ch_capital")
     && ctx.req.header("x-isolated-uat-case") === "qualified-play";
 }
 
@@ -614,13 +616,15 @@ export const thesisRouter = router({
         .limit(1);
 
       let graph;
+      let compilerStatus: "compiled" | "manual_draft" = "compiled";
       if (isQualifiedPlayIsolatedUat(ctx)) {
         graph = illustrativeUatGraph(source.thesisText, source.name);
       } else {
         try {
           graph = await compileThesis(source.thesisText);
-        } catch (error: any) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Capital projection failed: ${error?.message ?? "unknown compiler error"}` });
+        } catch {
+          graph = manualThesisProjection(source.thesisText, source.name);
+          compilerStatus = "manual_draft";
         }
       }
 
@@ -641,6 +645,6 @@ export const thesisRouter = router({
         apertureThesisId = (result as any).insertId as number;
       }
 
-      return { apertureThesisId, sourceCompilationId: source.id, graph, linked: Boolean(existing) };
+      return { apertureThesisId, sourceCompilationId: source.id, graph, linked: Boolean(existing), compilerStatus };
     }),
 });

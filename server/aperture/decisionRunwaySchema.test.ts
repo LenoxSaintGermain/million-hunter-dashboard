@@ -27,8 +27,8 @@ describe("Decision Runway authoritative schema", () => {
 
     expect(orderFlow).toContain('evaluateOrder(input, "preflight")');
     expect(orderFlow).toContain('evaluateOrder(input, "create_proposal")');
-    expect(orderFlow).toContain('action: "approve"');
-    expect(orderFlow).toContain('action: "submit"');
+    expect(orderFlow).toContain('rerunStoredOrder(order, userId, "approve")');
+    expect(orderFlow).toContain('rerunStoredOrder(order, userId, "submit")');
     expect(orderFlow).toContain("decisionRunId: decisionAuthorization?.decisionRunId ?? null");
     expect(orderFlow).toContain("queuePaperOutcome");
     expect(orderFlow).toContain('for("update")');

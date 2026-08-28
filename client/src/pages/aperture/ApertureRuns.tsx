@@ -10,16 +10,22 @@ import { formatDistanceToNow } from "date-fns";
 
 const toneFor = (state: ResearchJourney["state"]) => state === "ready_to_review"
   ? "oklch(0.52 0.15 145)"
-  : state === "needs_attention" ? "var(--sh-red)" : "var(--sh-signal)";
+  : state === "needs_attention" || state === "paper_stage_declined" ? "var(--sh-red)" : "var(--sh-signal)";
 
 const labelFor = (state: ResearchJourney["state"]) => ({
   in_progress: "Researching",
   needs_attention: "Needs attention",
+  paper_stage_declined: "Paper stage declined",
   ready_to_review: "Decision ready",
   more_research_available: "More evidence available",
 })[state];
 
 const actionFor = (journey: ResearchJourney) => {
+  if (journey.state === "paper_stage_declined") return {
+    label: "Review preserve-cash receipt",
+    detail: "A required evidence answer was not confirmed. Review the durable decision; this revision cannot prepare a proposal or create an order.",
+    route: `/aperture/run/${journey.latest.id}?view=evidence`,
+  };
   if (journey.state === "ready_to_review") return {
     label: "Review the lead",
     detail: "Open the priority candidate, record the few checks that could change the decision, then unlock paper-proposal preparation.",
@@ -66,7 +72,7 @@ export default function ApertureRuns() {
         </div>
         <div className="grid gap-3 p-5 sm:grid-cols-3">
           <Metric icon={<Layers3 className="h-4 w-4" />} label="Research coverage" value={`${journey.symbolsReviewed} symbols`} detail={journey.remainingDeferred ? `${journey.remainingDeferred} still available for research` : "Full discovered universe reviewed"} />
-          <Metric icon={<FlaskConical className="h-4 w-4" />} label="Current decision state" value={labelFor(journey.state)} detail={journey.remainingDeferred ? "You can research more without clearing every check." : "Move into the priority evidence review."} />
+          <Metric icon={<FlaskConical className="h-4 w-4" />} label="Current decision state" value={labelFor(journey.state)} detail={journey.state === "paper_stage_declined" ? "The current revision is closed to paper-proposal preparation." : journey.remainingDeferred ? "You can research more without clearing every check." : "Move into the priority evidence review."} />
           <Metric icon={<CheckCircle2 className="h-4 w-4" />} label="What to do now" value={action.label} detail={action.detail} />
         </div>
         <div className="flex flex-wrap gap-2 border-t px-5 py-3" style={{ borderColor: "var(--sh-border-1)" }}>{journey.runs.map((run, index) => <button key={run.id} onClick={() => navigate(`/aperture/run/${run.id}`)} className="rounded-full border px-2.5 py-1 text-[11px] transition-colors hover:bg-muted" style={{ borderColor: run.id === journey.latest.id ? "var(--sh-signal)" : "var(--sh-border-1)", color: run.id === journey.latest.id ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Chapter {index + 1} · {run.candidateCount ?? 0} candidates</button>)}</div>

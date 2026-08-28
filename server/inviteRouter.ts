@@ -17,7 +17,7 @@ import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "./db";
 import { inviteTokens, users } from "../drizzle/schema";
-import { protectedProcedure, router } from "./_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { capitalOperatorInviteProfile, matchesInviteRecipient } from "./invitePolicy";
 
 // 30-day default expiry
@@ -100,7 +100,7 @@ export const inviteRouter = router({
    * Validate an invite token (public — called by InviteAccept before login).
    * Returns basic info about the invite without consuming it.
    */
-  validate: protectedProcedure
+  validate: publicProcedure
     .input(z.object({ token: z.string() }))
     .query(async ({ input }) => {
       const db = await getDb();
@@ -126,7 +126,10 @@ export const inviteRouter = router({
         valid: true,
         assignRole: row.assignRole,
         label: row.label,
-        recipientEmail: row.recipientEmail,
+        recipientHint: row.recipientEmail
+          ? row.recipientEmail.replace(/^(.).+(@.+)$/, "$1•••$2")
+          : null,
+        expiresAt: row.expiresAt,
       };
     }),
 
@@ -140,56 +143,30 @@ export const inviteRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      const [row] = await db
-        .select()
-        .from(inviteTokens)
-        .where(eq(inviteTokens.token, input.token))
-        .limit(1);
-
-      if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Invite not found" });
-      }
-      if (row.consumedAt) {
-        // Already consumed — check if it was consumed by this same user (idempotent)
-        if (row.consumedByUserId === ctx.user.id) {
-          return { success: true, role: row.assignRole, alreadyConsumed: true };
+      return db.transaction(async (tx) => {
+        const [row] = await tx.select().from(inviteTokens)
+          .where(eq(inviteTokens.token, input.token)).for("update").limit(1);
+        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Invite not found" });
+        if (row.consumedAt) {
+          if (row.consumedByUserId === ctx.user.id) return { success: true, role: row.assignRole, alreadyConsumed: true };
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This invite link has already been used" });
         }
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "This invite link has already been used",
-        });
-      }
-      if (row.expiresAt && row.expiresAt < new Date()) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "This invite link has expired",
-        });
-      }
-
-      if (!matchesInviteRecipient(row.recipientEmail, ctx.user.email)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Sign in with the email address this invite was issued to",
-        });
-      }
-
-      // Assign role and mark consumed — do both in parallel
-      await Promise.all([
-        db
-          .update(users)
-          .set({
-            role: row.assignRole,
-            ...capitalOperatorInviteProfile(row.assignRole, row.label),
-            updatedAt: new Date(),
-          })
-          .where(eq(users.id, ctx.user.id)),
-        db
-          .update(inviteTokens)
-          .set({ consumedAt: new Date(), consumedByUserId: ctx.user.id })
-          .where(eq(inviteTokens.id, row.id)),
-      ]);
-
-      return { success: true, role: row.assignRole, alreadyConsumed: false };
+        if (row.expiresAt && row.expiresAt < new Date()) throw new TRPCError({ code: "BAD_REQUEST", message: "This invite link has expired" });
+        if (!matchesInviteRecipient(row.recipientEmail, ctx.user.email)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Sign in with the email address this invite was issued to" });
+        }
+        const now = new Date();
+        await tx.update(users).set({
+          role: row.assignRole,
+          ...capitalOperatorInviteProfile(row.assignRole, row.label),
+          updatedAt: now,
+        }).where(eq(users.id, ctx.user.id));
+        const consumed = await tx.update(inviteTokens)
+          .set({ consumedAt: now, consumedByUserId: ctx.user.id })
+          .where(eq(inviteTokens.id, row.id));
+        if (!consumed[0].affectedRows) throw new TRPCError({ code: "CONFLICT", message: "Invite changed before it could be accepted" });
+        return { success: true, role: row.assignRole, alreadyConsumed: false };
+      });
     }),
 
   /**
@@ -238,11 +215,12 @@ export const inviteRouter = router({
         ? `\n\nPersonal note from ${ctx.user.name || "Lenox"}:\n${input.personalNote}\n`
         : "";
 
-      const emailBody = `Hi${row.label ? ` ${row.label.split(" ")[0]}` : ""},
+      const isCapitalOperator = row.assignRole === "capital_operator";
+      const emailBody = `Hi${row.label ? ` ${row.label}` : ""},
 
-I'd like to invite you to access Signal Hunter — my AI-powered business acquisition intelligence platform.
+I'd like to invite you to Signal Hunter${isCapitalOperator ? " — a paper-only workspace for turning a market thesis into researched, risk-bounded plays" : ""}.
 
-Your access level: ${roleLabel}
+Your access: ${roleLabel}${isCapitalOperator ? "\nYour workspace: Capital Aperture\nNo real-money trading is enabled; every paper action remains human-approved." : ""}
 ${personalSection}
 Click the link below to accept your invitation and set up your account:
 

@@ -1,11 +1,11 @@
-export type IsolatedUatIdentity = "jim" | "lenox";
+export type IsolatedUatIdentity = "jim" | "lenox" | "ch_capital";
 export type IsolatedUatCase = "qualified-play";
 
 const STORAGE_KEY = "capital_aperture_isolated_uat_identity";
 const CASE_STORAGE_KEY = "capital_aperture_isolated_uat_case";
 
 function isIdentity(value: string | null): value is IsolatedUatIdentity {
-  return value === "jim" || value === "lenox";
+  return value === "jim" || value === "lenox" || value === "ch_capital";
 }
 
 function isCase(value: string | null): value is IsolatedUatCase {

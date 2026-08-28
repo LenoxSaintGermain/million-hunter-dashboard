@@ -18,6 +18,7 @@ import {
   capitalTheses,
   portfolioAccounts,
   positions,
+  apertureActivePlayContexts,
   apertureRuns,
   apertureCandidates,
   apertureStrategies,
@@ -70,6 +71,7 @@ import { buildCapitalDecisionBrief } from "./aperture/decisionBrief";
 import { ensureThesisReady } from "./aperture/thesisReadiness";
 import { buildBriefResearchPlan, isRunStale, nextFollowUpOffset } from "./aperture/runRecovery";
 import { getEvidenceReviewReadiness } from "../shared/evidenceReview";
+import { normalizeJsonRecord, normalizeStringList } from "../shared/stringList";
 import { missingIntradayRecipeMessage } from "../shared/intradayRecipeGuard";
 import { fetchIntradayBars } from "./aperture/providers/marketData";
 import { checkVwapHold, openingRange, sessionVwap } from "./aperture/intraday";
@@ -329,7 +331,7 @@ async function evidenceReviewBlock(
     .where(and(eq(apertureCandidates.id, candidateId), eq(apertureCandidates.runId, runId)))
     .limit(1);
   if (!candidate) throw new TRPCError({ code: "NOT_FOUND", message: "Candidate not found in this research brief" });
-  const requiredChecks = Array.isArray(candidate.verifyFields) ? candidate.verifyFields : [];
+  const requiredChecks = normalizeStringList(candidate.verifyFields);
   if (!requiredChecks.length) return null;
   const reviews = await db!.select().from(apertureEvidenceReviews).where(and(
     eq(apertureEvidenceReviews.userId, userId),
@@ -355,6 +357,7 @@ const orderCreateInput = z.object({
   runId: z.number(),
   candidateId: z.number().optional(),
   accountId: z.number(),
+  portfolioContextAccountId: z.number().optional(),
   symbol: z.string(),
   side: z.enum(["buy", "sell"]),
   qty: z.number().optional(),
@@ -554,6 +557,7 @@ export const apertureRouter = router({
         label: z.string().max(120),
         brokerId: z.enum(["manual", "alpaca_paper", "robinhood_mcp"]).default("manual"),
         isPaper: z.boolean().default(true),
+        startingCashCents: z.number().int().nonnegative().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -563,6 +567,9 @@ export const apertureRouter = router({
           label: input.label,
           brokerId: input.brokerId,
           isPaper: input.isPaper,
+          cashCents: input.startingCashCents ?? null,
+          buyingPowerCents: input.startingCashCents ?? null,
+          equityValueCents: input.startingCashCents ?? null,
           createdAt: now,
           updatedAt: now,
         });
@@ -600,8 +607,26 @@ export const apertureRouter = router({
           throw new TRPCError({ code: "BAD_GATEWAY", message: detail });
         }
 
+        if (account.brokerId === "alpaca_paper") {
+          if (!acctData.externalAccountId) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Alpaca Paper did not return an external account identity. The destination remains unbound." });
+          }
+          if (account.externalAccountId && account.externalAccountId !== acctData.externalAccountId) {
+            throw new TRPCError({ code: "CONFLICT", message: "The configured Alpaca Paper credentials resolve to a different account. No destination binding was changed." });
+          }
+          const bound = await db!.select({ id: portfolioAccounts.id, userId: portfolioAccounts.userId })
+            .from(portfolioAccounts).where(and(
+              eq(portfolioAccounts.brokerId, "alpaca_paper"),
+              eq(portfolioAccounts.externalAccountId, acctData.externalAccountId),
+            ));
+          if (bound.some((row) => row.id !== account.id)) {
+            throw new TRPCError({ code: "CONFLICT", message: "This external Alpaca Paper account is already bound to another Signal Hunter account. Submission remains blocked." });
+          }
+        }
+
         const now = Date.now();
         await db!.update(portfolioAccounts).set({
+          externalAccountId: acctData.externalAccountId,
           cashCents: acctData.cashCents,
           buyingPowerCents: acctData.buyingPowerCents,
           equityValueCents: acctData.equityValueCents,
@@ -684,6 +709,7 @@ export const apertureRouter = router({
     importCsv: capitalOperatorProcedure
       .input(z.object({
         accountId: z.number(),
+        mode: z.enum(["merge", "replace"]).default("replace"),
         rows: z.array(z.object({
           symbol: z.string(),
           qty: z.number(),
@@ -695,22 +721,115 @@ export const apertureRouter = router({
         const db = await getDb();
         await requireAccount(db, input.accountId, ctx.user.id);
         const now = Date.now();
-        await db!.delete(positions).where(eq(positions.accountId, input.accountId));
-        if (input.rows.length) {
-          await db!.insert(positions).values(input.rows.map((r) => ({
-            accountId: input.accountId,
-            symbol: normSymbol(r.symbol),
-            assetType: "equity" as const,
-            qty: r.qty,
-            avgCostCents: r.avgCostCents ?? null,
-            marketValueCents: r.marketValueCents ?? null,
-            priceAsOf: now,
-            priceSource: "csv_import",
-            createdAt: now,
-            updatedAt: now,
-          })));
+        const normalized = input.rows.map((row) => ({ ...row, symbol: normSymbol(row.symbol) }));
+        const symbols = normalized.map((row) => row.symbol);
+        if (new Set(symbols).size !== symbols.length) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Each ticker can appear only once in an import. Combine duplicate rows before continuing." });
         }
-        return { imported: input.rows.length };
+        await db!.transaction(async (tx) => {
+          if (input.mode === "replace") {
+            await tx.delete(positions).where(eq(positions.accountId, input.accountId));
+          } else if (symbols.length) {
+            await tx.delete(positions).where(and(
+              eq(positions.accountId, input.accountId),
+              inArray(positions.symbol, symbols),
+            ));
+          }
+          if (normalized.length) {
+            await tx.insert(positions).values(normalized.map((r) => ({
+              accountId: input.accountId,
+              symbol: r.symbol,
+              assetType: "equity" as const,
+              qty: r.qty,
+              avgCostCents: r.avgCostCents ?? null,
+              marketValueCents: r.marketValueCents ?? null,
+              priceAsOf: now,
+              priceSource: "csv_import",
+              createdAt: now,
+              updatedAt: now,
+            })));
+          }
+          await tx.update(portfolioAccounts).set({
+            lastSyncedAt: now,
+            syncSource: `csv_${input.mode}`,
+            syncError: null,
+            updatedAt: now,
+          }).where(eq(portfolioAccounts.id, input.accountId));
+        });
+        return { imported: normalized.length, mode: input.mode };
+      }),
+
+    listActivePlays: capitalOperatorProcedure
+      .input(z.object({ accountId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        await requireAccount(db, input.accountId, ctx.user.id);
+        return db!.select().from(apertureActivePlayContexts)
+          .where(and(
+            eq(apertureActivePlayContexts.userId, ctx.user.id),
+            eq(apertureActivePlayContexts.accountId, input.accountId),
+          ))
+          .orderBy(desc(apertureActivePlayContexts.updatedAt));
+      }),
+
+    upsertActivePlay: capitalOperatorProcedure
+      .input(z.object({
+        accountId: z.number(),
+        symbol: z.string().min(1).max(24),
+        side: z.enum(["long", "short"]).default("long"),
+        status: z.enum(["watching", "active", "closed"]).default("active"),
+        thesisNote: z.string().min(10).max(4000),
+        horizon: z.string().max(120).optional(),
+        entryPriceCents: z.number().int().positive().optional(),
+        stopPriceCents: z.number().int().positive().optional(),
+        targetPriceCents: z.number().int().positive().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        await requireAccount(db, input.accountId, ctx.user.id);
+        const now = Date.now();
+        const symbol = normSymbol(input.symbol);
+        await db!.insert(apertureActivePlayContexts).values({
+          userId: ctx.user.id,
+          accountId: input.accountId,
+          symbol,
+          side: input.side,
+          status: input.status,
+          thesisNote: input.thesisNote.trim(),
+          horizon: input.horizon?.trim() || null,
+          entryPriceCents: input.entryPriceCents ?? null,
+          stopPriceCents: input.stopPriceCents ?? null,
+          targetPriceCents: input.targetPriceCents ?? null,
+          source: "manual",
+          asOf: now,
+          createdAt: now,
+          updatedAt: now,
+        }).onDuplicateKeyUpdate({ set: {
+          side: input.side,
+          status: input.status,
+          thesisNote: input.thesisNote.trim(),
+          horizon: input.horizon?.trim() || null,
+          entryPriceCents: input.entryPriceCents ?? null,
+          stopPriceCents: input.stopPriceCents ?? null,
+          targetPriceCents: input.targetPriceCents ?? null,
+          source: "manual",
+          asOf: now,
+          updatedAt: now,
+        } });
+        return { symbol, status: input.status };
+      }),
+
+    removeActivePlay: capitalOperatorProcedure
+      .input(z.object({ accountId: z.number(), id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        await requireAccount(db, input.accountId, ctx.user.id);
+        await db!.delete(apertureActivePlayContexts).where(and(
+          eq(apertureActivePlayContexts.id, input.id),
+          eq(apertureActivePlayContexts.userId, ctx.user.id),
+          eq(apertureActivePlayContexts.accountId, input.accountId),
+        ));
+        return { removed: true };
       }),
   }),
 
@@ -797,7 +916,16 @@ export const apertureRouter = router({
 
       return rows
         .filter(({ candidate }) => belongsInMemoLibrary(candidate.memoStatus))
-        .map(({ candidate, run, thesisName }) => ({ candidate, run, thesisName }));
+        .map(({ candidate, run, thesisName }) => ({
+          candidate: {
+            ...candidate,
+            memo: normalizeJsonRecord(candidate.memo),
+            verifyFields: normalizeStringList(candidate.verifyFields),
+            citations: normalizeStringList(candidate.citations),
+          },
+          run,
+          thesisName,
+        }));
     }),
 
     get: capitalOperatorProcedure
@@ -824,7 +952,16 @@ export const apertureRouter = router({
           ? await db!.select({ symbol: positions.symbol, marketValueCents: positions.marketValueCents, priceAsOf: positions.priceAsOf })
             .from(positions).where(eq(positions.accountId, account.id))
           : [];
-        return { ...row, paperContext: account ? { account, positions: paperPositions } : null };
+        return {
+          ...row,
+          candidate: {
+            ...row.candidate,
+            memo: normalizeJsonRecord(row.candidate.memo),
+            verifyFields: normalizeStringList(row.candidate.verifyFields),
+            citations: normalizeStringList(row.candidate.citations),
+          },
+          paperContext: account ? { account, positions: paperPositions } : null,
+        };
       }),
   }),
 
@@ -1185,21 +1322,21 @@ export const apertureRouter = router({
         const isolatedUatResearchBlocked = isExactIsolatedUatRuntime();
         const qualifiedPlayFixture = isolatedUatResearchBlocked
           && input.uatCase === "qualified-play"
-          && ctx.user.openId === "uat_jim_9c18799";
+          && ["uat_jim_9c18799", "uat_ch_capital_9c18799"].includes(ctx.user.openId);
         if (input.uatCase && !qualifiedPlayFixture) {
-          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The qualified-play fixture is available only to the Jim identity in the exact isolated development UAT environment." });
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The qualified-play fixture is available only to approved owner identities in the exact isolated development UAT environment." });
         }
         if (qualifiedPlayFixture) {
           const [decisionRun] = await db!.select().from(apertureDecisionRuns).where(and(
             eq(apertureDecisionRuns.id, input.decisionRunId), eq(apertureDecisionRuns.userId, ctx.user.id),
           )).limit(1);
-          if (!decisionRun || decisionRun.currentRevisionId !== input.revisionId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current Jim mission revision before compiling the illustrative UAT fixture." });
+          if (!decisionRun || decisionRun.currentRevisionId !== input.revisionId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current operator-owned mission revision before compiling the illustrative UAT fixture." });
           if (decisionRun.researchRunId != null) return { status: "started" as const, runId: decisionRun.researchRunId, decisionRunId: decisionRun.id, revisionId: input.revisionId, fixture: "qualified-play" as const };
           const [revision] = await db!.select().from(apertureDecisionRevisions).where(and(eq(apertureDecisionRevisions.id, input.revisionId), eq(apertureDecisionRevisions.decisionRunId, decisionRun.id))).limit(1);
           if (!revision || revision.effectiveBranch !== "research") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash and conditional branches cannot compile the illustrative fixture." });
           const thesis = await requireThesis(db, decisionRun.capitalThesisId, ctx.user.id);
           const account = await requireAccount(db, decisionRun.accountId, ctx.user.id);
-          if (!account.isPaper) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The illustrative fixture requires Jim’s paper account." });
+          if (!account.isPaper) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The illustrative fixture requires an operator-owned paper account." });
           const now = Date.now();
           const deadline = now + 2 * 60 * 60 * 1000;
           const marker = "ILLUSTRATIVE_UAT_QUALIFIED_PLAY_ZERO_NETWORK_NOT_CURRENT_MARKET_DATA";
@@ -1209,7 +1346,7 @@ export const apertureRouter = router({
             const [runResult] = await tx.insert(apertureRuns).values({ userId: ctx.user.id, thesisId: thesis.id, accountId: account.id, deployableCapitalCents: revision.deployableCapitalCents, intendedTrades: [], holdingPeriod: "intraday", catalystDeadlineAt: deadline, liquidityFloorAdvUsd: CURRENT_MANDATE.minAdvUsd30d, maxSingleNamePct: CURRENT_MANDATE.maxPositionPctOfEquity, invalidationRule: "Illustrative UAT fixture invalidates if the named catalyst evidence, paper-only boundary, or modeled risk cap is not confirmed by a human.", mandateVersion: CURRENT_MANDATE.version, status: "completed", universeCount: 2, candidateCount: 2, droppedNote: marker, providerAvailability: { illustrative_uat_fixture: true, provider_network_invoked: false }, startedAt: now, completedAt: now, createdAt: now });
             const runId = Number((runResult as any).insertId);
             await tx.insert(apertureCandidates).values([
-              { runId, symbol: "UATQ", playSide: "long", role: "core", compositeScore: 91, confidenceScore: 0.74, rankScore: 0.91, dimensions: { thesisFit: "modeled", evidenceFreshness: "unknown", liquidity: "illustrative" }, verifyFields: ["Confirm the named catalyst evidence is still current before any paper proposal."], exposureNodeIds: [], memo: { basis: "Illustrative UAT fixture — not current market data.", whyRanked: "Highest modeled thesis fit within Jim’s declared paper-risk cap; no return is promised." }, memoStatus: "ok", citations: ["illustrative-uat-fixture://qualified-play"], suggestedSizeLowCents: 240000, suggestedSizeHighCents: 300000, createdAt: now },
+              { runId, symbol: "UATQ", playSide: "long", role: "core", compositeScore: 91, confidenceScore: 0.74, rankScore: 0.91, dimensions: { thesisFit: "modeled", evidenceFreshness: "unknown", liquidity: "illustrative" }, verifyFields: ["Confirm the named catalyst evidence is still current before any paper proposal."], exposureNodeIds: [], memo: { basis: "Illustrative UAT fixture — not current market data.", whyRanked: "Highest modeled thesis fit within the operator’s declared paper-risk cap; no return is promised." }, memoStatus: "ok", citations: ["illustrative-uat-fixture://qualified-play"], suggestedSizeLowCents: 240000, suggestedSizeHighCents: 300000, createdAt: now },
               { runId, symbol: "UATC", playSide: "long", role: "alternative_expression", compositeScore: 72, confidenceScore: 0.52, rankScore: 0.72, dimensions: { thesisFit: "modeled", evidenceFreshness: "unknown", liquidity: "illustrative" }, verifyFields: ["Confirm this alternative’s catalyst and liquidity before it can replace the lead."], exposureNodeIds: [], memo: { basis: "Illustrative UAT fixture — not current market data.", whyRanked: "Conditional alternative: lower modeled thesis fit and incomplete evidence." }, memoStatus: "ok", citations: ["illustrative-uat-fixture://conditional-alternative"], suggestedSizeLowCents: null, suggestedSizeHighCents: null, createdAt: now },
             ]);
             const [slateResult] = await tx.insert(aperturePlaySlates).values({ userId: ctx.user.id, canonicalThesisId: decisionRun.canonicalThesisId, accountId: account.id, sessionDateEt: new Date(now).toISOString().slice(0, 10), windowKey: `illustrative_qualified_play_${decisionRun.id}`, snapshotBasis: "historical_reconstruction", status: "captured", operatorDecision: "not_recorded", portfolioSnapshot: { label: "Illustrative UAT fixture — not current market data", equityCents: account.equityValueCents ?? null, measured: false }, contextSnapshot: { label: "Illustrative UAT fixture — not current market data", providerNetworkCalls: 0, brokerOrdersCreated: 0 }, capturedAt: now, createdAt: now, updatedAt: now });
@@ -1217,7 +1354,7 @@ export const apertureRouter = router({
             const candidates = await tx.select().from(apertureCandidates).where(eq(apertureCandidates.runId, runId)).orderBy(desc(apertureCandidates.rankScore));
             await tx.insert(aperturePlaySlateItems).values(candidates.map((candidate, index) => ({ slateId, sourceRunId: runId, sourceCandidateId: candidate.id, symbol: candidate.symbol, conditionKey: index === 0 ? "illustrative-qualified-lead" : "illustrative-conditional-alternative", recommendationSnapshot: { label: "Illustrative UAT fixture — not current market data", rank: index + 1, thesisFit: "modeled", evidenceFreshness: "unknown", riskCapCents: revision.maxPlannedLossCents }, outcomeStatus: "unavailable" as const, outcomeResult: "unresolved" as const, triggerObservation: "not_observed" as const, exitObservation: "not_observed" as const, outcomeBasis: "unknown" as const, outcomeExplanation: "Illustrative UAT fixture. No price, outcome, or current-market claim exists.", createdAt: now, updatedAt: now })));
             const update = await tx.update(apertureDecisionRuns).set({ researchRunId: runId, lifecycle: "researching", lockVersion: decisionRun.lockVersion + 1, updatedAt: now }).where(and(eq(apertureDecisionRuns.id, decisionRun.id), eq(apertureDecisionRuns.currentRevisionId, revision.id), eq(apertureDecisionRuns.lockVersion, decisionRun.lockVersion)));
-            if (!update[0].affectedRows) throw new TRPCError({ code: "CONFLICT", message: "Jim’s mission changed before the fixture could be bound." });
+            if (!update[0].affectedRows) throw new TRPCError({ code: "CONFLICT", message: "The operator’s mission changed before the fixture could be bound." });
               return runId;
             });
           } catch (error) {
@@ -1541,7 +1678,28 @@ export const apertureRouter = router({
         .where(eq(apertureRuns.userId, ctx.user.id))
         .orderBy(desc(apertureRuns.createdAt))
         .limit(20);
-      return rows.map(({ run, thesisName }) => ({ ...run, thesisName }));
+      const runIds = rows.map(({ run }) => run.id);
+      if (!runIds.length) return [];
+      const candidateRows = await db!.select().from(apertureCandidates)
+        .where(inArray(apertureCandidates.runId, runIds))
+        .orderBy(desc(apertureCandidates.compositeScore), desc(apertureCandidates.id));
+      const leadByRun = new Map<number, typeof candidateRows[number]>();
+      for (const candidate of candidateRows) {
+        if (!leadByRun.has(candidate.runId)) leadByRun.set(candidate.runId, candidate);
+      }
+      const leadIds = Array.from(leadByRun.values()).map((candidate) => candidate.id);
+      const reviews = leadIds.length ? await db!.select().from(apertureEvidenceReviews).where(and(
+        eq(apertureEvidenceReviews.userId, ctx.user.id),
+        inArray(apertureEvidenceReviews.candidateId, leadIds),
+      )) : [];
+      return rows.map(({ run, thesisName }) => {
+        const lead = leadByRun.get(run.id);
+        const readiness = lead ? getEvidenceReviewReadiness(
+          normalizeStringList(lead.verifyFields),
+          reviews.filter((review) => review.candidateId === lead.id),
+        ) : null;
+        return { ...run, thesisName, paperStageDeclined: readiness?.paperStageDeclined === true };
+      });
     }),
 
     get: capitalOperatorProcedure
@@ -1552,9 +1710,15 @@ export const apertureRouter = router({
           .where(and(eq(apertureRuns.id, input.id), eq(apertureRuns.userId, ctx.user.id)))
           .limit(1);
         if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
-        const candidates = await db!.select().from(apertureCandidates)
+        const candidateRows = await db!.select().from(apertureCandidates)
           .where(eq(apertureCandidates.runId, input.id))
           .orderBy(desc(apertureCandidates.compositeScore));
+        const candidates = candidateRows.map((candidate) => ({
+          ...candidate,
+          memo: normalizeJsonRecord(candidate.memo),
+          verifyFields: normalizeStringList(candidate.verifyFields),
+          citations: normalizeStringList(candidate.citations),
+        }));
         const evidenceReviews = await db!.select().from(apertureEvidenceReviews)
           .where(and(eq(apertureEvidenceReviews.runId, input.id), eq(apertureEvidenceReviews.userId, ctx.user.id)));
         const strategies = await db!.select().from(apertureStrategies)
@@ -1623,7 +1787,7 @@ export const apertureRouter = router({
           runId: z.number(),
           candidateId: z.number(),
           checkLabel: z.string().min(2).max(255),
-          status: z.enum(["reviewed", "confirmed", "not_confirmed", "not_applicable", "needs_follow_up"]),
+          status: z.enum(["confirmed", "not_confirmed", "not_applicable", "needs_follow_up"]),
           note: z.string().max(1_000).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
@@ -1986,8 +2150,8 @@ export const apertureRouter = router({
             decisionReason: revision?.reason ?? null,
             decisionBlocker: revision?.blocker ?? null,
             decisionReopenCondition: revision?.reopenCondition ?? null,
-            evidenceSummary: Array.isArray(candidate.verifyFields) && candidate.verifyFields.length
-              ? `${candidate.verifyFields.length} decision-critical evidence check${candidate.verifyFields.length === 1 ? " remains" : "s remain"}.`
+            evidenceSummary: normalizeStringList(candidate.verifyFields).length
+              ? `${normalizeStringList(candidate.verifyFields).length} decision-critical evidence check${normalizeStringList(candidate.verifyFields).length === 1 ? " remains" : "s remain"}.`
               : "No decision-critical evidence field was generated; current market conditions still require human confirmation.",
           };
         }),
@@ -2802,9 +2966,19 @@ export const apertureRouter = router({
       .input(z.object({ runId: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
-        return db!.select().from(brokerOrders)
+        const rows = await db!.select().from(brokerOrders)
           .where(and(eq(brokerOrders.runId, input.runId), eq(brokerOrders.userId, ctx.user.id)))
           .orderBy(desc(brokerOrders.createdAt));
+        const accountIds = Array.from(new Set(rows.flatMap((row) => [row.accountId, row.portfolioContextAccountId].filter((id): id is number => id != null))));
+        const accounts = accountIds.length
+          ? await db!.select().from(portfolioAccounts).where(and(eq(portfolioAccounts.userId, ctx.user.id), inArray(portfolioAccounts.id, accountIds)))
+          : [];
+        const byId = new Map(accounts.map((account) => [account.id, account]));
+        return rows.map((row) => ({
+          ...row,
+          destinationAccount: byId.get(row.accountId) ?? null,
+          portfolioContextAccount: row.portfolioContextAccountId ? byId.get(row.portfolioContextAccountId) ?? null : byId.get(row.accountId) ?? null,
+        }));
       }),
 
     create: capitalOperatorProcedure
@@ -2926,13 +3100,18 @@ export const apertureRouter = router({
       }),
 
     approve: capitalOperatorProcedure
-      .input(z.object({ orderId: z.number() }))
+      .input(z.object({ orderId: z.number(), paperConfirmation: z.literal("APPROVE PAPER") }))
       .mutation(async ({ ctx, input }) => {
-        return approveOrder(input.orderId, ctx.user.id);
+        try {
+          return await approveOrder(input.orderId, ctx.user.id, input.paperConfirmation);
+        } catch (error) {
+          if (error instanceof OrderGateError || error instanceof DecisionRunwayBlockedError) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message, cause: error });
+          throw error;
+        }
       }),
 
     reject: capitalOperatorProcedure
-      .input(z.object({ orderId: z.number(), reason: z.string().optional() }))
+      .input(z.object({ orderId: z.number(), reason: z.string().trim().min(10).max(1_000) }))
       .mutation(async ({ ctx, input }) => {
         await rejectOrder(input.orderId, ctx.user.id, input.reason);
         const db = await getDb();
@@ -2952,9 +3131,15 @@ export const apertureRouter = router({
       }),
 
     submit: capitalOperatorProcedure
-      .input(z.object({ orderId: z.number() }))
+      .input(z.object({ orderId: z.number(), paperConfirmation: z.literal("SUBMIT PAPER") }))
       .mutation(async ({ ctx, input }) => {
-        const submitted = await submitBrokerOrder(input.orderId, ctx.user.id);
+        let submitted;
+        try {
+          submitted = await submitBrokerOrder(input.orderId, ctx.user.id, input.paperConfirmation);
+        } catch (error) {
+          if (error instanceof OrderGateError || error instanceof DecisionRunwayBlockedError) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message, cause: error });
+          throw error;
+        }
         if (submitted.candidateId != null) {
           const db = await getDb();
           await syncCapturedPlayDecision({
@@ -2987,7 +3172,21 @@ export const apertureRouter = router({
         thesisSummary: z.string(),
         checkTypes: z.array(z.enum(["catalyst", "thesis_invalidation", "earnings", "macro"])).optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [owned] = await db!.select({ runId: apertureRuns.id, candidateId: apertureCandidates.id, symbol: apertureCandidates.symbol })
+          .from(apertureRuns)
+          .innerJoin(apertureCandidates, and(
+            eq(apertureCandidates.id, input.candidateId),
+            eq(apertureCandidates.runId, apertureRuns.id),
+          ))
+          .where(and(
+            eq(apertureRuns.id, input.runId),
+            eq(apertureRuns.userId, ctx.user.id),
+          )).limit(1);
+        if (!owned || normSymbol(input.symbol) !== owned.symbol) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "The monitored candidate is not part of this operator-owned run." });
+        }
         return runMonitoringChecks(
           input.runId,
           input.candidateId,
@@ -2999,11 +3198,23 @@ export const apertureRouter = router({
 
     list: capitalOperatorProcedure
       .input(z.object({ runId: z.number() }))
-      .query(async ({ input }) => getMonitoringChecks(input.runId)),
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [run] = await db!.select({ id: apertureRuns.id }).from(apertureRuns)
+          .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id))).limit(1);
+        if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+        return getMonitoringChecks(input.runId);
+      }),
 
     flagged: capitalOperatorProcedure
       .input(z.object({ runId: z.number() }))
-      .query(async ({ input }) => getFlaggedChecks(input.runId)),
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [run] = await db!.select({ id: apertureRuns.id }).from(apertureRuns)
+          .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id))).limit(1);
+        if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+        return getFlaggedChecks(input.runId);
+      }),
   }),
 
   // ── Aperture Alpha ─────────────────────────────────────────────────────────

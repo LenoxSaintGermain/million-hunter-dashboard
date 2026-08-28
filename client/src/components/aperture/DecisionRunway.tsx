@@ -34,7 +34,8 @@ function displayMoney(value: string) {
 
 function missionFor(thesis: string, capital: string, holding: HoldingPeriod) {
   const horizon = holding === "intraday" ? "today" : holding === "overnight" ? "through the next close" : holding === "swing" ? "this week" : "inside the named catalyst window";
-  return "Where can I best deploy $" + displayMoney(capital) + " against my " + thesis + " thesis " + horizon + " without exceeding the planned-loss ceiling?";
+  const capitalPhrase = capital.trim() ? `$${displayMoney(capital)}` : "the capital available for this mission";
+  return "Where can I best deploy " + capitalPhrase + " against my " + thesis + " thesis " + horizon + " without exceeding the planned-loss ceiling?";
 }
 
 function branchLabel(branch?: string) {
@@ -101,6 +102,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
   const [eligibilityReviewAt, setEligibilityReviewAt] = useState("");
   const [outcomeReviewAtInput, setOutcomeReviewAtInput] = useState("");
   const hydratedProjectionId = useRef<number | null>(null);
+  const hydratedDecisionRevisionId = useRef<number | null>(null);
   const libraryBindings = missionLibraryBindingState({
     canonicalThesisId: activeCanonicalId,
     capitalThesisId: projection?.id ?? null,
@@ -147,7 +149,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
   const buildThesisHere = async () => {
     try {
       const created = await createThesis.mutateAsync({ name: newTitle.trim(), thesisText: newBelief.trim() });
-      await projectThesis.mutateAsync({ compilationId: created.compilationId });
+      const projected = await projectThesis.mutateAsync({ compilationId: created.compilationId });
       setSelectedCanonicalId(created.compilationId);
       await Promise.all([
         utils.thesis.list.invalidate(),
@@ -155,7 +157,11 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
         utils.aperture.thesis.list.invalidate(),
         utils.aperture.runway.latest.invalidate(),
       ]);
-      toast.success("Thesis assigned to this Capital Mission");
+      if (projected.compilerStatus === "manual_draft") {
+        toast.warning("Thesis saved as an unresolved manual draft. No inferred sectors, rules, or trade conclusions were added; compile before provider-backed research.");
+      } else {
+        toast.success("Thesis assigned to this Capital Mission");
+      }
     } catch (error: any) {
       toast.error(error?.message ?? "The thesis could not be prepared.");
     }
@@ -261,6 +267,29 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
     && runway.latest.canonicalThesisId === activeCanonicalId
     && runway.latest.capitalThesisId === projection?.id
     && runway.latest.accountId === paperAccount?.id;
+  useEffect(() => {
+    const receipt = runway?.latest;
+    if (receiptTarget || !currentBindingMatches || receipt?.authority !== "authoritative" || hydratedDecisionRevisionId.current === receipt.decisionRevisionId) return;
+    hydratedDecisionRevisionId.current = receipt.decisionRevisionId;
+    setMission(receipt.missionText);
+    setCapital(String(Math.round(receipt.deployableCapitalCents / 100)));
+    setDesiredEnding(receipt.desiredEndingValueCents == null ? "" : String(Math.round(receipt.desiredEndingValueCents / 100)));
+    setMaxLoss(String(Math.round(receipt.maxPlannedLossCents / 100)));
+    setHoldingPeriod(receipt.holdingPeriod as HoldingPeriod);
+    setObjective(receipt.objective as Objective);
+    setInstrument(receipt.instrumentPreference);
+    setIncludeHeld(receipt.includeHeldResearch);
+    setBranch(receipt.branch as Branch);
+    setReason(receipt.reason ?? "");
+    setBlocker(receipt.blocker ?? "");
+    setReopen(receipt.reopenCondition ?? "");
+    setGateLabel(receipt.namedGateLabel ?? "");
+    const receiptReview = receipt.reviewAt == null ? "" : easternDateTimeInputFromEpoch(receipt.reviewAt);
+    setEligibilityReviewAt(receipt.branch === "conditional" ? receiptReview : "");
+    setOutcomeReviewAtInput(receipt.branch === "research" ? receiptReview : "");
+    setMissionDirty(false);
+    setRevisingReceipt(false);
+  }, [currentBindingMatches, receiptTarget, runway?.latest]);
   const plannedRiskCeiling = cockpit.data?.headroom.lines.find((line) => line.key === "planned_risk_per_play")?.ceilingCents ?? null;
   const concentrationLine = cockpit.data?.headroom.lines.find((line) => /single name/i.test(line.label)) ?? null;
   const receiptActive = !receiptTarget && !revisingReceipt && currentBindingMatches && (latestBranch === "cash" || latestBranch === "conditional");

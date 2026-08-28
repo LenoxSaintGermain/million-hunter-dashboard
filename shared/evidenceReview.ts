@@ -10,8 +10,8 @@ export interface EvidenceReviewRecord {
  * Translates the raw acknowledgement records into the only decision relevant to
  * proposal preparation: which required questions remain open, and whether a
  * resolved answer itself declines the paper stage. Legacy "reviewed" records
- * continue to count as a completed review; no historical record is rewritten.
- * A "needs follow up" acknowledgement intentionally stays open. A "not
+ * remain visible as history but never clear a decision gate because they do not
+ * state what the operator concluded. A "needs follow up" acknowledgement intentionally stays open. A "not
  * confirmed" answer closes the question but blocks the paper stage until the
  * operator creates a new research decision.
  */
@@ -21,7 +21,7 @@ export function getEvidenceReviewReadiness(requiredChecks: readonly string[] | n
     .map((check) => check.trim())
     .filter(Boolean)));
   const resolved = new Set((reviews ?? [])
-    .filter((review) => review.status === "reviewed" || review.status === "confirmed" || review.status === "not_confirmed" || review.status === "not_applicable")
+    .filter((review) => review.status === "confirmed" || review.status === "not_confirmed" || review.status === "not_applicable")
     .map((review) => review.checkLabel.trim()));
   const negativeChecks = normalizedRequired.filter((check) => (reviews ?? []).some((review) => review.checkLabel.trim() === check && review.status === "not_confirmed"));
   const unreviewedChecks = normalizedRequired.filter((check) => !resolved.has(check));

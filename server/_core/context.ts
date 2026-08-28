@@ -52,7 +52,12 @@ export async function createContext(
   if (isIsolatedUat && isolatedPreviewOpenId) {
     const requestedFixture = opts.req.header("x-isolated-uat-identity");
     const jimFixtureOpenId = process.env.LOCAL_PREVIEW_JIM_OPENID ?? "uat_jim_9c18799";
-    const fixtureOpenId = requestedFixture === "jim" ? jimFixtureOpenId : isolatedPreviewOpenId;
+    const chCapitalFixtureOpenId = process.env.LOCAL_PREVIEW_CH_CAPITAL_OPENID ?? "uat_ch_capital_9c18799";
+    const fixtureOpenId = requestedFixture === "jim"
+      ? jimFixtureOpenId
+      : requestedFixture === "ch_capital"
+        ? chCapitalFixtureOpenId
+        : isolatedPreviewOpenId;
     const db = await getDb();
     const rows = db
       ? await db.select().from(users).where(eq(users.openId, fixtureOpenId)).limit(1)

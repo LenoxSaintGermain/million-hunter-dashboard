@@ -3,7 +3,7 @@
  * Create and manage portfolio accounts (Alpaca paper, manual entry).
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
+import { AccountContextPanel } from "@/components/aperture/AccountContextPanel";
+import { parsePortfolioCsv } from "@shared/portfolioCsv";
 
 const DISCLAIMER = "Internal research tool — not investment advice. Paper only — no real capital.";
 
@@ -31,7 +33,7 @@ export default function ApertureAccounts() {
   const [showCreate, setShowCreate] = useState(false);
   const [label, setLabel] = useState("");
   const [brokerId, setBrokerId] = useState<"alpaca_paper" | "manual" | "robinhood_mcp">("alpaca_paper");
-  const [cashCents, setCashCents] = useState("");
+  const [startingCash, setStartingCash] = useState("");
   const [csvAccountId, setCsvAccountId] = useState<number | null>(null);
   const [csvText, setCsvText] = useState("");
   const [syncFeedback, setSyncFeedback] = useState<{ accountId: number; message: string; tone: "success" | "error" } | null>(null);
@@ -43,7 +45,7 @@ export default function ApertureAccounts() {
     onSuccess: () => {
       toast.success("Account created");
       setShowCreate(false);
-      setLabel(""); setCashCents("");
+      setLabel(""); setStartingCash("");
       refetch();
     },
     onError: (e) => toast.error(e.message),
@@ -83,22 +85,21 @@ export default function ApertureAccounts() {
       label: label.trim(),
       brokerId,
       isPaper: true,
+      startingCashCents: startingCash.trim() && Number.isFinite(Number(startingCash))
+        ? Math.round(Number(startingCash) * 100)
+        : undefined,
     });
   };
 
-  const handleImportCsv = (accountId: number) => {
+  const csvPreview = useMemo(() => parsePortfolioCsv(csvText), [csvText]);
+  const csvErrors = csvPreview.filter((row) => row.error);
+  const csvRows = csvPreview.filter((row) => !row.error).map(({ error: _error, ...row }) => row);
+
+  const handleImportCsv = (accountId: number, mode: "merge" | "replace") => {
     if (!csvText.trim()) return toast.error("Paste CSV data first");
-    const rows = csvText.trim().split("\n").map((line) => {
-      const [sym, qty, avgCost, mktVal] = line.split(",").map((s) => s.trim());
-      return {
-        symbol: sym,
-        qty: parseFloat(qty) || 0,
-        avgCostCents: avgCost ? Math.round(parseFloat(avgCost) * 100) : undefined,
-        marketValueCents: mktVal ? Math.round(parseFloat(mktVal) * 100) : undefined,
-      };
-    }).filter((r) => r.symbol && r.qty > 0);
-    if (!rows.length) return toast.error("No valid rows — format: symbol,qty,avg_cost,market_value");
-    importCsv.mutate({ accountId, rows });
+    if (csvErrors.length) return toast.error(csvErrors[0]?.error ?? "Fix the invalid CSV rows before importing.");
+    if (!csvRows.length) return toast.error("No valid holdings found.");
+    importCsv.mutate({ accountId, mode, rows: csvRows });
   };
 
   return (
@@ -168,8 +169,8 @@ export default function ApertureAccounts() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Starting Cash ($) <span className="opacity-50">optional — overridden by sync</span></Label>
-                <Input placeholder="e.g. 25000" value={cashCents} onChange={(e) => setCashCents(e.target.value)} />
+                <Label className="text-xs">Starting paper cash ($) <span className="opacity-50">optional — replaced by an Alpaca Paper sync</span></Label>
+                <Input placeholder="e.g. 25000" value={startingCash} onChange={(e) => setStartingCash(e.target.value)} inputMode="decimal" />
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleCreate} disabled={createAccount.isPending}>
@@ -213,6 +214,10 @@ export default function ApertureAccounts() {
                   </CardTitle>
                   <p className="text-xs mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>
                     Cash: {fmt(account.cashCents)} · Buying power: {fmt(account.buyingPowerCents)} · Equity: {fmt(account.equityValueCents)}
+                  </p>
+                  <p className="text-[11px] mt-1" style={{ color: "var(--sh-fg-muted)" }}>
+                    {account.externalAccountId ? `Bound paper destination · ${account.externalAccountId}` : account.brokerId === "manual" ? "Portfolio context only · not an order destination" : "Paper destination not bound yet"}
+                    {account.lastSyncedAt ? ` · refreshed ${new Date(account.lastSyncedAt).toLocaleString()}` : " · never refreshed"}
                   </p>
                 </div>
                 <Button
@@ -287,22 +292,31 @@ export default function ApertureAccounts() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-medium">Import Positions (CSV)</Label>
-                  <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>symbol,qty,avg_cost,market_value</span>
+                  <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Broker export or symbol,qty,avg_cost,market_value</span>
                 </div>
                 {csvAccountId === account.id ? (
                   <div className="space-y-2">
                     <textarea
                       className="w-full h-24 text-xs p-2 rounded border font-mono resize-none"
                       style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}
-                      placeholder={"NVDA,50,450.00,22500\nMSFT,30,380.00,11400\nAAPL,40,195.00,7800"}
+                      placeholder={"symbol,qty,avg_cost,market_value\nNVDA,50,450.00,22500\nMSFT,30,380.00,11400"}
                       value={csvText}
                       onChange={(e) => setCsvText(e.target.value)}
                     />
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => handleImportCsv(account.id)} disabled={importCsv.isPending}>
+                    {csvPreview.length > 0 && (
+                      <div className="overflow-hidden rounded-md border" style={{ borderColor: csvErrors.length ? "var(--sh-red)" : "var(--sh-border-1)" }}>
+                        <div className="grid grid-cols-[1fr_0.7fr_1fr] gap-2 px-3 py-2 text-[10px] uppercase tracking-wider" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}><span>Ticker</span><span>Quantity</span><span>Market value</span></div>
+                        {csvPreview.slice(0, 6).map((row, index) => <div key={`${row.symbol}-${index}`} className="grid grid-cols-[1fr_0.7fr_1fr] gap-2 border-t px-3 py-2 text-xs" style={{ borderColor: "var(--sh-border-1)", color: row.error ? "var(--sh-red)" : "var(--sh-text-primary)" }}><span>{row.symbol || "Invalid row"}</span><span>{row.qty || "—"}</span><span>{row.error ?? fmt(row.marketValueCents)}</span></div>)}
+                        {csvPreview.length > 6 && <p className="border-t px-3 py-2 text-[11px]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>+ {csvPreview.length - 6} more row(s)</p>}
+                      </div>
+                    )}
+                    <p className="text-[11px] leading-5" style={{ color: "var(--sh-fg-muted)" }}>Merge updates matching tickers and preserves the rest. Replace removes every existing holding first. Negative quantities remain short positions.</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => handleImportCsv(account.id, "merge")} disabled={importCsv.isPending || !csvRows.length || csvErrors.length > 0}>
                         <Upload className="h-3.5 w-3.5 mr-1" />
-                        {importCsv.isPending ? "Importing…" : "Import"}
+                        {importCsv.isPending ? "Importing…" : `Merge ${csvRows.length || ""} holding${csvRows.length === 1 ? "" : "s"}`}
                       </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleImportCsv(account.id, "replace")} disabled={importCsv.isPending || !csvRows.length || csvErrors.length > 0}>Replace all holdings</Button>
                       <Button variant="outline" size="sm" onClick={() => { setCsvAccountId(null); setCsvText(""); }}>Cancel</Button>
                     </div>
                   </div>
@@ -312,6 +326,8 @@ export default function ApertureAccounts() {
                   </Button>
                 )}
               </div>
+
+              <AccountContextPanel accountId={account.id} />
             </CardContent>
           </Card>
         ))}

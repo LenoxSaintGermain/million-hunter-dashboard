@@ -6,6 +6,7 @@ export type RunWorkspaceItem = {
   universeCount?: number | null;
   candidateCount?: number | null;
   droppedNote?: string | null;
+  paperStageDeclined?: boolean;
   createdAt: number;
 };
 
@@ -18,7 +19,7 @@ export type ResearchJourney = {
   symbolsReviewed: number;
   evidenceCandidates: number;
   remainingDeferred: number;
-  state: "in_progress" | "needs_attention" | "ready_to_review" | "more_research_available";
+  state: "in_progress" | "needs_attention" | "ready_to_review" | "more_research_available" | "paper_stage_declined";
   nextLabel: string;
 };
 
@@ -66,6 +67,8 @@ export function buildResearchJourneys(runs: RunWorkspaceItem[]): ResearchJourney
       ? "in_progress"
       : latest.status === "failed"
         ? "needs_attention"
+        : latest.paperStageDeclined
+          ? "paper_stage_declined"
         : remainingDeferred > 0
           ? "more_research_available"
           : "ready_to_review";
@@ -73,6 +76,8 @@ export function buildResearchJourneys(runs: RunWorkspaceItem[]): ResearchJourney
       ? "View live research"
       : state === "needs_attention"
         ? "Review interruption"
+        : state === "paper_stage_declined"
+          ? "Review declined paper stage"
         : state === "more_research_available"
           ? `Research next ${Math.min(12, remainingDeferred)} symbols`
           : "Review final decision";

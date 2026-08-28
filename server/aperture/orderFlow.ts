@@ -24,7 +24,7 @@
 import { eq, and, inArray, gte } from "drizzle-orm";
 import { getDb } from "../db";
 import {
-  apertureDecisionRuns, brokerOrders, positionSnapshots, portfolioAccounts, positions as positionsTable,
+  apertureDecisionRuns, apertureRuns, brokerOrders, positionSnapshots, portfolioAccounts, positions as positionsTable,
   type BrokerOrder,
 } from "../../drizzle/schema";
 import { brokerFor } from "./brokers/index";
@@ -57,6 +57,8 @@ export interface CreateOrderInput {
   runId: number;
   candidateId?: number;
   accountId: number;
+  /** Risk/holdings context when the paper execution destination is separate. */
+  portfolioContextAccountId?: number | null;
   userId: number;
   symbol: string;
   side: "buy" | "sell";
@@ -87,6 +89,8 @@ export interface CreateOrderInput {
   portfolioRules?: Parameters<typeof effectiveMandate>[1];
   /** Injected in tests. Production uses the real clock. */
   now?: number;
+  /** Internal only: prevent a stored proposal from counting itself during a gate rerun. */
+  excludeOrderId?: number;
 }
 
 /**
@@ -152,12 +156,13 @@ export interface OrderEvaluation {
   orderType: "market" | "limit";
   timeInForce: "day" | "gtc";
   now: number;
-  account: { id: number; isPaper: boolean; equityValueCents: number | null; cashCents: number | null };
+  account: { id: number; isPaper: boolean; brokerId: string; externalAccountId: string | null; equityValueCents: number | null; cashCents: number | null; lastSyncedAt: number | null; label: string };
+  portfolioContextAccount: { id: number; brokerId: string; lastSyncedAt: number | null; label: string };
   /** Exact authoritative binding when the proposal originated in Decision Runway. */
   decisionAuthorization: DecisionAuthorizationSnapshot | null;
 }
 
-async function evaluateOrder(input: CreateOrderInput, action: Extract<PaperDecisionAction, "preflight" | "create_proposal">): Promise<OrderEvaluation> {
+async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionAction): Promise<OrderEvaluation> {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
 
@@ -167,14 +172,23 @@ async function evaluateOrder(input: CreateOrderInput, action: Extract<PaperDecis
   const timeInForce = input.timeInForce ?? "day";
 
   const acctRows = await db.select().from(portfolioAccounts)
-    .where(eq(portfolioAccounts.id, input.accountId)).limit(1);
+    .where(and(eq(portfolioAccounts.id, input.accountId), eq(portfolioAccounts.userId, input.userId))).limit(1);
   const account = acctRows[0];
   if (!account) throw new Error("account not found");
+  const contextAccountId = input.portfolioContextAccountId ?? account.id;
+  const contextRows = contextAccountId === account.id
+    ? [account]
+    : await db.select().from(portfolioAccounts).where(and(
+      eq(portfolioAccounts.id, contextAccountId),
+      eq(portfolioAccounts.userId, input.userId),
+    )).limit(1);
+  const portfolioContextAccount = contextRows[0];
+  if (!portfolioContextAccount) throw new Error("portfolio context account not found");
 
   const mandate: Mandate = effectiveMandate(CURRENT_MANDATE, input.portfolioRules);
   const session = marketSession(now);
   const accountState = await loadOrderAccountState({
-    db, account, symbol, runId: input.runId, userId: input.userId, now,
+    db, account: portfolioContextAccount, symbol, runId: input.runId, userId: input.userId, now, excludeOrderId: input.excludeOrderId,
   });
 
   const { gatedNotionalCents, notionalBasis } = await resolveNotional({
@@ -194,11 +208,11 @@ async function evaluateOrder(input: CreateOrderInput, action: Extract<PaperDecis
     action,
     userId: input.userId,
     runId: input.runId,
-    accountId: input.accountId,
+    accountId: portfolioContextAccount.id,
     intent: resolvedIntent.intent,
   });
 
-  const evaluation = evaluateOrderGates({
+  const gateEvaluation = evaluateOrderGates({
     input: {
       symbol,
       side: input.side,
@@ -225,10 +239,53 @@ async function evaluateOrder(input: CreateOrderInput, action: Extract<PaperDecis
     now,
   });
 
+  const broker = brokerFor(account.brokerId, account.id);
+  const operationalResults = [
+    {
+      key: "paper_execution_destination",
+      passed: account.isPaper === true && broker.capabilities.paperTrading === true && broker.capabilities.serverSideExecution === true,
+      detail: account.isPaper === true && broker.capabilities.paperTrading === true && broker.capabilities.serverSideExecution === true
+        ? `destination is ${account.label} on a server-side paper rail`
+        : "Choose a connected server-side paper account as the execution destination; manual portfolio context cannot submit an order",
+    },
+    {
+      key: "external_paper_account_binding",
+      passed: account.brokerId !== "alpaca_paper" || Boolean(account.externalAccountId),
+      detail: account.brokerId !== "alpaca_paper" || account.externalAccountId
+        ? `paper destination identity ${account.externalAccountId ?? "not required for this rail"}`
+        : "Sync the Alpaca Paper account before proposal review so the exact external destination can be verified",
+    },
+    {
+      key: "execution_account_freshness",
+      passed: account.lastSyncedAt != null && now - account.lastSyncedAt <= 15 * 60_000,
+      detail: account.lastSyncedAt != null && now - account.lastSyncedAt <= 15 * 60_000
+        ? `execution account refreshed ${Math.max(0, Math.round((now - account.lastSyncedAt) / 60_000))} minute(s) ago`
+        : "Refresh the execution paper account within 15 minutes of proposal, approval, and submission",
+    },
+    {
+      key: "portfolio_context_freshness",
+      passed: portfolioContextAccount.lastSyncedAt != null && now - portfolioContextAccount.lastSyncedAt <= (portfolioContextAccount.brokerId === "manual" ? 4 * 60 * 60_000 : 15 * 60_000),
+      detail: portfolioContextAccount.lastSyncedAt != null && now - portfolioContextAccount.lastSyncedAt <= (portfolioContextAccount.brokerId === "manual" ? 4 * 60 * 60_000 : 15 * 60_000)
+        ? `portfolio context refreshed ${Math.max(0, Math.round((now - portfolioContextAccount.lastSyncedAt) / 60_000))} minute(s) ago`
+        : `Refresh ${portfolioContextAccount.label} before continuing; ${portfolioContextAccount.brokerId === "manual" ? "manual imports are valid for four hours" : "connected context is valid for 15 minutes"}`,
+    },
+    {
+      key: "broker_available",
+      passed: broker.available(),
+      detail: broker.available() ? `${broker.label} is configured` : broker.unavailableReason() ?? `${broker.label} is unavailable`,
+    },
+  ];
+  const evaluation: GateEvaluation = {
+    ...gateEvaluation,
+    passed: gateEvaluation.passed && operationalResults.every((result) => result.passed),
+    results: [...gateEvaluation.results, ...operationalResults],
+    failures: [...gateEvaluation.failures, ...operationalResults.filter((result) => !result.passed).map((result) => result.detail)],
+  };
+
   return {
     evaluation, resolvedIntent, session, mandate, accountState,
     gatedNotionalCents, notionalBasis,
-    symbol, orderType, timeInForce, now, account, decisionAuthorization,
+    symbol, orderType, timeInForce, now, account, portfolioContextAccount, decisionAuthorization,
   };
 }
 
@@ -260,6 +317,7 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
     runId: input.runId,
     candidateId: input.candidateId ?? null,
     accountId: input.accountId,
+    portfolioContextAccountId: input.portfolioContextAccountId ?? input.accountId,
     userId: input.userId,
     decisionRunId: decisionAuthorization?.decisionRunId ?? null,
     decisionRevisionId: decisionAuthorization?.revisionId ?? null,
@@ -367,8 +425,9 @@ async function loadOrderAccountState(args: {
   runId: number;
   userId: number;
   now: number;
+  excludeOrderId?: number;
 }): Promise<OrderAccountState> {
-  const { db, account, symbol, runId, userId, now } = args;
+  const { db, account, symbol, runId, userId, now, excludeOrderId } = args;
 
   const held = await db.select().from(positionsTable).where(eq(positionsTable.accountId, account.id));
   const ownRows = held.filter((p) => normSymbol(p.symbol) === symbol);
@@ -402,6 +461,7 @@ async function loadOrderAccountState(args: {
   const dayStart = startOfEtDay(now) ?? now - 86_400_000;
 
   const todayRows = await db.select({
+    id: brokerOrders.id,
     gated: brokerOrders.gatedNotionalCents,
     notional: brokerOrders.notionalCents,
     side: brokerOrders.side,
@@ -414,6 +474,7 @@ async function loadOrderAccountState(args: {
   ));
 
   const runRows = await db.select({
+    id: brokerOrders.id,
     gated: brokerOrders.gatedNotionalCents,
     notional: brokerOrders.notionalCents,
     side: brokerOrders.side,
@@ -423,6 +484,8 @@ async function loadOrderAccountState(args: {
     inArray(brokerOrders.status, [...LIVE]),
   ));
 
+  const currentTodayRows = todayRows.filter((row) => row.id !== excludeOrderId);
+  const currentRunRows = runRows.filter((row) => row.id !== excludeOrderId);
   const sumBuys = (rows: Array<{ gated: number | null; notional: number | null; side: string }>) =>
     rows.filter((r) => r.side === "buy").reduce((s, r) => s + (r.gated ?? r.notional ?? 0), 0);
 
@@ -430,8 +493,8 @@ async function loadOrderAccountState(args: {
   // symbol's cluster. Orders with no stated planned loss contribute 0 here —
   // they were gated on notional instead, and the gate says so in its notes
   // rather than inventing a risk figure for them.
-  const plannedRiskTodayCents = todayRows.reduce((s, r) => s + (r.plannedRisk ?? 0), 0);
-  const clusterPlannedRiskCents = todayRows.reduce((s, r) => {
+  const plannedRiskTodayCents = currentTodayRows.reduce((s, r) => s + (r.plannedRisk ?? 0), 0);
+  const clusterPlannedRiskCents = currentTodayRows.reduce((s, r) => {
     const sym = normSymbol(r.symbol);
     const sameCluster = orderSector
       ? sectorBySymbol.get(sym) === orderSector
@@ -450,15 +513,64 @@ async function loadOrderAccountState(args: {
     sectorKnown: orderSector != null,
     plannedRiskTodayCents,
     clusterPlannedRiskCents,
-    newNotionalTodayCents: sumBuys(todayRows),
-    runGrossDeployedCents: sumBuys(runRows),
+    newNotionalTodayCents: sumBuys(currentTodayRows),
+    runGrossDeployedCents: sumBuys(currentRunRows),
     advUsd: advRow?.valueNum ?? null,
   };
 }
 
 // ── Approve ───────────────────────────────────────────────────────────────────
 
-export async function approveOrder(orderId: number, userId: number): Promise<BrokerOrder> {
+async function rerunStoredOrder(order: BrokerOrder, userId: number, action: Extract<PaperDecisionAction, "approve" | "submit">) {
+  const db = await getDb();
+  if (!db) throw new Error("database unavailable");
+  const [run] = await db.select({ maxSingleNamePct: apertureRuns.maxSingleNamePct, liquidityFloorAdvUsd: apertureRuns.liquidityFloorAdvUsd })
+    .from(apertureRuns).where(and(eq(apertureRuns.id, order.runId), eq(apertureRuns.userId, userId))).limit(1);
+  if (!run) throw new Error("research run not found");
+  return evaluateOrder({
+    runId: order.runId,
+    candidateId: order.candidateId ?? undefined,
+    accountId: order.accountId,
+    portfolioContextAccountId: order.portfolioContextAccountId ?? order.accountId,
+    userId,
+    symbol: order.symbol,
+    side: order.side,
+    intent: order.intent,
+    qty: order.qty ?? undefined,
+    notionalCents: order.notionalCents ?? undefined,
+    orderType: order.orderType,
+    limitPriceCents: order.limitPriceCents ?? undefined,
+    timeInForce: order.timeInForce,
+    reason: order.reason,
+    invalidationCondition: order.invalidationCondition,
+    invalidationPriceCents: order.invalidationPriceCents,
+    entryPriceCents: order.entryPriceCents,
+    stopPriceCents: order.stopPriceCents,
+    slippageCents: order.slippageCents,
+    timeStopAt: order.timeStopAt,
+    noTradeConditions: Array.isArray(order.noTradeConditions) ? order.noTradeConditions as string[] : [],
+    holdingPeriod: order.holdingPeriod,
+    catalystDeadlineAt: order.catalystDeadlineAt,
+    paperAcknowledgement: "PAPER",
+    portfolioRules: {
+      maxSingleNamePct: run.maxSingleNamePct ?? null,
+      minAvgDailyVolumeUsd: run.liquidityFloorAdvUsd ?? null,
+    },
+    excludeOrderId: order.id,
+  }, action);
+}
+
+async function persistRerun(orderId: number, evaluation: GateEvaluation, now: number) {
+  const db = await getDb();
+  if (!db) throw new Error("database unavailable");
+  await db.update(brokerOrders).set({
+    lastPreflightAt: now,
+    lastPreflightSnapshot: evaluation as unknown as Record<string, unknown>,
+    updatedAt: now,
+  }).where(eq(brokerOrders.id, orderId));
+}
+
+export async function approveOrder(orderId: number, userId: number, paperConfirmation: string): Promise<BrokerOrder> {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
   const rows = await db.select().from(brokerOrders)
@@ -467,20 +579,16 @@ export async function approveOrder(orderId: number, userId: number): Promise<Bro
   const order = rows[0];
   if (!order) throw new Error("order not found");
   if (order.status !== "pending_approval") throw new Error(`cannot approve an order in status ${order.status}`);
+  if (paperConfirmation !== "APPROVE PAPER") throw new Error("Type APPROVE PAPER at action time before approving this proposal");
 
-  const now = Date.now();
+  const rerun = await rerunStoredOrder(order, userId, "approve");
+  await persistRerun(order.id, rerun.evaluation, rerun.now);
+  if (!rerun.evaluation.passed) throw new OrderGateError(rerun.evaluation, order.id);
+
+  const now = rerun.now;
   await db.transaction(async (tx) => {
-    const authorization = await authorizeDecisionAction({
-      action: "approve",
-      userId,
-      runId: order.runId,
-      accountId: order.accountId,
-      intent: order.intent,
-      decisionRunId: order.decisionRunId,
-      decisionRevisionId: order.decisionRevisionId,
-    });
-    await lockCurrentDecisionRevision(tx, authorization);
-    const update = await tx.update(brokerOrders).set({ status: "approved", approvedAt: now, updatedAt: now })
+    await lockCurrentDecisionRevision(tx, rerun.decisionAuthorization);
+    const update = await tx.update(brokerOrders).set({ status: "approved", approvalConfirmedAt: now, approvedAt: now, updatedAt: now })
       .where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.status, "pending_approval")));
     if (!update[0].affectedRows) throw new Error("order changed before approval could be recorded");
   });
@@ -515,7 +623,7 @@ export async function rejectOrder(orderId: number, userId: number, reason?: stri
  * Writes `submitted` before the broker call and updates with the result after.
  * Returns the updated order row.
  */
-export async function submitOrder(orderId: number, userId: number): Promise<BrokerOrder> {
+export async function submitOrder(orderId: number, userId: number, paperConfirmation: string): Promise<BrokerOrder> {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
 
@@ -525,29 +633,20 @@ export async function submitOrder(orderId: number, userId: number): Promise<Brok
   const order = rows[0];
   if (!order) throw new Error("order not found");
   if (order.status !== "approved") throw new Error(`order must be approved before submission (current: ${order.status})`);
+  if (paperConfirmation !== "SUBMIT PAPER") throw new Error("Type SUBMIT PAPER at action time before dispatch");
 
-  const decisionAuthorization = await authorizeDecisionAction({
-    action: "submit",
-    userId,
-    runId: order.runId,
-    accountId: order.accountId,
-    intent: order.intent,
-    decisionRunId: order.decisionRunId,
-    decisionRevisionId: order.decisionRevisionId,
-  });
-
-  // Load the account to get the broker rail and isPaper flag
-  const acctRows = await db.select().from(portfolioAccounts)
-    .where(eq(portfolioAccounts.id, order.accountId)).limit(1);
-  const account = acctRows[0];
-  if (!account) throw new Error("account not found");
+  const rerun = await rerunStoredOrder(order, userId, "submit");
+  await persistRerun(order.id, rerun.evaluation, rerun.now);
+  if (!rerun.evaluation.passed) throw new OrderGateError(rerun.evaluation, order.id);
+  const decisionAuthorization = rerun.decisionAuthorization;
+  const account = rerun.account;
 
   const broker = brokerFor(account.brokerId, account.id);
   if (!broker.available()) {
     throw new Error(broker.unavailableReason() ?? `broker ${account.brokerId} is not configured`);
   }
 
-  const now = Date.now();
+  const now = rerun.now;
   const clientOrderId = order.clientOrderId ?? `sh-paper-${order.id}`;
   // Mark as submitted at the serialized authorization point, before the broker
   // call. Cash recorded first blocks this transition. Until the broker response
@@ -555,7 +654,7 @@ export async function submitOrder(orderId: number, userId: number): Promise<Brok
   // dispatch lease that prevents a new Decision Run revision from overtaking it.
   await db.transaction(async (tx) => {
     await lockCurrentDecisionRevision(tx, decisionAuthorization);
-    const update = await tx.update(brokerOrders).set({ status: "submitted", clientOrderId, dispatchError: null, submittedAt: now, updatedAt: now })
+    const update = await tx.update(brokerOrders).set({ status: "submitted", clientOrderId, dispatchError: null, submitConfirmedAt: now, submittedAt: now, updatedAt: now })
       .where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.status, "approved")));
     if (!update[0].affectedRows) throw new Error("order changed before submission could be authorized");
   });

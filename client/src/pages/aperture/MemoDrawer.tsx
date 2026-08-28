@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/DashboardLayout";
 import { DecisionFocusCard } from "@/components/aperture/DecisionFocusCard";
+import { normalizeStringList } from "@shared/stringList";
 
 export default function MemoDrawer() {
   const [, runParams] = useRoute("/aperture/run/:runId/memo/:candidateId");
@@ -43,7 +44,7 @@ export default function MemoDrawer() {
   if (!candidate) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Candidate not found.</div></DashboardLayout>;
 
   const memo = candidate.memo as any;
-  const citations = (candidate.citations as string[]) ?? [];
+  const citations = normalizeStringList(candidate.citations);
   const memoRunId = isLibraryRoute ? libraryData?.run.id : runId;
   const paperPositions = isLibraryRoute ? (libraryData as any)?.paperContext?.positions ?? [] : (runData as any)?.paperContext?.positions ?? [];
 

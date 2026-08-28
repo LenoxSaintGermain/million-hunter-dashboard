@@ -1120,6 +1120,7 @@ export const portfolioAccounts = mysqlTable("portfolio_accounts", {
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
 }, (table) => ({
   syncScheduleTaskUidIdx: index("portfolio_accounts_sync_schedule_task_uid_idx").on(table.syncScheduleTaskUid),
+  brokerExternalUnique: uniqueIndex("portfolio_accounts_broker_external_uq").on(table.brokerId, table.externalAccountId),
 }));
 export type PortfolioAccount = typeof portfolioAccounts.$inferSelect;
 export type InsertPortfolioAccount = typeof portfolioAccounts.$inferInsert;
@@ -1141,6 +1142,36 @@ export const positions = mysqlTable("positions", {
 });
 export type Position = typeof positions.$inferSelect;
 export type InsertPosition = typeof positions.$inferInsert;
+
+/**
+ * Operator-entered context for a play already in progress before Aperture saw it.
+ *
+ * This is not a broker order and never implies that Signal Hunter opened the
+ * position. It lets research preserve the operator's thesis, invalidation and
+ * intended exit while the held quantity remains sourced from `positions`.
+ */
+export const apertureActivePlayContexts = mysqlTable("aperture_active_play_contexts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  accountId: int("account_id").notNull(),
+  symbol: varchar("symbol", { length: 24 }).notNull(),
+  side: mysqlEnum("side", ["long", "short"]).default("long").notNull(),
+  status: mysqlEnum("status", ["watching", "active", "closed"]).default("active").notNull(),
+  thesisNote: text("thesis_note").notNull(),
+  horizon: varchar("horizon", { length: 120 }),
+  entryPriceCents: bigint("entry_price_cents", { mode: "number" }),
+  stopPriceCents: bigint("stop_price_cents", { mode: "number" }),
+  targetPriceCents: bigint("target_price_cents", { mode: "number" }),
+  source: mysqlEnum("source", ["manual", "csv_import"]).default("manual").notNull(),
+  asOf: bigint("as_of", { mode: "number" }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  ownerAccountIdx: index("aperture_active_play_owner_account_idx").on(table.userId, table.accountId, table.status),
+  oneCurrentPlayPerSymbol: uniqueIndex("aperture_active_play_account_symbol_uq").on(table.accountId, table.symbol),
+}));
+export type ApertureActivePlayContext = typeof apertureActivePlayContexts.$inferSelect;
+export type InsertApertureActivePlayContext = typeof apertureActivePlayContexts.$inferInsert;
 
 /** Thin identity record. Anything with a value lives in `security_facts`. */
 export const securities = mysqlTable("securities", {
@@ -1724,6 +1755,8 @@ export const brokerOrders = mysqlTable("broker_orders", {
   runId: int("run_id").notNull(),
   candidateId: int("candidate_id"),
   accountId: int("account_id").notNull(),
+  /** Portfolio/equity context used for risk gates when execution is a separate paper account. */
+  portfolioContextAccountId: int("portfolio_context_account_id"),
   userId: int("user_id").notNull(),
   /** Exact Decision Run binding for proposals created from the Runway. */
   decisionRunId: int("decision_run_id"),
@@ -1785,6 +1818,11 @@ export const brokerOrders = mysqlTable("broker_orders", {
   mandateVersion: varchar("mandate_version", { length: 16 }),
   /** The full gate evaluation, so a blocked order records which ceiling stopped it. */
   gateSnapshot: json("gate_snapshot"),
+  /** Most recent full gate rerun before approval or submission. */
+  lastPreflightAt: bigint("last_preflight_at", { mode: "number" }),
+  lastPreflightSnapshot: json("last_preflight_snapshot"),
+  approvalConfirmedAt: bigint("approval_confirmed_at", { mode: "number" }),
+  submitConfirmedAt: bigint("submit_confirmed_at", { mode: "number" }),
   approvedAt: bigint("approved_at", { mode: "number" }),
   submittedAt: bigint("submitted_at", { mode: "number" }),
   filledAt: bigint("filled_at", { mode: "number" }),

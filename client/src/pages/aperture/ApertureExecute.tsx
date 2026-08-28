@@ -17,7 +17,12 @@ import type { AppRouter } from "../../../../server/routers";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   AlertTriangle, ArrowLeft, CheckCircle2, XCircle, Send, RefreshCw, TrendingUp,
   TrendingDown, Minus, Flag, BarChart3, Loader2,
@@ -26,6 +31,8 @@ import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { PaperProposalForm } from "@/components/aperture/PaperProposalForm";
 import { format, formatDistanceToNow } from "date-fns";
+import { normalizeStringList } from "@shared/stringList";
+import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
 
 const DISCLAIMER = "Internal research tool — not investment advice. Paper only — no real capital.";
 
@@ -53,6 +60,11 @@ function fmtPct(v: number | null | undefined): string {
 // ── Order Queue ───────────────────────────────────────────────────────────────
 
 function OrderQueue({ runId }: { runId: number }) {
+  type Order = NonNullable<inferRouterOutputs<AppRouter>["aperture"]["order"]["list"]>[number];
+  const [confirmation, setConfirmation] = useState<{ kind: "approve" | "submit"; order: Order } | null>(null);
+  const [confirmationText, setConfirmationText] = useState("");
+  const [rejection, setRejection] = useState<Order | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
   const { data: orders, refetch } = trpc.aperture.order.list.useQuery({ runId });
   const approve = trpc.aperture.order.approve.useMutation({
     onSuccess: () => { toast.success("Order approved"); refetch(); },
@@ -87,6 +99,17 @@ function OrderQueue({ runId }: { runId: number }) {
     rejected: "Not approved",
     cancelled: "Cancelled",
   }[status] ?? status.replaceAll("_", " "));
+  const requiredConfirmation = confirmation?.kind === "submit" ? "SUBMIT PAPER" : "APPROVE PAPER";
+  const confirmAction = () => {
+    if (!confirmation || confirmationText !== requiredConfirmation) return;
+    if (confirmation.kind === "approve") {
+      approve.mutate({ orderId: confirmation.order.id, paperConfirmation: "APPROVE PAPER" });
+    } else {
+      submit.mutate({ orderId: confirmation.order.id, paperConfirmation: "SUBMIT PAPER" });
+    }
+    setConfirmation(null);
+    setConfirmationText("");
+  };
 
   return (
     <div className="space-y-4">
@@ -134,16 +157,16 @@ function OrderQueue({ runId }: { runId: number }) {
                   )}
                   {o.status === "pending_approval" && (
                     <>
-                      <Button size="sm" className="h-7 text-xs" onClick={() => approve.mutate({ orderId: o.id })} disabled={approve.isPending}>
+                      <Button size="sm" className="h-7 text-xs" onClick={() => { setConfirmation({ kind: "approve", order: o }); setConfirmationText(""); }} disabled={approve.isPending}>
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve proposal
                       </Button>
-                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => reject.mutate({ orderId: o.id })} disabled={reject.isPending}>
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setRejection(o); setRejectionReason(""); }} disabled={reject.isPending}>
                         <XCircle className="h-3.5 w-3.5 mr-1" /> Do not approve
                       </Button>
                     </>
                   )}
                   {o.status === "approved" && (
-                    <Button size="sm" className="h-7 text-xs" onClick={() => submit.mutate({ orderId: o.id })} disabled={submit.isPending}>
+                    <Button size="sm" className="h-7 text-xs" onClick={() => { setConfirmation({ kind: "submit", order: o }); setConfirmationText(""); }} disabled={submit.isPending}>
                         <Send className="h-3.5 w-3.5 mr-1" /> Send to Alpaca Paper
                     </Button>
                   )}
@@ -162,13 +185,63 @@ function OrderQueue({ runId }: { runId: number }) {
           </Card>
         ))}
       </div>
+      <AlertDialog open={confirmation != null} onOpenChange={(open) => { if (!open) { setConfirmation(null); setConfirmationText(""); } }}>
+        <AlertDialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmation?.kind === "submit" ? "Confirm paper submission" : "Approve this paper proposal"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action is paper-only. The server will rerun freshness, account-binding, evidence, and risk gates before changing the order state.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {confirmation && (
+            <div className="grid gap-3 rounded-lg border p-4 text-sm sm:grid-cols-2" style={{ borderColor: "var(--sh-border-1)" }}>
+              <div><span className="block text-xs text-muted-foreground">Instrument</span><strong>{confirmation.order.symbol} · {confirmation.order.side.toUpperCase()}</strong></div>
+              <div><span className="block text-xs text-muted-foreground">Size</span><strong>{confirmation.order.qty ? `${confirmation.order.qty} shares` : fmt(confirmation.order.notionalCents)}</strong></div>
+              <div><span className="block text-xs text-muted-foreground">Order</span><strong>{confirmation.order.orderType.toUpperCase()} · {confirmation.order.timeInForce.toUpperCase()}{confirmation.order.limitPriceCents ? ` · limit ${fmt(confirmation.order.limitPriceCents)}` : ""}</strong></div>
+              <div><span className="block text-xs text-muted-foreground">Entry / stop</span><strong>{fmt(confirmation.order.entryPriceCents)} / {fmt(confirmation.order.stopPriceCents)}</strong></div>
+              <div><span className="block text-xs text-muted-foreground">Maximum planned loss</span><strong>{fmt(confirmation.order.plannedRiskCents)}</strong></div>
+              <div><span className="block text-xs text-muted-foreground">Human review time stop</span><strong>{confirmation.order.timeStopAt ? format(confirmation.order.timeStopAt, "PP p") : "Not recorded"}</strong></div>
+              <div className="sm:col-span-2"><span className="block text-xs text-muted-foreground">Invalidation</span><strong>{confirmation.order.invalidationCondition || "Not recorded"}</strong></div>
+              <div className="sm:col-span-2 rounded-md p-3" style={{ background: "var(--sh-surface-2)" }}>
+                <span className="block text-xs text-muted-foreground">Exact paper destination</span>
+                <strong>{confirmation.order.destinationAccount?.label ?? "Unavailable"}</strong>
+                <span className="block break-all text-xs text-muted-foreground">{confirmation.order.destinationAccount?.brokerId ?? "unknown broker"} · account {confirmation.order.destinationAccount?.externalAccountId ?? "not bound"}</span>
+                <span className="block text-xs text-muted-foreground">Portfolio context: {confirmation.order.portfolioContextAccount?.label ?? "Unavailable"}</span>
+              </div>
+            </div>
+          )}
+          <div className="space-y-2">
+            <label htmlFor="paper-confirmation" className="text-sm font-medium">Type <span className="font-mono">{requiredConfirmation}</span> to continue</label>
+            <Input id="paper-confirmation" autoComplete="off" value={confirmationText} onChange={(event) => setConfirmationText(event.target.value.toUpperCase())} />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back</AlertDialogCancel>
+            <Button onClick={confirmAction} disabled={confirmationText !== requiredConfirmation || approve.isPending || submit.isPending}>
+              {confirmation?.kind === "submit" ? "Submit to named paper account" : "Approve paper proposal"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={rejection != null} onOpenChange={(open) => { if (!open) { setRejection(null); setRejectionReason(""); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Do not approve {rejection?.symbol}</AlertDialogTitle>
+            <AlertDialogDescription>This permanently records why the operator declined the paper proposal. It creates no broker order and becomes part of the decision look-back.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2"><label htmlFor="paper-rejection-reason" className="text-sm font-medium">Operator reason</label><textarea id="paper-rejection-reason" rows={4} value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} className="w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} placeholder="What made cash, delay, or another play preferable?" /><p className="text-xs text-muted-foreground">At least 10 characters. Be specific enough to learn from tomorrow.</p></div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back</AlertDialogCancel>
+            <Button variant="outline" disabled={!rejection || rejectionReason.trim().length < 10 || reject.isPending} onClick={() => { if (!rejection) return; reject.mutate({ orderId: rejection.id, reason: rejectionReason.trim() }); setRejection(null); setRejectionReason(""); }}>Record rejection</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
 // ── Monitoring Panel ──────────────────────────────────────────────────────────
 
-function MonitoringPanel({ runId }: { runId: number }) {
+function MonitoringPanel({ runId, candidate, thesisSummary }: { runId: number; candidate?: { id: number; symbol: string }; thesisSummary?: string | null }) {
   const { data: checks, refetch } = trpc.aperture.monitor.list.useQuery({ runId });
   const { data: flagged } = trpc.aperture.monitor.flagged.useQuery({ runId });
   const runCheck = trpc.aperture.monitor.run.useMutation({
@@ -186,6 +259,10 @@ function MonitoringPanel({ runId }: { runId: number }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+        <div><p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Challenge the current paper thesis</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{candidate ? `Run sourced catalyst, invalidation, earnings, and macro checks for ${candidate.symbol}. A finding never submits or exits an order.` : "Choose a candidate from the decision brief before running monitored checks."}</p></div>
+        <Button variant="outline" disabled={!candidate || runCheck.isPending} onClick={() => candidate && runCheck.mutate({ runId, candidateId: candidate.id, symbol: candidate.symbol, thesisSummary: thesisSummary?.trim() || `Monitor ${candidate.symbol} against the recorded paper thesis and its invalidation conditions.` })}>{runCheck.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}Run reviewed checks</Button>
+      </div>
       {flagged && flagged.length > 0 && (
         <div className="p-3 rounded-lg" style={{ background: "oklch(0.97 0.02 30)", border: "1px solid var(--sh-signal)" }}>
           <div className="flex items-center gap-2 mb-2">
@@ -218,9 +295,9 @@ function MonitoringPanel({ runId }: { runId: number }) {
                   <p className="text-xs" style={{ color: c.flagged ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>
                     {c.finding ?? "No finding."}
                   </p>
-                  {(c.citations as string[])?.length > 0 && (
+                  {normalizeStringList(c.citations).length > 0 && (
                     <div className="flex gap-1 mt-1 flex-wrap">
-                      {(c.citations as string[]).slice(0, 2).map((url, i) => (
+                      {normalizeStringList(c.citations).slice(0, 2).map((url, i) => (
                         <a key={i} href={url} target="_blank" rel="noopener noreferrer"
                           className="text-xs underline" style={{ color: "var(--sh-signal)" }}>
                           [{i + 1}]
@@ -731,6 +808,13 @@ export default function ApertureExecute() {
   const run = data?.run;
   const candidateId = Number(new URLSearchParams(window.location.search).get("candidate"));
   const proposalCandidate = Number.isFinite(candidateId) && candidateId > 0 ? data?.candidates.find((candidate) => candidate.id === candidateId) : undefined;
+  const proposalEvidence = proposalCandidate
+    ? getEvidenceReviewReadiness(
+      normalizeStringList(proposalCandidate.verifyFields),
+      (data?.evidenceReviews ?? []).filter((review) => review.candidateId === proposalCandidate.id),
+    )
+    : null;
+  const paperStageDeclined = proposalEvidence?.paperStageDeclined === true;
 
   return (
     <DashboardLayout>
@@ -758,15 +842,15 @@ export default function ApertureExecute() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Current human decision</p>
-                <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{data.brief.nextDecision.title}</p>
-                <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.brief.nextDecision.detail}</p>
+                <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{paperStageDeclined ? "Paper stage declined — preserve cash for this candidate" : data.brief.nextDecision.title}</p>
+                <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{paperStageDeclined ? "A required evidence answer was recorded as not confirmed. This revision cannot prepare a proposal or create an order." : data.brief.nextDecision.detail}</p>
               </div>
               <Button variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}`)}>Return to decision brief</Button>
             </div>
           </div>
         )}
 
-        {proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(`/aperture/run/${runId}?view=evidence`)} onProposalCreated={() => navigate(`/aperture/run/${runId}/execute`)} />}
+        {proposalCandidate && paperStageDeclined ? <section className="rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3" variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}?view=evidence`)}>Review the recorded evidence decision</Button></section> : proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(`/aperture/run/${runId}?view=evidence`)} onProposalCreated={() => navigate(`/aperture/run/${runId}/execute`)} />}
 
         <Tabs defaultValue="orders">
           <TabsList className="flex h-auto w-full min-w-0 max-w-full justify-start overflow-x-auto sm:inline-flex sm:w-fit">
@@ -778,7 +862,7 @@ export default function ApertureExecute() {
             <OrderQueue runId={runId} />
           </TabsContent>
           <TabsContent value="monitoring" className="mt-4">
-            <MonitoringPanel runId={runId} />
+            <MonitoringPanel runId={runId} candidate={proposalCandidate ?? data?.candidates[0]} thesisSummary={run?.invalidationRule} />
           </TabsContent>
           <TabsContent value="alpha" className="mt-4">
             <AlphaDashboard runId={runId} />

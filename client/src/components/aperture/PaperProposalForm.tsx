@@ -37,11 +37,15 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   const [preflightInput, setPreflightInput] = useState<any | null>(null);
   const [recipePrefilled, setRecipePrefilled] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [destinationAccountId, setDestinationAccountId] = useState<number | null>(null);
   // This form only prepares a new research-backed paper position. Closing an
   // existing position belongs to its own account-position flow, where the held
   // quantity and closing side can be proven before we state intent: "close".
   const orderIntent = "open" as const;
   const acknowledgementRef = useRef<HTMLInputElement>(null);
+  const accountsQuery = trpc.aperture.account.list.useQuery();
+  const executionAccounts = (accountsQuery.data ?? []).filter((item) => item.isPaper && item.brokerId === "alpaca_paper" && item.externalAccountId);
+  const destinationAccount = executionAccounts.find((item) => item.id === destinationAccountId) ?? null;
   const constructed = trpc.aperture.play.construct.useQuery({ runId, candidateId: candidate?.id ?? 0 }, { enabled: !!candidate?.id, staleTime: 30_000 });
   const create = trpc.aperture.order.create.useMutation({
     onSuccess: () => { toast.success("Paper proposal created. It is waiting for your separate approval."); onProposalCreated(); },
@@ -71,6 +75,12 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   useEffect(() => {
     if (paperAcknowledgement === "PAPER") setShowDetails(false);
   }, [paperAcknowledgement]);
+
+  useEffect(() => {
+    if (destinationAccountId != null) return;
+    const preferred = executionAccounts.find((item) => item.id === account?.id) ?? executionAccounts[0];
+    if (preferred) setDestinationAccountId(preferred.id);
+  }, [account?.id, destinationAccountId, executionAccounts.map((item) => item.id).join(",")]);
 
   const adjustNotional = (multiplier: number) => {
     const current = Number(notionalDollars);
@@ -112,7 +122,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
     const statedNotionalCents = Math.round(Number(notionalDollars) * 100);
     const noTradeConditions = noTradeText.split("\n").map((condition) => condition.trim()).filter(Boolean);
     return {
-      runId, candidateId: candidate?.id, accountId: account?.id ?? 0, symbol: candidate?.symbol ?? "",
+      runId, candidateId: candidate?.id, accountId: destinationAccount?.id ?? 0, portfolioContextAccountId: account?.id ?? undefined, symbol: candidate?.symbol ?? "",
       side: candidate?.playSide === "short" ? "sell" as const : "buy" as const,
       intent: orderIntent,
       qty: isIntraday ? intradaySizing?.qty : undefined,
@@ -127,13 +137,13 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
       noTradeConditions: noTradeConditions.length ? noTradeConditions : undefined,
       holdingPeriod, catalystDeadlineAt: Number.isFinite(deadlineAt) ? deadlineAt : undefined, paperAcknowledgement: paperAcknowledgement || undefined,
     };
-  }, [account?.id, candidate?.id, candidate?.symbol, deadline, entryPriceCents, invalidationCondition, intradaySizing?.qty, isIntraday, noTradeText, notionalDollars, orderIntent, paperAcknowledgement, reason, runId, slippageCents, stopPriceCents, timeStop, holdingPeriod]);
+  }, [account?.id, candidate?.id, candidate?.symbol, deadline, destinationAccount?.id, entryPriceCents, invalidationCondition, intradaySizing?.qty, isIntraday, noTradeText, notionalDollars, orderIntent, paperAcknowledgement, reason, runId, slippageCents, stopPriceCents, timeStop, holdingPeriod]);
 
   useEffect(() => {
-    if (!account || !candidate || !recipeCanPrepare) { setPreflightInput(null); return; }
+    if (!account || !destinationAccount || !candidate || !recipeCanPrepare) { setPreflightInput(null); return; }
     const timer = window.setTimeout(() => setPreflightInput(ticket), 400);
     return () => window.clearTimeout(timer);
-  }, [account, candidate, recipeCanPrepare, ticket]);
+  }, [account, destinationAccount, candidate, recipeCanPrepare, ticket]);
   const preflight = trpc.aperture.order.preflight.useQuery(preflightInput ?? ticket, { enabled: preflightInput != null, staleTime: 0, retry: false });
   const readiness = buildProposalReadiness({
     recipeReady: recipeCanPrepare,
@@ -146,14 +156,15 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   const submitProposal = () => {
     const deadlineAt = new Date(deadline).getTime();
     const noTradeConditions = noTradeText.split("\n").map((condition) => condition.trim()).filter(Boolean);
-    if (!account) return toast.error("Connect or select a paper account before preparing a proposal.");
+    if (!account) return toast.error("Choose the portfolio context this research was tested against.");
+    if (!destinationAccount) return toast.error("Connect, sync, and bind an Alpaca Paper destination before preparing a proposal.");
     if (!recipeCanPrepare) return toast.error(readiness.explanation);
     if (!Number.isFinite(deadlineAt)) return toast.error("Choose a valid catalyst deadline.");
     if (paperAcknowledgement !== "PAPER") return toast.error("Type PAPER to record your paper-only acknowledgement.");
     if (isIntraday && (!intradaySizing || entryPriceCents == null || stopPriceCents == null || slippageCents == null || !noTradeConditions.length)) return toast.error("Review the modelled intraday plan before preparing a proposal.");
     if (preflight.isFetching) return toast.error("Checking paper-order guardrails. Please wait.");
     if (!preflight.data?.wouldPass) return toast.error(readiness.explanation);
-    create.mutate({ ...ticket, accountId: account.id, candidateId: candidate.id, symbol: candidate.symbol, catalystDeadlineAt: deadlineAt, paperAcknowledgement: "PAPER" } as any);
+    create.mutate({ ...ticket, accountId: destinationAccount.id, portfolioContextAccountId: account.id, candidateId: candidate.id, symbol: candidate.symbol, catalystDeadlineAt: deadlineAt, paperAcknowledgement: "PAPER" } as any);
   };
 
   if (!candidate) return null;
@@ -176,6 +187,17 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
         <div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: readiness.action === "create_proposal" ? "oklch(0.55 0.15 145)" : "var(--sh-signal)" }} /><div><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{readiness.title}</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{readiness.explanation}</p></div></div>
         {preflight.data?.notionalBasis === "derived_from_last_price" && <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Modeled basis: the mandate ceiling uses notional derived from the last recorded price.</p>}
         {preflightGaps.length > 1 && <details className="mt-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}><summary className="cursor-pointer font-medium">See {preflightGaps.length - 1} supporting gap{preflightGaps.length === 2 ? "" : "s"}</summary><ul className="mt-2 space-y-1 pl-4">{preflightGaps.slice(1).map((gap) => <li key={gap}>{gap}</li>)}</ul></details>}
+      </section>
+
+      <section className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <div><p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Portfolio context</p><p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{account?.label ?? "Not selected"}</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Holdings and equity used by the risk gates.</p></div>
+        <label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Paper execution destination
+          <select className="mt-1 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} value={destinationAccountId ?? ""} onChange={(event) => setDestinationAccountId(Number(event.target.value) || null)}>
+            <option value="">Choose a synced Alpaca Paper account</option>
+            {executionAccounts.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.externalAccountId}</option>)}
+          </select>
+          <span className="block font-normal" style={{ color: "var(--sh-fg-muted)" }}>{destinationAccount ? `Bound external paper account ${destinationAccount.externalAccountId}` : "No executable destination is bound. Set it up under Accounts."}</span>
+        </label>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"><label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Holding horizon<div className="grid grid-cols-2 gap-1 sm:grid-cols-4" role="group" aria-label="Planned holding horizon">{(["intraday", "overnight", "swing", "catalyst_window"] as HoldingPeriod[]).map((period) => <button key={period} type="button" onClick={() => setHoldingPeriod(period)} className="rounded-md border px-2 py-2 text-xs capitalize" style={{ borderColor: holdingPeriod === period ? "var(--sh-signal)" : "var(--sh-border-1)", background: holdingPeriod === period ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{period.replace("_", " ")}</button>)}</div></label>{!isIntraday && <div className="space-y-1.5"><label className="block text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Modelled paper size<input value={notionalDollars} onChange={(event) => setNotionalDollars(event.target.value)} type="number" min="1" inputMode="decimal" className="mt-1 w-full rounded-md border bg-transparent px-3 py-2 text-sm sm:w-36" style={{ borderColor: "var(--sh-border-1)" }} /></label><div className="flex gap-1" aria-label="Quick modelled paper size adjustments"><button type="button" onClick={() => adjustNotional(0.75)} className="rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)" }}>−25%</button><button type="button" onClick={() => setNotionalDollars(String(Math.round(suggestedCents / 100)))} className="rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)" }}>Model</button><button type="button" onClick={() => adjustNotional(1.25)} className="rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)" }}>+25%</button></div></div>}</section>

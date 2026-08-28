@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `aperture_active_play_contexts` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `user_id` INT NOT NULL,
+  `account_id` INT NOT NULL,
+  `symbol` VARCHAR(24) NOT NULL,
+  `side` ENUM('long','short') NOT NULL DEFAULT 'long',
+  `status` ENUM('watching','active','closed') NOT NULL DEFAULT 'active',
+  `thesis_note` TEXT NOT NULL,
+  `horizon` VARCHAR(120) NULL,
+  `entry_price_cents` BIGINT NULL,
+  `stop_price_cents` BIGINT NULL,
+  `target_price_cents` BIGINT NULL,
+  `source` ENUM('manual','csv_import') NOT NULL DEFAULT 'manual',
+  `as_of` BIGINT NOT NULL,
+  `created_at` BIGINT NOT NULL,
+  `updated_at` BIGINT NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `aperture_active_play_account_symbol_uq` (`account_id`, `symbol`),
+  KEY `aperture_active_play_owner_account_idx` (`user_id`, `account_id`, `status`)
+);

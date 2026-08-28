@@ -51,7 +51,7 @@ const trpcClient = trpc.createClient({
       async fetch(input, init) {
         const headers = new Headers(init?.headers);
         const isolatedFixture = readIsolatedUatIdentity();
-        if (isolatedFixture === "jim") headers.set("x-isolated-uat-identity", "jim");
+        if (isolatedFixture) headers.set("x-isolated-uat-identity", isolatedFixture);
         const isolatedCase = readIsolatedUatCase();
         if (isolatedCase === "qualified-play") headers.set("x-isolated-uat-case", "qualified-play");
         const response = await globalThis.fetch(input, {
