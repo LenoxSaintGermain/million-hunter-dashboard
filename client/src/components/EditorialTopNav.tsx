@@ -387,9 +387,9 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
         )}
         style={{ height: "56px" }}
       >
-        <div className="max-w-[1280px] mx-auto px-6 h-full flex items-center justify-between gap-8">
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-full flex items-center justify-between gap-4 sm:gap-8">
           {/* Logo */}
-          <Link href="/">
+          <Link href="/" className="flex items-center" style={{ minHeight: 44 }}>
             <div className="flex items-center gap-2.5 cursor-pointer shrink-0">
               <div
                 className="w-7 h-7 rounded-sm flex items-center justify-center"
@@ -584,7 +584,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
             {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 outline-none group">
+                  <button aria-label="Open operator menu" className="flex items-center justify-center gap-2 outline-none group" style={{ minHeight: 44, minWidth: 44 }}>
                     <div
                       className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-[var(--bone)] transition-opacity group-hover:opacity-80"
                       style={{ background: "var(--ink)" }}
@@ -672,7 +672,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden h-8 w-8 text-[var(--sh-fg-2)]"
+                  className="md:hidden h-11 w-11 text-[var(--sh-fg-2)]"
                 >
                   <Menu className="w-4 h-4" />
                 </Button>

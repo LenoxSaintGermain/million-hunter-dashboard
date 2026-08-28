@@ -1,6 +1,6 @@
 import { easternDateTimeInputToEpoch } from "./easternMarketTime";
 
-export type CapitalMissionHoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window";
+export type CapitalMissionHoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
 export type CapitalMissionInstrument = "shares" | "options" | "either";
 
 export type CapitalMissionDefaults = {
@@ -103,7 +103,9 @@ export function extractCapitalMissionDefaults(rawText: string): CapitalMissionDe
       ? "overnight"
       : /\bthis week\b|\bwithin (?:the next )?\d+ (?:trading )?days?\b/i.test(text)
         ? "swing"
-        : catalystAt || /\bcatalyst window\b/i.test(text)
+        : /\blong[- ]term\b|\bmulti[- ]month\b|\bposition trade\b|\bLEAPS?\b/i.test(text)
+          ? "position"
+          : catalystAt || /\bcatalyst window\b/i.test(text)
           ? "catalyst_window"
           : null;
 

@@ -88,6 +88,7 @@ import { parse as parseCookie } from "cookie";
 import { DAILY_OUTCOME_REFRESH_CRON, DAILY_OUTCOME_REFRESH_PATH, refreshLiveSlateOutcomes } from "./aperture/dailyOutcomeRefresh";
 import { ONE_TIME_GLP1_RESEARCH_PATH, oneTimeResearchCron } from "./aperture/oneTimeGlp1Research";
 import { PAPER_ACCOUNT_SYNC_CRON, PAPER_ACCOUNT_SYNC_PATH } from "./aperture/paperAccountSyncScheduled";
+import { validatePaperInstrument } from "../shared/paperInstrument";
 import { compileDisclosureIntent, evaluateDisclosureTransaction, tightenControls, type DisclosureControls } from "../shared/disclosure";
 import { DisclosureDocumentStore, housePtrFixtureDocument } from "./aperture/disclosureRail";
 import {
@@ -359,6 +360,11 @@ const orderCreateInput = z.object({
   accountId: z.number(),
   portfolioContextAccountId: z.number().optional(),
   symbol: z.string(),
+  instrumentType: z.enum(["shares", "long_call", "long_put"]).default("shares"),
+  underlyingSymbol: z.string().max(24).optional(),
+  optionExpirationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  optionStrikePriceCents: z.number().int().positive().optional(),
+  contractMultiplier: z.number().int().positive().optional(),
   side: z.enum(["buy", "sell"]),
   qty: z.number().optional(),
   notionalCents: z.number().optional(),
@@ -630,6 +636,9 @@ export const apertureRouter = router({
           cashCents: acctData.cashCents,
           buyingPowerCents: acctData.buyingPowerCents,
           equityValueCents: acctData.equityValueCents,
+          optionsApprovedLevel: acctData.optionsApprovedLevel,
+          optionsTradingLevel: acctData.optionsTradingLevel,
+          optionsBuyingPowerCents: acctData.optionsBuyingPowerCents,
           lastSyncedAt: now,
           syncSource: broker.id,
           syncError: null,
@@ -713,6 +722,7 @@ export const apertureRouter = router({
         rows: z.array(z.object({
           symbol: z.string(),
           qty: z.number(),
+          assetType: z.enum(["equity", "etf", "option", "crypto", "cash"]).default("equity"),
           avgCostCents: z.number().optional(),
           marketValueCents: z.number().optional(),
         })),
@@ -739,7 +749,7 @@ export const apertureRouter = router({
             await tx.insert(positions).values(normalized.map((r) => ({
               accountId: input.accountId,
               symbol: r.symbol,
-              assetType: "equity" as const,
+              assetType: r.assetType,
               qty: r.qty,
               avgCostCents: r.avgCostCents ?? null,
               marketValueCents: r.marketValueCents ?? null,
@@ -776,6 +786,11 @@ export const apertureRouter = router({
       .input(z.object({
         accountId: z.number(),
         symbol: z.string().min(1).max(24),
+        instrumentType: z.enum(["shares", "long_call", "long_put"]).default("shares"),
+        underlyingSymbol: z.string().max(24).optional(),
+        optionExpirationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        optionStrikePriceCents: z.number().int().positive().optional(),
+        contractMultiplier: z.literal(100).optional(),
         side: z.enum(["long", "short"]).default("long"),
         status: z.enum(["watching", "active", "closed"]).default("active"),
         thesisNote: z.string().min(10).max(4000),
@@ -789,10 +804,26 @@ export const apertureRouter = router({
         await requireAccount(db, input.accountId, ctx.user.id);
         const now = Date.now();
         const symbol = normSymbol(input.symbol);
+        const instrument = validatePaperInstrument({
+          instrumentType: input.instrumentType,
+          symbol,
+          underlyingSymbol: input.underlyingSymbol,
+          optionExpirationDate: input.optionExpirationDate,
+          optionStrikePriceCents: input.optionStrikePriceCents,
+          contractMultiplier: input.contractMultiplier,
+          qty: input.instrumentType === "shares" ? undefined : 1,
+        }, now);
+        if (instrument.failures.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: instrument.failures.join(" ") });
+        if (input.instrumentType !== "shares" && input.side !== "long") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only long call and long put contexts are supported." });
         await db!.insert(apertureActivePlayContexts).values({
           userId: ctx.user.id,
           accountId: input.accountId,
           symbol,
+          instrumentType: input.instrumentType,
+          underlyingSymbol: instrument.optionTerms?.underlyingSymbol ?? null,
+          optionExpirationDate: instrument.optionTerms?.expirationDate ?? null,
+          optionStrikePriceCents: instrument.optionTerms?.strikePriceCents ?? null,
+          contractMultiplier: instrument.optionTerms?.contractMultiplier ?? null,
           side: input.side,
           status: input.status,
           thesisNote: input.thesisNote.trim(),
@@ -806,6 +837,11 @@ export const apertureRouter = router({
           updatedAt: now,
         }).onDuplicateKeyUpdate({ set: {
           side: input.side,
+          instrumentType: input.instrumentType,
+          underlyingSymbol: instrument.optionTerms?.underlyingSymbol ?? null,
+          optionExpirationDate: instrument.optionTerms?.expirationDate ?? null,
+          optionStrikePriceCents: instrument.optionTerms?.strikePriceCents ?? null,
+          contractMultiplier: instrument.optionTerms?.contractMultiplier ?? null,
           status: input.status,
           thesisNote: input.thesisNote.trim(),
           horizon: input.horizon?.trim() || null,

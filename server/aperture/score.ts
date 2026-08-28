@@ -36,10 +36,10 @@ export interface ThesisFitScore {
 
 /** Facts that carry weight. Missing ones lower confidence rather than the score. */
 const SCORING_FACTS = ["revenue_ttm", "pe_ratio", "price_to_sales", "adv_usd_30d", "last_price", "market_cap"];
-export type ScoreHoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window";
+export type ScoreHoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
 
 function normalizeHoldingPeriod(value: unknown): ScoreHoldingPeriod {
-  return ["intraday", "overnight", "swing", "catalyst_window"].includes(String(value))
+  return ["intraday", "overnight", "swing", "catalyst_window", "position"].includes(String(value))
     ? value as ScoreHoldingPeriod
     : "swing";
 }

@@ -16,6 +16,8 @@ try {
   if (!user || user.role !== "capital_operator" || !user.onboarding_completed || user.default_workspace !== "capital_aperture_trader") throw new Error("CH Capital UAT identity is not a bounded Capital Operator.");
   const [[account]] = await db.execute("SELECT id, broker_id, is_paper, sync_source, last_synced_at FROM portfolio_accounts WHERE user_id = ? AND label LIKE 'CH Capital%' LIMIT 1", [user.id]);
   if (!account || account.broker_id !== "manual" || !account.is_paper || account.sync_source !== "illustrative_uat_fixture" || !account.last_synced_at) throw new Error("CH Capital illustrative paper context is missing, stale, or mislabeled.");
+  const [[executionAccount]] = await db.execute("SELECT id, broker_id, external_account_id, is_paper, options_trading_level, options_buying_power_cents, sync_source, last_synced_at FROM portfolio_accounts WHERE user_id = ? AND broker_id = 'uat_paper' LIMIT 1", [user.id]);
+  if (!executionAccount || !executionAccount.is_paper || executionAccount.external_account_id !== "CH-UAT-PAPER-9C18799" || executionAccount.options_trading_level < 2 || !executionAccount.options_buying_power_cents || executionAccount.sync_source !== "isolated_uat_paper" || !executionAccount.last_synced_at) throw new Error("CH Capital isolated execution account is missing its exact paper identity or options entitlement.");
   const [[positions]] = await db.execute("SELECT COUNT(*) AS count FROM positions WHERE account_id = ? AND price_source = 'illustrative_uat_fixture'", [account.id]);
   const [[plays]] = await db.execute("SELECT COUNT(*) AS count FROM aperture_active_play_contexts WHERE user_id = ? AND account_id = ? AND status = 'active'", [user.id, account.id]);
   const [[orders]] = await db.execute("SELECT COUNT(*) AS count FROM broker_orders WHERE user_id = ?", [user.id]);
@@ -23,7 +25,7 @@ try {
   if (Number(positions.count) < 2 || Number(plays.count) < 1) throw new Error("CH Capital portfolio/play fixture is incomplete.");
   if (Number(orders.count) !== 0) throw new Error("CH Capital fixture must start with zero broker orders.");
   if (!invite || invite.assign_role !== "capital_operator" || invite.label !== "CH Capital" || invite.consumed_at || !invite.expires_at) throw new Error("CH Capital pre-login invite fixture is incomplete or already consumed.");
-  console.log(JSON.stringify({ identity: "ch_capital", role: user.role, defaultWorkspace: user.default_workspace, accountId: account.id, illustrativePositions: Number(positions.count), activePlayContexts: Number(plays.count), brokerOrders: 0, invite: { role: invite.assign_role, label: invite.label, consumed: false } }, null, 2));
+  console.log(JSON.stringify({ identity: "ch_capital", role: user.role, defaultWorkspace: user.default_workspace, accountId: account.id, executionAccountId: executionAccount.id, illustrativePositions: Number(positions.count), activePlayContexts: Number(plays.count), brokerOrders: 0, invite: { role: invite.assign_role, label: invite.label, consumed: false } }, null, 2));
 } finally {
   await db.end();
 }

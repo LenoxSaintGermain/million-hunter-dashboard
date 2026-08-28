@@ -15,9 +15,10 @@ import { getDb } from "../../db";
 import { portfolioAccounts, positions as positionsTable } from "../../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { httpJson, num } from "../providers/types";
+import { parseOccOptionSymbol } from "../../../shared/paperInstrument";
 import {
   assertPaperOnly, BrokerUnavailableError, dollarsToCents,
-  type BrokerAccount, type BrokerAdapter, type BrokerPosition, type OrderRequest, type OrderResult,
+  type BrokerAccount, type BrokerAdapter, type BrokerPosition, type OptionContractResult, type OrderRequest, type OrderResult,
 } from "./types";
 
 // ── Manual / CSV entry ───────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ export function manualBroker(accountId: number): BrokerAdapter {
       paperTrading: false,
       liveTrading: false,
       readPositions: true,
+      longOptions: false,
       constraints: ["Positions are whatever you entered or imported — nothing is synced or verified against a broker."],
     },
     available: () => true,
@@ -48,6 +50,9 @@ export function manualBroker(accountId: number): BrokerAdapter {
         cashCents: a.cashCents,
         buyingPowerCents: a.buyingPowerCents ?? a.cashCents,
         equityValueCents: a.equityValueCents,
+        optionsApprovedLevel: a.optionsApprovedLevel,
+        optionsTradingLevel: a.optionsTradingLevel,
+        optionsBuyingPowerCents: a.optionsBuyingPowerCents,
         isPaper: a.isPaper,
         asOf: a.lastSyncedAt ?? a.updatedAt,
       };
@@ -184,6 +189,7 @@ export const alpacaPaperBroker: BrokerAdapter = {
     paperTrading: true,
     liveTrading: false,
     readPositions: true,
+    longOptions: true,
     constraints: [
       "Paper account only — fills are simulated and no real capital moves.",
       "Free market data is the delayed IEX feed, so paper fills are not a fair test of execution quality.",
@@ -213,6 +219,9 @@ export const alpacaPaperBroker: BrokerAdapter = {
       cashCents: d(data.cash),
       buyingPowerCents: d(data.buying_power),
       equityValueCents: d(data.equity),
+      optionsApprovedLevel: num(data.options_approved_level),
+      optionsTradingLevel: num(data.options_trading_level),
+      optionsBuyingPowerCents: d(data.options_buying_power),
       isPaper: true,
       asOf: Date.now(),
     };
@@ -232,7 +241,7 @@ export const alpacaPaperBroker: BrokerAdapter = {
         avgCostCents: cents(p.avg_entry_price),
         lastPriceCents: cents(p.current_price),
         marketValueCents: cents(p.market_value),
-        assetType: p.asset_class === "crypto" ? "crypto" : "equity",
+        assetType: p.asset_class === "crypto" ? "crypto" : p.asset_class === "us_option" ? "option" : "equity",
       };
     });
   },
@@ -248,6 +257,9 @@ export const alpacaPaperBroker: BrokerAdapter = {
       time_in_force: order.timeInForce,
     };
     if (order.clientOrderId) body.client_order_id = order.clientOrderId;
+    if (order.instrumentType === "long_call" || order.instrumentType === "long_put") {
+      body.position_intent = "buy_to_open";
+    }
     if (order.qty != null) body.qty = String(order.qty);
     else if (order.notionalCents != null) body.notional = String(order.notionalCents / 100);
     else throw new BrokerUnavailableError("an order needs either qty or notionalCents");
@@ -302,6 +314,31 @@ export const alpacaPaperBroker: BrokerAdapter = {
     if (!res.ok) throw new BrokerUnavailableError(`Alpaca Paper order reconciliation returned HTTP ${res.status}.`);
     return toOrderResult(await res.json());
   },
+
+  async getOptionContract(symbol: string): Promise<OptionContractResult | null> {
+    const res = await fetch(`${ALPACA_PAPER_BASE}/options/contracts/${encodeURIComponent(symbol)}`, {
+      headers: alpacaHeaders(),
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new BrokerUnavailableError(`Alpaca Paper option-contract verification returned HTTP ${res.status}.`);
+    const data: any = await res.json();
+    const strike = num(data.strike_price);
+    const multiplier = num(data.size);
+    if (!data.symbol || !data.underlying_symbol || !data.expiration_date || !strike || !multiplier) {
+      throw new BrokerUnavailableError("Alpaca Paper returned an incomplete option-contract record.");
+    }
+    return {
+      symbol: String(data.symbol).toUpperCase(),
+      underlyingSymbol: String(data.underlying_symbol).toUpperCase(),
+      expirationDate: String(data.expiration_date),
+      type: data.type === "put" ? "put" : "call",
+      strikePriceCents: dollarsToCents(strike),
+      multiplier,
+      tradable: Boolean(data.tradable),
+      status: String(data.status ?? "unknown"),
+      asOf: Date.now(),
+    };
+  },
 };
 
 // ── Robinhood (declared, not usable server-side) ─────────────────────────────
@@ -314,6 +351,7 @@ export const robinhoodMcpBroker: BrokerAdapter = {
     paperTrading: false,
     liveTrading: false,
     readPositions: false,
+    longOptions: false,
     constraints: [
       "Robinhood exposes an MCP server that your own agent client connects to — there is no API key this server can hold, so Signal Hunter cannot call it on your behalf.",
       "Agent trading is confined to a dedicated Agentic account, separate from your existing accounts. It cannot rebalance your main portfolio.",
@@ -343,15 +381,87 @@ export const robinhoodMcpBroker: BrokerAdapter = {
   },
 };
 
+function isExactIsolatedUatRuntime(): boolean {
+  if (process.env.NODE_ENV !== "development" || process.env.ISOLATED_UAT_MODE !== "true") return false;
+  try {
+    const url = new URL(process.env.DATABASE_URL ?? "");
+    return url.protocol === "mysql:" && url.hostname === "127.0.0.1" && url.port === "3307"
+      && url.pathname === "/capital_aperture_uat_9c18799" && url.username === "uat_app";
+  } catch {
+    return false;
+  }
+}
+
+/** Deterministic paper adapter available only in the exact loopback UAT lane. */
+export function isolatedUatPaperBroker(accountId: number): BrokerAdapter {
+  return {
+    id: "uat_paper",
+    label: "Isolated UAT Paper",
+    requiredEnv: ["ISOLATED_UAT_MODE"],
+    capabilities: {
+      serverSideExecution: true,
+      paperTrading: true,
+      liveTrading: false,
+      readPositions: true,
+      longOptions: true,
+      constraints: ["Exact loopback UAT database only; deterministic fills; never registered in production."],
+    },
+    available: isExactIsolatedUatRuntime,
+    unavailableReason: () => isExactIsolatedUatRuntime() ? null : "available only in the exact isolated CH Capital development UAT runtime",
+    async getAccount() {
+      if (!isExactIsolatedUatRuntime()) throw new BrokerUnavailableError("isolated UAT paper adapter refused outside its exact loopback runtime");
+      return manualBroker(accountId).getAccount();
+    },
+    async getPositions() {
+      if (!isExactIsolatedUatRuntime()) throw new BrokerUnavailableError("isolated UAT paper adapter refused outside its exact loopback runtime");
+      return manualBroker(accountId).getPositions();
+    },
+    async submitOrder(order, opts) {
+      assertPaperOnly("Isolated UAT Paper", opts.isPaper);
+      if (!isExactIsolatedUatRuntime()) throw new BrokerUnavailableError("isolated UAT paper adapter refused outside its exact loopback runtime");
+      const fillPrice = order.limitPriceCents;
+      if (fillPrice == null) throw new BrokerUnavailableError("deterministic UAT paper orders require an exact limit price");
+      return {
+        brokerOrderId: `uat-paper-${order.clientOrderId ?? Date.now()}`,
+        status: "filled",
+        filledQty: order.qty ?? null,
+        filledAvgPriceCents: fillPrice,
+        submittedAt: Date.now(),
+        raw: { fixture: true, isolated: true, instrumentType: order.instrumentType ?? "shares" },
+      };
+    },
+    async getOrders() { return []; },
+    async getOrder() { return null; },
+    async getOrderByClientOrderId() { return null; },
+    async getOptionContract(symbol) {
+      if (!isExactIsolatedUatRuntime()) throw new BrokerUnavailableError("isolated UAT paper adapter refused outside its exact loopback runtime");
+      const parsed = parseOccOptionSymbol(symbol);
+      if (!parsed) return null;
+      return {
+        symbol: parsed.contractSymbol,
+        underlyingSymbol: parsed.underlyingSymbol,
+        expirationDate: parsed.expirationDate,
+        type: parsed.instrumentType === "long_call" ? "call" : "put",
+        strikePriceCents: parsed.strikePriceCents,
+        multiplier: parsed.contractMultiplier,
+        tradable: true,
+        status: "active_uat_fixture",
+        asOf: Date.now(),
+      };
+    },
+  };
+}
+
 /** Every rail, including the ones that cannot run — the UI shows all of them. */
 export function listBrokers(): BrokerAdapter[] {
-  return [manualBroker(0), alpacaPaperBroker, robinhoodMcpBroker];
+  return [manualBroker(0), alpacaPaperBroker, robinhoodMcpBroker, ...(isExactIsolatedUatRuntime() ? [isolatedUatPaperBroker(0)] : [])];
 }
 
 export function brokerFor(brokerId: string, accountId: number): BrokerAdapter {
   switch (brokerId) {
     case "alpaca_paper": return alpacaPaperBroker;
     case "robinhood_mcp": return robinhoodMcpBroker;
+    case "uat_paper": return isolatedUatPaperBroker(accountId);
     default: return manualBroker(accountId);
   }
 }

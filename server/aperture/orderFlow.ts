@@ -44,6 +44,11 @@ import {
 } from "./gates";
 import { CURRENT_MANDATE, effectiveMandate, type HoldingPeriod, type Mandate } from "./mandate";
 import {
+  isOptionInstrument,
+  validatePaperInstrument,
+  type PaperInstrumentType,
+} from "../../shared/paperInstrument";
+import {
   authorizeDecisionAction,
   DecisionRunwayBlockedError,
   queuePaperOutcome,
@@ -61,6 +66,11 @@ export interface CreateOrderInput {
   portfolioContextAccountId?: number | null;
   userId: number;
   symbol: string;
+  instrumentType?: PaperInstrumentType;
+  underlyingSymbol?: string | null;
+  optionExpirationDate?: string | null;
+  optionStrikePriceCents?: number | null;
+  contractMultiplier?: number | null;
   side: "buy" | "sell";
   /** Opens or closes exposure. Inferred from the held position when absent. */
   intent?: OrderIntent | null;
@@ -156,8 +166,9 @@ export interface OrderEvaluation {
   orderType: "market" | "limit";
   timeInForce: "day" | "gtc";
   now: number;
-  account: { id: number; isPaper: boolean; brokerId: string; externalAccountId: string | null; equityValueCents: number | null; cashCents: number | null; lastSyncedAt: number | null; label: string };
+  account: { id: number; isPaper: boolean; brokerId: string; externalAccountId: string | null; equityValueCents: number | null; cashCents: number | null; lastSyncedAt: number | null; label: string; optionsApprovedLevel: number | null; optionsTradingLevel: number | null; optionsBuyingPowerCents: number | null };
   portfolioContextAccount: { id: number; brokerId: string; lastSyncedAt: number | null; label: string };
+  instrumentSnapshot: Record<string, unknown> | null;
   /** Exact authoritative binding when the proposal originated in Decision Runway. */
   decisionAuthorization: DecisionAuthorizationSnapshot | null;
 }
@@ -168,6 +179,19 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
 
   const now = input.now ?? Date.now();
   const symbol = normSymbol(input.symbol);
+  const instrumentType = input.instrumentType ?? "shares";
+  const instrument = validatePaperInstrument({
+    instrumentType,
+    symbol,
+    underlyingSymbol: input.underlyingSymbol,
+    optionExpirationDate: input.optionExpirationDate,
+    optionStrikePriceCents: input.optionStrikePriceCents,
+    contractMultiplier: input.contractMultiplier,
+    qty: input.qty,
+    entryPriceCents: input.entryPriceCents,
+    slippageCents: input.slippageCents,
+  }, now);
+  const exposureSymbol = instrument.optionTerms?.underlyingSymbol ?? symbol;
   const orderType = input.orderType ?? "market";
   const timeInForce = input.timeInForce ?? "day";
 
@@ -188,11 +212,12 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
   const mandate: Mandate = effectiveMandate(CURRENT_MANDATE, input.portfolioRules);
   const session = marketSession(now);
   const accountState = await loadOrderAccountState({
-    db, account: portfolioContextAccount, symbol, runId: input.runId, userId: input.userId, now, excludeOrderId: input.excludeOrderId,
+    db, account: portfolioContextAccount, symbol, exposureSymbol, runId: input.runId, userId: input.userId, now, excludeOrderId: input.excludeOrderId,
   });
 
   const { gatedNotionalCents, notionalBasis } = await resolveNotional({
     symbol, qty: input.qty, notionalCents: input.notionalCents, limitPriceCents: input.limitPriceCents,
+    contractMultiplier: isOptionInstrument(instrumentType) ? (input.contractMultiplier ?? 100) : 1,
   });
 
   // The same resolver the gates use, on the same inputs, so the intent stored on
@@ -215,6 +240,11 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
   const gateEvaluation = evaluateOrderGates({
     input: {
       symbol,
+      instrumentType,
+      underlyingSymbol: input.underlyingSymbol,
+      optionExpirationDate: input.optionExpirationDate,
+      optionStrikePriceCents: input.optionStrikePriceCents,
+      contractMultiplier: input.contractMultiplier,
       side: input.side,
       orderType,
       timeInForce,
@@ -240,6 +270,11 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
   });
 
   const broker = brokerFor(account.brokerId, account.id);
+  const optionContract = isOptionInstrument(instrumentType) && broker.getOptionContract && broker.available()
+    ? await broker.getOptionContract(symbol).catch(() => null)
+    : null;
+  const optionType = instrumentType === "long_put" ? "put" : "call";
+  const optionDebitCents = isOptionInstrument(instrumentType) ? gatedNotionalCents : null;
   const operationalResults = [
     {
       key: "paper_execution_destination",
@@ -274,6 +309,43 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
       passed: broker.available(),
       detail: broker.available() ? `${broker.label} is configured` : broker.unavailableReason() ?? `${broker.label} is unavailable`,
     },
+    ...(isOptionInstrument(instrumentType) ? [
+      {
+        key: "long_option_capability",
+        passed: broker.capabilities.longOptions === true,
+        detail: broker.capabilities.longOptions ? `${broker.label} supports bounded long-option paper orders` : `${broker.label} cannot submit long calls or long puts`,
+      },
+      {
+        key: "options_entitlement",
+        passed: (account.optionsTradingLevel ?? 0) >= 2,
+        detail: (account.optionsTradingLevel ?? 0) >= 2
+          ? `paper account options level ${account.optionsTradingLevel} permits long calls and puts`
+          : "Enable and resync options level 2 or higher on the exact paper destination before continuing",
+      },
+      {
+        key: "options_buying_power",
+        passed: optionDebitCents != null && account.optionsBuyingPowerCents != null && account.optionsBuyingPowerCents >= optionDebitCents,
+        detail: optionDebitCents != null && account.optionsBuyingPowerCents != null && account.optionsBuyingPowerCents >= optionDebitCents
+          ? `options buying power covers the $${(optionDebitCents / 100).toFixed(2)} maximum premium debit`
+          : "Options buying power is missing or below the maximum premium debit; refresh the paper account",
+      },
+      {
+        key: "option_contract_verified",
+        passed: Boolean(optionContract
+          && optionContract.tradable
+          && optionContract.symbol === symbol
+          && optionContract.underlyingSymbol === instrument.optionTerms?.underlyingSymbol
+          && optionContract.expirationDate === instrument.optionTerms?.expirationDate
+          && optionContract.type === optionType
+          && optionContract.strikePriceCents === instrument.optionTerms?.strikePriceCents
+          && optionContract.multiplier === 100),
+        detail: optionContract
+          ? optionContract.tradable
+            ? `broker verified tradable contract ${optionContract.symbol} at ${new Date(optionContract.asOf).toISOString()}`
+            : `broker contract ${optionContract.symbol} is not tradable`
+          : "Resolve option evidence: the exact contract could not be verified with the paper broker",
+      },
+    ] : []),
   ];
   const evaluation: GateEvaluation = {
     ...gateEvaluation,
@@ -286,6 +358,15 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
     evaluation, resolvedIntent, session, mandate, accountState,
     gatedNotionalCents, notionalBasis,
     symbol, orderType, timeInForce, now, account, portfolioContextAccount, decisionAuthorization,
+    instrumentSnapshot: isOptionInstrument(instrumentType) ? {
+      declared: instrument.optionTerms,
+      brokerContract: optionContract,
+      entitlement: {
+        approvedLevel: account.optionsApprovedLevel,
+        tradingLevel: account.optionsTradingLevel,
+        optionsBuyingPowerCents: account.optionsBuyingPowerCents,
+      },
+    } : null,
   };
 }
 
@@ -305,7 +386,7 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
   if (!db) throw new Error("database unavailable");
 
   const {
-    evaluation, resolvedIntent, session, gatedNotionalCents, symbol, orderType, timeInForce, now, decisionAuthorization,
+    evaluation, resolvedIntent, session, gatedNotionalCents, symbol, orderType, timeInForce, now, decisionAuthorization, instrumentSnapshot,
   } = await evaluateOrder(input, "create_proposal");
 
   const holdingPeriod = isStoredHoldingPeriod(input.holdingPeriod) ? input.holdingPeriod : null;
@@ -322,6 +403,12 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
     decisionRunId: decisionAuthorization?.decisionRunId ?? null,
     decisionRevisionId: decisionAuthorization?.revisionId ?? null,
     symbol,
+    instrumentType: input.instrumentType ?? "shares",
+    underlyingSymbol: input.underlyingSymbol ?? null,
+    optionExpirationDate: input.optionExpirationDate ?? null,
+    optionStrikePriceCents: input.optionStrikePriceCents ?? null,
+    contractMultiplier: input.contractMultiplier ?? null,
+    instrumentSnapshot,
     side: input.side,
     intent: resolvedIntent.intent,
     qty: input.qty ?? null,
@@ -372,9 +459,19 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
   });
 }
 
-const STORED_HOLDING_PERIODS = ["intraday", "overnight", "swing", "catalyst_window"] as const;
+const STORED_HOLDING_PERIODS = ["intraday", "overnight", "swing", "catalyst_window", "position"] as const;
 function isStoredHoldingPeriod(v: unknown): v is HoldingPeriod {
   return typeof v === "string" && (STORED_HOLDING_PERIODS as readonly string[]).includes(v);
+}
+
+function storedStringArray(value: unknown): string[] {
+  let candidate = value;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (Array.isArray(candidate)) return candidate.filter((item): item is string => typeof item === "string");
+    if (typeof candidate !== "string") return [];
+    try { candidate = JSON.parse(candidate); } catch { return []; }
+  }
+  return Array.isArray(candidate) ? candidate.filter((item): item is string => typeof item === "string") : [];
 }
 
 /**
@@ -388,6 +485,7 @@ async function resolveNotional(args: {
   qty?: number;
   notionalCents?: number;
   limitPriceCents?: number;
+  contractMultiplier?: number;
 }): Promise<{ gatedNotionalCents: number | null; notionalBasis: NotionalBasis }> {
   if (args.notionalCents != null && args.notionalCents > 0) {
     return { gatedNotionalCents: Math.round(args.notionalCents), notionalBasis: "stated" };
@@ -395,13 +493,13 @@ async function resolveNotional(args: {
   if (args.qty != null && args.qty > 0) {
     if (args.limitPriceCents != null && args.limitPriceCents > 0) {
       return {
-        gatedNotionalCents: Math.round(args.qty * args.limitPriceCents),
+        gatedNotionalCents: Math.round(args.qty * args.limitPriceCents * (args.contractMultiplier ?? 1)),
         notionalBasis: "derived_from_last_price",
       };
     }
     const priceCents = await lastPriceCents(args.symbol);
     if (priceCents != null) {
-      return { gatedNotionalCents: Math.round(args.qty * priceCents), notionalBasis: "derived_from_last_price" };
+      return { gatedNotionalCents: Math.round(args.qty * priceCents * (args.contractMultiplier ?? 1)), notionalBasis: "derived_from_last_price" };
     }
   }
   return { gatedNotionalCents: null, notionalBasis: "unknown" };
@@ -422,12 +520,13 @@ async function loadOrderAccountState(args: {
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>;
   account: { id: number; isPaper: boolean; equityValueCents: number | null; cashCents: number | null };
   symbol: string;
+  exposureSymbol: string;
   runId: number;
   userId: number;
   now: number;
   excludeOrderId?: number;
 }): Promise<OrderAccountState> {
-  const { db, account, symbol, runId, userId, now, excludeOrderId } = args;
+  const { db, account, symbol, exposureSymbol, runId, userId, now, excludeOrderId } = args;
 
   const held = await db.select().from(positionsTable).where(eq(positionsTable.accountId, account.id));
   const ownRows = held.filter((p) => normSymbol(p.symbol) === symbol);
@@ -438,7 +537,7 @@ async function loadOrderAccountState(args: {
 
   // Sector for the order symbol and for everything held, from the fact ledger.
   const heldSymbols = Array.from(new Set(held.map((p) => normSymbol(p.symbol))));
-  const factSymbols = Array.from(new Set([symbol, ...heldSymbols]));
+  const factSymbols = Array.from(new Set([exposureSymbol, ...heldSymbols]));
   const factRows = factSymbols.length ? await getFacts(factSymbols) : [];
   const sectorBySymbol = new Map<string, string>();
   for (const f of factRows) {
@@ -447,14 +546,14 @@ async function loadOrderAccountState(args: {
     if (!sectorBySymbol.has(s)) sectorBySymbol.set(s, f.valueText);
   }
 
-  const orderSector = sectorBySymbol.get(symbol) ?? null;
+  const orderSector = sectorBySymbol.get(exposureSymbol) ?? null;
   const clusterValueCents = orderSector
     ? held
         .filter((p) => sectorBySymbol.get(normSymbol(p.symbol)) === orderSector)
         .reduce((s, p) => s + (p.marketValueCents ?? 0), 0)
     : positionValueCents;
 
-  const advRow = freshestPerKey(factRows.filter((f) => normSymbol(f.symbol) === symbol))
+  const advRow = freshestPerKey(factRows.filter((f) => normSymbol(f.symbol) === exposureSymbol))
     .find((f) => f.factKey === "adv_usd_30d" && f.basis !== "unknown" && f.valueNum != null);
 
   const LIVE = LIVE_ORDER_STATUSES;
@@ -509,7 +608,7 @@ async function loadOrderAccountState(args: {
     positionQty,
     positionValueCents,
     clusterValueCents,
-    clusterLabel: orderSector ?? `${symbol} (unclassified)`,
+    clusterLabel: orderSector ?? `${exposureSymbol} (unclassified)`,
     sectorKnown: orderSector != null,
     plannedRiskTodayCents,
     clusterPlannedRiskCents,
@@ -521,7 +620,7 @@ async function loadOrderAccountState(args: {
 
 // ── Approve ───────────────────────────────────────────────────────────────────
 
-async function rerunStoredOrder(order: BrokerOrder, userId: number, action: Extract<PaperDecisionAction, "approve" | "submit">) {
+async function rerunStoredOrder(order: BrokerOrder, userId: number, action: Extract<PaperDecisionAction, "approve" | "submit">, nowOverride?: number) {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
   const [run] = await db.select({ maxSingleNamePct: apertureRuns.maxSingleNamePct, liquidityFloorAdvUsd: apertureRuns.liquidityFloorAdvUsd })
@@ -534,6 +633,11 @@ async function rerunStoredOrder(order: BrokerOrder, userId: number, action: Extr
     portfolioContextAccountId: order.portfolioContextAccountId ?? order.accountId,
     userId,
     symbol: order.symbol,
+    instrumentType: order.instrumentType,
+    underlyingSymbol: order.underlyingSymbol,
+    optionExpirationDate: order.optionExpirationDate,
+    optionStrikePriceCents: order.optionStrikePriceCents,
+    contractMultiplier: order.contractMultiplier,
     side: order.side,
     intent: order.intent,
     qty: order.qty ?? undefined,
@@ -548,7 +652,7 @@ async function rerunStoredOrder(order: BrokerOrder, userId: number, action: Extr
     stopPriceCents: order.stopPriceCents,
     slippageCents: order.slippageCents,
     timeStopAt: order.timeStopAt,
-    noTradeConditions: Array.isArray(order.noTradeConditions) ? order.noTradeConditions as string[] : [],
+    noTradeConditions: storedStringArray(order.noTradeConditions),
     holdingPeriod: order.holdingPeriod,
     catalystDeadlineAt: order.catalystDeadlineAt,
     paperAcknowledgement: "PAPER",
@@ -557,6 +661,7 @@ async function rerunStoredOrder(order: BrokerOrder, userId: number, action: Extr
       minAvgDailyVolumeUsd: run.liquidityFloorAdvUsd ?? null,
     },
     excludeOrderId: order.id,
+    now: nowOverride,
   }, action);
 }
 
@@ -570,7 +675,7 @@ async function persistRerun(orderId: number, evaluation: GateEvaluation, now: nu
   }).where(eq(brokerOrders.id, orderId));
 }
 
-export async function approveOrder(orderId: number, userId: number, paperConfirmation: string): Promise<BrokerOrder> {
+export async function approveOrder(orderId: number, userId: number, paperConfirmation: string, nowOverride?: number): Promise<BrokerOrder> {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
   const rows = await db.select().from(brokerOrders)
@@ -581,7 +686,9 @@ export async function approveOrder(orderId: number, userId: number, paperConfirm
   if (order.status !== "pending_approval") throw new Error(`cannot approve an order in status ${order.status}`);
   if (paperConfirmation !== "APPROVE PAPER") throw new Error("Type APPROVE PAPER at action time before approving this proposal");
 
-  const rerun = await rerunStoredOrder(order, userId, "approve");
+  const rerun = nowOverride == null
+    ? await rerunStoredOrder(order, userId, "approve")
+    : await rerunStoredOrder(order, userId, "approve", nowOverride);
   await persistRerun(order.id, rerun.evaluation, rerun.now);
   if (!rerun.evaluation.passed) throw new OrderGateError(rerun.evaluation, order.id);
 
@@ -623,7 +730,7 @@ export async function rejectOrder(orderId: number, userId: number, reason?: stri
  * Writes `submitted` before the broker call and updates with the result after.
  * Returns the updated order row.
  */
-export async function submitOrder(orderId: number, userId: number, paperConfirmation: string): Promise<BrokerOrder> {
+export async function submitOrder(orderId: number, userId: number, paperConfirmation: string, nowOverride?: number): Promise<BrokerOrder> {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
 
@@ -635,7 +742,9 @@ export async function submitOrder(orderId: number, userId: number, paperConfirma
   if (order.status !== "approved") throw new Error(`order must be approved before submission (current: ${order.status})`);
   if (paperConfirmation !== "SUBMIT PAPER") throw new Error("Type SUBMIT PAPER at action time before dispatch");
 
-  const rerun = await rerunStoredOrder(order, userId, "submit");
+  const rerun = nowOverride == null
+    ? await rerunStoredOrder(order, userId, "submit")
+    : await rerunStoredOrder(order, userId, "submit", nowOverride);
   await persistRerun(order.id, rerun.evaluation, rerun.now);
   if (!rerun.evaluation.passed) throw new OrderGateError(rerun.evaluation, order.id);
   const decisionAuthorization = rerun.decisionAuthorization;
@@ -663,6 +772,7 @@ export async function submitOrder(orderId: number, userId: number, paperConfirma
     clientOrderId,
     symbol: order.symbol,
     side: order.side,
+    instrumentType: order.instrumentType,
     qty: order.qty ?? undefined,
     notionalCents: order.notionalCents ?? undefined,
     type: order.orderType,

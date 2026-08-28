@@ -28,7 +28,9 @@ const ROLE_DESCRIPTIONS: Record<Role, string> = {
   alternative_expression: "A different instrument for the same underlying thesis exposure.",
 };
 
-function percent(value: number | null | undefined) { return `${Math.round((value ?? 0) * 100)}%`; }
+function evidenceConfidenceLabel(value: number | null | undefined) {
+  return value == null ? "Not measured" : `${Math.round(value * 100)}% evidence confidence`;
+}
 
 function researchContextLabel(note: string | null | undefined) {
   if (!note) return "";
@@ -381,7 +383,7 @@ export default function CandidateBoard() {
                           <h2 className="mt-1 text-base font-semibold" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol} · {candidate.id === brief?.priorityCandidate?.id && verifyFields.length ? `${verifyFields.length} decision-critical check${verifyFields.length === 1 ? "" : "s"}` : verifyFields.length ? `${verifyFields.length} supporting check${verifyFields.length === 1 ? "" : "s"}` : "evidence review ready"}</h2>
                           <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{ROLE_DESCRIPTIONS[role]}</p>
                         </div>
-                        <Badge variant="outline" className="shrink-0 text-xs">{percent(candidate.confidenceScore)} evidence confidence</Badge>
+                        <Badge variant="outline" className="shrink-0 text-xs">{evidenceConfidenceLabel(candidate.confidenceScore)}</Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-3 rounded-lg p-3" style={{ background: "var(--sh-surface-2)" }}>
                         <div><p className="text-[0.64rem] uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Research fit</p><p className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{candidate.compositeScore ?? "—"}<span className="ml-1 text-xs font-normal" style={{ color: "var(--sh-fg-muted)" }}>/100</span></p></div>

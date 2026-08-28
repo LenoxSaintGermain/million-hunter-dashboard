@@ -22,7 +22,7 @@
 
 // ── Holding-period taxonomy ───────────────────────────────────────────────────
 
-export type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window";
+export type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
 
 export interface HoldingPeriodRule {
   key: HoldingPeriod;
@@ -78,6 +78,15 @@ export const HOLDING_PERIODS: Record<HoldingPeriod, HoldingPeriodRule> = {
     requiresRegularSession: false,
     mustBeFlatBySessionEnd: false,
     description: "Bounded by a dated catalyst. Capped at 20 sessions regardless.",
+  },
+  position: {
+    key: "position",
+    label: "Long term",
+    maxSessions: 504,
+    maxHorizonDays: 730,
+    requiresRegularSession: false,
+    mustBeFlatBySessionEnd: false,
+    description: "Multi-month paper position with a named review date; review at least every 30 days.",
   },
 };
 

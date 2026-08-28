@@ -1,6 +1,9 @@
+import { parseOccOptionSymbol } from "./paperInstrument";
+
 export interface PortfolioCsvRow {
   symbol: string;
   qty: number;
+  assetType?: "equity" | "etf" | "option" | "crypto" | "cash";
   avgCostCents?: number;
   marketValueCents?: number;
   error?: string;
@@ -51,9 +54,11 @@ export function parsePortfolioCsv(text: string): PortfolioCsvRow[] {
     if (!symbol || !Number.isFinite(qty) || qty === 0) return { symbol, qty: 0, error: "Ticker and a non-zero quantity are required." };
     if (avgCost !== undefined && (!Number.isFinite(avgCost) || avgCost < 0)) return { symbol, qty, error: "Average cost is not a valid non-negative number." };
     if (marketValue !== undefined && !Number.isFinite(marketValue)) return { symbol, qty, error: "Market value is not a valid number." };
+    const option = parseOccOptionSymbol(symbol);
     return {
       symbol,
       qty,
+      assetType: option ? "option" : "equity",
       avgCostCents: avgCost === undefined ? undefined : Math.round(avgCost * 100),
       marketValueCents: marketValue === undefined ? undefined : Math.round(marketValue * 100),
     };

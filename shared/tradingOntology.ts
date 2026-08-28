@@ -63,7 +63,7 @@ export type ExecutionStrategy =
   | "options_hedge"
   | "not_selected";
 
-export type TimeHorizon = "scalp" | "day_trade" | "overnight" | "short_swing" | "swing" | "catalyst_window";
+export type TimeHorizon = "scalp" | "day_trade" | "overnight" | "short_swing" | "swing" | "catalyst_window" | "position";
 export type SetupStatus = "confirmed" | "candidate" | "unclassified";
 export type SignalStatus = "confirmed" | "rejected" | "pending" | "unavailable";
 
@@ -134,6 +134,8 @@ const horizonFromHoldingPeriod = (holdingPeriod: string): TimeHorizonTaxonomy =>
       return { key: "swing", label: "Swing · 2–10 sessions", sourceHoldingPeriod: holdingPeriod, basis: "The mandate permits a multi-session holding period; it does not determine a market play." };
     case "catalyst_window":
       return { key: "catalyst_window", label: "Catalyst window", sourceHoldingPeriod: holdingPeriod, basis: "The mandate is bounded by a dated catalyst window." };
+    case "position":
+      return { key: "position", label: "Long term · recurring review", sourceHoldingPeriod: holdingPeriod, basis: "The mandate permits a multi-month paper position with recurring human review." };
     default:
       return { key: "day_trade", label: "Time horizon not classified", sourceHoldingPeriod: holdingPeriod, basis: "The source holding-period value is not recognized by the trading taxonomy." };
   }

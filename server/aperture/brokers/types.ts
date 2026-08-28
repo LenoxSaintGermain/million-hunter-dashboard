@@ -21,6 +21,8 @@ export interface BrokerCapabilities {
   liveTrading: boolean;
   /** Can we read positions and balances programmatically? */
   readPositions: boolean;
+  /** Can the adapter submit a bounded single-leg long call or long put? */
+  longOptions: boolean;
   /** Anything the operator must know before choosing this rail. */
   constraints: string[];
 }
@@ -30,6 +32,9 @@ export interface BrokerAccount {
   cashCents: number | null;
   buyingPowerCents: number | null;
   equityValueCents: number | null;
+  optionsApprovedLevel: number | null;
+  optionsTradingLevel: number | null;
+  optionsBuyingPowerCents: number | null;
   isPaper: boolean;
   /** When the broker says this was true. */
   asOf: number;
@@ -55,6 +60,19 @@ export interface OrderRequest {
   type: "market" | "limit";
   limitPriceCents?: number;
   timeInForce: "day" | "gtc";
+  instrumentType?: "shares" | "long_call" | "long_put";
+}
+
+export interface OptionContractResult {
+  symbol: string;
+  underlyingSymbol: string;
+  expirationDate: string;
+  type: "call" | "put";
+  strikePriceCents: number;
+  multiplier: number;
+  tradable: boolean;
+  status: string;
+  asOf: number;
 }
 
 export interface OrderResult {
@@ -88,6 +106,8 @@ export interface BrokerAdapter {
   getOrder(brokerOrderId: string): Promise<OrderResult | null>;
   /** One order by our stable client id, used after an ambiguous dispatch. */
   getOrderByClientOrderId(clientOrderId: string): Promise<OrderResult | null>;
+  /** Exact contract lookup used by the proposal, approval and submission gates. */
+  getOptionContract?(symbol: string): Promise<OptionContractResult | null>;
 }
 
 /** The single gate every adapter routes order submission through. */

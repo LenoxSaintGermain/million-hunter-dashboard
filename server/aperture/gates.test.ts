@@ -168,6 +168,49 @@ describe("holding period and catalyst deadline", () => {
     expect(gate(evalOrder({ holdingPeriod: "catalyst_window", catalystDeadlineAt: far }), "catalyst_deadline")!.passed).toBe(true);
     expect(gate(evalOrder({ holdingPeriod: "swing", catalystDeadlineAt: far }), "catalyst_deadline")!.passed).toBe(false);
   });
+
+  it("supports a bounded long-term position with a recurring review deadline", () => {
+    const review = NOW + 180 * DAY;
+    expect(gate(evalOrder({ holdingPeriod: "position", catalystDeadlineAt: review }), "catalyst_deadline")!.passed).toBe(true);
+  });
+});
+
+describe("bounded long options", () => {
+  const option = (over: Partial<OrderGateInput> = {}): Partial<OrderGateInput> => ({
+    instrumentType: "long_call",
+    symbol: "NVDA270115C00250000",
+    underlyingSymbol: "NVDA",
+    optionExpirationDate: "2027-01-15",
+    optionStrikePriceCents: 25_000,
+    contractMultiplier: 100,
+    qty: 2,
+    entryPriceCents: 400,
+    slippageCents: 5,
+    orderType: "limit",
+    timeInForce: "day",
+    gatedNotionalCents: 80_000,
+    notionalBasis: "derived_from_last_price",
+    ...over,
+  });
+
+  it("uses premium debit as maximum loss and never requires a share stop", () => {
+    const ev = evalOrder(option());
+    expect(gate(ev, "instrument_identity")?.passed).toBe(true);
+    expect(gate(ev, "planned_risk_stated")?.detail).toContain("contracts x 100");
+    expect(ev.results.some((result) => result.key === "play_stop")).toBe(false);
+  });
+
+  it("blocks fractional contracts, sell-to-open, and non-limit option tickets", () => {
+    const ev = evalOrder(option({ qty: 1.5, side: "sell", orderType: "market" }));
+    expect(gate(ev, "instrument_identity")?.passed).toBe(false);
+    expect(gate(ev, "long_option_buy_only")?.passed).toBe(false);
+    expect(gate(ev, "option_limit_day_only")?.passed).toBe(false);
+  });
+
+  it("blocks expiration before the declared review deadline", () => {
+    const ev = evalOrder(option({ catalystDeadlineAt: Date.parse("2027-02-01T20:00:00Z"), holdingPeriod: "position" }));
+    expect(gate(ev, "option_expiration_window")?.passed).toBe(false);
+  });
 });
 
 // ── Market hours ──────────────────────────────────────────────────────────────

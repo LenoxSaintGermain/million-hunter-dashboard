@@ -30,7 +30,7 @@ function dollarsToCents(v: string): number {
 }
 
 function defaultCatalystDeadline(holdingPeriod = "swing"): string {
-  const daysByPeriod: Record<string, number> = { intraday: 1, overnight: 1, swing: 10, catalyst_window: 20 };
+  const daysByPeriod: Record<string, number> = { intraday: 1, overnight: 1, swing: 10, catalyst_window: 20, position: 30 };
   const now = Date.now();
   if (holdingPeriod === "intraday") {
     let candidate = `${easternDateTimeInputFromEpoch(now).slice(0, 10)}T15:55`;
@@ -64,6 +64,12 @@ const HORIZON_GUIDANCE = {
   catalyst_window: {
     title: "Catalyst-window decision",
     recommendation: "Use only when a dated event can resolve the thesis within 20 sessions. The deadline is a research stop, not permission to keep holding.",
+    liquidity: "20,000,000",
+    concentration: "10",
+  },
+  position: {
+    title: "Long-term position",
+    recommendation: "Use for multi-month ownership theses. Name the next human review date; the product queues review at least every 30 days and never auto-exits.",
     liquidity: "20,000,000",
     concentration: "10",
   },
@@ -405,6 +411,7 @@ export default function ApertureHome() {
                           <SelectItem value="overnight">Overnight — exit by the next close</SelectItem>
                           <SelectItem value="swing">Swing — 2 to 10 sessions</SelectItem>
                           <SelectItem value="catalyst_window">Catalyst window — up to 20 sessions</SelectItem>
+                          <SelectItem value="position">Long term — recurring 30-day review</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

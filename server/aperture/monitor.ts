@@ -6,16 +6,24 @@
  *      to the operator; it does not trigger any autonomous action.
  *   2. Four check types: catalyst, thesis_invalidation, earnings, macro.
  *   3. Each check writes a monitoring_checks row regardless of whether it flags.
- *      The absence of a flag is itself a signal.
+ *      Only a current, well-formed, cited response may produce a clear state.
  *   4. Flagged checks are returned to the caller for immediate surfacing.
  *   5. The caller (router or heartbeat) decides cadence. This module is pure logic.
  */
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, lt, or } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   monitoringChecks, apertureCandidates, apertureRuns,
   type MonitoringCheck,
 } from "../../drizzle/schema";
+import {
+  MONITORING_FRESHNESS_MS,
+  UNKNOWN_MONITORING_PREFIX,
+  monitoringReviewState,
+  validMonitoringCitations,
+} from "../../shared/monitoringState";
+
+export { monitoringReviewState } from "../../shared/monitoringState";
 
 const SONAR_BASE = "https://api.perplexity.ai";
 
@@ -94,24 +102,47 @@ FLAGGED: YES or NO — flag YES only if there is a concrete macro event with dir
 
 // ── Parse Sonar reply ─────────────────────────────────────────────────────────
 
-function parseCheckReply(content: string, checkType: CheckType): Omit<CheckResult, "citations"> {
+export function parseMonitoringProviderOutput(
+  content: string,
+  checkType: CheckType,
+  citations: unknown,
+): Omit<CheckResult, "citations"> {
   const lines = content.split("\n").map((l) => l.trim()).filter(Boolean);
   let finding: string | null = null;
-  let flagged = false;
+  let flagged: boolean | null = null;
 
   for (const line of lines) {
     if (line.toUpperCase().startsWith("FINDING:")) {
       finding = line.slice("FINDING:".length).trim() || null;
     }
     if (line.toUpperCase().startsWith("FLAGGED:")) {
-      flagged = line.toUpperCase().includes("YES");
+      const match = line.match(/^FLAGGED:\s*(YES|NO)\s*$/i);
+      flagged = match ? match[1]!.toUpperCase() === "YES" : null;
     }
   }
 
-  // Fallback: if the model didn't follow the format, treat any content as a finding
-  if (!finding && content.trim()) {
-    finding = content.slice(0, 300);
-    flagged = false;
+  const validCitations = validMonitoringCitations(citations);
+  const staleClaim = /\b(stale|outdated|unable to verify current|cannot verify current|no access to current)\b/i.test(content);
+  if (!finding || flagged == null) {
+    return {
+      checkType,
+      finding: `${UNKNOWN_MONITORING_PREFIX} Provider output did not contain a valid FINDING and FLAGGED decision.`,
+      flagged: true,
+    };
+  }
+  if (validCitations.length === 0) {
+    return {
+      checkType,
+      finding: `${UNKNOWN_MONITORING_PREFIX} Provider output was not backed by a source citation.`,
+      flagged: true,
+    };
+  }
+  if (staleClaim) {
+    return {
+      checkType,
+      finding: `${UNKNOWN_MONITORING_PREFIX} Provider output could not establish current evidence.`,
+      flagged: true,
+    };
   }
 
   return { checkType, finding, flagged };
@@ -142,7 +173,8 @@ export async function runMonitoringChecks(
     }
 
     const { content, citations } = await sonarCheck(prompt);
-    const parsed = parseCheckReply(content, checkType);
+    const validCitations = validMonitoringCitations(citations);
+    const parsed = parseMonitoringProviderOutput(content, checkType, validCitations);
 
     const [result] = await db.insert(monitoringChecks).values({
       runId,
@@ -151,7 +183,7 @@ export async function runMonitoringChecks(
       checkType,
       finding: parsed.finding,
       flagged: parsed.flagged,
-      citations,
+      citations: validCitations,
       checkedAt: now,
       createdAt: now,
     });
@@ -179,6 +211,12 @@ export async function getFlaggedChecks(runId: number): Promise<MonitoringCheck[]
   const db = await getDb();
   if (!db) return [];
   return db.select().from(monitoringChecks)
-    .where(and(eq(monitoringChecks.runId, runId), eq(monitoringChecks.flagged, true)))
+    .where(and(
+      eq(monitoringChecks.runId, runId),
+      or(
+        eq(monitoringChecks.flagged, true),
+        lt(monitoringChecks.checkedAt, Date.now() - MONITORING_FRESHNESS_MS),
+      ),
+    ))
     .orderBy(desc(monitoringChecks.checkedAt));
 }

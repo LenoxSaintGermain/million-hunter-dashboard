@@ -1,10 +1,10 @@
 /**
  * Aperture Execute — Phase 2 UI.
  *
- * Three panels in one page:
- *   1. Order Queue — pending_approval orders awaiting human action
- *   2. Monitoring — post-entry catalyst / thesis-invalidation checks
- *   3. Aperture Alpha — the honest product metric
+ * Three lifecycle panels in one page:
+ *   1. Paper ticket — pending_approval orders awaiting human action
+ *   2. Check whether thesis still holds — post-entry catalyst / thesis-invalidation checks
+ *   3. Outcome & notes — the honest product metric and decision record
  *
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
  * Paper only. No live capital.
@@ -33,15 +33,17 @@ import { PaperProposalForm } from "@/components/aperture/PaperProposalForm";
 import { format, formatDistanceToNow } from "date-fns";
 import { normalizeStringList } from "@shared/stringList";
 import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
+import { monitoringReviewState } from "@shared/monitoringState";
+import { isOptionInstrument, paperInstrumentLabel } from "@shared/paperInstrument";
 
 const DISCLAIMER = "Internal research tool — not investment advice. Paper only — no real capital.";
 
 function DisclaimerBanner() {
   return (
-    <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium"
+    <div className="flex min-w-0 items-start gap-2 rounded-lg px-3 py-2 text-xs font-medium leading-5 sm:items-center sm:px-4"
       style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", border: "1px solid var(--sh-border-1)" }}>
-      <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} />
-      {DISCLAIMER}
+      <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 sm:mt-0" style={{ color: "var(--sh-signal)" }} />
+      <span className="min-w-0">{DISCLAIMER}</span>
     </div>
   );
 }
@@ -52,9 +54,39 @@ function fmt(cents: number | null | undefined): string {
   return `${sign}$${(Math.abs(cents) / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 }
 
+function fmtPrice(cents: number | null | undefined): string {
+  if (cents == null) return "—";
+  const sign = cents < 0 ? "-" : "";
+  return `${sign}$${(Math.abs(cents) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 function fmtPct(v: number | null | undefined): string {
   if (v == null) return "—";
   return `${(v * 100).toFixed(1)}%`;
+}
+
+function orderInstrumentLabel(order: {
+  symbol: string;
+  instrumentType?: "shares" | "long_call" | "long_put" | null;
+  underlyingSymbol?: string | null;
+  optionExpirationDate?: string | null;
+  optionStrikePriceCents?: number | null;
+}): string {
+  return paperInstrumentLabel({
+    symbol: order.symbol,
+    instrumentType: order.instrumentType ?? "shares",
+    underlyingSymbol: order.underlyingSymbol,
+    optionExpirationDate: order.optionExpirationDate,
+    optionStrikePriceCents: order.optionStrikePriceCents,
+  });
+}
+
+function orderSizeLabel(order: { instrumentType?: string | null; qty?: number | null; notionalCents?: number | null }): string {
+  if (order.qty != null) {
+    const unit = isOptionInstrument(order.instrumentType) ? (order.qty === 1 ? "contract" : "contracts") : (order.qty === 1 ? "share" : "shares");
+    return `${order.qty} ${unit}`;
+  }
+  return fmt(order.notionalCents);
 }
 
 // ── Order Queue ───────────────────────────────────────────────────────────────
@@ -87,14 +119,23 @@ function OrderQueue({ runId }: { runId: number }) {
   const approved = orders?.filter((o) => o.status === "approved") ?? [];
   const submitted = orders?.filter((o) => o.status === "submitted") ?? [];
   const terminal = orders?.filter((o) => ["filled", "rejected", "cancelled"].includes(o.status)) ?? [];
+  const nextAction = pending.length
+    ? "Review the waiting paper ticket. Approval changes only its paper-workflow state."
+    : approved.length
+      ? "Submit the approved ticket to the exact named paper account, or return without sending it."
+      : submitted.length
+        ? "Wait for broker reconciliation. Do not create or submit a duplicate ticket."
+        : terminal.some((order) => order.status === "filled")
+          ? "Open “Check whether thesis still holds” at the recorded review time, then close the outcome loop."
+          : "Return to the decision brief to prepare a proposal, revise the mission, or preserve cash.";
 
   const statusColor = (s: string) => s === "filled" ? "oklch(0.55 0.15 145)" :
     s === "rejected" || s === "cancelled" ? "var(--sh-red)" :
     s === "approved" ? "var(--sh-signal)" : "var(--sh-fg-muted)";
   const statusLabel = (status: string) => ({
     pending_approval: "Waiting for your review",
-    approved: "Ready to submit to Alpaca Paper",
-    submitted: "Sent to Alpaca Paper",
+    approved: "Ready to submit to the named paper account",
+    submitted: "Sent to the named paper account",
     filled: "Paper trade executed",
     rejected: "Not approved",
     cancelled: "Cancelled",
@@ -113,15 +154,16 @@ function OrderQueue({ runId }: { runId: number }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex gap-3 text-xs">
-          <span style={{ color: "var(--sh-signal)" }}>{pending.length} waiting for review</span>
-          <span style={{ color: "var(--sh-fg-muted)" }}>{approved.length} ready to submit</span>
-          <span style={{ color: "var(--sh-fg-muted)" }}>{submitted.length} sent to paper broker</span>
-          <span style={{ color: "oklch(0.55 0.15 145)" }}>{terminal.filter((o) => o.status === "filled").length} executed</span>
+      <div role="status" className="rounded-lg border px-4 py-3 text-sm leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}><strong>Next:</strong> {nextAction}</div>
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 text-xs sm:flex sm:flex-wrap" aria-label="Paper ticket status summary">
+          <span className="min-w-0" style={{ color: "var(--sh-signal)" }}>{pending.length} waiting for review</span>
+          <span className="min-w-0" style={{ color: "var(--sh-fg-muted)" }}>{approved.length} ready to submit</span>
+          <span className="min-w-0" style={{ color: "var(--sh-fg-muted)" }}>{submitted.length} sent to paper broker</span>
+          <span className="min-w-0" style={{ color: "oklch(0.55 0.15 145)" }}>{terminal.filter((o) => o.status === "filled").length} executed</span>
         </div>
-        <Button variant="outline" size="sm" onClick={() => mirror.mutate()} disabled={mirror.isPending}>
-          {mirror.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+        <Button variant="outline" size="sm" className="min-h-11 w-full sm:w-auto" onClick={() => mirror.mutate()} disabled={mirror.isPending}>
+          {mirror.isPending ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw aria-hidden="true" className="h-3.5 w-3.5 mr-1" />}
           Mirror fills
         </Button>
       </div>
@@ -134,49 +176,49 @@ function OrderQueue({ runId }: { runId: number }) {
 
       <div className="space-y-2">
         {orders?.map((o) => (
-          <Card key={o.id}>
-            <CardContent className="pt-3 pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono font-bold text-sm" style={{ color: "var(--sh-text-primary)" }}>{o.symbol}</span>
+          <Card key={o.id} className="min-w-0 overflow-hidden">
+            <CardContent className="min-w-0 pb-3 pt-3">
+              <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+                  <span className="min-w-0 break-words font-mono text-sm font-bold" style={{ color: "var(--sh-text-primary)" }}>{orderInstrumentLabel(o)}</span>
                   <Badge variant="outline" className="text-xs" style={{ color: o.side === "buy" ? "oklch(0.55 0.15 145)" : "var(--sh-red)" }}>
                     {o.side.toUpperCase()}
                   </Badge>
-                  <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
-                    {o.qty ? `${o.qty} shares` : fmt(o.notionalCents)} · {o.orderType} · {o.timeInForce}
+                  <span className="min-w-0 basis-full break-words text-xs sm:basis-auto" style={{ color: "var(--sh-fg-muted)" }}>
+                    {orderSizeLabel(o)} · {o.orderType} · {o.timeInForce}
                   </span>
-                  <Badge variant="outline" className="text-xs" style={{ color: statusColor(o.status) }}>
+                  <Badge variant="outline" className="max-w-full whitespace-normal text-left text-xs" style={{ color: statusColor(o.status) }}>
                     {statusLabel(o.status)}
                   </Badge>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
                   {o.status === "filled" && o.filledAvgPriceCents && (
-                    <span className="text-xs" style={{ color: "oklch(0.55 0.15 145)" }}>
-                      filled @ {fmt(o.filledAvgPriceCents)}/sh
+                    <span className="text-xs tabular-nums" style={{ color: "oklch(0.55 0.15 145)" }}>
+                      filled @ {fmtPrice(o.filledAvgPriceCents)}{isOptionInstrument(o.instrumentType) ? " premium" : "/share"}
                     </span>
                   )}
                   {o.status === "pending_approval" && (
                     <>
-                      <Button size="sm" className="h-7 text-xs" onClick={() => { setConfirmation({ kind: "approve", order: o }); setConfirmationText(""); }} disabled={approve.isPending}>
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve proposal
+                      <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "approve", order: o }); setConfirmationText(""); }} disabled={approve.isPending}>
+                        <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Approve paper ticket
                       </Button>
-                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setRejection(o); setRejectionReason(""); }} disabled={reject.isPending}>
-                        <XCircle className="h-3.5 w-3.5 mr-1" /> Do not approve
+                      <Button variant="outline" size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setRejection(o); setRejectionReason(""); }} disabled={reject.isPending}>
+                        <XCircle aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Do not approve
                       </Button>
                     </>
                   )}
                   {o.status === "approved" && (
-                    <Button size="sm" className="h-7 text-xs" onClick={() => { setConfirmation({ kind: "submit", order: o }); setConfirmationText(""); }} disabled={submit.isPending}>
-                        <Send className="h-3.5 w-3.5 mr-1" /> Send to Alpaca Paper
+                    <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "submit", order: o }); setConfirmationText(""); }} disabled={submit.isPending}>
+                      <Send aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Send to named paper account
                     </Button>
                   )}
-                  <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
+                  <span className="text-xs tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>
                     {formatDistanceToNow(o.createdAt)} ago
                   </span>
                 </div>
               </div>
               {o.rejectionReason && (
-                <p className="text-xs mt-1" style={{ color: "var(--sh-red)" }}>Reason: {o.rejectionReason}</p>
+                <p className="mt-2 break-words text-xs" style={{ color: "var(--sh-red)" }}>Reason: {o.rejectionReason}</p>
               )}
               {o.dispatchError && (
                 <p className="mt-2 rounded border px-3 py-2 text-xs leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 45%, var(--sh-border-1))", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Broker response unresolved.</strong> The stable paper-order ID is being reconciled. Do not submit another order or change this mission disposition yet.</p>
@@ -186,7 +228,7 @@ function OrderQueue({ runId }: { runId: number }) {
         ))}
       </div>
       <AlertDialog open={confirmation != null} onOpenChange={(open) => { if (!open) { setConfirmation(null); setConfirmationText(""); } }}>
-        <AlertDialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <AlertDialogContent className="max-h-[90vh] w-[calc(100%_-_2rem)] max-w-[calc(100%_-_2rem)] overflow-x-hidden overflow-y-auto sm:max-w-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>{confirmation?.kind === "submit" ? "Confirm paper submission" : "Approve this paper proposal"}</AlertDialogTitle>
             <AlertDialogDescription>
@@ -195,10 +237,10 @@ function OrderQueue({ runId }: { runId: number }) {
           </AlertDialogHeader>
           {confirmation && (
             <div className="grid gap-3 rounded-lg border p-4 text-sm sm:grid-cols-2" style={{ borderColor: "var(--sh-border-1)" }}>
-              <div><span className="block text-xs text-muted-foreground">Instrument</span><strong>{confirmation.order.symbol} · {confirmation.order.side.toUpperCase()}</strong></div>
-              <div><span className="block text-xs text-muted-foreground">Size</span><strong>{confirmation.order.qty ? `${confirmation.order.qty} shares` : fmt(confirmation.order.notionalCents)}</strong></div>
-              <div><span className="block text-xs text-muted-foreground">Order</span><strong>{confirmation.order.orderType.toUpperCase()} · {confirmation.order.timeInForce.toUpperCase()}{confirmation.order.limitPriceCents ? ` · limit ${fmt(confirmation.order.limitPriceCents)}` : ""}</strong></div>
-              <div><span className="block text-xs text-muted-foreground">Entry / stop</span><strong>{fmt(confirmation.order.entryPriceCents)} / {fmt(confirmation.order.stopPriceCents)}</strong></div>
+              <div><span className="block text-xs text-muted-foreground">Instrument</span><strong>{orderInstrumentLabel(confirmation.order)} · {confirmation.order.side.toUpperCase()}</strong>{isOptionInstrument(confirmation.order.instrumentType) && <span className="mt-1 block break-all font-mono text-xs text-muted-foreground">Contract: {confirmation.order.symbol}</span>}</div>
+              <div><span className="block text-xs text-muted-foreground">Size</span><strong>{orderSizeLabel(confirmation.order)}</strong></div>
+              <div><span className="block text-xs text-muted-foreground">Order</span><strong>{confirmation.order.orderType.toUpperCase()} · {confirmation.order.timeInForce.toUpperCase()}{confirmation.order.limitPriceCents ? ` · limit ${fmtPrice(confirmation.order.limitPriceCents)}` : ""}</strong></div>
+              <div><span className="block text-xs text-muted-foreground">{isOptionInstrument(confirmation.order.instrumentType) ? "Premium / protection" : "Entry / protective stop"}</span><strong>{isOptionInstrument(confirmation.order.instrumentType) ? `${fmtPrice(confirmation.order.entryPriceCents)} premium · fully defined by debit` : `${fmtPrice(confirmation.order.entryPriceCents)} / ${fmtPrice(confirmation.order.stopPriceCents)}`}</strong></div>
               <div><span className="block text-xs text-muted-foreground">Maximum planned loss</span><strong>{fmt(confirmation.order.plannedRiskCents)}</strong></div>
               <div><span className="block text-xs text-muted-foreground">Human review time stop</span><strong>{confirmation.order.timeStopAt ? format(confirmation.order.timeStopAt, "PP p") : "Not recorded"}</strong></div>
               <div className="sm:col-span-2"><span className="block text-xs text-muted-foreground">Invalidation</span><strong>{confirmation.order.invalidationCondition || "Not recorded"}</strong></div>
@@ -212,26 +254,26 @@ function OrderQueue({ runId }: { runId: number }) {
           )}
           <div className="space-y-2">
             <label htmlFor="paper-confirmation" className="text-sm font-medium">Type <span className="font-mono">{requiredConfirmation}</span> to continue</label>
-            <Input id="paper-confirmation" autoComplete="off" value={confirmationText} onChange={(event) => setConfirmationText(event.target.value.toUpperCase())} />
+            <Input id="paper-confirmation" className="min-h-11" autoComplete="off" value={confirmationText} onChange={(event) => setConfirmationText(event.target.value.toUpperCase())} />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Go back</AlertDialogCancel>
-            <Button onClick={confirmAction} disabled={confirmationText !== requiredConfirmation || approve.isPending || submit.isPending}>
+            <AlertDialogCancel className="min-h-11">Go back</AlertDialogCancel>
+            <Button className="min-h-11" onClick={confirmAction} disabled={confirmationText !== requiredConfirmation || approve.isPending || submit.isPending}>
               {confirmation?.kind === "submit" ? "Submit to named paper account" : "Approve paper proposal"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       <AlertDialog open={rejection != null} onOpenChange={(open) => { if (!open) { setRejection(null); setRejectionReason(""); } }}>
-        <AlertDialogContent>
+        <AlertDialogContent className="w-[calc(100%_-_2rem)] max-w-[calc(100%_-_2rem)] overflow-x-hidden sm:max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Do not approve {rejection?.symbol}</AlertDialogTitle>
             <AlertDialogDescription>This permanently records why the operator declined the paper proposal. It creates no broker order and becomes part of the decision look-back.</AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-2"><label htmlFor="paper-rejection-reason" className="text-sm font-medium">Operator reason</label><textarea id="paper-rejection-reason" rows={4} value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} className="w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} placeholder="What made cash, delay, or another play preferable?" /><p className="text-xs text-muted-foreground">At least 10 characters. Be specific enough to learn from tomorrow.</p></div>
+          <div className="space-y-2"><label htmlFor="paper-rejection-reason" className="text-sm font-medium">Operator reason</label><textarea id="paper-rejection-reason" rows={4} value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} className="min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} placeholder="What made cash, delay, or another play preferable?" /><p className="text-xs text-muted-foreground">At least 10 characters. Be specific enough to learn from tomorrow.</p></div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Go back</AlertDialogCancel>
-            <Button variant="outline" disabled={!rejection || rejectionReason.trim().length < 10 || reject.isPending} onClick={() => { if (!rejection) return; reject.mutate({ orderId: rejection.id, reason: rejectionReason.trim() }); setRejection(null); setRejectionReason(""); }}>Record rejection</Button>
+            <AlertDialogCancel className="min-h-11">Go back</AlertDialogCancel>
+            <Button variant="outline" className="min-h-11" disabled={!rejection || rejectionReason.trim().length < 10 || reject.isPending} onClick={() => { if (!rejection) return; reject.mutate({ orderId: rejection.id, reason: rejectionReason.trim() }); setRejection(null); setRejectionReason(""); }}>Record rejection</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -239,15 +281,14 @@ function OrderQueue({ runId }: { runId: number }) {
   );
 }
 
-// ── Monitoring Panel ──────────────────────────────────────────────────────────
+// ── Check whether thesis still holds ─────────────────────────────────────────
 
 function MonitoringPanel({ runId, candidate, thesisSummary }: { runId: number; candidate?: { id: number; symbol: string }; thesisSummary?: string | null }) {
   const { data: checks, refetch } = trpc.aperture.monitor.list.useQuery({ runId });
-  const { data: flagged } = trpc.aperture.monitor.flagged.useQuery({ runId });
   const runCheck = trpc.aperture.monitor.run.useMutation({
     onSuccess: (results) => {
-      const flaggedCount = results.filter((r) => r.flagged).length;
-      toast.success(`${results.length} checks run, ${flaggedCount} flagged`);
+      const reviewCount = results.filter((result) => monitoringReviewState(result).needsReview).length;
+      toast.success(`${results.length} checks run, ${reviewCount} require review`);
       refetch();
     },
     onError: (e) => toast.error(e.message),
@@ -256,63 +297,70 @@ function MonitoringPanel({ runId, candidate, thesisSummary }: { runId: number; c
   const checkTypeColor = (t: string) => t === "thesis_invalidation" ? "var(--sh-red)" :
     t === "catalyst" ? "oklch(0.55 0.15 145)" :
     t === "earnings" ? "var(--sh-signal)" : "var(--sh-fg-muted)";
+  const reviewItems = (checks ?? []).map((check) => ({ check, review: monitoringReviewState(check) }))
+    .filter(({ review }) => review.needsReview);
+  const primaryNextAction = reviewItems.find(({ review }) => review.state === "unknown")?.review.nextAction
+    ?? reviewItems[0]?.review.nextAction;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
-        <div><p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Challenge the current paper thesis</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{candidate ? `Run sourced catalyst, invalidation, earnings, and macro checks for ${candidate.symbol}. A finding never submits or exits an order.` : "Choose a candidate from the decision brief before running monitored checks."}</p></div>
-        <Button variant="outline" disabled={!candidate || runCheck.isPending} onClick={() => candidate && runCheck.mutate({ runId, candidateId: candidate.id, symbol: candidate.symbol, thesisSummary: thesisSummary?.trim() || `Monitor ${candidate.symbol} against the recorded paper thesis and its invalidation conditions.` })}>{runCheck.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}Run reviewed checks</Button>
+        <div className="min-w-0"><p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Check whether thesis still holds</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{candidate ? `Run sourced catalyst, invalidation, earnings, and macro checks for ${candidate.symbol}. A finding never submits or exits an order.` : "Choose a candidate from the decision brief before running monitored checks."}</p></div>
+        <Button variant="outline" className="min-h-11 w-full shrink-0 sm:w-auto" disabled={!candidate || runCheck.isPending} onClick={() => candidate && runCheck.mutate({ runId, candidateId: candidate.id, symbol: candidate.symbol, thesisSummary: thesisSummary?.trim() || `Monitor ${candidate.symbol} against the recorded paper thesis and its invalidation conditions.` })}>{runCheck.isPending ? <Loader2 aria-hidden="true" className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />}Run reviewed checks</Button>
       </div>
-      {flagged && flagged.length > 0 && (
-        <div className="p-3 rounded-lg" style={{ background: "oklch(0.97 0.02 30)", border: "1px solid var(--sh-signal)" }}>
+      {reviewItems.length > 0 && (
+        <div role="alert" className="min-w-0 rounded-lg p-3" style={{ background: "oklch(0.97 0.02 30)", border: "1px solid var(--sh-signal)" }}>
           <div className="flex items-center gap-2 mb-2">
-            <Flag className="h-4 w-4" style={{ color: "var(--sh-signal)" }} />
+            <Flag aria-hidden="true" className="h-4 w-4" style={{ color: "var(--sh-signal)" }} />
             <span className="text-sm font-medium" style={{ color: "var(--sh-signal)" }}>
-              {flagged.length} flagged check{flagged.length !== 1 ? "s" : ""} require operator review
+              {reviewItems.length} check{reviewItems.length !== 1 ? "s" : ""} require operator review
             </span>
           </div>
-          {flagged.slice(0, 3).map((c) => (
-            <p key={c.id} className="text-xs ml-6" style={{ color: "var(--sh-text-primary)" }}>
-              <span className="font-mono">{c.symbol}</span> · {c.checkType.replace("_", " ")} · {c.finding}
+          {reviewItems.slice(0, 3).map(({ check, review }) => (
+            <p key={check.id} className="ml-6 break-words text-xs" style={{ color: "var(--sh-text-primary)" }}>
+              <span className="font-mono">{check.symbol}</span> · {review.state === "unknown" ? "UNKNOWN" : check.checkType.replace("_", " ")} · {review.reason}
             </p>
           ))}
+          <p className="ml-6 mt-2 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Next: {primaryNextAction}.</p>
         </div>
       )}
 
       <div className="space-y-2">
-        {checks?.map((c) => (
-          <Card key={c.id}>
-            <CardContent className="pt-3 pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-sm font-bold" style={{ color: "var(--sh-text-primary)" }}>{c.symbol}</span>
+        {checks?.map((c) => {
+          const review = monitoringReviewState(c);
+          return <Card key={c.id} className="min-w-0 overflow-hidden">
+            <CardContent className="min-w-0 pb-3 pt-3">
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="min-w-0 break-all font-mono text-sm font-bold" style={{ color: "var(--sh-text-primary)" }}>{c.symbol}</span>
                     <Badge variant="outline" className="text-xs" style={{ color: checkTypeColor(c.checkType) }}>
                       {c.checkType.replace("_", " ")}
                     </Badge>
-                    {c.flagged && <Flag className="h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} />}
+                    {review.state === "unknown" ? <Badge variant="outline" className="text-xs">UNKNOWN</Badge> : c.flagged && <Flag aria-label="Flagged for review" className="h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} />}
                   </div>
-                  <p className="text-xs" style={{ color: c.flagged ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>
+                  <p className="break-words text-xs leading-5" style={{ color: review.needsReview ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>
                     {c.finding ?? "No finding."}
                   </p>
+                  {review.needsReview && <p className="mt-1 text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>Next: {review.nextAction}.</p>}
                   {normalizeStringList(c.citations).length > 0 && (
                     <div className="flex gap-1 mt-1 flex-wrap">
                       {normalizeStringList(c.citations).slice(0, 2).map((url, i) => (
                         <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                          className="text-xs underline" style={{ color: "var(--sh-signal)" }}>
-                          [{i + 1}]
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded text-xs underline" style={{ color: "var(--sh-signal)" }}>
+                          Source {i + 1}
                         </a>
                       ))}
                     </div>
                   )}
                 </div>
-                <span className="text-xs shrink-0" style={{ color: "var(--sh-fg-muted)" }}>
+                <span className="shrink-0 text-xs tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>
                   {formatDistanceToNow(c.checkedAt)} ago
                 </span>
               </div>
             </CardContent>
-          </Card>
-        ))}
+          </Card>;
+        })}
         {checks?.length === 0 && (
           <p className="text-sm text-center py-8" style={{ color: "var(--sh-fg-muted)" }}>
               No monitoring checks yet. Add a reviewed paper position, then use this surface to challenge its catalyst and invalidation conditions.
@@ -509,13 +557,13 @@ function AlphaDashboard({ runId }: { runId: number }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Aperture Alpha</h3>
+          <h3 className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Outcome &amp; notes</h3>
           <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
-            Honest product metric — measured from real paper outcomes, never asserted.
+            Aperture Alpha is measured from real paper outcomes, never asserted.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => compute.mutate({ runId })} disabled={compute.isPending}>
-          {compute.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+        <Button variant="outline" size="sm" className="min-h-11 w-full sm:w-auto" onClick={() => compute.mutate({ runId })} disabled={compute.isPending}>
+          {compute.isPending ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw aria-hidden="true" className="h-3.5 w-3.5 mr-1" />}
           Recompute
         </Button>
       </div>
@@ -818,16 +866,16 @@ export default function ApertureExecute() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 max-w-5xl">
+      <div className="mx-auto w-full min-w-0 max-w-5xl space-y-6 overflow-x-clip">
         <DisclaimerBanner />
 
         <div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate(`/aperture/run/${runId}`)}>
-              <ArrowLeft className="h-4 w-4" />
+          <div className="flex min-w-0 items-center gap-2">
+            <Button aria-label="Return to decision brief" variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={() => navigate(`/aperture/run/${runId}`)}>
+              <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             </Button>
-            <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>
-              Decision follow-through
+            <h1 className="min-w-0 text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>
+              Paper ticket
             </h1>
           </div>
           {run && (
@@ -837,7 +885,7 @@ export default function ApertureExecute() {
           )}
         </div>
 
-        {data?.brief && (
+        {proposalCandidate && data?.brief && (
           <div className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -845,26 +893,26 @@ export default function ApertureExecute() {
                 <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{paperStageDeclined ? "Paper stage declined — preserve cash for this candidate" : data.brief.nextDecision.title}</p>
                 <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{paperStageDeclined ? "A required evidence answer was recorded as not confirmed. This revision cannot prepare a proposal or create an order." : data.brief.nextDecision.detail}</p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}`)}>Return to decision brief</Button>
+              <Button variant="outline" size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => navigate(`/aperture/run/${runId}`)}>Return to decision brief</Button>
             </div>
           </div>
         )}
 
-        {proposalCandidate && paperStageDeclined ? <section className="rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3" variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}?view=evidence`)}>Review the recorded evidence decision</Button></section> : proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(`/aperture/run/${runId}?view=evidence`)} onProposalCreated={() => navigate(`/aperture/run/${runId}/execute`)} />}
+        {proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}?view=evidence`)}>Review the recorded evidence decision</Button></section> : proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(`/aperture/run/${runId}?view=evidence`)} onProposalCreated={() => navigate(`/aperture/run/${runId}/execute`)} />}
 
-        <Tabs defaultValue="orders">
-          <TabsList className="flex h-auto w-full min-w-0 max-w-full justify-start overflow-x-auto sm:inline-flex sm:w-fit">
-            <TabsTrigger value="orders">Paper order review</TabsTrigger>
-            <TabsTrigger value="monitoring">Thesis monitoring</TabsTrigger>
-            <TabsTrigger value="alpha">Measured outcomes</TabsTrigger>
+        <Tabs defaultValue="orders" className="min-w-0">
+          <TabsList aria-label="Paper lifecycle" className="grid h-auto w-full min-w-0 grid-cols-1 gap-1 p-1 sm:grid-cols-3">
+            <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-3 py-2 text-center leading-5" value="orders">Paper ticket</TabsTrigger>
+            <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-3 py-2 text-center leading-5" value="monitoring">Check whether thesis still holds</TabsTrigger>
+            <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-3 py-2 text-center leading-5" value="alpha">Outcome &amp; notes</TabsTrigger>
           </TabsList>
-          <TabsContent value="orders" className="mt-4">
+          <TabsContent value="orders" className="mt-4 min-w-0" aria-label="Paper ticket">
             <OrderQueue runId={runId} />
           </TabsContent>
-          <TabsContent value="monitoring" className="mt-4">
+          <TabsContent value="monitoring" className="mt-4 min-w-0" aria-label="Check whether thesis still holds">
             <MonitoringPanel runId={runId} candidate={proposalCandidate ?? data?.candidates[0]} thesisSummary={run?.invalidationRule} />
           </TabsContent>
-          <TabsContent value="alpha" className="mt-4">
+          <TabsContent value="alpha" className="mt-4 min-w-0" aria-label="Outcome and notes">
             <AlphaDashboard runId={runId} />
           </TabsContent>
         </Tabs>

@@ -180,7 +180,7 @@ export async function authorizeDecisionAction(input: {
 }
 
 export type MissionObjective = "best_qualified_play" | "deploy_today" | "verify_catalyst" | "portfolio_gap" | "preserve_optionality";
-export type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window";
+export type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
 
 export type RankedMission = {
   key: "best_play" | "deploy_today" | "dated_catalyst" | "portfolio_gap" | "preserve_cash";
@@ -269,6 +269,7 @@ export function outcomeReviewAt(holdingPeriod: HoldingPeriod | null, catalystDea
   if (holdingPeriod === "intraday") return now + 8 * 60 * 60 * 1_000;
   if (holdingPeriod === "overnight") return now + 24 * 60 * 60 * 1_000;
   if (holdingPeriod === "swing") return now + 7 * 24 * 60 * 60 * 1_000;
+  if (holdingPeriod === "position") return now + 30 * 24 * 60 * 60 * 1_000;
   return null;
 }
 

@@ -4,15 +4,20 @@ import { parsePortfolioCsv } from "./portfolioCsv";
 describe("portfolio CSV intake", () => {
   it("accepts common brokerage headings", () => {
     expect(parsePortfolioCsv("Ticker,Shares,Average Cost,Current Value\nNVDA,5,120.50,750"))
-      .toEqual([{ symbol: "NVDA", qty: 5, avgCostCents: 12050, marketValueCents: 75000 }]);
+      .toEqual([{ symbol: "NVDA", qty: 5, assetType: "equity", avgCostCents: 12050, marketValueCents: 75000 }]);
   });
 
   it("accepts the compact headerless format and preserves shorts", () => {
     expect(parsePortfolioCsv("TLT,-10,92.25,-925"))
-      .toEqual([{ symbol: "TLT", qty: -10, avgCostCents: 9225, marketValueCents: -92500 }]);
+      .toEqual([{ symbol: "TLT", qty: -10, assetType: "equity", avgCostCents: 9225, marketValueCents: -92500 }]);
   });
 
   it("surfaces malformed rows instead of importing zero holdings", () => {
     expect(parsePortfolioCsv("symbol,qty\nIWM,not-a-number")[0]?.error).toMatch(/non-zero quantity/);
+  });
+
+  it("preserves an OCC option contract as an option holding", () => {
+    expect(parsePortfolioCsv("symbol,qty,avg_cost,market_value\nAAPL270115C00250000,2,4.20,840")[0])
+      .toMatchObject({ symbol: "AAPL270115C00250000", qty: 2, assetType: "option" });
   });
 });

@@ -5,6 +5,7 @@ const FIXTURE = {
   email: "ch-capital-uat@invalid.local",
   name: "CH Capital UAT",
   accountLabel: "CH Capital · illustrative paper context",
+  executionAccountLabel: "CH Capital · isolated paper execution",
   inviteToken: "c".repeat(64),
   inviteEmail: "ch-capital-invite-uat@invalid.local",
 };
@@ -65,6 +66,28 @@ try {
   const [[account]] = await db.execute("SELECT id FROM portfolio_accounts WHERE user_id = ? AND label = ? ORDER BY id ASC LIMIT 1", [user.id, FIXTURE.accountLabel]);
   if (!account) throw new Error("CH Capital illustrative account was not created.");
 
+  const [[existingExecutionAccount]] = await db.execute("SELECT id FROM portfolio_accounts WHERE user_id = ? AND label = ? ORDER BY id ASC LIMIT 1", [user.id, FIXTURE.executionAccountLabel]);
+  if (existingExecutionAccount) {
+    await db.execute(
+      `UPDATE portfolio_accounts SET broker_id = 'uat_paper', external_account_id = 'CH-UAT-PAPER-9C18799', is_paper = 1,
+       cash_cents = 1000000, buying_power_cents = 1000000, equity_value_cents = 2500000,
+       options_approved_level = 2, options_trading_level = 2, options_buying_power_cents = 1000000,
+       sync_source = 'isolated_uat_paper', sync_error = NULL, last_synced_at = ?, updated_at = ?
+       WHERE id = ? AND user_id = ?`,
+      [now, now, existingExecutionAccount.id, user.id],
+    );
+  } else {
+    await db.execute(
+      `INSERT INTO portfolio_accounts
+       (user_id, label, broker_id, external_account_id, is_paper, cash_cents, buying_power_cents, equity_value_cents,
+        options_approved_level, options_trading_level, options_buying_power_cents, sync_source, sync_error, last_synced_at, created_at, updated_at)
+       VALUES (?, ?, 'uat_paper', 'CH-UAT-PAPER-9C18799', 1, 1000000, 1000000, 2500000, 2, 2, 1000000, 'isolated_uat_paper', NULL, ?, ?, ?)`,
+      [user.id, FIXTURE.executionAccountLabel, now, now, now],
+    );
+  }
+  const [[executionAccount]] = await db.execute("SELECT id FROM portfolio_accounts WHERE user_id = ? AND label = ? ORDER BY id ASC LIMIT 1", [user.id, FIXTURE.executionAccountLabel]);
+  if (!executionAccount) throw new Error("CH Capital isolated paper execution account was not created.");
+
   await db.execute("DELETE FROM positions WHERE account_id = ?", [account.id]);
   await db.execute(
     `INSERT INTO positions (account_id, symbol, asset_type, qty, avg_cost_cents, last_price_cents, market_value_cents, price_as_of, price_source, created_at, updated_at)
@@ -83,7 +106,7 @@ try {
 
   const [[orders]] = await db.execute("SELECT COUNT(*) AS count FROM broker_orders WHERE user_id = ?", [user.id]);
   await db.commit();
-  console.log(JSON.stringify({ fixture: { ...FIXTURE, inviteToken: `${FIXTURE.inviteToken.slice(0, 8)}…` }, user, accountId: account.id, positions: ["TLT", "NVDA"], activePlay: "TLT", brokerOrders: Number(orders.count), invite: { label: "CH Capital", role: "capital_operator", recipient: FIXTURE.inviteEmail, sent: false }, disclosure: "Illustrative isolated fixture; not Akil's portfolio and not a broker account." }, null, 2));
+  console.log(JSON.stringify({ fixture: { ...FIXTURE, inviteToken: `${FIXTURE.inviteToken.slice(0, 8)}…` }, user, accountId: account.id, executionAccountId: executionAccount.id, positions: ["TLT", "NVDA"], activePlay: "TLT", brokerOrders: Number(orders.count), invite: { label: "CH Capital", role: "capital_operator", recipient: FIXTURE.inviteEmail, sent: false }, disclosure: "Illustrative isolated fixture; not Akil's portfolio and never a real-money account." }, null, 2));
 } catch (error) {
   await db.rollback();
   throw error;

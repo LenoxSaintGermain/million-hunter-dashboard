@@ -1108,6 +1108,10 @@ export const portfolioAccounts = mysqlTable("portfolio_accounts", {
   cashCents: bigint("cash_cents", { mode: "number" }),
   buyingPowerCents: bigint("buying_power_cents", { mode: "number" }),
   equityValueCents: bigint("equity_value_cents", { mode: "number" }),
+  /** Alpaca-reported options authority. Level 2 is required for long calls/puts. */
+  optionsApprovedLevel: int("options_approved_level"),
+  optionsTradingLevel: int("options_trading_level"),
+  optionsBuyingPowerCents: bigint("options_buying_power_cents", { mode: "number" }),
   lastSyncedAt: bigint("last_synced_at", { mode: "number" }),
   syncSource: varchar("sync_source", { length: 64 }),
   syncError: text("sync_error"),
@@ -1155,6 +1159,11 @@ export const apertureActivePlayContexts = mysqlTable("aperture_active_play_conte
   userId: int("user_id").notNull(),
   accountId: int("account_id").notNull(),
   symbol: varchar("symbol", { length: 24 }).notNull(),
+  instrumentType: mysqlEnum("instrument_type", ["shares", "long_call", "long_put"]).default("shares").notNull(),
+  underlyingSymbol: varchar("underlying_symbol", { length: 24 }),
+  optionExpirationDate: varchar("option_expiration_date", { length: 10 }),
+  optionStrikePriceCents: bigint("option_strike_price_cents", { mode: "number" }),
+  contractMultiplier: int("contract_multiplier"),
   side: mysqlEnum("side", ["long", "short"]).default("long").notNull(),
   status: mysqlEnum("status", ["watching", "active", "closed"]).default("active").notNull(),
   thesisNote: text("thesis_note").notNull(),
@@ -1370,7 +1379,7 @@ export const apertureRuns = mysqlTable("aperture_runs", {
   // ── Short-Horizon Paper Run preset — these fields ARE the mandate ──────────
   // Null on runs created before the preset existed: pre-mandate, not gated.
   // See server/aperture/mandate.ts.
-  holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window"]),
+  holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window", "position"]),
   /** When the thesis for this run expires. A short-horizon run without one is a hold. */
   catalystDeadlineAt: bigint("catalyst_deadline_at", { mode: "number" }),
   /** 30-day ADV floor in USD. May tighten the mandate floor, never loosen it. */
@@ -1472,7 +1481,7 @@ export const apertureDecisionRevisions = mysqlTable("aperture_decision_revisions
   deployableCapitalCents: bigint("deployable_capital_cents", { mode: "number" }).notNull(),
   desiredEndingValueCents: bigint("desired_ending_value_cents", { mode: "number" }),
   maxPlannedLossCents: bigint("max_planned_loss_cents", { mode: "number" }).notNull(),
-  holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window"]).notNull(),
+  holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window", "position"]).notNull(),
   invalidationRule: text("invalidation_rule").notNull(),
   operatorChoice: mysqlEnum("operator_choice", ["research", "conditional", "cash", "selected_play"]).default("research").notNull(),
   effectiveBranch: mysqlEnum("effective_branch", ["research", "eligible", "conditional", "cash"]).default("research").notNull(),
@@ -1762,6 +1771,13 @@ export const brokerOrders = mysqlTable("broker_orders", {
   decisionRunId: int("decision_run_id"),
   decisionRevisionId: int("decision_revision_id"),
   symbol: varchar("symbol", { length: 24 }).notNull(),
+  instrumentType: mysqlEnum("instrument_type", ["shares", "long_call", "long_put"]).default("shares").notNull(),
+  underlyingSymbol: varchar("underlying_symbol", { length: 24 }),
+  optionExpirationDate: varchar("option_expiration_date", { length: 10 }),
+  optionStrikePriceCents: bigint("option_strike_price_cents", { mode: "number" }),
+  contractMultiplier: int("contract_multiplier"),
+  /** Immutable option terms and verification receipt captured at proposal creation. */
+  instrumentSnapshot: json("instrument_snapshot").$type<Record<string, unknown>>(),
   side: mysqlEnum("side", ["buy", "sell"]).notNull(),
   /** Whether the order opens exposure or closes it. `side` alone cannot say:
    *  a sell exits a long OR establishes a short, and those are opposites for
@@ -1805,7 +1821,7 @@ export const brokerOrders = mysqlTable("broker_orders", {
   timeStopAt: bigint("time_stop_at", { mode: "number" }),
   /** Market conditions that mean the operator should not create or should reject this proposal. */
   noTradeConditions: json("no_trade_conditions").$type<string[]>().default([]),
-  holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window"]),
+  holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window", "position"]),
   catalystDeadlineAt: bigint("catalyst_deadline_at", { mode: "number" }),
   /** regular | pre_market | after_hours | closed | unknown, at creation time. */
   marketSession: varchar("market_session", { length: 24 }),
@@ -1931,7 +1947,7 @@ export const apertureAlpha = mysqlTable("aperture_alpha", {
   horizonStartAt: bigint("horizon_start_at", { mode: "number" }),
   horizonEndAt: bigint("horizon_end_at", { mode: "number" }),
   horizonDays: float("horizon_days"),
-  holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window"]),
+  holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window", "position"]),
   /** Paper fills flatter. The assumption travels with the figures. */
   slippageAssumption: text("slippage_assumption"),
   /** Basis for all figures: verified = from real fills, modeled = estimated. */

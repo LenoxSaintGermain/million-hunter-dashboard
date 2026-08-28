@@ -29,6 +29,12 @@ import {
   type Mandate,
 } from "./mandate";
 import type { MarketSession, SessionState } from "./marketSession";
+import {
+  isOptionInstrument,
+  optionPremiumAtRiskCents,
+  validatePaperInstrument,
+  type PaperInstrumentType,
+} from "../../shared/paperInstrument";
 
 // ── Result shape ──────────────────────────────────────────────────────────────
 
@@ -152,11 +158,14 @@ export function measurePctCeiling(
  * is not zero risk.
  */
 export function plannedRiskCentsFor(input: {
+  instrumentType?: PaperInstrumentType | null;
   qty?: number | null;
   entryPriceCents?: number | null;
   stopPriceCents?: number | null;
   slippageCents?: number | null;
+  contractMultiplier?: number | null;
 }): number | null {
+  if (isOptionInstrument(input.instrumentType)) return optionPremiumAtRiskCents(input);
   const { qty, entryPriceCents: entry, stopPriceCents: stop, slippageCents: slip } = input;
   if (qty == null || qty <= 0) return null;
   if (entry == null || entry <= 0) return null;
@@ -275,6 +284,11 @@ export type NotionalBasis = "stated" | "derived_from_last_price" | "unknown";
 
 export interface OrderGateInput {
   symbol: string;
+  instrumentType?: PaperInstrumentType | null;
+  underlyingSymbol?: string | null;
+  optionExpirationDate?: string | null;
+  optionStrikePriceCents?: number | null;
+  contractMultiplier?: number | null;
   side: "buy" | "sell";
   /**
    * Whether this order opens exposure or closes it. When absent it is inferred
@@ -350,6 +364,18 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
   const { input, account, session, now } = args;
   const mandate = args.mandate ?? CURRENT_MANDATE;
   const g = new GateCollector();
+  const instrument = validatePaperInstrument({
+    instrumentType: input.instrumentType,
+    symbol: input.symbol,
+    underlyingSymbol: input.underlyingSymbol,
+    optionExpirationDate: input.optionExpirationDate,
+    optionStrikePriceCents: input.optionStrikePriceCents,
+    contractMultiplier: input.contractMultiplier,
+    qty: input.qty,
+    entryPriceCents: input.entryPriceCents,
+    slippageCents: input.slippageCents,
+  }, now);
+  const isOption = isOptionInstrument(instrument.instrumentType);
 
   // What this order does to exposure — not what side it is. See resolveOrderIntent.
   const resolved = resolveOrderIntent({
@@ -374,6 +400,20 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
     account.isPaper === true,
     account.isPaper ? "account is a paper account" : "account is not flagged paper — there is no live-execution path",
   );
+
+  g.add(
+    "instrument_identity",
+    instrument.failures.length === 0,
+    instrument.failures.length === 0
+      ? isOption
+        ? `${instrument.optionTerms!.underlyingSymbol} ${instrument.optionTerms!.expirationDate} $${(instrument.optionTerms!.strikePriceCents / 100).toFixed(2)} ${instrument.instrumentType === "long_call" ? "call" : "put"}; exact contract ${instrument.optionTerms!.contractSymbol}`
+        : `${input.symbol} shares`
+      : instrument.failures.join(" "),
+  );
+  if (isOption) {
+    g.add("long_option_buy_only", input.side === "buy", input.side === "buy" ? "bounded long option opens with buy to open" : "Only buy-to-open long calls and long puts are supported; sell-to-open is blocked.");
+    g.add("option_limit_day_only", input.orderType === "limit" && input.timeInForce === "day", input.orderType === "limit" && input.timeInForce === "day" ? "option order is limit + day" : "Long-option paper orders must use a limit price and day time-in-force.");
+  }
 
   const ack = (input.paperAcknowledgement ?? "").trim().toUpperCase();
   g.add(
@@ -425,6 +465,19 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
     );
   } else {
     g.add("catalyst_deadline", false, "catalyst horizon cannot be checked without a valid holding period");
+  }
+  if (isOption && instrument.optionTerms) {
+    const optionExpiryAt = Date.parse(`${instrument.optionTerms.expirationDate}T20:00:00Z`);
+    const notZeroDte = optionExpiryAt - now > 24 * 60 * 60 * 1_000;
+    g.add(
+      "option_expiration_window",
+      notZeroDte && deadline != null && optionExpiryAt >= deadline,
+      !notZeroDte
+        ? "Opening same-day or next-day expiration options is outside this bounded paper flow"
+        : deadline == null || optionExpiryAt < deadline
+          ? "Option expiration must be on or after the declared thesis review deadline"
+          : `option expiration ${instrument.optionTerms.expirationDate} remains after the declared review deadline`,
+    );
   }
 
   // ── Market session ──────────────────────────────────────────────────────────
@@ -484,7 +537,7 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
     const validStop = stop != null && stop > 0 && stop !== entry;
     const validSlippage = slippage != null && slippage >= 0;
     g.add("play_entry", validEntry, validEntry ? "play entry is stated" : "intraday play requires a positive entry price");
-    g.add("play_stop", validStop, validStop ? "play stop is stated" : "intraday play requires a stop different from entry");
+    if (!isOption) g.add("play_stop", validStop, validStop ? "play stop is stated" : "intraday share play requires a stop different from entry");
     g.add("play_slippage", validSlippage, validSlippage ? "slippage allowance is stated" : "intraday play requires a slippage allowance");
     const timeStop = input.timeStopAt ?? null;
     const deadlineForStop = input.catalystDeadlineAt ?? null;
@@ -502,14 +555,16 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
   // The second sizing axis. Notional caps what an order commits; this caps what
   // the stop puts at risk. Both must pass.
   const plannedRisk = plannedRiskCentsFor(input);
-  const riskRequired = PLANNED_RISK_REQUIRED.has(String(input.holdingPeriod));
+  const riskRequired = isOption || PLANNED_RISK_REQUIRED.has(String(input.holdingPeriod));
 
   if (plannedRisk == null) {
     if (riskRequired) {
       g.add(
         "planned_risk_stated",
         false,
-        `a ${String(input.holdingPeriod)} play must state qty, entry, stop and slippage so its planned loss can be measured — an unmeasurable loss is not a small one`,
+        isOption
+          ? "a long-option play must state whole contracts, limit premium and slippage so maximum premium loss can be measured"
+          : `a ${String(input.holdingPeriod)} play must state qty, entry, stop and slippage so its planned loss can be measured — an unmeasurable loss is not a small one`,
       );
     } else {
       // Not a failure: a longer-horizon position may legitimately be held
@@ -522,7 +577,9 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
     g.add(
       "planned_risk_stated",
       true,
-      `planned loss $${dollars(plannedRisk)} = qty x (|entry - stop| + slippage)`,
+      isOption
+        ? `maximum premium loss $${dollars(plannedRisk)} = contracts x 100 x (limit premium + slippage)`
+        : `planned loss $${dollars(plannedRisk)} = qty x (|entry - stop| + slippage)`,
       plannedRisk,
     );
 

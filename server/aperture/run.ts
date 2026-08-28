@@ -43,7 +43,7 @@ export interface AssembleInput {
   deployableCapitalCents: number;
   intendedTrades: Array<{ symbol: string; dollarsCents: number }>;
   hurdleRateBps?: number | null;
-  holdingPeriod?: "intraday" | "overnight" | "swing" | "catalyst_window" | null;
+  holdingPeriod?: "intraday" | "overnight" | "swing" | "catalyst_window" | "position" | null;
 }
 
 export interface AssembledCandidate {
