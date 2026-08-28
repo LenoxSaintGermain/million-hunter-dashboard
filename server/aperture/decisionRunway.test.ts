@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  decisionReceiptPendingOutcome,
   decisionActionBlock,
   missingDecisionAuthorityBlock,
   outcomeReviewAt,
@@ -65,6 +66,22 @@ describe("Decision Runway authorization", () => {
     expect(requiresCurrentDecisionBinding("unknown")).toBe(true);
     expect(requiresCurrentDecisionBinding(null)).toBe(true);
     expect(requiresCurrentDecisionBinding("close")).toBe(false);
+  });
+});
+
+describe("Decision Runway receipt look-backs", () => {
+  it("queues a cash outcome review without creating an order binding", () => {
+    expect(decisionReceiptPendingOutcome({
+      branch: "cash",
+      reviewAt: 1_800_000_000_000,
+      reopenCondition: "Re-rank after verified evidence changes.",
+      namedGateKey: null,
+    })).toEqual({
+      kind: "play_outcome",
+      dueAt: 1_800_000_000_000,
+      gateKey: null,
+      reviewBasis: "Review the zero-exposure cash decision at its declared horizon. No order or automatic exit exists.",
+    });
   });
 });
 

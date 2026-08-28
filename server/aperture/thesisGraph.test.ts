@@ -6,7 +6,7 @@
  * the looseJsonParse fallback that the compiler relies on.
  */
 import { describe, it, expect } from "vitest";
-import { flattenExposureTree, parseCompilerResponse, type ThesisGraph } from "./thesisGraph";
+import { flattenExposureTree, parseCompilerResponse, validateGraphForPersistence, type ThesisGraph } from "./thesisGraph";
 
 describe("flattenExposureTree", () => {
   it("returns an empty array for an empty tree", () => {
@@ -136,5 +136,29 @@ describe("Capital compiler response recovery", () => {
 
   it("unwraps common structured response envelopes", () => {
     expect(parseCompilerResponse({ text: JSON.stringify({ output: graph }) })).toEqual(graph);
+  });
+});
+
+describe("Capital compiler persistence boundary", () => {
+  it("rejects provider commentary that cannot fit an exposure-node label", () => {
+    const malformed = {
+      beliefs: ["Post-benchmark rates may support duration"],
+      seek: ["liquid share expressions"],
+      avoid: [],
+      horizons: ["intraday"],
+      sectors: [],
+      exclusions: [],
+      portfolioRules: {},
+      behavior: {},
+      exposureTree: [{
+        label: "Macro Catalyst: payroll benchmark revision. (Note: Condensed to fit schema depth). Let's expand properly below: Wait, I need to format this as the schema dictates. Let's do it cleanly.",
+      }],
+      confidenceNotes: [],
+      suggestedName: "Post-Benchmark Small-Cap Confirmation",
+    } satisfies ThesisGraph;
+
+    expect(() => validateGraphForPersistence(malformed)).toThrow(
+      "The thesis service returned an invalid exposure map",
+    );
   });
 });

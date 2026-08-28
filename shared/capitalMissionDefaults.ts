@@ -43,11 +43,11 @@ function declaredDate(text: string): string | null {
   return `${match[3]}-${String(MONTHS[match[1].toLowerCase()]).padStart(2, "0")}-${match[2].padStart(2, "0")}`;
 }
 
-function timeOnDate(date: string | null, match: RegExpMatchArray | null): number | null {
+function timeOnDate(date: string | null, match: RegExpMatchArray | null, defaultMeridiem: "am" | "pm" | null = null): number | null {
   if (!date || !match) return null;
   let hour = Number(match[1]);
   const minute = Number(match[2] ?? "0");
-  const meridiem = match[3]?.toLowerCase().replace(/\./g, "") ?? null;
+  const meridiem = match[3]?.toLowerCase().replace(/\./g, "") ?? defaultMeridiem;
   if (meridiem === "pm" && hour < 12) hour += 12;
   if (meridiem === "am" && hour === 12) hour = 0;
   if (hour > 23 || minute > 59) return null;
@@ -82,9 +82,12 @@ export function extractCapitalMissionDefaults(rawText: string): CapitalMissionDe
     /(?:do not enter|no entry|wait|eligible|eligibility)[^.!?]{0,60}?before\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?/i,
     /(?:review|verify|recheck)\s+(?:at|after)\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?/i,
   ]));
+  // In a US regular-session thesis, "close by 3:45 ET" names an afternoon
+  // close-out. Preserve an explicit a.m./p.m. when supplied; only the
+  // close/exit/flatten grammar receives this deterministic p.m. default.
   const outcomeReviewAt = timeOnDate(date, firstTime(text, [
     /(?:close|exit|flatten|record(?: the)? outcome)\s+(?:by|at|after)\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?/i,
-  ]));
+  ]), "pm");
 
   const instrumentPreference: CapitalMissionInstrument | null = /\b(?:shares|equity)\s+only\b/i.test(text) || /\bshare play\b/i.test(text)
     ? "shares"

@@ -272,6 +272,32 @@ export function outcomeReviewAt(holdingPeriod: HoldingPeriod | null, catalystDea
   return null;
 }
 
+export function decisionReceiptPendingOutcome(input: {
+  branch: DecisionBranch;
+  reviewAt: number | null;
+  reopenCondition: string | null;
+  namedGateKey: string | null;
+}): { kind: "gate_review" | "play_outcome"; dueAt: number; gateKey: string | null; reviewBasis: string } | null {
+  if (input.reviewAt == null) return null;
+  if (input.branch === "conditional") {
+    return {
+      kind: "gate_review",
+      dueAt: input.reviewAt,
+      gateKey: input.namedGateKey,
+      reviewBasis: input.reopenCondition ?? "Review the named gate at its declared horizon.",
+    };
+  }
+  if (input.branch === "cash") {
+    return {
+      kind: "play_outcome",
+      dueAt: input.reviewAt,
+      gateKey: null,
+      reviewBasis: "Review the zero-exposure cash decision at its declared horizon. No order or automatic exit exists.",
+    };
+  }
+  return null;
+}
+
 export async function queuePaperOutcome(input: {
   userId: number;
   decisionRunId: number;

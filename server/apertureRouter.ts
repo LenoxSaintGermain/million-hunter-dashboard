@@ -45,7 +45,7 @@ import {
 } from "../drizzle/schema";
 import { adminProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { compileThesis, flattenExposureTree } from "./aperture/thesisGraph";
+import { compileThesis, flattenExposureTree, validateGraphForPersistence } from "./aperture/thesisGraph";
 import { discoverUniverse, thesisSummary } from "./aperture/universe";
 import { collectSecurityFacts, collectMacroFacts, describeAvailability, availabilityMap, MACRO_SYMBOL } from "./aperture/providers/index";
 import { getFacts, freshestPerKey } from "./aperture/facts";
@@ -89,6 +89,7 @@ import { PAPER_ACCOUNT_SYNC_CRON, PAPER_ACCOUNT_SYNC_PATH } from "./aperture/pap
 import { compileDisclosureIntent, evaluateDisclosureTransaction, tightenControls, type DisclosureControls } from "../shared/disclosure";
 import { DisclosureDocumentStore, housePtrFixtureDocument } from "./aperture/disclosureRail";
 import {
+  decisionReceiptPendingOutcome,
   DecisionRunwayBlockedError,
   outcomeReviewAt,
   rankMissionLibrary,
@@ -992,6 +993,9 @@ export const apertureRouter = router({
         if (input.branch === "conditional" && (!input.namedGateKey || !input.namedGateLabel || !input.reviewAt)) {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "A conditional decision requires a named gate and review time." });
         }
+        if (input.branch === "cash" && !input.reviewAt) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "A cash decision requires an outcome look-back time." });
+        }
         const systemLossCeiling = account.equityValueCents == null
           ? input.maxPlannedLossCents
           : Math.floor(account.equityValueCents * CURRENT_MANDATE.maxPlannedRiskPctPerPlay / 100);
@@ -1106,16 +1110,22 @@ export const apertureRouter = router({
               eq(aperturePendingOutcomes.revisionId, current.id),
               inArray(aperturePendingOutcomes.status, ["pending", "due"]),
             ));
-            if (input.branch === "conditional" && input.reviewAt) {
+            const pendingOutcome = decisionReceiptPendingOutcome({
+              branch: input.branch,
+              reviewAt: input.reviewAt ?? null,
+              reopenCondition: input.reopenCondition ?? null,
+              namedGateKey: input.namedGateKey ?? null,
+            });
+            if (pendingOutcome) {
               await tx.insert(aperturePendingOutcomes).values({
                 userId: ctx.user.id,
                 decisionRunId: lockedHead.id,
                 revisionId,
-                kind: "gate_review",
+                kind: pendingOutcome.kind,
                 status: "pending",
-                dueAt: input.reviewAt,
-                gateKey: input.namedGateKey ?? null,
-                reviewBasis: input.reopenCondition!,
+                dueAt: pendingOutcome.dueAt,
+                gateKey: pendingOutcome.gateKey,
+                reviewBasis: pendingOutcome.reviewBasis,
                 createdAt: now,
                 updatedAt: now,
               });
@@ -1144,16 +1154,22 @@ export const apertureRouter = router({
           const revisionId = Number((revisionResult as any).insertId);
           await tx.update(apertureDecisionRuns).set({ currentRevisionId: revisionId })
             .where(eq(apertureDecisionRuns.id, decisionRunId));
-          if (input.branch === "conditional" && input.reviewAt) {
+          const pendingOutcome = decisionReceiptPendingOutcome({
+            branch: input.branch,
+            reviewAt: input.reviewAt ?? null,
+            reopenCondition: input.reopenCondition ?? null,
+            namedGateKey: input.namedGateKey ?? null,
+          });
+          if (pendingOutcome) {
             await tx.insert(aperturePendingOutcomes).values({
               userId: ctx.user.id,
               decisionRunId,
               revisionId,
-              kind: "gate_review",
+              kind: pendingOutcome.kind,
               status: "pending",
-              dueAt: input.reviewAt,
-              gateKey: input.namedGateKey ?? null,
-              reviewBasis: input.reopenCondition!,
+              dueAt: pendingOutcome.dueAt,
+              gateKey: pendingOutcome.gateKey,
+              reviewBasis: pendingOutcome.reviewBasis,
               createdAt: now,
               updatedAt: now,
             });
@@ -3059,7 +3075,7 @@ async function executeRun(
     // the concentration cap and liquidity floor reach strategy construction
     // instead of sitting inert on the row. Tightening only — a preset can never
     // widen what the thesis allows.
-    const graph = withPresetRules(thesis.graph as any, input);
+    const graph = validateGraphForPersistence(withPresetRules(thesis.graph as any, input));
     const nodeRows = flattenExposureTree(graph.exposureTree ?? []);
 
     // ── 1. Persist exposure nodes ──────────────────────────────────────────

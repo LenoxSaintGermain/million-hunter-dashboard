@@ -25,4 +25,15 @@ describe("Decision Runway client revision contract", () => {
     expect(source.match(/onGateReview=\{reviseReceipt\}/g)).toHaveLength(2);
     expect(source).not.toContain("onGateReview={onNewResearch}");
   });
+
+  it("sends the declared outcome look-back for both research and cash", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "client/src/components/aperture/DecisionRunway.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain(': easternDateTimeInputToEpoch(outcomeReviewAtInput);');
+    expect(source).toContain('if (branch === "cash" && reviewAt == null)');
+    expect(source).toContain('"Outcome look-back"');
+  });
 });

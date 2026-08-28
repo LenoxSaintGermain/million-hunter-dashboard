@@ -219,6 +219,30 @@ export function flattenExposureTree(
 
 export class ThesisCompileError extends Error {}
 
+const EXPOSURE_LABEL_MAX_CHARS = 160;
+const EXPOSURE_PATH_MAX_CHARS = 512;
+const EXPOSURE_NODE_MAX_COUNT = 256;
+
+/**
+ * Keep provider output inside the durable exposure-node contract before any
+ * row is written. Rejecting the whole projection is intentional: truncating a
+ * causal label or path would silently change the operator's thesis.
+ */
+export function validateGraphForPersistence(graph: ThesisGraph): ThesisGraph {
+  const rows = flattenExposureTree(graph.exposureTree);
+  const invalid = rows.find((row) =>
+    row.label.length > EXPOSURE_LABEL_MAX_CHARS
+    || row.path.length > EXPOSURE_PATH_MAX_CHARS
+    || /[\r\n\t]/.test(row.label),
+  );
+  if (rows.length > EXPOSURE_NODE_MAX_COUNT || invalid) {
+    throw new ThesisCompileError(
+      "The thesis service returned an invalid exposure map. Your thesis is saved unchanged; please try the projection again.",
+    );
+  }
+  return graph;
+}
+
 type JsonRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -314,17 +338,20 @@ export async function compileThesis(thesisText: string): Promise<ThesisGraph> {
 
   const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-  let raw: any;
+  const compileResponse = async (retry: boolean) => validateGraphForPersistence(
+    normalizeGraph(parseCompilerResponse(await generateCompilerResponse(genai, thesisText, retry))),
+  );
+
+  let graph: ThesisGraph;
   try {
-    raw = parseCompilerResponse(await generateCompilerResponse(genai, thesisText));
+    graph = await compileResponse(false);
   } catch {
     try {
-      raw = parseCompilerResponse(await generateCompilerResponse(genai, thesisText, true));
+      graph = await compileResponse(true);
     } catch {
       throw new ThesisCompileError("The thesis service could not format a structured projection after an automatic retry. Your thesis is saved unchanged; please try the projection again.");
     }
   }
-  const graph = normalizeGraph(raw);
 
   if (!graph.beliefs.length && !graph.seek.length) {
     throw new ThesisCompileError(
