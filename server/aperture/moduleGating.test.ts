@@ -3,9 +3,9 @@ import { ADMIN_ONLY_MODULES, isAdminOnlyModule, isModuleGrantable } from "../../
 import { ALL_MODULES } from "../rolePermissionsRouter";
 
 /**
- * Capital Aperture is an internal instrument for one self-directed operator.
- * If it ever became reachable by a client role it would function as personalised
- * investment advice. These tests are the regression guard on that.
+ * Capital Aperture is a paper-only instrument for self-directed operators.
+ * These tests keep ordinary client roles out while preserving the explicit,
+ * separately-audited Capital Operator role.
  */
 describe("Capital Aperture module gating", () => {
   it("is registered as a module", () => {
@@ -27,6 +27,10 @@ describe("Capital Aperture module gating", () => {
 
   it("can be granted to admin", () => {
     expect(isModuleGrantable("capital_aperture", "admin")).toBe(true);
+  });
+
+  it("can be granted to Capital Operator", () => {
+    expect(isModuleGrantable("capital_aperture", "capital_operator")).toBe(true);
   });
 
   it("does not restrict ordinary modules", () => {

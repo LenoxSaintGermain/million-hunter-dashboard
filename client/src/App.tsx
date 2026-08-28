@@ -70,6 +70,7 @@ import ApertureRecord from "./pages/aperture/ApertureRecord";
 import CapitalWalkthrough from "./pages/aperture/CapitalWalkthrough";
 import { getLoginUrl } from "./const";
 import { getDefaultWorkspacePath } from "@shared/defaultWorkspace";
+import { canOperateCapital } from "@shared/capitalOperatorAccess";
 
 // ─── Protected Route ─────────────────────────────────────────────────────────
 // Redirects unauthenticated users to the landing page.
@@ -84,9 +85,8 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   return <Component />;
 }
 
-// Capital Aperture is an operator workspace. The server uses adminProcedure on
-// every aperture endpoint; this matching client guard prevents investors from
-// landing on a non-functional research surface through a copied URL.
+// Capital Aperture is available only to admins and the bounded Capital Operator
+// role. The server independently enforces the same boundary.
 function ApertureRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading, user } = useAuth();
   if (loading) return null;
@@ -94,7 +94,7 @@ function ApertureRoute({ component: Component }: { component: React.ComponentTyp
     window.location.href = getLoginUrl();
     return null;
   }
-  if ((user as any)?.role !== "admin") {
+  if (!canOperateCapital((user as any)?.role)) {
     window.location.href = "/";
     return null;
   }
@@ -141,6 +141,17 @@ function OnboardingGuard() {
 
   useEffect(() => {
     if (!authData) return;
+
+    if (
+      userRole === "capital_operator" &&
+      !isPublicPage &&
+      !location.startsWith("/aperture") &&
+      location !== "/thesis" &&
+      location !== "/profile"
+    ) {
+      navigate("/aperture");
+      return;
+    }
 
     // A default workspace redirects only a root landing; deep links retain their
     // context. This lets a Capital stakeholder be Aperture-first without changing

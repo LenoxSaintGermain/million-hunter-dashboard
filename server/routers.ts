@@ -3880,7 +3880,7 @@ Be concise. Be direct. Be right.`;
     updateRole: protectedProcedure
       .input(z.object({
         userId: z.number(),
-        role: z.enum(["user", "admin", "investor", "insurance"]),
+        role: z.enum(["user", "admin", "investor", "insurance", "capital_operator"]),
       }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

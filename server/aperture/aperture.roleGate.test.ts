@@ -3,9 +3,9 @@
  *
  * Verifies that capital_aperture:
  *   1. Is registered in ALL_MODULES
- *   2. Is in ADMIN_ONLY_MODULES
+ *   2. Is in the restricted-module list
  *   3. Cannot be granted to investor, insurance, or user roles
- *   4. Can be granted to admin
+ *   4. Can be granted only to admin and Capital Operator
  *   5. Aperture routes are not in the investor nav
  *
  * This test must never be deleted. It is the structural guarantee that
@@ -38,6 +38,10 @@ describe("Capital Aperture role gate", () => {
 
   it("capital_aperture can be granted to admin role", () => {
     expect(isModuleGrantable("capital_aperture", "admin")).toBe(true);
+  });
+
+  it("capital_aperture can be granted to the bounded Capital Operator role", () => {
+    expect(isModuleGrantable("capital_aperture", "capital_operator")).toBe(true);
   });
 
   it("ALL_MODULES contains the expected core modules", () => {

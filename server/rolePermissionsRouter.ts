@@ -38,11 +38,15 @@ export const ALL_MODULES = [
   { key: "settings",             label: "Settings",             href: "/settings" },
 ];
 
-type PermRole = "admin" | "investor" | "insurance" | "user";
+type PermRole = "admin" | "capital_operator" | "investor" | "insurance" | "user";
 
 // ─── Default permissions per role ─────────────────────────────────────────────
 const ROLE_DEFAULTS: Record<PermRole, string[]> = {
   admin: ALL_MODULES.map((m) => m.key),
+  capital_operator: [
+    "thesis_engine",
+    "capital_aperture",
+  ],
   investor: [
     "command_center",
     "market_scan",
@@ -64,23 +68,24 @@ const ROLE_DEFAULTS: Record<PermRole, string[]> = {
   ],
 };
 
-const PERM_ROLES: PermRole[] = ["admin", "investor", "insurance", "user"];
+const PERM_ROLES: PermRole[] = ["admin", "capital_operator", "investor", "insurance", "user"];
 
 // ─── Seed helper — idempotent ──────────────────────────────────────────────────
 export async function seedRolePermissions() {
   const db = await getDb();
   if (!db) return;
-  const existing = await db.select().from(roleModulePermissions).limit(1);
-  if (existing.length > 0) return; // already seeded
-
+  const existing = await db.select().from(roleModulePermissions);
+  const existingKeys = new Set(existing.map((row) => `${row.role}:${row.moduleKey}`));
   const rows: Array<{ role: PermRole; moduleKey: string; enabled: boolean }> = [];
   for (const role of PERM_ROLES) {
     const enabledKeys = ROLE_DEFAULTS[role];
     for (const mod of ALL_MODULES) {
-      rows.push({ role, moduleKey: mod.key, enabled: enabledKeys.includes(mod.key) });
+      if (!existingKeys.has(`${role}:${mod.key}`)) {
+        rows.push({ role, moduleKey: mod.key, enabled: enabledKeys.includes(mod.key) });
+      }
     }
   }
-  await db.insert(roleModulePermissions).values(rows);
+  if (rows.length) await db.insert(roleModulePermissions).values(rows);
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -106,7 +111,7 @@ export const rolePermissionsRouter = router({
   setPermission: protectedProcedure
     .input(
       z.object({
-        role: z.enum(["admin", "investor", "insurance", "user"]),
+        role: z.enum(["admin", "capital_operator", "investor", "insurance", "user"]),
         moduleKey: z.string(),
         enabled: z.boolean(),
       })
@@ -192,7 +197,7 @@ export const rolePermissionsRouter = router({
    * Reset a role's permissions back to defaults (admin only).
    */
   resetToDefaults: protectedProcedure
-    .input(z.object({ role: z.enum(["admin", "investor", "insurance", "user"]) }))
+    .input(z.object({ role: z.enum(["admin", "capital_operator", "investor", "insurance", "user"]) }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });

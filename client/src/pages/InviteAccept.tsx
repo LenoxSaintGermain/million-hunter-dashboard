@@ -19,6 +19,7 @@ import { Loader2, ShieldCheck, AlertTriangle, CheckCircle2, Link2 } from "lucide
 const ROLE_LABELS: Record<string, string> = {
   insurance: "Insurance Partner",
   investor: "Investor",
+  capital_operator: "Capital Operator",
   admin: "Administrator",
   user: "Member",
 };
@@ -26,6 +27,7 @@ const ROLE_LABELS: Record<string, string> = {
 const ROLE_DESCRIPTIONS: Record<string, string> = {
   insurance: "Access the Insurance Prospector — score commercial insurance prospects from the live deal pipeline, generate pre-call briefs, and manage your prospect list.",
   investor: "Access the full acquisition intelligence platform — deal pipeline, thesis engine, TIDE capital flow intelligence, and investment memos.",
+  capital_operator: "Access the paper-only Capital Aperture workspace, thesis builder, evidence review, and human-approved paper decision flow.",
   admin: "Full platform access including user management, admin panel, and all features.",
   user: "Access the Signal Hunter platform.",
 };

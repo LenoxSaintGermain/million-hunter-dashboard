@@ -5,6 +5,7 @@ import { getLoginUrl } from "@/const";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolatedUatIdentity";
+import { canOperateCapital } from "@shared/capitalOperatorAccess";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -330,6 +331,8 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
   const { user, isAuthenticated, logout } = useAuth();
   const userRole = (user as any)?.role as string | undefined;
   const isAdmin = userRole === "admin";
+  const isCapitalOperator = userRole === "capital_operator";
+  const hasCapitalAccess = canOperateCapital(userRole);
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -355,14 +358,21 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
   const isActive = (href: string) =>
     href === "/" ? location === "/" : location.startsWith(href);
 
-  const analyzeNav = isAdmin
-    ? [...ANALYZE_NAV, { label: "Capital Aperture", href: "/aperture", icon: Landmark, badge: "Paper" }]
-    : ANALYZE_NAV;
-  const hasMoreActive = MORE_NAV.some((n) => isActive(n.href));
+  const capitalNavItem = { label: "Capital Aperture", href: "/aperture", icon: Landmark, badge: "Paper" };
+  const analyzeNav = isCapitalOperator
+    ? [ANALYZE_NAV.find((item) => item.href === "/thesis")!, capitalNavItem]
+    : hasCapitalAccess
+      ? [...ANALYZE_NAV, capitalNavItem]
+      : ANALYZE_NAV;
+  const visibleMoreNav = isCapitalOperator ? [] : MORE_NAV;
+  const visibleActNav = isCapitalOperator ? [] : ACT_NAV;
+  const hasMoreActive = visibleMoreNav.some((n) => isActive(n.href));
   const hasAnalyzeActive = analyzeNav.some((n) => isActive(n.href));
-  const hasActActive = ACT_NAV.some((n) => isActive(n.href));
-  const primaryNav = isAdmin
-    ? [...PRIMARY_NAV, { label: "Capital", href: "/aperture", icon: Landmark }]
+  const hasActActive = visibleActNav.some((n) => isActive(n.href));
+  const primaryNav = isCapitalOperator
+    ? [{ label: "Capital", href: "/aperture", icon: Landmark }]
+    : isAdmin
+      ? [...PRIMARY_NAV, { label: "Capital", href: "/aperture", icon: Landmark }]
     : PRIMARY_NAV;
 
   return (
@@ -457,7 +467,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
             </DropdownMenu>
 
             {/* Act dropdown */}
-            <DropdownMenu>
+            {visibleActNav.length > 0 && <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   className={cn(
@@ -478,7 +488,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                 <div className="px-3 py-1.5">
                   <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--sh-fg-4)] font-medium">Execute</p>
                 </div>
-                {ACT_NAV.map((item) => {
+                {visibleActNav.map((item) => {
                   const Icon = item.icon;
                   return (
                     <DropdownMenuItem key={item.href} asChild>
@@ -517,10 +527,10 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                   );
                 })}
               </DropdownMenuContent>
-            </DropdownMenu>
+            </DropdownMenu>}
 
             {/* More dropdown */}
-            <DropdownMenu>
+            {visibleMoreNav.length > 0 && <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   className={cn(
@@ -538,7 +548,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                 align="end"
                 className="w-52 bg-[var(--paper)] border-[var(--rule)] shadow-lg"
               >
-                {MORE_NAV.map((item) => {
+                {visibleMoreNav.map((item) => {
                   const Icon = item.icon;
                   return (
                     <DropdownMenuItem key={item.href} asChild>
@@ -555,7 +565,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                   );
                 })}
               </DropdownMenuContent>
-            </DropdownMenu>
+            </DropdownMenu>}
           </nav>
 
           {/* Right actions */}
@@ -684,7 +694,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
 
                   {/* Mobile nav items */}
                   <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-                    {[...primaryNav, ...MORE_NAV].map((item) => {
+                    {[...primaryNav, ...visibleMoreNav].map((item) => {
                       const Icon = item.icon;
                       const active = isActive(item.href);
                       return (

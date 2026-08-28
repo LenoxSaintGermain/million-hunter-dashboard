@@ -1,7 +1,7 @@
 /**
  * Aperture router — tRPC namespace `aperture`.
  *
- * Every procedure is adminProcedure: this is a single-operator internal tool.
+ * Every procedure is capitalOperatorProcedure: this is a single-operator internal tool.
  * No autonomous execution. Paper only. The guardrails are structural, not
  * just a warning banner.
  *
@@ -43,7 +43,7 @@ import {
   thesisCompilations,
   users,
 } from "../drizzle/schema";
-import { adminProcedure, router } from "./_core/trpc";
+import { capitalOperatorProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { compileThesis, flattenExposureTree, validateGraphForPersistence } from "./aperture/thesisGraph";
 import { discoverUniverse, thesisSummary } from "./aperture/universe";
@@ -401,7 +401,7 @@ export const apertureRouter = router({
   // ── Thesis management ──────────────────────────────────────────────────────
 
   thesis: router({
-    list: adminProcedure.query(async ({ ctx }) => {
+    list: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const rows = await db!.select().from(capitalTheses)
         .where(eq(capitalTheses.userId, ctx.user.id))
@@ -412,14 +412,14 @@ export const apertureRouter = router({
       });
     }),
 
-    get: adminProcedure
+    get: capitalOperatorProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
         return requireThesis(db, input.id, ctx.user.id);
       }),
 
-    create: adminProcedure
+    create: capitalOperatorProcedure
       .input(z.object({
         name: z.string().max(160).optional(),
         rawText: z.string().min(10).max(8000),
@@ -445,7 +445,7 @@ export const apertureRouter = router({
       }),
 
     /** One-time repair for legacy Capital-only theses created before the canonical-first workflow. */
-    promoteCanonical: adminProcedure
+    promoteCanonical: capitalOperatorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -466,7 +466,7 @@ export const apertureRouter = router({
       }),
 
     /** Legacy only: canonical-linked theses are edited in the main Thesis Engine. */
-    update: adminProcedure
+    update: capitalOperatorProcedure
       .input(z.object({
         id: z.number(),
         name: z.string().max(160).optional(),
@@ -484,7 +484,7 @@ export const apertureRouter = router({
         return { ok: true };
       }),
 
-    compile: adminProcedure
+    compile: capitalOperatorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -514,7 +514,7 @@ export const apertureRouter = router({
         return { graph, confidenceNotes };
       }),
 
-    activate: adminProcedure
+    activate: capitalOperatorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -529,7 +529,7 @@ export const apertureRouter = router({
         return { ok: true };
       }),
 
-    delete: adminProcedure
+    delete: capitalOperatorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -542,14 +542,14 @@ export const apertureRouter = router({
   // ── Portfolio accounts ─────────────────────────────────────────────────────
 
   account: router({
-    list: adminProcedure.query(async ({ ctx }) => {
+    list: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       return db!.select().from(portfolioAccounts)
         .where(eq(portfolioAccounts.userId, ctx.user.id))
         .orderBy(desc(portfolioAccounts.updatedAt));
     }),
 
-    create: adminProcedure
+    create: capitalOperatorProcedure
       .input(z.object({
         label: z.string().max(120),
         brokerId: z.enum(["manual", "alpaca_paper", "robinhood_mcp"]).default("manual"),
@@ -569,7 +569,7 @@ export const apertureRouter = router({
         return { id: (result as any).insertId as number };
       }),
 
-    sync: adminProcedure
+    sync: capitalOperatorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -632,7 +632,7 @@ export const apertureRouter = router({
         return { synced: posData.length, cashCents: acctData.cashCents };
       }),
 
-    configureSyncSchedule: adminProcedure
+    configureSyncSchedule: capitalOperatorProcedure
       .input(z.object({ id: z.number(), enabled: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -671,7 +671,7 @@ export const apertureRouter = router({
         return { enabled: input.enabled, configured: true, nextExecutionAt: nextExecutionAt ?? null };
       }),
 
-    getPositions: adminProcedure
+    getPositions: capitalOperatorProcedure
       .input(z.object({ accountId: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
@@ -681,7 +681,7 @@ export const apertureRouter = router({
           .orderBy(desc(positions.marketValueCents));
       }),
 
-    importCsv: adminProcedure
+    importCsv: capitalOperatorProcedure
       .input(z.object({
         accountId: z.number(),
         rows: z.array(z.object({
@@ -716,7 +716,7 @@ export const apertureRouter = router({
 
   // ── Broker availability ────────────────────────────────────────────────────
 
-  brokers: adminProcedure.query(() => {
+  brokers: capitalOperatorProcedure.query(() => {
     return listBrokers().map((b) => ({
       id: b.id,
       label: b.label,
@@ -728,7 +728,7 @@ export const apertureRouter = router({
 
   // ── Provider availability ──────────────────────────────────────────────────
 
-  providers: adminProcedure.query(() => describeAvailability()),
+  providers: capitalOperatorProcedure.query(() => describeAvailability()),
 
   /**
    * The operator cockpit — market session, account, mandate headroom and run
@@ -743,7 +743,7 @@ export const apertureRouter = router({
    * with neither, the session and mandate still render and every account-derived
    * figure is null with a stated reason rather than a zero.
    */
-  cockpit: adminProcedure
+  cockpit: capitalOperatorProcedure
     .input(z.object({
       accountId: z.number().optional(),
       runId: z.number().optional(),
@@ -757,7 +757,7 @@ export const apertureRouter = router({
     }),
 
   cockpitPreference: router({
-    get: adminProcedure.query(async ({ ctx }) => {
+    get: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const [user] = await db!.select({ expanded: users.cockpitRailExpanded, acknowledgedSignature: users.cockpitRailAcknowledgedSignature })
         .from(users)
@@ -765,12 +765,12 @@ export const apertureRouter = router({
         .limit(1);
       return { expanded: user?.expanded === true, acknowledgedSignature: user?.acknowledgedSignature ?? null };
     }),
-    set: adminProcedure.input(z.object({ expanded: z.boolean() })).mutation(async ({ ctx, input }) => {
+    set: capitalOperatorProcedure.input(z.object({ expanded: z.boolean() })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
       await db!.update(users).set({ cockpitRailExpanded: input.expanded }).where(eq(users.id, ctx.user.id));
       return { expanded: input.expanded };
     }),
-    acknowledge: adminProcedure.input(z.object({ signature: z.string().min(1).max(255) })).mutation(async ({ ctx, input }) => {
+    acknowledge: capitalOperatorProcedure.input(z.object({ signature: z.string().min(1).max(255) })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
       await db!.update(users).set({ cockpitRailAcknowledgedSignature: input.signature, cockpitRailExpanded: false }).where(eq(users.id, ctx.user.id));
       return { acknowledgedSignature: input.signature };
@@ -782,7 +782,7 @@ export const apertureRouter = router({
   // score, role, fact ledger, and thesis context that produced them. This is the
   // cross-run index that makes that durable record discoverable to an operator.
   memo: router({
-    list: adminProcedure.query(async ({ ctx }) => {
+    list: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const rows = await db!.select({
         candidate: apertureCandidates,
@@ -800,7 +800,7 @@ export const apertureRouter = router({
         .map(({ candidate, run, thesisName }) => ({ candidate, run, thesisName }));
     }),
 
-    get: adminProcedure
+    get: capitalOperatorProcedure
       .input(z.object({ candidateId: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
@@ -832,7 +832,7 @@ export const apertureRouter = router({
 
   macro: router({
     /** Refresh the shared macro ledger on operator request. It never trades or changes a thesis. */
-    refresh: adminProcedure.mutation(async () => {
+    refresh: capitalOperatorProcedure.mutation(async () => {
       const result = await collectMacroFacts();
       return {
         factsWritten: result.facts.length,
@@ -846,7 +846,7 @@ export const apertureRouter = router({
   // Durable operator context only. A cash branch cannot be attached to a run
   // and is separately checked when a paper-order proposal is attempted.
   runway: router({
-    latest: adminProcedure.input(z.object({
+    latest: capitalOperatorProcedure.input(z.object({
       decisionRunId: z.number().positive().optional(),
       revisionId: z.number().positive().optional(),
     }).optional()).query(async ({ ctx, input }) => {
@@ -880,7 +880,7 @@ export const apertureRouter = router({
         activeCanonicalThesisId: profile?.activeCapitalThesisId ?? null,
       };
     }),
-    pending: adminProcedure.query(async ({ ctx }) => {
+    pending: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       return db!.select({
         id: aperturePendingOutcomes.id,
@@ -908,7 +908,7 @@ export const apertureRouter = router({
         ))
         .orderBy(asc(aperturePendingOutcomes.dueAt));
     }),
-    library: adminProcedure
+    library: capitalOperatorProcedure
       .input(z.object({
         canonicalThesisId: z.number().nullable().optional(),
         capitalThesisId: z.number().nullable().optional(),
@@ -951,7 +951,7 @@ export const apertureRouter = router({
           hasVerifiedCatalyst: false,
         });
       }),
-    begin: adminProcedure
+    begin: capitalOperatorProcedure
       .input(z.object({
         missionText: z.string().trim().min(MIN_NARRATIVE_CHARS).max(12_000),
         canonicalThesisId: z.number(),
@@ -1178,7 +1178,7 @@ export const apertureRouter = router({
         });
         return { ...receipt, created: true, branch: input.branch, maxPlannedLossCents };
       }),
-    startResearch: adminProcedure
+    startResearch: capitalOperatorProcedure
       .input(z.object({ decisionRunId: z.number(), revisionId: z.number(), uatCase: z.literal("qualified-play").optional() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -1376,10 +1376,10 @@ export const apertureRouter = router({
         executeRun(runId, ctx.user.id, thesis, runInput).catch((error) => console.error(`[aperture] Decision Runway research ${runId} failed:`, error?.message ?? error));
         return { status: "started" as const, runId, decisionRunId: decisionRun.id, revisionId: revision.id };
       }),
-    attachRun: adminProcedure.input(z.object({ stateId: z.number(), runId: z.number() })).mutation(() => {
+    attachRun: capitalOperatorProcedure.input(z.object({ stateId: z.number(), runId: z.number() })).mutation(() => {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Arbitrary run attachment is retired. Start research from the exact Decision Run revision." });
     }),
-    setBranch: adminProcedure.input(z.object({ stateId: z.number(), branch: z.enum(["research", "eligible", "conditional", "cash"]), reason: z.string().nullable().optional() })).mutation(() => {
+    setBranch: capitalOperatorProcedure.input(z.object({ stateId: z.number(), branch: z.enum(["research", "eligible", "conditional", "cash"]), reason: z.string().nullable().optional() })).mutation(() => {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Decision history is immutable. Record a new mission revision instead of rewriting a branch." });
     }),
   }),
@@ -1388,19 +1388,19 @@ export const apertureRouter = router({
   // This namespace is evidence and paper-stage preparation only. It never calls
   // a broker adapter and never creates, approves, or submits an order.
   disclosure: router({
-    compileIntent: adminProcedure
+    compileIntent: capitalOperatorProcedure
       .input(z.object({ rawIntent: z.string().min(20).max(12_000) }))
       .mutation(({ input }) => compileDisclosureIntent(input.rawIntent)),
 
     plan: router({
-      list: adminProcedure.query(async ({ ctx }) => {
+      list: capitalOperatorProcedure.query(async ({ ctx }) => {
         const db = await getDb();
         return db!.select().from(disclosurePlans)
           .where(eq(disclosurePlans.userId, ctx.user.id))
           .orderBy(desc(disclosurePlans.updatedAt));
       }),
 
-      createRevision: adminProcedure
+      createRevision: capitalOperatorProcedure
         .input(z.object({
           planId: z.number().optional(),
           rawIntent: z.string().min(20).max(12_000),
@@ -1442,7 +1442,7 @@ export const apertureRouter = router({
           return { planId, revisionId, revisionNumber, compiledPlan: finalCompiled };
         }),
 
-      approveRevision: adminProcedure
+      approveRevision: capitalOperatorProcedure
         .input(z.object({ planId: z.number(), revisionId: z.number() }))
         .mutation(async ({ ctx, input }) => {
           const db = await getDb();
@@ -1458,7 +1458,7 @@ export const apertureRouter = router({
           return { approved: true, planId: plan.id, revisionId: revision.id };
         }),
 
-      pause: adminProcedure.input(z.object({ planId: z.number() })).mutation(async ({ ctx, input }) => {
+      pause: capitalOperatorProcedure.input(z.object({ planId: z.number() })).mutation(async ({ ctx, input }) => {
         const db = await getDb(); const now = Date.now();
         await db!.update(disclosurePlans).set({ status: "paused", pausedAt: now, updatedAt: now })
           .where(and(eq(disclosurePlans.id, input.planId), eq(disclosurePlans.userId, ctx.user.id)));
@@ -1466,7 +1466,7 @@ export const apertureRouter = router({
       }),
     }),
 
-    replayOfficialFixture: adminProcedure
+    replayOfficialFixture: capitalOperatorProcedure
       .input(z.object({ planId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -1508,7 +1508,7 @@ export const apertureRouter = router({
       }),
 
     match: router({
-      list: adminProcedure.input(z.object({ planId: z.number() })).query(async ({ ctx, input }) => {
+      list: capitalOperatorProcedure.input(z.object({ planId: z.number() })).query(async ({ ctx, input }) => {
         const db = await getDb();
         const [plan] = await db!.select().from(disclosurePlans).where(and(eq(disclosurePlans.id, input.planId), eq(disclosurePlans.userId, ctx.user.id))).limit(1);
         if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Disclosure plan not found" });
@@ -1517,7 +1517,7 @@ export const apertureRouter = router({
           .innerJoin(disclosureFilings, eq(disclosureTransactions.filingId, disclosureFilings.id))
           .where(eq(disclosureMatches.planRevisionId, plan.currentRevisionId!)).orderBy(asc(disclosureMatches.createdAt));
       }),
-      promoteEvidence: adminProcedure.input(z.object({ matchId: z.number(), note: z.string().min(1).max(2_000) })).mutation(async ({ ctx, input }) => {
+      promoteEvidence: capitalOperatorProcedure.input(z.object({ matchId: z.number(), note: z.string().min(1).max(2_000) })).mutation(async ({ ctx, input }) => {
         const db = await getDb();
         const [match] = await db!.select({ match: disclosureMatches, plan: disclosurePlans, transaction: disclosureTransactions, filing: disclosureFilings }).from(disclosureMatches)
           .innerJoin(disclosurePlanRevisions, eq(disclosureMatches.planRevisionId, disclosurePlanRevisions.id))
@@ -1534,7 +1534,7 @@ export const apertureRouter = router({
   }),
 
   run: router({
-    list: adminProcedure.query(async ({ ctx }) => {
+    list: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const rows = await db!.select({ run: apertureRuns, thesisName: capitalTheses.name }).from(apertureRuns)
         .leftJoin(capitalTheses, eq(apertureRuns.thesisId, capitalTheses.id))
@@ -1544,7 +1544,7 @@ export const apertureRouter = router({
       return rows.map(({ run, thesisName }) => ({ ...run, thesisName }));
     }),
 
-    get: adminProcedure
+    get: capitalOperatorProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
@@ -1618,7 +1618,7 @@ export const apertureRouter = router({
       }),
 
     evidence: router({
-      review: adminProcedure
+      review: capitalOperatorProcedure
         .input(z.object({
           runId: z.number(),
           candidateId: z.number(),
@@ -1654,7 +1654,7 @@ export const apertureRouter = router({
      * record as an explicit interruption and restart the identical paper research
      * inputs in a new, traceable run. No order is created or submitted.
      */
-    retry: adminProcedure
+    retry: capitalOperatorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -1714,7 +1714,7 @@ export const apertureRouter = router({
       }),
 
     /** Advance only to the next deferred evidence batch. Never creates an order. */
-    followUp: adminProcedure
+    followUp: capitalOperatorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -1758,7 +1758,7 @@ export const apertureRouter = router({
      * MANDATE_V1 by evaluateRunPreset, which is where "may tighten, never
      * loosen" is enforced.
      */
-    start: adminProcedure
+    start: capitalOperatorProcedure
       .input(z.object({
         thesisId: z.number(),
         accountId: z.number().optional(),
@@ -1854,7 +1854,7 @@ export const apertureRouter = router({
 
   // ── Candidate memo generation ──────────────────────────────────────────────
 
-  generateMemo: adminProcedure
+  generateMemo: capitalOperatorProcedure
     .input(z.object({
       runId: z.number(),
       candidateId: z.number(),
@@ -1899,7 +1899,7 @@ export const apertureRouter = router({
   // This is a read model over completed short-horizon runs. It starts no
   // research, alters no thesis, and never reaches the broker adapter.
   play: router({
-    list: adminProcedure.query(async ({ ctx }) => {
+    list: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const now = Date.now();
       const [profile] = await db!.select({ activeCapitalThesisId: users.activeCapitalThesisId })
@@ -1994,7 +1994,7 @@ export const apertureRouter = router({
       };
     }),
 
-    trigger: adminProcedure
+    trigger: capitalOperatorProcedure
       .input(z.object({ runId: z.number(), candidateId: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
@@ -2036,7 +2036,7 @@ export const apertureRouter = router({
         };
       }),
 
-    construct: adminProcedure
+    construct: capitalOperatorProcedure
       .input(z.object({ runId: z.number(), candidateId: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
@@ -2124,7 +2124,7 @@ export const apertureRouter = router({
         };
       }),
 
-    decide: adminProcedure
+    decide: capitalOperatorProcedure
       .input(z.object({ runId: z.number(), candidateId: z.number(), decision: z.enum(["skipped", "deferred"]), reason: z.string().trim().min(3).max(1_000) }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -2165,7 +2165,7 @@ export const apertureRouter = router({
   // Reconstructing a past run is explicitly marked historical. It is useful for
   // a postmortem, but cannot be represented as a live recommendation capture.
   ledger: router({
-    list: adminProcedure.query(async ({ ctx }) => {
+    list: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const slates = await db!.select().from(aperturePlaySlates)
         .where(eq(aperturePlaySlates.userId, ctx.user.id))
@@ -2202,7 +2202,7 @@ export const apertureRouter = router({
       });
     }),
 
-    portfolioImpactTrend: adminProcedure.query(async ({ ctx }) => {
+    portfolioImpactTrend: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const slates = await db!.select().from(aperturePlaySlates)
         .where(eq(aperturePlaySlates.userId, ctx.user.id));
@@ -2241,7 +2241,7 @@ export const apertureRouter = router({
       return buildPortfolioImpactTrend(rows);
     }),
 
-    dailyRefreshSchedule: adminProcedure.query(async ({ ctx }) => {
+    dailyRefreshSchedule: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const [profile] = await db!.select({
         enabled: users.dailyOutcomeRefreshEnabled,
@@ -2258,7 +2258,7 @@ export const apertureRouter = router({
       };
     }),
 
-    configureDailyRefresh: adminProcedure
+    configureDailyRefresh: capitalOperatorProcedure
       .input(z.object({ enabled: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -2294,7 +2294,7 @@ export const apertureRouter = router({
         return { enabled: input.enabled, configured: true, nextExecutionAt: nextExecutionAt ?? null };
       }),
 
-    oneTimeResearchSchedule: adminProcedure.query(async ({ ctx }) => {
+    oneTimeResearchSchedule: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const [profile] = await db!.select({
         enabled: users.oneTimeResearchEnabled,
@@ -2317,7 +2317,7 @@ export const apertureRouter = router({
       };
     }),
 
-    configureOneTimeGlp1Research: adminProcedure
+    configureOneTimeGlp1Research: capitalOperatorProcedure
       .input(z.object({ enabled: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -2377,7 +2377,7 @@ export const apertureRouter = router({
         return { enabled: true, configured: true, targetAt, nextExecutionAt: nextExecutionAt ?? null };
       }),
 
-    availableCohorts: adminProcedure.query(async ({ ctx }) => {
+    availableCohorts: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const rows = await db!.select({ run: apertureRuns, thesisName: capitalTheses.name, canonicalThesisId: capitalTheses.sourceCompilationId })
         .from(apertureRuns)
@@ -2401,7 +2401,7 @@ export const apertureRouter = router({
       }));
     }),
 
-    captureCurrentWindow: adminProcedure
+    captureCurrentWindow: capitalOperatorProcedure
       .input(z.object({ windowKey: z.string().trim().min(2).max(64) }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -2548,7 +2548,7 @@ export const apertureRouter = router({
         return { slateId, created: true };
       }),
 
-    recordSlateDecision: adminProcedure
+    recordSlateDecision: capitalOperatorProcedure
       .input(z.object({
         slateId: z.number(),
         decision: z.enum(["cash", "selected"]),
@@ -2593,7 +2593,7 @@ export const apertureRouter = router({
         return { ok: true };
       }),
 
-    refreshLiveOutcomes: adminProcedure
+    refreshLiveOutcomes: capitalOperatorProcedure
       .input(z.object({ slateId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -2608,7 +2608,7 @@ export const apertureRouter = router({
         return refreshLiveSlateOutcomes(db!, slate);
       }),
 
-    reconstructRecentRun: adminProcedure
+    reconstructRecentRun: capitalOperatorProcedure
       .input(z.object({ runId: z.number(), windowKey: z.string().trim().min(2).max(64).default("historical_postmortem") }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -2798,7 +2798,7 @@ export const apertureRouter = router({
   // ── Order management ──────────────────────────────────────────────────────
 
   order: router({
-    list: adminProcedure
+    list: capitalOperatorProcedure
       .input(z.object({ runId: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
@@ -2807,7 +2807,7 @@ export const apertureRouter = router({
           .orderBy(desc(brokerOrders.createdAt));
       }),
 
-    create: adminProcedure
+    create: capitalOperatorProcedure
       .input(orderCreateInput)
       .mutation(async ({ ctx, input }) => {
         const recipeGap = missingIntradayRecipeMessage(input);
@@ -2870,7 +2870,7 @@ export const apertureRouter = router({
      * evaluated here too and folded into `blocking`, so `wouldPass` is true only
      * where create would actually go through.
      */
-    preflight: adminProcedure
+    preflight: capitalOperatorProcedure
       .input(orderPreflightInput)
       .query(async ({ ctx, input }) => {
         const db = await getDb();
@@ -2925,13 +2925,13 @@ export const apertureRouter = router({
         };
       }),
 
-    approve: adminProcedure
+    approve: capitalOperatorProcedure
       .input(z.object({ orderId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         return approveOrder(input.orderId, ctx.user.id);
       }),
 
-    reject: adminProcedure
+    reject: capitalOperatorProcedure
       .input(z.object({ orderId: z.number(), reason: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
         await rejectOrder(input.orderId, ctx.user.id, input.reason);
@@ -2951,7 +2951,7 @@ export const apertureRouter = router({
         return { ok: true, ledger };
       }),
 
-    submit: adminProcedure
+    submit: capitalOperatorProcedure
       .input(z.object({ orderId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const submitted = await submitBrokerOrder(input.orderId, ctx.user.id);
@@ -2969,7 +2969,7 @@ export const apertureRouter = router({
         return submitted;
       }),
 
-    mirrorFills: adminProcedure
+    mirrorFills: capitalOperatorProcedure
       .mutation(async ({ ctx }) => {
         const updated = await mirrorFills(ctx.user.id);
         return { updated };
@@ -2979,7 +2979,7 @@ export const apertureRouter = router({
   // ── Monitoring ─────────────────────────────────────────────────────────────
 
   monitor: router({
-    run: adminProcedure
+    run: capitalOperatorProcedure
       .input(z.object({
         runId: z.number(),
         candidateId: z.number(),
@@ -2997,11 +2997,11 @@ export const apertureRouter = router({
         );
       }),
 
-    list: adminProcedure
+    list: capitalOperatorProcedure
       .input(z.object({ runId: z.number() }))
       .query(async ({ input }) => getMonitoringChecks(input.runId)),
 
-    flagged: adminProcedure
+    flagged: capitalOperatorProcedure
       .input(z.object({ runId: z.number() }))
       .query(async ({ input }) => getFlaggedChecks(input.runId)),
   }),
@@ -3009,13 +3009,13 @@ export const apertureRouter = router({
   // ── Aperture Alpha ─────────────────────────────────────────────────────────
 
   alpha: router({
-    compute: adminProcedure
+    compute: capitalOperatorProcedure
       .input(z.object({ runId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         return computeAlpha(input.runId, ctx.user.id);
       }),
 
-    get: adminProcedure
+    get: capitalOperatorProcedure
       .input(z.object({ runId: z.number() }))
       .query(async ({ input }) => getAlpha(input.runId)),
   }),

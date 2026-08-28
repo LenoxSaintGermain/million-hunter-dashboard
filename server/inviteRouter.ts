@@ -18,6 +18,7 @@ import { z } from "zod";
 import { getDb } from "./db";
 import { inviteTokens, users } from "../drizzle/schema";
 import { protectedProcedure, router } from "./_core/trpc";
+import { capitalOperatorInviteProfile, matchesInviteRecipient } from "./invitePolicy";
 
 // 30-day default expiry
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -30,7 +31,7 @@ export const inviteRouter = router({
   create: protectedProcedure
     .input(
       z.object({
-        assignRole: z.enum(["user", "admin", "investor", "insurance"]),
+        assignRole: z.enum(["user", "admin", "investor", "insurance", "capital_operator"]),
         label: z.string().max(256).optional(),
         recipientEmail: z.string().email().optional(),
         /** Origin of the frontend (window.location.origin) — used to build the invite URL */
@@ -165,11 +166,22 @@ export const inviteRouter = router({
         });
       }
 
+      if (!matchesInviteRecipient(row.recipientEmail, ctx.user.email)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Sign in with the email address this invite was issued to",
+        });
+      }
+
       // Assign role and mark consumed — do both in parallel
       await Promise.all([
         db
           .update(users)
-          .set({ role: row.assignRole, updatedAt: new Date() })
+          .set({
+            role: row.assignRole,
+            ...capitalOperatorInviteProfile(row.assignRole, row.label),
+            updatedAt: new Date(),
+          })
           .where(eq(users.id, ctx.user.id)),
         db
           .update(inviteTokens)
@@ -217,7 +229,8 @@ export const inviteRouter = router({
       }
 
       const inviteUrl = `${input.origin}/invite/${row.token}`;
-      const roleLabel = row.assignRole === "insurance" ? "Insurance Partner" :
+      const roleLabel = row.assignRole === "capital_operator" ? "Capital Operator" :
+        row.assignRole === "insurance" ? "Insurance Partner" :
         row.assignRole === "investor" ? "Investor" :
         row.assignRole === "admin" ? "Admin" : "User";
 

@@ -23,6 +23,7 @@ import {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const ROLE_COLORS: Record<string, string> = {
   admin: "text-red-400 bg-red-400/10 border-red-400/20",
+  capital_operator: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
   investor: "text-blue-400 bg-blue-400/10 border-blue-400/20",
   insurance: "text-purple-400 bg-purple-400/10 border-purple-400/20",
   user: "text-muted-foreground bg-muted/20 border-border",
@@ -30,6 +31,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
+  capital_operator: "Capital Operator",
   investor: "Investor",
   insurance: "Insurance",
   user: "User",
@@ -112,6 +114,7 @@ function UserTableRow({ user, onRoleChange }: {
             className="h-7 text-xs rounded border border-[var(--sh-border)] bg-transparent text-muted-foreground pl-2 pr-6 cursor-pointer hover:border-primary/40 transition-colors appearance-none"
           >
             <option value="user">User</option>
+            <option value="capital_operator">Capital Operator</option>
             <option value="investor">Investor</option>
             <option value="insurance">Insurance</option>
             <option value="admin">Admin</option>
@@ -128,12 +131,13 @@ function UserTableRow({ user, onRoleChange }: {
 // ─── Module Permissions Matrix ───────────────────────────────────────────────
 const ROLE_LABELS_PERM: Record<string, string> = {
   admin: "Admin",
+  capital_operator: "Capital Operator",
   investor: "Investor",
   insurance: "Insurance",
   user: "User",
 };
 
-const PERM_ROLES = ["investor", "insurance", "user"] as const;
+const PERM_ROLES = ["capital_operator", "investor", "insurance", "user"] as const;
 type PermRole = typeof PERM_ROLES[number];
 
 function ModulePermissionsMatrix() {
@@ -287,7 +291,7 @@ function InviteManager() {
   const utils = trpc.useUtils();
   const [newLabel, setNewLabel] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [newRole, setNewRole] = useState<"user" | "admin" | "investor" | "insurance">("insurance");
+  const [newRole, setNewRole] = useState<"user" | "admin" | "investor" | "insurance" | "capital_operator">("capital_operator");
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
 
@@ -392,6 +396,7 @@ function InviteManager() {
             >
               <option value="insurance">Insurance Partner</option>
               <option value="investor">Investor</option>
+              <option value="capital_operator">Capital Operator</option>
               <option value="user">User</option>
               <option value="admin">Admin</option>
             </select>

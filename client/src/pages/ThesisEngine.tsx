@@ -6,7 +6,7 @@
  *   Left  — thesis input (large textarea + template gallery)
  *   Right — STRATEGIST output review (editable structured form + Approve & Run)
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { SetAsideHistory } from "@/components/aperture/SetAsideHistory";
 import { CapitalThesisWorkspace } from "@/components/aperture/CapitalThesisWorkspace";
+import { canOperateCapital } from "@shared/capitalOperatorAccess";
 import { resolveThesisEntryWorkspace } from "@shared/thesisEntryRoute";
 import {
   Sparkles, ChevronRight, Loader2, Trash2, Lock, Play, Pencil, Check, X,
@@ -136,12 +137,17 @@ function WeightBar({ weight, isCustom }: { weight: number; isCustom: boolean }) 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ThesisEngine() {
   const { user } = useAuth();
-  const canUseAperture = user?.role === "admin";
+  const isCapitalOperator = user?.role === "capital_operator";
+  const canUseAperture = canOperateCapital(user?.role);
   const [location, navigate] = useLocation();
   const routeSearch = typeof window === "undefined" ? "" : window.location.search;
   const requestedScope = new URLSearchParams(routeSearch).get("scope");
   const requestedUatCase = new URLSearchParams(routeSearch).get("uat_case");
-  const initialScope: ThesisScope = requestedScope === "capital" ? "capital" : requestedScope === "property" ? "property" : "acquisition";
+  const initialScope: ThesisScope = isCapitalOperator || requestedScope === "capital"
+    ? "capital"
+    : requestedScope === "property"
+      ? "property"
+      : "acquisition";
   const [thesisText, setThesisText] = useState(initialScope === "capital" ? CAPITAL_TRADE_STARTER : "");
   const [scope, setScope] = useState<ThesisScope>(initialScope);
   const [capitalName, setCapitalName] = useState("");
@@ -155,7 +161,19 @@ export default function ThesisEngine() {
       ? TEMPLATES.filter((template) => template.id === "wingate")
       : TEMPLATES.filter((template) => template.id !== "wingate");
 
+  useEffect(() => {
+    if (!isCapitalOperator || scope === "capital") return;
+    setScope("capital");
+    setThesisText(CAPITAL_TRADE_STARTER);
+    setActiveTemplate(null);
+    setCompilationResult(null);
+    setCompilationId(null);
+  }, [isCapitalOperator, scope]);
+
   const { data: savedTheses, refetch: refetchList } = trpc.thesis.list.useQuery();
+  const visibleSavedTheses = isCapitalOperator
+    ? savedTheses?.filter((thesis: any) => thesis.templateUsed === "capital_trade")
+    : savedTheses;
   const setActiveCapital = trpc.thesis.setActiveCapital.useMutation({
     onSuccess: ({ name }) => {
       toast.success(`${name} now drives your Capital Decision Center.`);
@@ -320,14 +338,18 @@ export default function ThesisEngine() {
           <div className="flex items-start justify-between">
             <div>
               <p className="eyebrow text-muted-foreground mb-1">Thesis workspace</p>
-              <h1 className="font-display text-3xl font-bold tracking-tight">One thesis. The right execution path.</h1>
+              <h1 className="font-display text-3xl font-bold tracking-tight">
+                {isCapitalOperator ? "Start with the thesis." : "One thesis. The right execution path."}
+              </h1>
               <p className="text-muted-foreground mt-1 text-sm max-w-xl">
-                Define a conviction once, then choose whether it drives acquisition search, property criteria, or a Capital Aperture paper-research run.
+                {isCapitalOperator
+                  ? "Define the market view once. Capital Aperture turns it into a paper-only decision run with evidence, risk boundaries, and human approval."
+                  : "Define a conviction once, then choose whether it drives acquisition search, property criteria, or a Capital Aperture paper-research run."}
               </p>
             </div>
             <Badge variant="outline" className="border-amber-500/40 text-[var(--amber)] bg-amber-500/5 text-xs">
               <Sparkles className="h-3 w-3 mr-1" />
-              Hunter Tier
+              {isCapitalOperator ? "Capital Operator" : "Hunter Tier"}
             </Badge>
           </div>
         </motion.div>
@@ -338,7 +360,7 @@ export default function ThesisEngine() {
           <motion.div variants={fadeIn} initial="hidden" animate="visible" transition={{ delay: 0.1 }}
             className="space-y-4">
 
-            <div className="rounded-xl border border-border bg-muted/10 p-2 grid grid-cols-1 sm:grid-cols-3 gap-1" aria-label="Choose what this thesis should do">
+            {!isCapitalOperator && <div className="rounded-xl border border-border bg-muted/10 p-2 grid grid-cols-1 sm:grid-cols-3 gap-1" aria-label="Choose what this thesis should do">
               {(Object.keys(SCOPE_COPY) as ThesisScope[]).map((scopeId) => (
                 <button
                   key={scopeId}
@@ -360,7 +382,7 @@ export default function ThesisEngine() {
                   <span className="block text-[11px] leading-snug text-muted-foreground mt-0.5">{SCOPE_COPY[scopeId].detail}</span>
                 </button>
               ))}
-            </div>
+            </div>}
 
             {/* Template Gallery */}
             <div>
@@ -463,11 +485,11 @@ export default function ThesisEngine() {
             </Button>
 
             {/* Saved Theses */}
-            {savedTheses && savedTheses.length > 0 && (
+            {visibleSavedTheses && visibleSavedTheses.length > 0 && (
               <div className="space-y-2">
                 <p className="eyebrow text-muted-foreground">Saved theses</p>
                 <div className="space-y-1">
-                  {savedTheses.map((t: any) => {
+                  {visibleSavedTheses.map((t: any) => {
                     const expanded = expandedThesisId === t.id;
                     const deadline = t.latestCatalystDeadlineAt ? new Date(Number(t.latestCatalystDeadlineAt)) : null;
                     return <div key={t.id} className="rounded-md border border-border transition-colors group">
@@ -583,9 +605,11 @@ export default function ThesisEngine() {
                 </div>
               </div>
             )}
-            {savedTheses && savedTheses.length === 0 && (
+            {visibleSavedTheses && visibleSavedTheses.length === 0 && (
               <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-                No personal or shared theses yet. Choose a scope above and create your first one—**Capital / Trade** opens Aperture automatically after it is saved.
+                {isCapitalOperator
+                  ? "No personal or shared Capital theses yet. Choose a starting point above and create the first paper-research thesis."
+                  : "No personal or shared theses yet. Choose a scope above and create your first one—Capital / Trade opens Aperture automatically after it is saved."}
               </div>
             )}
           </motion.div>
@@ -835,7 +859,7 @@ export default function ThesisEngine() {
         </div>
 
         {/* ── Tier Gate Banner (for non-Hunter users — placeholder) ── */}
-        <motion.div variants={fadeIn} initial="hidden" animate="visible" transition={{ delay: 0.3 }}
+        {!isCapitalOperator && <motion.div variants={fadeIn} initial="hidden" animate="visible" transition={{ delay: 0.3 }}
           className="rounded-xl border border-border bg-muted/5 p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Lock className="h-4 w-4 text-muted-foreground" />
@@ -847,7 +871,7 @@ export default function ThesisEngine() {
           <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground text-xs shrink-0">
             Operator Only
           </Badge>
-        </motion.div>
+        </motion.div>}
       </div>
     </EditorialTopNav>
   );

@@ -8,7 +8,7 @@
 import { z } from "zod";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
+import { capitalOperatorProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { logActivity } from "./db";
 import { apertureCandidates, aperturePlayDecisions, aperturePlaySlateItems, apertureRuns, apertureSetAside, capitalTheses, thesisCompilations, thesisShares, users } from "../drizzle/schema";
@@ -492,7 +492,7 @@ export const thesisRouter = router({
     }),
 
   /** Create a canonical thesis for a capital/trade workflow without forcing acquisition filters. */
-  createCapital: adminProcedure
+  createCapital: capitalOperatorProcedure
     .input(z.object({ thesisText: z.string().min(20).max(4000), name: z.string().min(1).max(120).optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -515,11 +515,13 @@ export const thesisRouter = router({
     }),
 
   /** Operator-owned thesis sharing. A share grants visibility/use, never edit or delete rights. */
-  shareCandidates: adminProcedure.query(async ({ ctx }) => {
+  shareCandidates: capitalOperatorProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
     return db.select({ id: users.id, name: users.name, email: users.email, role: users.role })
-      .from(users).where(sql`${users.id} != ${ctx.user.id}`).orderBy(users.name);
+      .from(users)
+      .where(and(sql`${users.id} != ${ctx.user.id}`, inArray(users.role, ["admin", "capital_operator"])))
+      .orderBy(users.name);
   }),
 
   shares: protectedProcedure
@@ -535,7 +537,7 @@ export const thesisRouter = router({
         .where(eq(thesisShares.compilationId, input.compilationId));
     }),
 
-  share: adminProcedure
+  share: capitalOperatorProcedure
     .input(z.object({ compilationId: z.number(), userId: z.number(), permission: z.enum(["view", "use"]).default("use") }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -549,7 +551,7 @@ export const thesisRouter = router({
       return { success: true };
     }),
 
-  unshare: adminProcedure
+  unshare: capitalOperatorProcedure
     .input(z.object({ compilationId: z.number(), userId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -590,7 +592,7 @@ export const thesisRouter = router({
    * This is a bridge, not a copy: repeat calls update the same linked Aperture
    * record so the user never has to re-enter their thesis in a second tool.
    */
-  useInAperture: adminProcedure
+  useInAperture: capitalOperatorProcedure
     .input(z.object({ compilationId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();

@@ -4,6 +4,7 @@ import { getDefaultWorkspacePath } from "@shared/defaultWorkspace";
 describe("default workspace routing", () => {
   it("routes an Aperture stakeholder to Capital Aperture at the root", () => {
     expect(getDefaultWorkspacePath("admin", "capital_aperture")).toBe("/aperture");
+    expect(getDefaultWorkspacePath("capital_operator", "capital_aperture_trader")).toBe("/aperture");
   });
 
   it("retains Command Center as the default for ordinary users", () => {

@@ -20,7 +20,7 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin", "investor", "insurance"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "admin", "investor", "insurance", "capital_operator"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -786,7 +786,7 @@ export const inviteTokens = mysqlTable("invite_tokens", {
   // Cryptographically random token (32-byte hex)
   token: varchar("token", { length: 64 }).notNull().unique(),
   // Role to assign when the invite is consumed
-  assignRole: mysqlEnum("assign_role", ["user", "admin", "investor", "insurance"]).notNull(),
+  assignRole: mysqlEnum("assign_role", ["user", "admin", "investor", "insurance", "capital_operator"]).notNull(),
   // Optional label for the admin to identify the invite (e.g. "NY Life — John Smith")
   label: varchar("label", { length: 256 }),
   // Optional email to pre-fill / restrict to a specific recipient
@@ -1013,7 +1013,7 @@ export type InsertRipplePipelineJob = typeof ripplePipelineJobs.$inferInsert;
 // the Admin Panel. Changes take effect immediately on next nav render.
 export const roleModulePermissions = mysqlTable("role_module_permissions", {
   id: int("id").autoincrement().primaryKey(),
-  role: mysqlEnum("role", ["admin", "investor", "insurance", "user"]).notNull(),
+  role: mysqlEnum("role", ["admin", "investor", "insurance", "user", "capital_operator"]).notNull(),
   moduleKey: varchar("module_key", { length: 64 }).notNull(),
   enabled: boolean("enabled").default(true).notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

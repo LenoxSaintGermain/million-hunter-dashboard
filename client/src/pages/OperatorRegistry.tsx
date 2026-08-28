@@ -35,12 +35,14 @@ type AccessRequest = {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const ROLE_COLORS: Record<string, string> = {
   admin: "border-amber-500/40 bg-amber-500/10 text-amber-700",
+  capital_operator: "border-emerald-600/40 bg-emerald-600/10 text-emerald-700",
   user: "border-emerald-600/40 bg-emerald-600/10 text-emerald-700",
   investor: "border-blue-600/40 bg-blue-600/10 text-blue-700",
   insurance: "border-purple-600/40 bg-purple-600/10 text-purple-700",
 };
 const ROLE_LABELS: Record<string, string> = {
   admin: "ADMIN",
+  capital_operator: "CAPITAL OPERATOR",
   user: "OPERATOR",
   investor: "INVESTOR",
   insurance: "INSURANCE",
@@ -178,6 +180,7 @@ function OperatorCard({ user, onRoleChange }: {
             }}
           >
             <option value="user">Operator</option>
+            <option value="capital_operator">Capital Operator</option>
             <option value="investor">Investor</option>
             <option value="admin">Admin</option>
             <option value="insurance">Insurance</option>
@@ -318,7 +321,7 @@ export default function OperatorRegistry() {
   const userList = users as unknown as UserRow[];
   const reqList = accessRequests as unknown as AccessRequest[];
   const totalOperators = userList.length;
-  const activeOperators = userList.filter(u => u.role === "user" || u.role === "admin").length;
+  const activeOperators = userList.filter(u => u.role === "user" || u.role === "admin" || u.role === "capital_operator").length;
   const investors = userList.filter(u => u.role === "investor").length;
   const pendingProtocols = reqList.filter(r => r.status === "pending").length;
 
