@@ -201,9 +201,14 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
         canonicalThesisId: activeCanonicalId,
         capitalThesisId: projection.id,
         accountId: paperAccount.id,
-        decisionRunId: runway?.latest?.authority === "authoritative" && runway.latest.runId != null
+        // `runId` is the optional provider-backed research run. Conditional and
+        // cash receipts do not have one, but they still belong to a durable
+        // Decision Run and revisions must append to that run. Requiring
+        // `runId` here silently opened a second v1 receipt instead of revising
+        // the existing conditional decision.
+        decisionRunId: runway?.latest?.authority === "authoritative"
           && runway.latest.canonicalThesisId === activeCanonicalId && runway.latest.capitalThesisId === projection.id && runway.latest.accountId === paperAccount.id
-          ? runway.latest.id : null,
+          ? runway.latest.decisionRunId : null,
         branch,
         missionSource: missionDirty ? "edited" : "assigned",
         objective,
