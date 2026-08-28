@@ -225,3 +225,48 @@ Both operators independently complete:
 - responsive and accessibility evidence;
 - explicit order-activity statement;
 - remaining usability, provenance, and data-continuity risks.
+
+## 9. First-demo discovery extension — Jim and partner
+
+**Added:** 2026-08-28
+
+**Evidence limitation:** The source notes do not attribute individual statements. Treat the feedback as joint until either operator confirms otherwise. Do not infer that Jim and his partner have different product roles.
+
+### Product interpretation
+
+Capital Aperture is being hired as a mobile decision-underwriting layer, not a charting terminal or autonomous trader. The operator should see what needs attention, why it matters, what remains uncertain, the bounded risk, and one allowed next action. Evidence and technical detail remain one deliberate action away.
+
+The two users share the `Capital Operator` capability set but must have separate owner identities, sessions, review attribution, and timestamps. Same role never means shared credentials or a shared audit actor.
+
+### Safe translation of demo requests
+
+| Demo language | Required implementation meaning |
+| --- | --- |
+| Fidelity positions | Start with a redacted, previewed manual import into an isolated manual paper account. Do not promise direct Fidelity connectivity. Always show source and freshness. |
+| `$500 test budget` | A **virtual $500 paper allocation/risk envelope**, never funded capital or broker authorization. |
+| Top five live items | At most five current paper-research decisions plus cash/no-trade, each with feed basis and as-of time. `Live` must not imply verified real-time data. |
+| Order snapshot | A non-executable draft paper-plan snapshot. No brokerage order queue or implied submission. |
+| Trigger alert and approval | A trigger-to-decision packet that can record review, defer, skip, cash, or preparation of a paper draft. It cannot create, approve, or submit an order. |
+| Manual execution first | Execution remains outside Capital Aperture. The product may later reconcile a manually supplied outcome with provenance. |
+| Small-budget delegation after performance | A future governance discussion only. Paper results do not authorize live capital or establish live-market performance. |
+
+For the next demo, the strict zero-order UAT boundary in this addendum governs. Any later paper-order pilot or real-money phase requires a separate explicit authorization and contract.
+
+### Prioritized acceptance tests
+
+1. **Zero-order invariant.** From either operator identity, alerts, reviews, play selection, and paper-plan preparation create zero broker calls and zero order rows. The `$500` amount is visibly virtual.
+2. **Mobile top-five triage.** At 375px, show no more than five decisions plus cash/no-trade. Each item exposes status, trigger, freshness, primary blocker, risk/invalidation, and one next action without horizontal overflow or candlestick noise.
+3. **Trigger-to-decision packet.** Demonstrate one supported trigger and one stale/unknown trigger. Each packet shows what changed, source/as-of time, preliminary research, thesis effect, uncertainty, risk, invalidation, and human choices. Missing evidence yields `Needs evidence` or `Hold`, never actionable certainty.
+4. **Fidelity manual-import fallback.** With a sanitized representative export, preview column mapping, accepted/rejected rows, unsupported assets, source date, and totals before writing. Import only to an isolated manual paper account. Never silently drop, duplicate, or replace positions.
+5. **Separate audit identities.** Jim and his partner authenticate separately with equivalent Capital Operator permissions. Review, defer, skip, cash, and draft-preparation events retain the correct actor and timestamp. No shared session or cross-owner leakage.
+
+### Questions to resolve before the next build slice
+
+- What should qualify for the top five: held positions, new triggers, pending decisions, or a weighted mix?
+- What must fit on the first mobile screen to choose review, defer, skip, or cash?
+- Which trigger rules matter first, and what should happen when data is stale, delayed, or contradictory?
+- During this paper-only phase, what should `Approve` record: a research decision, a paper-plan draft, or another non-broker action?
+- Where would manual execution occur, and which outcome fields should be recorded back in Capital Aperture?
+- Can the operators provide a redacted Fidelity export, and which account and asset types must be supported?
+- What should be shared between the two operator identities, and what should remain private or separately attributable?
+- Which alert channels, quiet hours, and escalation rules are preferred?

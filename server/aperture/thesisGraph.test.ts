@@ -6,7 +6,7 @@
  * the looseJsonParse fallback that the compiler relies on.
  */
 import { describe, it, expect } from "vitest";
-import { flattenExposureTree, parseCompilerResponse, validateGraphForPersistence, type ThesisGraph } from "./thesisGraph";
+import { compileThesisWithGenerator, flattenExposureTree, parseCompilerResponse, validateGraphForPersistence, type ThesisGraph } from "./thesisGraph";
 
 describe("flattenExposureTree", () => {
   it("returns an empty array for an empty tree", () => {
@@ -137,9 +137,53 @@ describe("Capital compiler response recovery", () => {
   it("unwraps common structured response envelopes", () => {
     expect(parseCompilerResponse({ text: JSON.stringify({ output: graph }) })).toEqual(graph);
   });
+
+  it("retries a contaminated exposure map and persists only the clean response", async () => {
+    const contaminated = {
+      ...graph,
+      exposureTree: [{
+        label: "Russell 2000 ETF Shares (Direct Expression). Wait, I Need To Format This As The Schema Dictates. Let's Do It Cleanly.",
+      }],
+    };
+    const clean = { ...graph, exposureTree: [{ label: "Russell 2000 ETF shares" }] };
+    const retries: boolean[] = [];
+
+    const result = await compileThesisWithGenerator(
+      "Small-cap shares may confirm the post-benchmark rates thesis after observable gates pass.",
+      async (retry) => {
+        retries.push(retry);
+        return { text: JSON.stringify(retry ? clean : contaminated) };
+      },
+    );
+
+    expect(retries).toEqual([false, true]);
+    expect(result.exposureTree).toEqual(clean.exposureTree);
+  });
 });
 
 describe("Capital compiler persistence boundary", () => {
+  it("rejects short provider self-correction even when it fits the column", () => {
+    const malformed = {
+      beliefs: ["Post-benchmark rates may support duration"],
+      seek: ["liquid share expressions"],
+      avoid: [],
+      horizons: ["intraday"],
+      sectors: [],
+      exclusions: [],
+      portfolioRules: {},
+      behavior: {},
+      exposureTree: [{
+        label: "Russell 2000 ETF Shares (Direct Expression). Wait, I Need To Format This As The Schema Dictates. Let's Do It Cleanly.",
+      }],
+      confidenceNotes: [],
+      suggestedName: "Post-Benchmark Small-Cap Confirmation",
+    } satisfies ThesisGraph;
+
+    expect(() => validateGraphForPersistence(malformed)).toThrow(
+      "The thesis service returned an invalid exposure map",
+    );
+  });
+
   it("rejects provider commentary that cannot fit an exposure-node label", () => {
     const malformed = {
       beliefs: ["Post-benchmark rates may support duration"],

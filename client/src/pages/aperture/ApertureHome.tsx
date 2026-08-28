@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { formatDistanceToNow } from "date-fns";
 import { buildResearchJourneys } from "@shared/runWorkspace";
+import { canonicalThesisLabel } from "@shared/canonicalThesisLabel";
 import { addDaysToEasternDate, easternDateTimeInputFromEpoch, easternDateTimeInputToEpoch } from "@shared/easternMarketTime";
 import { DailyPlayList } from "@/components/aperture/DailyPlayList";
 import { DecisionRunway } from "@/components/aperture/DecisionRunway";
@@ -317,7 +318,7 @@ export default function ApertureHome() {
                         {theses?.map((t) => (
                           <SelectItem key={t.id} value={t.id.toString()}>
                             {t.name ?? `Thesis #${t.id}`}
-                            {t.sourceCompilationId ? " · canonical" : " · legacy"}
+                            {t.sourceCompilationId ? ` · canonical v${t.sourceCompilationId}` : ` · legacy v${t.id}`}
                             {t.status !== "active" && (
                               <span className="ml-2 text-xs opacity-50">({t.status})</span>
                             )}
@@ -325,7 +326,7 @@ export default function ApertureHome() {
                         ))}
                         {unprojectedCanonicalTheses.map((thesis) => (
                           <SelectItem key={`canonical-${thesis.id}`} value={`canonical:${thesis.id}`}>
-                            {thesis.name ?? `Untitled Thesis #${thesis.id}`} · saved thesis
+                            {canonicalThesisLabel(thesis)} · saved thesis
                           </SelectItem>
                         ))}
                       </SelectContent>

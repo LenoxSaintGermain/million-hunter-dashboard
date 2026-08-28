@@ -109,20 +109,20 @@ const SCHEMA = {
       items: {
         type: "object" as const,
         properties: {
-          label: { type: "string" as const },
+          label: { type: "string" as const, maxLength: 120, description: "Short concrete noun phrase only; never include reasoning, schema commentary, or self-correction." },
           children: {
             type: "array" as const,
             items: {
               type: "object" as const,
               properties: {
-                label: { type: "string" as const },
+                label: { type: "string" as const, maxLength: 120, description: "Short concrete noun phrase only; never include reasoning, schema commentary, or self-correction." },
                 children: {
                   type: "array" as const,
                   items: {
                     type: "object" as const,
                     properties: {
-                      label: { type: "string" as const },
-                      children: { type: "array" as const, items: { type: "object" as const, properties: { label: { type: "string" as const } } } },
+                      label: { type: "string" as const, maxLength: 120, description: "Short concrete noun phrase only; never include reasoning, schema commentary, or self-correction." },
+                      children: { type: "array" as const, items: { type: "object" as const, properties: { label: { type: "string" as const, maxLength: 120, description: "Short concrete noun phrase only; never include reasoning, schema commentary, or self-correction." } } } },
                     },
                   },
                 },
@@ -222,6 +222,7 @@ export class ThesisCompileError extends Error {}
 const EXPOSURE_LABEL_MAX_CHARS = 160;
 const EXPOSURE_PATH_MAX_CHARS = 512;
 const EXPOSURE_NODE_MAX_COUNT = 256;
+const EXPOSURE_PROVIDER_META = /\b(?:wait[,;:]?\s+i\s+need|i\s+need\s+to\s+format|let['’]?s\s+(?:do|format|rewrite)|schema\s+dictates|format\s+this\s+as\s+the\s+schema|previous\s+response|return\s+(?:only|exactly)\s+(?:json|an?\s+json))\b/i;
 
 /**
  * Keep provider output inside the durable exposure-node contract before any
@@ -233,7 +234,8 @@ export function validateGraphForPersistence(graph: ThesisGraph): ThesisGraph {
   const invalid = rows.find((row) =>
     row.label.length > EXPOSURE_LABEL_MAX_CHARS
     || row.path.length > EXPOSURE_PATH_MAX_CHARS
-    || /[\r\n\t]/.test(row.label),
+    || /[\r\n\t]/.test(row.label)
+    || EXPOSURE_PROVIDER_META.test(row.label)
   );
   if (rows.length > EXPOSURE_NODE_MAX_COUNT || invalid) {
     throw new ThesisCompileError(
@@ -311,7 +313,12 @@ export function parseCompilerResponse(response: unknown): unknown {
 
 async function generateCompilerResponse(genai: GoogleGenAI, thesisText: string, retry = false) {
   const recovery = retry
-    ? "\n\nRECOVERY: Your previous response could not be parsed. Return exactly one JSON object matching the schema. Do not use markdown, prose, or code fences."
+    ? `\n\nRECOVERY: The previous response violated the durable exposure-map contract. Rewrite the entire object from scratch.
+- Return exactly one JSON object matching the schema; no markdown, prose, or code fences.
+- Every exposureTree label must be a concrete noun phrase of at most 120 characters.
+- Labels must never contain reasoning, self-correction, instructions, or commentary about formatting or the schema.
+- Use no more than four exposure-tree levels and 64 total nodes.
+- Do not truncate a thought into a label. Omit a node when it cannot be stated cleanly.`
     : "";
   return genai.models.generateContent({
     model: GEMINI_STRONG,
@@ -321,25 +328,29 @@ async function generateCompilerResponse(genai: GoogleGenAI, thesisText: string, 
     config: {
       responseMimeType: "application/json",
       responseSchema: SCHEMA as any,
-      temperature: 0.2,
-      maxOutputTokens: 8192,
+      temperature: retry ? 0 : 0.2,
+      maxOutputTokens: 4096,
     },
   });
 }
 
-/** Compile free text into a Thesis Graph. */
-export async function compileThesis(thesisText: string): Promise<ThesisGraph> {
+type CompilerGenerator = (retry: boolean) => Promise<unknown>;
+
+/**
+ * Run the persistence-safe compiler loop against an injected provider seam.
+ * Exported so malformed-first-response recovery is regression-testable without
+ * a network call or provider key.
+ */
+export async function compileThesisWithGenerator(
+  thesisText: string,
+  generate: CompilerGenerator,
+): Promise<ThesisGraph> {
   if (!thesisText || thesisText.trim().length < 20) {
     throw new ThesisCompileError("A thesis needs at least a sentence or two to compile.");
   }
-  if (!process.env.GEMINI_API_KEY) {
-    throw new ThesisCompileError("GEMINI_API_KEY is not configured — the thesis compiler cannot run.");
-  }
-
-  const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   const compileResponse = async (retry: boolean) => validateGraphForPersistence(
-    normalizeGraph(parseCompilerResponse(await generateCompilerResponse(genai, thesisText, retry))),
+    normalizeGraph(parseCompilerResponse(await generate(retry))),
   );
 
   let graph: ThesisGraph;
@@ -359,4 +370,20 @@ export async function compileThesis(thesisText: string): Promise<ThesisGraph> {
     );
   }
   return graph;
+}
+
+/** Compile free text into a Thesis Graph. */
+export async function compileThesis(thesisText: string): Promise<ThesisGraph> {
+  if (!thesisText || thesisText.trim().length < 20) {
+    throw new ThesisCompileError("A thesis needs at least a sentence or two to compile.");
+  }
+  if (!process.env.GEMINI_API_KEY) {
+    throw new ThesisCompileError("GEMINI_API_KEY is not configured — the thesis compiler cannot run.");
+  }
+
+  const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  return compileThesisWithGenerator(
+    thesisText,
+    (retry) => generateCompilerResponse(genai, thesisText, retry),
+  );
 }
