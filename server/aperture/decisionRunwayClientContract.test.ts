@@ -12,4 +12,17 @@ describe("Decision Runway client revision contract", () => {
     expect(source).toContain("? runway.latest.decisionRunId : null");
     expect(source).not.toMatch(/runway\.latest\.runId\s*!=\s*null/);
   });
+
+  it("keeps conditional gate review on the bound Decision Run editor", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "client/src/components/aperture/DecisionRunway.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain(
+      'if (immutableReceipt && !revisingReceipt && (latestBranch === "cash" || latestBranch === "conditional"))',
+    );
+    expect(source.match(/onGateReview=\{reviseReceipt\}/g)).toHaveLength(2);
+    expect(source).not.toContain("onGateReview={onNewResearch}");
+  });
 });
