@@ -137,3 +137,37 @@ export function extractCapitalMissionDefaults(rawText: string): CapitalMissionDe
     warnings,
   };
 }
+
+type StructuredCapitalMissionDefaults = {
+  holdingPeriod?: unknown;
+  instrumentPreference?: unknown;
+};
+
+const HOLDING_PERIODS: CapitalMissionHoldingPeriod[] = ["intraday", "overnight", "swing", "catalyst_window", "position"];
+const INSTRUMENTS: CapitalMissionInstrument[] = ["shares", "options", "either"];
+
+/**
+ * Resolve mission defaults without allowing narrative parsing to overwrite
+ * fields the operator already saved as structured thesis data.
+ */
+export function resolveCapitalMissionDefaults(
+  rawText: string,
+  structured?: StructuredCapitalMissionDefaults | null,
+): CapitalMissionDefaults {
+  const inferred = extractCapitalMissionDefaults(rawText);
+  const holdingPeriod = typeof structured?.holdingPeriod === "string"
+    && HOLDING_PERIODS.includes(structured.holdingPeriod as CapitalMissionHoldingPeriod)
+    ? structured.holdingPeriod as CapitalMissionHoldingPeriod
+    : inferred.holdingPeriod;
+  const instrumentPreference = typeof structured?.instrumentPreference === "string"
+    && INSTRUMENTS.includes(structured.instrumentPreference as CapitalMissionInstrument)
+    ? structured.instrumentPreference as CapitalMissionInstrument
+    : inferred.instrumentPreference;
+
+  return {
+    ...inferred,
+    holdingPeriod,
+    instrumentPreference,
+    source: holdingPeriod != null || instrumentPreference != null ? "declared" : inferred.source,
+  };
+}

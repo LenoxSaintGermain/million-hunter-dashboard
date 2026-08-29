@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractCapitalMissionDefaults } from "../../shared/capitalMissionDefaults";
+import { extractCapitalMissionDefaults, resolveCapitalMissionDefaults } from "../../shared/capitalMissionDefaults";
 
 const conciseTltThesis = `Paper-only short-term thesis for Friday, August 28, 2026: research a long TLT share play only after the BLS Current Employment Statistics preliminary benchmark revision at 10:00 a.m. ET. Do not predict the release and do not enter before 10:15.
 
@@ -43,5 +43,16 @@ describe("Capital Mission defaults", () => {
 
     expect(defaults.outcomeReviewAt).toBe(Date.UTC(2026, 7, 28, 19, 45));
     expect(defaults.holdingPeriod).toBe("intraday");
+  });
+
+  it("prefers first-class operator structure over narrative re-inference", () => {
+    const defaults = resolveCapitalMissionDefaults(
+      "Research defined-risk options in a named catalyst window as a multi-week position study.",
+      { holdingPeriod: "position", instrumentPreference: "options" },
+    );
+
+    expect(defaults.holdingPeriod).toBe("position");
+    expect(defaults.instrumentPreference).toBe("options");
+    expect(defaults.source).toBe("declared");
   });
 });

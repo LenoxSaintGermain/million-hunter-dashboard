@@ -98,7 +98,7 @@ import {
   rankMissionLibrary,
 } from "./aperture/decisionRunway";
 import { immutableReceiptBindingIssue } from "./aperture/decisionReceiptBinding";
-import { extractCapitalMissionDefaults } from "../shared/capitalMissionDefaults";
+import { resolveCapitalMissionDefaults } from "../shared/capitalMissionDefaults";
 import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -418,9 +418,29 @@ export const apertureRouter = router({
       const rows = await db!.select().from(capitalTheses)
         .where(eq(capitalTheses.userId, ctx.user.id))
         .orderBy(desc(capitalTheses.updatedAt));
+      const sourceIds = rows
+        .map((row) => row.sourceCompilationId)
+        .filter((id): id is number => typeof id === "number");
+      const canonicalSources = sourceIds.length
+        ? await db!.select({ id: thesisCompilations.id, compiledFilters: thesisCompilations.compiledFilters })
+          .from(thesisCompilations)
+          .where(and(eq(thesisCompilations.userId, ctx.user.id), inArray(thesisCompilations.id, sourceIds)))
+        : [];
+      const canonicalById = new Map(canonicalSources.map((source) => [source.id, source]));
       return rows.map((row) => {
         const normalized = normalizeCapitalThesisRead(row);
-        return { ...normalized, missionDefaults: extractCapitalMissionDefaults(normalized.rawText) };
+        const compiledFilters = row.sourceCompilationId == null
+          ? null
+          : canonicalById.get(row.sourceCompilationId)?.compiledFilters;
+        return {
+          ...normalized,
+          missionDefaults: resolveCapitalMissionDefaults(
+            normalized.rawText,
+            compiledFilters && typeof compiledFilters === "object"
+              ? compiledFilters as Record<string, unknown>
+              : null,
+          ),
+        };
       });
     }),
 
