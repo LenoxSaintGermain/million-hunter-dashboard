@@ -11,7 +11,7 @@
  * so the contract is visible in the server code too.
  */
 import { z } from "zod";
-import { eq, and, inArray, gte, lt, sql, asc, isNull } from "drizzle-orm";
+import { eq, and, or, inArray, gte, lt, sql, asc, isNull } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { getDb } from "./db";
 import {
@@ -224,6 +224,18 @@ async function readImmutableDecisionReceipt(
     db.select({ id: portfolioAccounts.id, label: portfolioAccounts.label, isPaper: portfolioAccounts.isPaper }).from(portfolioAccounts).where(and(eq(portfolioAccounts.id, decisionRun.accountId), eq(portfolioAccounts.userId, userId))).limit(1),
   ]);
   if (!canonical || !projection || projection.sourceCompilationId !== canonical.id || !account?.isPaper) receiptBindingUnavailable();
+  const [cashOutcome] = revision.effectiveBranch === "cash"
+    ? await db.select({
+      status: aperturePendingOutcomes.status,
+      result: aperturePendingOutcomes.result,
+      resolvedAt: aperturePendingOutcomes.resolvedAt,
+    }).from(aperturePendingOutcomes).where(and(
+      eq(aperturePendingOutcomes.userId, userId),
+      eq(aperturePendingOutcomes.decisionRunId, decisionRun.id),
+      eq(aperturePendingOutcomes.revisionId, revision.id),
+      eq(aperturePendingOutcomes.kind, "play_outcome"),
+    )).orderBy(desc(aperturePendingOutcomes.updatedAt)).limit(1)
+    : [undefined];
   return {
     ...revision,
     id: decisionRun.id,
@@ -235,6 +247,7 @@ async function readImmutableDecisionReceipt(
     canonicalThesisId: decisionRun.canonicalThesisId,
     capitalThesisId: decisionRun.capitalThesisId,
     lifecycle: decisionRun.lifecycle,
+    cashOutcome: cashOutcome?.status === "resolved" ? cashOutcome : null,
     authority: "authoritative" as const,
     binding: {
       ownerId: decisionRun.userId,
@@ -1097,13 +1110,78 @@ export const apertureRouter = router({
           eq(aperturePendingOutcomes.revisionId, apertureDecisionRevisions.id),
           eq(aperturePendingOutcomes.decisionRunId, apertureDecisionRevisions.decisionRunId),
         ))
-        .leftJoin(thesisCompilations, eq(apertureDecisionRuns.canonicalThesisId, thesisCompilations.id))
+        .innerJoin(thesisCompilations, and(
+          eq(apertureDecisionRuns.canonicalThesisId, thesisCompilations.id),
+          eq(thesisCompilations.userId, ctx.user.id),
+        ))
         .where(and(
           eq(aperturePendingOutcomes.userId, ctx.user.id),
+          eq(apertureDecisionRuns.userId, ctx.user.id),
           inArray(aperturePendingOutcomes.status, ["pending", "due"]),
         ))
         .orderBy(asc(aperturePendingOutcomes.dueAt));
     }),
+    resolveCashOutcome: capitalOperatorProcedure
+      .input(z.object({
+        pendingOutcomeId: z.number().positive(),
+        outcome: z.enum(["cash_remained_correct", "cash_too_early", "cash_too_conservative", "inconclusive"]),
+        note: z.string().trim().min(10).max(2_000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const now = Date.now();
+        return db!.transaction(async (tx) => {
+          const [row] = await tx.select({
+            pending: aperturePendingOutcomes,
+            branch: apertureDecisionRevisions.effectiveBranch,
+            currentRevisionId: apertureDecisionRuns.currentRevisionId,
+          }).from(aperturePendingOutcomes)
+            .innerJoin(apertureDecisionRuns, eq(aperturePendingOutcomes.decisionRunId, apertureDecisionRuns.id))
+            .innerJoin(apertureDecisionRevisions, and(
+              eq(aperturePendingOutcomes.revisionId, apertureDecisionRevisions.id),
+              eq(aperturePendingOutcomes.decisionRunId, apertureDecisionRevisions.decisionRunId),
+            ))
+            .where(and(
+              eq(aperturePendingOutcomes.id, input.pendingOutcomeId),
+              eq(aperturePendingOutcomes.userId, ctx.user.id),
+              eq(apertureDecisionRuns.userId, ctx.user.id),
+            )).for("update").limit(1);
+          if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "The cash look-back is unavailable." });
+          if (row.pending.kind !== "play_outcome" || row.branch !== "cash") {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only a bound cash outcome can be resolved here." });
+          }
+          if (!(["pending", "due"] as string[]).includes(row.pending.status)) {
+            throw new TRPCError({ code: "CONFLICT", message: "This cash look-back is already closed or superseded." });
+          }
+          if (now < row.pending.dueAt) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The declared cash look-back has not arrived yet." });
+          }
+          await tx.update(aperturePendingOutcomes).set({
+            status: "resolved",
+            result: {
+              decision: "cash",
+              outcome: input.outcome,
+              note: input.note,
+              recordedByUserId: ctx.user.id,
+              recordedAt: now,
+            },
+            resolvedAt: now,
+            updatedAt: now,
+          }).where(and(
+            eq(aperturePendingOutcomes.id, row.pending.id),
+            inArray(aperturePendingOutcomes.status, ["pending", "due"]),
+          ));
+          if (row.currentRevisionId === row.pending.revisionId) {
+            await tx.update(apertureDecisionRuns).set({ lifecycle: "closed", closedAt: now, updatedAt: now })
+              .where(and(
+                eq(apertureDecisionRuns.id, row.pending.decisionRunId),
+                eq(apertureDecisionRuns.userId, ctx.user.id),
+                eq(apertureDecisionRuns.currentRevisionId, row.pending.revisionId),
+              ));
+          }
+          return { resolved: true, decisionRunId: row.pending.decisionRunId, revisionId: row.pending.revisionId };
+        });
+      }),
     library: capitalOperatorProcedure
       .input(z.object({
         canonicalThesisId: z.number().nullable().optional(),
@@ -1742,14 +1820,115 @@ export const apertureRouter = router({
     }),
   }),
 
+  // ── Cross-run operator desk ─────────────────────────────────────────────
+  // Read-only lifecycle summary. This intentionally composes existing durable
+  // records; it does not create proposals, orders, monitoring rows, or outcomes.
+  desk: router({
+    summary: capitalOperatorProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      const orderRows = await db!.select({
+        id: brokerOrders.id,
+        runId: brokerOrders.runId,
+        candidateId: brokerOrders.candidateId,
+        accountId: brokerOrders.accountId,
+        accountLabel: portfolioAccounts.label,
+        thesisName: capitalTheses.name,
+        symbol: brokerOrders.symbol,
+        instrumentType: brokerOrders.instrumentType,
+        underlyingSymbol: brokerOrders.underlyingSymbol,
+        optionExpirationDate: brokerOrders.optionExpirationDate,
+        optionStrikePriceCents: brokerOrders.optionStrikePriceCents,
+        side: brokerOrders.side,
+        intent: brokerOrders.intent,
+        qty: brokerOrders.qty,
+        filledQty: brokerOrders.filledQty,
+        notionalCents: brokerOrders.notionalCents,
+        plannedRiskCents: brokerOrders.plannedRiskCents,
+        status: brokerOrders.status,
+        brokerOrderId: brokerOrders.brokerOrderId,
+        dispatchError: brokerOrders.dispatchError,
+        timeStopAt: brokerOrders.timeStopAt,
+        createdAt: brokerOrders.createdAt,
+        updatedAt: brokerOrders.updatedAt,
+      }).from(brokerOrders)
+        .innerJoin(apertureRuns, eq(brokerOrders.runId, apertureRuns.id))
+        .leftJoin(capitalTheses, eq(apertureRuns.thesisId, capitalTheses.id))
+        .innerJoin(portfolioAccounts, eq(brokerOrders.accountId, portfolioAccounts.id))
+        .where(and(
+          eq(brokerOrders.userId, ctx.user.id),
+          eq(portfolioAccounts.userId, ctx.user.id),
+          eq(apertureRuns.userId, ctx.user.id),
+          eq(capitalTheses.userId, ctx.user.id),
+          or(
+            inArray(brokerOrders.status, ["pending_approval", "approved", "submitted"]),
+            eq(brokerOrders.status, "filled"),
+          ),
+        ))
+        .orderBy(desc(brokerOrders.updatedAt));
+
+      const exposureKey = (order: typeof orderRows[number]) => [
+        order.accountId,
+        order.symbol,
+        order.instrumentType,
+        order.underlyingSymbol ?? "",
+        order.optionExpirationDate ?? "",
+        order.optionStrikePriceCents ?? "",
+      ].join(":");
+      const filledExposure = new Map<string, { netQty: number; latestOpenId: number | null; latestOpenAt: number }>();
+      for (const order of orderRows) {
+        if (order.status !== "filled" || (order.intent !== "open" && order.intent !== "close")) continue;
+        const key = exposureKey(order);
+        const state = filledExposure.get(key) ?? { netQty: 0, latestOpenId: null, latestOpenAt: -1 };
+        const filledQty = Math.abs(order.filledQty ?? order.qty ?? 1);
+        state.netQty += order.intent === "close" ? -filledQty : filledQty;
+        if (order.intent === "open" && order.updatedAt >= state.latestOpenAt) {
+          state.latestOpenId = order.id;
+          state.latestOpenAt = order.updatedAt;
+        }
+        filledExposure.set(key, state);
+      }
+      const orders = orderRows.filter((order) => {
+        if (order.status !== "filled") return true;
+        if (order.intent !== "open") return false;
+        const state = filledExposure.get(exposureKey(order));
+        return Boolean(state && state.netQty > 0 && state.latestOpenId === order.id);
+      });
+
+      const activePlays = await db!.select({
+        id: apertureActivePlayContexts.id,
+        accountId: apertureActivePlayContexts.accountId,
+        accountLabel: portfolioAccounts.label,
+        symbol: apertureActivePlayContexts.symbol,
+        instrumentType: apertureActivePlayContexts.instrumentType,
+        status: apertureActivePlayContexts.status,
+        thesisNote: apertureActivePlayContexts.thesisNote,
+        horizon: apertureActivePlayContexts.horizon,
+        asOf: apertureActivePlayContexts.asOf,
+        updatedAt: apertureActivePlayContexts.updatedAt,
+      }).from(apertureActivePlayContexts)
+        .innerJoin(portfolioAccounts, eq(apertureActivePlayContexts.accountId, portfolioAccounts.id))
+        .where(and(
+          eq(apertureActivePlayContexts.userId, ctx.user.id),
+          eq(portfolioAccounts.userId, ctx.user.id),
+          inArray(apertureActivePlayContexts.status, ["watching", "active"]),
+        ))
+        .orderBy(desc(apertureActivePlayContexts.updatedAt))
+        .limit(200);
+
+      return { orders, activePlays };
+    }),
+  }),
+
   run: router({
     list: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const rows = await db!.select({ run: apertureRuns, thesisName: capitalTheses.name }).from(apertureRuns)
-        .leftJoin(capitalTheses, eq(apertureRuns.thesisId, capitalTheses.id))
+        .leftJoin(capitalTheses, and(
+          eq(apertureRuns.thesisId, capitalTheses.id),
+          eq(capitalTheses.userId, ctx.user.id),
+        ))
         .where(eq(apertureRuns.userId, ctx.user.id))
-        .orderBy(desc(apertureRuns.createdAt))
-        .limit(20);
+        .orderBy(desc(apertureRuns.createdAt));
       const runIds = rows.map(({ run }) => run.id);
       if (!runIds.length) return [];
       const candidateRows = await db!.select().from(apertureCandidates)

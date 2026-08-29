@@ -10,6 +10,7 @@ export type CapitalMissionDefaults = {
   holdingPeriod: CapitalMissionHoldingPeriod | null;
   instrumentPreference: CapitalMissionInstrument | null;
   catalystAt: number | null;
+  catalystLabel: string | null;
   eligibilityReviewAt: number | null;
   outcomeReviewAt: number | null;
   source: "declared" | "unknown";
@@ -62,6 +63,23 @@ function firstTime(text: string, patterns: RegExp[]): RegExpMatchArray | null {
   return null;
 }
 
+function declaredCatalystLabel(text: string): string | null {
+  const protectedTimes = text
+    .replace(/\ba\.m\./gi, (value) => value.replace(/\./g, "__DOT__"))
+    .replace(/\bp\.m\./gi, (value) => value.replace(/\./g, "__DOT__"));
+  const catalystLanguage = /\bcatalyst\b|\b(?:revision|ruling|regulation|regulatory|football season|nfl season|season opener|kickoff)\b|\b(?:report|announcement|release|decision|earnings)\b[^.!?]{0,80}\b(?:scheduled|due|catalyst|window|at\s+\d{1,2}|on\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?))\b/i;
+  const negatedCatalyst = /\b(?:no|not|without|avoid(?:s|ed|ing)?|exclude(?:s|d|ing)?|lacks?|missing|unknown|unverified|undeclared)\b[^.!?]{0,64}\b(?:catalyst|revision|report|announcement|ruling|regulation|regulatory|release|decision|football season|nfl season|season opener|kickoff|earnings)\b|\b(?:catalyst|revision|report|announcement|ruling|regulation|regulatory|release|decision|football season|nfl season|season opener|kickoff|earnings)\b[^.!?]{0,48}\b(?:not|avoid(?:s|ed|ing)?|exclude(?:s|d|ing)?|missing|unknown|unverified|undeclared)\b/i;
+  const declarations = protectedTimes
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.replace(/__DOT__/g, ".").trim().replace(/[.!?]+$/, ""))
+    .filter((sentence) => sentence.length > 0
+      && !/^(?:do not|don't|never|no\b|avoid\b|exclude\b)/i.test(sentence)
+      && !negatedCatalyst.test(sentence)
+      && catalystLanguage.test(sentence));
+
+  return declarations.length > 0 ? declarations.slice(0, 2).join(" · ") : null;
+}
+
 /**
  * Extract only terms the operator explicitly declared in the thesis. This is a
  * deterministic bridge into Capital Mission, not a model-generated forecast.
@@ -78,6 +96,7 @@ export function extractCapitalMissionDefaults(rawText: string): CapitalMissionDe
   const catalystAt = timeOnDate(date, firstTime(text, [
     /(?:revision|release|report|announcement|decision|catalyst)\s+(?:is\s+)?(?:at|due at|scheduled for)\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\s*(?:ET|Eastern)?/i,
   ]));
+  const catalystLabel = declaredCatalystLabel(text);
   const eligibilityReviewAt = timeOnDate(date, firstTime(text, [
     /(?:do not enter|no entry|wait|eligible|eligibility)[^.!?]{0,60}?before\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?/i,
     /(?:review|verify|recheck)\s+(?:at|after)\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?/i,
@@ -116,11 +135,14 @@ export function extractCapitalMissionDefaults(rawText: string): CapitalMissionDe
     holdingPeriod,
     instrumentPreference,
     catalystAt,
+    catalystLabel,
     eligibilityReviewAt,
     outcomeReviewAt,
   ].some((value) => value != null);
   const warnings: string[] = [];
-  if (!date && !catalystAt && !eligibilityReviewAt && !outcomeReviewAt) {
+  if (catalystLabel && !catalystAt) {
+    warnings.push("Catalyst was declared, but its date and time were not normalized.");
+  } else if (!date && !catalystAt && !eligibilityReviewAt && !outcomeReviewAt) {
     warnings.push("No dated catalyst or review point was declared.");
   }
 
@@ -131,6 +153,7 @@ export function extractCapitalMissionDefaults(rawText: string): CapitalMissionDe
     holdingPeriod,
     instrumentPreference,
     catalystAt,
+    catalystLabel,
     eligibilityReviewAt,
     outcomeReviewAt,
     source: hasDeclaredValue ? "declared" : "unknown",

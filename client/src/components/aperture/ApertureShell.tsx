@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { BookOpen, FileSearch, FileText, Landmark, LayoutDashboard, Route, Wallet } from "lucide-react";
+import { BookOpen, FileSearch, FileText, Landmark, LayoutDashboard, ListTodo, Route, Wallet } from "lucide-react";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { cn } from "@/lib/utils";
 import { CapitalCockpitRail } from "@/components/aperture/CapitalCockpitRail";
@@ -9,6 +9,7 @@ import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolate
 
 const APERTURE_NAV = [
   { href: "/aperture", label: "Decision Center", icon: LayoutDashboard },
+  { href: "/aperture/plays", label: "Play Desk", icon: ListTodo },
   { href: "/aperture/runs", label: "Research Journeys", icon: Route },
   { href: "/aperture/theses", label: "Saved theses", icon: BookOpen },
   { href: "/aperture/disclosures", label: "Disclosure plans", icon: FileSearch },
@@ -19,6 +20,7 @@ const APERTURE_NAV = [
 
 const TRADER_NAV = [
   { href: "/aperture", label: "Today", icon: LayoutDashboard },
+  { href: "/aperture/plays", label: "Play Desk", icon: ListTodo },
   { href: "/aperture/runs", label: "Follow-ups", icon: Route },
   { href: "/aperture/accounts", label: "Portfolio", icon: Wallet },
   { href: "/thesis", label: "Theses", icon: BookOpen },

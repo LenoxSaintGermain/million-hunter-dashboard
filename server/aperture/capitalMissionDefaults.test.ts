@@ -16,6 +16,7 @@ describe("Capital Mission defaults", () => {
       holdingPeriod: "intraday",
       instrumentPreference: "shares",
       catalystAt: Date.UTC(2026, 7, 28, 14, 0),
+      catalystLabel: "Paper-only short-term thesis for Friday, August 28, 2026: research a long TLT share play only after the BLS Current Employment Statistics preliminary benchmark revision at 10:00 a.m. ET",
       eligibilityReviewAt: Date.UTC(2026, 7, 28, 14, 15),
       outcomeReviewAt: Date.UTC(2026, 7, 28, 19, 45),
       source: "declared",
@@ -31,6 +32,7 @@ describe("Capital Mission defaults", () => {
       holdingPeriod: null,
       instrumentPreference: null,
       catalystAt: null,
+      catalystLabel: null,
       eligibilityReviewAt: null,
       outcomeReviewAt: null,
       source: "unknown",
@@ -43,6 +45,31 @@ describe("Capital Mission defaults", () => {
 
     expect(defaults.outcomeReviewAt).toBe(Date.UTC(2026, 7, 28, 19, 45));
     expect(defaults.holdingPeriod).toBe("intraday");
+  });
+
+  it("preserves explicit catalyst language when no exact date or time can be normalized", () => {
+    const defaults = extractCapitalMissionDefaults(`The upcoming football season is the demand catalyst for public betting platforms. A new state regulation ruling could change market access. Research defined-risk options only.`);
+
+    expect(defaults.catalystAt).toBeNull();
+    expect(defaults.catalystLabel).toBe("The upcoming football season is the demand catalyst for public betting platforms · A new state regulation ruling could change market access");
+    expect(defaults.source).toBe("declared");
+    expect(defaults.warnings).toEqual(["Catalyst was declared, but its date and time were not normalized."]);
+  });
+
+  it("does not promote negated catalyst language into a declaration", () => {
+    const noEarnings = extractCapitalMissionDefaults("This thesis is not based on earnings. Research liquid shares only.");
+    const noRegulation = extractCapitalMissionDefaults("No regulatory catalyst has been declared. Preserve cash when evidence is missing.");
+    const excludedEarnings = extractCapitalMissionDefaults("Earnings are explicitly excluded. Research the football season demand effect instead.");
+    const avoidEarnings = extractCapitalMissionDefaults("Avoid earnings as a catalyst. Preserve cash unless the named regulation ruling is dated.");
+    const backgroundReport = extractCapitalMissionDefaults("Background reports describe historical betting demand. Research liquid shares only.");
+
+    expect(noEarnings.catalystLabel).toBeNull();
+    expect(noRegulation.catalystLabel).toBeNull();
+    expect(excludedEarnings.catalystLabel).toBe("Research the football season demand effect instead");
+    expect(avoidEarnings.catalystLabel).toBe("Preserve cash unless the named regulation ruling is dated");
+    expect(backgroundReport.catalystLabel).toBeNull();
+    expect(noEarnings.source).toBe("declared");
+    expect(noRegulation.source).toBe("unknown");
   });
 
   it("prefers first-class operator structure over narrative re-inference", () => {

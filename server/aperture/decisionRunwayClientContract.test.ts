@@ -35,6 +35,19 @@ describe("Decision Runway client revision contract", () => {
     expect(source).toContain(': easternDateTimeInputToEpoch(outcomeReviewAtInput);');
     expect(source).toContain('if (branch === "cash" && reviewAt == null)');
     expect(source).toContain('"Outcome look-back"');
+    expect(source.match(/setOutcomeReviewAtInput\(receipt\.branch === "cash" \? receiptReview : ""\)/g)).toHaveLength(2);
+  });
+
+  it("lets a due cash look-back close without opening a broker path", () => {
+    const client = readFileSync(resolve(process.cwd(), "client/src/components/aperture/DecisionRunway.tsx"), "utf8");
+    const router = readFileSync(resolve(process.cwd(), "server/apertureRouter.ts"), "utf8");
+
+    expect(client).toContain("Record the cash look-back");
+    expect(client).toContain("Cash look-back recorded");
+    expect(client).toContain("This never creates an order.");
+    expect(router).toContain("resolveCashOutcome: capitalOperatorProcedure");
+    expect(router).toContain('row.pending.kind !== "play_outcome" || row.branch !== "cash"');
+    expect(router).toContain('status: "resolved"');
   });
 
   it("preserves an edited or immutable mission when capital and horizon change", () => {

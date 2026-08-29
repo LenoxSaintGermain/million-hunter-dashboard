@@ -6,7 +6,7 @@ import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, ArrowLeft, ExternalLink, CheckCircle2, XCircle, SkipForward, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, ExternalLink, CheckCircle2, XCircle, SkipForward, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -89,11 +89,20 @@ export default function MemoDrawer() {
         )}
 
         {candidate.memoStatus === "skipped" && (
-          <div className="p-3 rounded-lg text-sm" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}>
+          <div className="p-4 rounded-lg text-sm" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", border: "1px solid var(--sh-border-1)" }}>
             <div className="flex items-center gap-2 mb-1 font-medium">
               <SkipForward className="h-4 w-4" /> Memo skipped
             </div>
             <p>{candidate.memoRejectReason ?? "Insufficient sourced facts to write a memo."}</p>
+            <p className="mt-2 text-xs leading-5">Nothing is ready to approve from this memo. Return to the evidence trail or move to the Play Desk to see the next human action.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {memoRunId ? <Button size="sm" variant="outline" onClick={() => navigate(`/aperture/run/${memoRunId}?view=evidence`)}>
+                Return to evidence <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </Button> : null}
+              <Button size="sm" onClick={() => navigate("/aperture/plays")}>
+                Open Play Desk <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         )}
 
