@@ -14,7 +14,7 @@ import { ResearchLedger } from "@/components/aperture/ResearchLedger";
 import { DecisionFocusCard } from "@/components/aperture/DecisionFocusCard";
 import { PlayRecipeCard } from "@/components/aperture/PlayRecipeCard";
 import { SetAsideHistory } from "@/components/aperture/SetAsideHistory";
-import { decisionPriority } from "@shared/decisionFocus";
+import { decisionPriority, describeCandidateRecommendation, rankResearchCandidates } from "@shared/decisionFocus";
 import { buildDecisionPath } from "@shared/decisionPath";
 import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
 
@@ -204,10 +204,11 @@ export default function CandidateBoard() {
   const roles: Array<Role | "all"> = ["all", "core", "complementary", "remainder", "alternative_expression"];
   const filtered = (activeRole === "all" ? candidates : candidates.filter((candidate) => candidate.role === activeRole))
     .slice().sort((a, b) => decisionPriority(b) - decisionPriority(a));
+  const researchRankedCandidates = rankResearchCandidates(candidates);
   const leadCandidate = candidates.find((candidate) => candidate.id === brief?.priorityCandidate?.id)
-    ?? candidates.slice().sort((a, b) => decisionPriority(b) - decisionPriority(a))[0];
+    ?? researchRankedCandidates[0];
   const candidateSequence = leadCandidate
-    ? [leadCandidate, ...candidates.filter((candidate) => candidate.id !== leadCandidate.id).slice().sort((a, b) => decisionPriority(b) - decisionPriority(a))]
+    ? [leadCandidate, ...researchRankedCandidates.filter((candidate) => candidate.id !== leadCandidate.id)]
     : [];
   const focusCandidate = candidateSequence.find((candidate) => candidate.id === selectedCandidateId) ?? leadCandidate;
   const focusIndex = focusCandidate ? candidateSequence.findIndex((candidate) => candidate.id === focusCandidate.id) : -1;
@@ -293,7 +294,7 @@ export default function CandidateBoard() {
                 <div className="min-w-0">
                   <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Your current recommendation</p>
                   <h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{paperStageDeclined ? `Preserve cash for ${focusCandidate.symbol} — the current evidence declined the paper stage.` : `Keep ${focusCandidate.symbol} in research — do not change the paper portfolio yet.`}</h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>The machine surfaced {focusCandidate.symbol} as the strongest current research lead for this brief. This is not a return forecast or trade instruction. {alreadyHeld ? `${focusCandidate.symbol} is already in the connected paper context, so any later proposal would review an existing exposure.` : `${focusCandidate.symbol} is not in the connected paper context, so any later proposal would be a new paper exposure.`}</p>
+                  <p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{describeCandidateRecommendation({ focusSymbol: focusCandidate.symbol, leadSymbol: leadCandidate?.symbol ?? focusCandidate.symbol, alreadyHeld })}</p>
                 </div>
                 <Badge variant="outline" className="shrink-0" style={{ color: paperStageDeclined ? "var(--sh-red)" : "var(--sh-signal)" }}>{paperStageDeclined ? "Paper stage declined" : paperProposalReady ? "Proposal can be prepared" : `${unreviewedChecks.length} review${unreviewedChecks.length === 1 ? "" : "s"} before proposal`}</Badge>
               </div>

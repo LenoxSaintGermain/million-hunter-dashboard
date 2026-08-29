@@ -6,6 +6,7 @@
  * thesis horizon → portfolio gap → evidence state → next human decision.
  */
 import { buildProgressiveEvidenceGate } from "@shared/evidenceGate";
+import { rankResearchCandidates } from "@shared/decisionFocus";
 
 export type DecisionCandidate = {
   id: number;
@@ -97,12 +98,7 @@ export function buildCapitalDecisionBrief(input: {
 }): CapitalDecisionBrief {
   const graph = input.graph ?? {};
   const horizonLabel = displayHorizon(graph.horizons);
-  const candidateOrder = [...input.candidates].sort((left, right) => {
-    const leftRole = left.role === "core" ? 1 : 0;
-    const rightRole = right.role === "core" ? 1 : 0;
-    if (leftRole !== rightRole) return rightRole - leftRole;
-    return ((right.compositeScore ?? 0) * (right.confidenceScore ?? 0)) - ((left.compositeScore ?? 0) * (left.confidenceScore ?? 0));
-  });
+  const candidateOrder = rankResearchCandidates(input.candidates);
   const priorityCandidate = candidateOrder[0] ?? null;
   const verificationCount = input.candidates.reduce((total, candidate) => total + verifyCount(candidate.verifyFields), 0);
   const lowConfidenceCount = input.candidates.filter((candidate) => (candidate.confidenceScore ?? 0) < 0.5).length;
