@@ -33,6 +33,22 @@ describe("Capital trading ontology", () => {
     expect(result.signals.find((signal) => signal.key === "vwap_hold")?.status).toBe("rejected");
   });
 
+  it("preserves defined-risk options intent instead of substituting shares", () => {
+    const result = buildOpeningRangeTradingOntology({
+      side: "short",
+      holdingPeriod: "position",
+      instrumentPreference: "options",
+      openingRange: { complete: false, minutes: null, unavailableReason: "Position research does not require an intraday opening range." },
+      vwapHold: null,
+      catalystDeadlineAt: 1_800_000_000_000,
+      now: 1_700_000_000_000,
+    });
+
+    expect(result.execution).toEqual({ direction: "short", strategy: "buy_put", instrument: "option" });
+    expect(result.horizon.key).toBe("position");
+    expect(result.marketPlay).toMatchObject({ family: "event", specificPlay: "thesis_catalyst_expression" });
+  });
+
   it("keeps an unmeasured opening range unclassified rather than inventing a setup", () => {
     const result = buildOpeningRangeTradingOntology({
       side: "long",

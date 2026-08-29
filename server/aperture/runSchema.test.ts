@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import mysql from "mysql2/promise";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const requiredRunColumns = [
   "holding_period",
@@ -8,6 +10,7 @@ const requiredRunColumns = [
   "max_single_name_pct",
   "invalidation_rule",
   "mandate_version",
+  "instrument_preference",
 ] as const;
 
 describe("Capital Brief run persistence schema", () => {
@@ -23,7 +26,11 @@ describe("Capital Brief run persistence schema", () => {
   });
 
   it("contains every short-horizon mandate column required by aperture.run.start", async () => {
-    if (!connection) return;
+    if (!connection) {
+      const schema = readFileSync(resolve(process.cwd(), "drizzle/schema.ts"), "utf8");
+      expect(schema).toContain('instrumentPreference: mysqlEnum("instrument_preference", ["shares", "options", "either"])');
+      return;
+    }
     const [rows] = await connection!.query<Array<{ COLUMN_NAME: string }>>(
       `SELECT COLUMN_NAME
        FROM INFORMATION_SCHEMA.COLUMNS

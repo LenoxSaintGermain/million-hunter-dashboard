@@ -707,6 +707,10 @@ export const thesisCompilations = mysqlTable("thesis_compilations", {
     businessAgeMin?: number;
     headcountMin?: number; headcountMax?: number;
     exclusions?: string[];
+    holdingPeriod?: "intraday" | "overnight" | "swing" | "catalyst_window" | "position" | null;
+    instrumentPreference?: "shares" | "options" | "either" | null;
+    researchSymbols?: string[];
+    capitalTradeDetails?: { belief?: string; seeks?: string; avoids?: string; horizon?: string; risk?: string };
   }>().default({}),
   scoringWeights: json("scoring_weights").$type<Array<{
     dimension: string; weight: number; isCustom: boolean;
@@ -1082,6 +1086,13 @@ export const capitalTheses = mysqlTable("capital_theses", {
       reservePct?: number;
     };
     behavior?: { researches?: number; shortlists?: number; executes?: number };
+    exposureTree?: Array<{ label: string; children?: any[] }>;
+    researchSymbols?: string[];
+    evidenceRequirements?: string[];
+    invalidationConditions?: string[];
+    instrumentPreference?: "shares" | "options" | "either" | null;
+    confidenceNotes?: string[];
+    suggestedName?: string;
   }>(),
   /** The compiler flagging its own ambiguous readings — never silently resolved. */
   confidenceNotes: json("confidence_notes").$type<string[]>().default([]),
@@ -1380,6 +1391,8 @@ export const apertureRuns = mysqlTable("aperture_runs", {
   // Null on runs created before the preset existed: pre-mandate, not gated.
   // See server/aperture/mandate.ts.
   holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window", "position"]),
+  /** Instrument intent is immutable per run; options may never silently become shares. */
+  instrumentPreference: mysqlEnum("instrument_preference", ["shares", "options", "either"]),
   /** When the thesis for this run expires. A short-horizon run without one is a hold. */
   catalystDeadlineAt: bigint("catalyst_deadline_at", { mode: "number" }),
   /** 30-day ADV floor in USD. May tighten the mandate floor, never loosen it. */

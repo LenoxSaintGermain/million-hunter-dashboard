@@ -139,6 +139,7 @@ export default function ApertureHome() {
   // authoritative and rejects anything looser, so tightening here is the only
   // thing this form can actually do.
   const [holdingPeriod, setHoldingPeriod] = useState("swing");
+  const [instrumentPreference, setInstrumentPreference] = useState<"shares" | "options" | "either">("either");
   const [liquidityFloor, setLiquidityFloor] = useState("20000000");
   const [maxSingleName, setMaxSingleName] = useState("10");
   const [catalystDeadline, setCatalystDeadline] = useState(() => defaultCatalystDeadline());
@@ -177,7 +178,12 @@ export default function ApertureHome() {
   });
   const [canonicalThesisId, setCanonicalThesisId] = useState<string>("");
   const projectCanonicalThesis = trpc.thesis.useInAperture.useMutation({
-    onSuccess: async ({ apertureThesisId, linked }) => {
+    onSuccess: async ({ apertureThesisId, linked, compilerStatus, missingFields, incompatibilities }) => {
+      if (compilerStatus === "needs_structure" || incompatibilities.length) {
+        toast.error("Complete the thesis structure before research", { description: [...missingFields, ...incompatibilities].join(" · ") });
+        navigate("/thesis?scope=capital");
+        return;
+      }
       await refetchTheses();
       setSelectedThesisId(apertureThesisId);
       setCanonicalThesisId("");
@@ -192,6 +198,7 @@ export default function ApertureHome() {
     if (!selectedThesisId) return toast.error("Select a thesis first");
     if (!deployable) return toast.error("Enter deployable capital");
     if (!holdingPeriod) return toast.error("Choose a holding period — it is part of the mandate");
+    if (instrumentPreference === "either") return toast.error("Choose shares or defined-risk options before research");
     if (!catalystDeadline) return toast.error("Set a catalyst deadline — a short-horizon run without one is a hold");
     if (!invalidationRule.trim()) return toast.error("State what would make this run wrong");
     const deadlineMs = easternDateTimeInputToEpoch(catalystDeadline);
@@ -203,6 +210,7 @@ export default function ApertureHome() {
       deployableCapitalCents: dollarsToCents(deployable),
       hurdleRateBps: undefined,
       holdingPeriod,
+      instrumentPreference,
       liquidityFloorAdvUsd: Math.round(parseFloat(liquidityFloor.replace(/[^0-9.]/g, "")) || 0),
       catalystDeadlineAt: deadlineMs,
       maxSingleNamePct: parseFloat(maxSingleName) || 0,
@@ -229,6 +237,13 @@ export default function ApertureHome() {
     (canonical) => !(theses ?? []).some((projection) => projection.sourceCompilationId === canonical.id),
   );
   const horizonGuidance = holdingPeriod ? HORIZON_GUIDANCE[holdingPeriod as keyof typeof HORIZON_GUIDANCE] : null;
+
+  useEffect(() => {
+    const declaredInstrument = selectedThesis?.graph?.instrumentPreference;
+    if (declaredInstrument === "shares" || declaredInstrument === "options" || declaredInstrument === "either") {
+      setInstrumentPreference(declaredInstrument);
+    }
+  }, [selectedThesis?.id, selectedThesis?.graph?.instrumentPreference]);
   const researchJourneys = buildResearchJourneys((runs ?? []) as any[]);
   const invalidationExamples = useMemo(() => [
     {
@@ -402,6 +417,13 @@ export default function ApertureHome() {
                     <Label className="pointer-events-none text-xs font-semibold">Safeguards are ready <span className="font-normal" style={{ color: "var(--sh-fg-muted)" }}>· review only if you want to customize them</span></Label>
                   </summary>
                   <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <FieldLabel inputId="instrument-preference" label="Instrument" help="The run keeps this choice through research, recipe construction, and the paper ticket. Options are never replaced with shares." />
+                      <Select value={instrumentPreference} onValueChange={(value) => setInstrumentPreference(value as "shares" | "options" | "either")}>
+                        <SelectTrigger id="instrument-preference"><SelectValue placeholder="Choose" /></SelectTrigger>
+                        <SelectContent><SelectItem value="shares">Shares only</SelectItem><SelectItem value="options">Defined-risk options</SelectItem><SelectItem value="either">Choose before research</SelectItem></SelectContent>
+                      </Select>
+                    </div>
                     <div className="space-y-1.5">
                       <FieldLabel inputId="holding-period" label="Holding Period" help="Choose how long the evidence is allowed to work. This determines when Aperture should stop researching the idea and ask for a new decision." />
                       <Select value={holdingPeriod} onValueChange={(period) => { setHoldingPeriod(period); setCatalystDeadline(defaultCatalystDeadline(period)); }}>

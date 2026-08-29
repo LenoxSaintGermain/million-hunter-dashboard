@@ -140,6 +140,7 @@ export interface ConstructPlayInput {
   symbol: string;
   side?: PlaySide;
   holdingPeriod: HoldingPeriod;
+  instrumentPreference?: "shares" | "options" | "either" | null;
   bars: MinuteBar[];
   vwap: SessionVwap;
   range: OpeningRange;
@@ -186,6 +187,7 @@ export function constructPlay(input: ConstructPlayInput): ConstructedPlay {
   const taxonomy = buildOpeningRangeTradingOntology({
     side,
     holdingPeriod: input.holdingPeriod,
+    instrumentPreference: input.instrumentPreference,
     openingRange: {
       complete: input.range.complete,
       minutes: input.range.minutes ?? null,

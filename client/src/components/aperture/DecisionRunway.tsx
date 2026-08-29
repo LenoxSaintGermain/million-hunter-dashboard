@@ -33,7 +33,7 @@ function displayMoney(value: string) {
 }
 
 function missionFor(thesis: string, capital: string, holding: HoldingPeriod) {
-  const horizon = holding === "intraday" ? "today" : holding === "overnight" ? "through the next close" : holding === "swing" ? "this week" : "inside the named catalyst window";
+  const horizon = holding === "intraday" ? "today" : holding === "overnight" ? "through the next close" : holding === "swing" ? "this week" : holding === "position" ? "for the long-term review window" : "inside the named catalyst window";
   const capitalPhrase = capital.trim() ? `$${displayMoney(capital)}` : "the capital available for this mission";
   return "Where can I best deploy " + capitalPhrase + " against my " + thesis + " thesis " + horizon + " without exceeding the planned-loss ceiling?";
 }
@@ -50,7 +50,7 @@ function formatCents(cents: number | null | undefined) {
 }
 
 function horizonLabel(holding: HoldingPeriod) {
-  return holding === "intraday" ? "Today / by close" : holding === "overnight" ? "Next close" : holding === "swing" ? "This week" : "Catalyst window";
+  return holding === "intraday" ? "Today / by close" : holding === "overnight" ? "Next close" : holding === "swing" ? "This week" : holding === "position" ? "Long term / recurring review" : "Catalyst window";
 }
 
 function branchState(branch: Branch | string | null | undefined): WorkflowState {
@@ -157,8 +157,10 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
         utils.aperture.thesis.list.invalidate(),
         utils.aperture.runway.latest.invalidate(),
       ]);
-      if (projected.compilerStatus === "manual_draft") {
-        toast.warning("Thesis saved as an unresolved manual draft. No inferred sectors, rules, or trade conclusions were added; compile before provider-backed research.");
+      if (projected.compilerStatus === "needs_structure") {
+        toast.warning(`Thesis saved. Add ${projected.missingFields.join(", ")} before research; no empty run was created.`);
+      } else if (projected.compilerStatus === "operator_structured") {
+        toast.success("Operator-declared thesis structure preserved without inferred fields");
       } else {
         toast.success("Thesis assigned to this Capital Mission");
       }
@@ -287,7 +289,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
     const receiptReview = receipt.reviewAt == null ? "" : easternDateTimeInputFromEpoch(receipt.reviewAt);
     setEligibilityReviewAt(receipt.branch === "conditional" ? receiptReview : "");
     setOutcomeReviewAtInput(receipt.branch === "research" ? receiptReview : "");
-    setMissionDirty(false);
+    setMissionDirty(true); // Immutable receipt text must never be regenerated from parameter defaults.
     setRevisingReceipt(false);
   }, [currentBindingMatches, receiptTarget, runway?.latest]);
   const plannedRiskCeiling = cockpit.data?.headroom.lines.find((line) => line.key === "planned_risk_per_play")?.ceilingCents ?? null;
@@ -371,9 +373,12 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
           <ArgumentRail state={visualWorkflowState} operatorCapCents={parseMoney(maxLoss) || null} evidenceLabel={latestGate ?? "—"} gateLabel={latestBranch === "conditional" ? "Conditional / opening held" : latestBranch === "cash" ? "Cash / opening held" : "Research only"} />
 
           <div><div className="mb-2 flex items-center justify-between gap-3"><p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Mission Math</p><span className="text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Measured inputs only</span></div><div className="grid overflow-hidden rounded-xl border sm:grid-cols-2 lg:grid-cols-4" style={{ borderColor: "var(--sh-border-1)" }}>
-            <MoneyField label="Capital" value={capital} onChange={(value) => { setCapital(value); setMissionDirty(false); }} help="Mission capital" />
+            <MoneyField label="Capital" value={capital} onChange={(value) => {
+              setCapital(value);
+              setMissionDirty(true); // Preserve the operator-authored mission across parameter edits.
+            }} help="Mission capital" />
             {branch === "research" ? <MoneyField label="Target stretch" value={desiredEnding} onChange={setDesiredEnding} help="Aspiration · never a forecast" /> : <div className="border-b p-3 text-[0.68rem] sm:border-b-0 sm:border-r" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Target stretch<p className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Not used</p><span className="text-[10px]">{branch === "cash" ? "Cash carries $0 risk." : "Gate review, not return target."}</span></div>}
-            <label className="border-b p-3 text-[0.68rem] sm:border-b-0 sm:border-r" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Horizon<select className="mt-1 min-h-11 w-full bg-transparent font-serif text-xl" style={{ color: "var(--sh-text-primary)" }} value={holdingPeriod} onChange={(event) => { setHoldingPeriod(event.target.value as HoldingPeriod); setMissionDirty(false); }}><option value="intraday">Today</option><option value="overnight">Next close</option><option value="swing">This week</option><option value="catalyst_window">Named catalyst</option><option value="position">Long term · review every 30 days</option></select><span className="text-[10px]">Outcome or review queued at horizon</span></label>
+            <label className="border-b p-3 text-[0.68rem] sm:border-b-0 sm:border-r" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Horizon<select className="mt-1 min-h-11 w-full bg-transparent font-serif text-xl" style={{ color: "var(--sh-text-primary)" }} value={holdingPeriod} onChange={(event) => { setHoldingPeriod(event.target.value as HoldingPeriod); setMissionDirty(true); }}><option value="intraday">Today</option><option value="overnight">Next close</option><option value="swing">This week</option><option value="catalyst_window">Named catalyst</option><option value="position">Long term · review every 30 days</option></select><span className="text-[10px]">Outcome or review queued at horizon</span></label>
             <MoneyField label="Max planned loss" value={maxLoss} onChange={setMaxLoss} help={`${capitalCents > 0 ? `${((parseMoney(maxLoss) / capitalCents) * 100).toFixed(1)}% of mission capital` : "Can tighten, never loosen"}`} />
           </div></div>
           {branch === "research" && targetStretchPct != null && <div className="flex flex-col gap-2 rounded-lg border px-3 py-3 text-xs" style={{ borderColor: sameSessionStretch ? "var(--sh-red)" : "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-serif text-lg" style={{ color: "var(--sh-text-primary)" }}>+{formatCents(desiredCents - capitalCents)} · +{targetStretchPct.toFixed(0)}% · aspiration</p><BasisMark basis="aspirational" label="Aspirational" /></div><p>Research may conclude that no qualifying play reaches this value within the declared risk limit.{sameSessionStretch ? " Same-session stretch requires horizon verification." : ""}</p></div>}

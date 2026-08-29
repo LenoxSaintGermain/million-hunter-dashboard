@@ -46,7 +46,7 @@ import {
 } from "../drizzle/schema";
 import { capitalOperatorProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { compileThesis, flattenExposureTree, validateGraphForPersistence } from "./aperture/thesisGraph";
+import { compileThesis, flattenExposureTree, validateGraphForPersistence, type ThesisGraph } from "./aperture/thesisGraph";
 import { discoverUniverse, thesisSummary } from "./aperture/universe";
 import { collectSecurityFacts, collectMacroFacts, describeAvailability, availabilityMap, MACRO_SYMBOL } from "./aperture/providers/index";
 import { getFacts, freshestPerKey } from "./aperture/facts";
@@ -99,6 +99,7 @@ import {
 } from "./aperture/decisionRunway";
 import { immutableReceiptBindingIssue } from "./aperture/decisionReceiptBinding";
 import { extractCapitalMissionDefaults } from "../shared/capitalMissionDefaults";
+import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -279,6 +280,7 @@ export async function startScheduledCapitalResearch(input: {
     deployableCapitalCents: 2_000_000,
     intendedTrades: [] as Array<{ symbol: string; dollarsCents: number; note?: string }>,
     holdingPeriod: "intraday",
+    instrumentPreference: "shares" as const,
     liquidityFloorAdvUsd: 50_000_000,
     catalystDeadlineAt: dayStart + (15 * 60 + 55) * 60_000,
     maxSingleNamePct: 5,
@@ -297,6 +299,7 @@ export async function startScheduledCapitalResearch(input: {
     intendedTrades: runInput.intendedTrades,
     hurdleRateBps: null,
     holdingPeriod: runInput.holdingPeriod as any,
+    instrumentPreference: runInput.instrumentPreference,
     catalystDeadlineAt: runInput.catalystDeadlineAt,
     liquidityFloorAdvUsd: runInput.liquidityFloorAdvUsd,
     maxSingleNamePct: runInput.maxSingleNamePct,
@@ -1379,7 +1382,7 @@ export const apertureRouter = router({
           let created: number;
           try {
             created = await db!.transaction(async (tx) => {
-            const [runResult] = await tx.insert(apertureRuns).values({ userId: ctx.user.id, thesisId: thesis.id, accountId: account.id, deployableCapitalCents: revision.deployableCapitalCents, intendedTrades: [], holdingPeriod: "intraday", catalystDeadlineAt: deadline, liquidityFloorAdvUsd: CURRENT_MANDATE.minAdvUsd30d, maxSingleNamePct: CURRENT_MANDATE.maxPositionPctOfEquity, invalidationRule: "Illustrative UAT fixture invalidates if the named catalyst evidence, paper-only boundary, or modeled risk cap is not confirmed by a human.", mandateVersion: CURRENT_MANDATE.version, status: "completed", universeCount: 2, candidateCount: 2, droppedNote: marker, providerAvailability: { illustrative_uat_fixture: true, provider_network_invoked: false }, startedAt: now, completedAt: now, createdAt: now });
+            const [runResult] = await tx.insert(apertureRuns).values({ userId: ctx.user.id, thesisId: thesis.id, accountId: account.id, deployableCapitalCents: revision.deployableCapitalCents, intendedTrades: [], holdingPeriod: "intraday", instrumentPreference: revision.instrumentPreference, catalystDeadlineAt: deadline, liquidityFloorAdvUsd: CURRENT_MANDATE.minAdvUsd30d, maxSingleNamePct: CURRENT_MANDATE.maxPositionPctOfEquity, invalidationRule: "Illustrative UAT fixture invalidates if the named catalyst evidence, paper-only boundary, or modeled risk cap is not confirmed by a human.", mandateVersion: CURRENT_MANDATE.version, status: "completed", universeCount: 2, candidateCount: 2, droppedNote: marker, providerAvailability: { illustrative_uat_fixture: true, provider_network_invoked: false }, startedAt: now, completedAt: now, createdAt: now });
             const runId = Number((runResult as any).insertId);
             await tx.insert(apertureCandidates).values([
               { runId, symbol: "UATQ", playSide: "long", role: "core", compositeScore: 91, confidenceScore: 0.74, rankScore: 0.91, dimensions: { thesisFit: "modeled", evidenceFreshness: "unknown", liquidity: "illustrative" }, verifyFields: ["Confirm the named catalyst evidence is still current before any paper proposal."], exposureNodeIds: [], memo: { basis: "Illustrative UAT fixture — not current market data.", whyRanked: "Highest modeled thesis fit within the operator’s declared paper-risk cap; no return is promised." }, memoStatus: "ok", citations: ["illustrative-uat-fixture://qualified-play"], suggestedSizeLowCents: 240000, suggestedSizeHighCents: 300000, createdAt: now },
@@ -1509,11 +1512,23 @@ export const apertureRouter = router({
           deployableCapitalCents: revision.deployableCapitalCents,
           intendedTrades: [] as Array<{ symbol: string; dollarsCents: number; note?: string }>,
           holdingPeriod: revision.holdingPeriod,
+          instrumentPreference: revision.instrumentPreference,
           liquidityFloorAdvUsd: CURRENT_MANDATE.minAdvUsd30d,
           catalystDeadlineAt,
           maxSingleNamePct: CURRENT_MANDATE.maxPositionPctOfEquity,
           invalidationRule: revision.invalidationRule,
         };
+        const readiness = evaluateThesisResearchReadiness(thesis.graph as ThesisGraph, {
+          holdingPeriod: revision.holdingPeriod,
+          instrumentPreference: revision.instrumentPreference,
+          invalidationRule: revision.invalidationRule,
+        });
+        if (!readiness.ready) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Complete the thesis structure before research: ${[...readiness.missing, ...readiness.incompatibilities].join("; ")}. No run was created.`,
+          });
+        }
         const preset = evaluateRunPreset(runInput, { accountLinked: true, equityCents: account.equityValueCents ?? null }, CURRENT_MANDATE, now);
         if (!preset.passed) throw new TRPCError({ code: "PRECONDITION_FAILED", message: `run preset rejected by the mandate: ${preset.failures.join("; ")}` });
         const runId = await db!.transaction(async (tx) => {
@@ -1524,6 +1539,7 @@ export const apertureRouter = router({
             deployableCapitalCents: revision.deployableCapitalCents,
             intendedTrades: [],
             holdingPeriod: revision.holdingPeriod,
+            instrumentPreference: revision.instrumentPreference,
             catalystDeadlineAt,
             liquidityFloorAdvUsd: CURRENT_MANDATE.minAdvUsd30d,
             maxSingleNamePct: CURRENT_MANDATE.maxPositionPctOfEquity,
@@ -1886,6 +1902,7 @@ export const apertureRouter = router({
           intendedTrades: run.intendedTrades ?? [],
           hurdleRateBps: run.hurdleRateBps,
           holdingPeriod: run.holdingPeriod,
+          instrumentPreference: run.instrumentPreference,
           catalystDeadlineAt: run.catalystDeadlineAt,
           liquidityFloorAdvUsd: run.liquidityFloorAdvUsd,
           maxSingleNamePct: run.maxSingleNamePct,
@@ -1902,6 +1919,7 @@ export const apertureRouter = router({
           intendedTrades: (run.intendedTrades ?? []) as Array<{ symbol: string; dollarsCents: number; note?: string }> ,
           hurdleRateBps: run.hurdleRateBps ?? undefined,
           holdingPeriod: run.holdingPeriod ?? undefined,
+          instrumentPreference: run.instrumentPreference ?? undefined,
           liquidityFloorAdvUsd: run.liquidityFloorAdvUsd ?? undefined,
           catalystDeadlineAt: run.catalystDeadlineAt ?? undefined,
           maxSingleNamePct: run.maxSingleNamePct ?? undefined,
@@ -1932,6 +1950,7 @@ export const apertureRouter = router({
           userId: ctx.user.id, thesisId: run.thesisId, accountId: run.accountId,
           deployableCapitalCents: run.deployableCapitalCents, intendedTrades: run.intendedTrades ?? [],
           hurdleRateBps: run.hurdleRateBps, holdingPeriod: run.holdingPeriod,
+          instrumentPreference: run.instrumentPreference,
           liquidityFloorAdvUsd: run.liquidityFloorAdvUsd, catalystDeadlineAt: run.catalystDeadlineAt,
           maxSingleNamePct: run.maxSingleNamePct, invalidationRule: run.invalidationRule,
           mandateVersion: run.mandateVersion, status: "queued", createdAt: now,
@@ -1942,6 +1961,7 @@ export const apertureRouter = router({
           thesisId: run.thesisId, accountId: run.accountId ?? undefined,
           deployableCapitalCents: run.deployableCapitalCents, intendedTrades: (run.intendedTrades ?? []) as Array<{ symbol: string; dollarsCents: number; note?: string }>,
           hurdleRateBps: run.hurdleRateBps ?? undefined, holdingPeriod: run.holdingPeriod ?? undefined,
+          instrumentPreference: run.instrumentPreference ?? undefined,
           liquidityFloorAdvUsd: run.liquidityFloorAdvUsd ?? undefined, catalystDeadlineAt: run.catalystDeadlineAt ?? undefined,
           maxSingleNamePct: run.maxSingleNamePct ?? undefined, invalidationRule: run.invalidationRule ?? undefined,
           researchOffset: offset, followUpFromRunId: run.id,
@@ -1970,6 +1990,7 @@ export const apertureRouter = router({
         })).default([]),
         hurdleRateBps: z.number().optional(),
         holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]),
+        instrumentPreference: z.enum(["shares", "options", "either"]).default("either"),
         liquidityFloorAdvUsd: z.number().positive(),
         catalystDeadlineAt: z.number(),
         maxSingleNamePct: z.number().positive(),
@@ -1998,6 +2019,18 @@ export const apertureRouter = router({
               message: `This saved thesis needs a little more detail before Aperture can frame a brief: ${error?.message ?? "add the belief, time horizon, and what you want to learn."}`,
             });
           }
+        }
+
+        const readiness = evaluateThesisResearchReadiness(thesis.graph as ThesisGraph, {
+          holdingPeriod: input.holdingPeriod as any,
+          instrumentPreference: input.instrumentPreference,
+          invalidationRule: input.invalidationRule,
+        });
+        if (!readiness.ready) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Complete the thesis structure before research: ${[...readiness.missing, ...readiness.incompatibilities].join("; ")}. No run was created.`,
+          });
         }
 
         const now = Date.now();
@@ -2033,6 +2066,7 @@ export const apertureRouter = router({
           intendedTrades: input.intendedTrades,
           hurdleRateBps: input.hurdleRateBps ?? null,
           holdingPeriod: input.holdingPeriod as any,
+          instrumentPreference: input.instrumentPreference,
           catalystDeadlineAt: input.catalystDeadlineAt,
           liquidityFloorAdvUsd: Math.round(input.liquidityFloorAdvUsd),
           maxSingleNamePct: input.maxSingleNamePct,
@@ -2301,6 +2335,7 @@ export const apertureRouter = router({
           symbol: row.candidate.symbol,
           side,
           holdingPeriod: row.run.holdingPeriod as any,
+          instrumentPreference: row.run.instrumentPreference,
           bars: tape.bars,
           vwap,
           range,
@@ -2675,6 +2710,7 @@ export const apertureRouter = router({
             symbol: candidate.symbol,
             side,
             holdingPeriod: run.holdingPeriod as any,
+            instrumentPreference: run.instrumentPreference,
             bars: tape.bars,
             vwap,
             range,
@@ -2877,6 +2913,7 @@ export const apertureRouter = router({
             symbol: candidate.symbol,
             side,
             holdingPeriod: "intraday",
+            instrumentPreference: "shares",
             bars: decisionTimeBars,
             vwap,
             range,
@@ -3304,6 +3341,7 @@ async function executeRun(
     intendedTrades: Array<{ symbol: string; dollarsCents: number; note?: string }>;
     hurdleRateBps?: number;
     holdingPeriod?: string;
+    instrumentPreference?: "shares" | "options" | "either";
     liquidityFloorAdvUsd?: number;
     catalystDeadlineAt?: number;
     maxSingleNamePct?: number;
@@ -3358,6 +3396,19 @@ async function executeRun(
     // ── 3. Universe discovery ──────────────────────────────────────────────
     const summary = thesisSummary(graph.beliefs ?? [], graph.seek ?? []);
     const universe = await discoverUniverse(nodeRows, summary, known);
+    const declaredSymbols = (graph.researchSymbols ?? [])
+      .map((symbol: string) => normSymbol(symbol))
+      .filter((symbol: string) => symbol && !known.has(symbol));
+    for (const symbol of declaredSymbols) {
+      if (universe.discovered.some((item) => item.symbol === symbol)) continue;
+      universe.discovered.unshift({
+        symbol,
+        name: null,
+        nodeLabel: "Operator-declared universe",
+        rationale: "The operator explicitly named this symbol in the canonical thesis structure.",
+        citations: ["operator-declared://canonical-thesis"],
+      });
+    }
     const offset = Math.max(0, input.researchOffset ?? 0);
     const researchPlan = buildBriefResearchPlan(universe.discovered.slice(offset), input.holdingPeriod);
     const researchDroppedNote = [
@@ -3397,8 +3448,8 @@ async function executeRun(
       deployableCapitalCents: input.deployableCapitalCents,
       intendedTrades: input.intendedTrades,
       hurdleRateBps: input.hurdleRateBps,
-      holdingPeriod: input.holdingPeriod != null && ["intraday", "overnight", "swing", "catalyst_window"].includes(input.holdingPeriod)
-        ? input.holdingPeriod as "intraday" | "overnight" | "swing" | "catalyst_window"
+      holdingPeriod: input.holdingPeriod != null && ["intraday", "overnight", "swing", "catalyst_window", "position"].includes(input.holdingPeriod)
+        ? input.holdingPeriod as "intraday" | "overnight" | "swing" | "catalyst_window" | "position"
         : null,
     });
 

@@ -43,6 +43,11 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   const [optionExpirationDate, setOptionExpirationDate] = useState(() => new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10));
   const [optionStrikeDollars, setOptionStrikeDollars] = useState("");
   const [contracts, setContracts] = useState("1");
+  const allowedInstrumentTypes: PaperInstrumentType[] = run?.instrumentPreference === "options"
+    ? ["long_call", "long_put"]
+    : run?.instrumentPreference === "shares"
+      ? ["shares"]
+      : ["shares", "long_call", "long_put"];
   // This form only prepares a new research-backed paper position. Closing an
   // existing position belongs to its own account-position flow, where the held
   // quantity and closing side can be proven before we state intent: "close".
@@ -227,10 +232,10 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
 
       <section aria-labelledby="instrument-choice" className="rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
         <p id="instrument-choice" className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>How should this thesis be expressed?</p>
-        <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Paper instrument">
-          {(["shares", "long_call", "long_put"] as PaperInstrumentType[]).map((value) => <button key={value} type="button" role="radio" aria-checked={instrumentType === value} onClick={() => setInstrumentType(value)} className="min-h-11 rounded-md border px-2 py-2 text-xs font-medium" style={{ borderColor: instrumentType === value ? "var(--sh-signal)" : "var(--sh-border-1)", background: instrumentType === value ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{value === "shares" ? "Shares" : value === "long_call" ? "Long call" : "Long put"}</button>)}
+        <div className={`mt-2 grid gap-2 ${allowedInstrumentTypes.length === 1 ? "grid-cols-1" : allowedInstrumentTypes.length === 2 ? "grid-cols-2" : "grid-cols-3"}`} role="radiogroup" aria-label="Paper instrument">
+          {allowedInstrumentTypes.map((value) => <button key={value} type="button" role="radio" aria-checked={instrumentType === value} onClick={() => setInstrumentType(value)} className="min-h-11 rounded-md border px-2 py-2 text-xs font-medium" style={{ borderColor: instrumentType === value ? "var(--sh-signal)" : "var(--sh-border-1)", background: instrumentType === value ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{value === "shares" ? "Shares" : value === "long_call" ? "Long call" : "Long put"}</button>)}
         </div>
-        <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{isOption ? "Bounded scope: standard long options only. No uncovered, short, multi-leg, exercise, or assignment path." : "Share tickets use the research entry, stop, and planned-loss model."}</p>
+        <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{run?.instrumentPreference === "options" ? "This run is locked to bounded long options. No share substitution, uncovered, short, multi-leg, exercise, or assignment path." : run?.instrumentPreference === "shares" ? "This run is locked to shares and uses the research entry, stop, and planned-loss model." : isOption ? "Bounded scope: standard long options only. No uncovered, short, multi-leg, exercise, or assignment path." : "Share tickets use the research entry, stop, and planned-loss model."}</p>
       </section>
 
       {isOption && <section className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2 lg:grid-cols-4" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}>

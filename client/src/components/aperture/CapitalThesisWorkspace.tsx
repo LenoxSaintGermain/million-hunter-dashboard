@@ -8,6 +8,10 @@ import { isCapitalThesisEligible } from "@shared/capitalThesisEligibility";
 import { canonicalThesisLabel } from "@shared/canonicalThesisLabel";
 
 type Purpose = "capital" | "acquisition" | "property";
+type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
+type Instrument = "shares" | "options" | "either";
+
+const EMPTY_DETAIL = { belief: "", evidence: "", seeks: "", avoids: "", horizon: "", holdingPeriod: "position" as HoldingPeriod, invalidation: "", risk: "", symbols: "", instrument: "either" as Instrument };
 
 const PURPOSES: Array<{ id: Purpose; label: string }> = [
   { id: "capital", label: "Capital" },
@@ -35,7 +39,7 @@ export function CapitalThesisWorkspace() {
   const [missionError, setMissionError] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftText, setDraftText] = useState(STARTER);
-  const [detail, setDetail] = useState({ belief: "", evidence: "", seeks: "", avoids: "", horizon: "", invalidation: "", risk: "" });
+  const [detail, setDetail] = useState(EMPTY_DETAIL);
 
   const capitalTheses = useMemo(
     () => (theses ?? []).filter(isCapitalThesisEligible),
@@ -49,6 +53,20 @@ export function CapitalThesisWorkspace() {
       setSelectedId(selected.id);
       setDraftName(selected.name ?? "");
       setDraftText(selected.thesisText ?? "");
+      const filters = (selected.compiledFilters ?? {}) as Record<string, any>;
+      const typed = (filters.capitalTradeDetails ?? {}) as Record<string, any>;
+      setDetail({
+        belief: typed.belief ?? "",
+        evidence: selected.evidenceRequirements?.[0] ?? "",
+        seeks: typed.seeks ?? "",
+        avoids: typed.avoids ?? "",
+        horizon: typed.horizon ?? "",
+        holdingPeriod: filters.holdingPeriod ?? "position",
+        invalidation: selected.autoDisqualifiers?.[0] ?? "",
+        risk: typed.risk ?? "",
+        symbols: Array.isArray(filters.researchSymbols) ? filters.researchSymbols.join(", ") : "",
+        instrument: filters.instrumentPreference ?? "either",
+      });
     }
   }, [selected?.id]);
 
@@ -75,14 +93,25 @@ export function CapitalThesisWorkspace() {
   };
   const createInline = async (openMission = false) => {
     if (draftText.trim().length < 20) return;
-    const result = await createCapital.mutateAsync({ thesisText: detailedThesisText(), name: draftName.trim() || undefined });
+    const result = await createCapital.mutateAsync({ thesisText: detailedThesisText(), name: draftName.trim() || undefined, details: { ...detail } });
     if (openMission) await useInMissionFor(result.compilationId);
   };
   const useInMissionFor = async (compilationId: number) => {
     setMissionError(null);
     try {
       await activate.mutateAsync({ compilationId });
-      await project.mutateAsync({ compilationId });
+      const projection = await project.mutateAsync({ compilationId });
+      if (projection.compilerStatus === "needs_structure") {
+        const missing = projection.missingFields.join(", ");
+        setMissionError(`Add the missing thesis structure before research: ${missing}. Your thesis is saved; no empty run was created.`);
+        setEditing(true);
+        setShowDetails(true);
+        return;
+      }
+      if (projection.incompatibilities.length) {
+        setMissionError(projection.incompatibilities.join(" "));
+        return;
+      }
       await utils.thesis.list.invalidate();
       navigate(route("/aperture"));
     } catch (error) {
@@ -100,7 +129,11 @@ export function CapitalThesisWorkspace() {
     <div className="flex flex-wrap gap-2" aria-label="Thesis framing helpers">{[["Where can I…", "Where can I find evidence for this paper-only thesis?"], ["How can I…", "How can I test this belief without exceeding the stated risk boundary?"], ["What would…", "What would invalidate the current thesis framing?" ]].map(([label, starter]) => <button key={label} type="button" onClick={() => applyFraming(starter)} className="min-h-9 rounded-full border px-3 text-xs font-semibold" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}>{label}</button>)}</div>
     <p className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>Helpers prepend an editable framing prompt and preserve your current statement. They never replace content.</p>
     <button type="button" onClick={() => setShowDetails((current) => !current)} aria-expanded={showDetails} className="inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}><ChevronDown className={showDetails ? "h-3.5 w-3.5 rotate-180" : "h-3.5 w-3.5"} />Add thesis detail</button>
-    {showDetails && <div className="grid gap-2 sm:grid-cols-2">{[["belief", "Belief"], ["evidence", "Evidence basis"], ["seeks", "Seeks"], ["avoids", "Avoids"], ["horizon", "Horizon"], ["invalidation", "Invalidation"], ["risk", "Risk boundary"]].map(([key, label]) => <label key={key} className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{label}<input value={detail[key as keyof typeof detail]} onChange={(event) => setDetail((current) => ({ ...current, [key]: event.target.value }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} /></label>)}</div>}
+    {showDetails && <div className="grid gap-2 sm:grid-cols-2">
+      {[["belief", "Belief"], ["evidence", "Evidence basis"], ["seeks", "Seeks"], ["avoids", "Avoids"], ["horizon", "Horizon"], ["invalidation", "Invalidation"], ["risk", "Risk boundary"], ["symbols", "Symbols or research universe"]].map(([key, label]) => <label key={key} className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{label}<input value={detail[key as keyof typeof detail]} onChange={(event) => setDetail((current) => ({ ...current, [key]: event.target.value }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} /></label>)}
+      <label className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Holding horizon<select value={detail.holdingPeriod} onChange={(event) => setDetail((current) => ({ ...current, holdingPeriod: event.target.value as HoldingPeriod }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><option value="intraday">Today</option><option value="overnight">Next close</option><option value="swing">2–10 sessions</option><option value="catalyst_window">Named catalyst window</option><option value="position">Multi-week / position</option></select></label>
+      <label className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Instrument<select value={detail.instrument} onChange={(event) => setDetail((current) => ({ ...current, instrument: event.target.value as Instrument }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><option value="shares">Shares only</option><option value="options">Defined-risk options</option><option value="either">Either; keep explicit at mission setup</option></select></label>
+    </div>}
     <label className="block text-xs" style={{ color: "var(--sh-fg-muted)" }}>Version name<input value={draftName} onChange={(event) => setDraftName(event.target.value)} aria-label="Thesis name" placeholder="Name this thesis version" className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} /></label>
     <div className="flex flex-col gap-2 sm:flex-row"><Button type="button" variant="outline" className="min-h-11" onClick={() => void createInline(false)} disabled={createCapital.isPending || draftText.trim().length < 20}>{createCapital.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save without starting a run</Button><Button type="button" className="min-h-11 flex-1" onClick={() => void createInline(true)} disabled={createCapital.isPending || activate.isPending || project.isPending || draftText.trim().length < 20}>{createCapital.isPending || activate.isPending || project.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}Save and use in Capital Mission</Button></div>
   </section>;
@@ -138,7 +171,7 @@ export function CapitalThesisWorkspace() {
               <button type="button" onClick={() => setChoosing((current) => !current)} aria-expanded={choosing} className="inline-flex min-h-10 items-center gap-1.5 rounded border px-3 text-xs font-semibold" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><Pencil className="h-3.5 w-3.5" />Change thesis</button>
             </div>
             <div className="mt-3 flex flex-wrap gap-2 font-mono text-[0.65rem] uppercase tracking-[0.08em]" style={{ color: "var(--sh-fg-muted)" }}><span>Capital</span><span>·</span><span>{selected.status ?? "review"}</span><span>·</span><span>{deadline ? `freshness due ${deadline.toLocaleDateString()}` : "freshness not measured"}</span><span>·</span><span>version {selected.id}</span></div>
-            {choosing && <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Owner-scoped alternatives</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{alternatives.map((thesis: any) => <button type="button" key={thesis.id} onClick={() => { setSelectedId(thesis.id); setChoosing(false); setEditing(false); }} className="min-h-10 rounded border px-3 text-left text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}>{canonicalThesisLabel(thesis)}</button>)}</div><button type="button" onClick={() => { setCreating(true); setChoosing(false); setDraftName(""); setDraftText(STARTER); setDetail({ belief: "", evidence: "", seeks: "", avoids: "", horizon: "", invalidation: "", risk: "" }); }} className="mt-3 min-h-10 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Create a new thesis</button><button type="button" onClick={() => { setEditing(true); setChoosing(false); }} className="ml-4 min-h-10 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Edit as new version</button></div>}
+            {choosing && <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Owner-scoped alternatives</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{alternatives.map((thesis: any) => <button type="button" key={thesis.id} onClick={() => { setSelectedId(thesis.id); setChoosing(false); setEditing(false); }} className="min-h-10 rounded border px-3 text-left text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}>{canonicalThesisLabel(thesis)}</button>)}</div><button type="button" onClick={() => { setCreating(true); setChoosing(false); setDraftName(""); setDraftText(STARTER); setDetail(EMPTY_DETAIL); }} className="mt-3 min-h-10 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Create a new thesis</button><button type="button" onClick={() => { setEditing(true); setChoosing(false); }} className="ml-4 min-h-10 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Edit as new version</button></div>}
             {editing ? <Composer versioning /> : <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm leading-6" style={{ color: "var(--sh-text-primary)" }}>{selected.thesisText}</p>}
           </section>
 
@@ -150,7 +183,7 @@ export function CapitalThesisWorkspace() {
           <section className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-paper)" }}><div className="flex items-center justify-between gap-3"><div><p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Contextual Thesis Library</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Owner-scoped Capital alternatives. Ranking is descriptive, never approval.</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-3">{visibleAlternatives.map((thesis: any) => <button key={thesis.id} type="button" onClick={() => { setSelectedId(thesis.id); setEditing(false); }} className="min-h-16 rounded border p-3 text-left text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><span className="block font-semibold">{thesis.name ?? "Untitled thesis"}</span><span className="mt-1 block" style={{ color: "var(--sh-fg-muted)" }}>{thesis.status ?? "review"} · v{thesis.id}</span></button>)}</div>{alternatives.length > 3 && <button type="button" onClick={() => setShowMore((current) => !current)} className="mt-3 inline-flex min-h-10 items-center gap-1 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}><ChevronDown className="h-3.5 w-3.5" /> {showMore ? "Show less" : `Show ${alternatives.length - 3} more`}</button>}</section>
 
           {missionError && <p role="alert" className="rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-red)", color: "var(--sh-red)" }}>{missionError}</p>}
-          <div className="flex flex-col gap-2 sm:flex-row"><Button className="min-h-11 flex-1" onClick={() => void useInMission()} disabled={activate.isPending || project.isPending}>{activate.isPending || project.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}Use in Capital Mission</Button><Button variant="outline" className="min-h-11" onClick={() => { setMissionError(null); setCreating(true); setDraftName(""); setDraftText(STARTER); setDetail({ belief: "", evidence: "", seeks: "", avoids: "", horizon: "", invalidation: "", risk: "" }); setEditing(false); }}>Create new Capital thesis</Button></div>
+          <div className="flex flex-col gap-2 sm:flex-row"><Button className="min-h-11 flex-1" onClick={() => void useInMission()} disabled={activate.isPending || project.isPending}>{activate.isPending || project.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}Use in Capital Mission</Button><Button variant="outline" className="min-h-11" onClick={() => { setMissionError(null); setCreating(true); setDraftName(""); setDraftText(STARTER); setDetail(EMPTY_DETAIL); setEditing(false); }}>Create new Capital thesis</Button></div>
         </>
       ) : <section className="rounded-lg border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-paper)" }}><p className="font-mono text-[0.65rem] uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>New Capital thesis</p><h2 className="mt-2 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>Frame the decision in one statement.</h2><Composer /></section>}
     </main>

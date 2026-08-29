@@ -39,6 +39,11 @@ export interface ThesisGraph {
   behavior: { researches?: number; shortlists?: number; executes?: number };
   /** Root nodes of the exposure decomposition: "AI adoption" → inference → power → … */
   exposureTree: ExposureTreeNode[];
+  /** Explicit symbols declared by the operator. Never inferred by fallback. */
+  researchSymbols: string[];
+  evidenceRequirements: string[];
+  invalidationConditions: string[];
+  instrumentPreference: "shares" | "options" | "either" | null;
   confidenceNotes: string[];
   suggestedName: string;
 }
@@ -194,6 +199,12 @@ export function normalizeGraph(raw: any): ThesisGraph {
     portfolioRules: rules,
     behavior,
     exposureTree: cleanTree(raw?.exposureTree),
+    researchSymbols: strArray(raw?.researchSymbols).map((symbol) => symbol.toUpperCase()),
+    evidenceRequirements: strArray(raw?.evidenceRequirements),
+    invalidationConditions: strArray(raw?.invalidationConditions),
+    instrumentPreference: ["shares", "options", "either"].includes(raw?.instrumentPreference)
+      ? raw.instrumentPreference
+      : null,
     confidenceNotes: strArray(raw?.confidenceNotes),
     suggestedName: typeof raw?.suggestedName === "string" && raw.suggestedName.trim()
       ? raw.suggestedName.trim()

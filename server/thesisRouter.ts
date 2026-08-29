@@ -19,6 +19,21 @@ import { GEMINI_FAST } from "../shared/models";
 import { normalizeCanonicalThesisRead } from "../shared/thesisReadContract";
 import { isCapitalThesisEligible } from "../shared/capitalThesisEligibility";
 import { manualThesisProjection } from "../shared/manualThesisProjection";
+import { detailsFromCanonicalFields, normalizeCapitalThesisDetails, buildCapitalThesisCompilationFields } from "../shared/capitalThesisStructure";
+import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
+
+const capitalThesisDetailsSchema = z.object({
+  belief: z.string().max(1000).optional(),
+  evidence: z.string().max(2000).optional(),
+  seeks: z.string().max(1000).optional(),
+  avoids: z.string().max(1000).optional(),
+  horizon: z.string().max(500).optional(),
+  holdingPeriod: z.enum(["intraday", "overnight", "swing", "catalyst_window", "position"]).nullable().optional(),
+  invalidation: z.string().max(2000).optional(),
+  risk: z.string().max(1000).optional(),
+  symbols: z.union([z.string().max(500), z.array(z.string().max(16)).max(50)]).optional(),
+  instrument: z.enum(["shares", "options", "either"]).nullable().optional(),
+}).optional();
 
 function isQualifiedPlayIsolatedUat(ctx: { req: { header(name: string): string | undefined } }) {
   const identity = ctx.req.header("x-isolated-uat-identity");
@@ -33,6 +48,7 @@ function illustrativeUatGraph(thesisText: string, name: string | null) {
   return {
     beliefs: [thesisText], seek: [], avoid: [], horizons: ["Unknown — operator has not specified a horizon."], sectors: [], exclusions: [],
     portfolioRules: {}, behavior: {}, exposureTree: [],
+    researchSymbols: [], evidenceRequirements: [], invalidationConditions: [], instrumentPreference: null,
     confidenceNotes: ["Illustrative UAT compilation — not current market data. No provider, market-data, or broker path was invoked."],
     suggestedName: name ?? "Capital / Trade Thesis",
   };
@@ -495,19 +511,21 @@ export const thesisRouter = router({
 
   /** Create a canonical thesis for a capital/trade workflow without forcing acquisition filters. */
   createCapital: capitalOperatorProcedure
-    .input(z.object({ thesisText: z.string().min(20).max(4000), name: z.string().min(1).max(120).optional() }))
+    .input(z.object({ thesisText: z.string().min(20).max(4000), name: z.string().min(1).max(120).optional(), details: capitalThesisDetailsSchema }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const details = normalizeCapitalThesisDetails(input.details);
+      const fields = buildCapitalThesisCompilationFields(details);
       const [result] = await db.insert(thesisCompilations).values({
         userId: ctx.user.id,
         thesisText: input.thesisText,
         name: input.name ?? "Capital / Trade Thesis",
         templateUsed: "capital_trade",
-        compiledFilters: {},
+        compiledFilters: fields.compiledFilters,
         scoringWeights: [],
-        evidenceRequirements: [],
-        autoDisqualifiers: [],
+        evidenceRequirements: fields.evidenceRequirements,
+        autoDisqualifiers: fields.autoDisqualifiers,
         confidenceNotes: ["Capital / Trade scope: use the linked Aperture graph for securities analysis."],
         status: "review",
       });
@@ -615,18 +633,41 @@ export const thesisRouter = router({
         .where(and(eq(capitalTheses.sourceCompilationId, source.id), eq(capitalTheses.userId, ctx.user.id)))
         .limit(1);
 
+      const declared = detailsFromCanonicalFields(source);
       let graph;
-      let compilerStatus: "compiled" | "manual_draft" = "compiled";
+      let providerCompiled = true;
       if (isQualifiedPlayIsolatedUat(ctx)) {
         graph = illustrativeUatGraph(source.thesisText, source.name);
       } else {
         try {
           graph = await compileThesis(source.thesisText);
         } catch {
-          graph = manualThesisProjection(source.thesisText, source.name);
-          compilerStatus = "manual_draft";
+          graph = manualThesisProjection(source.thesisText, source.name, declared);
+          providerCompiled = false;
         }
       }
+
+      graph = {
+        ...graph,
+        beliefs: declared.belief ? [declared.belief] : graph.beliefs,
+        seek: declared.seeks ? [declared.seeks] : graph.seek,
+        avoid: declared.avoids ? [declared.avoids] : graph.avoid,
+        horizons: declared.horizon ? [declared.horizon] : graph.horizons,
+        researchSymbols: declared.researchSymbols,
+        evidenceRequirements: declared.evidence ? [declared.evidence] : graph.evidenceRequirements,
+        invalidationConditions: declared.invalidation ? [declared.invalidation] : graph.invalidationConditions,
+        instrumentPreference: declared.instrumentPreference ?? graph.instrumentPreference,
+      };
+      const readiness = evaluateThesisResearchReadiness(graph, {
+        holdingPeriod: declared.holdingPeriod,
+        instrumentPreference: declared.instrumentPreference,
+        invalidationRule: declared.invalidation || null,
+      });
+      const compilerStatus: "compiled" | "operator_structured" | "needs_structure" = providerCompiled
+        ? "compiled"
+        : readiness.ready
+          ? "operator_structured"
+          : "needs_structure";
 
       const now = Date.now();
       const values = projectionValues({ id: source.id, name: source.name, thesisText: source.thesisText }, graph, existing?.isPrimary ?? false, now);
@@ -645,6 +686,6 @@ export const thesisRouter = router({
         apertureThesisId = (result as any).insertId as number;
       }
 
-      return { apertureThesisId, sourceCompilationId: source.id, graph, linked: Boolean(existing), compilerStatus };
+      return { apertureThesisId, sourceCompilationId: source.id, graph, linked: Boolean(existing), compilerStatus, missingFields: readiness.missing, incompatibilities: readiness.incompatibilities };
     }),
 });

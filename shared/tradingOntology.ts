@@ -144,6 +144,7 @@ const horizonFromHoldingPeriod = (holdingPeriod: string): TimeHorizonTaxonomy =>
 export function buildOpeningRangeTradingOntology(input: {
   side: "long" | "short";
   holdingPeriod: string;
+  instrumentPreference?: "shares" | "options" | "either" | null;
   openingRange: { complete: boolean; minutes: number | null; unavailableReason?: string | null };
   vwapHold: { state: "confirmed" | "rejected" | "unknown"; basis: string } | null;
   catalystDeadlineAt: number | null;
@@ -163,9 +164,17 @@ export function buildOpeningRangeTradingOntology(input: {
       ? "confirmed"
       : "candidate";
   const deadlineExpired = input.catalystDeadlineAt != null && input.catalystDeadlineAt <= input.now;
+  const isPositionExpression = input.holdingPeriod === "position";
 
   return {
-    marketPlay: !rangeMeasured
+    marketPlay: isPositionExpression
+      ? {
+        family: "event",
+        specificPlay: "thesis_catalyst_expression",
+        status: deadlineExpired ? "unclassified" : "candidate",
+        basis: "This is a long-term thesis expression. Opening range and VWAP remain confirmation signals; they do not redefine it as a day trade.",
+      }
+      : !rangeMeasured
       ? {
         family: "unclassified",
         specificPlay: "awaiting_opening_range",
@@ -178,11 +187,17 @@ export function buildOpeningRangeTradingOntology(input: {
         status: setupStatus,
         basis: `${input.openingRange.minutes}-minute opening range is ${rangeComplete ? "complete" : "still forming"}; this identifies a candidate setup, while VWAP remains a separate confirmation signal.`,
       },
-    execution: {
-      direction: input.side,
-      strategy: isLong ? "buy_shares" : "short_shares",
-      instrument: "equity",
-    },
+    execution: input.instrumentPreference === "options"
+      ? {
+        direction: input.side,
+        strategy: isLong ? "buy_call" : "buy_put",
+        instrument: "option",
+      }
+      : {
+        direction: input.side,
+        strategy: isLong ? "buy_shares" : "short_shares",
+        instrument: "equity",
+      },
     horizon: horizonFromHoldingPeriod(input.holdingPeriod),
     catalyst: input.catalystDeadlineAt == null
       ? { status: "not_specified", label: "No catalyst deadline recorded", deadlineAt: null, subtype: "not_classified" }
