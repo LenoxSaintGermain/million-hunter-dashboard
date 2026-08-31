@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "third-signal-v2"
+  },
+  "targets": {
+    "third-signal-v2": {
+      "hosting": {
+        "capital-aperture": [
+          "third-signal-capital-aperture"
+        ]
+      }
+    }
+  }
+}

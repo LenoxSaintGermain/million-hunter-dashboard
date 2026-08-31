@@ -16,6 +16,15 @@ RUN pnpm install --frozen-lockfile
 # Copy source
 COPY . .
 
+# Public OAuth identifiers are compiled into the Vite bundle. They are not
+# credentials, but must be supplied explicitly when building outside Manus.
+ARG VITE_APP_ID
+ARG VITE_OAUTH_PORTAL_URL
+ARG VITE_RELEASE_SHA
+ENV VITE_APP_ID=$VITE_APP_ID
+ENV VITE_OAUTH_PORTAL_URL=$VITE_OAUTH_PORTAL_URL
+ENV VITE_RELEASE_SHA=$VITE_RELEASE_SHA
+
 # Build Vite frontend + bundle Express server
 RUN pnpm build
 

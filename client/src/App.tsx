@@ -69,6 +69,7 @@ import ApertureRuns from "./pages/aperture/ApertureRuns";
 import ApertureRecord from "./pages/aperture/ApertureRecord";
 import AperturePlayDesk from "./pages/aperture/AperturePlayDesk";
 import CapitalWalkthrough from "./pages/aperture/CapitalWalkthrough";
+import AuthUnavailable from "./pages/AuthUnavailable";
 import { getLoginUrl } from "./const";
 import { getDefaultWorkspacePath } from "@shared/defaultWorkspace";
 import { canOperateCapital } from "@shared/capitalOperatorAccess";
@@ -124,7 +125,7 @@ function OnboardingGuard() {
   const alreadyChecked = typeof window !== "undefined" &&
     sessionStorage.getItem("onboarding_checked") === "done";
 
-  const isPublicPage = location === "/lobby" || location === "/404" || location.startsWith("/deal-share") || location.startsWith("/asset-share") || location.startsWith("/invite") || location === "/brief" || location === "/explore" || location === "/demo" || location === "/demo-tour" || location === "/walkthrough" || location === "/pricing";
+  const isPublicPage = location === "/lobby" || location === "/404" || location === "/auth-unavailable" || location.startsWith("/deal-share") || location.startsWith("/asset-share") || location.startsWith("/invite") || location === "/brief" || location === "/explore" || location === "/demo" || location === "/demo-tour" || location === "/walkthrough" || location === "/pricing";
   const isInvestorArea = location.startsWith("/investor");
 
   // Operator onboarding check
@@ -221,6 +222,7 @@ function Router() {
         <Route path="/brief" component={InvestorBrief} />
         <Route path="/walkthrough" component={Walkthrough} />
         <Route path="/pricing" component={Pricing} />
+        <Route path="/auth-unavailable" component={AuthUnavailable} />
 
         {/* ── Root: Landing for unauth, Command Center for auth ── */}
         <Route path="/" component={RootRoute} />
