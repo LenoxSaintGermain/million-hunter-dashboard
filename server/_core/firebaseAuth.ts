@@ -1,7 +1,7 @@
 import type { Express, Request } from "express";
 import { applicationDefault, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { ONE_YEAR_MS, SESSION_COOKIE_NAMES } from "@shared/const";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { ENV } from "./env";
@@ -63,10 +63,13 @@ export function registerFirebaseAuthRoutes(app: Express) {
         name: identity.name || identity.email,
         expiresInMs: ONE_YEAR_MS,
       });
-      res.cookie(COOKIE_NAME, sessionToken, {
+      const cookieOptions = {
         ...getSessionCookieOptions(req),
         maxAge: ONE_YEAR_MS,
-      });
+      };
+      for (const cookieName of SESSION_COOKIE_NAMES) {
+        res.cookie(cookieName, sessionToken, cookieOptions);
+      }
       res.status(200).json({ success: true });
     } catch (error) {
       console.error("[Firebase Auth] Session creation failed", error instanceof Error ? error.message : error);

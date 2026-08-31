@@ -2,7 +2,7 @@ import { z } from "zod";
 import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { consensusScores, sellerSimulations, dealTrajectory, deals } from "../drizzle/schema";
-import { COOKIE_NAME } from "@shared/const";
+import { SESSION_COOKIE_NAMES } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, operatorProcedure,
@@ -45,7 +45,9 @@ export const appRouter = router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      for (const cookieName of SESSION_COOKIE_NAMES) {
+        ctx.res.clearCookie(cookieName, { ...cookieOptions, maxAge: -1 });
+      }
       return { success: true } as const;
     }),
   }),

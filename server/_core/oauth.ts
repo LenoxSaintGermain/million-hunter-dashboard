@@ -1,4 +1,4 @@
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { ONE_YEAR_MS, SESSION_COOKIE_NAMES } from "@shared/const";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
@@ -69,7 +69,9 @@ export function registerOAuthRoutes(app: Express) {
       });
 
       const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      for (const cookieName of SESSION_COOKIE_NAMES) {
+        res.cookie(cookieName, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      }
 
       // Redirect to the return path encoded in state (e.g. /invite/:token)
       // Falls back to "/" if no returnPath is present

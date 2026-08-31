@@ -83,8 +83,7 @@ import { buildTrustCalibration, calculatePaperPlayOutcome } from "../shared/play
 import { buildPortfolioImpactTrend, type PortfolioImpactTrendRow } from "../shared/portfolioImpactTrend";
 import { evaluateIntradayPaperOutcome } from "./aperture/playOutcomeEvaluator";
 import { createHeartbeatJob, updateHeartbeatJob } from "./_core/heartbeat";
-import { COOKIE_NAME } from "../shared/const";
-import { parse as parseCookie } from "cookie";
+import { readSessionCookie } from "./_core/sessionCookie";
 import { DAILY_OUTCOME_REFRESH_CRON, DAILY_OUTCOME_REFRESH_PATH, refreshLiveSlateOutcomes } from "./aperture/dailyOutcomeRefresh";
 import { ONE_TIME_GLP1_RESEARCH_PATH, oneTimeResearchCron } from "./aperture/oneTimeGlp1Research";
 import { PAPER_ACCOUNT_SYNC_CRON, PAPER_ACCOUNT_SYNC_PATH } from "./aperture/paperAccountSyncScheduled";
@@ -711,7 +710,7 @@ export const apertureRouter = router({
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Scheduled freshness is available only for configured Alpaca Paper accounts." });
         }
         const rawCookie = typeof ctx.req.headers.cookie === "string" ? ctx.req.headers.cookie : "";
-        const sessionToken = parseCookie(rawCookie)[COOKIE_NAME] ?? "";
+        const sessionToken = readSessionCookie(rawCookie) ?? "";
         if (!sessionToken) throw new TRPCError({ code: "UNAUTHORIZED", message: "Your session could not be verified for the paper-account sync schedule." });
 
         let taskUid = account.syncScheduleTaskUid ?? null;
@@ -2696,7 +2695,7 @@ export const apertureRouter = router({
         const [profile] = await db!.select({ taskUid: users.dailyOutcomeRefreshTaskUid })
           .from(users).where(eq(users.id, ctx.user.id)).limit(1);
         const rawCookie = typeof ctx.req.headers.cookie === "string" ? ctx.req.headers.cookie : "";
-        const sessionToken = parseCookie(rawCookie)[COOKIE_NAME] ?? "";
+        const sessionToken = readSessionCookie(rawCookie) ?? "";
         if (!sessionToken) throw new TRPCError({ code: "UNAUTHORIZED", message: "Your session could not be verified for the daily refresh schedule." });
         let taskUid = profile?.taskUid ?? null;
         let nextExecutionAt: string | null | undefined;
@@ -2757,7 +2756,7 @@ export const apertureRouter = router({
           activeCapitalThesisId: users.activeCapitalThesisId,
         }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
         const rawCookie = typeof ctx.req.headers.cookie === "string" ? ctx.req.headers.cookie : "";
-        const sessionToken = parseCookie(rawCookie)[COOKIE_NAME] ?? "";
+        const sessionToken = readSessionCookie(rawCookie) ?? "";
         if (!sessionToken) throw new TRPCError({ code: "UNAUTHORIZED", message: "Your session could not be verified for the scheduled GLP-1 brief." });
         if (!input.enabled) {
           if (profile?.taskUid) await updateHeartbeatJob(profile.taskUid, { enable: false }, sessionToken);

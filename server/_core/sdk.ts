@@ -1,12 +1,12 @@
-import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { AXIOS_TIMEOUT_MS, ONE_YEAR_MS } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
-import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
+import { readSessionCookie } from "./sessionCookie";
 import type {
   ExchangeTokenRequest,
   ExchangeTokenResponse,
@@ -152,15 +152,6 @@ class SDKServer {
     } as GetUserInfoResponse;
   }
 
-  private parseCookies(cookieHeader: string | undefined) {
-    if (!cookieHeader) {
-      return new Map<string, string>();
-    }
-
-    const parsed = parseCookieHeader(cookieHeader);
-    return new Map(Object.entries(parsed));
-  }
-
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
     return new TextEncoder().encode(secret);
@@ -265,8 +256,7 @@ class SDKServer {
 
   async authenticateRequest(req: Request): Promise<AuthenticatedUser> {
     // Regular authentication flow
-    const cookies = this.parseCookies(req.headers.cookie);
-    const sessionCookie = cookies.get(COOKIE_NAME);
+    const sessionCookie = readSessionCookie(req.headers.cookie);
     const session = await this.verifySession(sessionCookie);
 
     if (!session) {
