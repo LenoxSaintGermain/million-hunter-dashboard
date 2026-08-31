@@ -2,6 +2,7 @@ import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
+import { signOutFirebaseIdentity } from "@/lib/firebaseAuth";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -38,6 +39,7 @@ export function useAuth(options?: UseAuthOptions) {
       }
       throw error;
     } finally {
+      await signOutFirebaseIdentity().catch(() => undefined);
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
     }

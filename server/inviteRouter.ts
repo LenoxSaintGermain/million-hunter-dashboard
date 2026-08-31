@@ -4,12 +4,12 @@
  * Flow:
  *   1. Admin calls invite.create → gets back a signed invite URL
  *   2. Recipient opens URL → lands on /invite/:token (InviteAccept page)
- *   3. InviteAccept page calls getLoginUrl(returnPath="/invite/:token") and redirects to OAuth
- *   4. After OAuth, user lands on /invite/:token again (now authenticated)
+ *   3. InviteAccept sends the recipient through the app's Firebase Google sign-in
+ *   4. After a verified session is created, the user returns to /invite/:token
  *   5. Page calls invite.consume → role is assigned, user redirected to /
  *
- * The token is stored in the DB; the OAuth state carries the return path so
- * the callback redirects back to /invite/:token after login.
+ * The token is stored in the DB; the local sign-in route carries a sanitized
+ * relative return path so the recipient comes back here after login.
  */
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";

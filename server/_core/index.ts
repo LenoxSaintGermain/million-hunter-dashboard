@@ -4,6 +4,7 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
+import { registerFirebaseAuthRoutes } from "./firebaseAuth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -50,6 +51,7 @@ async function startServer() {
   registerStorageProxy(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  registerFirebaseAuthRoutes(app);
   // Heartbeat callbacks must be registered before tRPC and the Vite/static fallthrough.
   app.post("/api/scheduled/capital-daily-outcome-refresh", handleDailyOutcomeRefresh);
   app.post("/api/scheduled/capital-one-time-glp1-research", handleOneTimeGlp1Research);

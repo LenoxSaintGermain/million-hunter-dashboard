@@ -8,6 +8,14 @@ steps:
       - VITE_OAUTH_PORTAL_URL=${_VITE_OAUTH_PORTAL_URL}
       - --build-arg
       - VITE_RELEASE_SHA=${_VITE_RELEASE_SHA}
+      - --build-arg
+      - VITE_FIREBASE_API_KEY=${_VITE_FIREBASE_API_KEY}
+      - --build-arg
+      - VITE_FIREBASE_AUTH_DOMAIN=${_VITE_FIREBASE_AUTH_DOMAIN}
+      - --build-arg
+      - VITE_FIREBASE_PROJECT_ID=${_VITE_FIREBASE_PROJECT_ID}
+      - --build-arg
+      - VITE_FIREBASE_APP_ID=${_VITE_FIREBASE_APP_ID}
       - --tag
       - ${_IMAGE}
       - .

@@ -14,6 +14,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Loader2, ShieldCheck, AlertTriangle, CheckCircle2, Link2 } from "lucide-react";
+import { getLoginUrl } from "@/const";
 
 const ROLE_LABELS: Record<string, string> = {
   insurance: "Insurance Partner",
@@ -71,27 +72,7 @@ export default function InviteAccept() {
     }
   }, [isAuthenticated, validation?.valid]);
 
-  // Build the login URL with the invite path as returnPath
-  const loginUrl = (() => {
-    const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
-    const appId = import.meta.env.VITE_APP_ID;
-    if (!oauthPortalUrl || !appId) return null;
-    const redirectUri = `${window.location.origin}/api/oauth/callback`;
-    // Encode origin + returnPath in state so the callback redirects back here
-    const statePayload = btoa(
-      JSON.stringify({ origin: window.location.origin, returnPath: `/invite/${token}` })
-    );
-    try {
-      const url = new URL("/app-auth", oauthPortalUrl);
-      url.searchParams.set("appId", appId);
-      url.searchParams.set("redirectUri", redirectUri);
-      url.searchParams.set("state", statePayload);
-      url.searchParams.set("type", "signIn");
-      return url.toString();
-    } catch {
-      return null;
-    }
-  })();
+  const loginUrl = getLoginUrl(`/invite/${token}`);
 
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (authLoading || validating) {

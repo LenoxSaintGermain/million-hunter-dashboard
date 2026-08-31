@@ -118,6 +118,25 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function getCanonicalUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const normalized = email.trim().toLowerCase();
+  const rows = await db.select().from(users).where(eq(users.email, normalized)).limit(10);
+  if (rows.length === 0) return undefined;
+  if (rows.length === 1) return rows[0];
+
+  const canonicalIds = new Set(rows.map(row => row.mergedIntoUserId ?? row.id));
+  if (canonicalIds.size !== 1) {
+    throw new Error("Multiple unlinked accounts use this verified email");
+  }
+  const canonicalId = Array.from(canonicalIds)[0]!;
+  const inRows = rows.find(row => row.id === canonicalId);
+  if (inRows) return inRows;
+  const [canonical] = await db.select().from(users).where(eq(users.id, canonicalId)).limit(1);
+  return canonical;
+}
+
 // ─── Deals ────────────────────────────────────────────────────────────────────
 export async function getDeals(opts?: { limit?: number; offset?: number }) {
   const db = await getDb();
