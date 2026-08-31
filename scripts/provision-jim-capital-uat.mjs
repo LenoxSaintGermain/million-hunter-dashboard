@@ -8,9 +8,18 @@ const FIXTURE = {
 const WINGATE_COMPILATION_ID = 270001;
 const OWNER_USER_ID = 1;
 
+function assertIsolatedDatabase(rawUrl) {
+  const parsed = new URL(rawUrl);
+  const database = parsed.pathname.replace(/^\//, "");
+  if (parsed.hostname !== "127.0.0.1" || parsed.port !== "3307" || database !== "capital_aperture_uat_9c18799") {
+    throw new Error("Refusing to provision Jim Capital UAT outside the exact isolated loopback database.");
+  }
+}
+
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is required to provision the UAT fixture.");
 }
+assertIsolatedDatabase(process.env.DATABASE_URL);
 
 const db = await mysql.createConnection(process.env.DATABASE_URL);
 

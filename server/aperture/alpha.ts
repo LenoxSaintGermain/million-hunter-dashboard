@@ -37,7 +37,10 @@ export async function computeAlpha(runId: number, userId: number): Promise<Apert
 
   const now = Date.now();
 
-  const runRows = await db.select().from(apertureRuns).where(eq(apertureRuns.id, runId)).limit(1);
+  const runRows = await db.select().from(apertureRuns).where(and(
+    eq(apertureRuns.id, runId),
+    eq(apertureRuns.userId, userId),
+  )).limit(1);
   const run = runRows[0];
   if (!run) throw new Error("run not found");
 
@@ -127,20 +130,30 @@ export async function computeAlpha(runId: number, userId: number): Promise<Apert
     .where(eq(apertureAlpha.runId, runId)).limit(1);
 
   if (existing[0]) {
-    await db.update(apertureAlpha).set(payload).where(eq(apertureAlpha.runId, runId));
+    if (existing[0].userId !== userId) throw new Error("alpha ownership mismatch");
+    await db.update(apertureAlpha).set(payload).where(and(
+      eq(apertureAlpha.runId, runId),
+      eq(apertureAlpha.userId, userId),
+    ));
   } else {
     await db.insert(apertureAlpha).values({ ...payload, createdAt: now } as InsertApertureAlpha);
   }
 
-  const rows = await db.select().from(apertureAlpha).where(eq(apertureAlpha.runId, runId)).limit(1);
+  const rows = await db.select().from(apertureAlpha).where(and(
+    eq(apertureAlpha.runId, runId),
+    eq(apertureAlpha.userId, userId),
+  )).limit(1);
   return rows[0]!;
 }
 
 // ── Get alpha for a run (no recompute) ────────────────────────────────────────
 
-export async function getAlpha(runId: number): Promise<ApertureAlpha | null> {
+export async function getAlpha(runId: number, userId: number): Promise<ApertureAlpha | null> {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(apertureAlpha).where(eq(apertureAlpha.runId, runId)).limit(1);
+  const rows = await db.select().from(apertureAlpha).where(and(
+    eq(apertureAlpha.runId, runId),
+    eq(apertureAlpha.userId, userId),
+  )).limit(1);
   return rows[0] ?? null;
 }

@@ -898,7 +898,7 @@ export default function ApertureExecute() {
           </div>
         )}
 
-        {proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}?view=evidence`)}>Review the recorded evidence decision</Button></section> : proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(`/aperture/run/${runId}?view=evidence`)} onProposalCreated={() => navigate(`/aperture/run/${runId}/execute`)} />}
+        {proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}?view=evidence`)}>Review the recorded evidence decision</Button></section> : proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(`/aperture/run/${runId}?view=evidence`)} onProposalCreated={() => navigate(`/aperture/run/${runId}/execute?candidate=${proposalCandidate.id}`)} />}
 
         <Tabs defaultValue="orders" className="min-w-0">
           <TabsList aria-label="Paper lifecycle" className="grid h-auto w-full min-w-0 grid-cols-1 gap-1 p-1 sm:grid-cols-3">
@@ -910,7 +910,7 @@ export default function ApertureExecute() {
             <OrderQueue runId={runId} />
           </TabsContent>
           <TabsContent value="monitoring" className="mt-4 min-w-0" aria-label="Check whether thesis still holds">
-            <MonitoringPanel runId={runId} candidate={proposalCandidate ?? data?.candidates[0]} thesisSummary={run?.invalidationRule} />
+            <MonitoringPanel runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule} />
           </TabsContent>
           <TabsContent value="alpha" className="mt-4 min-w-0" aria-label="Outcome and notes">
             <AlphaDashboard runId={runId} />

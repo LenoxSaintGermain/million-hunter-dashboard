@@ -330,6 +330,11 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
           : "Options buying power is missing or below the maximum premium debit; refresh the paper account",
       },
       {
+        key: "option_chain_market_evidence",
+        passed: false,
+        detail: "Options paper proposals remain blocked until a provider supplies current bid/ask, spread, volume, open interest, implied volatility, and quote time for the exact contract",
+      },
+      {
         key: "option_contract_verified",
         passed: Boolean(optionContract
           && optionContract.tradable
@@ -810,7 +815,7 @@ export async function submitOrder(orderId: number, userId: number, paperConfirma
 
   await db.update(brokerOrders).set(updates).where(eq(brokerOrders.id, orderId));
 
-  if (decisionAuthorization?.source === "authoritative" && decisionAuthorization.decisionRunId != null && decisionAuthorization.revisionId != null) {
+  if (newStatus === "filled" && decisionAuthorization?.source === "authoritative" && decisionAuthorization.decisionRunId != null && decisionAuthorization.revisionId != null) {
     await queuePaperOutcome({
       userId,
       decisionRunId: decisionAuthorization.decisionRunId,
@@ -880,6 +885,16 @@ export async function mirrorFills(userId: number): Promise<number> {
 
       if (newStatus === "filled" && result.filledQty && result.filledAvgPriceCents) {
         await writePositionSnapshot(order.accountId, order.runId, order.symbol, result.filledQty, result.filledAvgPriceCents);
+      }
+      if (newStatus === "filled" && order.decisionRunId != null && order.decisionRevisionId != null) {
+        await queuePaperOutcome({
+          userId,
+          decisionRunId: order.decisionRunId,
+          revisionId: order.decisionRevisionId,
+          orderId: order.id,
+          holdingPeriod: isStoredHoldingPeriod(order.holdingPeriod) ? order.holdingPeriod : null,
+          catalystDeadlineAt: order.catalystDeadlineAt,
+        });
       }
       updated++;
     } catch {

@@ -219,7 +219,7 @@ async function readImmutableDecisionReceipt(
   })) receiptBindingUnavailable();
 
   const [[canonical], [projection], [account]] = await Promise.all([
-    db.select({ id: thesisCompilations.id, name: thesisCompilations.name }).from(thesisCompilations).where(and(eq(thesisCompilations.id, decisionRun.canonicalThesisId), eq(thesisCompilations.userId, userId))).limit(1),
+    db.select({ id: thesisCompilations.id, name: thesisCompilations.name }).from(thesisCompilations).where(eq(thesisCompilations.id, decisionRun.canonicalThesisId)).limit(1),
     db.select({ id: capitalTheses.id, name: capitalTheses.name, sourceCompilationId: capitalTheses.sourceCompilationId }).from(capitalTheses).where(and(eq(capitalTheses.id, decisionRun.capitalThesisId), eq(capitalTheses.userId, userId))).limit(1),
     db.select({ id: portfolioAccounts.id, label: portfolioAccounts.label, isPaper: portfolioAccounts.isPaper }).from(portfolioAccounts).where(and(eq(portfolioAccounts.id, decisionRun.accountId), eq(portfolioAccounts.userId, userId))).limit(1),
   ]);
@@ -1110,10 +1110,7 @@ export const apertureRouter = router({
           eq(aperturePendingOutcomes.revisionId, apertureDecisionRevisions.id),
           eq(aperturePendingOutcomes.decisionRunId, apertureDecisionRevisions.decisionRunId),
         ))
-        .innerJoin(thesisCompilations, and(
-          eq(apertureDecisionRuns.canonicalThesisId, thesisCompilations.id),
-          eq(thesisCompilations.userId, ctx.user.id),
-        ))
+        .innerJoin(thesisCompilations, eq(apertureDecisionRuns.canonicalThesisId, thesisCompilations.id))
         .where(and(
           eq(aperturePendingOutcomes.userId, ctx.user.id),
           eq(apertureDecisionRuns.userId, ctx.user.id),
@@ -3459,6 +3456,24 @@ export const apertureRouter = router({
         if (!owned || normSymbol(input.symbol) !== owned.symbol) {
           throw new TRPCError({ code: "NOT_FOUND", message: "The monitored candidate is not part of this operator-owned run." });
         }
+        const filledOrders = await db!.select({
+          intent: brokerOrders.intent,
+          filledQty: brokerOrders.filledQty,
+        }).from(brokerOrders).where(and(
+          eq(brokerOrders.userId, ctx.user.id),
+          eq(brokerOrders.runId, input.runId),
+          eq(brokerOrders.candidateId, input.candidateId),
+          eq(brokerOrders.status, "filled"),
+        ));
+        const netFilledQty = filledOrders.reduce((total, order) => {
+          const quantity = Math.max(0, order.filledQty ?? 0);
+          if (order.intent === "open") return total + quantity;
+          if (order.intent === "close") return total - quantity;
+          return total;
+        }, 0);
+        if (netFilledQty <= 0) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No open filled paper exposure exists for this candidate. Monitoring begins only after a verified fill." });
+        }
         return runMonitoringChecks(
           input.runId,
           input.candidateId,
@@ -3500,7 +3515,7 @@ export const apertureRouter = router({
 
     get: capitalOperatorProcedure
       .input(z.object({ runId: z.number() }))
-      .query(async ({ input }) => getAlpha(input.runId)),
+      .query(async ({ ctx, input }) => getAlpha(input.runId, ctx.user.id)),
   }),
 });
 
