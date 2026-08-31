@@ -37,6 +37,7 @@ export interface ThesisFitScore {
 /** Facts that carry weight. Missing ones lower confidence rather than the score. */
 const SCORING_FACTS = ["revenue_ttm", "pe_ratio", "price_to_sales", "adv_usd_30d", "last_price", "market_cap"];
 export type ScoreHoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
+export type ScoreInstrumentPreference = "shares" | "options" | "either";
 
 function normalizeHoldingPeriod(value: unknown): ScoreHoldingPeriod {
   return ["intraday", "overnight", "swing", "catalyst_window", "position"].includes(String(value))
@@ -44,10 +45,22 @@ function normalizeHoldingPeriod(value: unknown): ScoreHoldingPeriod {
     : "swing";
 }
 
-function scoringFactsFor(holdingPeriod: ScoreHoldingPeriod): string[] {
+function normalizeInstrumentPreference(value: unknown): ScoreInstrumentPreference {
+  return ["shares", "options", "either"].includes(String(value))
+    ? value as ScoreInstrumentPreference
+    : "either";
+}
+
+function scoringFactsFor(holdingPeriod: ScoreHoldingPeriod, instrumentPreference: ScoreInstrumentPreference): string[] {
   // Valuation multiples describe a longer-horizon ownership question. They do
   // not confirm or invalidate a same-session tape setup, so they cannot block
-  // an intraday candidate through the evidence-review gate.
+  // an intraday candidate through the evidence-review gate. They also cannot
+  // clear an options catalyst play: that requires catalyst and contract facts.
+  if (instrumentPreference === "options") {
+    return SCORING_FACTS
+      .filter((key) => key !== "pe_ratio" && key !== "price_to_sales")
+      .concat("catalyst_primary_source", "option_chain_verified", "option_liquidity_verified");
+  }
   return holdingPeriod === "intraday"
     ? SCORING_FACTS.filter((key) => key !== "pe_ratio" && key !== "price_to_sales")
     : SCORING_FACTS;
@@ -57,7 +70,11 @@ function scoringFactsFor(holdingPeriod: ScoreHoldingPeriod): string[] {
  * Dimensions are fixed in shape but their thresholds come from the thesis: a
  * liquidity floor the investor stated becomes the gate on D.
  */
-export function dimensionsFor(graph: ThesisGraph, holdingPeriod: ScoreHoldingPeriod = "swing"): ScorableDimension[] {
+export function dimensionsFor(
+  graph: ThesisGraph,
+  holdingPeriod: ScoreHoldingPeriod = "swing",
+  instrumentPreference: ScoreInstrumentPreference = normalizeInstrumentPreference(graph.instrumentPreference),
+): ScorableDimension[] {
   const minAdv = graph.portfolioRules.minAvgDailyVolumeUsd;
   return [
     {
@@ -75,7 +92,16 @@ export function dimensionsFor(graph: ThesisGraph, holdingPeriod: ScoreHoldingPer
           bands: [{ gte: 80, points: 25 }, { gte: 60, points: 19 }, { gte: 40, points: 12 }, { gte: 20, points: 6 }, { gte: 0, points: 0 }] },
       ],
     },
-    holdingPeriod === "intraday"
+    instrumentPreference === "options"
+      ? {
+        key: "C", label: "Catalyst & option-contract readiness", max: 20, gate: 20,
+        factors: [
+          { key: "catalyst", label: "Named catalyst primary-source evidence", max: 10, field: "catalyst_primary_source", missing: 0, verifyWhenMissing: true, whenTrue: 10 },
+          { key: "contract", label: "Option chain and contract terms", max: 5, field: "option_chain_verified", missing: 0, verifyWhenMissing: true, whenTrue: 5 },
+          { key: "liquidity", label: "Option bid/ask and liquidity", max: 5, field: "option_liquidity_verified", missing: 0, verifyWhenMissing: true, whenTrue: 5 },
+        ],
+      }
+      : holdingPeriod === "intraday"
       ? { key: "C", label: "Valuation (not used for intraday)", max: 0, factors: [] }
       : {
         key: "C", label: "Valuation", max: 20,
@@ -138,11 +164,14 @@ export interface ScoreInput {
   sector?: string | null;
   /** Intraday scoring deliberately excludes trailing valuation multiples. */
   holdingPeriod?: ScoreHoldingPeriod | null;
+  /** Options research is gated by catalyst and contract evidence, not equity valuation multiples. */
+  instrumentPreference?: ScoreInstrumentPreference | null;
 }
 
 export function scoreThesisFit(input: ScoreInput): ThesisFitScore {
   const { symbol, facts, graph, nodeLabels } = input;
   const holdingPeriod = normalizeHoldingPeriod(input.holdingPeriod);
+  const instrumentPreference = normalizeInstrumentPreference(input.instrumentPreference ?? graph.instrumentPreference);
 
   const byKey = new Map<string, SecurityFact>();
   for (const f of facts) if (f.basis !== "unknown") byKey.set(f.factKey, f);
@@ -153,7 +182,7 @@ export function scoreThesisFit(input: ScoreInput): ThesisFitScore {
     sectorFact && graph.sectors.some((s) => s.toLowerCase().trim() && sectorFact.toLowerCase().includes(s.toLowerCase().trim())),
   );
 
-  const scoringFacts = scoringFactsFor(holdingPeriod);
+  const scoringFacts = scoringFactsFor(holdingPeriod, instrumentPreference);
   const present = scoringFacts.filter((k) => byKey.has(k));
   const factCoveragePct = (present.length / scoringFacts.length) * 100;
 
@@ -169,12 +198,12 @@ export function scoreThesisFit(input: ScoreInput): ThesisFitScore {
     return f.valueNum ?? f.valueText ?? undefined;
   };
 
-  const dims = dimensionsFor(graph, holdingPeriod);
+  const dims = dimensionsFor(graph, holdingPeriod, instrumentPreference);
   const { dimResults, rawSum, verifyFields } = scoreDimensions(dims, get);
   const maxAvailablePoints = dims.reduce((sum, dimension) => sum + dimension.max, 0);
   const compositeScore = clamp(Math.round(maxAvailablePoints > 0 ? (rawSum / maxAvailablePoints) * 100 : 0), 0, 100);
 
-  const confidenceScore = present.length / SCORING_FACTS.length;
+  const confidenceScore = scoringFacts.length > 0 ? present.length / scoringFacts.length : 0;
   const rankScore = Math.round(compositeScore * (0.5 + 0.5 * confidenceScore) * 10) / 10;
 
   const hardStopFailed = checkExclusions(facts, graph);

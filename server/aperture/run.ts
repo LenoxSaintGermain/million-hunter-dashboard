@@ -44,6 +44,7 @@ export interface AssembleInput {
   intendedTrades: Array<{ symbol: string; dollarsCents: number }>;
   hurdleRateBps?: number | null;
   holdingPeriod?: "intraday" | "overnight" | "swing" | "catalyst_window" | "position" | null;
+  instrumentPreference?: "shares" | "options" | "either" | null;
 }
 
 export interface AssembledCandidate {
@@ -148,6 +149,7 @@ export function assembleRun(input: AssembleInput): AssembledRun {
       nodeLabels,
       sector: sectorOf(facts),
       holdingPeriod: input.holdingPeriod,
+      instrumentPreference: input.instrumentPreference ?? graph.instrumentPreference,
     });
 
     if (score.hardStopFailed) {

@@ -123,6 +123,24 @@ describe("scoreThesisFit", () => {
     expect(intraday.verifyFields.join(" ")).not.toMatch(/Price \/ earnings|Price \/ sales/);
   });
 
+  it("gates options catalyst research on catalyst and contract evidence instead of equity valuation", () => {
+    const options = scoreThesisFit({
+      symbol: "DKNG",
+      graph: { ...GRAPH, instrumentPreference: "options" },
+      nodeLabels: NODES,
+      holdingPeriod: "catalyst_window",
+      instrumentPreference: "options",
+      facts: WELL_COVERED.filter((item) => !["pe_ratio", "price_to_sales"].includes(item.factKey)),
+    });
+
+    expect(options.dimensions.find((dimension) => dimension.key === "C")?.label).toMatch(/option-contract readiness/i);
+    expect(options.verifyFields.join(" ")).toMatch(/Named catalyst primary-source evidence/);
+    expect(options.verifyFields.join(" ")).toMatch(/Option chain and contract terms/);
+    expect(options.verifyFields.join(" ")).toMatch(/Option bid\/ask and liquidity/);
+    expect(options.verifyFields.join(" ")).not.toMatch(/Price \/ earnings|Price \/ sales/);
+    expect(options.gatesPass).toBe(false);
+  });
+
   it("uses the investor's stated liquidity floor as the tradability gate", () => {
     const strict: ThesisGraph = { ...GRAPH, portfolioRules: { minAvgDailyVolumeUsd: 500e6 } };
     expect(dimensionsFor(strict).find((d) => d.key === "D")!.gate).toBe(6);

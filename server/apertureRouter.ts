@@ -3650,6 +3650,7 @@ async function executeRun(
       holdingPeriod: input.holdingPeriod != null && ["intraday", "overnight", "swing", "catalyst_window", "position"].includes(input.holdingPeriod)
         ? input.holdingPeriod as "intraday" | "overnight" | "swing" | "catalyst_window" | "position"
         : null,
+      instrumentPreference: input.instrumentPreference ?? graph.instrumentPreference,
     });
 
     // ── 6. Persist candidates ──────────────────────────────────────────────
