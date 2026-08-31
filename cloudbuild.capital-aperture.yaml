@@ -1,0 +1,15 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg
+      - VITE_APP_ID=${_VITE_APP_ID}
+      - --build-arg
+      - VITE_OAUTH_PORTAL_URL=${_VITE_OAUTH_PORTAL_URL}
+      - --build-arg
+      - VITE_RELEASE_SHA=${_VITE_RELEASE_SHA}
+      - --tag
+      - ${_IMAGE}
+      - .
+images:
+  - ${_IMAGE}
