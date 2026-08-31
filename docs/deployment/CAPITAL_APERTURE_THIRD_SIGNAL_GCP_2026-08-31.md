@@ -6,13 +6,13 @@
 
 ## Release identity
 
-- Source commit: `2968650`
-- Cloud Build: `fc06b7ef-a95d-48a6-9bc6-8a16ae73621f` — `SUCCESS`
-- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:2968650`
-- Image digest: `sha256:4e2757364693a70a87941b7a23a7484c937ece6636ebd7dc3070b10bc6a833d7`
+- Source commit: `49df993`
+- Cloud Build: `89de161c-754d-4c23-9030-a67f33b76095` — `SUCCESS`
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:49df993`
+- Image digest: `sha256:d0997d78acfa28264b6583f2261208ec6417b32141e9d539df6b0ebbccac96d7`
 - Cloud Run service: `capital-aperture`
 - Region: `us-central1`
-- Ready revision: `capital-aperture-00003-cn7`
+- Ready revision: `capital-aperture-00004-9wn`
 - Firebase Hosting site: `third-signal-capital-aperture`
 - Firebase Hosting target: `capital-aperture`
 - Runtime identity: `capital-aperture-runtime@third-signal-v2.iam.gserviceaccount.com`
@@ -21,18 +21,20 @@
 ## Validation
 
 - GCP billing is enabled for `third-signal-v2`.
-- Cloud Run reports the revision ready and sends 100% of service traffic to `capital-aperture-00003-cn7`.
+- Cloud Run reports the revision ready and sends 100% of service traffic to `capital-aperture-00004-9wn`.
 - `GET /aperture` through Firebase Hosting returns HTTP 200.
 - `GET /walkthrough` through Firebase Hosting returns HTTP 200 and renders the zero-login walkthrough.
 - Same-origin `system.health` through Firebase Hosting returns HTTP 200 with `ok: true`.
-- The production bundle contains the expected `2968650` release marker and dedicated Firebase web-app configuration.
+- The production bundle contains the expected `49df993` release marker and dedicated Firebase web-app configuration.
 - An unauthenticated browser visit to `/aperture` stays on the Third Signal origin and lands at `/sign-in?returnPath=%2Faperture`.
 - `Continue with Google` opens the Google/Firebase account chooser for the Third Signal Firebase project; no Manus URL is generated.
 - Firebase Auth authorizes `third-signal-capital-aperture.web.app`; Google sign-in is enabled.
+- The server issues Firebase Hosting's permitted `__session` cookie and keeps `app_session_id` as a direct-service compatibility fallback. Authentication, paper-account schedules, and logout read or clear both names consistently.
+- A public request carrying a deliberately invalid `__session` reached revision `capital-aperture-00004-9wn` and produced `Session verification failed`, rather than `Missing session cookie`; this proves Firebase Hosting forwarded the cookie to Cloud Run.
 - The owner email resolves to exactly one existing administrator profile, so verified-email linking will preserve the existing account rather than create a blank duplicate.
 - A cross-origin session request is rejected with HTTP 403, a missing/short token with HTTP 400, and a forged long token with HTTP 401.
 - `pnpm check` passed.
-- `DATABASE_URL= Poe_api_key=uat-placeholder-not-a-provider-key pnpm test:unit` passed 101 files and 796 tests; 2 files and 2 tests were intentionally skipped.
+- `DATABASE_URL= Poe_api_key=uat-placeholder-not-a-provider-key pnpm test:unit` passed 102 files and 799 tests; 2 files and 2 tests were intentionally skipped.
 - The production build passed.
 
 ## Boundaries
@@ -61,7 +63,7 @@ To return to this release:
 gcloud run services update-traffic capital-aperture \
   --project third-signal-v2 \
   --region us-central1 \
-  --to-revisions capital-aperture-00003-cn7=100
+  --to-revisions capital-aperture-00004-9wn=100
 ```
 
 ## Remaining owner check
