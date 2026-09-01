@@ -18,7 +18,17 @@ import {
   getModelConfig, getAllModelConfigs, upsertModelConfig,
   getDealIdByNameSource,
 } from "./db";
-import { MODEL_CATALOG, DEFAULT_MODULE_MODELS, GEMINI_STRONG, GEMINI_FAST, VALID_GEMINI_IDS, toValidGeminiId, type AnalysisModule } from "../shared/models";
+import {
+  MODEL_CATALOG,
+  DEFAULT_CONSENSUS_MODELS,
+  DEFAULT_MODULE_MODELS,
+  GEMINI_STRONG,
+  GEMINI_FAST,
+  VALID_CATALOG_MODEL_IDS,
+  VALID_ROUTABLE_MODEL_IDS,
+  toValidRoutableModelId,
+  type AnalysisModule,
+} from "../shared/models";
 import {
   analyzeOwnerPsychology, runDigitalAudit, runRedTeamAnalysis,
   buildCapitalStack, generateInvestmentMemo, scoreDeal,
@@ -517,8 +527,9 @@ export const appRouter = router({
             capitalStackSummary: capital.summary,
           }),
           // Record the ids actually used, not hardcoded guesses: runOwnerPsychology
-          // and runDigitalAudit both call POE_MODELS.CLAUDE_OPUS (server/gemini.ts).
-          modelVersions: { psychology: POE_MODELS.CLAUDE_OPUS, digital: POE_MODELS.CLAUDE_OPUS, redteam: GEMINI_STRONG, capital: GEMINI_FAST },
+          // Owner psychology and digital-health interpretation use the same
+          // validated Sonnet route; research provenance remains separate.
+          modelVersions: { psychology: POE_MODELS.CLAUDE_SONNET, digital: POE_MODELS.CLAUDE_SONNET, redteam: GEMINI_STRONG, capital: GEMINI_FAST },
         };
         await upsertSignal(signalData);
         await logActivity({
@@ -740,7 +751,9 @@ export const appRouter = router({
     update: protectedProcedure
       .input(z.object({
         module: z.string(),
-        modelId: z.string(),
+        modelId: z.string().refine((modelId) => VALID_CATALOG_MODEL_IDS.has(modelId), {
+          message: "Model is not present in the validated catalog",
+        }),
         enabled: z.boolean().optional(),
       }))
       .mutation(async ({ input }) => {
@@ -762,9 +775,9 @@ export const appRouter = router({
         await upsertModelConfig(module as AnalysisModule, modelId, true);
       }
       // Reset consensus models to defaults
-      await upsertModelConfig("consensus_model_1" as AnalysisModule, GEMINI_STRONG, true);
-      await upsertModelConfig("consensus_model_2" as AnalysisModule, GEMINI_FAST, true);
-      await upsertModelConfig("consensus_model_3" as AnalysisModule, GEMINI_FAST, true);
+      await upsertModelConfig("consensus_model_1" as AnalysisModule, DEFAULT_CONSENSUS_MODELS[0], true);
+      await upsertModelConfig("consensus_model_2" as AnalysisModule, DEFAULT_CONSENSUS_MODELS[1], true);
+      await upsertModelConfig("consensus_model_3" as AnalysisModule, DEFAULT_CONSENSUS_MODELS[2], true);
       return { success: true };
     }),
 
@@ -772,25 +785,24 @@ export const appRouter = router({
     consensusConfig: publicProcedure.query(async () => {
       const saved = await getAllModelConfigs();
       const defaults = {
-        consensus_model_1: GEMINI_STRONG,
-        consensus_model_2: GEMINI_FAST,
-        consensus_model_3: GEMINI_FAST,
+        consensus_model_1: DEFAULT_CONSENSUS_MODELS[0],
+        consensus_model_2: DEFAULT_CONSENSUS_MODELS[1],
+        consensus_model_3: DEFAULT_CONSENSUS_MODELS[2],
       };
       const result: Record<string, string> = {};
       for (const [key, defaultModel] of Object.entries(defaults)) {
         const entry = saved.find((r) => r.module === key);
-        // Coerce stale pre-policy IDs to the default so
-        // the Settings UI never shows a model the key can't actually run.
-        result[key] = toValidGeminiId(entry?.modelId, defaultModel);
+        // Coerce stale provider IDs to a validated direct-Google/Poe default.
+        result[key] = toValidRoutableModelId(entry?.modelId, defaultModel);
       }
       return result;
     }),
 
     updateConsensus: protectedProcedure
       .input(z.object({
-        model1: z.string().refine((m) => VALID_GEMINI_IDS.has(m), { message: "Model not valid on the production key" }),
-        model2: z.string().refine((m) => VALID_GEMINI_IDS.has(m), { message: "Model not valid on the production key" }),
-        model3: z.string().refine((m) => VALID_GEMINI_IDS.has(m), { message: "Model not valid on the production key" }),
+        model1: z.string().refine((m) => VALID_ROUTABLE_MODEL_IDS.has(m), { message: "Model is not validated on an active provider route" }),
+        model2: z.string().refine((m) => VALID_ROUTABLE_MODEL_IDS.has(m), { message: "Model is not validated on an active provider route" }),
+        model3: z.string().refine((m) => VALID_ROUTABLE_MODEL_IDS.has(m), { message: "Model is not validated on an active provider route" }),
       }))
       .mutation(async ({ input }) => {
         await upsertModelConfig("consensus_model_1" as AnalysisModule, input.model1, true);

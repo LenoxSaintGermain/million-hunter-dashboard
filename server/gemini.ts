@@ -9,7 +9,8 @@
  *     GEMINI_LITE      → Background tasks, subagent work
  *
  *   Poe API (OpenAI-compatible gateway) — non-Gemini models:
- *     POE_MODELS.CLAUDE_OPUS  → Owner Psychology profiling, Digital Footprint Audit
+ *     POE_MODELS.CLAUDE_SONNET → Owner Psychology and digital-health interpretation
+ *     POE_MODELS.KIMI_K3       → independent long-context investment memo synthesis
  *
  *   Perplexity Sonar Pro (direct) — live web research:
  *     sonar-pro               → URL import extraction, live web research
@@ -107,7 +108,7 @@ Analyze and return a JSON object with:
 
   try {
     const parsed = await poeJSON<OwnerPsychologyResult>({
-      model: POE_MODELS.CLAUDE_OPUS,
+      model: POE_MODELS.CLAUDE_SONNET,
       systemPrompt: "You are an expert M&A psychologist. Return only valid JSON with no markdown.",
       userPrompt: prompt,
       maxTokens: 512,
@@ -164,7 +165,7 @@ Return ONLY valid JSON.`;
       reviewSentimentScore: number;
       auditSummary: string;
     }>({
-      model: POE_MODELS.CLAUDE_OPUS,
+      model: POE_MODELS.CLAUDE_SONNET,
       systemPrompt: "You are a digital due diligence analyst specializing in Main Street business acquisitions. Return only valid JSON.",
       userPrompt: prompt,
       maxTokens: 1000,
@@ -295,7 +296,7 @@ Return ONLY valid JSON.`;
   }
 }
 
-// ─── Investment Memo (Gemini 3.1 Pro — direct) ───────────────────────────────
+// ─── Investment Memo (Kimi K3 via Poe; fail closed if unavailable) ───────────
 export async function generateInvestmentMemo(
   deal: Deal,
   signals?: {
@@ -341,13 +342,13 @@ Return JSON with:
 Return ONLY valid JSON.`;
 
   try {
-    const response = await genai.models.generateContent({
-      model: GEMINI_PRO,
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: { responseMimeType: "application/json" },
+    const parsed: any = await poeJSON<Record<string, unknown>>({
+      model: POE_MODELS.KIMI_K3,
+      systemPrompt: "You are an evidence-disciplined senior M&A analyst. Return only valid JSON.",
+      userPrompt: prompt,
+      maxTokens: 6000,
+      temperature: 0.2,
     });
-    const text = response.text ?? "{}";
-    const parsed = looseJsonParse(text);
     return {
       title: parsed.title ?? `Investment Memo: ${deal.name}`,
       content: parsed.content ?? "# Investment Memo\n\nGeneration failed.",
@@ -360,7 +361,7 @@ Return ONLY valid JSON.`;
     // Throw instead of returning a fake memo: the route must not persist a
     // "Generation failed" document as if it were a real memo (cache-first
     // reads would then serve the failure forever).
-    console.error(`[InvestmentMemo] Generation failed for "${deal.name}" (model ${GEMINI_PRO}):`, e?.message ?? e);
+    console.error(`[InvestmentMemo] Generation failed for "${deal.name}" (${POE_MODELS.KIMI_K3}):`, e?.message ?? e);
     throw new Error(`Memo generation failed for ${deal.name}: ${e?.message ?? "unknown error"}`);
   }
 }

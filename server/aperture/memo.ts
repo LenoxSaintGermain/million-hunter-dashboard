@@ -11,10 +11,9 @@
  * three fabrication bugs in the property engine all started with a prompt that
  * asked nicely.
  */
-import { GoogleGenAI } from "@google/genai";
 import type { SecurityFact } from "../../drizzle/schema";
-import { GEMINI_STRONG } from "../../shared/models";
 import { looseJsonParse } from "../gemini";
+import { poeJSON, POE_MODELS } from "../poe";
 import { factsToPromptBlock, unknownGaps } from "./facts";
 import { validateMemoNumbers, type ValidationResult } from "./memoValidator";
 import type { ThesisGraph } from "./thesisGraph";
@@ -212,19 +211,21 @@ export function parseMemoResponse(response: unknown): unknown {
   throw new Error("Memo output contained no parseable structured JSON.");
 }
 
-async function callGemini(prompt: string): Promise<unknown> {
-  if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
-  const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  return genai.models.generateContent({
-    model: GEMINI_STRONG,
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: SCHEMA as any,
-      temperature: 0.3,
-      maxOutputTokens: 4096,
-    },
+/**
+ * Kimi supplies the independent long-context memo perspective. Provider changes
+ * are never silent: an unavailable route skips the memo, and the ledger
+ * validator still decides whether a returned narrative is allowed through.
+ */
+async function callMemoModel(prompt: string): Promise<unknown> {
+  const parsed = await poeJSON<Record<string, unknown>>({
+    model: POE_MODELS.KIMI_K3,
+    systemPrompt: "Write only from the supplied fact ledger. Return one JSON object and never invent a number.",
+    userPrompt: prompt,
+    maxTokens: 4096,
+    temperature: 0.2,
+    schema: JSON.stringify(SCHEMA),
   });
+  return JSON.stringify(parsed);
 }
 
 /**
@@ -256,7 +257,7 @@ export async function generateMemo(
     };
   }
 
-  const generate = opts.generate ?? callGemini;
+  const generate = opts.generate ?? callMemoModel;
   const prompt = buildMemoPrompt(symbol, facts, graph, holdings);
 
   let raw: unknown;

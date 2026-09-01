@@ -15,6 +15,9 @@
  *   Gemini-3-Flash          → frontier, cost-efficient
  *   Gemini-3.1-Flash-Lite   → fastest/cheapest
  *   GPT-5.4                 → OpenAI flagship on this key
+ *   kimi-k3                 → Moonshot long-context synthesis
+ *   deepseek-v4-pro         → independent reasoning / adversarial review
+ *   deepseek-v4-flash       → low-cost parallel critic and scoring
  *
  * Two ids this file previously used are DEAD and were removed:
  *   Claude-Opus-4  → HTTP 500 "Server got itself in trouble"; not in /v1/models.
@@ -68,6 +71,13 @@ export const POE_MODELS = {
   // OpenAI via Poe
   GPT_FLAGSHIP: "GPT-5.4",
   GPT_FAST: "GPT-5.4",
+
+  // Moonshot AI via Poe
+  KIMI_K3: "kimi-k3",
+
+  // DeepSeek via Poe
+  DEEPSEEK_V4_PRO: "deepseek-v4-pro",
+  DEEPSEEK_V4_FLASH: "deepseek-v4-flash",
 } as const;
 
 export type PoeModel = (typeof POE_MODELS)[keyof typeof POE_MODELS];

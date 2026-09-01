@@ -26,12 +26,13 @@ Signal Hunter OS — a multi-agent **deal diligence & decision** engine for smal
 
 ## Model policy (current API key)
 
-**`shared/models.ts` is the single source of truth. This section describes it; it does not override it.** Re-validated live against the production `GEMINI_API_KEY` on **2026-08-18** by `npx tsx scripts/validate-models.ts` (run from the repo root — a one-token `generateContent` probe per candidate, costs almost nothing, re-runnable). That script is the authority. Before changing any model ID, re-run it and update `shared/models.ts` and this section together.
+**`shared/models.ts` is the single source of truth. This section describes it; it does not override it.** Re-validated live against the production `GEMINI_API_KEY` on **2026-09-01** by `npx tsx scripts/validate-models.ts` (run from the repo root — a one-token `generateContent` probe per candidate, costs almost nothing, re-runnable). Poe role candidates are separately validated by `npx tsx scripts/validate-poe-role-models.ts`. Those scripts are the authority. Before changing any model ID, re-run the appropriate validator and update `shared/models.ts` and this section together.
 
-### Validated set (6 of 7 candidates passed, 2026-08-18)
+### Validated Gemini set (7 of 8 candidates passed, 2026-09-01)
 
 | Model ID | Result |
 | --- | --- |
+| `gemini-3.7-flash` | PASS |
 | `gemini-3.1-pro-preview` | PASS |
 | `gemini-3.6-flash` | PASS |
 | `gemini-3.5-flash` | PASS |
@@ -49,29 +50,29 @@ Note: the previous version of this section claimed only `gemini-3.1-pro-preview`
 | Constant | Resolves to | Use for |
 | --- | --- | --- |
 | `GEMINI_STRONG` | `gemini-3.1-pro-preview` | Red Team, Investment Memo — deepest reasoning, 2M context |
-| `GEMINI_FAST` | `gemini-3.6-flash` | High-volume: capital stack math, scoring, market scan |
-| `GEMINI_BALANCED` | `gemini-3.5-flash` | Middle tier: deal scoring, consensus |
+| `GEMINI_FAST` | `gemini-3.7-flash` | High-volume: capital stack math, scoring, market scan |
+| `GEMINI_BALANCED` | `gemini-3.7-flash` | Structured synthesis and consensus |
 | `GEMINI_LITE` | `gemini-3.5-flash-lite` | Ultra-cheap background/subagent tasks |
 
 (`GEMINI_LEGACY_LITE` = `gemini-3.1-flash-lite` exists as a fallback only.)
 
 ### Rules
 
-1. **Call sites import role constants from `shared/models.ts`.** No hardcoded model strings anywhere in `server/`, `client/`, or `scripts/` except `shared/models.ts` itself and `scripts/validate-models.ts`. Enforce with:
+1. **Call sites import role constants from `shared/models.ts`.** No hardcoded model strings anywhere in `server/`, `client/`, or `scripts/` except the registries and validator scripts. Enforce with:
    `grep -rn "gemini-[0-9]" server client shared scripts`
-2. **Anything read from the DB `model_configs` table must pass through `toValidGeminiId(id, fallback)`** with a valid fallback. A stale row must never reach the API. Verified at every call site: `server/routers.ts` (`consensusConfig`), `server/agents/index.ts` (`getConsensusModelIds`); `updateConsensus` additionally rejects writes outside `VALID_GEMINI_IDS` via zod.
+2. **Anything read from the DB `model_configs` table must pass through `toValidRoutableModelId(id, fallback)`** when the role permits Google or Poe, or `toValidGeminiId(id, fallback)` for Gemini-only call sites. A stale row must never reach a provider. `updateConsensus` rejects writes outside the validated routable catalog.
 3. **The Memos "Generation failed" bug came from mixed versions** (`2.5-*`, `3.1-pro`, `3.1-flash`, `3.1-pro-exp`) scattered across routers, plus stale `model_configs` rows reaching the API uncoerced. Both halves of that failure mode are still live risks — keep the registry single-sourced and keep the coercion.
 
-### Non-Gemini providers — unverified, do not invent
+### Non-Gemini providers — exact live IDs only
 
-`scripts/validate-models.ts` only holds a Gemini key, so **Poe and Perplexity IDs are unvalidated.** Poe uses its own label-style namespace (`Codex-Opus-4`, `GPT-5.5`, …). The current Anthropic family is Opus 5 / Sonnet 5 / Haiku 4.5, so the Poe labels in the catalog are likely stale — but **do not rename them without confirming the exact label against the live Poe gateway.** An invented Poe label fails at request time exactly the way `gemini-3.1-flash` did. Known drift, left deliberately untouched: `shared/models.ts` catalogs `Codex-Opus-4.7` while `server/poe.ts` actually sends `Codex-Opus-4`.
+Poe uses its own label-style namespace. On **2026-09-01**, `kimi-k3`, `deepseek-v4-pro`, and `deepseek-v4-flash` were confirmed in Poe's live catalog and passed minimal production-key completion probes. Run `scripts/validate-poe-role-models.ts` before changing or promoting these routes. Kimi K3 is reserved for long-context synthesis, DeepSeek V4 Pro for independent adversarial review, and DeepSeek V4 Flash for cheap parallel criticism. Poe Chat Completions does not enforce JSON schema; decision-critical responses require local parsing and validation and must fail closed when invalid. Perplexity IDs remain outside this validator.
 
 ---
 
 ## Architecture map (verify against current code — it moves)
 
 - **Client:** React + Vite. Design system = CSS custom properties prefixed `--sh-*` in `client/src/index.css` (surface, border, signal, primary, red, text tokens). **Use these tokens — do not invent a new visual language.** Key pages: `client/src/pages/LandingPage.tsx` (public landing), `client/src/pages/DemoTour.tsx` (cached 5-chapter demo), `client/src/pages/Walkthrough.tsx` (`/walkthrough` — 8-step public solo walkthrough, zero auth, zero API), `client/src/pages/InvestorBrief.tsx` (`/brief` — 13-section scrollytelling pitch with 6 deterministic simulators). Nav/layout: `DashboardLayout.tsx`, `EditorialTopNav.tsx`, `InvestorLayout.tsx`.
-- **Server:** Node/Express, entry `server/_core/index.ts`. Agents in `server/agents/` — the IC consensus scorer runs three Gemini calls in parallel and is surfaced in the UI via **persona labels** ("The Structuralist," "The Restructurer," "The Market Analyst"), NOT vendor names. Keep it that way (persona labels are the honest relabel). `server/poe.ts` = Poe gateway (Codex/Gemini). Real web research uses Perplexity Sonar (`server/deepResearch.ts`, RippleEffect Scanner, TIDE) — the pattern to reuse for any real cited data.
+- **Server:** Node/Express, entry `server/_core/index.ts`. Agents in `server/agents/` — the IC consensus scorer runs a provider-diverse three-model panel in parallel and is surfaced in the UI via **persona labels** ("The Structuralist," "The Restructurer," "The Market Analyst"), not vendor names. `server/poe.ts` is the Poe gateway for Claude, Kimi, DeepSeek, and other validated catalog routes. Real web research uses Perplexity Sonar (`server/deepResearch.ts`, RippleEffect Scanner, TIDE) — the pattern to reuse for any real cited data.
 - **Data:** Drizzle ORM. Runtime deal data in DB; model selection in `model_configs` table (`server/db.ts`). **Ground-truth fixtures:** `server/fixtures/ground-truth-deals.json` — 3 anonymized composite deals (e.g. "Apex Commercial Cleaning," $2.1M — customer concentration + add-back inflation) + a `rigor_gate_test` block. These composites are the sanctioned demo/test deals; keep them labeled composite.
 - **Run/build:** pnpm. `pnpm dev` (tsx watch), `pnpm check` (tsc), `pnpm test` (vitest, last known 99/99), `pnpm build`, `pnpm db:push`.
 

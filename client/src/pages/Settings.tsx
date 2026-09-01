@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import {
   MODULE_LABELS, MODULE_DESCRIPTIONS, MODEL_CATALOG,
-  GEMINI_STRONG, GEMINI_BALANCED, GEMINI_FAST,
+  DEFAULT_CONSENSUS_MODELS,
   type AnalysisModule,
 } from "@shared/models";
 
@@ -37,9 +37,9 @@ function ConsensusModelConfig() {
   const dataRef = useState(() => ({ loaded: false }))[0];
   if (consensusData && !dataRef.loaded) {
     dataRef.loaded = true;
-    setM1(consensusData.consensus_model_1 ?? GEMINI_STRONG);
-    setM2(consensusData.consensus_model_2 ?? GEMINI_BALANCED);
-    setM3(consensusData.consensus_model_3 ?? GEMINI_FAST);
+    setM1(consensusData.consensus_model_1 ?? DEFAULT_CONSENSUS_MODELS[0]);
+    setM2(consensusData.consensus_model_2 ?? DEFAULT_CONSENSUS_MODELS[1]);
+    setM3(consensusData.consensus_model_3 ?? DEFAULT_CONSENSUS_MODELS[2]);
   }
 
   const updateConsensus = trpc.models.updateConsensus.useMutation({
@@ -52,7 +52,9 @@ function ConsensusModelConfig() {
     onError: (e) => toast.error(`Failed: ${e.message}`),
   });
 
-  const GEMINI_MODELS = MODEL_CATALOG.filter((m) => m.provider === "google");
+  const CONSENSUS_MODELS = MODEL_CATALOG.filter((model) =>
+    model.provider === "google" || model.provider === "poe",
+  );
 
   const ModelSelect = ({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) => (
     <div className="space-y-1.5">
@@ -62,11 +64,13 @@ function ConsensusModelConfig() {
           <SelectValue placeholder="Select model..." />
         </SelectTrigger>
         <SelectContent>
-          {GEMINI_MODELS.map((model) => (
+          {CONSENSUS_MODELS.map((model) => (
             <SelectItem key={model.id} value={model.id} className="text-xs">
               <div className="flex items-center gap-2">
                 <span>{model.label}</span>
-                <span className="text-[9px] px-1 py-0.5 rounded-sm bg-blue-500/20 text-blue-400 font-medium">{model.tier}</span>
+                <span className={`text-[9px] px-1 py-0.5 rounded-sm font-medium ${model.provider === "poe" ? "bg-violet-500/20 text-violet-400" : "bg-blue-500/20 text-blue-400"}`}>
+                  {model.provider} · {model.tier}
+                </span>
               </div>
             </SelectItem>
           ))}
@@ -85,7 +89,7 @@ function ConsensusModelConfig() {
               Consensus Scoring Models
             </h3>
             <p className="text-[10px] text-muted-foreground mt-0.5">
-              3 models run in parallel — divergence &gt;15% triggers ⚠ Review flag
+              Three independent reviewers run in parallel — divergence &gt;15% triggers review
             </p>
           </div>
           <Button
@@ -99,14 +103,14 @@ function ConsensusModelConfig() {
           </Button>
         </div>
         {isLoading ? (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {[1,2,3].map(i => <Skeleton key={i} className="h-16" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-3">
-            <ModelSelect value={m1} onChange={setM1} label="Model 1 (Strong)" />
-            <ModelSelect value={m2} onChange={setM2} label="Model 2 (Fast)" />
-            <ModelSelect value={m3} onChange={setM3} label="Model 3 (Lite)" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <ModelSelect value={m1} onChange={setM1} label="Primary reviewer" />
+            <ModelSelect value={m2} onChange={setM2} label="Independent synthesizer" />
+            <ModelSelect value={m3} onChange={setM3} label="Adversarial reviewer" />
           </div>
         )}
         <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-[var(--sh-border)]/50">
@@ -144,7 +148,7 @@ const TIER_COLOR: Record<string, string> = {
 
 const PROVIDER_COLOR: Record<string, string> = {
   google: "bg-blue-500/20 text-blue-400",
-  openai: "bg-emerald-500/20 text-[var(--sage)]",
+  poe: "bg-violet-500/20 text-violet-400",
   perplexity: "bg-purple-500/20 text-purple-400",
 };
 
@@ -368,7 +372,7 @@ export default function Settings() {
                   </h3>
                   <p className="text-xs text-muted-foreground mt-1 max-w-lg">
                     Each analysis module runs on an independently configurable AI model.
-                    Experimental Gemini models have generous rate limits — use them freely.
+                    Roles are deliberately split across providers so one model family never becomes the whole investment argument.
                   </p>
                 </div>
                 <Button
@@ -431,13 +435,13 @@ export default function Settings() {
                             </SelectTrigger>
                             <SelectContent className="max-h-72">
                               {/* Group by provider */}
-                              {["google", "openai", "perplexity"].map((provider) => {
+                              {["google", "poe", "perplexity"].map((provider) => {
                                 const providerModels = catalogData?.filter((m) => m.provider === provider) ?? [];
                                 if (!providerModels.length) return null;
                                 return (
                                   <div key={provider}>
                                     <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                      {provider === "google" ? "Gemini Engine" : provider === "openai" ? "Language Engine" : "Research Engine"}
+                                      {provider === "google" ? "Gemini Engine" : provider === "poe" ? "Independent Models via Poe" : "Research Engine"}
                                     </div>
                                     {providerModels.map((model) => (
                                       <SelectItem key={model.id} value={model.id} className="text-xs">

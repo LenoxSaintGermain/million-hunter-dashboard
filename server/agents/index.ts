@@ -31,7 +31,14 @@ import {
 } from "../gemini";
 import { getDb } from "../db";
 import { dealTrajectory } from "../../drizzle/schema";
-import { GEMINI_STRONG, GEMINI_FAST, toValidGeminiId } from "../../shared/models";
+import {
+  DEFAULT_CONSENSUS_MODELS,
+  GEMINI_STRONG,
+  GEMINI_FAST,
+  getModelById,
+  toValidRoutableModelId,
+} from "../../shared/models";
+import { poeJSON } from "../poe";
 
 // ─── Model Tiers ─────────────────────────────────────────────────────────────
 // Gemini — called directly via Google Generative AI API.
@@ -204,19 +211,78 @@ export async function runThirdSignalPipeline(deal: Deal): Promise<{
  * High divergence (>0.15) flags the deal for manual review.
  */
 export async function getConsensusModelIds(): Promise<[string, string, string]> {
+  const defaults: [string, string, string] = [...DEFAULT_CONSENSUS_MODELS];
   try {
     const { getAllModelConfigs } = await import("../db");
     const saved = await getAllModelConfigs();
-    // model_configs rows can hold stale IDs from before the model policy
-    // — those fail at the API, so coerce anything
-    // outside the key-validated set back to the tier default.
-    const m1 = toValidGeminiId(saved.find((r) => r.module === "consensus_model_1")?.modelId, MODEL_STRONG);
-    const m2 = toValidGeminiId(saved.find((r) => r.module === "consensus_model_2")?.modelId, MODEL_FAST);
-    const m3 = toValidGeminiId(saved.find((r) => r.module === "consensus_model_3")?.modelId, MODEL_LITE);
+    // Rows may contain stale provider-specific IDs. Preserve only models that
+    // the current direct-Google or Poe route has explicitly validated.
+    const m1 = toValidRoutableModelId(saved.find((r) => r.module === "consensus_model_1")?.modelId, defaults[0]);
+    const m2 = toValidRoutableModelId(saved.find((r) => r.module === "consensus_model_2")?.modelId, defaults[1]);
+    const m3 = toValidRoutableModelId(saved.find((r) => r.module === "consensus_model_3")?.modelId, defaults[2]);
     return [m1, m2, m3];
   } catch {
-    return [MODEL_STRONG, MODEL_FAST, MODEL_LITE];
+    return defaults;
   }
+}
+
+type ConsensusModelOutput = { score?: number; rationale?: string };
+
+function validateConsensusOutput(
+  modelId: string,
+  output: ConsensusModelOutput,
+): { score: number; rationale: string } {
+  if (
+    typeof output.score !== "number"
+    || !Number.isFinite(output.score)
+    || output.score < 0
+    || output.score > 1
+    || typeof output.rationale !== "string"
+    || output.rationale.trim().length === 0
+  ) {
+    throw new Error(`Consensus model returned an invalid decision record: ${modelId}`);
+  }
+  return { score: output.score, rationale: output.rationale.trim() };
+}
+
+/** Invoke one consensus reviewer through its declared provider route. */
+async function callConsensusModel(
+  modelId: string,
+  prompt: string,
+): Promise<ConsensusModelOutput> {
+  const definition = getModelById(modelId);
+  if (!definition) throw new Error(`Consensus model is not in the validated catalog: ${modelId}`);
+
+  if (definition.provider === "poe") {
+    const output = await poeJSON<ConsensusModelOutput>({
+      model: modelId,
+      userPrompt: prompt,
+      maxTokens: 512,
+      temperature: 0.1,
+      schema: '{"score":"number from 0 to 1","rationale":"2-3 sentence string"}',
+    });
+    return validateConsensusOutput(modelId, output);
+  }
+
+  if (definition.provider === "google") {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" },
+        }),
+      },
+    );
+    if (!response.ok) throw new Error(`Gemini consensus call failed (${response.status})`);
+    const payload: any = await response.json();
+    const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+    return validateConsensusOutput(modelId, JSON.parse(text) as ConsensusModelOutput);
+  }
+
+  throw new Error(`Provider ${definition.provider} is not supported for consensus scoring`);
 }
 
 export async function runConsensusScoring(deal: Deal): Promise<ConsensusResult> {
@@ -244,39 +310,25 @@ Return ONLY valid JSON.`;
   // Load configured model IDs (dynamic — reads from DB, falls back to defaults)
   const [modelId1, modelId2, modelId3] = await getConsensusModelIds();
 
-  const callGemini = (modelId: string, label: string) =>
-    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: scoringPrompt(label) }] }],
-        generationConfig: { responseMimeType: "application/json" },
-      }),
-    }).then(r => r.json());
-
-  // Run all 3 models in parallel (MiroFish fan-out pattern)
+  // Run three provider-diverse reviewers in parallel (MiroFish fan-out pattern).
   const [result1, result2, result3] = await Promise.allSettled([
-    callGemini(modelId1, modelId1),
-    callGemini(modelId2, modelId2),
-    callGemini(modelId3, modelId3),
+    callConsensusModel(modelId1, scoringPrompt(modelId1)),
+    callConsensusModel(modelId2, scoringPrompt(modelId2)),
+    callConsensusModel(modelId3, scoringPrompt(modelId3)),
   ]);
+
+  const unavailable = [result1, result2, result3]
+    .map((result, index) => ({ result, model: [modelId1, modelId2, modelId3][index] }))
+    .filter((entry) => entry.result.status === "rejected");
+  if (unavailable.length > 0) {
+    const names = unavailable.map((entry) => entry.model).join(", ");
+    throw new Error(`Consensus panel unavailable; no score was recorded (${names})`);
+  }
 
   // Parse results from each model
   const parseScore = (result: PromiseSettledResult<any>, modelName: string): { model: string; score: number; rationale: string } => {
-    if (result.status === "rejected") {
-      return { model: modelName, score: 0.5, rationale: "Model unavailable." };
-    }
-    try {
-      const text = result.value?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-      const parsed = JSON.parse(text);
-      return {
-        model: modelName,
-        score: Math.min(1, Math.max(0, parsed.score ?? 0.5)),
-        rationale: parsed.rationale ?? "No rationale provided.",
-      };
-    } catch {
-      return { model: modelName, score: 0.5, rationale: "Parse error." };
-    }
+    if (result.status === "rejected") throw result.reason;
+    return { model: modelName, ...result.value };
   };
 
   const scores = [

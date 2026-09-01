@@ -18,6 +18,7 @@ import { VALID_GEMINI_IDS } from "../shared/models";
 
 // Candidates = declared-valid set ∪ every id seen hardcoded or documented anywhere.
 const EXTRA_CANDIDATES = [
+  "gemini-3.7-flash",
   "gemini-3.1-flash",
   "gemini-3.6-flash",
   "gemini-3.5-flash",
