@@ -33,6 +33,25 @@ export function isOptionInstrument(value: unknown): value is "long_call" | "long
   return value === "long_call" || value === "long_put";
 }
 
+/** Pick a valid standard monthly (third-Friday) expiration. */
+export function nextStandardMonthlyOptionExpiration(now = Date.now(), minimumDays = 75): string {
+  const threshold = new Date(now + minimumDays * 86_400_000);
+  threshold.setUTCHours(0, 0, 0, 0);
+
+  let year = threshold.getUTCFullYear();
+  let month = threshold.getUTCMonth();
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const first = new Date(Date.UTC(year, month, 1));
+    const firstFriday = 1 + ((5 - first.getUTCDay() + 7) % 7);
+    const thirdFriday = new Date(Date.UTC(year, month, firstFriday + 14));
+    if (thirdFriday >= threshold) return thirdFriday.toISOString().slice(0, 10);
+    month += 1;
+    if (month === 12) { month = 0; year += 1; }
+  }
+
+  throw new Error("Unable to determine a standard monthly option expiration.");
+}
+
 export function buildOccOptionSymbol(input: {
   underlyingSymbol: string;
   expirationDate: string;

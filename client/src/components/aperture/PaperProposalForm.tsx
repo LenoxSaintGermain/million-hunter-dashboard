@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { buildProposalReadiness } from "@shared/proposalReadiness";
 import { dollarsToCents } from "@shared/proposalTicketFields";
-import { buildOccOptionSymbol, isOptionInstrument, paperInstrumentLabel, type PaperInstrumentType } from "@shared/paperInstrument";
+import { buildOccOptionSymbol, isOptionInstrument, nextStandardMonthlyOptionExpiration, paperInstrumentLabel, type PaperInstrumentType } from "@shared/paperInstrument";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -62,7 +62,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   const [showDetails, setShowDetails] = useState(false);
   const [destinationAccountId, setDestinationAccountId] = useState<number | null>(null);
   const [instrumentType, setInstrumentType] = useState<PaperInstrumentType>(() => run?.instrumentPreference === "options" ? (candidate?.playSide === "short" ? "long_put" : "long_call") : "shares");
-  const [optionExpirationDate, setOptionExpirationDate] = useState(() => new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10));
+  const [optionExpirationDate, setOptionExpirationDate] = useState(() => nextStandardMonthlyOptionExpiration());
   const [optionStrikeDollars, setOptionStrikeDollars] = useState("");
   const [contracts, setContracts] = useState("1");
   const allowedInstrumentTypes: PaperInstrumentType[] = run?.instrumentPreference === "options"

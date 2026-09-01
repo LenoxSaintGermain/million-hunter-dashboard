@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildOccOptionSymbol, optionPremiumAtRiskCents, parseOccOptionSymbol, validatePaperInstrument } from "./paperInstrument";
+import { buildOccOptionSymbol, nextStandardMonthlyOptionExpiration, optionPremiumAtRiskCents, parseOccOptionSymbol, validatePaperInstrument } from "./paperInstrument";
 
 describe("paper option contract identity", () => {
+  it("defaults tickets to the next standard monthly expiration", () => {
+    expect(nextStandardMonthlyOptionExpiration(Date.parse("2026-09-01T16:00:00Z"))).toBe("2026-11-20");
+    expect(nextStandardMonthlyOptionExpiration(Date.parse("2026-11-19T16:00:00Z"), 0)).toBe("2026-11-20");
+    expect(nextStandardMonthlyOptionExpiration(Date.parse("2026-11-21T16:00:00Z"), 0)).toBe("2026-12-18");
+  });
+
   it("builds and parses a standard OCC contract symbol", () => {
     const symbol = buildOccOptionSymbol({ underlyingSymbol: "AAPL", expirationDate: "2027-01-15", optionType: "call", strikePriceCents: 25000 });
     expect(symbol).toBe("AAPL270115C00250000");
