@@ -127,9 +127,9 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
         ? "Wait for broker reconciliation. Do not create or submit a duplicate ticket."
         : terminal.some((order) => order.status === "filled")
           ? "Open “Check whether thesis still holds” at the recorded review time, then close the outcome loop."
-          : ticketBuilderActive
-            ? "Complete the exact paper ticket above. After proposal creation, it will appear here for separate approval."
-            : "Return to the decision brief to prepare a proposal, revise the mission, or preserve cash.";
+           : ticketBuilderActive
+             ? "Use the guarded action above. A proposal appears here only after preflight passes."
+             : "Return to the decision brief to prepare a proposal, revise the mission, or preserve cash.";
 
   const statusColor = (s: string) => s === "filled" ? "oklch(0.55 0.15 145)" :
     s === "rejected" || s === "cancelled" ? "var(--sh-red)" :
@@ -172,9 +172,9 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
 
       {orders?.length === 0 && (
         <p className="text-sm text-center py-8" style={{ color: "var(--sh-fg-muted)" }}>
-          {ticketBuilderActive
-            ? "No paper proposal yet. Finish the ticket above; proposal, approval, and paper submission remain separate steps."
-            : "No paper orders yet. A reviewed research decision must be translated into an order before it can enter this queue."}
+           {ticketBuilderActive
+             ? "No paper proposal yet. Follow the guarded action above; proposal, approval, and paper submission remain separate steps."
+             : "No paper orders yet. A reviewed research decision must be translated into an order before it can enter this queue."}
         </p>
       )}
 
@@ -855,6 +855,7 @@ export default function ApertureExecute() {
   const [, params] = useRoute("/aperture/run/:id/execute");
   const runId = Number(params?.id);
   const [, navigate] = useLocation();
+  const [showAlternatives, setShowAlternatives] = useState(false);
 
   const { data } = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
   const run = data?.run;
@@ -875,6 +876,15 @@ export default function ApertureExecute() {
   const decisionUrl = proposalCandidate
     ? `/aperture/run/${runId}?candidate=${proposalCandidate.id}`
     : `/aperture/run/${runId}`;
+  const alternativeCandidates = (data?.candidates ?? [])
+    .filter((candidate) => candidate.id !== proposalCandidate?.id)
+    .map((candidate) => ({
+      candidate,
+      evidence: getEvidenceReviewReadiness(
+        normalizeStringList(candidate.verifyFields),
+        (data?.evidenceReviews ?? []).filter((review) => review.candidateId === candidate.id),
+      ),
+    }));
 
   return (
     <DashboardLayout>
@@ -910,7 +920,25 @@ export default function ApertureExecute() {
           </div>
         )}
 
-        {proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(evidenceUrl)}>Review the recorded evidence decision</Button></section> : proposalCandidate && evidenceReviewRequired ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper ticket locked · step 1 of 4</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Review {unreviewedEvidenceChecks.length} decision-critical check{unreviewedEvidenceChecks.length === 1 ? "" : "s"} before building the ticket.</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This is the only blocker to address on this screen. After the final positive review, the flow advances to exact contract → proposal → approve → submit. A negative review preserves cash instead.</p><ol className="mt-4 space-y-2">{unreviewedEvidenceChecks.map((check, index) => <li key={check} className="flex gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}><span className="font-mono text-xs tabular-nums" style={{ color: "var(--sh-signal)" }}>{index + 1}</span><span>{check}</span></li>)}</ol><Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={() => navigate(evidenceUrl)}>Review {unreviewedEvidenceChecks.length} required check{unreviewedEvidenceChecks.length === 1 ? "" : "s"}</Button></section> : proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(evidenceUrl)} onReturnToDecisionBrief={() => navigate(decisionUrl)} onProposalCreated={() => navigate(`/aperture/run/${runId}/execute?candidate=${proposalCandidate.id}`)} />}
+        {proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(evidenceUrl)}>Review the recorded evidence decision</Button></section> : proposalCandidate && evidenceReviewRequired ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper ticket locked · step 1 of 4</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Review {unreviewedEvidenceChecks.length} decision-critical check{unreviewedEvidenceChecks.length === 1 ? "" : "s"} before building the ticket.</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This is the only blocker to address on this screen. After the final positive review, the flow advances to exact contract → proposal → approve → submit. A negative review preserves cash instead.</p><ol className="mt-4 space-y-2">{unreviewedEvidenceChecks.map((check, index) => <li key={check} className="flex gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}><span className="font-mono text-xs tabular-nums" style={{ color: "var(--sh-signal)" }}>{index + 1}</span><span>{check}</span></li>)}</ol><Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={() => navigate(evidenceUrl)}>Review {unreviewedEvidenceChecks.length} required check{unreviewedEvidenceChecks.length === 1 ? "" : "s"}</Button></section> : proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(evidenceUrl)} onReturnToDecisionBrief={() => setShowAlternatives(true)} onProposalCreated={() => navigate(`/aperture/run/${runId}/execute?candidate=${proposalCandidate.id}`)} />}
+
+        {showAlternatives && proposalCandidate && <section className="scroll-mt-4 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }} aria-live="polite">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Resolve this decision here</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Choose another play in this run</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{proposalCandidate.symbol} remains blocked by the named preflight rule. Pick an alternative below; the next button opens only its unresolved checks or its ticket.</p></div>
+            <Button variant="ghost" size="sm" className="min-h-11 shrink-0" onClick={() => setShowAlternatives(false)}>Keep this ticket visible</Button>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {alternativeCandidates.map(({ candidate, evidence }) => {
+              const remaining = evidence.unreviewedChecks.length;
+              const declined = evidence.paperStageDeclined;
+              return <button key={candidate.id} type="button" disabled={declined} className="flex min-h-16 items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left disabled:cursor-not-allowed disabled:opacity-55" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }} onClick={() => {
+                setShowAlternatives(false);
+                navigate(remaining > 0 ? `/aperture/run/${runId}?candidate=${candidate.id}&view=evidence` : `/aperture/run/${runId}/execute?candidate=${candidate.id}`);
+              }}><span><strong className="font-mono text-sm" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol}</strong><span className="mt-1 block text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>{declined ? "Paper stage declined" : remaining > 0 ? `${remaining} evidence check${remaining === 1 ? "" : "s"} remain` : "Evidence complete · open ticket"}</span></span><ArrowLeft className="h-4 w-4 rotate-180" style={{ color: "var(--sh-signal)" }} /></button>;
+            })}
+          </div>
+          {alternativeCandidates.length === 0 && <p className="mt-4 rounded-lg border p-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>No alternative play exists in this run. Preserve cash or revise the mission; no order was created.</p>}
+        </section>}
 
         <Tabs defaultValue="orders" className="min-w-0">
           <TabsList aria-label="Paper lifecycle" className="grid h-auto w-full min-w-0 grid-cols-1 gap-1 p-1 sm:grid-cols-3">

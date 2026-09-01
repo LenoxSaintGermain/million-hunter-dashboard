@@ -3,21 +3,45 @@ import { Button } from "@/components/ui/button";
 import { buildDecisionFocus, type DecisionCandidate, type PaperPosition } from "@shared/decisionFocus";
 import { buildDecisionPath } from "@shared/decisionPath";
 
-export function DecisionFocusCard({ candidate, positions, onOpenMemo, onReviewEvidence, onComparePostures, onViewPaperAccount }: {
+export function DecisionFocusCard({ candidate, positions, reviewedChecks, onOpenMemo, onReviewEvidence, onComparePostures, onViewPaperAccount, onPrepareProposal }: {
   candidate: DecisionCandidate;
   positions: PaperPosition[];
+  reviewedChecks?: Iterable<string>;
   onOpenMemo?: () => void;
   onReviewEvidence?: () => void;
   onComparePostures?: () => void;
   onViewPaperAccount?: () => void;
+  onPrepareProposal?: () => void;
 }) {
   const focus = buildDecisionFocus(candidate, positions);
   const decisiveChecks = Array.isArray(candidate.verifyFields)
     ? candidate.verifyFields.filter((check): check is string => typeof check === "string")
     : [];
+  const reviewedCheckSet = new Set(reviewedChecks ?? []);
+  const unresolvedChecks = decisiveChecks.filter((check) => !reviewedCheckSet.has(check));
+  const allChecksReviewed = decisiveChecks.length > 0 && unresolvedChecks.length === 0;
   const invalidationGuardrail = focus.humanChecks.find((check) => /invalidation/i.test(check));
-  const path = buildDecisionPath({ symbol: candidate.symbol, memoStatus: candidate.memoStatus, decisionCriticalChecks: decisiveChecks.length });
+  const path = buildDecisionPath({ symbol: candidate.symbol, memoStatus: candidate.memoStatus, decisionCriticalChecks: unresolvedChecks.length });
   const blocked = focus.verdict === "not_ready";
+
+  if (allChecksReviewed) {
+    return (
+      <section className="flex flex-col gap-4 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "color-mix(in srgb, var(--sh-emerald) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}>
+        <div className="flex min-w-0 gap-3">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} />
+          <div>
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-emerald)" }}>Evidence review complete</p>
+            <h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol} is ready for ticket preflight.</h2>
+            <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Finish the exact paper ticket here. Preflight will either prepare the proposal or name the rule that blocks it.</p>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {onPrepareProposal && <Button size="sm" className="min-h-11" onClick={onPrepareProposal}>Review paper ticket <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>}
+          {onReviewEvidence && <button className="text-xs underline-offset-4 hover:underline" style={{ color: "var(--sh-fg-muted)" }} onClick={onReviewEvidence}>Evidence</button>}
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="overflow-hidden rounded-2xl border" style={{ borderColor: blocked ? "color-mix(in oklab, var(--sh-signal) 65%, var(--sh-border-1))" : "oklch(0.55 0.15 145)", background: "var(--sh-surface)" }}>
       <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
@@ -29,7 +53,7 @@ export function DecisionFocusCard({ candidate, positions, onOpenMemo, onReviewEv
       </div>
       <div className="grid divide-y sm:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] sm:divide-x sm:divide-y-0" style={{ borderColor: "var(--sh-border-1)" }}>
         <div className="grid divide-y" style={{ borderColor: "var(--sh-border-1)" }}><div className="p-4"><p className="text-[0.65rem] font-semibold uppercase tracking-[0.13em]" style={{ color: "var(--sh-fg-muted)" }}>Portfolio impact</p><p className="mt-2 text-sm leading-5" style={{ color: "var(--sh-text-primary)" }}>{focus.portfolioEffect}</p></div><div className="p-4"><p className="text-[0.65rem] font-semibold uppercase tracking-[0.13em]" style={{ color: "var(--sh-fg-muted)" }}>What the evidence cannot say</p><p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{focus.returnOutlook}</p></div></div>
-        <div className="p-4"><p className="text-[0.65rem] font-semibold uppercase tracking-[0.13em]" style={{ color: "var(--sh-fg-muted)" }}>Two things to clear before paper review</p><ol className="mt-2 space-y-2">{decisiveChecks.slice(0, 2).map((check, index) => <li key={check} className="flex gap-2 text-sm leading-5" style={{ color: "var(--sh-text-primary)" }}><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.65rem] font-semibold" style={{ color: "var(--sh-signal)", background: "color-mix(in oklab, var(--sh-signal) 14%, transparent)" }}>{index + 1}</span>{check.replace(/^\w:\s*/, "")}</li>)}</ol>{invalidationGuardrail && <p className="mt-3 border-t pt-2 text-[11px] leading-4" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Guardrail:</span> {invalidationGuardrail}</p>}<p className="mt-2 text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>These checks gate paper-order review only. Research and posture comparison can continue now.</p></div>
+        <div className="p-4"><p className="text-[0.65rem] font-semibold uppercase tracking-[0.13em]" style={{ color: "var(--sh-fg-muted)" }}>What remains before paper review</p><ol className="mt-2 space-y-2">{unresolvedChecks.slice(0, 2).map((check, index) => <li key={check} className="flex gap-2 text-sm leading-5" style={{ color: "var(--sh-text-primary)" }}><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.65rem] font-semibold" style={{ color: "var(--sh-signal)", background: "color-mix(in oklab, var(--sh-signal) 14%, transparent)" }}>{index + 1}</span>{check.replace(/^\w:\s*/, "")}</li>)}</ol>{invalidationGuardrail && <p className="mt-3 border-t pt-2 text-[11px] leading-4" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Guardrail:</span> {invalidationGuardrail}</p>}<p className="mt-2 text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>These checks gate paper-order review only. Research and posture comparison can continue now.</p></div>
       </div>
       <div className="flex flex-col gap-3 border-t px-5 py-3 sm:flex-row sm:items-center" style={{ borderColor: "var(--sh-border-1)" }}>
         <div className="flex min-w-0 items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Next: {path.label}</p><p className="mt-0.5 text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{path.detail}</p></div></div>

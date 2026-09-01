@@ -27,7 +27,7 @@ const readinessCopy = {
 export function PlayRecipeCard({
   candidate,
   run,
-  reviewedChecks: _reviewedChecks,
+  reviewedChecks,
   alreadyHeld,
   thesisContext,
   onReviewEvidence,
@@ -64,6 +64,11 @@ export function PlayRecipeCard({
   const noPlay = ["budget_too_small", "needs_equity", "needs_tape", "needs_range", "expired"].includes(play.readiness);
   const taxonomy = play.taxonomy;
   const optionIntent = taxonomy?.execution?.instrument === "option";
+  const decisiveChecks = Array.isArray(candidate.verifyFields)
+    ? candidate.verifyFields.filter((check: unknown): check is string => typeof check === "string")
+    : [];
+  const reviewedCheckSet = new Set(reviewedChecks);
+  const allChecksReviewed = decisiveChecks.length > 0 && decisiveChecks.every((check: string) => reviewedCheckSet.has(check));
   const level = (title: string, value: string, basis?: string | null) => <div className="space-y-1.5 p-4" style={{ background: "var(--sh-surface)" }}>
     <p className="text-[0.65rem] font-semibold uppercase tracking-[0.13em]" style={{ color: "var(--sh-fg-muted)" }}>{title} · modeled</p>
     <p className="text-lg font-semibold tabular-nums" style={{ color: "var(--sh-text-primary)" }}>{value}</p>
@@ -144,7 +149,7 @@ export function PlayRecipeCard({
       </>}
       <div className="grid gap-4 px-4 py-4 sm:grid-cols-[1.25fr_0.85fr] sm:px-5">
         <div><p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Do not take the recipe when</p><ul className="mt-3 space-y-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{play.noTradeConditions.map((condition: string) => <li key={condition} className="rounded-lg border px-3 py-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>{condition}</li>)}</ul></div>
-        <aside className="rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}><ShieldCheck className="h-4 w-4" style={{ color: "var(--sh-signal)" }} />What must be confirmed</p><p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{proposalBlockedReason ?? play.trigger?.basis ?? "No trigger observation is available."}</p><div className="mt-3 flex flex-col gap-2">{proposalBlockedReason ? <Button type="button" size="sm" className="min-h-11" onClick={onReviewEvidence}><LockKeyhole className="mr-1.5 h-3.5 w-3.5" />Resolve before paper ticket</Button> : <><Button type="button" size="sm" className="min-h-11" onClick={onPrepareProposal}><LockKeyhole className="mr-1.5 h-3.5 w-3.5" />Review paper ticket</Button><Button type="button" variant="outline" size="sm" className="min-h-11" onClick={onReviewEvidence}>Review evidence</Button></>}<Button type="button" variant="outline" size="sm" className="min-h-11" onClick={onOpenResearch}>Why this recipe?</Button></div></aside>
+        <aside className="rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}><ShieldCheck className="h-4 w-4" style={{ color: allChecksReviewed ? "var(--sh-emerald)" : "var(--sh-signal)" }} />{allChecksReviewed ? "Ready for ticket preflight" : "What must be confirmed"}</p><p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{allChecksReviewed ? "Evidence reviews are recorded. Finish the exact contract; preflight will enforce liquidity, account, and tradability rules." : proposalBlockedReason ?? play.trigger?.basis ?? "No trigger observation is available."}</p><div className="mt-3 flex flex-col gap-2">{proposalBlockedReason ? <Button type="button" size="sm" className="min-h-11" onClick={onReviewEvidence}><LockKeyhole className="mr-1.5 h-3.5 w-3.5" />Resolve before paper ticket</Button> : <><Button type="button" size="sm" className="min-h-11" onClick={onPrepareProposal}><LockKeyhole className="mr-1.5 h-3.5 w-3.5" />Review paper ticket</Button>{!allChecksReviewed && <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={onReviewEvidence}>Review evidence</Button>}</>}<Button type="button" variant="outline" size="sm" className="min-h-11" onClick={onOpenResearch}>Why this recipe?</Button></div></aside>
       </div>
     </>}
 

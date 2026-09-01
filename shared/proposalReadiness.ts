@@ -48,8 +48,8 @@ export function buildProposalReadiness(input: {
     if (input.hardBlocker) {
       return {
         title: "This paper play cannot be prepared",
-        explanation: `${input.hardBlocker} Return to the decision brief to choose another play, revise the mission, or preserve cash.`,
-        actionLabel: "Return to decision brief",
+        explanation: `${input.hardBlocker} Choose another play below or preserve cash.`,
+        actionLabel: "Choose another play here",
         action: "return_to_decision",
       };
     }

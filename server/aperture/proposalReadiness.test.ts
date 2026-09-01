@@ -24,9 +24,9 @@ describe("buildProposalReadiness", () => {
     expect(buildProposalReadiness({ recipeReady: true, preflightReady: false, blocking: ["reason is required"] }).action).toBe("review_recipe");
     expect(buildProposalReadiness({ recipeReady: true, preflightReady: false, blocking: ["reason is required", "ADV is below the floor."], hardBlocker: "ADV is below the floor." })).toMatchObject({
       action: "return_to_decision",
-      actionLabel: "Return to decision brief",
+      actionLabel: "Choose another play here",
       title: "This paper play cannot be prepared",
-      explanation: expect.stringContaining("ADV is below the floor."),
+      explanation: expect.stringContaining("Choose another play below or preserve cash."),
     });
     expect(buildProposalReadiness({ recipeReady: true, preflightReady: true, paperAcknowledged: false }).action).toBe("confirm_paper");
     expect(buildProposalReadiness({ recipeReady: true, preflightReady: true, paperAcknowledged: true }).action).toBe("create_proposal");

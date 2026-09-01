@@ -46,11 +46,27 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain('navigate(decisionUrl)');
   });
 
-  it("keeps the empty order queue aligned with the active ticket builder", () => {
+  it("collapses completed evidence into one direct paper-ticket action", () => {
+    const board = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/CandidateBoard.tsx"), "utf8");
+    const focus = readFileSync(resolve(process.cwd(), "client/src/components/aperture/DecisionFocusCard.tsx"), "utf8");
+    const recipe = readFileSync(resolve(process.cwd(), "client/src/components/aperture/PlayRecipeCard.tsx"), "utf8");
+
+    expect(board).toContain("reviewedChecks={reviewedChecks}");
+    expect(board).toContain("onPrepareProposal={() => navigate(`/aperture/run/${runId}/execute?candidate=${focusCandidate.id}`)}");
+    expect(focus).toContain("allChecksReviewed");
+    expect(focus).toContain("Evidence review complete");
+    expect(focus).toContain("Review paper ticket");
+    expect(recipe).toContain("allChecksReviewed");
+    expect(recipe).toContain("Ready for ticket preflight");
+  });
+
+  it("keeps a hard-blocked ticket in place and reveals alternatives inline", () => {
     const execute = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/ApertureExecute.tsx"), "utf8");
 
-    expect(execute).toContain("Complete the exact paper ticket above.");
-    expect(execute).toContain("finish the exact paper ticket");
+    expect(execute).toContain("showAlternatives");
+    expect(execute).toContain("Choose another play in this run");
+    expect(execute).toContain("setShowAlternatives(true)");
+    expect(execute).toContain("A proposal appears here only after preflight passes.");
     expect(execute).toContain("ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired)}");
   });
 });
