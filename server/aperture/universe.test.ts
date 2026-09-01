@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { discoverUniverse, looksLikeTicker, thesisSummary } from "./universe";
+import { discoverUniverse, looksLikeTicker, operatorDeclaredUniverse, thesisSummary } from "./universe";
 
 const NODES = [
   { label: "AI adoption", depth: 0 },
@@ -33,6 +33,22 @@ describe("thesisSummary", () => {
 
   it("says so plainly when there is nothing to summarise", () => {
     expect(thesisSummary([], [])).toBe("(no thesis detail supplied)");
+  });
+});
+
+describe("operatorDeclaredUniverse", () => {
+  it("keeps the exact declared symbols as the first research brief", () => {
+    const result = operatorDeclaredUniverse(["iwm", "IWM"]);
+    expect(result?.discovered).toEqual([expect.objectContaining({
+      symbol: "IWM",
+      nodeLabel: "Operator-declared universe",
+    })]);
+    expect(result?.droppedNote).toMatch(/Broad exposure discovery was intentionally deferred/);
+  });
+
+  it("falls back to exposure discovery when no valid symbol was declared", () => {
+    expect(operatorDeclaredUniverse([])).toBeNull();
+    expect(operatorDeclaredUniverse(["not a ticker"])).toBeNull();
   });
 });
 

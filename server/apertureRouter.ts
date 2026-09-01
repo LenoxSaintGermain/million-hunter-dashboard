@@ -47,7 +47,7 @@ import {
 import { capitalOperatorProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { applyCanonicalDeclarations, compileThesis, flattenExposureTree, resolveRunGraph, validateGraphForPersistence, type ThesisGraph } from "./aperture/thesisGraph";
-import { discoverUniverse, thesisSummary } from "./aperture/universe";
+import { discoverUniverse, operatorDeclaredUniverse, thesisSummary } from "./aperture/universe";
 import { collectSecurityFacts, collectMacroFacts, describeAvailability, availabilityMap, MACRO_SYMBOL } from "./aperture/providers/index";
 import { getFacts, freshestPerKey } from "./aperture/facts";
 import { runResearchSwarm } from "./aperture/researchSwarm";
@@ -3634,20 +3634,8 @@ async function executeRun(
 
     // ── 3. Universe discovery ──────────────────────────────────────────────
     const summary = thesisSummary(graph.beliefs ?? [], graph.seek ?? []);
-    const universe = await discoverUniverse(nodeRows, summary, known);
-    const declaredSymbols = (graph.researchSymbols ?? [])
-      .map((symbol: string) => normSymbol(symbol))
-      .filter((symbol: string) => symbol && !known.has(symbol));
-    for (const symbol of declaredSymbols) {
-      if (universe.discovered.some((item) => item.symbol === symbol)) continue;
-      universe.discovered.unshift({
-        symbol,
-        name: null,
-        nodeLabel: "Operator-declared universe",
-        rationale: "The operator explicitly named this symbol in the canonical thesis structure.",
-        citations: ["operator-declared://canonical-thesis"],
-      });
-    }
+    const universe = operatorDeclaredUniverse(graph.researchSymbols)
+      ?? await discoverUniverse(nodeRows, summary, known);
     const offset = Math.max(0, input.researchOffset ?? 0);
     const researchPlan = buildBriefResearchPlan(universe.discovered.slice(offset), input.holdingPeriod);
     const researchDroppedNote = [

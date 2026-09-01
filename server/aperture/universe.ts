@@ -77,6 +77,32 @@ export interface DiscoverOpts {
   research?: (node: string, prompt: string) => Promise<{ content: string; citations: string[] }>;
 }
 
+/**
+ * An explicitly named research symbol is the operator's requested universe,
+ * including when that symbol is already held. The first brief must not replace
+ * it with exposure-tree alternatives; those belong in optional follow-up work.
+ */
+export function operatorDeclaredUniverse(symbols: string[] | null | undefined): UniverseResult | null {
+  const normalized = Array.from(new Set((symbols ?? [])
+    .map((symbol) => normSymbol(symbol))
+    .filter((symbol) => looksLikeTicker(symbol))));
+  if (normalized.length === 0) return null;
+
+  return {
+    discovered: normalized.map((symbol) => ({
+      symbol,
+      name: null,
+      nodeLabel: "Operator-declared universe",
+      rationale: "The operator explicitly named this symbol in the canonical thesis.",
+      citations: ["operator-declared://canonical-thesis"],
+    })),
+    excludedKnown: [],
+    droppedNote: "Broad exposure discovery was intentionally deferred because the operator declared the research universe.",
+    nodesQueried: ["Operator-declared universe"],
+    nodesFailed: [],
+  };
+}
+
 async function defaultResearch(node: string, prompt: string) {
   const r = await runResearch({
     subjectKey: `aperture:universe:${node.toLowerCase().replace(/\s+/g, "-").slice(0, 120)}`,
