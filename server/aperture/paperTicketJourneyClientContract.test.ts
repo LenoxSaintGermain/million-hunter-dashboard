@@ -69,4 +69,12 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain("A proposal appears here only after preflight passes.");
     expect(execute).toContain("ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired)}");
   });
+
+  it("reacts when an inline alternative changes only the candidate query parameter", () => {
+    const board = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/CandidateBoard.tsx"), "utf8");
+
+    expect(board).toContain('import { useRoute, useLocation, useSearch } from "wouter"');
+    expect(board).toContain("const search = useSearch();");
+    expect(board).toContain('new URLSearchParams(search).get("candidate")');
+  });
 });

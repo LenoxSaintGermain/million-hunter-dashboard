@@ -1,6 +1,6 @@
 /** Capital Aperture — decision-first evidence queue. Paper-only internal research. */
 import { useEffect, useRef, useState } from "react";
-import { useRoute, useLocation } from "wouter";
+import { useRoute, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -115,6 +115,7 @@ function RunProgress({ run, candidateCount, stale, retrying, onRefresh, onStartF
 export default function CandidateBoard() {
   const [, params] = useRoute("/aperture/run/:id");
   const [location, navigate] = useLocation();
+  const search = useSearch();
   const runId = Number(params?.id);
   const [view, setView] = useState<"play" | "brief" | "evidence" | "ledger">(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
@@ -137,7 +138,7 @@ export default function CandidateBoard() {
       refetchIntervalInBackground: true,
     },
   );
-  const requestedCandidateId = Number(new URLSearchParams(location.split("?")[1] ?? "").get("candidate")) || null;
+  const requestedCandidateId = Number(new URLSearchParams(search).get("candidate")) || null;
   useEffect(() => {
     if (!requestedCandidateId || !data?.candidates?.some((candidate: any) => candidate.id === requestedCandidateId)) return;
     setSelectedCandidateId(requestedCandidateId);
