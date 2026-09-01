@@ -256,6 +256,29 @@ export function validateGraphForPersistence(graph: ThesisGraph): ThesisGraph {
   return graph;
 }
 
+type ThesisGraphCompiler = (thesisText: string) => Promise<ThesisGraph>;
+
+/**
+ * A historical thesis can predate the durable exposure-map guard. Do not make
+ * the operator leave a Decision Run to repair machine-authored projection
+ * data: re-project the unchanged thesis text once, validate the replacement,
+ * and let the caller persist an auditable repaired graph. If recovery also
+ * fails, the original validation error remains a hard stop.
+ */
+export async function resolveRunGraph(
+  graph: ThesisGraph,
+  thesisText: string,
+  compile: ThesisGraphCompiler = compileThesis,
+): Promise<{ graph: ThesisGraph; recovered: boolean }> {
+  try {
+    return { graph: validateGraphForPersistence(graph), recovered: false };
+  } catch (error) {
+    if (!(error instanceof ThesisCompileError)) throw error;
+    const recovered = validateGraphForPersistence(await compile(thesisText));
+    return { graph: recovered, recovered: true };
+  }
+}
+
 type JsonRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is JsonRecord {

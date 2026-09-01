@@ -46,7 +46,7 @@ import {
 } from "../drizzle/schema";
 import { capitalOperatorProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { compileThesis, flattenExposureTree, validateGraphForPersistence, type ThesisGraph } from "./aperture/thesisGraph";
+import { compileThesis, flattenExposureTree, resolveRunGraph, validateGraphForPersistence, type ThesisGraph } from "./aperture/thesisGraph";
 import { discoverUniverse, thesisSummary } from "./aperture/universe";
 import { collectSecurityFacts, collectMacroFacts, describeAvailability, availabilityMap, MACRO_SYMBOL } from "./aperture/providers/index";
 import { getFacts, freshestPerKey } from "./aperture/facts";
@@ -3576,7 +3576,18 @@ async function executeRun(
     // the concentration cap and liquidity floor reach strategy construction
     // instead of sitting inert on the row. Tightening only — a preset can never
     // widen what the thesis allows.
-    const graph = validateGraphForPersistence(withPresetRules(thesis.graph as any, input));
+    const resolved = await resolveRunGraph(thesis.graph as ThesisGraph, thesis.rawText);
+    if (resolved.recovered) {
+      await db!.update(capitalTheses)
+        .set({
+          graph: resolved.graph,
+          confidenceNotes: resolved.graph.confidenceNotes ?? [],
+          updatedAt: Date.now(),
+        })
+        .where(and(eq(capitalTheses.id, input.thesisId), eq(capitalTheses.userId, userId)));
+      console.warn(`[aperture] Repaired invalid machine projection for thesis ${input.thesisId} before run ${runId}.`);
+    }
+    const graph = validateGraphForPersistence(withPresetRules(resolved.graph, input));
     const nodeRows = flattenExposureTree(graph.exposureTree ?? []);
 
     // ── 1. Persist exposure nodes ──────────────────────────────────────────

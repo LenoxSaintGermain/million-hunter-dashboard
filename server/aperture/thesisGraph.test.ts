@@ -6,7 +6,7 @@
  * the looseJsonParse fallback that the compiler relies on.
  */
 import { describe, it, expect } from "vitest";
-import { compileThesisWithGenerator, flattenExposureTree, parseCompilerResponse, validateGraphForPersistence, type ThesisGraph } from "./thesisGraph";
+import { compileThesisWithGenerator, flattenExposureTree, parseCompilerResponse, resolveRunGraph, validateGraphForPersistence, type ThesisGraph } from "./thesisGraph";
 
 describe("flattenExposureTree", () => {
   it("returns an empty array for an empty tree", () => {
@@ -204,5 +204,59 @@ describe("Capital compiler persistence boundary", () => {
     expect(() => validateGraphForPersistence(malformed)).toThrow(
       "The thesis service returned an invalid exposure map",
     );
+  });
+});
+
+describe("Decision Run projection recovery", () => {
+  const clean = {
+    beliefs: ["Post-benchmark rates may support small caps"],
+    seek: ["IWM only after observable intraday gates pass"],
+    avoid: ["missing or contradictory tape evidence"],
+    horizons: ["intraday"],
+    sectors: [],
+    exclusions: [],
+    portfolioRules: { minAvgDailyVolumeUsd: 20_000_000 },
+    behavior: {},
+    exposureTree: [{ label: "US small-cap equities", children: [{ label: "IWM ETF shares" }] }],
+    researchSymbols: ["IWM"],
+    evidenceRequirements: ["IWM above VWAP"],
+    invalidationConditions: ["Tape evidence is missing or contradictory"],
+    instrumentPreference: "shares" as const,
+    confidenceNotes: [],
+    suggestedName: "Post-Benchmark Small-Cap Confirmation",
+  } satisfies ThesisGraph;
+
+  it("uses a valid stored projection without invoking the compiler", async () => {
+    let calls = 0;
+    const result = await resolveRunGraph(clean, "A complete operator thesis sentence for testing.", async () => {
+      calls += 1;
+      return clean;
+    });
+    expect(result).toEqual({ graph: clean, recovered: false });
+    expect(calls).toBe(0);
+  });
+
+  it("re-projects unchanged thesis text when a historical graph is malformed", async () => {
+    const malformed = {
+      ...clean,
+      exposureTree: [{ label: "IWM shares. Wait, I need to format this as the schema dictates." }],
+    };
+    const seen: string[] = [];
+    const thesisText = "Paper-only IWM research after the named observable gates pass.";
+    const result = await resolveRunGraph(malformed, thesisText, async (text) => {
+      seen.push(text);
+      return clean;
+    });
+    expect(result).toEqual({ graph: clean, recovered: true });
+    expect(seen).toEqual([thesisText]);
+  });
+
+  it("fails closed when the replacement projection is also malformed", async () => {
+    const malformed = {
+      ...clean,
+      exposureTree: [{ label: "IWM shares. Wait, I need to format this as the schema dictates." }],
+    };
+    await expect(resolveRunGraph(malformed, "A complete operator thesis sentence for testing.", async () => malformed))
+      .rejects.toThrow("invalid exposure map");
   });
 });
