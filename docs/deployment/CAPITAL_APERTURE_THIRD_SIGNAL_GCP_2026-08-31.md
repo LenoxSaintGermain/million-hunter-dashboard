@@ -69,3 +69,17 @@ gcloud run services update-traffic capital-aperture \
 ## Remaining owner check
 
 Complete the Google account chooser once and confirm the verified owner lands in the existing Capital Aperture administrator workspace at `https://third-signal-capital-aperture.web.app/aperture`. Then repeat from the CH Capital email-specific invite before sending that invite externally. Stop before any paper-order approval or submission unless that exact action is separately confirmed.
+
+## 2026-09-01 provider-ensemble release
+
+- Deployed source: `d38770c` (`21ece36` provider policy plus the Settings refresh repair).
+- Cloud Build: `270d641b-ccc1-4b4d-95ed-47c2e0e814ab` — `SUCCESS`.
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:d38770c`.
+- Image digest: `sha256:ca29fa594e67101c434856bb267e3f53c1acc8ce47827aa065330c5fcc437061`.
+- Ready revision: `capital-aperture-00006-5ks`, serving 100% of Cloud Run traffic.
+- Release marker: `d38770c`.
+- Authenticated production settings were reset to the validated defaults: Gemini 3.1 Pro, Kimi K3, and DeepSeek V4 Pro for consensus; Kimi K3 for investment memos; Claude Sonnet 4.6 through Poe for interpretation; Gemini 3.7 Flash for structured high-volume roles.
+- Browser UAT confirmed the signed-in Decision Run still loads, the live settings reflect those exact provider assignments, and the browser reported no console errors.
+- Public `/aperture/run/240001` and same-origin `system.health` returned HTTP 200.
+- `pnpm check`, the 28 scoped model-policy/memo tests, and `pnpm build` passed. The database-disabled full suite passed 785 tests; 31 legacy database/key-presence tests remained unavailable by design without an isolated database.
+- No schema migration, invite change, broker setting, real-money rail, paper-order approval, or broker order occurred in this release.
