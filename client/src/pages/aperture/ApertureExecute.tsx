@@ -863,6 +863,14 @@ export default function ApertureExecute() {
     )
     : null;
   const paperStageDeclined = proposalEvidence?.paperStageDeclined === true;
+  const unreviewedEvidenceChecks = proposalEvidence?.unreviewedChecks ?? [];
+  const evidenceReviewRequired = unreviewedEvidenceChecks.length > 0;
+  const evidenceUrl = proposalCandidate
+    ? `/aperture/run/${runId}?candidate=${proposalCandidate.id}&view=evidence`
+    : `/aperture/run/${runId}?view=evidence`;
+  const decisionUrl = proposalCandidate
+    ? `/aperture/run/${runId}?candidate=${proposalCandidate.id}`
+    : `/aperture/run/${runId}`;
 
   return (
     <DashboardLayout>
@@ -871,7 +879,7 @@ export default function ApertureExecute() {
 
         <div>
           <div className="flex min-w-0 items-center gap-2">
-            <Button aria-label="Return to decision brief" variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={() => navigate(`/aperture/run/${runId}`)}>
+            <Button aria-label="Return to decision brief" variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={() => navigate(decisionUrl)}>
               <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             </Button>
             <h1 className="min-w-0 text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>
@@ -893,12 +901,12 @@ export default function ApertureExecute() {
                 <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{paperStageDeclined ? "Paper stage declined — preserve cash for this candidate" : data.brief.nextDecision.title}</p>
                 <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{paperStageDeclined ? "A required evidence answer was recorded as not confirmed. This revision cannot prepare a proposal or create an order." : data.brief.nextDecision.detail}</p>
               </div>
-              <Button variant="outline" size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => navigate(`/aperture/run/${runId}`)}>Return to decision brief</Button>
+              <Button variant="outline" size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => navigate(evidenceReviewRequired ? evidenceUrl : decisionUrl)}>{evidenceReviewRequired ? `Review ${unreviewedEvidenceChecks.length} required check${unreviewedEvidenceChecks.length === 1 ? "" : "s"}` : "Return to decision brief"}</Button>
             </div>
           </div>
         )}
 
-        {proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(`/aperture/run/${runId}?view=evidence`)}>Review the recorded evidence decision</Button></section> : proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(`/aperture/run/${runId}?view=evidence`)} onProposalCreated={() => navigate(`/aperture/run/${runId}/execute?candidate=${proposalCandidate.id}`)} />}
+        {proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(evidenceUrl)}>Review the recorded evidence decision</Button></section> : proposalCandidate && evidenceReviewRequired ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper ticket locked · step 1 of 4</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Review {unreviewedEvidenceChecks.length} decision-critical check{unreviewedEvidenceChecks.length === 1 ? "" : "s"} before building the ticket.</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This is the only blocker to address on this screen. After the final positive review, the flow advances to exact contract → proposal → approve → submit. A negative review preserves cash instead.</p><ol className="mt-4 space-y-2">{unreviewedEvidenceChecks.map((check, index) => <li key={check} className="flex gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}><span className="font-mono text-xs tabular-nums" style={{ color: "var(--sh-signal)" }}>{index + 1}</span><span>{check}</span></li>)}</ol><Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={() => navigate(evidenceUrl)}>Review {unreviewedEvidenceChecks.length} required check{unreviewedEvidenceChecks.length === 1 ? "" : "s"}</Button></section> : proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(evidenceUrl)} onReturnToDecisionBrief={() => navigate(decisionUrl)} onProposalCreated={() => navigate(`/aperture/run/${runId}/execute?candidate=${proposalCandidate.id}`)} />}
 
         <Tabs defaultValue="orders" className="min-w-0">
           <TabsList aria-label="Paper lifecycle" className="grid h-auto w-full min-w-0 grid-cols-1 gap-1 p-1 sm:grid-cols-3">

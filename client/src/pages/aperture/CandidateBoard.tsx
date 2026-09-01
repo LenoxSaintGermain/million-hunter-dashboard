@@ -233,6 +233,11 @@ export default function CandidateBoard() {
       ? Object.values(focusMemo as Record<string, unknown>).flatMap((value) => Array.isArray(value) ? value : [value]).filter((value): value is string => typeof value === "string").join(" ").slice(0, 420)
       : null;
   const alreadyHeld = Boolean(focusCandidate && paperPositions.some((position: any) => position.symbol === focusCandidate.symbol));
+  const proposalBlockedReason = paperStageDeclined
+    ? "A required evidence answer was not confirmed. This revision preserves cash and cannot open a paper ticket."
+    : unreviewedChecks.length
+      ? `Review the required evidence before opening the paper ticket — ${unreviewedChecks.length} decision-critical check${unreviewedChecks.length === 1 ? " remains" : "s remain"}.`
+      : null;
 
   const openEvidence = () => { setView("evidence"); setActiveRole("all"); };
   return (
@@ -281,6 +286,7 @@ export default function CandidateBoard() {
               reviewedChecks={reviewedChecks}
               alreadyHeld={alreadyHeld}
               thesisContext={thesisContext}
+              proposalBlockedReason={proposalBlockedReason}
               onReviewEvidence={openEvidence}
               onPrepareProposal={() => navigate(`/aperture/run/${runId}/execute?candidate=${focusCandidate.id}`)}
               onOpenResearch={() => setView("ledger")}
