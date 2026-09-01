@@ -72,6 +72,24 @@ export interface OptionContractResult {
   multiplier: number;
   tradable: boolean;
   status: string;
+  openInterest: number | null;
+  openInterestAsOf: string | null;
+  asOf: number;
+}
+
+export interface OptionMarketSnapshotResult {
+  symbol: string;
+  bidPriceCents: number;
+  askPriceCents: number;
+  bidSize: number | null;
+  askSize: number | null;
+  quoteAt: number;
+  lastTradePriceCents: number | null;
+  lastTradeSize: number | null;
+  lastTradeAt: number | null;
+  dailyVolume: number;
+  impliedVolatility: number;
+  feed: "opra" | "indicative";
   asOf: number;
 }
 
@@ -108,6 +126,8 @@ export interface BrokerAdapter {
   getOrderByClientOrderId(clientOrderId: string): Promise<OrderResult | null>;
   /** Exact contract lookup used by the proposal, approval and submission gates. */
   getOptionContract?(symbol: string): Promise<OptionContractResult | null>;
+  /** Current exact-contract market evidence used by every option lifecycle gate. */
+  getOptionMarketSnapshot?(symbol: string): Promise<OptionMarketSnapshotResult | null>;
 }
 
 /** The single gate every adapter routes order submission through. */

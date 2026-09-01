@@ -18,7 +18,7 @@ import { httpJson, num } from "../providers/types";
 import { parseOccOptionSymbol } from "../../../shared/paperInstrument";
 import {
   assertPaperOnly, BrokerUnavailableError, dollarsToCents,
-  type BrokerAccount, type BrokerAdapter, type BrokerPosition, type OptionContractResult, type OrderRequest, type OrderResult,
+  type BrokerAccount, type BrokerAdapter, type BrokerPosition, type OptionContractResult, type OptionMarketSnapshotResult, type OrderRequest, type OrderResult,
 } from "./types";
 
 // ── Manual / CSV entry ───────────────────────────────────────────────────────
@@ -116,8 +116,38 @@ export function toOrderResult(data: any): OrderResult {
   };
 }
 
+/** Alpaca exact-option snapshot JSON → typed evidence stored with a proposal. */
+export function toOptionMarketSnapshot(symbol: string, data: any, feed: "opra" | "indicative" = "opra"): OptionMarketSnapshotResult | null {
+  const quote = data?.latestQuote;
+  const trade = data?.latestTrade;
+  const bid = num(quote?.bp);
+  const ask = num(quote?.ap);
+  const quoteAt = quote?.t ? Date.parse(String(quote.t)) : Number.NaN;
+  const dailyVolume = num(data?.dailyBar?.v);
+  const impliedVolatility = num(data?.impliedVolatility);
+  if (!symbol || bid == null || ask == null || bid <= 0 || ask < bid || !Number.isFinite(quoteAt) || dailyVolume == null || dailyVolume < 0 || impliedVolatility == null || impliedVolatility <= 0) return null;
+  const lastTradeAt = trade?.t ? Date.parse(String(trade.t)) : Number.NaN;
+  const lastTradePrice = num(trade?.p);
+  return {
+    symbol: symbol.toUpperCase(),
+    bidPriceCents: dollarsToCents(bid),
+    askPriceCents: dollarsToCents(ask),
+    bidSize: num(quote?.bs),
+    askSize: num(quote?.as),
+    quoteAt,
+    lastTradePriceCents: lastTradePrice == null ? null : dollarsToCents(lastTradePrice),
+    lastTradeSize: num(trade?.s),
+    lastTradeAt: Number.isFinite(lastTradeAt) ? lastTradeAt : null,
+    dailyVolume,
+    impliedVolatility,
+    feed,
+    asOf: Date.now(),
+  };
+}
+
 // ── Alpaca paper ─────────────────────────────────────────────────────────────
 const ALPACA_PAPER_BASE = "https://paper-api.alpaca.markets/v2";
+const ALPACA_OPTION_DATA_BASE = "https://data.alpaca.markets/v1beta1/options";
 
 const ALPACA_KEY_ID_ENV = ["ALPACA_PAPER_KEY", "ALPACA_API_KEY_ID"] as const;
 const ALPACA_SECRET_ENV = ["ALPACA_PAPER_SECRET", "ALPACA_API_SECRET_KEY"] as const;
@@ -336,8 +366,26 @@ export const alpacaPaperBroker: BrokerAdapter = {
       multiplier,
       tradable: Boolean(data.tradable),
       status: String(data.status ?? "unknown"),
+      openInterest: num(data.open_interest),
+      openInterestAsOf: data.open_interest_date ? String(data.open_interest_date) : null,
       asOf: Date.now(),
     };
+  },
+
+  async getOptionMarketSnapshot(symbol: string): Promise<OptionMarketSnapshotResult | null> {
+    const normalized = symbol.trim().toUpperCase();
+    if (!normalized) return null;
+    for (const feed of ["opra", "indicative"] as const) {
+      const url = new URL(`${ALPACA_OPTION_DATA_BASE}/snapshots`);
+      url.searchParams.set("symbols", normalized);
+      url.searchParams.set("feed", feed);
+      const res = await fetch(url, { headers: alpacaHeaders() });
+      if (res.status === 403 && feed === "opra") continue;
+      if (!res.ok) throw new BrokerUnavailableError(`Alpaca option snapshot returned HTTP ${res.status}.`);
+      const body: any = await res.json();
+      return toOptionMarketSnapshot(normalized, body?.snapshots?.[normalized], feed);
+    }
+    return null;
   },
 };
 
@@ -446,7 +494,18 @@ export function isolatedUatPaperBroker(accountId: number): BrokerAdapter {
         multiplier: parsed.contractMultiplier,
         tradable: true,
         status: "active_uat_fixture",
+        openInterest: 100,
+        openInterestAsOf: new Date().toISOString().slice(0, 10),
         asOf: Date.now(),
+      };
+    },
+    async getOptionMarketSnapshot(symbol) {
+      if (!isExactIsolatedUatRuntime()) throw new BrokerUnavailableError("isolated UAT paper adapter refused outside its exact loopback runtime");
+      return {
+        symbol: symbol.toUpperCase(), bidPriceCents: 100, askPriceCents: 110,
+        bidSize: 10, askSize: 10, quoteAt: Date.now(),
+        lastTradePriceCents: 105, lastTradeSize: 1, lastTradeAt: Date.now(),
+        dailyVolume: 100, impliedVolatility: 0.3, feed: "opra", asOf: Date.now(),
       };
     },
   };

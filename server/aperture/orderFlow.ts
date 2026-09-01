@@ -270,11 +270,34 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
   });
 
   const broker = brokerFor(account.brokerId, account.id);
-  const optionContract = isOptionInstrument(instrumentType) && broker.getOptionContract && broker.available()
-    ? await broker.getOptionContract(symbol).catch(() => null)
-    : null;
+  const [optionContract, optionMarket] = isOptionInstrument(instrumentType) && broker.available()
+    ? await Promise.all([
+        broker.getOptionContract ? broker.getOptionContract(symbol).catch(() => null) : null,
+        broker.getOptionMarketSnapshot ? broker.getOptionMarketSnapshot(symbol).catch(() => null) : null,
+      ])
+    : [null, null];
   const optionType = instrumentType === "long_put" ? "put" : "call";
   const optionDebitCents = isOptionInstrument(instrumentType) ? gatedNotionalCents : null;
+  const optionQuoteAgeMs = optionMarket ? now - optionMarket.quoteAt : Number.POSITIVE_INFINITY;
+  const optionQuoteCurrent = Boolean(optionMarket && optionQuoteAgeMs >= 0 && optionQuoteAgeMs <= (session.session === "regular" ? 5 * 60_000 : 8 * 60 * 60_000));
+  const optionMidCents = optionMarket ? (optionMarket.bidPriceCents + optionMarket.askPriceCents) / 2 : null;
+  const optionSpreadPct = optionMarket && optionMidCents && optionMidCents > 0
+    ? ((optionMarket.askPriceCents - optionMarket.bidPriceCents) / optionMidCents) * 100
+    : null;
+  const optionMarketComplete = Boolean(optionMarket
+    && optionContract
+    && optionMarket.symbol === symbol
+    && optionQuoteCurrent
+    && optionMarket.dailyVolume > 0
+    && optionContract.openInterest != null
+    && optionContract.openInterest > 0
+    && optionMarket.impliedVolatility > 0
+    && optionSpreadPct != null
+    && optionSpreadPct <= 35);
+  const optionLimitInsideMarket = Boolean(optionMarket
+    && input.limitPriceCents != null
+    && input.limitPriceCents >= optionMarket.bidPriceCents
+    && input.limitPriceCents <= optionMarket.askPriceCents);
   const operationalResults = [
     {
       key: "paper_execution_destination",
@@ -331,8 +354,19 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
       },
       {
         key: "option_chain_market_evidence",
-        passed: false,
-        detail: "Options paper proposals remain blocked until a provider supplies current bid/ask, spread, volume, open interest, implied volatility, and quote time for the exact contract",
+        passed: optionMarketComplete,
+        detail: optionMarketComplete && optionMarket && optionContract && optionSpreadPct != null
+          ? `${optionMarket.feed.toUpperCase()} quote ${new Date(optionMarket.quoteAt).toISOString()} · bid $${(optionMarket.bidPriceCents / 100).toFixed(2)} · ask $${(optionMarket.askPriceCents / 100).toFixed(2)} · spread ${optionSpreadPct.toFixed(1)}% · volume ${optionMarket.dailyVolume} · open interest ${optionContract.openInterest} as of ${optionContract.openInterestAsOf ?? "provider date unavailable"} · IV ${(optionMarket.impliedVolatility * 100).toFixed(1)}%`
+          : "Resolve option evidence: require a same-session quote, positive bid/ask, spread at or below 35%, daily volume, open interest, and implied volatility for the exact contract",
+      },
+      {
+        key: "option_limit_vs_market",
+        passed: optionLimitInsideMarket,
+        detail: optionLimitInsideMarket && optionMarket && input.limitPriceCents != null
+          ? `limit $${(input.limitPriceCents / 100).toFixed(2)} is inside the observed $${(optionMarket.bidPriceCents / 100).toFixed(2)}–$${(optionMarket.askPriceCents / 100).toFixed(2)} market`
+          : optionMarket
+            ? `Set the limit between the observed bid $${(optionMarket.bidPriceCents / 100).toFixed(2)} and ask $${(optionMarket.askPriceCents / 100).toFixed(2)}`
+            : "Set the limit only after the exact option quote is available",
       },
       {
         key: "option_contract_verified",
@@ -366,6 +400,8 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
     instrumentSnapshot: isOptionInstrument(instrumentType) ? {
       declared: instrument.optionTerms,
       brokerContract: optionContract,
+      marketSnapshot: optionMarket,
+      spreadPct: optionSpreadPct,
       entitlement: {
         approvedLevel: account.optionsApprovedLevel,
         tradingLevel: account.optionsTradingLevel,

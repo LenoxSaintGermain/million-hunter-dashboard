@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { assertPaperOnly, LiveTradingRefusedError } from "./brokers/types";
-import { toOrderResult } from "./brokers/index";
+import { toOptionMarketSnapshot, toOrderResult } from "./brokers/index";
 
 describe("assertPaperOnly", () => {
   it("does not throw when isPaper is true", () => {
@@ -77,5 +77,28 @@ describe("toOrderResult — Alpaca status mapping", () => {
     const r = toOrderResult({ id: "abc", status: "new" });
     expect(r.filledQty).toBeNull();
     expect(r.filledAvgPriceCents).toBeNull();
+  });
+});
+
+describe("toOptionMarketSnapshot — exact option evidence", () => {
+  it("types a complete OPRA snapshot without inventing absent fields", () => {
+    const result = toOptionMarketSnapshot("DKNG261002C00024000", {
+      latestQuote: { bp: 1.05, ap: 1.30, bs: 12, as: 18, t: "2026-09-01T19:59:59Z" },
+      latestTrade: { p: 1.20, s: 2, t: "2026-09-01T19:58:00Z" },
+      dailyBar: { v: 32 },
+      impliedVolatility: 0.4999,
+    }, "opra");
+    expect(result).toMatchObject({
+      symbol: "DKNG261002C00024000",
+      bidPriceCents: 105,
+      askPriceCents: 130,
+      dailyVolume: 32,
+      impliedVolatility: 0.4999,
+      feed: "opra",
+    });
+  });
+
+  it("fails closed when the quote or IV is missing", () => {
+    expect(toOptionMarketSnapshot("DKNG261002C00024000", { dailyBar: { v: 32 } }, "opra")).toBeNull();
   });
 });

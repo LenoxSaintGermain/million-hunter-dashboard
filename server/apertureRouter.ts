@@ -355,7 +355,10 @@ async function evidenceReviewBlock(
     eq(apertureEvidenceReviews.candidateId, candidateId),
   ));
   const readiness = getEvidenceReviewReadiness(requiredChecks, reviews);
-  if (!readiness.unreviewedChecks.length) return null;
+  if (readiness.paperStageDeclined) {
+    return `Paper stage declined because ${readiness.negativeChecks.length} required evidence check${readiness.negativeChecks.length === 1 ? " was" : "s were"} recorded as not confirmed. Start a new research decision before preparing another proposal.`;
+  }
+  if (readiness.paperProposalReady) return null;
   const n = readiness.unreviewedChecks.length;
   return `Record your review of ${n} evidence check${n === 1 ? "" : "s"} before preparing this paper proposal`;
 }

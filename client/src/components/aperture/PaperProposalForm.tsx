@@ -24,6 +24,7 @@ const HARD_PREFLIGHT_GATE_KEYS = new Set([
   "long_option_capability",
   "options_entitlement",
   "option_chain_market_evidence",
+  "option_limit_vs_market",
   "market_session_known",
   "market_open",
   "intraday_requires_regular_session",
