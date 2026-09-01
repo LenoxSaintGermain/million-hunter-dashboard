@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import ScanProgress from "@/components/ScanProgress";
@@ -33,14 +33,13 @@ function ConsensusModelConfig() {
   const [m3, setM3] = useState("");
   const [saved, setSaved] = useState(false);
 
-  // Sync local state when data loads
-  const dataRef = useState(() => ({ loaded: false }))[0];
-  if (consensusData && !dataRef.loaded) {
-    dataRef.loaded = true;
+  // Keep the editable values synchronized after saves and default resets.
+  useEffect(() => {
+    if (!consensusData) return;
     setM1(consensusData.consensus_model_1 ?? DEFAULT_CONSENSUS_MODELS[0]);
     setM2(consensusData.consensus_model_2 ?? DEFAULT_CONSENSUS_MODELS[1]);
     setM3(consensusData.consensus_model_3 ?? DEFAULT_CONSENSUS_MODELS[2]);
-  }
+  }, [consensusData]);
 
   const updateConsensus = trpc.models.updateConsensus.useMutation({
     onSuccess: () => {
@@ -241,6 +240,7 @@ export default function Settings() {
     onSuccess: () => {
       toast.success("All models reset to defaults");
       utils.models.config.invalidate();
+      utils.models.consensusConfig.invalidate();
     },
     onError: (e) => toast.error(`Reset failed: ${e.message}`),
   });
