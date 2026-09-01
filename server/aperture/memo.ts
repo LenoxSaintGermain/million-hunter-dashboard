@@ -156,6 +156,22 @@ export interface GenerateOpts {
   generate?: (prompt: string) => Promise<unknown>;
   /** Retry once with the offending figures named. Models usually fix it. */
   retryOnReject?: boolean;
+  /**
+   * Operator-facing source records must not wait on a slow provider forever.
+   * When the deadline expires, generation falls back to the deterministic,
+   * validator-checked ledger summary below.
+   */
+  modelDeadlineMs?: number;
+}
+
+function withDeadline<T>(promise: Promise<T>, deadlineMs: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => reject(new Error(`model deadline exceeded after ${deadlineMs}ms`)), deadlineMs);
+      timer.unref?.();
+    }),
+  ]);
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -257,14 +273,21 @@ export async function generateMemo(
     };
   }
 
-  const generate = opts.generate ?? callMemoModel;
+  const rawGenerate = opts.generate ?? callMemoModel;
+  const generate = (generationPrompt: string) => withDeadline(
+    Promise.resolve(rawGenerate(generationPrompt)),
+    opts.modelDeadlineMs ?? 12_000,
+  );
   const prompt = buildMemoPrompt(symbol, facts, graph, holdings);
 
   let raw: unknown;
   try {
     raw = await generate(prompt);
   } catch (e: any) {
-    return { memo: null, status: "skipped", rejectReason: `Memo generation failed: ${String(e?.message ?? e)}`, validation: null, citations };
+    return factLedgerFallbackResult(
+      symbol, facts, graph, holdings, citations,
+      `The model narrative was unavailable: ${String(e?.message ?? e)}. Showing a validated ledger-only research record instead.`,
+    );
   }
 
   let parsed: any;

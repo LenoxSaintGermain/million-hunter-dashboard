@@ -105,10 +105,22 @@ describe("generateMemo", () => {
     expect(r.rejectReason).toMatch(/No sourced facts/);
   });
 
-  it("reports a generation failure as skipped rather than throwing into the run", async () => {
+  it("falls back to a validated ledger-only record when generation fails", async () => {
     const r = await generateMemo("NVDA", FACTS, GRAPH, [], { generate: async () => { throw new Error("503 upstream"); } });
-    expect(r.status).toBe("skipped");
+    expect(r.status).toBe("ok");
+    expect(r.memo?.generationBasis).toBe("fact_ledger_fallback");
+    expect(r.validation?.ok).toBe(true);
     expect(r.rejectReason).toMatch(/503 upstream/);
+  });
+
+  it("falls back instead of leaving the operator waiting past the model deadline", async () => {
+    const r = await generateMemo("NVDA", FACTS, GRAPH, [], {
+      generate: async () => new Promise(() => undefined),
+      modelDeadlineMs: 5,
+    });
+    expect(r.status).toBe("ok");
+    expect(r.memo?.generationBasis).toBe("fact_ledger_fallback");
+    expect(r.rejectReason).toMatch(/deadline exceeded/);
   });
 
   it("rejects unparseable output", async () => {

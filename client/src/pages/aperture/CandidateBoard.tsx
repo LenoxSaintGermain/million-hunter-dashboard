@@ -127,6 +127,7 @@ export default function CandidateBoard() {
   const [evidenceNote, setEvidenceNote] = useState("");
   const [reviewProgressMessage, setReviewProgressMessage] = useState("");
   const [reviewCompletedAt, setReviewCompletedAt] = useState<number | null>(null);
+  const [sourceRecordMessage, setSourceRecordMessage] = useState("");
   const nextActionRef = useRef<HTMLDivElement>(null);
   const [generatingMemo, setGeneratingMemo] = useState<number | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null);
@@ -173,8 +174,23 @@ export default function CandidateBoard() {
     onError: (error) => toast.error(error.message),
   });
   const genMemo = trpc.aperture.generateMemo.useMutation({
-    onSuccess: (_result, variables) => { toast.success("Memo generated — opening the fact-traced record"); refetch(); setGeneratingMemo(null); navigate(`/aperture/memos/${variables.candidateId}`); },
-    onError: (error) => { toast.error(error.message); setGeneratingMemo(null); },
+    onSuccess: async (result) => {
+      await refetch();
+      setGeneratingMemo(null);
+      setShowInlineRecord(true);
+      const fallback = result.memo?.generationBasis === "fact_ledger_fallback";
+      const message = fallback
+        ? "Source record ready from the validated fact ledger. Model narration was not required."
+        : "Fact-traced source record ready. Review it here, then answer the current question.";
+      setSourceRecordMessage(message);
+      toast.success(message);
+    },
+    onError: (error) => {
+      const message = `Source record could not be built: ${error.message}`;
+      toast.error(message);
+      setSourceRecordMessage(message);
+      setGeneratingMemo(null);
+    },
   });
 
   if (isLoading) return (
@@ -354,7 +370,7 @@ export default function CandidateBoard() {
             </div>
             {focusCandidate && currentEvidenceQuestion && <Card className="border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><CardContent className="space-y-4 pt-5">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Current decision-critical question</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{currentEvidenceQuestion}</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Why this matters: a confirmed answer can clear this gate; a not-confirmed answer declines the current paper stage rather than quietly passing it.</p></div><Badge variant="outline" style={{ color: "var(--sh-signal)" }}>{unreviewedChecks.length} open</Badge></div>
-              <div className="rounded-lg border p-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Source record · provenance</p><p className="mt-1" style={{ color: "var(--sh-fg-muted)" }}>{sourceExcerpt ? `${sourceExcerpt}${sourceExcerpt.length >= 420 ? "…" : ""}` : "No fact-traced source record is available yet. Build it inline before resolving this question; no paper order is created."}</p><div className="mt-2 flex gap-2"><Button type="button" variant="ghost" size="sm" onClick={() => setShowInlineRecord(true)}><FileText className="mr-1.5 h-3.5 w-3.5" />View source record</Button>{focusCandidate.memoStatus !== "ok" && <Button type="button" variant="outline" size="sm" disabled={generatingMemo === focusCandidate.id} onClick={() => { setGeneratingMemo(focusCandidate.id); genMemo.mutate({ runId, candidateId: focusCandidate.id }); }}>{generatingMemo === focusCandidate.id ? "Building source…" : "Build source record"}</Button>}</div></div>
+              <div className="rounded-lg border p-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Source record · provenance</p><p className="mt-1" style={{ color: "var(--sh-fg-muted)" }}>{sourceExcerpt ? `${sourceExcerpt}${sourceExcerpt.length >= 420 ? "…" : ""}` : "No fact-traced source record is available yet. Build it inline before resolving this question; no paper order is created."}</p>{sourceRecordMessage && <p role="status" className="mt-2 rounded border px-2 py-1.5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", color: "var(--sh-text-primary)" }}>{sourceRecordMessage}</p>}<div className="mt-2 flex gap-2"><Button type="button" variant="ghost" size="sm" onClick={() => setShowInlineRecord(true)}><FileText className="mr-1.5 h-3.5 w-3.5" />View source record</Button>{focusCandidate.memoStatus !== "ok" && <Button type="button" variant="outline" size="sm" disabled={generatingMemo === focusCandidate.id} onClick={() => { setSourceRecordMessage(""); setGeneratingMemo(focusCandidate.id); genMemo.mutate({ runId, candidateId: focusCandidate.id }); }}>{generatingMemo === focusCandidate.id ? "Building source…" : "Build source record"}</Button>}</div></div>
               <div><label htmlFor="current-evidence-note" className="text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Optional review note</label><Textarea id="current-evidence-note" value={evidenceNote} onChange={(event) => setEvidenceNote(event.target.value)} placeholder="Record the observable fact, uncertainty, or reason for this answer…" className="mt-1 min-h-20 text-xs" /></div>
               <div className="flex flex-wrap gap-2"><Button type="button" size="sm" className="min-h-11" disabled={reviewEvidence.isPending} onClick={() => reviewEvidence.mutate({ runId, candidateId: focusCandidate.id, checkLabel: currentEvidenceQuestion, status: "confirmed", note: evidenceNote || undefined })}>Confirmed · clear this gate</Button><Button type="button" variant="outline" size="sm" className="min-h-11" disabled={reviewEvidence.isPending} onClick={() => reviewEvidence.mutate({ runId, candidateId: focusCandidate.id, checkLabel: currentEvidenceQuestion, status: "not_confirmed", note: evidenceNote || undefined })}>Not confirmed · decline paper stage</Button><Button type="button" variant="outline" size="sm" className="min-h-11" disabled={reviewEvidence.isPending} onClick={() => reviewEvidence.mutate({ runId, candidateId: focusCandidate.id, checkLabel: currentEvidenceQuestion, status: "not_applicable", note: evidenceNote || undefined })}>Not applicable</Button><Button type="button" variant="ghost" size="sm" className="min-h-11" disabled={reviewEvidence.isPending} onClick={() => reviewEvidence.mutate({ runId, candidateId: focusCandidate.id, checkLabel: currentEvidenceQuestion, status: "needs_follow_up", note: evidenceNote || undefined })}>Need more evidence</Button></div>
             </CardContent></Card>}
