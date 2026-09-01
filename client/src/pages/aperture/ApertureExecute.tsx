@@ -91,7 +91,7 @@ function orderSizeLabel(order: { instrumentType?: string | null; qty?: number | 
 
 // ── Order Queue ───────────────────────────────────────────────────────────────
 
-function OrderQueue({ runId }: { runId: number }) {
+function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; ticketBuilderActive?: boolean }) {
   type Order = NonNullable<inferRouterOutputs<AppRouter>["aperture"]["order"]["list"]>[number];
   const [confirmation, setConfirmation] = useState<{ kind: "approve" | "submit"; order: Order } | null>(null);
   const [confirmationText, setConfirmationText] = useState("");
@@ -127,7 +127,9 @@ function OrderQueue({ runId }: { runId: number }) {
         ? "Wait for broker reconciliation. Do not create or submit a duplicate ticket."
         : terminal.some((order) => order.status === "filled")
           ? "Open “Check whether thesis still holds” at the recorded review time, then close the outcome loop."
-          : "Return to the decision brief to prepare a proposal, revise the mission, or preserve cash.";
+          : ticketBuilderActive
+            ? "Complete the exact paper ticket above. After proposal creation, it will appear here for separate approval."
+            : "Return to the decision brief to prepare a proposal, revise the mission, or preserve cash.";
 
   const statusColor = (s: string) => s === "filled" ? "oklch(0.55 0.15 145)" :
     s === "rejected" || s === "cancelled" ? "var(--sh-red)" :
@@ -170,7 +172,9 @@ function OrderQueue({ runId }: { runId: number }) {
 
       {orders?.length === 0 && (
         <p className="text-sm text-center py-8" style={{ color: "var(--sh-fg-muted)" }}>
-          No paper orders yet. A reviewed research decision must be translated into an order before it can enter this queue.
+          {ticketBuilderActive
+            ? "No paper proposal yet. Finish the ticket above; proposal, approval, and paper submission remain separate steps."
+            : "No paper orders yet. A reviewed research decision must be translated into an order before it can enter this queue."}
         </p>
       )}
 
@@ -898,10 +902,10 @@ export default function ApertureExecute() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Current human decision</p>
-                <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{paperStageDeclined ? "Paper stage declined — preserve cash for this candidate" : data.brief.nextDecision.title}</p>
-                <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{paperStageDeclined ? "A required evidence answer was recorded as not confirmed. This revision cannot prepare a proposal or create an order." : data.brief.nextDecision.detail}</p>
+                <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{paperStageDeclined ? "Paper stage declined — preserve cash for this candidate" : evidenceReviewRequired ? data.brief.nextDecision.title : `${proposalCandidate.symbol} evidence review complete · finish the exact paper ticket`}</p>
+                <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{paperStageDeclined ? "A required evidence answer was recorded as not confirmed. This revision cannot prepare a proposal or create an order." : evidenceReviewRequired ? data.brief.nextDecision.detail : "The remaining path is exact contract → proposal → approve → submit. Each step stays separate and nothing is sent automatically."}</p>
               </div>
-              <Button variant="outline" size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => navigate(evidenceReviewRequired ? evidenceUrl : decisionUrl)}>{evidenceReviewRequired ? `Review ${unreviewedEvidenceChecks.length} required check${unreviewedEvidenceChecks.length === 1 ? "" : "s"}` : "Return to decision brief"}</Button>
+              {evidenceReviewRequired && <Button variant="outline" size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => navigate(evidenceUrl)}>{`Review ${unreviewedEvidenceChecks.length} required check${unreviewedEvidenceChecks.length === 1 ? "" : "s"}`}</Button>}
             </div>
           </div>
         )}
@@ -915,7 +919,7 @@ export default function ApertureExecute() {
             <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-3 py-2 text-center leading-5" value="alpha">Outcome &amp; notes</TabsTrigger>
           </TabsList>
           <TabsContent value="orders" className="mt-4 min-w-0" aria-label="Paper ticket">
-            <OrderQueue runId={runId} />
+            <OrderQueue runId={runId} ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired)} />
           </TabsContent>
           <TabsContent value="monitoring" className="mt-4 min-w-0" aria-label="Check whether thesis still holds">
             <MonitoringPanel runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule} />

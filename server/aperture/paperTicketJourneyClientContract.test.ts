@@ -15,6 +15,8 @@ describe("Capital Aperture paper-ticket journey contract", () => {
 
     expect(form).toContain('readiness.action === "complete_ticket"');
     expect(form).toContain("const portfolioImpactReady = !isOption && recipeCanPrepare");
+    expect(form).toContain("{isOption ? optionTermsReady ?");
+    expect(form).toContain("Option impact is not measured yet.");
     expect(form).toContain("ticketMissing: optionTicketMissing");
   });
 
@@ -42,5 +44,13 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain("?candidate=${proposalCandidate.id}&view=evidence");
     expect(execute).toContain("const decisionUrl = proposalCandidate");
     expect(execute).toContain('navigate(decisionUrl)');
+  });
+
+  it("keeps the empty order queue aligned with the active ticket builder", () => {
+    const execute = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/ApertureExecute.tsx"), "utf8");
+
+    expect(execute).toContain("Complete the exact paper ticket above.");
+    expect(execute).toContain("finish the exact paper ticket");
+    expect(execute).toContain("ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired)}");
   });
 });
