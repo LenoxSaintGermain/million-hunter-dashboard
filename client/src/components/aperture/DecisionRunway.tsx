@@ -196,7 +196,23 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
   };
 
   const commit = async () => {
-    if (!activeCanonicalId || !projection || !paperAccount) return toast.error("Assign a thesis projection and paper account first.");
+    if (!activeCanonicalId || !paperAccount) return toast.error("Assign a thesis and paper account first.");
+    let projectionId = projection?.id ?? null;
+    if (projectionId == null) {
+      try {
+        const repaired = await projectThesis.mutateAsync({ compilationId: activeCanonicalId });
+        if (repaired.compilerStatus === "needs_structure") {
+          return toast.error(`Finish the thesis structure first: ${repaired.missingFields.join(", ")}.`);
+        }
+        if (repaired.incompatibilities.length) {
+          return toast.error(repaired.incompatibilities.join(" "));
+        }
+        projectionId = repaired.apertureThesisId;
+        await utils.aperture.thesis.list.invalidate();
+      } catch (error: any) {
+        return toast.error(error?.message ?? "The thesis could not be bound to this Capital Mission.");
+      }
+    }
     const reviewAt = branch === "conditional"
       ? easternDateTimeInputToEpoch(eligibilityReviewAt)
       : easternDateTimeInputToEpoch(outcomeReviewAtInput);
@@ -213,7 +229,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
       const receipt = await saveMission.mutateAsync({
         missionText: mission.trim(),
         canonicalThesisId: activeCanonicalId,
-        capitalThesisId: projection.id,
+        capitalThesisId: projectionId,
         accountId: paperAccount.id,
         // Conditional and cash receipts revise the durable Decision Run even
         // when that run already has research attached. A new research request,
@@ -221,7 +237,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
         // to a research run. Otherwise begin() appends an immutable revision and
         // startResearch() can only reject it as a duplicate of the older run.
         decisionRunId: runway?.latest?.authority === "authoritative"
-          && runway.latest.canonicalThesisId === activeCanonicalId && runway.latest.capitalThesisId === projection.id && runway.latest.accountId === paperAccount.id
+          && runway.latest.canonicalThesisId === activeCanonicalId && runway.latest.capitalThesisId === projectionId && runway.latest.accountId === paperAccount.id
           && !(branch === "research" && runway.latest.runId != null)
           ? runway.latest.decisionRunId : null,
         branch,
@@ -392,7 +408,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
               setMissionDirty(true); // Preserve the operator-authored mission across parameter edits.
             }} help="Mission capital" />
             {branch === "research" ? <MoneyField label="Target stretch" value={desiredEnding} onChange={setDesiredEnding} help="Aspiration · never a forecast" /> : <div className="border-b p-3 text-[0.68rem] sm:border-b-0 sm:border-r" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Target stretch<p className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Not used</p><span className="text-[10px]">{branch === "cash" ? "Cash carries $0 risk." : "Gate review, not return target."}</span></div>}
-            <label className="border-b p-3 text-[0.68rem] sm:border-b-0 sm:border-r" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Horizon<select className="mt-1 min-h-11 w-full bg-transparent font-serif text-xl" style={{ color: "var(--sh-text-primary)" }} value={holdingPeriod} onChange={(event) => { setHoldingPeriod(event.target.value as HoldingPeriod); setMissionDirty(true); }}><option value="intraday">Today</option><option value="overnight">Next close</option><option value="swing">This week</option><option value="catalyst_window">Named catalyst</option><option value="position">Long term · review every 30 days</option></select><span className="text-[10px]">Outcome or review queued at horizon</span></label>
+            <label className="border-b p-3 text-[0.68rem] sm:border-b-0 sm:border-r" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Horizon<select aria-label="Holding horizon" className="mt-1 min-h-11 w-full bg-transparent font-serif text-xl" style={{ color: "var(--sh-text-primary)" }} value={holdingPeriod} onChange={(event) => { setHoldingPeriod(event.target.value as HoldingPeriod); setMissionDirty(true); }}><option value="intraday">Today</option><option value="overnight">Next close</option><option value="swing">This week</option><option value="catalyst_window">Named catalyst</option><option value="position">Long term · review every 30 days</option></select><span className="text-[10px]">Outcome or review queued at horizon</span></label>
             <MoneyField label="Max planned loss" value={maxLoss} onChange={setMaxLoss} help={`${capitalCents > 0 ? `${((parseMoney(maxLoss) / capitalCents) * 100).toFixed(1)}% of mission capital` : "Can tighten, never loosen"}`} />
           </div></div>
           {branch === "research" && targetStretchPct != null && <div className="flex flex-col gap-2 rounded-lg border px-3 py-3 text-xs" style={{ borderColor: sameSessionStretch ? "var(--sh-red)" : "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-serif text-lg" style={{ color: "var(--sh-text-primary)" }}>+{formatCents(desiredCents - capitalCents)} · +{targetStretchPct.toFixed(0)}% · aspiration</p><BasisMark basis="aspirational" label="Aspirational" /></div><p>Research may conclude that no qualifying play reaches this value within the declared risk limit.{sameSessionStretch ? " Same-session stretch requires horizon verification." : ""}</p></div>}
@@ -404,8 +420,8 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenRun, re
           </div>
 
           <details open={showTune} onToggle={(event) => setShowTune(event.currentTarget.open)} className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold"><span>Tune this run</span><ChevronDown className={"h-4 w-4 transition-transform " + (showTune ? "rotate-180" : "")} /></summary><div className="grid gap-4 border-t p-4 sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)" }}>
-            <label className="text-xs font-semibold">Objective<select className="mt-1 min-h-10 w-full rounded-md border bg-transparent px-2" style={{ borderColor: "var(--sh-border-1)" }} value={objective} onChange={(event) => setObjective(event.target.value as Objective)}><option value="best_qualified_play">Best qualified play</option><option value="deploy_today">Deploy today</option><option value="verify_catalyst">Verify catalyst</option><option value="portfolio_gap">Portfolio gap</option><option value="preserve_optionality">Preserve optionality</option></select></label>
-            <label className="text-xs font-semibold">Instrument preference<select className="mt-1 min-h-10 w-full rounded-md border bg-transparent px-2" style={{ borderColor: "var(--sh-border-1)" }} value={instrument} onChange={(event) => setInstrument(event.target.value as "shares" | "options" | "either")}><option value="shares">Shares</option><option value="either">Either, if eligible</option><option value="options">Defined-risk options</option></select></label>
+            <label className="text-xs font-semibold">Objective<select aria-label="Mission objective" className="mt-1 min-h-10 w-full rounded-md border bg-transparent px-2" style={{ borderColor: "var(--sh-border-1)" }} value={objective} onChange={(event) => setObjective(event.target.value as Objective)}><option value="best_qualified_play">Best qualified play</option><option value="deploy_today">Deploy today</option><option value="verify_catalyst">Verify catalyst</option><option value="portfolio_gap">Portfolio gap</option><option value="preserve_optionality">Preserve optionality</option></select></label>
+            <label className="text-xs font-semibold">Instrument preference<select aria-label="Instrument preference" className="mt-1 min-h-10 w-full rounded-md border bg-transparent px-2" style={{ borderColor: "var(--sh-border-1)" }} value={instrument} onChange={(event) => setInstrument(event.target.value as "shares" | "options" | "either")}><option value="shares">Shares</option><option value="either">Either, if eligible</option><option value="options">Defined-risk options</option></select></label>
             <label className="flex min-h-10 items-center gap-2 self-end text-xs font-semibold"><input type="checkbox" checked={includeHeld} onChange={(event) => setIncludeHeld(event.target.checked)} /> Include held research</label>
           </div></details>
 

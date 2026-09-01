@@ -112,7 +112,16 @@ export function CapitalThesisWorkspace() {
         setMissionError(projection.incompatibilities.join(" "));
         return;
       }
-      await utils.thesis.list.invalidate();
+      // The projection mutation writes the Capital record, but the Decision
+      // Runway can still have a warm, empty thesis-list cache from the thesis
+      // workspace. Invalidate every binding the next screen consumes before
+      // navigating so a newly-created thesis never requires a manual reload.
+      await Promise.all([
+        utils.thesis.list.invalidate(),
+        utils.thesis.activeCapital.invalidate(),
+        utils.aperture.thesis.list.invalidate(),
+        utils.aperture.runway.latest.invalidate(),
+      ]);
       navigate(route("/aperture"));
     } catch (error) {
       setMissionError(error instanceof Error ? error.message : "This thesis could not be bound to a Capital Mission. Review its type and try again.");
