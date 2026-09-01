@@ -99,7 +99,7 @@ import {
 import { immutableReceiptBindingIssue } from "./aperture/decisionReceiptBinding";
 import { resolveCapitalMissionDefaults } from "../shared/capitalMissionDefaults";
 import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
-import { detailsFromCanonicalFields } from "../shared/capitalThesisStructure";
+import { detailsFromCanonicalRecord } from "../shared/capitalThesisStructure";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -3584,7 +3584,7 @@ async function executeRun(
       const [canonical] = await db!.select().from(thesisCompilations)
         .where(eq(thesisCompilations.id, thesis.sourceCompilationId)).limit(1);
       if (canonical) {
-        baseGraph = applyCanonicalDeclarations(baseGraph, detailsFromCanonicalFields(canonical));
+        baseGraph = applyCanonicalDeclarations(baseGraph, detailsFromCanonicalRecord(canonical));
         canonicalDeclarationsApplied = true;
       }
     }

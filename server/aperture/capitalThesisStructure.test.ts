@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCapitalThesisCompilationFields, normalizeCapitalThesisDetails } from "../../shared/capitalThesisStructure";
+import { buildCapitalThesisCompilationFields, detailsFromCanonicalRecord, extractDeclaredResearchSymbols, normalizeCapitalThesisDetails } from "../../shared/capitalThesisStructure";
 import { manualThesisProjection } from "../../shared/manualThesisProjection";
 
 describe("Capital thesis structured authoring", () => {
@@ -31,5 +31,31 @@ describe("Capital thesis structured authoring", () => {
       instrumentPreference: "options",
     });
     expect(graph.confidenceNotes.join(" ")).toMatch(/operator-declared/i);
+  });
+
+  it("recovers explicit declarations from a legacy canonical thesis without treating market acronyms as symbols", () => {
+    const thesisText = "Paper-only intraday research after the 10:00 ET BLS release. Research a long IWM share expression only if IWM is above VWAP and its range high. Use at most $3,000 notional and $30 maximum planned loss, and preserve cash if tape evidence is missing.";
+    const details = detailsFromCanonicalRecord({ thesisText });
+
+    expect(extractDeclaredResearchSymbols(thesisText)).toEqual(["IWM"]);
+    expect(details.researchSymbols).toEqual(["IWM"]);
+    expect(details.instrumentPreference).toBe("shares");
+    expect(details.holdingPeriod).toBe("intraday");
+    expect(details.evidence).toMatch(/^only if IWM is above VWAP/);
+    expect(details.invalidation).toMatch(/^preserve cash if tape evidence is missing/);
+    expect(details.risk).toContain("$30 maximum planned loss");
+  });
+
+  it("keeps structured declarations authoritative over legacy text", () => {
+    const details = detailsFromCanonicalRecord({
+      thesisText: "Research a long IWM share expression only if IWM is above VWAP.",
+      compiledFilters: {
+        researchSymbols: ["DKNG"],
+        instrumentPreference: "options",
+      },
+    });
+
+    expect(details.researchSymbols).toEqual(["DKNG"]);
+    expect(details.instrumentPreference).toBe("options");
   });
 });
