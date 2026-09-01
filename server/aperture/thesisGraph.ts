@@ -21,6 +21,7 @@
  */
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_STRONG } from "../../shared/models";
+import type { CapitalThesisDetails } from "../../shared/capitalThesisStructure";
 import { looseJsonParse } from "../gemini";
 
 export interface ThesisGraph {
@@ -277,6 +278,29 @@ export async function resolveRunGraph(
     const recovered = validateGraphForPersistence(await compile(thesisText));
     return { graph: recovered, recovered: true };
   }
+}
+
+/**
+ * Canonical Capital fields are operator declarations, not model suggestions.
+ * Reapply them after every provider projection or historical-graph recovery so
+ * universe discovery cannot drift away from an explicitly named symbol or
+ * silently change the requested instrument and evidence gates.
+ */
+export function applyCanonicalDeclarations(
+  graph: ThesisGraph,
+  declared: CapitalThesisDetails,
+): ThesisGraph {
+  return {
+    ...graph,
+    beliefs: declared.belief ? [declared.belief] : graph.beliefs,
+    seek: declared.seeks ? [declared.seeks] : graph.seek,
+    avoid: declared.avoids ? [declared.avoids] : graph.avoid,
+    horizons: declared.horizon ? [declared.horizon] : graph.horizons,
+    researchSymbols: declared.researchSymbols,
+    evidenceRequirements: declared.evidence ? [declared.evidence] : graph.evidenceRequirements,
+    invalidationConditions: declared.invalidation ? [declared.invalidation] : graph.invalidationConditions,
+    instrumentPreference: declared.instrumentPreference ?? graph.instrumentPreference,
+  };
 }
 
 type JsonRecord = Record<string, unknown>;

@@ -6,7 +6,7 @@
  * the looseJsonParse fallback that the compiler relies on.
  */
 import { describe, it, expect } from "vitest";
-import { compileThesisWithGenerator, flattenExposureTree, parseCompilerResponse, resolveRunGraph, validateGraphForPersistence, type ThesisGraph } from "./thesisGraph";
+import { applyCanonicalDeclarations, compileThesisWithGenerator, flattenExposureTree, parseCompilerResponse, resolveRunGraph, validateGraphForPersistence, type ThesisGraph } from "./thesisGraph";
 
 describe("flattenExposureTree", () => {
   it("returns an empty array for an empty tree", () => {
@@ -234,6 +234,26 @@ describe("Decision Run projection recovery", () => {
     });
     expect(result).toEqual({ graph: clean, recovered: false });
     expect(calls).toBe(0);
+  });
+
+  it("restores operator-declared symbols and gates after machine projection recovery", () => {
+    const merged = applyCanonicalDeclarations(clean, {
+      belief: "Falling yields may support small-cap shares",
+      evidence: "IWM above VWAP and its opening-range high on fresh volume",
+      seeks: "One long IWM share expression",
+      avoids: "Missing or contradictory tape evidence",
+      horizon: "Intraday, flat by 3:45 ET",
+      holdingPeriod: "intraday",
+      invalidation: "Preserve cash when any named gate is absent",
+      risk: "$3,000 notional and $30 maximum planned loss",
+      researchSymbols: ["IWM"],
+      instrumentPreference: "shares",
+    });
+    expect(merged.researchSymbols).toEqual(["IWM"]);
+    expect(merged.evidenceRequirements).toEqual(["IWM above VWAP and its opening-range high on fresh volume"]);
+    expect(merged.invalidationConditions).toEqual(["Preserve cash when any named gate is absent"]);
+    expect(merged.instrumentPreference).toBe("shares");
+    expect(merged.seek).toEqual(["One long IWM share expression"]);
   });
 
   it("re-projects unchanged thesis text when a historical graph is malformed", async () => {

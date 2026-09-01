@@ -46,7 +46,7 @@ import {
 } from "../drizzle/schema";
 import { capitalOperatorProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { compileThesis, flattenExposureTree, resolveRunGraph, validateGraphForPersistence, type ThesisGraph } from "./aperture/thesisGraph";
+import { applyCanonicalDeclarations, compileThesis, flattenExposureTree, resolveRunGraph, validateGraphForPersistence, type ThesisGraph } from "./aperture/thesisGraph";
 import { discoverUniverse, thesisSummary } from "./aperture/universe";
 import { collectSecurityFacts, collectMacroFacts, describeAvailability, availabilityMap, MACRO_SYMBOL } from "./aperture/providers/index";
 import { getFacts, freshestPerKey } from "./aperture/facts";
@@ -99,6 +99,7 @@ import {
 import { immutableReceiptBindingIssue } from "./aperture/decisionReceiptBinding";
 import { resolveCapitalMissionDefaults } from "../shared/capitalMissionDefaults";
 import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
+import { detailsFromCanonicalFields } from "../shared/capitalThesisStructure";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -3577,17 +3578,28 @@ async function executeRun(
     // instead of sitting inert on the row. Tightening only — a preset can never
     // widen what the thesis allows.
     const resolved = await resolveRunGraph(thesis.graph as ThesisGraph, thesis.rawText);
-    if (resolved.recovered) {
+    let baseGraph = resolved.graph;
+    let canonicalDeclarationsApplied = false;
+    if (thesis.sourceCompilationId) {
+      const [canonical] = await db!.select().from(thesisCompilations)
+        .where(eq(thesisCompilations.id, thesis.sourceCompilationId)).limit(1);
+      if (canonical) {
+        baseGraph = applyCanonicalDeclarations(baseGraph, detailsFromCanonicalFields(canonical));
+        canonicalDeclarationsApplied = true;
+      }
+    }
+    baseGraph = validateGraphForPersistence(baseGraph);
+    if (resolved.recovered || canonicalDeclarationsApplied) {
       await db!.update(capitalTheses)
         .set({
-          graph: resolved.graph,
-          confidenceNotes: resolved.graph.confidenceNotes ?? [],
+          graph: baseGraph,
+          confidenceNotes: baseGraph.confidenceNotes ?? [],
           updatedAt: Date.now(),
         })
         .where(and(eq(capitalTheses.id, input.thesisId), eq(capitalTheses.userId, userId)));
-      console.warn(`[aperture] Repaired invalid machine projection for thesis ${input.thesisId} before run ${runId}.`);
+      console.warn(`[aperture] Reconciled thesis projection with canonical declarations for thesis ${input.thesisId} before run ${runId}.`);
     }
-    const graph = validateGraphForPersistence(withPresetRules(resolved.graph, input));
+    const graph = validateGraphForPersistence(withPresetRules(baseGraph, input));
     const nodeRows = flattenExposureTree(graph.exposureTree ?? []);
 
     // ── 1. Persist exposure nodes ──────────────────────────────────────────

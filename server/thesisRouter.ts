@@ -12,7 +12,7 @@ import { capitalOperatorProcedure, protectedProcedure, router } from "./_core/tr
 import { TRPCError } from "@trpc/server";
 import { logActivity } from "./db";
 import { apertureCandidates, aperturePlayDecisions, aperturePlaySlateItems, apertureRuns, apertureSetAside, capitalTheses, thesisCompilations, thesisShares, users } from "../drizzle/schema";
-import { compileThesis } from "./aperture/thesisGraph";
+import { applyCanonicalDeclarations, compileThesis } from "./aperture/thesisGraph";
 import { projectionValues } from "./thesisBridge";
 import { canUseCanonicalThesis } from "./thesisAccess";
 import { GEMINI_FAST } from "../shared/models";
@@ -647,17 +647,7 @@ export const thesisRouter = router({
         }
       }
 
-      graph = {
-        ...graph,
-        beliefs: declared.belief ? [declared.belief] : graph.beliefs,
-        seek: declared.seeks ? [declared.seeks] : graph.seek,
-        avoid: declared.avoids ? [declared.avoids] : graph.avoid,
-        horizons: declared.horizon ? [declared.horizon] : graph.horizons,
-        researchSymbols: declared.researchSymbols,
-        evidenceRequirements: declared.evidence ? [declared.evidence] : graph.evidenceRequirements,
-        invalidationConditions: declared.invalidation ? [declared.invalidation] : graph.invalidationConditions,
-        instrumentPreference: declared.instrumentPreference ?? graph.instrumentPreference,
-      };
+      graph = applyCanonicalDeclarations(graph, declared);
       const readiness = evaluateThesisResearchReadiness(graph, {
         holdingPeriod: declared.holdingPeriod,
         instrumentPreference: declared.instrumentPreference,
