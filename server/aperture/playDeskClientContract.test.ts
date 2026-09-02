@@ -33,4 +33,13 @@ describe("Capital Aperture Play Desk contract", () => {
     expect(memo).toContain("Open Play Desk");
     expect(memo).toContain("Nothing is ready to approve from this memo.");
   });
+
+  it("shows a deferred play as queued until its next regular-session resume time", () => {
+    const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
+
+    expect(page).toContain("deferredByRun");
+    expect(page).toContain("Queued for next regular session");
+    expect(page).toContain("Returns ");
+    expect(page).toContain("Review queue");
+  });
 });

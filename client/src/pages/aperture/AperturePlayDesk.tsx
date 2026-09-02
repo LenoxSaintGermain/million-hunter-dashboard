@@ -27,17 +27,21 @@ export default function AperturePlayDesk() {
   const [, navigate] = useLocation();
   const desk = trpc.aperture.desk.summary.useQuery();
   const runs = trpc.aperture.run.list.useQuery();
+  const playList = trpc.aperture.play.list.useQuery();
   const outcomes = trpc.aperture.runway.pending.useQuery();
   const journeys = buildResearchJourneys((runs.data ?? []) as any[]);
   const researchActions = journeys.filter((journey) => ["needs_attention", "paper_stage_declined", "ready_to_review", "more_research_available"].includes(journey.state));
+  const deferredByRun = new Map((playList.data?.plays ?? [])
+    .filter((play) => play.decision?.decision === "deferred" && play.decision.resumeAt != null && play.decision.resumeAt > Date.now())
+    .map((play) => [play.run.id, play.decision!] as const));
   const orderActions = (desk.data?.orders ?? []).filter((order) => ["pending_approval", "approved"].includes(order.status));
   const inMotionOrders = (desk.data?.orders ?? []).filter((order) => order.status === "submitted" || (order.status === "filled" && order.intent !== "close"));
   const activePlays = (desk.data?.activePlays ?? []).filter((play) => !inMotionOrders.some((order) => order.accountId === play.accountId && order.symbol === play.symbol));
   const pendingOutcomes = outcomes.data ?? [];
-  const isLoading = desk.isLoading || runs.isLoading || outcomes.isLoading;
+  const isLoading = desk.isLoading || runs.isLoading || playList.isLoading || outcomes.isLoading;
   const count = researchActions.length + orderActions.length + inMotionOrders.length + activePlays.length + pendingOutcomes.length;
 
-  const refresh = () => Promise.all([desk.refetch(), runs.refetch(), outcomes.refetch()]);
+  const refresh = () => Promise.all([desk.refetch(), runs.refetch(), playList.refetch(), outcomes.refetch()]);
 
   return <DashboardLayout><div className="mx-auto max-w-6xl space-y-6 pb-12">
     <div className="flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}>
@@ -65,7 +69,10 @@ export default function AperturePlayDesk() {
 
     {!isLoading && count > 0 ? <div className="grid gap-5 lg:grid-cols-2">
       <DeskLane icon={<FileSearch className="h-4 w-4" />} title="Research & evidence" detail="Resolve gaps before a proposal can exist." count={researchActions.length}>
-        {researchActions.map((journey) => <DeskItem key={journey.rootId} eyebrow={journey.state === "ready_to_review" ? "Decision ready" : journey.state === "paper_stage_declined" ? "Cash / no paper stage" : "Research follow-up"} title={journey.thesisName} meta={`${journey.evidenceCandidates} candidates · updated ${formatDistanceToNow(Number(journey.latest.createdAt))} ago`} action={journey.state === "ready_to_review" ? "Review lead" : journey.state === "paper_stage_declined" ? "Review receipt" : "Open journey"} onAction={() => navigate(`/aperture/run/${journey.latest.id}?view=evidence`)} />)}
+        {researchActions.map((journey) => {
+          const deferred = deferredByRun.get(journey.latest.id);
+          return <DeskItem key={journey.rootId} eyebrow={deferred ? "Queued for next regular session" : journey.state === "ready_to_review" ? "Decision ready" : journey.state === "paper_stage_declined" ? "Cash / no paper stage" : "Research follow-up"} title={journey.thesisName} meta={deferred ? `Returns ${new Date(deferred.resumeAt!).toLocaleString()} · ${deferred.reason}` : `${journey.evidenceCandidates} candidates · updated ${formatDistanceToNow(Number(journey.latest.createdAt))} ago`} action={deferred ? "Review queue" : journey.state === "ready_to_review" ? "Review lead" : journey.state === "paper_stage_declined" ? "Review receipt" : "Open journey"} onAction={() => navigate(deferred ? `/aperture/run/${journey.latest.id}` : `/aperture/run/${journey.latest.id}?view=evidence`)} />;
+        })}
       </DeskLane>
 
       <DeskLane icon={<WalletCards className="h-4 w-4" />} title="Paper tickets" detail="Approval and submission are separate checkpoints." count={orderActions.length}>
