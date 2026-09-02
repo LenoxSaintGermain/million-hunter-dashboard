@@ -67,7 +67,7 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain("Choose another play in this run");
     expect(execute).toContain("setShowAlternatives(true)");
     expect(execute).toContain("A proposal appears here only after preflight passes.");
-    expect(execute).toContain("ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired)}");
+    expect(execute).toContain("ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired && !candidateActiveOrder)}");
   });
 
   it("presents closed-session option submission as a broker queue instead of an evidence loop", () => {
@@ -78,6 +78,15 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain("held for the next eligible options session");
     expect(execute).toContain("Accepted / queued at paper broker");
     expect(desk).toContain("Accepted / queued at paper broker");
+  });
+
+  it("replaces a duplicate ticket builder with the existing paper-order receipt", () => {
+    const execute = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/ApertureExecute.tsx"), "utf8");
+
+    expect(execute).toContain("candidateActiveOrder");
+    expect(execute).toContain("Paper order already exists · do not duplicate");
+    expect(execute).toContain("accepted and queued for the next eligible session");
+    expect(execute).toContain("!candidateActiveOrder");
   });
 
   it("reacts when an inline alternative changes only the candidate query parameter", () => {
