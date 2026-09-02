@@ -263,6 +263,43 @@ describe("market hours", () => {
     });
   });
 
+  it("allows a bounded long-option limit order to be approved and queued while closed", () => {
+    const now = Date.parse("2026-06-13T14:30:00Z"); // Saturday
+    const closed = at("2026-06-13T14:30:00Z");
+    const input = order({
+      instrumentType: "long_call",
+      symbol: "NVDA270115C00250000",
+      underlyingSymbol: "NVDA",
+      optionExpirationDate: "2027-01-15",
+      optionStrikePriceCents: 25_000,
+      contractMultiplier: 100,
+      qty: 1,
+      entryPriceCents: 400,
+      slippageCents: 5,
+      orderType: "limit",
+      timeInForce: "day",
+      holdingPeriod: "position",
+      catalystDeadlineAt: now + 30 * DAY,
+      gatedNotionalCents: 40_000,
+      notionalBasis: "derived_from_last_price",
+    });
+
+    for (const action of ["approve", "submit"] as const) {
+      const evaluation = evaluateOrderGates({
+        input,
+        account: account(),
+        session: closed,
+        mandate: CURRENT_MANDATE,
+        now,
+        action,
+      });
+      expect(gate(evaluation, "market_open")).toMatchObject({
+        passed: true,
+        detail: expect.stringContaining("queued for the next eligible options session"),
+      });
+    }
+  });
+
   it("blocks when the session is unknown rather than assuming it is open", () => {
     const unknown = at("2029-06-13T14:30:00Z");
     const ev = evalOrder({}, {}, unknown, Date.parse("2029-06-13T14:30:00Z"));

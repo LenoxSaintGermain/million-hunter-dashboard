@@ -107,7 +107,7 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
     onError: (e) => toast.error(e.message),
   });
   const submit = trpc.aperture.order.submit.useMutation({
-    onSuccess: () => { toast.success("Order submitted to broker"); refetch(); },
+    onSuccess: () => { toast.success("Paper order accepted or queued by the broker"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
   const mirror = trpc.aperture.order.mirrorFills.useMutation({
@@ -122,9 +122,9 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
   const nextAction = pending.length
     ? "Review the waiting paper ticket. Approval changes only its paper-workflow state."
     : approved.length
-      ? "Submit the approved ticket to the exact named paper account, or return without sending it."
+      ? "Submit the approved ticket now. If the options session is closed, the named paper broker will queue the limit order for the next eligible session."
       : submitted.length
-        ? "Wait for broker reconciliation. Do not create or submit a duplicate ticket."
+        ? "The broker accepted the paper order. It may be queued for the next eligible options session; do not create a duplicate ticket."
         : terminal.some((order) => order.status === "filled")
           ? "Open “Check whether thesis still holds” at the recorded review time, then close the outcome loop."
            : ticketBuilderActive
@@ -137,7 +137,7 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
   const statusLabel = (status: string) => ({
     pending_approval: "Waiting for your review",
     approved: "Ready to submit to the named paper account",
-    submitted: "Sent to the named paper account",
+    submitted: "Accepted / queued at paper broker",
     filled: "Paper trade executed",
     rejected: "Not approved",
     cancelled: "Cancelled",
@@ -161,7 +161,7 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
         <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 text-xs sm:flex sm:flex-wrap" aria-label="Paper ticket status summary">
           <span className="min-w-0" style={{ color: "var(--sh-signal)" }}>{pending.length} waiting for review</span>
           <span className="min-w-0" style={{ color: "var(--sh-fg-muted)" }}>{approved.length} ready to submit</span>
-          <span className="min-w-0" style={{ color: "var(--sh-fg-muted)" }}>{submitted.length} sent to paper broker</span>
+          <span className="min-w-0" style={{ color: "var(--sh-fg-muted)" }}>{submitted.length} accepted / queued</span>
           <span className="min-w-0" style={{ color: "oklch(0.55 0.15 145)" }}>{terminal.filter((o) => o.status === "filled").length} executed</span>
         </div>
         <Button variant="outline" size="sm" className="min-h-11 w-full sm:w-auto" onClick={() => mirror.mutate()} disabled={mirror.isPending}>
@@ -213,7 +213,7 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
                   )}
                   {o.status === "approved" && (
                     <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "submit", order: o }); setConfirmationText(""); }} disabled={submit.isPending}>
-                      <Send aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Send to named paper account
+                      <Send aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Submit / queue paper order
                     </Button>
                   )}
                   <span className="text-xs tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>
@@ -234,9 +234,9 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
       <AlertDialog open={confirmation != null} onOpenChange={(open) => { if (!open) { setConfirmation(null); setConfirmationText(""); } }}>
         <AlertDialogContent className="max-h-[90vh] w-[calc(100%_-_2rem)] max-w-[calc(100%_-_2rem)] overflow-x-hidden overflow-y-auto sm:max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>{confirmation?.kind === "submit" ? "Confirm paper submission" : "Approve this paper proposal"}</AlertDialogTitle>
+            <AlertDialogTitle>{confirmation?.kind === "submit" ? "Submit or queue this paper order" : "Approve this paper proposal"}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action is paper-only. The server will rerun freshness, account-binding, evidence, and risk gates before changing the order state.
+              This action is paper-only. The server reruns the account, evidence, and risk gates first. If the options session is closed, a limit order is held for the next eligible options session; it cannot execute overnight and it cannot fill above your limit.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {confirmation && (
@@ -263,7 +263,7 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
           <AlertDialogFooter>
             <AlertDialogCancel className="min-h-11">Go back</AlertDialogCancel>
             <Button className="min-h-11" onClick={confirmAction} disabled={confirmationText !== requiredConfirmation || approve.isPending || submit.isPending}>
-              {confirmation?.kind === "submit" ? "Submit to named paper account" : "Approve paper proposal"}
+              {confirmation?.kind === "submit" ? "Submit / queue paper order" : "Approve paper proposal"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

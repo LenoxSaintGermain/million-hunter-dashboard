@@ -16,8 +16,8 @@ const orderState = (order: { status: string; brokerOrderId?: string | null; disp
   ? { label: "Dispatch unresolved", action: "Reconcile paper dispatch" }
   : ({
   pending_approval: { label: "Awaiting review", action: "Review paper ticket" },
-  approved: { label: "Ready to submit", action: "Confirm paper submission" },
-  submitted: { label: "Sent to paper broker", action: "Check broker status" },
+  approved: { label: "Ready to submit or queue", action: "Submit / queue paper order" },
+  submitted: { label: "Accepted / queued at paper broker", action: "Check broker status" },
   filled: { label: "In motion", action: "Monitor play" },
   rejected: { label: "Rejected", action: "Review decision" },
   cancelled: { label: "Cancelled", action: "Review decision" },

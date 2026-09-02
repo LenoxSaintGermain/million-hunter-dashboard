@@ -493,12 +493,23 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
   if (known) {
     const proposalStage = args.action === "preflight" || args.action === "create_proposal";
     const mayPrepareWhileClosed = proposalStage && input.holdingPeriod !== "intraday";
-    const marketAvailableForAction = session.session !== "closed" || mayPrepareWhileClosed;
+    // Alpaca accepts bounded option limit orders with DAY time-in-force after
+    // the close and holds them for the next eligible options session. This is
+    // a broker-native queue, not extended-hours execution. Keep shares,
+    // intraday plays, market orders, and every unbounded shape fail-closed.
+    const mayQueueOptionWhileClosed = isOption
+      && input.holdingPeriod !== "intraday"
+      && input.orderType === "limit"
+      && input.timeInForce === "day"
+      && (args.action === "approve" || args.action === "submit");
+    const marketAvailableForAction = session.session !== "closed" || mayPrepareWhileClosed || mayQueueOptionWhileClosed;
     g.add(
       "market_open",
       marketAvailableForAction,
       session.session !== "closed"
         ? `market session is ${session.session}`
+        : mayQueueOptionWhileClosed
+          ? "market is closed — this limit-only paper option may be approved and queued for the next eligible options session; it cannot execute overnight and the limit caps the premium per share"
         : mayPrepareWhileClosed
           ? "market is closed — the paper proposal may be prepared, but approval and submission will recheck live market, account, and quote conditions"
           : "market is closed — no paper order may be approved or submitted",
