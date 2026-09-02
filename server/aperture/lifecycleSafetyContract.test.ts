@@ -42,11 +42,33 @@ describe("Capital Aperture lifecycle safety contracts", () => {
     const page = read("client/src/pages/aperture/ApertureExecute.tsx");
     const router = read("server/apertureRouter.ts");
 
-    expect(page).toContain('onProposalCreated={() => navigate(`/aperture/run/${runId}/execute?candidate=${proposalCandidate.id}`)}');
+    expect(page).toContain('onProposalCreated={() => document.getElementById("paper-lifecycle")?.scrollIntoView');
     expect(page).toContain("<MonitoringPanel runId={runId} candidate={proposalCandidate}");
     expect(page).not.toContain("candidate={proposalCandidate ?? data?.candidates[0]}");
     expect(router).toContain("const netFilledQty = filledOrders.reduce");
     expect(router).toContain('eq(brokerOrders.status, "filled")');
     expect(router).toContain("No open filled paper exposure exists for this candidate");
+  });
+
+  it("refreshes a created proposal in place instead of navigating to the same URL", () => {
+    const form = read("client/src/components/aperture/PaperProposalForm.tsx");
+    const page = read("client/src/pages/aperture/ApertureExecute.tsx");
+
+    expect(form).toContain("await utils.aperture.order.list.invalidate({ runId })");
+    expect(form).toContain("onProposalCreated(result)");
+    expect(page).not.toContain('onProposalCreated={() => navigate(`/aperture/run/${runId}/execute?candidate=${proposalCandidate.id}`)}');
+  });
+
+  it("returns the existing active candidate proposal instead of inserting a duplicate", () => {
+    const flow = read("server/aperture/orderFlow.ts");
+    const retryCheck = flow.indexOf("const existingBeforeEvaluation");
+    const evaluation = flow.indexOf('await evaluateOrder(input, "create_proposal")');
+
+    expect(flow).toContain("lockCandidateProposalScope");
+    expect(flow).toContain("findExistingActiveCandidateOrder");
+    expect(retryCheck).toBeGreaterThan(-1);
+    expect(evaluation).toBeGreaterThan(retryCheck);
+    expect(flow).toContain("return { orderId: existingOrder.id, created: false }");
+    expect(flow).toContain("return { orderId: (result as any).insertId as number, created: true }");
   });
 });

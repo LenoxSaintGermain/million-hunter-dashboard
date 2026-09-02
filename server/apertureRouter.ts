@@ -3370,7 +3370,7 @@ export const apertureRouter = router({
         if (evidenceBlock) throw new TRPCError({ code: "PRECONDITION_FAILED", message: evidenceBlock });
 
         try {
-          const orderId = await createOrder({
+          return await createOrder({
             ...input,
             userId: ctx.user.id,
             portfolioRules: {
@@ -3378,7 +3378,6 @@ export const apertureRouter = router({
               minAvgDailyVolumeUsd: run.liquidityFloorAdvUsd ?? null,
             },
           });
-          return { orderId };
         } catch (e: any) {
           if (e instanceof OrderGateError) {
             throw new TRPCError({

@@ -52,7 +52,7 @@ function holdingPeriodLabel(value: HoldingPeriod) {
 }
 
 export function PaperProposalForm({ runId, candidate, account, run, onReturnToBrief, onReturnToDecisionBrief, onProposalCreated, onCashPreserved }: {
-  runId: number; candidate: any; account: any; run: any; onReturnToBrief: () => void; onReturnToDecisionBrief: () => void; onProposalCreated: () => void; onCashPreserved: () => void;
+  runId: number; candidate: any; account: any; run: any; onReturnToBrief: () => void; onReturnToDecisionBrief: () => void; onProposalCreated: (result: { orderId: number; created: boolean }) => void; onCashPreserved: () => void;
 }) {
   const suggestedCents = candidate?.suggestedSizeLowCents ?? 100_000;
   const [notionalDollars, setNotionalDollars] = useState(String(Math.max(100, Math.round(suggestedCents / 100))));
@@ -99,7 +99,13 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   const utils = trpc.useUtils();
   const constructed = trpc.aperture.play.construct.useQuery({ runId, candidateId: candidate?.id ?? 0 }, { enabled: !!candidate?.id, staleTime: 30_000 });
   const create = trpc.aperture.order.create.useMutation({
-    onSuccess: () => { toast.success("Paper proposal created. It is waiting for your separate approval."); onProposalCreated(); },
+    onSuccess: async (result) => {
+      await utils.aperture.order.list.invalidate({ runId });
+      toast.success(result.created
+        ? "Paper proposal created. It is waiting for your separate approval."
+        : "This paper proposal already exists. Opening the waiting ticket.");
+      onProposalCreated(result);
+    },
     onError: (error) => toast.error(error.message),
   });
   const preserveCash = trpc.aperture.play.decide.useMutation({

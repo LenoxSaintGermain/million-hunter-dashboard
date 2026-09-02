@@ -423,9 +423,44 @@ export async function preflightOrder(input: CreateOrderInput): Promise<OrderEval
 
 // ── Create (gate → pending_approval) ──────────────────────────────────────────
 
-export async function createOrder(input: CreateOrderInput): Promise<number> {
+export interface CreateOrderResult {
+  orderId: number;
+  created: boolean;
+}
+
+async function lockCandidateProposalScope(tx: any, input: Pick<CreateOrderInput, "runId" | "candidateId" | "userId">) {
+  if (input.candidateId == null) return;
+  const [scope] = await tx.select({ id: apertureRuns.id })
+    .from(apertureRuns)
+    .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, input.userId)))
+    .for("update")
+    .limit(1);
+  if (!scope) throw new Error("research run not found");
+}
+
+async function findExistingActiveCandidateOrder(tx: any, input: Pick<CreateOrderInput, "runId" | "candidateId" | "userId">) {
+  if (input.candidateId == null) return null;
+  const [existingOrder] = await tx.select({ id: brokerOrders.id })
+    .from(brokerOrders)
+    .where(and(
+      eq(brokerOrders.runId, input.runId),
+      eq(brokerOrders.candidateId, input.candidateId),
+      eq(brokerOrders.userId, input.userId),
+      inArray(brokerOrders.status, [...LIVE_ORDER_STATUSES]),
+    ))
+    .limit(1);
+  return existingOrder ?? null;
+}
+
+export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
+
+  // A retry after a successful response must not be re-evaluated as fresh
+  // exposure: the existing proposal already counts against the gates. The
+  // locked check below closes the simultaneous-request race.
+  const existingBeforeEvaluation = await findExistingActiveCandidateOrder(db, input);
+  if (existingBeforeEvaluation) return { orderId: existingBeforeEvaluation.id, created: false };
 
   const {
     evaluation, resolvedIntent, session, gatedNotionalCents, symbol, orderType, timeInForce, now, decisionAuthorization, instrumentSnapshot,
@@ -491,13 +526,19 @@ export async function createOrder(input: CreateOrderInput): Promise<number> {
   }
 
   return db.transaction(async (tx) => {
+    // Candidate proposals are one active lifecycle, not one row per click. Lock
+    // the run before checking so simultaneous retries serialize, then return the
+    // durable proposal that already owns this candidate instead of duplicating it.
+    await lockCandidateProposalScope(tx, input);
+    const existingOrder = await findExistingActiveCandidateOrder(tx, input);
+    if (existingOrder) return { orderId: existingOrder.id, created: false };
     await lockCurrentDecisionRevision(tx, decisionAuthorization);
     const [result] = await tx.insert(brokerOrders).values({
       ...base,
       status: "pending_approval",
       paperAckAt: now,
     });
-    return (result as any).insertId as number;
+    return { orderId: (result as any).insertId as number, created: true };
   });
 }
 
