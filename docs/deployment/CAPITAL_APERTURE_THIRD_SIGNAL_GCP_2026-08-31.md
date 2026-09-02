@@ -97,3 +97,18 @@ Complete the Google account chooser once and confirm the verified owner lands in
 - Public `/aperture` returned HTTP 200, same-origin `system.health` returned `ok: true`, and the public client bundle exposed the exact `c01a6785b9bb4320b981e784ee7f141c9aa0b2de` release marker.
 - No schema migration, invite change, provider configuration change, proposal creation, paper approval, paper submission, or broker order occurred during this release or UAT.
 - Rollback revision: `capital-aperture-00035-zuk`.
+
+## 2026-09-02 proposal-idempotency repair
+
+- Deployed source: `009a2f9503d3a54e4173abad627e0074986be48d`.
+- Cloud Build: `5aee6978-7b1a-424e-8248-3b45a26a4ca8` — `SUCCESS`.
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:009a2f95-firebase`.
+- Image digest: `sha256:60ae881d20a5e19f49c52bbbcee19ad52c05ec9e1aca54c8801452fc730da93c`.
+- Ready revision: `capital-aperture-00039-dug`, serving 100% of Cloud Run traffic.
+- Release behavior: creating a paper proposal now invalidates and refreshes the ticket lifecycle immediately instead of reloading the same stale route. Repeated or simultaneous create attempts for the same operator, run, and candidate return the active proposal instead of creating a duplicate.
+- Authenticated production UAT confirmed that the repaired route opens the existing proposal directly. The extra proposal created by the pre-repair stale-screen retry was rejected with the durable reason `Duplicate proposal created during stale-screen UAT; original MGM ticket retained for review. No broker order was created.`
+- Current MGM UAT state after cleanup: one proposal waiting for review, zero ready to submit, zero accepted or queued, and zero executed. The remaining proposal is `MGM261120C00040000`, one `MGM 2026-11-20 $40 call`, `LIMIT`/`DAY` at `$4.20`, maximum planned loss `$420`, destined for Alpaca Paper account `PA3X46OF7EKJ`.
+- `pnpm check`, 20 focused lifecycle safety tests, and `pnpm build` passed. The database-disabled broad suite passed 830 tests; its 31 remaining failures are the documented database/key-dependent suites, with production database access intentionally disabled.
+- The Firebase production URL returned HTTP 200 and its client bundle exposed the exact `009a2f9503d3a54e4173abad627e0074986be48d` release marker.
+- UAT stopped at the explicit action-time approval dialog. No paper approval, paper submission, or broker order occurred in this repair pass.
+- Rollback revision: `capital-aperture-00037-maf`.
