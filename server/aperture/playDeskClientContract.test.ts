@@ -63,6 +63,12 @@ describe("Capital Aperture Play Desk contract", () => {
     expect(page).toContain("lifecycle=monitoring");
   });
 
+  it("opens filled plays on monitoring instead of returning to the ticket form", () => {
+    const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
+
+    expect(page).toContain('order.status === "filled" ? "&lifecycle=monitoring" : ""');
+  });
+
   it("uses per-candidate state rather than completed-run status for the choose lane", () => {
     const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
 
