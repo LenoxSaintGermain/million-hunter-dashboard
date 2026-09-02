@@ -12,4 +12,18 @@ describe("progressive Capital Aperture evidence gate", () => {
     const priority = { id: 1, symbol: "LLY", confidenceScore: 0.72, memoStatus: "ok", verifyFields: [] };
     expect(buildProgressiveEvidenceGate(priority, [priority]).paperOrderEligible).toBe(true);
   });
+
+  it("moves prefixed option contract checks to the exact paper-ticket stage", () => {
+    const priority = {
+      id: 1,
+      symbol: "MRVL",
+      confidenceScore: 0.72,
+      memoStatus: "ok",
+      verifyFields: ["C: Option chain and contract terms", "C: Option bid/ask and liquidity"],
+    };
+    expect(buildProgressiveEvidenceGate(priority, [priority])).toMatchObject({
+      decisionCriticalCheckCount: 0,
+      paperOrderEligible: true,
+    });
+  });
 });

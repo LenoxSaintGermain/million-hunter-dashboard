@@ -1,3 +1,5 @@
+import { proposalEvidenceChecks } from "./evidenceReview";
+
 export type EvidenceGateCandidate = {
   id: number;
   symbol: string;
@@ -6,7 +8,9 @@ export type EvidenceGateCandidate = {
   verifyFields: unknown;
 };
 
-const checksFor = (value: unknown) => Array.isArray(value) ? value.length : 0;
+const checksFor = (value: unknown) => proposalEvidenceChecks(
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [],
+).requiredChecks.length;
 
 /**
  * Research navigation should never be blocked by a long tail of checks. This

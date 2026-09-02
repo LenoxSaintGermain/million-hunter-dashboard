@@ -1,3 +1,5 @@
+import { proposalEvidenceChecks } from "./evidenceReview";
+
 export interface DecisionCandidate {
   symbol: string;
   role: string;
@@ -55,7 +57,7 @@ const asStrings = (value: unknown) => Array.isArray(value) ? value.filter((item)
  * decision conditions, not establish a positive return outcome.
  */
 export function buildDecisionFocus(candidate: DecisionCandidate, positions: PaperPosition[]): DecisionFocus {
-  const checks = asStrings(candidate.verifyFields);
+  const checks = proposalEvidenceChecks(asStrings(candidate.verifyFields)).requiredChecks;
   const held = positions.some((position) => position.symbol === candidate.symbol);
   const confidence = candidate.confidenceScore ?? 0;
   const lowFit = (candidate.compositeScore ?? 0) < 60 || candidate.role === "remainder";
@@ -84,7 +86,7 @@ export function buildDecisionFocus(candidate: DecisionCandidate, positions: Pape
 }
 
 export function decisionPriority(candidate: DecisionCandidate): number {
-  const checks = asStrings(candidate.verifyFields).length;
+  const checks = proposalEvidenceChecks(asStrings(candidate.verifyFields)).requiredChecks.length;
   const confidence = candidate.confidenceScore ?? 0;
   return checks * 100 + (1 - confidence) * 10 + ((candidate.compositeScore ?? 0) < 60 ? 5 : 0);
 }

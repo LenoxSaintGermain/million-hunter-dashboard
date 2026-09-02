@@ -18,14 +18,18 @@ const PAPER_TICKET_EVIDENCE_CHECKS = new Set([
   "Option bid/ask and liquidity",
 ]);
 
+function isPaperTicketEvidenceCheck(check: string) {
+  return PAPER_TICKET_EVIDENCE_CHECKS.has(check.replace(/^[A-Z]\s*:\s*/, ""));
+}
+
 export function proposalEvidenceChecks(checks: readonly string[] | null | undefined) {
   const normalized = Array.from(new Set((checks ?? [])
     .filter((check): check is string => typeof check === "string")
     .map((check) => check.trim())
     .filter(Boolean)));
   return {
-    requiredChecks: normalized.filter((check) => !PAPER_TICKET_EVIDENCE_CHECKS.has(check)),
-    ticketChecks: normalized.filter((check) => PAPER_TICKET_EVIDENCE_CHECKS.has(check)),
+    requiredChecks: normalized.filter((check) => !isPaperTicketEvidenceCheck(check)),
+    ticketChecks: normalized.filter(isPaperTicketEvidenceCheck),
   };
 }
 
