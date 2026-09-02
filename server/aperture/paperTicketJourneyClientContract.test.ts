@@ -18,6 +18,9 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(form).toContain("{isOption ? optionTermsReady ?");
     expect(form).toContain("Option impact is not measured yet.");
     expect(form).toContain("ticketMissing: optionTicketMissing");
+    expect(form).toContain("Price &amp; risk");
+    expect(form).toContain("PriceRiskVisual");
+    expect(form).toContain("Live option quote required");
   });
 
   it("does not make the paper acknowledgement a circular preflight dependency", () => {

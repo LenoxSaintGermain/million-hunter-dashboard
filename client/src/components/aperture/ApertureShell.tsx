@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { BookOpen, FileSearch, FileText, Landmark, LayoutDashboard, ListTodo, Route, Wallet } from "lucide-react";
+import { BookOpen, FileText, Landmark, LayoutDashboard, ListTodo, Route, Wallet } from "lucide-react";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { cn } from "@/lib/utils";
 import { CapitalCockpitRail } from "@/components/aperture/CapitalCockpitRail";
@@ -8,14 +8,12 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolatedUatIdentity";
 
 const APERTURE_NAV = [
-  { href: "/aperture", label: "Decision Center", icon: LayoutDashboard },
+  { href: "/aperture", label: "Today", icon: LayoutDashboard },
   { href: "/aperture/plays", label: "Play Desk", icon: ListTodo },
-  { href: "/aperture/runs", label: "Research Journeys", icon: Route },
-  { href: "/aperture/theses", label: "Saved theses", icon: BookOpen },
-  { href: "/aperture/disclosures", label: "Disclosure plans", icon: FileSearch },
+  { href: "/aperture/runs", label: "Research", icon: Route },
+  { href: "/aperture/accounts", label: "Portfolio", icon: Wallet },
+  { href: "/aperture/theses", label: "Theses", icon: BookOpen },
   { href: "/thesis", label: "New thesis", icon: BookOpen },
-  { href: "/aperture/accounts", label: "Accounts", icon: Wallet },
-  { href: "/aperture/memos", label: "Memo Library", icon: FileText },
 ] as const;
 
 const TRADER_NAV = [
@@ -52,7 +50,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <div className="w-full min-w-0 max-w-[1280px] mx-auto px-6 lg:px-10 overflow-x-auto">
-          <nav className="flex min-w-max gap-5" aria-label="Capital Aperture navigation">
+          <nav className="flex min-w-max gap-5" aria-label="Capital Aperture workspace menu">
             {nav.map((item) => {
               const Icon = item.icon;
               const active = item.href === "/aperture"
@@ -74,7 +72,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
         </div>
       </section>
       <main className="aperture-editorial max-w-[1280px] mx-auto w-full px-6 lg:px-10 py-8 lg:py-10">
-        <CapitalCockpitRail runId={runId} />
+        <CapitalCockpitRail runId={runId} compactOnly={location === "/aperture/plays"} />
         {children}
       </main>
     </EditorialTopNav>

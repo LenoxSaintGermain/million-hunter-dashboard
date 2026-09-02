@@ -45,7 +45,7 @@ function MeasureLine({ line }: { line: HeadroomLine }) {
   </div>;
 }
 
-export function CapitalCockpitRail({ runId }: { runId?: number }) {
+export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: number; compactOnly?: boolean }) {
   const { data: accounts } = trpc.aperture.account.list.useQuery();
   const preferredAccountId = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")?.id
     ?? accounts?.find((account) => account.isPaper)?.id
@@ -72,16 +72,17 @@ export function CapitalCockpitRail({ runId }: { runId?: number }) {
     [data],
   );
   useEffect(() => {
-    if (preferenceApplied.current || preference.data == null) return;
+    if (compactOnly || preferenceApplied.current || preference.data == null) return;
     preferenceApplied.current = true;
     setExpanded(preference.data.expanded);
-  }, [preference.data]);
+  }, [compactOnly, preference.data]);
   if (isLoading || !data || !summary) return <section className="mb-5 animate-pulse motion-reduce:animate-none rounded-xl border px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Loading paper-research context…</span></section>;
 
   const elapsedMs = Math.max(0, clockNow - responseAt.current);
   const boundaryMs = data.session.msToNextBoundary == null ? null : data.session.msToNextBoundary - elapsedMs;
   const deadlineMs = data.run?.msToCatalystDeadline == null ? null : data.run.msToCatalystDeadline - elapsedMs;
   const changeExpanded = () => {
+    if (compactOnly) return;
     const next = !expanded;
     setExpanded(next);
     setPreference.mutate({ expanded: next });
@@ -94,9 +95,6 @@ export function CapitalCockpitRail({ runId }: { runId?: number }) {
   });
   const notionalLines = sortLines(summary.expandedLines.filter((line) => !line.key.includes("planned_risk")));
   const riskLines = sortLines(summary.expandedLines.filter((line) => line.key.includes("planned_risk")));
-  const bindingText = summary.binding
-    ? `${summary.binding.label}${summary.binding.subject ? ` · ${summary.binding.subject}` : ""} ${(summary.bindingUtilizationPct ?? 0).toFixed(1)}%`
-    : "no ceiling is measurable yet";
   const staleText = summary.accountStale
     ? `ceilings are measured against ${syncedLabel(data.account.stalenessMs)} equity`
     : syncedLabel(data.account.stalenessMs);
@@ -109,10 +107,10 @@ export function CapitalCockpitRail({ runId }: { runId?: number }) {
     <div className="flex min-h-12 flex-col gap-1 px-3 py-2 sm:flex-row sm:items-center sm:gap-0 sm:py-0" style={{ background: summary.severity === "critical" ? "color-mix(in srgb, var(--sh-red) 5%, var(--sh-surface))" : "var(--sh-surface)" }}>
       <div className="flex min-w-0 items-center gap-2 py-1 sm:flex-1 sm:border-r sm:px-3" style={{ borderColor: "var(--sh-border-1)" }}><StateMark state={data.session.session === "unknown" ? "unknown" : "researchable"} label={data.session.session.replaceAll("_", " ")} compact /><span className="truncate text-xs" style={{ color: "var(--sh-text-primary)" }}>· {data.session.nextBoundary?.label.toLowerCase() ?? "boundary —"}{boundaryMs != null ? ` ${duration(boundaryMs)}` : ""}</span><RailHelp label="Explain market boundary">Market timing context only; it is not a trade signal.</RailHelp></div>
       <div className="flex min-w-0 items-center gap-2 py-1 sm:flex-1 sm:border-r sm:px-3" style={{ borderColor: "var(--sh-border-1)" }}><StateMark state={summary.accountStale ? "stale" : "rule_qualified"} label={data.account.label || "Paper account —"} compact /><span className="truncate text-xs" style={{ color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-text-primary)" }}>· {staleText}</span><RailHelp label="Explain account freshness">Paper-account freshness controls the quality of measured ceilings.</RailHelp></div>
-      <div className="flex min-w-0 items-center gap-2 py-1 sm:flex-[1.35] sm:px-3"><StateMark state={summary.severity === "critical" ? "blocked" : summary.severity === "unmeasurable" ? "unknown" : "rule_qualified"} label={summary.binding?.label ?? "Tightest constraint"} compact /><div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full" style={{ background: "var(--sh-border-1)" }} role="progressbar" aria-label="Tightest constraint utilization" aria-valuemin={0} aria-valuemax={100} aria-valuenow={bindingUtilization} aria-valuetext={`${bindingUtilization.toFixed(0)}% used; ${bindingHeadroom.toFixed(0)}% headroom`}><div className="h-full rounded-full" style={{ width: `${bindingUtilization}%`, background: severityColor }} /></div><BasisMark basis="measured" label={`${bindingUtilization.toFixed(0)}% / ${bindingHeadroom.toFixed(0)}%`} /><RailHelp label="Explain tightest constraint">{summary.binding ? `${money(summary.binding.usedCents)} used against ${money(summary.binding.ceilingCents)} from ${summary.binding.basis}.` : "No measurable running ceiling."}</RailHelp><button type="button" aria-expanded={expanded} aria-controls="cockpit-rail-detail" aria-label={expanded ? "Hide instrument detail" : "Show instrument detail"} onClick={changeExpanded} className="min-h-11 rounded px-2 py-1 text-[11px] font-semibold sm:min-h-8" style={{ color: "var(--sh-text-primary)" }}>{expanded ? "Hide" : "Detail"}<ChevronDown className={`ml-1 inline h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} /></button></div>
+      <div className="flex min-w-0 items-center gap-2 py-1 sm:flex-[1.35] sm:px-3"><StateMark state={summary.severity === "critical" ? "blocked" : summary.severity === "unmeasurable" ? "unknown" : "rule_qualified"} label={summary.binding?.label ?? "Tightest constraint"} compact /><div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full" style={{ background: "var(--sh-border-1)" }} role="progressbar" aria-label="Tightest constraint utilization" aria-valuemin={0} aria-valuemax={100} aria-valuenow={bindingUtilization} aria-valuetext={`${bindingUtilization.toFixed(0)}% used; ${bindingHeadroom.toFixed(0)}% headroom`}><div className="h-full rounded-full" style={{ width: `${bindingUtilization}%`, background: severityColor }} /></div><BasisMark basis="measured" label={`${bindingUtilization.toFixed(0)}% / ${bindingHeadroom.toFixed(0)}%`} /><RailHelp label="Explain tightest constraint">{summary.binding ? `${money(summary.binding.usedCents)} used against ${money(summary.binding.ceilingCents)} from ${summary.binding.basis}.` : "No measurable running ceiling."}</RailHelp>{!compactOnly && <button type="button" aria-expanded={expanded} aria-controls="cockpit-rail-detail" aria-label={expanded ? "Hide instrument detail" : "Show instrument detail"} onClick={changeExpanded} className="min-h-11 rounded px-2 py-1 text-[11px] font-semibold sm:min-h-8" style={{ color: "var(--sh-text-primary)" }}>{expanded ? "Hide" : "Detail"}<ChevronDown className={`ml-1 inline h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} /></button>}</div>
     </div>
     {summary.severity === "critical" && !expanded && <div className="border-t px-4 py-1.5 text-[11px]" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 35%, var(--sh-border-1))", color: "var(--sh-red)" }}>Constraint blocks new exposure that relies on this headroom. Existing paper positions are unchanged.</div>}
-    {expanded && <div id="cockpit-rail-detail">
+    {expanded && !compactOnly && <div id="cockpit-rail-detail">
     <div className="grid gap-px lg:grid-cols-3" style={{ background: "var(--sh-border-1)" }}>
       <div className="space-y-2 p-4" style={{ background: "var(--sh-surface)" }}><RailHead>Market clock</RailHead><div className="flex items-center gap-2"><Clock3 className="h-4 w-4" style={{ color: data.session.session === "unknown" ? "var(--sh-red)" : "var(--sh-signal)" }} /><p className="text-sm font-semibold capitalize" style={{ color: "var(--sh-text-primary)" }}>{data.session.session.replaceAll("_", " ")}</p></div>{data.session.unavailableReason ? <p className="text-xs leading-5" style={{ color: "var(--sh-red)" }}>{data.session.unavailableReason}</p> : <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.session.nextBoundary?.label ?? "No next boundary recorded"}{boundaryMs != null ? ` in ${duration(boundaryMs)}` : ""}{data.session.halfDay ? " · half day" : ""}</p>}</div>
       <div className="space-y-2 p-4" style={{ background: "var(--sh-surface)" }}><RailHead>Paper account</RailHead><div className="flex min-w-0 items-center gap-2"><Landmark className="h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><p className="min-w-0 truncate text-sm font-semibold" title={data.account.label || "No paper account in scope"} style={{ color: "var(--sh-text-primary)" }}>{data.account.label || "No paper account in scope"}</p></div>{data.account.unavailableReason ? <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.account.unavailableReason}</p> : <div className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}><p style={{ color: summary.accountStale ? "var(--sh-signal)" : undefined }}>{data.account.isPaper ? "Paper account" : "Account type not stated"} · {staleText}{summary.accountStale ? " — play ceilings may be stale" : ""}</p><p className="tabular-nums">Equity {money(data.account.equityValueCents) ?? "not measured"} · cash {money(data.account.cashCents) ?? "not measured"}</p>{data.account.syncError && <p style={{ color: "var(--sh-red)" }}>Sync issue: {data.account.syncError}</p>}</div>}</div>

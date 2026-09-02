@@ -42,4 +42,26 @@ describe("Capital Aperture Play Desk contract", () => {
     expect(page).toContain("Returns ");
     expect(page).toContain("Review queue");
   });
+
+  it("opens decision-ready work at the play instead of forcing another evidence loop", () => {
+    const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
+    const decisionReadySection = page.slice(page.indexOf("!isLoading && decisionReady.length"), page.indexOf("!isLoading && (inMotionOrders.length"));
+
+    expect(page).toContain('"Choose play"');
+    expect(decisionReadySection).toContain('navigate(`/aperture/run/${journey.latest.id}`)');
+    expect(decisionReadySection).not.toContain("view=evidence");
+  });
+
+  it("keeps the desk compact and makes play types visible", () => {
+    const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
+    const shell = readFileSync(resolve(process.cwd(), "client/src/components/aperture/ApertureShell.tsx"), "utf8");
+
+    expect(page).toContain("Make the next decision");
+    expect(page).toContain("Shares");
+    expect(page).toContain("Calls");
+    expect(page).toContain("Puts");
+    expect(page).toContain("Show research backlog");
+    expect(page).not.toContain("Nothing in this lane.");
+    expect(shell).toContain('compactOnly={location === "/aperture/plays"}');
+  });
 });

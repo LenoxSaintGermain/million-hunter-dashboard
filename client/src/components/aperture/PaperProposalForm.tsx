@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, ClipboardCheck, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ClipboardCheck, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { buildProposalReadiness } from "@shared/proposalReadiness";
@@ -8,6 +8,7 @@ import { buildOccOptionSymbol, isOptionInstrument, nextStandardMonthlyOptionExpi
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PriceRiskVisual } from "@/components/aperture/PriceRiskVisual";
 
 type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
 
@@ -42,6 +43,10 @@ function toLocalDateTimeInputValue(epochMs: number): string {
 
 function safeHoldingPeriod(value: unknown): HoldingPeriod {
   return ["intraday", "overnight", "swing", "catalyst_window", "position"].includes(String(value)) ? value as HoldingPeriod : "swing";
+}
+
+function holdingPeriodLabel(value: HoldingPeriod) {
+  return value === "intraday" ? "Today" : value === "overnight" ? "Next close" : value === "swing" ? "This week" : value === "catalyst_window" ? "Named catalyst" : "Long term";
 }
 
 export function PaperProposalForm({ runId, candidate, account, run, onReturnToBrief, onReturnToDecisionBrief, onProposalCreated }: {
@@ -123,27 +128,6 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
     const preferred = executionAccounts.find((item) => item.id === account?.id) ?? executionAccounts[0];
     if (preferred) setDestinationAccountId(preferred.id);
   }, [account?.id, destinationAccountId, executionAccounts.map((item) => item.id).join(",")]);
-
-  const adjustNotional = (multiplier: number) => {
-    const current = Number(notionalDollars);
-    if (!Number.isFinite(current) || current <= 0) return;
-    setNotionalDollars(String(Math.max(1, Math.round(current * multiplier))));
-  };
-
-  const adjustRiskBudget = (multiplier: number) => {
-    const current = Number(riskBudgetDollars);
-    if (!Number.isFinite(current) || current <= 0) return;
-    setRiskBudgetDollars((current * multiplier).toFixed(2));
-  };
-
-  const adjustStopDistance = (multiplier: number) => {
-    const entry = Number(entryDollars);
-    const stop = Number(stopDollars);
-    if (!Number.isFinite(entry) || !Number.isFinite(stop) || entry === stop) return;
-    const distance = Math.abs(entry - stop) * multiplier;
-    const nextStop = candidate?.playSide === "short" ? entry + distance : entry - distance;
-    setStopDollars(nextStop.toFixed(2));
-  };
 
   const isIntraday = holdingPeriod === "intraday";
   const entryPriceCents = dollarsToCents(isOption ? optionPremiumDollars : entryDollars);
@@ -271,11 +255,17 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
     if (readiness.action === "confirm_paper") return acknowledgementRef.current?.focus();
     submitProposal();
   };
+  const modeledEntryCents = isOption ? constructedPlay?.entry?.priceCents : entryPriceCents ?? constructedPlay?.entry?.priceCents;
+  const modeledStopCents = isOption ? constructedPlay?.stop?.priceCents : stopPriceCents ?? constructedPlay?.stop?.priceCents;
+  const modeledTargets = isOption ? [] : (constructedPlay?.targets ?? []).map((target: any) => ({ label: `${target.rMultiple}R`, priceCents: target.priceCents }));
+  const modeledQuantity = isOption ? (Number.isInteger(optionQty) && optionQty > 0 ? `${optionQty} contract${optionQty === 1 ? "" : "s"}` : "—") : constructedPlay?.qty == null ? "—" : `${constructedPlay.qty.toLocaleString()} shares`;
+  const modeledLoss = isOption ? optionMaxLossCents : constructedPlay?.plannedLossCents;
+  const modeledCapital = isOption ? optionMaxLossCents : constructedPlay?.notionalCents;
 
   return <Card id="paper-proposal" className="scroll-mt-6 border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
     <CardContent className="space-y-4 pt-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper ticket · review before approval</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol} · decide the next safe step</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Choose the exact instrument first. Nothing is sent until a separate paper approval and submission.</p></div><div className="flex flex-wrap gap-1"><Badge variant="outline" style={{ color: "var(--sh-signal)" }}>Modeled range {suggestedRange}</Badge><Badge variant="outline" style={{ color: "var(--sh-text-primary)" }}>Intent · open paper exposure</Badge></div>
+        <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper ticket</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol} · review the play</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Check price and risk, finish the exact ticket, then create a paper proposal.</p></div><Badge variant="outline" style={{ color: "var(--sh-signal)" }}>{isOption ? instrumentType === "long_call" ? "Long call" : "Long put" : "Shares"}</Badge>
       </div>
 
       <section className="rounded-lg border p-3" style={{ borderColor: readiness.action === "create_proposal" ? "oklch(0.55 0.15 145)" : "var(--sh-signal)", background: "var(--sh-surface)" }} aria-live="polite">
@@ -284,23 +274,32 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
         {preflightGaps.length > 1 && <details className="mt-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}><summary className="cursor-pointer font-medium">See {preflightGaps.length - 1} supporting gap{preflightGaps.length === 2 ? "" : "s"}</summary><ul className="mt-2 space-y-1 pl-4">{preflightGaps.slice(1).map((gap) => <li key={gap}>{gap}</li>)}</ul></details>}
       </section>
 
-      <section className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-        <div><p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Portfolio context</p><p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{account?.label ?? "Not selected"}</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Holdings and equity used by the risk gates.</p></div>
-        <label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Paper execution destination
+      <section aria-labelledby="price-risk-heading" className="space-y-3">
+        <div className="flex items-center justify-between gap-3"><h3 id="price-risk-heading" className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Price &amp; risk</h3><span className="text-[10px] font-mono uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>{isOption ? "underlying plan" : "modeled play"}</span></div>
+        <PriceRiskVisual entryCents={modeledEntryCents} stopCents={modeledStopCents} targets={modeledTargets} label={isOption ? `${candidate.symbol} underlying levels` : `${candidate.symbol} price plan`} />
+        <div className="grid grid-cols-3 overflow-hidden rounded-lg border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+          <TicketValue label={isOption ? "Contracts" : "Quantity"} value={modeledQuantity} />
+          <TicketValue label="Maximum loss" value={money(modeledLoss)} />
+          <TicketValue label={isOption ? "Premium at risk" : "Capital"} value={money(modeledCapital)} />
+        </div>
+        {isOption && <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" }}><span><strong style={{ color: "var(--sh-text-primary)" }}>Live option quote required.</strong> <span style={{ color: "var(--sh-fg-muted)" }}>Choose the exact contract and limit below; no quote is inferred.</span></span><span className="shrink-0 font-mono tabular-nums" style={{ color: "var(--sh-text-primary)" }}>{suggestedRange}</span></div>}
+      </section>
+
+      <section className="grid gap-2 rounded-lg border p-3 sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <TicketValue label="Portfolio" value={account?.label ?? "Not selected"} />
+        {executionAccounts.length === 1 ? <TicketValue label="Paper destination" value={destinationAccount?.label ?? "Not connected"} /> : <label className="space-y-1.5 text-xs font-medium sm:col-span-2" style={{ color: "var(--sh-text-primary)" }}>Paper destination
           <select className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} value={destinationAccountId ?? ""} onChange={(event) => setDestinationAccountId(Number(event.target.value) || null)}>
             <option value="">Choose a paper execution account</option>
             {executionAccounts.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.externalAccountId}</option>)}
           </select>
-          <span className="block font-normal" style={{ color: "var(--sh-fg-muted)" }}>{destinationAccount ? `Bound external paper account ${destinationAccount.externalAccountId}` : "No executable destination is bound. Set it up under Accounts."}</span>
-        </label>
+        </label>}
+        <TicketValue label="Review" value={holdingPeriodLabel(holdingPeriod)} />
       </section>
 
       <section aria-labelledby="instrument-choice" className="rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-        <p id="instrument-choice" className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>How should this thesis be expressed?</p>
-        <div className={`mt-2 grid gap-2 ${allowedInstrumentTypes.length === 1 ? "grid-cols-1" : allowedInstrumentTypes.length === 2 ? "grid-cols-2" : "grid-cols-3"}`} role="radiogroup" aria-label="Paper instrument">
-          {allowedInstrumentTypes.map((value) => <button key={value} type="button" role="radio" aria-checked={instrumentType === value} onClick={() => setInstrumentType(value)} className="min-h-11 rounded-md border px-2 py-2 text-xs font-medium" style={{ borderColor: instrumentType === value ? "var(--sh-signal)" : "var(--sh-border-1)", background: instrumentType === value ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{value === "shares" ? "Shares" : value === "long_call" ? "Long call" : "Long put"}</button>)}
-        </div>
-        <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{run?.instrumentPreference === "options" ? "This run is locked to bounded long options. No share substitution, uncovered, short, multi-leg, exercise, or assignment path." : run?.instrumentPreference === "shares" ? "This run is locked to shares and uses the research entry, stop, and planned-loss model." : isOption ? "Bounded scope: standard long options only. No uncovered, short, multi-leg, exercise, or assignment path." : "Share tickets use the research entry, stop, and planned-loss model."}</p>
+        <div className="flex items-center justify-between gap-3"><p id="instrument-choice" className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Expression</p>{allowedInstrumentTypes.length === 1 && <span className="text-xs font-medium" style={{ color: "var(--sh-signal)" }}>{instrumentType === "shares" ? "Shares" : instrumentType === "long_call" ? "Long call" : "Long put"}</span>}</div>
+        {run?.instrumentPreference === "options" && <p className="sr-only">This run is locked to bounded long options. No share substitution.</p>}
+        {allowedInstrumentTypes.length > 1 && <div className={`mt-2 grid gap-2 ${allowedInstrumentTypes.length === 2 ? "grid-cols-2" : "grid-cols-3"}`} role="radiogroup" aria-label="Paper instrument">{allowedInstrumentTypes.map((value) => <button key={value} type="button" role="radio" aria-checked={instrumentType === value} onClick={() => setInstrumentType(value)} className="min-h-11 rounded-md border px-2 py-2 text-xs font-medium" style={{ borderColor: instrumentType === value ? "var(--sh-signal)" : "var(--sh-border-1)", background: instrumentType === value ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{value === "shares" ? "Shares" : value === "long_call" ? "Long call" : "Long put"}</button>)}</div>}
       </section>
 
       {isOption && <section className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2 lg:grid-cols-4" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}>
@@ -314,11 +313,11 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
         </div>
       </section>}
 
-      <section className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"><label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>When will you review this play?<div className="grid grid-cols-2 gap-1 sm:grid-cols-5" role="radiogroup" aria-label="Planned holding horizon">{(["intraday", "overnight", "swing", "catalyst_window", "position"] as HoldingPeriod[]).map((period) => <button key={period} type="button" role="radio" aria-checked={holdingPeriod === period} onClick={() => setHoldingPeriod(period)} className="min-h-11 rounded-md border px-2 py-2 text-xs capitalize" style={{ borderColor: holdingPeriod === period ? "var(--sh-signal)" : "var(--sh-border-1)", background: holdingPeriod === period ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{period === "intraday" ? "Today" : period === "overnight" ? "Next close" : period === "swing" ? "This week" : period === "position" ? "Long term" : "Named catalyst"}</button>)}</div></label>{!isOption && !isIntraday && <div className="space-y-1.5"><label className="block text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Modeled paper size<input value={notionalDollars} onChange={(event) => setNotionalDollars(event.target.value)} type="number" min="1" inputMode="decimal" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm sm:w-36" style={{ borderColor: "var(--sh-border-1)" }} /></label><div className="flex gap-1" aria-label="Quick modeled paper size adjustments"><button type="button" onClick={() => adjustNotional(0.75)} className="min-h-11 rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)" }}>−25%</button><button type="button" onClick={() => setNotionalDollars(String(Math.round(suggestedCents / 100)))} className="min-h-11 rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)" }}>Model</button><button type="button" onClick={() => adjustNotional(1.25)} className="min-h-11 rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)" }}>+25%</button></div></div>}</section>
+      <details className="rounded-lg border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="cursor-pointer px-3 py-2 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Change review timing or size</summary><section className="grid gap-3 border-t p-3 sm:grid-cols-[1fr_auto] sm:items-end" style={{ borderColor: "var(--sh-border-1)" }}><label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Review horizon<div className="grid grid-cols-2 gap-1 sm:grid-cols-5" role="radiogroup" aria-label="Planned holding horizon">{(["intraday", "overnight", "swing", "catalyst_window", "position"] as HoldingPeriod[]).map((period) => <button key={period} type="button" role="radio" aria-checked={holdingPeriod === period} onClick={() => setHoldingPeriod(period)} className="min-h-11 rounded-md border px-2 py-2 text-xs" style={{ borderColor: holdingPeriod === period ? "var(--sh-signal)" : "var(--sh-border-1)", background: holdingPeriod === period ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{holdingPeriodLabel(period)}</button>)}</div></label>{!isOption && !isIntraday && <label className="block text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Modeled paper size<input value={notionalDollars} onChange={(event) => setNotionalDollars(event.target.value)} type="number" min="1" inputMode="decimal" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm sm:w-36" style={{ borderColor: "var(--sh-border-1)" }} /></label>}</section></details>
 
       {!isOption && recipeCanPrepare && <div className="rounded-md px-3 py-2 text-xs leading-5" style={{ background: "color-mix(in srgb, var(--sh-signal) 7%, var(--sh-surface))", color: "var(--sh-fg-muted)" }}><Sparkles className="mr-1 inline h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} />Prefilled model: {constructedPlay?.side} · entry {money(constructedPlay?.entry?.priceCents)} · stop {money(constructedPlay?.stop?.priceCents)} · planned loss {money(constructedPlay?.plannedLossCents)}. Confirm against a real-time terminal.</div>}
 
-      <section className="rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }} aria-live="polite">
+      <section className="sr-only" aria-live="polite">
         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Portfolio impact</p>
         {isOption ? optionTermsReady ? <p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-text-primary)" }}>If later approved, this modeled ticket commits {optionQty} contract{optionQty === 1 ? "" : "s"} and at most {money(optionMaxLossCents)} of premium plus the stated slippage allowance. This is not a fill or return forecast.</p> : <p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>Option impact is not measured yet. Enter the exact contract and limit premium so maximum premium loss can be calculated—unknown is not zero.</p> : portfolioImpactReady ? <p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-text-primary)" }}>If you later approve this modeled paper proposal: {constructedPlay?.qty?.toLocaleString()} shares · {money(constructedPlay?.notionalCents)} gross exposure · {money(constructedPlay?.plannedLossCents)} planned loss ({constructedPlay?.plannedLossPctOfEquity?.toFixed(2)}% of the last synced equity). This is not a broker fill.</p> : <p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>Portfolio impact is not measured yet. Required sizing evidence is missing, so exposure and loss remain unknown—not zero.</p>}
       </section>
@@ -335,4 +334,8 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
       <div className="sticky bottom-3 z-10 flex flex-col gap-2 rounded-lg border p-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="px-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Next guarded action: <strong style={{ color: "var(--sh-text-primary)" }}>{readiness.actionLabel}</strong></p><div className="flex gap-2">{readiness.action === "return_to_evidence" && <Button className="min-h-11" variant="outline" size="sm" onClick={onReturnToBrief}>Open evidence</Button>}<Button className="min-h-11 flex-1 sm:flex-none" size="sm" onClick={takeReadinessAction} disabled={create.isPending || constructed.isLoading || preflightBusy}>{create.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : readiness.action === "create_proposal" ? <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> : <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />}{readiness.actionLabel}</Button></div></div>
     </CardContent>
   </Card>;
+}
+
+function TicketValue({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0 border-r px-3 py-2 last:border-r-0" style={{ borderColor: "var(--sh-border-1)" }}><p className="text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>{label}</p><p className="mt-1 truncate font-mono text-xs font-semibold tabular-nums" title={value} style={{ color: "var(--sh-text-primary)" }}>{value}</p></div>;
 }
