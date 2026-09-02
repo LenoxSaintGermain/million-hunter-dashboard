@@ -15,6 +15,10 @@ describe("Capital Mission decision-path UX contract", () => {
     resolve(process.cwd(), "client/src/components/aperture/ContextHelp.tsx"),
     "utf8",
   );
+  const router = readFileSync(
+    resolve(process.cwd(), "server/apertureRouter.ts"),
+    "utf8",
+  );
 
   it("keeps the mission-to-submit path visible without implying automatic execution", () => {
     expect(runway).toContain("Mission");
@@ -43,5 +47,13 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(help).toContain("min-h-11");
     expect(help).toContain("min-w-11");
     expect(help).toContain("What does this mean?");
+  });
+
+  it("removes active or queued orders from Today instead of presenting stale research as the next step", () => {
+    expect(router).toContain("inMotionCandidateIds");
+    expect(router).toContain("inMotionPlayCount: inMotionCandidateIds.size");
+    expect(router).toContain(".filter(({ candidate }) => !inMotionCandidateIds.has(candidate.id))");
+    expect(plays).toContain("Already in motion");
+    expect(plays).toContain("Open Play Desk");
   });
 });

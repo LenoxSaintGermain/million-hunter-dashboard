@@ -2438,6 +2438,36 @@ export const apertureRouter = router({
       const decisions = candidateIds.length
         ? await db!.select().from(aperturePlayDecisions).where(and(eq(aperturePlayDecisions.userId, ctx.user.id), inArray(aperturePlayDecisions.candidateId, candidateIds)))
         : [];
+      const activeOrderRows = candidateIds.length
+        ? await db!.select({
+            candidateId: brokerOrders.candidateId,
+            status: brokerOrders.status,
+            intent: brokerOrders.intent,
+            qty: brokerOrders.qty,
+            filledQty: brokerOrders.filledQty,
+          }).from(brokerOrders).where(and(
+            eq(brokerOrders.userId, ctx.user.id),
+            inArray(brokerOrders.candidateId, candidateIds),
+            inArray(brokerOrders.status, ["pending_approval", "approved", "submitted", "filled"]),
+          ))
+        : [];
+      const inMotionCandidateIds = new Set<number>();
+      const filledQtyByCandidate = new Map<number, number>();
+      for (const order of activeOrderRows) {
+        if (order.candidateId == null) continue;
+        if (order.status !== "filled") {
+          inMotionCandidateIds.add(order.candidateId);
+          continue;
+        }
+        const quantity = Math.abs(order.filledQty ?? order.qty ?? 1);
+        filledQtyByCandidate.set(
+          order.candidateId,
+          (filledQtyByCandidate.get(order.candidateId) ?? 0) + (order.intent === "close" ? -quantity : quantity),
+        );
+      }
+      filledQtyByCandidate.forEach((netQty, candidateId) => {
+        if (netQty > 0) inMotionCandidateIds.add(candidateId);
+      });
       const researchRunIds = Array.from(new Set(rows.map(({ run }) => run.id)));
       const decisionRuns = researchRunIds.length
         ? await db!.select().from(apertureDecisionRuns).where(and(
@@ -2466,7 +2496,8 @@ export const apertureRouter = router({
         activeCanonicalThesisId: activeCapitalThesisId,
         activeCanonicalThesis: activeCanonicalThesis ?? null,
         expiredPlayCount: expiredRows.length,
-        plays: rows.map(({ candidate, run, thesisName, thesisRawText }) => {
+        inMotionPlayCount: inMotionCandidateIds.size,
+        plays: rows.filter(({ candidate }) => !inMotionCandidateIds.has(candidate.id)).map(({ candidate, run, thesisName, thesisRawText }) => {
           const authority = decisionByResearchRun.get(run.id);
           const revision = authority?.revision ?? null;
           return {
