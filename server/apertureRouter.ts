@@ -76,7 +76,8 @@ import { missingIntradayRecipeMessage } from "../shared/intradayRecipeGuard";
 import { fetchIntradayBars } from "./aperture/providers/marketData";
 import { checkVwapHold, openingRange, sessionVwap } from "./aperture/intraday";
 import { REGULAR_OPEN, etClock, nextRegularSessionOpen, startOfEtDay } from "./aperture/marketSession";
-import { constructPlay, CONSTRUCTED_PLAY_DISCLOSURE } from "./aperture/playConstructor";
+import { constructPlay, CONSTRUCTED_PLAY_DISCLOSURE, QUEUE_AT_OPEN_PLAY_DISCLOSURE } from "./aperture/playConstructor";
+import { requestsQueueAtOpen } from "./aperture/queueAtOpen";
 import { canonicalCapitalValues, needsCanonicalPromotion } from "./aperture/canonicalThesisLink";
 import { normalizeCapitalThesisRead } from "../shared/thesisReadContract";
 import { buildTrustCalibration, calculatePaperPlayOutcome } from "../shared/playOutcomeLedger";
@@ -2515,8 +2516,19 @@ export const apertureRouter = router({
             ?? accounts.find((item) => item.isPaper)
             ?? null;
         const now = Date.now();
+        const [decisionAuthority] = await db!.select({ revision: apertureDecisionRevisions })
+          .from(apertureDecisionRuns)
+          .innerJoin(apertureDecisionRevisions, and(
+            eq(apertureDecisionRevisions.id, apertureDecisionRuns.currentRevisionId),
+            eq(apertureDecisionRevisions.decisionRunId, apertureDecisionRuns.id),
+          ))
+          .where(and(
+            eq(apertureDecisionRuns.userId, ctx.user.id),
+            eq(apertureDecisionRuns.researchRunId, row.run.id),
+          )).limit(1);
+        const queueAtOpenRequested = requestsQueueAtOpen(decisionAuthority?.revision);
         const sessionDayStartMs = startOfEtDay(now);
-        const tape = sessionDayStartMs == null
+        const tape = queueAtOpenRequested || sessionDayStartMs == null
           ? { bars: [], feed: "unknown" as const, unavailableReason: "the ET session day could not be determined, so no minute tape was requested" }
           : await fetchIntradayBars(row.candidate.symbol, { startMs: sessionDayStartMs, timeoutMs: 4_000, maxPages: 1 });
         const vwap = sessionVwap(tape.bars, { feed: tape.feed, now });
@@ -2530,6 +2542,30 @@ export const apertureRouter = router({
         const trigger = checkVwapHold(tape.bars, vwap, { side: side === "long" ? "above" : "below", minutesRequired: 15, now });
         const facts = await getFacts(row.candidate.symbol, now);
         const advUsd = facts.find((fact) => fact.factKey === "adv_usd_30d" && fact.valueNum != null)?.valueNum ?? null;
+        const lastPriceFact = facts.find((fact) => fact.factKey === "last_price" && fact.basis === "verified" && fact.valueNum != null) ?? null;
+        const queueAtOpen = queueAtOpenRequested && decisionAuthority?.revision && lastPriceFact?.valueNum != null
+          ? {
+            referencePriceCents: Math.round(lastPriceFact.valueNum * 100),
+            referenceAsOf: lastPriceFact.asOf ?? lastPriceFact.fetchedAt,
+            referenceExpiresAt: lastPriceFact.expiresAt,
+            sourceName: lastPriceFact.sourceName ?? lastPriceFact.providerId,
+            maxNotionalCents: decisionAuthority.revision.deployableCapitalCents,
+            maxPlannedLossCents: decisionAuthority.revision.maxPlannedLossCents,
+            slippageCents: 3,
+            timeStopAt: decisionAuthority.revision.reviewAt ?? row.run.catalystDeadlineAt ?? now,
+          }
+          : queueAtOpenRequested
+            ? {
+              referencePriceCents: 0,
+              referenceAsOf: 0,
+              referenceExpiresAt: null,
+              sourceName: "verified market-data source",
+              maxNotionalCents: decisionAuthority?.revision.deployableCapitalCents ?? row.run.deployableCapitalCents,
+              maxPlannedLossCents: decisionAuthority?.revision.maxPlannedLossCents ?? 0,
+              slippageCents: 3,
+              timeStopAt: decisionAuthority?.revision.reviewAt ?? row.run.catalystDeadlineAt ?? now,
+            }
+            : null;
         const play = constructPlay({
           symbol: row.candidate.symbol,
           side,
@@ -2543,6 +2579,7 @@ export const apertureRouter = router({
           sessionDayStartMs,
           catalystDeadlineAt: row.run.catalystDeadlineAt,
           advUsd,
+          queueAtOpen,
           now,
         });
         const sideAssumption = row.candidate.playSide == null
@@ -2552,9 +2589,9 @@ export const apertureRouter = router({
           play: {
             ...play,
             assumptions: sideAssumption ? [sideAssumption, ...play.assumptions] : play.assumptions,
-            unavailableReasons: tape.unavailableReason ? [tape.unavailableReason, ...play.unavailableReasons] : play.unavailableReasons,
+            unavailableReasons: !queueAtOpenRequested && tape.unavailableReason ? [tape.unavailableReason, ...play.unavailableReasons] : play.unavailableReasons,
           },
-          disclosure: CONSTRUCTED_PLAY_DISCLOSURE,
+          disclosure: queueAtOpenRequested ? QUEUE_AT_OPEN_PLAY_DISCLOSURE : CONSTRUCTED_PLAY_DISCLOSURE,
         };
       }),
 

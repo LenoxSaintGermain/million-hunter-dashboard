@@ -53,6 +53,55 @@ const input = (over: Partial<ConstructPlayInput> = {}): ConstructPlayInput => {
 // ── Levels ────────────────────────────────────────────────────────────────────
 
 describe("levels", () => {
+  it("constructs an explicit bounded queue-at-open play without inventing an opening range", () => {
+    const play = constructPlay(input({
+      bars: [],
+      equityCents: 10_000_000,
+      advUsd: 5_622_544_000,
+      queueAtOpen: {
+        referencePriceCents: 29_057,
+        referenceAsOf: Date.parse("2026-08-17T20:00:00Z"),
+        referenceExpiresAt: Date.parse("2026-08-19T04:00:00Z"),
+        sourceName: "Alpaca SIP",
+        maxNotionalCents: 30_000,
+        maxPlannedLossCents: 500,
+        slippageCents: 3,
+        timeStopAt: DAY_START + (15 * 60 + 45) * MIN,
+      },
+    }));
+
+    expect(play.readiness).toBe("constructed");
+    expect(play.taxonomy.marketPlay.specificPlay).toBe("operator_bounded_opening_limit");
+    expect(play.entry?.priceCents).toBe(29_057);
+    expect(play.qty).toBe(1);
+    expect(play.notionalCents).toBe(29_057);
+    expect(play.plannedLossCents).toBe(500);
+    expect(play.stop?.priceCents).toBe(28_560);
+    expect(play.slippage?.priceCents).toBe(3);
+    expect(play.noTradeConditions.join(" ")).toContain("Do not chase");
+    expect(play.unavailableReasons).toEqual([]);
+  });
+
+  it("fails an expired queue-at-open price reference closed", () => {
+    const play = constructPlay(input({
+      bars: [],
+      queueAtOpen: {
+        referencePriceCents: 29_057,
+        referenceAsOf: Date.parse("2026-08-16T20:00:00Z"),
+        referenceExpiresAt: Date.parse("2026-08-17T04:00:00Z"),
+        sourceName: "Alpaca SIP",
+        maxNotionalCents: 30_000,
+        maxPlannedLossCents: 500,
+        slippageCents: 3,
+        timeStopAt: DAY_START + (15 * 60 + 45) * MIN,
+      },
+    }));
+
+    expect(play.readiness).toBe("needs_tape");
+    expect(play.entry).toBeNull();
+    expect(play.unavailableReasons.join(" ")).toContain("no fresh verified price reference");
+  });
+
   it("puts the long entry a stated buffer above the opening-range high", () => {
     const play = constructPlay(input());
     // range high 100.50 → 10050c, buffer = 6bps of 10050 ≈ 6c

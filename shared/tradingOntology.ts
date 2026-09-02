@@ -68,7 +68,7 @@ export type SetupStatus = "confirmed" | "candidate" | "unclassified";
 export type SignalStatus = "confirmed" | "rejected" | "pending" | "unavailable";
 
 export interface TaxonomySignal {
-  key: "opening_range" | "vwap_hold" | "catalyst_deadline";
+  key: "opening_range" | "vwap_hold" | "catalyst_deadline" | "price_limit" | "regular_session_queue";
   label: string;
   status: SignalStatus;
   basis: string;

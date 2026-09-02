@@ -151,6 +151,16 @@ export interface ConstructPlayInput {
   catalystDeadlineAt?: number | null;
   advUsd?: number | null;
   mandate?: Mandate;
+  queueAtOpen?: {
+    referencePriceCents: number;
+    referenceAsOf: number;
+    referenceExpiresAt: number | null;
+    sourceName: string;
+    maxNotionalCents: number;
+    maxPlannedLossCents: number;
+    slippageCents: number;
+    timeStopAt: number;
+  } | null;
   now: number;
 }
 
@@ -175,9 +185,180 @@ const lastPriceCents = (bars: MinuteBar[]): number | null => {
   return withVolume.length ? cents(withVolume[withVolume.length - 1]!.c) : null;
 };
 
+function constructQueueAtOpenPlay(input: ConstructPlayInput, queue: NonNullable<ConstructPlayInput["queueAtOpen"]>): ConstructedPlay {
+  const side: PlaySide = input.side ?? "long";
+  const mandate = input.mandate ?? CURRENT_MANDATE;
+  const unavailable: string[] = [];
+  const assumptions: string[] = [];
+  const noTradeConditions: string[] = [];
+  const sourceName = queue.sourceName.trim() || "verified market-data source";
+  const referenceIsFresh = queue.referencePriceCents > 0
+    && queue.referenceAsOf > 0
+    && (queue.referenceExpiresAt == null || queue.referenceExpiresAt > input.now);
+  const taxonomy: TradingOntology = {
+    marketPlay: {
+      family: "unclassified",
+      specificPlay: "operator_bounded_opening_limit",
+      status: referenceIsFresh ? "candidate" : "unclassified",
+      basis: "The operator chose a bounded queue-at-open workflow. No opening-range or VWAP setup is inferred before the session exists.",
+    },
+    execution: {
+      direction: side,
+      strategy: side === "long" ? "buy_shares" : "short_shares",
+      instrument: "equity",
+    },
+    horizon: {
+      key: "day_trade",
+      label: "Day trade · queued for next regular session",
+      sourceHoldingPeriod: input.holdingPeriod,
+      basis: "The LIMIT/DAY order may queue while closed and the human review time keeps the play inside one regular session.",
+    },
+    catalyst: input.catalystDeadlineAt == null
+      ? { status: "not_specified", label: "No catalyst deadline recorded", deadlineAt: null, subtype: "not_classified" }
+      : input.catalystDeadlineAt <= input.now
+        ? { status: "expired", label: "Decision window expired", deadlineAt: input.catalystDeadlineAt, subtype: "not_classified" }
+        : { status: "time_bound", label: "Same-session decision window", deadlineAt: input.catalystDeadlineAt, subtype: "not_classified" },
+    signals: [
+      {
+        key: "price_limit",
+        label: "Verified price cap",
+        status: referenceIsFresh ? "confirmed" : "unavailable",
+        basis: referenceIsFresh
+          ? `${sourceName} reference from ${new Date(queue.referenceAsOf).toISOString()} caps the queued buy; it is not a forecast.`
+          : "No fresh verified price reference is available, so no queued limit may be constructed.",
+      },
+      {
+        key: "regular_session_queue",
+        label: "Regular-session queue",
+        status: "confirmed",
+        basis: "LIMIT/DAY is eligible to rest for the next regular session and cannot execute overnight.",
+      },
+    ],
+  };
+  const base: ConstructedPlay = {
+    symbol: input.symbol,
+    side,
+    holdingPeriod: input.holdingPeriod,
+    taxonomy,
+    readiness: "needs_tape",
+    entry: null,
+    stop: null,
+    slippage: null,
+    targets: [],
+    budgetCents: null,
+    qty: null,
+    notionalCents: null,
+    plannedLossCents: null,
+    plannedLossPctOfEquity: null,
+    sizeLimitedByNotionalCeiling: false,
+    timeStopAt: queue.timeStopAt,
+    noTradeConditions,
+    trigger: null,
+    tapeBasis: referenceIsFresh
+      ? `${sourceName} verified reference ${(queue.referencePriceCents / 100).toFixed(2)} as of ${new Date(queue.referenceAsOf).toISOString()}`
+      : "Verified price reference unavailable",
+    feed: sourceName.toLowerCase().includes("sip") ? "sip" : "unknown",
+    unavailableReasons: unavailable,
+    assumptions,
+  };
+
+  if (!referenceIsFresh) {
+    unavailable.push("the queue-at-open instruction has no fresh verified price reference, so a bounded LIMIT/DAY ticket cannot be prepared");
+    return base;
+  }
+  if (input.equityCents == null || input.equityCents <= 0) {
+    unavailable.push("account equity is unknown, so the queue cannot be checked against the single-order and planned-loss ceilings");
+    return { ...base, readiness: "needs_equity" };
+  }
+  if (input.catalystDeadlineAt != null && input.catalystDeadlineAt <= input.now) {
+    unavailable.push("the same-session decision window has expired, so this queue cannot be prepared");
+    return { ...base, readiness: "expired" };
+  }
+
+  const systemRiskBudget = Math.floor((mandate.maxPlannedRiskPctPerPlay / 100) * input.equityCents);
+  const budgetCents = Math.min(queue.maxPlannedLossCents, systemRiskBudget);
+  const orderCeilingCents = singleOrderCeilingCents(input.equityCents, mandate);
+  const maxNotionalCents = Math.min(queue.maxNotionalCents, orderCeilingCents);
+  const qty = Math.floor(maxNotionalCents / queue.referencePriceCents);
+  if (qty < 1) {
+    unavailable.push(`the $${(maxNotionalCents / 100).toFixed(2)} notional ceiling cannot buy one share at the verified $${(queue.referencePriceCents / 100).toFixed(2)} limit`);
+    return { ...base, readiness: "budget_too_small", budgetCents };
+  }
+
+  const riskPerShareCents = Math.floor(budgetCents / qty);
+  if (riskPerShareCents <= queue.slippageCents) {
+    unavailable.push("the planned-loss ceiling cannot cover one share plus the declared slippage allowance");
+    return { ...base, readiness: "budget_too_small", budgetCents };
+  }
+  const stopDistanceCents = riskPerShareCents - queue.slippageCents;
+  const stopPriceCents = side === "long"
+    ? queue.referencePriceCents - stopDistanceCents
+    : queue.referencePriceCents + stopDistanceCents;
+  if (stopPriceCents <= 0) {
+    unavailable.push("the derived protective stop is not a valid positive price");
+    return { ...base, readiness: "budget_too_small", budgetCents };
+  }
+
+  const plannedLossCents = qty * (stopDistanceCents + queue.slippageCents);
+  const notionalCents = qty * queue.referencePriceCents;
+  const targets = TARGET_R_MULTIPLES.map((rMultiple) => ({
+    priceCents: side === "long"
+      ? queue.referencePriceCents + Math.round(riskPerShareCents * rMultiple)
+      : queue.referencePriceCents - Math.round(riskPerShareCents * rMultiple),
+    modeled: true as const,
+    rMultiple,
+    basis: `${rMultiple}R arithmetic from the declared maximum loss; not a probability or price forecast`,
+  }));
+  assumptions.push(
+    `limit equals the latest fresh verified ${sourceName} reference; a higher open does not chase`,
+    `protective stop uses the operator's $${(budgetCents / 100).toFixed(2)} maximum planned loss across ${qty} share${qty === 1 ? "" : "s"}, including ${queue.slippageCents}c/share slippage`,
+    "the protective stop is a human-reviewed risk boundary; the entry submission does not claim an automatic exit order",
+  );
+  noTradeConditions.push(
+    `Cancel before the open if the paper account, market calendar, ${input.symbol} tradability or liquidity, or the verified price basis becomes missing or stale.`,
+    `Do not chase: if ${input.symbol} opens above the $${(queue.referencePriceCents / 100).toFixed(2)} limit, allow the DAY order to remain unfilled or cancel it.`,
+    `Exit or reassess by ${new Date(queue.timeStopAt).toISOString()}; this is a same-session paper play, not an overnight position.`,
+  );
+  if (input.advUsd == null) {
+    noTradeConditions.push("No fresh 30-day ADV fact exists; the liquidity gate must refuse this order.");
+  } else if (input.advUsd < mandate.minAdvUsd30d) {
+    noTradeConditions.push(`30-day ADV $${Math.round(input.advUsd).toLocaleString("en-US")} is below the $${mandate.minAdvUsd30d.toLocaleString("en-US")} floor; the liquidity gate must refuse this order.`);
+  }
+
+  return {
+    ...base,
+    readiness: "constructed",
+    entry: {
+      priceCents: queue.referencePriceCents,
+      modeled: true,
+      basis: `LIMIT cap set at the verified ${sourceName} reference from ${new Date(queue.referenceAsOf).toISOString()}; a higher opening price does not fill`,
+    },
+    stop: {
+      priceCents: stopPriceCents,
+      modeled: true,
+      basis: `maximum-loss boundary: ${(stopDistanceCents / 100).toFixed(2)} per share from entry, plus ${queue.slippageCents}c/share slippage`,
+    },
+    slippage: {
+      priceCents: queue.slippageCents,
+      modeled: true,
+      basis: "fixed queue-at-open slippage assumption",
+    },
+    targets,
+    budgetCents,
+    qty,
+    notionalCents,
+    plannedLossCents,
+    plannedLossPctOfEquity: round2((plannedLossCents / input.equityCents) * 100),
+    sizeLimitedByNotionalCeiling: maxNotionalCents === orderCeilingCents && orderCeilingCents < queue.maxNotionalCents,
+    assumptions,
+    noTradeConditions,
+  };
+}
+
 // ── The constructor ───────────────────────────────────────────────────────────
 
 export function constructPlay(input: ConstructPlayInput): ConstructedPlay {
+  if (input.queueAtOpen) return constructQueueAtOpenPlay(input, input.queueAtOpen);
   const side: PlaySide = input.side ?? "long";
   const mandate = input.mandate ?? CURRENT_MANDATE;
   const long = side === "long";
@@ -442,3 +623,7 @@ export function constructPlay(input: ConstructPlayInput): ConstructedPlay {
 export const CONSTRUCTED_PLAY_DISCLOSURE =
   "Levels are modeled from observed minute bars under the assumptions listed with them, not quoted from a source and not a recommendation. " +
   "Confirm every level against a real-time terminal before acting. This is a paper research proposal: it creates no order, and a human must review, acknowledge and approve it separately.";
+
+export const QUEUE_AT_OPEN_PLAY_DISCLOSURE =
+  "The queued limit is capped by a fresh verified market-data fact; the stop, slippage, and targets are modeled risk controls, not forecasts. " +
+  "A higher open does not fill the LIMIT/DAY order. This paper research proposal creates no order until a human prepares, approves, and submits it separately.";
