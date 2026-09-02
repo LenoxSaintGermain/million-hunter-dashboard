@@ -224,6 +224,45 @@ describe("market hours", () => {
     expect(gate(ev, "market_open")!.passed).toBe(false);
   });
 
+  it("allows a non-intraday paper proposal to be prepared while closed but keeps approval blocked", () => {
+    const now = Date.parse("2026-06-13T14:30:00Z"); // Saturday
+    const closed = at("2026-06-13T14:30:00Z");
+    const proposal = evaluateOrderGates({
+      input: order({ holdingPeriod: "position", catalystDeadlineAt: now + 30 * DAY }),
+      account: account(),
+      session: closed,
+      mandate: CURRENT_MANDATE,
+      now,
+      action: "create_proposal",
+    });
+    const proposalPreflight = evaluateOrderGates({
+      input: order({ holdingPeriod: "position", catalystDeadlineAt: now + 30 * DAY }),
+      account: account(),
+      session: closed,
+      mandate: CURRENT_MANDATE,
+      now,
+      action: "preflight",
+    });
+    const approval = evaluateOrderGates({
+      input: order({ holdingPeriod: "position", catalystDeadlineAt: now + 30 * DAY }),
+      account: account(),
+      session: closed,
+      mandate: CURRENT_MANDATE,
+      now,
+      action: "approve",
+    });
+
+    expect(gate(proposal, "market_open")).toMatchObject({
+      passed: true,
+      detail: expect.stringContaining("proposal may be prepared"),
+    });
+    expect(gate(proposalPreflight, "market_open")?.passed).toBe(true);
+    expect(gate(approval, "market_open")).toMatchObject({
+      passed: false,
+      detail: expect.stringContaining("market is closed"),
+    });
+  });
+
   it("blocks when the session is unknown rather than assuming it is open", () => {
     const unknown = at("2029-06-13T14:30:00Z");
     const ev = evalOrder({}, {}, unknown, Date.parse("2029-06-13T14:30:00Z"));

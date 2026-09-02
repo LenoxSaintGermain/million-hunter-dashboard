@@ -267,6 +267,7 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
     session,
     mandate,
     now,
+    action,
   });
 
   const broker = brokerFor(account.brokerId, account.id);

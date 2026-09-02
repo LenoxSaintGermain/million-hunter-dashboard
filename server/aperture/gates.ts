@@ -358,6 +358,12 @@ export interface EvaluateOrderArgs {
   session: SessionState;
   mandate?: Mandate;
   now: number;
+  /**
+   * Proposal preparation is a research/audit write, not a broker action. The
+   * market-hours gate therefore applies differently at proposal time than it
+   * does at approval and submission, both of which rerun these gates.
+   */
+  action?: "preflight" | "create_proposal" | "approve" | "submit";
 }
 
 export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
@@ -485,10 +491,17 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
   g.add("market_session_known", known, known ? `session: ${session.session} (${session.basis})` : `market session unknown — ${session.basis}`);
 
   if (known) {
+    const proposalStage = args.action === "preflight" || args.action === "create_proposal";
+    const mayPrepareWhileClosed = proposalStage && input.holdingPeriod !== "intraday";
+    const marketAvailableForAction = session.session !== "closed" || mayPrepareWhileClosed;
     g.add(
       "market_open",
-      session.session !== "closed",
-      session.session === "closed" ? "market is closed — no order may be created" : `market session is ${session.session}`,
+      marketAvailableForAction,
+      session.session !== "closed"
+        ? `market session is ${session.session}`
+        : mayPrepareWhileClosed
+          ? "market is closed — the paper proposal may be prepared, but approval and submission will recheck live market, account, and quote conditions"
+          : "market is closed — no paper order may be approved or submitted",
     );
 
     if (rule?.requiresRegularSession) {
