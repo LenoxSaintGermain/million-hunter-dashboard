@@ -83,3 +83,17 @@ Complete the Google account chooser once and confirm the verified owner lands in
 - Public `/aperture/run/240001` and same-origin `system.health` returned HTTP 200.
 - `pnpm check`, the 28 scoped model-policy/memo tests, and `pnpm build` passed. The database-disabled full suite passed 785 tests; 31 legacy database/key-presence tests remained unavailable by design without an isolated database.
 - No schema migration, invite change, broker setting, real-money rail, paper-order approval, or broker order occurred in this release.
+
+## 2026-09-02 in-place option-ticket release
+
+- Deployed source: `c01a6785b9bb4320b981e784ee7f141c9aa0b2de`.
+- Cloud Build: `ae2acf2c-9c4e-4a56-b19e-019366c4ec5f` — `SUCCESS`.
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:c01a6785-firebase`.
+- Image digest: `sha256:5f24460b4bc24f3ca083122482ac263023ab0643557c5655a5ce843f81b4125e`.
+- Ready revision: `capital-aperture-00037-maf`, serving 100% of Cloud Run traffic.
+- Release behavior: option tickets now load a broker-backed focused contract chain, show bid/ask, mark, spread, volume, and open interest, prefill an editable long-option buy limit from the ask, and resolve unavailable quote evidence in place with retry, another-contract, or durable preserve-cash actions.
+- Read-only provider verification returned active MGM 2026-11-20 calls and current OPRA evidence. Authenticated browser UAT selected `MGM261120C00040000`, prefilled one contract at a `$4.20` limit, calculated `$420` maximum premium loss, and advanced to the paper-only acknowledgement checkpoint without a route loop or browser console issue.
+- `pnpm check`, 29 focused broker/journey tests, and `pnpm build` passed. The database-disabled broad suite still reports the documented 31 legacy database/key-presence failures; no production database was exposed to the test runner.
+- Public `/aperture` returned HTTP 200, same-origin `system.health` returned `ok: true`, and the public client bundle exposed the exact `c01a6785b9bb4320b981e784ee7f141c9aa0b2de` release marker.
+- No schema migration, invite change, provider configuration change, proposal creation, paper approval, paper submission, or broker order occurred during this release or UAT.
+- Rollback revision: `capital-aperture-00035-zuk`.
