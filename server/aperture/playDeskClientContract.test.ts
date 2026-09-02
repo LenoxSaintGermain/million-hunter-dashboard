@@ -62,6 +62,6 @@ describe("Capital Aperture Play Desk contract", () => {
     expect(page).toContain("Puts");
     expect(page).toContain("Show research backlog");
     expect(page).not.toContain("Nothing in this lane.");
-    expect(shell).toContain('compactOnly={location === "/aperture/plays"}');
+    expect(shell).toContain('compactOnly={location === "/aperture/plays" || location.startsWith("/aperture/run/")}');
   });
 });

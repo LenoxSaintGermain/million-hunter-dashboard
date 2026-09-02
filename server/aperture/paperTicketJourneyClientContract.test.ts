@@ -68,6 +68,7 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(focus).toContain("Review paper ticket");
     expect(recipe).toContain("allChecksReviewed");
     expect(recipe).toContain("Ready for ticket preflight");
+    expect(recipe).toContain('exactOptionTicketCanResolve ? "Open paper ticket" : "Resolve blocker"');
   });
 
   it("keeps a hard-blocked ticket in place and reveals alternatives inline", () => {

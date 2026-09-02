@@ -72,7 +72,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
         </div>
       </section>
       <main className="aperture-editorial max-w-[1280px] mx-auto w-full px-6 lg:px-10 py-8 lg:py-10">
-        <CapitalCockpitRail runId={runId} compactOnly={location === "/aperture/plays"} />
+        <CapitalCockpitRail runId={runId} compactOnly={location === "/aperture/plays" || location.startsWith("/aperture/run/")} />
         {children}
       </main>
     </EditorialTopNav>

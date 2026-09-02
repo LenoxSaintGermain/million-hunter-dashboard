@@ -65,6 +65,7 @@ export function PlayRecipeCard({
   const noPlay = ["budget_too_small", "needs_equity", "needs_tape", "needs_range", "expired"].includes(play.readiness);
   const taxonomy = play.taxonomy;
   const optionIntent = taxonomy?.execution?.instrument === "option";
+  const exactOptionTicketCanResolve = optionIntent && noPlay;
   const decisiveChecks = Array.isArray(candidate.verifyFields)
     ? candidate.verifyFields.filter((check: unknown): check is string => typeof check === "string")
     : [];
@@ -91,7 +92,7 @@ export function PlayRecipeCard({
           <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{play.unavailableReasons[0] ?? "Required inputs are not measurable."}</p>
         </div></div>
       </div>
-      <div className="flex flex-wrap gap-2"><Button type="button" size="sm" className="min-h-11" onClick={onReviewEvidence}>Resolve blocker</Button><Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={onOpenResearch}>View research</Button></div>
+      <div className="flex flex-wrap gap-2"><Button type="button" size="sm" className="min-h-11" onClick={exactOptionTicketCanResolve ? onPrepareProposal : onReviewEvidence}>{exactOptionTicketCanResolve ? "Open paper ticket" : "Resolve blocker"}</Button><Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={onOpenResearch}>View research</Button></div>
       {play.unavailableReasons.length > 1 && <details className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><summary className="cursor-pointer font-semibold" style={{ color: "var(--sh-text-primary)" }}>Other blockers</summary><ul className="mt-2 space-y-1">{play.unavailableReasons.slice(1).map((reason: string) => <li key={reason}>{reason}</li>)}</ul></details>}
     </div> : <>
       <div className="space-y-4 p-4 sm:p-5">

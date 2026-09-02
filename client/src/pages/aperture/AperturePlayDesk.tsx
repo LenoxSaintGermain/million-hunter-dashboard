@@ -87,7 +87,7 @@ export default function AperturePlayDesk() {
 
     {!isLoading && decisionReady.length > 0 && <section className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
       <SectionHead title="Choose a play" detail="Research is complete enough to decide. Evidence is optional unless a named blocker remains." count={decisionReady.length} />
-      <div className="divide-y" style={{ borderColor: "var(--sh-border-1)" }}>{decisionReady.slice(0, 4).map((journey) => {
+      <div className="divide-y" style={{ borderColor: "var(--sh-border-1)" }}>{decisionReady.map((journey) => {
         const deferred = deferredByRun.get(journey.latest.id);
         return <DeskItem key={journey.rootId} eyebrow={deferred ? "Queued for next regular session" : "Ready to choose"} title={journey.thesisName} meta={deferred ? `Returns ${new Date(deferred.resumeAt!).toLocaleString()} · ${deferred.reason}` : `${journey.evidenceCandidates} play${journey.evidenceCandidates === 1 ? "" : "s"} compared · ${formatDistanceToNow(Number(journey.latest.createdAt))} ago`} action={deferred ? "Review queue" : "Choose play"} primary={!deferred} onAction={() => navigate(`/aperture/run/${journey.latest.id}`)} />;
       })}</div>
