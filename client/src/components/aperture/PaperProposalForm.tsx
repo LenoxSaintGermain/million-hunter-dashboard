@@ -253,6 +253,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   const optionChainHasSelectableContract = optionChainItems.some((item) => item.quoteReady);
   const optionResolutionNeeded = isOption && (optionEvidenceBlocked || (optionChain.isFetched && !optionChainHasSelectableContract));
   const riskResolutionNeeded = isOption && riskCeilingResult != null;
+  const hardResolutionNeeded = isOption && hardPreflightResult != null && !optionResolutionNeeded && !riskResolutionNeeded;
   const riskCeilingCents = riskCeilingResult?.key === "planned_risk_per_play"
     && optionMaxLossCents != null
     && riskCeilingResult.observed != null
@@ -271,6 +272,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   };
   const preserveCashReason = `${candidate?.symbol ?? "This play"} preserved as cash — current option quote/liquidity evidence unavailable for the selected contract. No proposal or order was created.`;
   const preserveRiskCashReason = `${candidate?.symbol ?? "This play"} preserved as cash — the selected option ticket exceeded the current paper-account risk ceiling. No proposal or order was created.`;
+  const preserveHardBlockCashReason = `${candidate?.symbol ?? "This play"} preserved as cash — ${hardPreflightResult?.detail ?? "the selected option ticket did not clear current paper-account guardrails"}. No proposal or order was created.`;
   const readiness = buildProposalReadiness({
     recipeReady: isOption ? true : recipeCanPrepare,
     unavailableReason: constructedPlay?.unavailableReasons[0],
@@ -334,6 +336,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
         <div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: readiness.action === "create_proposal" ? "oklch(0.55 0.15 145)" : "var(--sh-signal)" }} /><div><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{readiness.title}</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{readiness.explanation}</p></div></div>
         {currentPreflightData?.notionalBasis === "derived_from_last_price" && <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Modeled basis: the mandate ceiling uses notional derived from the last recorded price.</p>}
         {preflightGaps.length > 1 && <details className="mt-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}><summary className="cursor-pointer font-medium">See {preflightGaps.length - 1} supporting gap{preflightGaps.length === 2 ? "" : "s"}</summary><ul className="mt-2 space-y-1 pl-4">{preflightGaps.slice(1).map((gap) => <li key={gap}>{gap}</li>)}</ul></details>}
+        {hardResolutionNeeded && <div className="mt-3 grid gap-2 sm:grid-cols-2"><Button type="button" variant="outline" className="min-h-11" onClick={onReturnToDecisionBrief}>Choose another play</Button><Button type="button" className="min-h-11" disabled={preserveCash.isPending} onClick={() => preserveCash.mutate({ runId, candidateId: candidate.id, decision: "skipped", reason: preserveHardBlockCashReason })}>{preserveCash.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CircleSlash2 className="mr-1.5 h-3.5 w-3.5" />}Preserve cash · $0 risk</Button></div>}
       </section>
 
       <section aria-labelledby="price-risk-heading" className="space-y-3">
@@ -394,7 +397,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
       </div></details>
 
       {(isOption ? optionTermsReady : recipeCanPrepare) && currentPreflightData?.wouldPass && <label className="block rounded-lg border p-3 text-xs font-medium" style={{ borderColor: "var(--sh-border-1)" }}>Type <span className="font-mono">PAPER</span> to acknowledge a paper-only proposal<input ref={acknowledgementRef} value={paperAcknowledgement} onChange={(event) => setPaperAcknowledgement(event.target.value)} autoComplete="off" placeholder="PAPER" className="mt-2 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>}
-      {!optionResolutionNeeded && !riskResolutionNeeded && <div className="sticky bottom-3 z-10 flex flex-col gap-2 rounded-lg border p-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="px-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Next guarded action: <strong style={{ color: "var(--sh-text-primary)" }}>{readiness.actionLabel}</strong></p><div className="flex gap-2">{readiness.action === "return_to_evidence" && <Button className="min-h-11" variant="outline" size="sm" onClick={onReturnToBrief}>Open evidence</Button>}<Button className="min-h-11 flex-1 sm:flex-none" size="sm" onClick={takeReadinessAction} disabled={create.isPending || constructed.isLoading || preflightBusy}>{create.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : readiness.action === "create_proposal" ? <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> : <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />}{readiness.actionLabel}</Button></div></div>}
+      {!optionResolutionNeeded && !riskResolutionNeeded && !hardResolutionNeeded && <div className="sticky bottom-3 z-10 flex flex-col gap-2 rounded-lg border p-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="px-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Next guarded action: <strong style={{ color: "var(--sh-text-primary)" }}>{readiness.actionLabel}</strong></p><div className="flex gap-2">{readiness.action === "return_to_evidence" && <Button className="min-h-11" variant="outline" size="sm" onClick={onReturnToBrief}>Open evidence</Button>}<Button className="min-h-11 flex-1 sm:flex-none" size="sm" onClick={takeReadinessAction} disabled={create.isPending || constructed.isLoading || preflightBusy}>{create.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : readiness.action === "create_proposal" ? <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> : <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />}{readiness.actionLabel}</Button></div></div>}
     </CardContent>
   </Card>;
 }

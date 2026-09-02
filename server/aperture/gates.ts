@@ -775,11 +775,12 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
   }
 
   // ── Liquidity ───────────────────────────────────────────────────────────────
+  const liquiditySymbol = isOption ? (input.underlyingSymbol ?? input.symbol) : input.symbol;
   if (account.advUsd == null) {
     g.add(
       "liquidity_adv_floor",
       false,
-      `no 30-day ADV fact for ${input.symbol} — an unknown liquidity is not a passing liquidity`,
+      `no 30-day ADV fact for ${liquiditySymbol} — an unknown liquidity is not a passing liquidity`,
       null,
       mandate.minAdvUsd30d,
     );

@@ -138,6 +138,15 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(form).toContain("Preserve cash · $0 risk");
   });
 
+  it("resolves a hard option guardrail in place without reviving the sticky loop", () => {
+    const form = readFileSync(resolve(process.cwd(), "client/src/components/aperture/PaperProposalForm.tsx"), "utf8");
+
+    expect(form).toContain("hardResolutionNeeded");
+    expect(form).toContain("preserveHardBlockCashReason");
+    expect(form).toContain("Choose another play");
+    expect(form).toContain("!hardResolutionNeeded");
+  });
+
   it("reacts when an inline alternative changes only the candidate query parameter", () => {
     const board = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/CandidateBoard.tsx"), "utf8");
 

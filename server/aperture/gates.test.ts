@@ -503,6 +503,25 @@ describe("liquidity", () => {
     expect(ev.passed).toBe(false);
   });
 
+  it("names the underlying when an option lacks an ADV fact", () => {
+    const ev = evalOrder({
+      symbol: "MRVL261120C00210000",
+      underlyingSymbol: "MRVL",
+      instrumentType: "long_call",
+      optionExpirationDate: "2026-11-20",
+      optionStrikePriceCents: 21_000,
+      optionContractMultiplier: 100,
+      qty: 1,
+      entryPriceCents: 2_215,
+      slippageCents: 0,
+      gatedNotionalCents: 221_500,
+    }, { advUsd: null });
+
+    const detail = gate(ev, "liquidity_adv_floor")!.detail;
+    expect(detail).toContain("for MRVL");
+    expect(detail).not.toContain("MRVL261120C00210000");
+  });
+
   it("blocks a name below the $20M ADV floor", () => {
     expect(gate(evalOrder({}, { advUsd: 4_000_000 }), "liquidity_adv_floor")!.passed).toBe(false);
   });
