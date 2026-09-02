@@ -8,6 +8,7 @@ import { orderDailyPlayQueue, researchCoverageLabel } from "@shared/dailyPlayQue
 import { dailyPlayPrimaryDestination } from "@shared/dailyPlayActions";
 import { easternDateKeyFromEpoch } from "@shared/easternMarketTime";
 import { PlayRecipeCard } from "./PlayRecipeCard";
+import { ContextHelp } from "./ContextHelp";
 
 function money(cents: number | null | undefined) {
   return cents == null ? "Not set" : `$${Math.round(cents / 100).toLocaleString()}`;
@@ -35,6 +36,11 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: {
   const currentCashReopen = runway?.latest && "reopenCondition" in runway.latest ? runway.latest.reopenCondition : null;
   const preferredAccount = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")
     ?? accounts?.find((account) => account.isPaper);
+  const accountModeLabel = preferredAccount
+    ? preferredAccount.isPaper
+      ? "Paper account · human approval required"
+      : "Live account · human approval required"
+    : "No execution account selected";
   const preferredAccountId = preferredAccount?.id;
   const { data: cockpit } = trpc.aperture.cockpit.useQuery(preferredAccountId ? { accountId: preferredAccountId } : undefined);
   const utils = trpc.useUtils();
@@ -104,16 +110,16 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: {
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture · today</p>
-        <h1 className="mt-1 font-serif text-3xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Today’s paper plays</h1>
-        <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Start with the decision. Open one setup, record a skip, or preserve cash. Provenance stays one click away, never in the way.</p>
+        <div className="flex items-center gap-1"><h1 className="mt-1 font-serif text-3xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Today’s plays</h1><ContextHelp title="What happens here?" what="Choose a researched setup, move an existing ticket forward, or monitor a play already in motion." next="The account-mode label below tells you whether an approved submission goes to paper or live execution." align="start" /></div>
+        <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Choose one setup, record a skip, or preserve cash. Open details only when you need to validate.</p>
       </div>
       <div className="flex flex-wrap gap-2"><Button className="min-h-11" variant="outline" disabled={!hasTodayPlay || captureComparison.isPending} title={hasTodayPlay ? "Capture today's eligible paper plays before choosing a disposition" : "Available on the declared ET decision date"} onClick={() => captureComparison.mutate({ windowKey: "operator_decision" })}>{captureComparison.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitCompareArrows className="mr-2 h-4 w-4" />}Start today’s comparison</Button><Button className="min-h-11" variant="outline" onClick={onNewResearch}><FileSearch className="mr-2 h-4 w-4" />New research brief</Button></div>
     </header>
 
     <div className="grid gap-px overflow-hidden rounded-xl border sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
       <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Active thesis</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{activeCapitalContext?.thesis?.name ?? "No active Capital thesis"}</p></div>
-      <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Paper account · as of</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{preferredAccount ? `${preferredAccount.label} · ${preferredAccount.lastSyncedAt ? new Date(preferredAccount.lastSyncedAt).toLocaleString() : "not synced"}` : "No paper account selected"}</p></div>
-      <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Operating state</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Paper-only · human approval required</p></div>
+      <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Account · as of</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{preferredAccount ? `${preferredAccount.label} · ${preferredAccount.lastSyncedAt ? new Date(preferredAccount.lastSyncedAt).toLocaleString() : "not synced"}` : "No execution account selected"}</p></div>
+      <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Account mode</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{accountModeLabel}</p></div>
     </div>
 
     <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><summary className="min-h-10 cursor-pointer px-4 py-3 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Why / correlated budget and provenance</summary><div className="border-t px-4 py-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Correlated planned-loss budget:</strong> {correlation?.usedCents != null && correlation.ceilingCents != null ? `${money(correlation.usedCents)} committed${correlation.subject ? ` in ${correlation.subject}` : ""} of ${money(correlation.ceilingCents)}.` : correlation?.reason ?? "Not measured."} Theme overlap is not assigned until factual preflight.</div></details>

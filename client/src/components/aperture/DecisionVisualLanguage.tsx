@@ -54,12 +54,12 @@ function formatMoney(cents: number | null | undefined) {
 export function TypedStatusStrip({ state, horizon, operatorCapCents, syncedAt, catalystLabel }: { state: WorkflowState; horizon: string; operatorCapCents: number | null; syncedAt: number | null | undefined; catalystLabel?: string | null }) {
   const stale = syncedAt == null || Date.now() - syncedAt > 60 * 60 * 1000;
   const freshness = syncedAt == null ? "synced —" : `synced ${Math.max(0, Math.floor((Date.now() - syncedAt) / 3_600_000))}h ago`;
-  return <div className="grid gap-px overflow-hidden rounded-xl border sm:grid-cols-2 lg:grid-cols-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
+  return <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border lg:grid-cols-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
     <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: "var(--sh-surface-2)" }}><StateMark state={state} compact /><span className="sr-only">Workflow state</span></div>
     <div className="min-w-0 px-3 py-2" style={{ background: "var(--sh-surface-2)" }}><BasisMark basis="declared" label="Horizon" /><p className="mt-1 truncate text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>{horizon}</p></div>
     <div className="min-w-0 px-3 py-2" style={{ background: "var(--sh-surface-2)" }}><BasisMark basis="declared" label="Operator loss cap" /><p className="mt-1 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>{formatMoney(operatorCapCents)}</p></div>
     <div className="min-w-0 px-3 py-2" style={{ background: "var(--sh-surface-2)" }}><BasisMark basis={catalystLabel ? "declared" : "unknown"} label="Catalyst" /><p className="mt-1 truncate text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>{catalystLabel ?? "—"}</p></div>
-    <div className={`min-w-0 px-3 py-2 ${stale ? "border-dashed" : ""}`} style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-fg-muted)" }}><StateMark state={stale ? "stale" : "rule_qualified"} label={freshness} compact /></div>
+    <div className={`col-span-2 min-w-0 px-3 py-2 lg:col-span-1 ${stale ? "border-dashed" : ""}`} style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-fg-muted)" }}><StateMark state={stale ? "stale" : "rule_qualified"} label={freshness} compact /></div>
   </div>;
 }
 
@@ -71,7 +71,7 @@ export function ArgumentRail({ state, operatorCapCents, evidenceLabel, gateLabel
     { title: "Risk", state: operatorCapCents == null ? "unknown" : "rule_qualified", detail: operatorCapCents == null ? "Operator cap —" : "Risk cap declared" },
     { title: "Gate", state, detail: gateLabel },
   ];
-  return <section aria-label="Decision argument rail" className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><div role="list" className="grid gap-px sm:grid-cols-5" style={{ background: "var(--sh-border-1)" }}>{nodes.map((node, index) => <div role="listitem" key={node.title} className="min-h-20 p-3 text-left" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.58rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>{index + 1}. {node.title}</p><div className="mt-2"><StateMark state={node.state} compact /></div><p className="mt-1 text-[11px] leading-4" style={{ color: "var(--sh-text-primary)" }}>{node.detail}</p></div>)}</div></section>;
+  return <section aria-label="Decision argument rail" className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><div role="list" className="grid grid-cols-2 gap-px sm:grid-cols-5" style={{ background: "var(--sh-border-1)" }}>{nodes.map((node, index) => <div role="listitem" key={node.title} className={`${index === nodes.length - 1 ? "col-span-2 sm:col-span-1" : ""} min-h-16 p-3 text-left sm:min-h-20`} style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.58rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>{index + 1}. {node.title}</p><div className="mt-1.5 sm:mt-2"><StateMark state={node.state} compact /></div><p className="mt-1 text-[11px] leading-4" style={{ color: "var(--sh-text-primary)" }}>{node.detail}</p></div>)}</div></section>;
 }
 
 export function RiskBudgetBar({ operatorCapCents, perPlayCeilingCents, concentrationBlocked }: { operatorCapCents: number | null; perPlayCeilingCents: number | null; concentrationBlocked: boolean }) {
