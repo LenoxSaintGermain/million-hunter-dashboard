@@ -68,3 +68,42 @@
 - New broker orders created during this UAT: 0
 - Existing fills mirrored: 1 (`MGM261120C00040000` at `$4.20` premium)
 - Remaining accepted/queued orders: IWM, `DKNG261120C00025000`, and `NU261120C00014000`
+
+## Repair and production re-UAT — 2026-09-02 12:37–13:16 EDT
+
+- Repair commits: `566fe0be0ee17118bb342554e57697e0f9215cc3` and follow-up `1c17f26ca8b00646f0064fcfd11ece9d4b82d404`.
+- Cloud Build: `9a03cd42-f383-4290-910f-7ad407e90f33` — `SUCCESS`.
+- Image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:1c17f26c-firebase`.
+- Image digest: `sha256:cea14db2476342db1d1d42c4687473ad41a9f5022898f4f68b029f2b32fc136a`.
+- Ready revision: `capital-aperture-00036-ls8`, serving 100% of Cloud Run traffic.
+- Public validation: `/aperture/plays` returned HTTP 200, same-origin `system.health` returned `ok: true`, and the served bundle contained the exact `1c17f26ca8b00646f0064fcfd11ece9d4b82d404` marker.
+
+### Final live inventory
+
+- Choose: 4 run cards representing 5 ready candidates.
+- Approve / send: 0 tickets.
+- Monitor: 5 plays — 2 filled and 3 accepted/queued.
+- Reviews due: 3 items.
+- Research backlog: 11 journeys.
+- Browser console errors during the final sweep: 0.
+
+### Acceptance results
+
+| Acceptance check | Production result |
+| --- | --- |
+| Candidate-level decision state | Pass. Active, expired, declined, blocked, and failed candidates no longer masquerade as fresh choices. Mixed CH Capital state reads `1 ready · 1 in motion · 2 need evidence`. |
+| Ready decisions | Pass. MRVL opened `run 510001 / candidate 360001`; MGM opened `300001 / 180002`; CZR opened `270001 / 150001` and `240001 / 120001`. The second ready candidate in run `300001`, CZR `180001`, also opened its own exact ticket. |
+| MRVL risk recovery | Pass. The live `$210` call showed bid `$21.80`, ask `$22.05`, one-contract maximum loss `$2,205`, and the current `$735` per-play ceiling. The ticket exposed `Choose a lower-premium contract` and `Preserve cash · $0 risk` in place. Neither action was committed during this read-only UAT. |
+| Filled-play monitoring | Pass after the follow-up route repair. MGM `240002` and DKNG put `240003` opened their exact execution routes with `lifecycle=monitoring`, the thesis-holds tab selected, and `Run reviewed checks` visible. |
+| Queued-order receipts | Pass. IWM `570001 / 420001`, DKNG call `330001 / 210003`, and NU call `510001 / 360004` opened their exact Paper Ticket receipt and remained accepted/queued. |
+| Scheduled reviews | Pass. TLT opened immutable cash receipt `decision 120001 / revision 240001`; MGM and DKNG play outcomes opened their distinct order monitoring routes instead of the generic mission editor. |
+| Duplicate prevention | Pass. Existing active candidates open their current order lifecycle and do not expose a fresh proposal path. |
+
+### Final broker safety receipt
+
+- New proposals created during repair UAT: 0.
+- Approvals performed during repair UAT: 0.
+- Submissions performed during repair UAT: 0.
+- New broker orders created during repair UAT: 0.
+- Existing broker-order count before / after: 5 / 5.
+- No provider configuration, invitation, database migration, or real-money rail changed.
