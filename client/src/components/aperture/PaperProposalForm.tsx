@@ -35,6 +35,11 @@ const money = (cents: number | null | undefined) => cents == null
   ? "Not modeled"
   : new Intl.NumberFormat(navigator.language, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cents / 100);
 
+function toLocalDateTimeInputValue(epochMs: number): string {
+  const date = new Date(epochMs);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
 function safeHoldingPeriod(value: unknown): HoldingPeriod {
   return ["intraday", "overnight", "swing", "catalyst_window", "position"].includes(String(value)) ? value as HoldingPeriod : "swing";
 }
@@ -53,8 +58,8 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   const [reason, setReason] = useState(`Paper-only proposal based on recorded human review of ${candidate?.symbol ?? "this"} research evidence.`);
   const [invalidationCondition, setInvalidationCondition] = useState(run?.invalidationRule ?? "Do not proceed, or exit the paper position, if the thesis evidence no longer supports the decision.");
   const [holdingPeriod, setHoldingPeriod] = useState<HoldingPeriod>(() => safeHoldingPeriod(run?.holdingPeriod));
-  const [deadline, setDeadline] = useState(() => new Date(run?.catalystDeadlineAt ?? Date.now() + 7 * 86_400_000).toISOString().slice(0, 16));
-  const [timeStop, setTimeStop] = useState(() => new Date(run?.catalystDeadlineAt ?? Date.now() + 6 * 3_600_000).toISOString().slice(0, 16));
+  const [deadline, setDeadline] = useState(() => toLocalDateTimeInputValue(run?.catalystDeadlineAt ?? Date.now() + 7 * 86_400_000));
+  const [timeStop, setTimeStop] = useState(() => toLocalDateTimeInputValue(run?.catalystDeadlineAt ?? Date.now() + 6 * 3_600_000));
   const [noTradeText, setNoTradeText] = useState("");
   const [paperAcknowledgement, setPaperAcknowledgement] = useState("");
   const [preflightInput, setPreflightInput] = useState<{ ticket: any; fingerprint: string } | null>(null);
@@ -103,7 +108,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
     setStopDollars(constructedPlay.stop == null ? "" : (constructedPlay.stop.priceCents / 100).toFixed(2));
     setSlippageDollars(constructedPlay.slippage == null ? "" : (constructedPlay.slippage.priceCents / 100).toFixed(2));
     setNotionalDollars(constructedPlay.notionalCents == null ? "" : (constructedPlay.notionalCents / 100).toFixed(2));
-    setTimeStop(constructedPlay.timeStopAt == null ? "" : new Date(constructedPlay.timeStopAt).toISOString().slice(0, 16));
+    setTimeStop(constructedPlay.timeStopAt == null ? "" : toLocalDateTimeInputValue(constructedPlay.timeStopAt));
     setNoTradeText(constructedPlay.noTradeConditions.join("\n"));
     setReason(`Modeled ${constructedPlay.side} paper recipe for ${candidate.symbol}; confirm every derived level against a real-time terminal before human approval.`);
     setRecipePrefilled(true);

@@ -38,6 +38,13 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(form).toContain("const preflightBusy = preflightEnabled &&");
   });
 
+  it("formats ticket deadlines as local wall-clock values for datetime-local inputs", () => {
+    const form = readFileSync(resolve(process.cwd(), "client/src/components/aperture/PaperProposalForm.tsx"), "utf8");
+
+    expect(form).toContain("toLocalDateTimeInputValue");
+    expect(form).not.toContain("new Date(constructedPlay.timeStopAt).toISOString().slice(0, 16)");
+  });
+
   it("returns to evidence with the selected candidate preserved", () => {
     const execute = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/ApertureExecute.tsx"), "utf8");
 
