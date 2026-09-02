@@ -91,8 +91,9 @@ function orderSizeLabel(order: { instrumentType?: string | null; qty?: number | 
 
 // ── Order Queue ───────────────────────────────────────────────────────────────
 
-function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; ticketBuilderActive?: boolean }) {
+function OrderQueue({ runId, focusCandidateId, ticketBuilderActive = false }: { runId: number; focusCandidateId?: number; ticketBuilderActive?: boolean }) {
   type Order = NonNullable<inferRouterOutputs<AppRouter>["aperture"]["order"]["list"]>[number];
+  const [, navigate] = useLocation();
   const [confirmation, setConfirmation] = useState<{ kind: "approve" | "submit"; order: Order } | null>(null);
   const [confirmationText, setConfirmationText] = useState("");
   const [rejection, setRejection] = useState<Order | null>(null);
@@ -115,11 +116,15 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
     onError: (e) => toast.error(e.message),
   });
 
-  const pending = orders?.filter((o) => o.status === "pending_approval") ?? [];
-  const approved = orders?.filter((o) => o.status === "approved") ?? [];
-  const submitted = orders?.filter((o) => o.status === "submitted") ?? [];
-  const terminal = orders?.filter((o) => ["filled", "rejected", "cancelled"].includes(o.status)) ?? [];
-  const nextAction = pending.length
+  const scopedOrders = focusCandidateId == null ? (orders ?? []) : (orders ?? []).filter((order) => order.candidateId === focusCandidateId);
+  const otherRunOrders = focusCandidateId == null ? [] : (orders ?? []).filter((order) => order.candidateId !== focusCandidateId);
+  const pending = scopedOrders.filter((o) => o.status === "pending_approval");
+  const approved = scopedOrders.filter((o) => o.status === "approved");
+  const submitted = scopedOrders.filter((o) => o.status === "submitted");
+  const terminal = scopedOrders.filter((o) => ["filled", "rejected", "cancelled"].includes(o.status));
+  const nextAction = ticketBuilderActive
+    ? "Finish the exact ticket above. A proposal appears here only after preflight passes."
+    : pending.length
     ? "Review the waiting paper ticket. Approval changes only its paper-workflow state."
     : approved.length
       ? "Submit the approved ticket now. An eligible LIMIT/DAY order will be held for the next eligible regular session when the market is closed."
@@ -127,9 +132,7 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
         ? "The broker accepted the paper order. It may be queued for the next eligible regular session; do not create a duplicate ticket."
         : terminal.some((order) => order.status === "filled")
           ? "Open “Check whether thesis still holds” at the recorded review time, then close the outcome loop."
-           : ticketBuilderActive
-             ? "Use the guarded action above. A proposal appears here only after preflight passes."
-             : "Return to the decision brief to prepare a proposal, revise the mission, or preserve cash.";
+           : "Return to the decision brief to prepare a proposal, revise the mission, or preserve cash.";
 
   const statusColor = (s: string) => s === "filled" ? "oklch(0.55 0.15 145)" :
     s === "rejected" || s === "cancelled" ? "var(--sh-red)" :
@@ -170,7 +173,7 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
         </Button>
       </div>
 
-      {orders?.length === 0 && (
+      {scopedOrders.length === 0 && (
         <p className="text-sm text-center py-8" style={{ color: "var(--sh-fg-muted)" }}>
            {ticketBuilderActive
              ? "No paper proposal yet. Follow the guarded action above; proposal, approval, and paper submission remain separate steps."
@@ -179,7 +182,7 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
       )}
 
       <div className="space-y-2">
-        {orders?.map((o) => (
+        {scopedOrders.map((o) => (
           <Card key={o.id} className="min-w-0 overflow-hidden">
             <CardContent className="min-w-0 pb-3 pt-3">
               <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -231,6 +234,12 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
           </Card>
         ))}
       </div>
+      {otherRunOrders.length > 0 && focusCandidateId != null && (
+        <div className="flex min-w-0 flex-col gap-2 rounded-lg border px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
+          <span>{otherRunOrders.length} other paper order{otherRunOrders.length === 1 ? "" : "s"} in this research run.</span>
+          <Button variant="ghost" size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => navigate("/aperture/plays")}>Monitor in Play Desk</Button>
+        </div>
+      )}
       <AlertDialog open={confirmation != null} onOpenChange={(open) => { if (!open) { setConfirmation(null); setConfirmationText(""); } }}>
         <AlertDialogContent className="max-h-[90vh] w-[calc(100%_-_2rem)] max-w-[calc(100%_-_2rem)] overflow-x-hidden overflow-y-auto sm:max-w-2xl">
           <AlertDialogHeader>
@@ -976,7 +985,7 @@ export default function ApertureExecute() {
             <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-3 py-2 text-center leading-5" value="alpha">Outcome &amp; notes</TabsTrigger>
           </TabsList>
           <TabsContent value="orders" className="mt-4 min-w-0" aria-label="Paper ticket">
-            <OrderQueue runId={runId} ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired && !candidateActiveOrder)} />
+            <OrderQueue runId={runId} focusCandidateId={proposalCandidate?.id} ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired && !candidateActiveOrder)} />
           </TabsContent>
           <TabsContent value="monitoring" className="mt-4 min-w-0" aria-label="Check whether thesis still holds">
             <MonitoringPanel runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule} />

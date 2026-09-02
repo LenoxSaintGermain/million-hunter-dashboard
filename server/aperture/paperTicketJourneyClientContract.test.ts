@@ -78,6 +78,9 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain("Choose another play in this run");
     expect(execute).toContain("setShowAlternatives(true)");
     expect(execute).toContain("A proposal appears here only after preflight passes.");
+    expect(execute).toContain("focusCandidateId={proposalCandidate?.id}");
+    expect(execute).toContain("other paper order");
+    expect(execute).toContain("Monitor in Play Desk");
     expect(execute).toContain("ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired && !candidateActiveOrder)}");
   });
 
