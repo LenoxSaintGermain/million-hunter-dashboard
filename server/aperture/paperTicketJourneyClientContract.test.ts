@@ -70,12 +70,13 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain("ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired && !candidateActiveOrder)}");
   });
 
-  it("presents closed-session option submission as a broker queue instead of an evidence loop", () => {
+  it("presents any eligible closed-session DAY submission as a broker queue instead of an evidence loop", () => {
     const execute = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/ApertureExecute.tsx"), "utf8");
     const desk = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
 
     expect(execute).toContain("Submit / queue paper order");
-    expect(execute).toContain("held for the next eligible options session");
+    expect(execute).toContain("held for the next eligible regular session");
+    expect(execute).not.toContain("If the options session is closed");
     expect(execute).toContain("Accepted / queued at paper broker");
     expect(desk).toContain("Accepted / queued at paper broker");
   });

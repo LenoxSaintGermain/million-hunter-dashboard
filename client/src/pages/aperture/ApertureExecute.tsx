@@ -122,9 +122,9 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
   const nextAction = pending.length
     ? "Review the waiting paper ticket. Approval changes only its paper-workflow state."
     : approved.length
-      ? "Submit the approved ticket now. If the options session is closed, the named paper broker will queue the limit order for the next eligible session."
+      ? "Submit the approved ticket now. An eligible LIMIT/DAY order will be held for the next eligible regular session when the market is closed."
       : submitted.length
-        ? "The broker accepted the paper order. It may be queued for the next eligible options session; do not create a duplicate ticket."
+        ? "The broker accepted the paper order. It may be queued for the next eligible regular session; do not create a duplicate ticket."
         : terminal.some((order) => order.status === "filled")
           ? "Open “Check whether thesis still holds” at the recorded review time, then close the outcome loop."
            : ticketBuilderActive
@@ -236,7 +236,7 @@ function OrderQueue({ runId, ticketBuilderActive = false }: { runId: number; tic
           <AlertDialogHeader>
             <AlertDialogTitle>{confirmation?.kind === "submit" ? "Submit or queue this paper order" : "Approve this paper proposal"}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action is paper-only. The server reruns the account, evidence, and risk gates first. If the options session is closed, a limit order is held for the next eligible options session; it cannot execute overnight and it cannot fill above your limit.
+              This action is paper-only. The server reruns the account, evidence, and risk gates first. When the market is closed, an eligible LIMIT/DAY order is held for the next eligible regular session; it cannot execute overnight and it cannot fill above your limit.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {confirmation && (
@@ -890,7 +890,7 @@ export default function ApertureExecute() {
         : candidateActiveOrder.status === "approved"
           ? {
               title: `${orderInstrumentLabel(candidateActiveOrder)} approved · ready to submit or queue`,
-              detail: "The exact ticket already exists. Submit it once below; if the options session is closed, the broker will hold the limit order for the next eligible session.",
+              detail: "The exact ticket already exists. Submit it once below; when the market is closed, the broker will hold an eligible LIMIT/DAY order for the next regular session.",
               action: "Submit or queue order",
             }
           : {

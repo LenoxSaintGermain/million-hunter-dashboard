@@ -317,6 +317,43 @@ describe("market hours", () => {
     expect(gate(ev, "intraday_requires_regular_session")!.passed).toBe(false);
   });
 
+  it("queues an exact bounded intraday LIMIT DAY order for the next regular session", () => {
+    const now = Date.parse("2026-06-13T14:30:00Z"); // Saturday
+    const closed = at("2026-06-13T14:30:00Z");
+    const nextSessionStop = Date.parse("2026-06-15T19:45:00Z"); // Monday 15:45 ET
+    const input = order({
+      holdingPeriod: "intraday",
+      orderType: "limit",
+      timeInForce: "day",
+      catalystDeadlineAt: nextSessionStop,
+      qty: 5,
+      entryPriceCents: 24_000,
+      stopPriceCents: 23_800,
+      slippageCents: 5,
+      timeStopAt: nextSessionStop,
+      noTradeConditions: ["Cancel before the open if the declared thesis or account boundary changes."],
+      gatedNotionalCents: 120_000,
+      notionalBasis: "stated",
+    });
+
+    for (const action of ["preflight", "create_proposal", "approve", "submit"] as const) {
+      const evaluation = evaluateOrderGates({
+        input,
+        account: account(),
+        session: closed,
+        mandate: CURRENT_MANDATE,
+        now,
+        action,
+      });
+      expect(gate(evaluation, "market_open")).toMatchObject({
+        passed: true,
+        detail: expect.stringContaining("queued for the next regular session"),
+      });
+      expect(gate(evaluation, "intraday_requires_regular_session")?.passed).toBe(true);
+      expect(evaluation.failures).toEqual([]);
+    }
+  });
+
   it("allows a limit + day order in the pre-market", () => {
     const pre = at("2026-06-10T12:00:00Z");
     const now = Date.parse("2026-06-10T12:00:00Z");

@@ -28,7 +28,7 @@ import {
   type HoldingPeriod,
   type Mandate,
 } from "./mandate";
-import type { MarketSession, SessionState } from "./marketSession";
+import { nextRegularSessionOpen, REGULAR_OPEN, startOfEtDay, type MarketSession, type SessionState } from "./marketSession";
 import {
   isOptionInstrument,
   optionPremiumAtRiskCents,
@@ -382,6 +382,16 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
     slippageCents: input.slippageCents,
   }, now);
   const isOption = isOptionInstrument(instrument.instrumentType);
+  const queuedRegularSessionOpen = session.session === "pre_market"
+    ? (startOfEtDay(now) ?? 0) + REGULAR_OPEN * 60_000
+    : nextRegularSessionOpen(now);
+  const mayQueueIntradayForNextRegularSession = input.holdingPeriod === "intraday"
+    && session.session !== "regular"
+    && session.session !== "unknown"
+    && input.orderType === "limit"
+    && input.timeInForce === "day"
+    && args.action != null
+    && queuedRegularSessionOpen != null;
 
   // What this order does to exposure — not what side it is. See resolveOrderIntent.
   const resolved = resolveOrderIntent({
@@ -458,14 +468,19 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
   } else if (deadline <= now) {
     g.add("catalyst_deadline", false, "catalystDeadlineAt is in the past", deadline, now);
   } else if (rule) {
-    const days = (deadline - now) / 86_400_000;
-    const ok = days <= rule.maxHorizonDays;
+    const horizonStart = mayQueueIntradayForNextRegularSession ? queuedRegularSessionOpen! : now;
+    const days = (deadline - horizonStart) / 86_400_000;
+    const ok = deadline >= horizonStart && days <= rule.maxHorizonDays;
     g.add(
       "catalyst_deadline",
       ok,
       ok
-        ? `catalyst is ${round2(days)}d out, inside the ${rule.maxHorizonDays}d ${rule.label.toLowerCase()} horizon`
-        : `catalyst is ${round2(days)}d out — beyond the ${rule.maxHorizonDays}d horizon for ${rule.label.toLowerCase()}`,
+        ? mayQueueIntradayForNextRegularSession
+          ? `catalyst is ${round2(days)}d after the next regular-session open, inside the ${rule.maxHorizonDays}d ${rule.label.toLowerCase()} horizon`
+          : `catalyst is ${round2(days)}d out, inside the ${rule.maxHorizonDays}d ${rule.label.toLowerCase()} horizon`
+        : deadline < horizonStart
+          ? "catalyst deadline must remain after the queued order reaches the next regular session"
+          : `catalyst is ${round2(days)}d out — beyond the ${rule.maxHorizonDays}d horizon for ${rule.label.toLowerCase()}`,
       round2(days),
       rule.maxHorizonDays,
     );
@@ -502,7 +517,7 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
       && input.orderType === "limit"
       && input.timeInForce === "day"
       && (args.action === "approve" || args.action === "submit");
-    const marketAvailableForAction = session.session !== "closed" || mayPrepareWhileClosed || mayQueueOptionWhileClosed;
+    const marketAvailableForAction = session.session !== "closed" || mayPrepareWhileClosed || mayQueueOptionWhileClosed || mayQueueIntradayForNextRegularSession;
     g.add(
       "market_open",
       marketAvailableForAction,
@@ -510,17 +525,23 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
         ? `market session is ${session.session}`
         : mayQueueOptionWhileClosed
           ? "market is closed — this limit-only paper option may be approved and queued for the next eligible options session; it cannot execute overnight and the limit caps the premium per share"
+        : mayQueueIntradayForNextRegularSession
+          ? "market is closed — this exact limit + day paper order may be queued for the next regular session; it cannot execute overnight and every unresolved evidence gate still blocks proposal creation"
         : mayPrepareWhileClosed
           ? "market is closed — the paper proposal may be prepared, but approval and submission will recheck live market, account, and quote conditions"
           : "market is closed — no paper order may be approved or submitted",
     );
 
     if (rule?.requiresRegularSession) {
-      const ok = session.session === "regular";
+      const ok = session.session === "regular" || mayQueueIntradayForNextRegularSession;
       g.add(
         "intraday_requires_regular_session",
         ok,
-        ok ? "intraday order placed during the regular session" : `an intraday order requires the regular session (current: ${session.session})`,
+        session.session === "regular"
+          ? "intraday order placed during the regular session"
+          : mayQueueIntradayForNextRegularSession
+            ? "exact intraday limit + day order is queued for the next regular session and cannot execute before it"
+            : `an intraday order requires the regular session (current: ${session.session})`,
       );
     }
 
@@ -537,11 +558,13 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
 
     // Signed off 2026-08-13: this blocks, it does not merely flag.
     if (rule?.mustBeFlatBySessionEnd && session.etMinutes != null) {
-      const ok = session.etMinutes < mandate.intradayCutoffEtMinutes;
+      const ok = mayQueueIntradayForNextRegularSession || session.etMinutes < mandate.intradayCutoffEtMinutes;
       g.add(
         "intraday_cutoff",
         ok,
-        ok
+        mayQueueIntradayForNextRegularSession
+          ? `queued for the next regular session before its ${fmtEt(mandate.intradayCutoffEtMinutes)} ET intraday cutoff`
+          : ok
           ? `${fmtEt(session.etMinutes)} ET is before the ${fmtEt(mandate.intradayCutoffEtMinutes)} ET intraday cutoff`
           : `no new intraday order after ${fmtEt(mandate.intradayCutoffEtMinutes)} ET (now ${fmtEt(session.etMinutes)} ET) — the position must be flat by the close`,
         session.etMinutes,
