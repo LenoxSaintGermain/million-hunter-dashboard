@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, ClipboardCheck, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, CircleSlash2, ClipboardCheck, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { buildProposalReadiness } from "@shared/proposalReadiness";
@@ -36,6 +36,8 @@ const money = (cents: number | null | undefined) => cents == null
   ? "Not modeled"
   : new Intl.NumberFormat(navigator.language, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cents / 100);
 
+const price = (cents: number | null | undefined) => cents == null ? "—" : `$${(cents / 100).toFixed(2)}`;
+
 function toLocalDateTimeInputValue(epochMs: number): string {
   const date = new Date(epochMs);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
@@ -49,8 +51,8 @@ function holdingPeriodLabel(value: HoldingPeriod) {
   return value === "intraday" ? "Today" : value === "overnight" ? "Next close" : value === "swing" ? "This week" : value === "catalyst_window" ? "Named catalyst" : "Long term";
 }
 
-export function PaperProposalForm({ runId, candidate, account, run, onReturnToBrief, onReturnToDecisionBrief, onProposalCreated }: {
-  runId: number; candidate: any; account: any; run: any; onReturnToBrief: () => void; onReturnToDecisionBrief: () => void; onProposalCreated: () => void;
+export function PaperProposalForm({ runId, candidate, account, run, onReturnToBrief, onReturnToDecisionBrief, onProposalCreated, onCashPreserved }: {
+  runId: number; candidate: any; account: any; run: any; onReturnToBrief: () => void; onReturnToDecisionBrief: () => void; onProposalCreated: () => void; onCashPreserved: () => void;
 }) {
   const suggestedCents = candidate?.suggestedSizeLowCents ?? 100_000;
   const [notionalDollars, setNotionalDollars] = useState(String(Math.max(100, Math.round(suggestedCents / 100))));
@@ -89,16 +91,37 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   const strikeRef = useRef<HTMLInputElement>(null);
   const contractsRef = useRef<HTMLInputElement>(null);
   const premiumRef = useRef<HTMLInputElement>(null);
+  const contractPickerRef = useRef<HTMLElement>(null);
   const accountsQuery = trpc.aperture.account.list.useQuery();
   const executionAccounts = (accountsQuery.data ?? []).filter((item) => item.isPaper && ["alpaca_paper", "uat_paper"].includes(item.brokerId) && item.externalAccountId);
   const destinationAccount = executionAccounts.find((item) => item.id === destinationAccountId) ?? null;
   const isOption = isOptionInstrument(instrumentType);
+  const utils = trpc.useUtils();
   const constructed = trpc.aperture.play.construct.useQuery({ runId, candidateId: candidate?.id ?? 0 }, { enabled: !!candidate?.id, staleTime: 30_000 });
   const create = trpc.aperture.order.create.useMutation({
     onSuccess: () => { toast.success("Paper proposal created. It is waiting for your separate approval."); onProposalCreated(); },
     onError: (error) => toast.error(error.message),
   });
+  const preserveCash = trpc.aperture.play.decide.useMutation({
+    onSuccess: async () => {
+      await utils.aperture.play.list.invalidate();
+      toast.success(`${candidate?.symbol ?? "Play"} preserved as cash. No proposal or order was created.`);
+      onCashPreserved();
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const constructedPlay = constructed.data?.play;
+  const optionChain = trpc.aperture.order.optionChain.useQuery({
+    accountId: destinationAccount?.id ?? 0,
+    underlyingSymbol: candidate?.symbol ?? "",
+    expirationDate: optionExpirationDate,
+    type: instrumentType === "long_put" ? "put" : "call",
+    targetPriceCents: constructedPlay?.entry?.priceCents ?? undefined,
+  }, {
+    enabled: Boolean(isOption && destinationAccount?.id && candidate?.symbol && /^\d{4}-\d{2}-\d{2}$/.test(optionExpirationDate)),
+    staleTime: 30_000,
+    retry: false,
+  });
   const recipeCanPrepare = constructedPlay?.readiness === "constructed";
   const portfolioImpactReady = !isOption && recipeCanPrepare
     && constructedPlay?.qty != null
@@ -209,6 +232,20 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   const currentPreflightData = preflightMatchesTicket ? preflight.data : undefined;
   const hardPreflightResult = (currentPreflightData?.evaluation.results ?? []).find((result) => !result.passed && HARD_PREFLIGHT_GATE_KEYS.has(result.key));
   const preflightBusy = preflightEnabled && (preflightInput == null || !preflightMatchesTicket || preflight.isFetching);
+  const optionEvidenceBlocked = isOption && ["option_chain_market_evidence", "option_contract_verified"].includes(hardPreflightResult?.key ?? "");
+  const optionChainItems = optionChain.data?.items ?? [];
+  const optionChainHasSelectableContract = optionChainItems.some((item) => item.quoteReady);
+  const optionResolutionNeeded = isOption && (optionEvidenceBlocked || (optionChain.isFetched && !optionChainHasSelectableContract));
+  const selectQuotedContract = (item: (typeof optionChainItems)[number]) => {
+    setOptionStrikeDollars((item.contract.strikePriceCents / 100).toFixed(2));
+    if (item.market?.askPriceCents != null) setOptionPremiumDollars((item.market.askPriceCents / 100).toFixed(2));
+    setPaperAcknowledgement("");
+  };
+  const retryOptionEvidence = async () => {
+    await optionChain.refetch();
+    if (preflightEnabled) await preflight.refetch();
+  };
+  const preserveCashReason = `${candidate?.symbol ?? "This play"} preserved as cash — current option quote/liquidity evidence unavailable for the selected contract. No proposal or order was created.`;
   const readiness = buildProposalReadiness({
     recipeReady: isOption ? true : recipeCanPrepare,
     unavailableReason: constructedPlay?.unavailableReasons[0],
@@ -302,16 +339,15 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
         {allowedInstrumentTypes.length > 1 && <div className={`mt-2 grid gap-2 ${allowedInstrumentTypes.length === 2 ? "grid-cols-2" : "grid-cols-3"}`} role="radiogroup" aria-label="Paper instrument">{allowedInstrumentTypes.map((value) => <button key={value} type="button" role="radio" aria-checked={instrumentType === value} onClick={() => setInstrumentType(value)} className="min-h-11 rounded-md border px-2 py-2 text-xs font-medium" style={{ borderColor: instrumentType === value ? "var(--sh-signal)" : "var(--sh-border-1)", background: instrumentType === value ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{value === "shares" ? "Shares" : value === "long_call" ? "Long call" : "Long put"}</button>)}</div>}
       </section>
 
-      {isOption && <section className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2 lg:grid-cols-4" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}>
-        <label className="text-xs font-medium">Expiration<input ref={expirationRef} value={optionExpirationDate} onChange={(event) => setOptionExpirationDate(event.target.value)} type="date" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>
-        <label className="text-xs font-medium">Strike price<input ref={strikeRef} value={optionStrikeDollars} onChange={(event) => setOptionStrikeDollars(event.target.value)} type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="250.00" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>
-        <label className="text-xs font-medium">Contracts<input ref={contractsRef} value={contracts} onChange={(event) => setContracts(event.target.value)} type="number" min="1" step="1" inputMode="numeric" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>
-        <label className="text-xs font-medium">Limit premium / share<input ref={premiumRef} value={optionPremiumDollars} onChange={(event) => setOptionPremiumDollars(event.target.value)} type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="4.20" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>
-        <div className="sm:col-span-2 lg:col-span-4 rounded-md px-3 py-2 text-xs leading-5" style={{ background: "color-mix(in srgb, var(--sh-signal) 7%, var(--sh-surface))", color: "var(--sh-fg-muted)" }}>
-          <strong style={{ color: "var(--sh-text-primary)" }}>{optionContractSymbol ? paperInstrumentLabel({ instrumentType, symbol: optionContractSymbol, underlyingSymbol: candidate.symbol, optionExpirationDate, optionStrikePriceCents }) : "Exact contract not ready"}</strong><br />
-          {optionContractSymbol ? <span className="font-mono break-all">{optionContractSymbol}</span> : "Enter a valid expiration and strike."} · Maximum premium loss {money(optionMaxLossCents)}. Broker entitlement and tradability must verify before the ticket clears.
-        </div>
+      {isOption && <section ref={contractPickerRef} aria-labelledby="contract-picker-heading" className="scroll-mt-5 space-y-3 rounded-lg border p-3" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Exact contract</p><h3 id="contract-picker-heading" className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Choose from the live chain</h3><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Nearest strikes first. Select a quoted row to prefill its ask as your editable buy limit.</p></div><label className="text-xs font-medium">Expiration<input ref={expirationRef} value={optionExpirationDate} onChange={(event) => { setOptionExpirationDate(event.target.value); setOptionStrikeDollars(""); setOptionPremiumDollars(""); }} type="date" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm sm:w-44" style={{ borderColor: "var(--sh-border-1)" }} /></label></div>
+        {optionChain.isFetching ? <div className="flex min-h-20 items-center justify-center gap-2 rounded-md border text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><Loader2 className="h-4 w-4 animate-spin" />Loading live contracts…</div> : optionChainItems.length ? <div className="overflow-hidden rounded-md border" style={{ borderColor: "var(--sh-border-1)" }}><div className="hidden grid-cols-[1.2fr_1.35fr_.65fr_.65fr_.65fr] gap-2 border-b px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.1em] sm:grid" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><span>Contract</span><span>Bid / ask · mark</span><span>Spread</span><span>Volume</span><span>Open int.</span></div>{optionChainItems.map((item) => { const selected = optionContractSymbol === item.contract.symbol; return <button key={item.contract.symbol} type="button" disabled={!item.quoteReady} aria-pressed={selected} aria-label={`${candidate.symbol} ${price(item.contract.strikePriceCents)} ${item.contract.type}; ${item.quoteReady ? `bid ${price(item.market?.bidPriceCents)}, ask ${price(item.market?.askPriceCents)}` : "quote unavailable"}`} onClick={() => selectQuotedContract(item)} className="grid min-h-12 w-full gap-1 border-b px-3 py-2 text-left text-xs last:border-b-0 disabled:cursor-not-allowed disabled:opacity-50 sm:grid-cols-[1.2fr_1.35fr_.65fr_.65fr_.65fr] sm:items-center" style={{ borderColor: "var(--sh-border-1)", background: selected ? "color-mix(in srgb, var(--sh-signal) 10%, var(--sh-surface))" : "transparent", color: "var(--sh-text-primary)" }}><span className="font-semibold tabular-nums">{price(item.contract.strikePriceCents)} {item.contract.type}</span><span className="font-mono tabular-nums">{item.market ? <>{price(item.market.bidPriceCents)} / {price(item.market.askPriceCents)}<small className="ml-1 opacity-70">· mark {price(item.midpointCents)}</small></> : "Quote unavailable"}</span><span className="font-mono tabular-nums">{item.spreadPct == null ? "—" : `${item.spreadPct.toFixed(1)}%`}</span><span className="font-mono tabular-nums">{item.market?.dailyVolume?.toLocaleString() ?? "—"}</span><span className="font-mono tabular-nums">{item.contract.openInterest?.toLocaleString() ?? "—"}</span></button>; })}</div> : <div className="rounded-md border px-3 py-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>No usable live contracts returned.</strong><br />{optionChain.data?.unavailableReason ?? optionChain.error?.message ?? "Retry the chain or preserve cash; do not guess a contract."}</div>}
+        <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-medium">Contracts<input ref={contractsRef} value={contracts} onChange={(event) => setContracts(event.target.value)} type="number" min="1" step="1" inputMode="numeric" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label><label className="text-xs font-medium">Limit premium / share<input ref={premiumRef} value={optionPremiumDollars} onChange={(event) => setOptionPremiumDollars(event.target.value)} type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="Select a quoted contract" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label></div>
+        <details className="rounded-md border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-medium">Enter a contract manually</summary><div className="border-t p-3" style={{ borderColor: "var(--sh-border-1)" }}><label className="text-xs font-medium">Strike price<input ref={strikeRef} value={optionStrikeDollars} onChange={(event) => setOptionStrikeDollars(event.target.value)} type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="40.00" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label></div></details>
+        <div className="rounded-md px-3 py-2 text-xs leading-5" style={{ background: "color-mix(in srgb, var(--sh-signal) 7%, var(--sh-surface))", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>{optionContractSymbol ? paperInstrumentLabel({ instrumentType, symbol: optionContractSymbol, underlyingSymbol: candidate.symbol, optionExpirationDate, optionStrikePriceCents }) : "No contract selected"}</strong><br />{optionContractSymbol ? <span className="font-mono break-all">{optionContractSymbol}</span> : "Choose a quoted row above."} · Maximum premium loss {money(optionMaxLossCents)}.</div>
       </section>}
+
+      {optionResolutionNeeded && <section aria-labelledby="quote-recovery-heading" className="rounded-lg border p-3" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 5%, var(--sh-surface))" }}><div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><h3 id="quote-recovery-heading" className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Live quote unavailable — choose the safe next step</h3><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Nothing has been proposed or sent. Retry the market data, choose another quoted contract above, or finish this decision at $0 risk.</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-3"><Button type="button" variant="outline" className="min-h-11" disabled={optionChain.isFetching || preflight.isFetching} onClick={() => void retryOptionEvidence()}>{optionChain.isFetching || preflight.isFetching ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}Retry live quote</Button><Button type="button" variant="outline" className="min-h-11" onClick={() => { contractPickerRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); }}>Choose another contract</Button><Button type="button" className="min-h-11" disabled={preserveCash.isPending} onClick={() => preserveCash.mutate({ runId, candidateId: candidate.id, decision: "skipped", reason: preserveCashReason })}>{preserveCash.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CircleSlash2 className="mr-1.5 h-3.5 w-3.5" />}Preserve cash · $0 risk</Button></div></section>}
 
       <details className="rounded-lg border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="cursor-pointer px-3 py-2 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Change review timing or size</summary><section className="grid gap-3 border-t p-3 sm:grid-cols-[1fr_auto] sm:items-end" style={{ borderColor: "var(--sh-border-1)" }}><label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Review horizon<div className="grid grid-cols-2 gap-1 sm:grid-cols-5" role="radiogroup" aria-label="Planned holding horizon">{(["intraday", "overnight", "swing", "catalyst_window", "position"] as HoldingPeriod[]).map((period) => <button key={period} type="button" role="radio" aria-checked={holdingPeriod === period} onClick={() => setHoldingPeriod(period)} className="min-h-11 rounded-md border px-2 py-2 text-xs" style={{ borderColor: holdingPeriod === period ? "var(--sh-signal)" : "var(--sh-border-1)", background: holdingPeriod === period ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{holdingPeriodLabel(period)}</button>)}</div></label>{!isOption && !isIntraday && <label className="block text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Modeled paper size<input value={notionalDollars} onChange={(event) => setNotionalDollars(event.target.value)} type="number" min="1" inputMode="decimal" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm sm:w-36" style={{ borderColor: "var(--sh-border-1)" }} /></label>}</section></details>
 
@@ -331,7 +367,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
       </div></details>
 
       {(isOption ? optionTermsReady : recipeCanPrepare) && currentPreflightData?.wouldPass && <label className="block rounded-lg border p-3 text-xs font-medium" style={{ borderColor: "var(--sh-border-1)" }}>Type <span className="font-mono">PAPER</span> to acknowledge a paper-only proposal<input ref={acknowledgementRef} value={paperAcknowledgement} onChange={(event) => setPaperAcknowledgement(event.target.value)} autoComplete="off" placeholder="PAPER" className="mt-2 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>}
-      <div className="sticky bottom-3 z-10 flex flex-col gap-2 rounded-lg border p-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="px-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Next guarded action: <strong style={{ color: "var(--sh-text-primary)" }}>{readiness.actionLabel}</strong></p><div className="flex gap-2">{readiness.action === "return_to_evidence" && <Button className="min-h-11" variant="outline" size="sm" onClick={onReturnToBrief}>Open evidence</Button>}<Button className="min-h-11 flex-1 sm:flex-none" size="sm" onClick={takeReadinessAction} disabled={create.isPending || constructed.isLoading || preflightBusy}>{create.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : readiness.action === "create_proposal" ? <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> : <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />}{readiness.actionLabel}</Button></div></div>
+      {!optionResolutionNeeded && <div className="sticky bottom-3 z-10 flex flex-col gap-2 rounded-lg border p-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="px-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Next guarded action: <strong style={{ color: "var(--sh-text-primary)" }}>{readiness.actionLabel}</strong></p><div className="flex gap-2">{readiness.action === "return_to_evidence" && <Button className="min-h-11" variant="outline" size="sm" onClick={onReturnToBrief}>Open evidence</Button>}<Button className="min-h-11 flex-1 sm:flex-none" size="sm" onClick={takeReadinessAction} disabled={create.isPending || constructed.isLoading || preflightBusy}>{create.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : readiness.action === "create_proposal" ? <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> : <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />}{readiness.actionLabel}</Button></div></div>}
     </CardContent>
   </Card>;
 }

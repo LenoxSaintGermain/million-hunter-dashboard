@@ -41,6 +41,22 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(form).toContain("const preflightBusy = preflightEnabled &&");
   });
 
+  it("offers a broker-familiar quoted contract picker and resolves quote failures in place", () => {
+    const form = readFileSync(resolve(process.cwd(), "client/src/components/aperture/PaperProposalForm.tsx"), "utf8");
+
+    expect(form).toContain("Choose from the live chain");
+    expect(form).toContain("Bid / ask · mark");
+    expect(form).toContain("prefill its ask as your editable buy limit");
+    expect(form).toContain("Open int.");
+    expect(form).toContain("Retry live quote");
+    expect(form).toContain("Choose another contract");
+    expect(form).toContain("Preserve cash · $0 risk");
+    expect(form).toContain("optionChainHasSelectableContract");
+    expect(form).toContain("optionResolutionNeeded");
+    expect(form).toContain("aperture.play.decide.useMutation");
+    expect(form).toContain("No proposal or order was created.");
+  });
+
   it("formats ticket deadlines as local wall-clock values for datetime-local inputs", () => {
     const form = readFileSync(resolve(process.cwd(), "client/src/components/aperture/PaperProposalForm.tsx"), "utf8");
 

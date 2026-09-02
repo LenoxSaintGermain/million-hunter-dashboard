@@ -93,6 +93,20 @@ export interface OptionMarketSnapshotResult {
   asOf: number;
 }
 
+export interface OptionChainQuery {
+  underlyingSymbol: string;
+  expirationDate: string;
+  type: "call" | "put";
+  strikePriceGteCents?: number;
+  strikePriceLteCents?: number;
+  limit?: number;
+}
+
+export interface OptionChainItem {
+  contract: OptionContractResult;
+  market: OptionMarketSnapshotResult | null;
+}
+
 export interface OrderResult {
   brokerOrderId: string;
   status: "accepted" | "filled" | "rejected" | "pending";
@@ -128,6 +142,8 @@ export interface BrokerAdapter {
   getOptionContract?(symbol: string): Promise<OptionContractResult | null>;
   /** Current exact-contract market evidence used by every option lifecycle gate. */
   getOptionMarketSnapshot?(symbol: string): Promise<OptionMarketSnapshotResult | null>;
+  /** Broker-backed contract shortlist used by the ticket picker. */
+  getOptionChain?(query: OptionChainQuery): Promise<OptionChainItem[]>;
 }
 
 /** The single gate every adapter routes order submission through. */

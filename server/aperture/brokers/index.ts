@@ -18,7 +18,7 @@ import { httpJson, num } from "../providers/types";
 import { parseOccOptionSymbol } from "../../../shared/paperInstrument";
 import {
   assertPaperOnly, BrokerUnavailableError, dollarsToCents,
-  type BrokerAccount, type BrokerAdapter, type BrokerPosition, type OptionContractResult, type OptionMarketSnapshotResult, type OrderRequest, type OrderResult,
+  type BrokerAccount, type BrokerAdapter, type BrokerPosition, type OptionChainItem, type OptionChainQuery, type OptionContractResult, type OptionMarketSnapshotResult, type OrderRequest, type OrderResult,
 } from "./types";
 
 // ── Manual / CSV entry ───────────────────────────────────────────────────────
@@ -143,6 +143,47 @@ export function toOptionMarketSnapshot(symbol: string, data: any, feed: "opra" |
     feed,
     asOf: Date.now(),
   };
+}
+
+export function toOptionContractResult(data: any): OptionContractResult | null {
+  const strike = num(data?.strike_price);
+  const multiplier = num(data?.size);
+  if (!data?.symbol || !data?.underlying_symbol || !data?.expiration_date || !strike || !multiplier) return null;
+  return {
+    symbol: String(data.symbol).toUpperCase(),
+    underlyingSymbol: String(data.underlying_symbol).toUpperCase(),
+    expirationDate: String(data.expiration_date),
+    type: data.type === "put" ? "put" : "call",
+    strikePriceCents: dollarsToCents(strike),
+    multiplier,
+    tradable: Boolean(data.tradable),
+    status: String(data.status ?? "unknown"),
+    openInterest: num(data.open_interest),
+    openInterestAsOf: data.open_interest_date ? String(data.open_interest_date) : null,
+    asOf: Date.now(),
+  };
+}
+
+async function alpacaOptionSnapshots(symbols: string[]): Promise<Map<string, OptionMarketSnapshotResult>> {
+  const normalized = symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean).slice(0, 100);
+  const snapshots = new Map<string, OptionMarketSnapshotResult>();
+  if (!normalized.length) return snapshots;
+  for (const feed of ["opra", "indicative"] as const) {
+    const url = new URL(`${ALPACA_OPTION_DATA_BASE}/snapshots`);
+    url.searchParams.set("symbols", normalized.join(","));
+    url.searchParams.set("feed", feed);
+    const res = await fetch(url, { headers: alpacaHeaders() });
+    if (res.status === 403 && feed === "opra") continue;
+    if (!res.ok) throw new BrokerUnavailableError(`Alpaca option snapshot returned HTTP ${res.status}.`);
+    const body: any = await res.json();
+    for (const symbol of normalized) {
+      if (snapshots.has(symbol)) continue;
+      const market = toOptionMarketSnapshot(symbol, body?.snapshots?.[symbol], feed);
+      if (market) snapshots.set(symbol, market);
+    }
+    if (snapshots.size === normalized.length || feed === "indicative") break;
+  }
+  return snapshots;
 }
 
 // ── Alpaca paper ─────────────────────────────────────────────────────────────
@@ -352,24 +393,11 @@ export const alpacaPaperBroker: BrokerAdapter = {
     if (res.status === 404) return null;
     if (!res.ok) throw new BrokerUnavailableError(`Alpaca Paper option-contract verification returned HTTP ${res.status}.`);
     const data: any = await res.json();
-    const strike = num(data.strike_price);
-    const multiplier = num(data.size);
-    if (!data.symbol || !data.underlying_symbol || !data.expiration_date || !strike || !multiplier) {
+    const contract = toOptionContractResult(data);
+    if (!contract) {
       throw new BrokerUnavailableError("Alpaca Paper returned an incomplete option-contract record.");
     }
-    return {
-      symbol: String(data.symbol).toUpperCase(),
-      underlyingSymbol: String(data.underlying_symbol).toUpperCase(),
-      expirationDate: String(data.expiration_date),
-      type: data.type === "put" ? "put" : "call",
-      strikePriceCents: dollarsToCents(strike),
-      multiplier,
-      tradable: Boolean(data.tradable),
-      status: String(data.status ?? "unknown"),
-      openInterest: num(data.open_interest),
-      openInterestAsOf: data.open_interest_date ? String(data.open_interest_date) : null,
-      asOf: Date.now(),
-    };
+    return contract;
   },
 
   async getOptionMarketSnapshot(symbol: string): Promise<OptionMarketSnapshotResult | null> {
@@ -383,9 +411,27 @@ export const alpacaPaperBroker: BrokerAdapter = {
       if (res.status === 403 && feed === "opra") continue;
       if (!res.ok) throw new BrokerUnavailableError(`Alpaca option snapshot returned HTTP ${res.status}.`);
       const body: any = await res.json();
-      return toOptionMarketSnapshot(normalized, body?.snapshots?.[normalized], feed);
+      const market = toOptionMarketSnapshot(normalized, body?.snapshots?.[normalized], feed);
+      if (market) return market;
     }
     return null;
+  },
+
+  async getOptionChain(query: OptionChainQuery): Promise<OptionChainItem[]> {
+    const url = new URL(`${ALPACA_PAPER_BASE}/options/contracts`);
+    url.searchParams.set("underlying_symbols", query.underlyingSymbol.trim().toUpperCase());
+    url.searchParams.set("expiration_date", query.expirationDate);
+    url.searchParams.set("type", query.type);
+    url.searchParams.set("status", "active");
+    url.searchParams.set("limit", String(Math.min(100, Math.max(1, query.limit ?? 40))));
+    if (query.strikePriceGteCents != null) url.searchParams.set("strike_price_gte", (query.strikePriceGteCents / 100).toFixed(2));
+    if (query.strikePriceLteCents != null) url.searchParams.set("strike_price_lte", (query.strikePriceLteCents / 100).toFixed(2));
+    const body = await httpJson<any>(url.toString(), { headers: alpacaHeaders() });
+    const contracts: OptionContractResult[] = (Array.isArray(body?.option_contracts) ? body.option_contracts : [])
+      .map(toOptionContractResult)
+      .filter((contract: OptionContractResult | null): contract is OptionContractResult => Boolean(contract?.tradable));
+    const snapshots = await alpacaOptionSnapshots(contracts.map((contract) => contract.symbol));
+    return contracts.map((contract) => ({ contract, market: snapshots.get(contract.symbol) ?? null }));
   },
 };
 

@@ -8,9 +8,13 @@
  *   - toOrderResult maps Alpaca statuses correctly
  *   - The order lifecycle state machine enforces valid transitions
  */
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { assertPaperOnly, LiveTradingRefusedError } from "./brokers/types";
-import { toOptionMarketSnapshot, toOrderResult } from "./brokers/index";
+import { alpacaPaperBroker, toOptionContractResult, toOptionMarketSnapshot, toOrderResult } from "./brokers/index";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("assertPaperOnly", () => {
   it("does not throw when isPaper is true", () => {
@@ -100,5 +104,63 @@ describe("toOptionMarketSnapshot — exact option evidence", () => {
 
   it("fails closed when the quote or IV is missing", () => {
     expect(toOptionMarketSnapshot("DKNG261002C00024000", { dailyBar: { v: 32 } }, "opra")).toBeNull();
+  });
+});
+
+describe("toOptionContractResult — broker contract evidence", () => {
+  it("maps an active Alpaca contract without inventing open interest", () => {
+    expect(toOptionContractResult({
+      symbol: "MGM261120C00035000",
+      underlying_symbol: "MGM",
+      expiration_date: "2026-11-20",
+      type: "call",
+      strike_price: "35",
+      size: "100",
+      tradable: true,
+      status: "active",
+    })).toMatchObject({
+      symbol: "MGM261120C00035000",
+      underlyingSymbol: "MGM",
+      expirationDate: "2026-11-20",
+      type: "call",
+      strikePriceCents: 3500,
+      multiplier: 100,
+      tradable: true,
+      status: "active",
+      openInterest: null,
+    });
+  });
+
+  it("fails closed when the broker record cannot identify an exact contract", () => {
+    expect(toOptionContractResult({ underlying_symbol: "MGM", strike_price: "35" })).toBeNull();
+  });
+});
+
+describe("Alpaca option quote feed fallback", () => {
+  it("tries indicative data when OPRA returns an empty successful response", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ snapshots: {} }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        snapshots: {
+          MGM261120C00035000: {
+            latestQuote: { bp: 1.05, ap: 1.15, bs: 4, as: 6, t: new Date().toISOString() },
+            dailyBar: { v: 28 },
+            impliedVolatility: 0.42,
+          },
+        },
+      }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const market = await alpacaPaperBroker.getOptionMarketSnapshot?.("MGM261120C00035000");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("feed=opra");
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("feed=indicative");
+    expect(market).toMatchObject({
+      symbol: "MGM261120C00035000",
+      bidPriceCents: 105,
+      askPriceCents: 115,
+      feed: "indicative",
+    });
   });
 });

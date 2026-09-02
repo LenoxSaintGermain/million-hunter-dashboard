@@ -75,7 +75,7 @@ import { normalizeJsonRecord, normalizeStringList } from "../shared/stringList";
 import { missingIntradayRecipeMessage } from "../shared/intradayRecipeGuard";
 import { fetchIntradayBars } from "./aperture/providers/marketData";
 import { checkVwapHold, openingRange, sessionVwap } from "./aperture/intraday";
-import { REGULAR_OPEN, etClock, nextRegularSessionOpen, startOfEtDay } from "./aperture/marketSession";
+import { REGULAR_OPEN, etClock, marketSession, nextRegularSessionOpen, startOfEtDay } from "./aperture/marketSession";
 import { constructPlay, CONSTRUCTED_PLAY_DISCLOSURE, QUEUE_AT_OPEN_PLAY_DISCLOSURE } from "./aperture/playConstructor";
 import { requestsQueueAtOpen } from "./aperture/queueAtOpen";
 import { canonicalCapitalValues, needsCanonicalPromotion } from "./aperture/canonicalThesisLink";
@@ -3288,6 +3288,62 @@ export const apertureRouter = router({
           destinationAccount: byId.get(row.accountId) ?? null,
           portfolioContextAccount: row.portfolioContextAccountId ? byId.get(row.portfolioContextAccountId) ?? null : byId.get(row.accountId) ?? null,
         }));
+      }),
+
+    optionChain: capitalOperatorProcedure
+      .input(z.object({
+        accountId: z.number(),
+        underlyingSymbol: z.string().trim().min(1).max(12),
+        expirationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        type: z.enum(["call", "put"]),
+        targetPriceCents: z.number().int().positive().optional(),
+      }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        const account = await requireAccount(db, input.accountId, ctx.user.id);
+        const broker = brokerFor(account.brokerId, account.id);
+        if (!broker.available() || !broker.getOptionChain) {
+          return { items: [], unavailableReason: broker.unavailableReason() ?? `${broker.label} does not provide an option chain.` };
+        }
+        const target = input.targetPriceCents;
+        try {
+          const chain = await broker.getOptionChain({
+            underlyingSymbol: normSymbol(input.underlyingSymbol),
+            expirationDate: input.expirationDate,
+            type: input.type,
+            strikePriceGteCents: target == null ? undefined : Math.max(1, Math.round(target * 0.8)),
+            strikePriceLteCents: target == null ? undefined : Math.round(target * 1.2),
+            limit: 40,
+          });
+          const now = Date.now();
+          const maxQuoteAgeMs = marketSession(now).session === "regular" ? 5 * 60_000 : 8 * 60 * 60_000;
+          const items = chain.map(({ contract, market }) => {
+            const midpointCents = market ? Math.round((market.bidPriceCents + market.askPriceCents) / 2) : null;
+            const spreadPct = market && midpointCents && midpointCents > 0
+              ? ((market.askPriceCents - market.bidPriceCents) / midpointCents) * 100
+              : null;
+            const quoteAgeMs = market ? now - market.quoteAt : null;
+            const quoteReady = Boolean(market
+              && quoteAgeMs != null && quoteAgeMs >= 0 && quoteAgeMs <= maxQuoteAgeMs
+              && market.bidPriceCents > 0 && market.askPriceCents >= market.bidPriceCents
+              && market.dailyVolume > 0
+              && contract.openInterest != null && contract.openInterest > 0
+              && market.impliedVolatility > 0
+              && spreadPct != null && spreadPct <= 35);
+            return { contract, market, midpointCents, spreadPct, quoteAgeMs, quoteReady };
+          }).sort((a, b) => {
+            if (a.quoteReady !== b.quoteReady) return a.quoteReady ? -1 : 1;
+            const aDistance = target == null ? a.contract.strikePriceCents : Math.abs(a.contract.strikePriceCents - target);
+            const bDistance = target == null ? b.contract.strikePriceCents : Math.abs(b.contract.strikePriceCents - target);
+            return aDistance !== bDistance ? aDistance - bDistance : (b.contract.openInterest ?? 0) - (a.contract.openInterest ?? 0);
+          }).slice(0, 8);
+          return {
+            items,
+            unavailableReason: items.length ? null : `No active ${input.expirationDate} ${input.type} contracts were returned for ${normSymbol(input.underlyingSymbol)}.`,
+          };
+        } catch (error) {
+          return { items: [], unavailableReason: error instanceof Error ? error.message : "The option chain is temporarily unavailable." };
+        }
       }),
 
     create: capitalOperatorProcedure
