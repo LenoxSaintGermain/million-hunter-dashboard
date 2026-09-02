@@ -127,6 +127,11 @@ describe("startOfEtDay", () => {
 });
 
 describe("nextRegularSessionOpen", () => {
+  it("returns today's open when called before the pre-market on a trading day", () => {
+    const next = nextRegularSessionOpen(utc("2026-06-10T04:15:00Z"))!; // Wednesday 00:15 ET
+    expect(etClock(next)).toMatchObject({ dateEt: "2026-06-10", etMinutes: 9 * 60 + 30 });
+  });
+
   it("moves a Friday defer to Monday's 09:30 ET regular open", () => {
     const next = nextRegularSessionOpen(utc("2026-06-12T20:30:00Z"))!; // Friday 16:30 ET
     expect(etClock(next)).toMatchObject({ dateEt: "2026-06-15", etMinutes: 9 * 60 + 30 });

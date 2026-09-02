@@ -175,7 +175,10 @@ export function startOfEtDay(nowMs: number): number | null {
 export function nextRegularSessionOpen(nowMs: number): number | null {
   if (!Number.isFinite(nowMs)) return null;
   const dayMs = 24 * 60 * 60 * 1_000;
-  for (let day = 1; day <= 8; day++) {
+  // Include the current ET date. Before 09:30, today's regular open is still
+  // the first open after `nowMs`; starting at tomorrow incorrectly turns a
+  // midnight queue into a next-day order.
+  for (let day = 0; day <= 8; day++) {
     const probe = nowMs + day * dayMs;
     const dayStart = startOfEtDay(probe);
     if (dayStart == null) continue;
