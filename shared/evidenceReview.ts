@@ -7,6 +7,29 @@ export interface EvidenceReviewRecord {
 }
 
 /**
+ * These checks cannot be answered until the operator has chosen an exact OCC
+ * contract in the paper ticket. Keeping them in the pre-ticket review creates
+ * a circular lock: the ticket is needed to verify the contract, while the
+ * contract review is required to open the ticket. They remain hard broker
+ * preflight checks after contract selection; they are not waived.
+ */
+const PAPER_TICKET_EVIDENCE_CHECKS = new Set([
+  "Option chain and contract terms",
+  "Option bid/ask and liquidity",
+]);
+
+export function proposalEvidenceChecks(checks: readonly string[] | null | undefined) {
+  const normalized = Array.from(new Set((checks ?? [])
+    .filter((check): check is string => typeof check === "string")
+    .map((check) => check.trim())
+    .filter(Boolean)));
+  return {
+    requiredChecks: normalized.filter((check) => !PAPER_TICKET_EVIDENCE_CHECKS.has(check)),
+    ticketChecks: normalized.filter((check) => PAPER_TICKET_EVIDENCE_CHECKS.has(check)),
+  };
+}
+
+/**
  * Translates the raw acknowledgement records into the only decision relevant to
  * proposal preparation: which required questions remain open, and whether a
  * resolved answer itself declines the paper stage. Legacy "reviewed" records
@@ -16,10 +39,7 @@ export interface EvidenceReviewRecord {
  * operator creates a new research decision.
  */
 export function getEvidenceReviewReadiness(requiredChecks: readonly string[] | null | undefined, reviews: readonly EvidenceReviewRecord[] | null | undefined) {
-  const normalizedRequired = Array.from(new Set((requiredChecks ?? [])
-    .filter((check): check is string => typeof check === "string")
-    .map((check) => check.trim())
-    .filter(Boolean)));
+  const { requiredChecks: normalizedRequired, ticketChecks } = proposalEvidenceChecks(requiredChecks);
   const resolved = new Set((reviews ?? [])
     .filter((review) => review.status === "confirmed" || review.status === "not_confirmed" || review.status === "not_applicable")
     .map((review) => review.checkLabel.trim()));
@@ -27,10 +47,11 @@ export function getEvidenceReviewReadiness(requiredChecks: readonly string[] | n
   const unreviewedChecks = normalizedRequired.filter((check) => !resolved.has(check));
   return {
     requiredChecks: normalizedRequired,
+    ticketChecks,
     reviewedChecks: normalizedRequired.filter((check) => resolved.has(check)),
     unreviewedChecks,
     negativeChecks,
-    paperProposalReady: normalizedRequired.length > 0 && unreviewedChecks.length === 0 && negativeChecks.length === 0,
+    paperProposalReady: unreviewedChecks.length === 0 && negativeChecks.length === 0,
     paperStageDeclined: negativeChecks.length > 0,
   };
 }

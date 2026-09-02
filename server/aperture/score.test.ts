@@ -123,7 +123,7 @@ describe("scoreThesisFit", () => {
     expect(intraday.verifyFields.join(" ")).not.toMatch(/Price \/ earnings|Price \/ sales/);
   });
 
-  it("gates options catalyst research on catalyst and contract evidence instead of equity valuation", () => {
+  it("gates options research on catalyst evidence and defers exact contract checks to the ticket", () => {
     const options = scoreThesisFit({
       symbol: "DKNG",
       graph: { ...GRAPH, instrumentPreference: "options" },
@@ -133,10 +133,10 @@ describe("scoreThesisFit", () => {
       facts: WELL_COVERED.filter((item) => !["pe_ratio", "price_to_sales"].includes(item.factKey)),
     });
 
-    expect(options.dimensions.find((dimension) => dimension.key === "C")?.label).toMatch(/option-contract readiness/i);
+    expect(options.dimensions.find((dimension) => dimension.key === "C")?.label).toMatch(/catalyst readiness/i);
     expect(options.verifyFields.join(" ")).toMatch(/Named catalyst primary-source evidence/);
-    expect(options.verifyFields.join(" ")).toMatch(/Option chain and contract terms/);
-    expect(options.verifyFields.join(" ")).toMatch(/Option bid\/ask and liquidity/);
+    expect(options.verifyFields.join(" ")).not.toMatch(/Option chain and contract terms/);
+    expect(options.verifyFields.join(" ")).not.toMatch(/Option bid\/ask and liquidity/);
     expect(options.verifyFields.join(" ")).not.toMatch(/Price \/ earnings|Price \/ sales/);
     expect(options.gatesPass).toBe(false);
   });

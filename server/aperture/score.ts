@@ -55,11 +55,12 @@ function scoringFactsFor(holdingPeriod: ScoreHoldingPeriod, instrumentPreference
   // Valuation multiples describe a longer-horizon ownership question. They do
   // not confirm or invalidate a same-session tape setup, so they cannot block
   // an intraday candidate through the evidence-review gate. They also cannot
-  // clear an options catalyst play: that requires catalyst and contract facts.
+  // clear an options catalyst play: thesis review requires the catalyst, while
+  // the exact contract and quote are verified later by broker preflight.
   if (instrumentPreference === "options") {
     return SCORING_FACTS
       .filter((key) => key !== "pe_ratio" && key !== "price_to_sales")
-      .concat("catalyst_primary_source", "option_chain_verified", "option_liquidity_verified");
+      .concat("catalyst_primary_source");
   }
   return holdingPeriod === "intraday"
     ? SCORING_FACTS.filter((key) => key !== "pe_ratio" && key !== "price_to_sales")
@@ -94,11 +95,9 @@ export function dimensionsFor(
     },
     instrumentPreference === "options"
       ? {
-        key: "C", label: "Catalyst & option-contract readiness", max: 20, gate: 20,
+        key: "C", label: "Catalyst readiness", max: 20, gate: 20,
         factors: [
-          { key: "catalyst", label: "Named catalyst primary-source evidence", max: 10, field: "catalyst_primary_source", missing: 0, verifyWhenMissing: true, whenTrue: 10 },
-          { key: "contract", label: "Option chain and contract terms", max: 5, field: "option_chain_verified", missing: 0, verifyWhenMissing: true, whenTrue: 5 },
-          { key: "liquidity", label: "Option bid/ask and liquidity", max: 5, field: "option_liquidity_verified", missing: 0, verifyWhenMissing: true, whenTrue: 5 },
+          { key: "catalyst", label: "Named catalyst primary-source evidence", max: 20, field: "catalyst_primary_source", missing: 0, verifyWhenMissing: true, whenTrue: 20 },
         ],
       }
       : holdingPeriod === "intraday"

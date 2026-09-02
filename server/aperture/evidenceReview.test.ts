@@ -54,4 +54,14 @@ describe("getEvidenceReviewReadiness", () => {
     expect(result.paperProposalReady).toBe(false);
     expect(result.paperStageDeclined).toBe(true);
   });
+
+  it("defers exact option contract and quote checks to broker preflight after ticket selection", () => {
+    const result = getEvidenceReviewReadiness(
+      ["Named catalyst primary-source evidence", "Option chain and contract terms", "Option bid/ask and liquidity"],
+      [{ candidateId: 9, checkLabel: "Named catalyst primary-source evidence", status: "confirmed" }],
+    );
+    expect(result.paperProposalReady).toBe(true);
+    expect(result.unreviewedChecks).toEqual([]);
+    expect(result.ticketChecks).toEqual(["Option chain and contract terms", "Option bid/ask and liquidity"]);
+  });
 });
