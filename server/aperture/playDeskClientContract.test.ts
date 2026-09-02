@@ -48,8 +48,27 @@ describe("Capital Aperture Play Desk contract", () => {
     const decisionReadySection = page.slice(page.indexOf("!isLoading && decisionReady.length"), page.indexOf("!isLoading && (inMotionOrders.length"));
 
     expect(page).toContain('"Choose play"');
-    expect(decisionReadySection).toContain('navigate(`/aperture/run/${journey.latest.id}`)');
+    expect(decisionReadySection).toContain("navigate(deferred ?");
+    expect(decisionReadySection).toContain("actionableCandidateId");
     expect(decisionReadySection).not.toContain("view=evidence");
+  });
+
+  it("routes play-outcome reviews to the exact order lifecycle", () => {
+    const router = readFileSync(resolve(process.cwd(), "server/apertureRouter.ts"), "utf8");
+    const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
+
+    expect(router).toContain("orderRunId: brokerOrders.runId");
+    expect(router).toContain("orderCandidateId: brokerOrders.candidateId");
+    expect(page).toContain('item.kind === "play_outcome"');
+    expect(page).toContain("lifecycle=monitoring");
+  });
+
+  it("uses per-candidate state rather than completed-run status for the choose lane", () => {
+    const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
+
+    expect(page).toContain("playDeskJourneyLane");
+    expect(page).toContain("candidateStates?.label");
+    expect(page).toContain("actionableCandidateId");
   });
 
   it("keeps the desk compact and makes play types visible", () => {

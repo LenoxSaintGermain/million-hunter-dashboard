@@ -101,6 +101,7 @@ import { immutableReceiptBindingIssue } from "./aperture/decisionReceiptBinding"
 import { resolveCapitalMissionDefaults } from "../shared/capitalMissionDefaults";
 import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
 import { detailsFromCanonicalRecord } from "../shared/capitalThesisStructure";
+import { classifyDeskCandidate, summarizeDeskCandidates } from "../shared/playDeskState";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1108,6 +1109,11 @@ export const apertureRouter = router({
         revisionVersion: apertureDecisionRevisions.version,
         branch: apertureDecisionRevisions.effectiveBranch,
         thesisName: thesisCompilations.name,
+        orderId: aperturePendingOutcomes.orderId,
+        orderRunId: brokerOrders.runId,
+        orderCandidateId: brokerOrders.candidateId,
+        orderSymbol: brokerOrders.symbol,
+        orderStatus: brokerOrders.status,
       }).from(aperturePendingOutcomes)
         .innerJoin(apertureDecisionRuns, eq(aperturePendingOutcomes.decisionRunId, apertureDecisionRuns.id))
         .innerJoin(apertureDecisionRevisions, and(
@@ -1115,6 +1121,10 @@ export const apertureRouter = router({
           eq(aperturePendingOutcomes.decisionRunId, apertureDecisionRevisions.decisionRunId),
         ))
         .innerJoin(thesisCompilations, eq(apertureDecisionRuns.canonicalThesisId, thesisCompilations.id))
+        .leftJoin(brokerOrders, and(
+          eq(aperturePendingOutcomes.orderId, brokerOrders.id),
+          eq(brokerOrders.userId, ctx.user.id),
+        ))
         .where(and(
           eq(aperturePendingOutcomes.userId, ctx.user.id),
           eq(apertureDecisionRuns.userId, ctx.user.id),
@@ -1939,18 +1949,69 @@ export const apertureRouter = router({
       for (const candidate of candidateRows) {
         if (!leadByRun.has(candidate.runId)) leadByRun.set(candidate.runId, candidate);
       }
-      const leadIds = Array.from(leadByRun.values()).map((candidate) => candidate.id);
-      const reviews = leadIds.length ? await db!.select().from(apertureEvidenceReviews).where(and(
+      const candidateIds = candidateRows.map((candidate) => candidate.id);
+      const reviews = candidateIds.length ? await db!.select().from(apertureEvidenceReviews).where(and(
         eq(apertureEvidenceReviews.userId, ctx.user.id),
-        inArray(apertureEvidenceReviews.candidateId, leadIds),
+        inArray(apertureEvidenceReviews.candidateId, candidateIds),
       )) : [];
+      const activeOrderRows = candidateIds.length ? await db!.select({
+        candidateId: brokerOrders.candidateId,
+        status: brokerOrders.status,
+        intent: brokerOrders.intent,
+        qty: brokerOrders.qty,
+        filledQty: brokerOrders.filledQty,
+      }).from(brokerOrders).where(and(
+        eq(brokerOrders.userId, ctx.user.id),
+        inArray(brokerOrders.runId, runIds),
+        inArray(brokerOrders.status, ["pending_approval", "approved", "submitted", "filled"]),
+      )) : [];
+      const activeCandidateIds = new Set<number>();
+      const filledQtyByCandidate = new Map<number, number>();
+      for (const order of activeOrderRows) {
+        if (order.candidateId == null) continue;
+        if (order.status !== "filled") {
+          activeCandidateIds.add(order.candidateId);
+          continue;
+        }
+        const quantity = Math.abs(order.filledQty ?? order.qty ?? 1);
+        filledQtyByCandidate.set(order.candidateId, (filledQtyByCandidate.get(order.candidateId) ?? 0) + (order.intent === "close" ? -quantity : quantity));
+      }
+      filledQtyByCandidate.forEach((netQty, candidateId) => {
+        if (netQty > 0) activeCandidateIds.add(candidateId);
+      });
+      const candidatesByRun = new Map<number, typeof candidateRows>();
+      for (const candidate of candidateRows) candidatesByRun.set(candidate.runId, [...(candidatesByRun.get(candidate.runId) ?? []), candidate]);
+      const reviewsByCandidate = new Map<number, typeof reviews>();
+      for (const review of reviews) reviewsByCandidate.set(review.candidateId, [...(reviewsByCandidate.get(review.candidateId) ?? []), review]);
       return rows.map(({ run, thesisName }) => {
         const lead = leadByRun.get(run.id);
         const readiness = lead ? getEvidenceReviewReadiness(
           normalizeStringList(lead.verifyFields),
-          reviews.filter((review) => review.candidateId === lead.id),
+          reviewsByCandidate.get(lead.id) ?? [],
         ) : null;
-        return { ...run, thesisName, paperStageDeclined: readiness?.paperStageDeclined === true };
+        const candidateStates = summarizeDeskCandidates((candidatesByRun.get(run.id) ?? []).map((candidate) => {
+          const candidateReadiness = getEvidenceReviewReadiness(
+            normalizeStringList(candidate.verifyFields),
+            reviewsByCandidate.get(candidate.id) ?? [],
+          );
+          return classifyDeskCandidate({
+            id: candidate.id,
+            symbol: candidate.symbol,
+            hasActiveOrder: activeCandidateIds.has(candidate.id),
+            catalystDeadlineAt: run.catalystDeadlineAt,
+            paperStageDeclined: candidateReadiness.paperStageDeclined,
+            unreviewedChecks: candidateReadiness.unreviewedChecks.length,
+            runFailed: run.status === "failed",
+          });
+        }));
+        return {
+          ...run,
+          thesisName,
+          paperStageDeclined: readiness?.paperStageDeclined === true,
+          candidateStates,
+          actionableCandidateId: candidateStates.actionableCandidateId,
+          actionableSymbol: candidateStates.actionableSymbol,
+        };
       });
     }),
 

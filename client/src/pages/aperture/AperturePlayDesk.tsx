@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { buildResearchJourneys } from "@shared/runWorkspace";
+import { playDeskJourneyLane } from "@shared/playDeskState";
 
 const money = (cents?: number | null) => cents == null
   ? "—"
@@ -15,6 +16,16 @@ const money = (cents?: number | null) => cents == null
 
 const instrumentLabel = (instrumentType: string) => instrumentType === "long_call" ? "Call" : instrumentType === "long_put" ? "Put" : "Shares";
 const instrumentFilter = (instrumentType: string) => instrumentType === "long_call" ? "calls" : instrumentType === "long_put" ? "puts" : "shares";
+
+const pendingOutcomeRoute = (item: {
+  kind: string;
+  orderRunId?: number | null;
+  orderCandidateId?: number | null;
+  decisionRunId: number;
+  revisionId: number;
+}) => item.kind === "play_outcome" && item.orderRunId != null && item.orderCandidateId != null
+  ? `/aperture/run/${item.orderRunId}/execute?candidate=${item.orderCandidateId}&lifecycle=monitoring`
+  : `/aperture/decision/${item.decisionRunId}/revision/${item.revisionId}`;
 
 const orderState = (order: { status: string; brokerOrderId?: string | null; dispatchError?: string | null }) => order.status === "submitted" && !order.brokerOrderId
   ? { label: "Dispatch unresolved", action: "Reconcile paper dispatch" }
@@ -46,9 +57,9 @@ export default function AperturePlayDesk() {
   const activePlays = (desk.data?.activePlays ?? []).filter((play) => !inMotionOrders.some((order) => order.accountId === play.accountId && order.symbol === play.symbol));
   const pendingOutcomes = outcomes.data ?? [];
   const isLoading = desk.isLoading || runs.isLoading || playList.isLoading || outcomes.isLoading;
-  const decisionReady = researchActions.filter((journey) => journey.state === "ready_to_review" || deferredByRun.has(journey.latest.id));
-  const researchBacklog = researchActions.filter((journey) => !decisionReady.includes(journey));
-  const count = researchActions.length + orderActions.length + inMotionOrders.length + activePlays.length + pendingOutcomes.length;
+  const decisionReady = researchActions.filter((journey) => deferredByRun.has(journey.latest.id) || playDeskJourneyLane(journey.latest.candidateStates) === "choose");
+  const researchBacklog = researchActions.filter((journey) => !decisionReady.includes(journey) && playDeskJourneyLane(journey.latest.candidateStates) !== "in_motion_only");
+  const count = decisionReady.length + researchBacklog.length + orderActions.length + inMotionOrders.length + activePlays.length + pendingOutcomes.length;
   const visibleOrders = inMotionOrders.filter((order) => playFilter === "all" || instrumentFilter(order.instrumentType) === playFilter);
   const visibleActivePlays = activePlays.filter((play) => playFilter === "all" || instrumentFilter(play.instrumentType) === playFilter);
 
@@ -89,7 +100,13 @@ export default function AperturePlayDesk() {
       <SectionHead title="Choose a play" detail="Research is complete enough to decide. Evidence is optional unless a named blocker remains." count={decisionReady.length} />
       <div className="divide-y" style={{ borderColor: "var(--sh-border-1)" }}>{decisionReady.map((journey) => {
         const deferred = deferredByRun.get(journey.latest.id);
-        return <DeskItem key={journey.rootId} eyebrow={deferred ? "Queued for next regular session" : "Ready to choose"} title={journey.thesisName} meta={deferred ? `Returns ${new Date(deferred.resumeAt!).toLocaleString()} · ${deferred.reason}` : `${journey.evidenceCandidates} play${journey.evidenceCandidates === 1 ? "" : "s"} compared · ${formatDistanceToNow(Number(journey.latest.createdAt))} ago`} action={deferred ? "Review queue" : "Choose play"} primary={!deferred} onAction={() => navigate(`/aperture/run/${journey.latest.id}`)} />;
+        const candidateStates = journey.latest.candidateStates;
+        const actionableCandidateId = journey.latest.actionableCandidateId ?? candidateStates?.actionableCandidateId;
+        const actionableSymbol = journey.latest.actionableSymbol ?? candidateStates?.actionableSymbol;
+        const destination = actionableCandidateId == null
+          ? `/aperture/run/${journey.latest.id}`
+          : `/aperture/run/${journey.latest.id}?candidate=${actionableCandidateId}`;
+        return <DeskItem key={journey.rootId} eyebrow={deferred ? "Queued for next regular session" : "Ready to choose"} title={journey.thesisName} meta={deferred ? `Returns ${new Date(deferred.resumeAt!).toLocaleString()} · ${deferred.reason}` : `${journey.latest.candidateStates?.label ?? `${journey.evidenceCandidates} plays compared`} · ${formatDistanceToNow(Number(journey.latest.createdAt))} ago`} action={deferred ? "Review queue" : actionableSymbol ? `Review ${actionableSymbol}` : "Choose play"} primary={!deferred} onAction={() => navigate(deferred ? `/aperture/run/${journey.latest.id}` : destination)} />;
       })}</div>
     </section>}
 
@@ -109,11 +126,11 @@ export default function AperturePlayDesk() {
       {visibleOrders.length === 0 && visibleActivePlays.length === 0 && <p className="rounded-xl border px-4 py-6 text-center text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>No {playFilter} plays are in motion.</p>}
     </section>}
 
-    {!isLoading && pendingOutcomes.length > 0 && <section className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><SectionHead title="Reviews due" detail="Scheduled check-ins, not automatic exits." count={pendingOutcomes.length} /><div className="divide-y" style={{ borderColor: "var(--sh-border-1)" }}>{pendingOutcomes.slice(0, 3).map((item) => <DeskItem key={item.id} eyebrow={item.kind === "gate_review" ? "Gate review" : "Outcome due"} title={item.gateLabel ?? item.thesisName ?? "Decision review"} meta={`Due ${new Date(item.dueAt).toLocaleString()}`} action="Open" onAction={() => navigate(`/aperture/decision/${item.decisionRunId}/revision/${item.revisionId}`)} />)}</div></section>}
+    {!isLoading && pendingOutcomes.length > 0 && <section className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><SectionHead title="Reviews due" detail="Scheduled check-ins, not automatic exits." count={pendingOutcomes.length} /><div className="divide-y" style={{ borderColor: "var(--sh-border-1)" }}>{pendingOutcomes.slice(0, 3).map((item) => <DeskItem key={item.id} eyebrow={item.kind === "gate_review" ? "Gate review" : "Outcome due"} title={item.kind === "play_outcome" && item.orderSymbol ? `${item.orderSymbol} paper-play review` : item.gateLabel ?? item.thesisName ?? "Decision review"} meta={`${item.orderStatus ? `${item.orderStatus.replaceAll("_", " ")} · ` : ""}Due ${new Date(item.dueAt).toLocaleString()}`} action={item.kind === "play_outcome" ? "Review play" : "Open"} onAction={() => navigate(pendingOutcomeRoute(item))} />)}</div></section>}
 
     {!isLoading && researchBacklog.length > 0 && <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
       <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}><span>Show research backlog</span><Badge variant="outline">{researchBacklog.length}</Badge></summary>
-      <div className="divide-y border-t" style={{ borderColor: "var(--sh-border-1)" }}>{researchBacklog.map((journey) => <DeskItem key={journey.rootId} eyebrow={journey.state === "paper_stage_declined" ? "Cash / no paper stage" : "Research follow-up"} title={journey.thesisName} meta={`${journey.evidenceCandidates} research candidate${journey.evidenceCandidates === 1 ? "" : "s"}`} action={journey.state === "paper_stage_declined" ? "View receipt" : "Open research"} onAction={() => navigate(`/aperture/run/${journey.latest.id}?view=evidence`)} />)}</div>
+      <div className="divide-y border-t" style={{ borderColor: "var(--sh-border-1)" }}>{researchBacklog.map((journey) => <DeskItem key={journey.rootId} eyebrow={journey.state === "paper_stage_declined" ? "Cash / no paper stage" : journey.latest.candidateStates?.expired ? "Expired setup" : "Research follow-up"} title={journey.thesisName} meta={journey.latest.candidateStates?.label ?? `${journey.evidenceCandidates} research candidate${journey.evidenceCandidates === 1 ? "" : "s"}`} action={journey.state === "paper_stage_declined" ? "View receipt" : journey.latest.candidateStates?.expired ? "Review expiry" : "Open research"} onAction={() => navigate(`/aperture/run/${journey.latest.id}?view=evidence`)} />)}</div>
     </details>}
   </div></DashboardLayout>;
 }

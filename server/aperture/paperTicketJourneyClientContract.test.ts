@@ -120,6 +120,24 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain("!candidateActiveOrder");
   });
 
+  it("opens the correct lifecycle tab from the current order action", () => {
+    const execute = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/ApertureExecute.tsx"), "utf8");
+
+    expect(execute).toContain("setLifecycleTab");
+    expect(execute).toContain('lifecycleTab: "monitoring"');
+    expect(execute).toContain("value={lifecycleTab}");
+    expect(execute).not.toContain('<Tabs id="paper-lifecycle" defaultValue="orders"');
+  });
+
+  it("explains an option risk-ceiling failure with measured choices in place", () => {
+    const form = readFileSync(resolve(process.cwd(), "client/src/components/aperture/PaperProposalForm.tsx"), "utf8");
+
+    expect(form).toContain("riskCeilingResult");
+    expect(form).toContain("Selected maximum loss");
+    expect(form).toContain("Choose a lower-premium contract");
+    expect(form).toContain("Preserve cash · $0 risk");
+  });
+
   it("reacts when an inline alternative changes only the candidate query parameter", () => {
     const board = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/CandidateBoard.tsx"), "utf8");
 

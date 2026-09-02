@@ -7,6 +7,9 @@ export type RunWorkspaceItem = {
   candidateCount?: number | null;
   droppedNote?: string | null;
   paperStageDeclined?: boolean;
+  candidateStates?: import("./playDeskState").DeskCandidateSummary;
+  actionableCandidateId?: number | null;
+  actionableSymbol?: string | null;
   createdAt: number;
 };
 

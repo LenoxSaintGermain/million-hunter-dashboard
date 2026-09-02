@@ -42,7 +42,8 @@ describe("Capital Aperture lifecycle safety contracts", () => {
     const page = read("client/src/pages/aperture/ApertureExecute.tsx");
     const router = read("server/apertureRouter.ts");
 
-    expect(page).toContain('onProposalCreated={() => document.getElementById("paper-lifecycle")?.scrollIntoView');
+    expect(page).toContain('onProposalCreated={() => openLifecycle("orders")}');
+    expect(page).toContain('lifecycleTab: "monitoring"');
     expect(page).toContain("<MonitoringPanel runId={runId} candidate={proposalCandidate}");
     expect(page).not.toContain("candidate={proposalCandidate ?? data?.candidates[0]}");
     expect(router).toContain("const netFilledQty = filledOrders.reduce");

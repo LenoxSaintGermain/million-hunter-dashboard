@@ -32,6 +32,15 @@ const HARD_PREFLIGHT_GATE_KEYS = new Set([
   "intraday_cutoff",
 ]);
 
+const RISK_CEILING_GATE_KEYS = new Set([
+  "planned_risk_per_play",
+  "daily_planned_risk",
+  "correlated_planned_risk",
+  "order_notional_ceiling",
+  "position_concentration",
+  "cluster_concentration",
+]);
+
 const money = (cents: number | null | undefined) => cents == null
   ? "Not modeled"
   : new Intl.NumberFormat(navigator.language, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cents / 100);
@@ -237,11 +246,20 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
   const preflightMatchesTicket = preflightInput?.fingerprint === preflightTicketFingerprint;
   const currentPreflightData = preflightMatchesTicket ? preflight.data : undefined;
   const hardPreflightResult = (currentPreflightData?.evaluation.results ?? []).find((result) => !result.passed && HARD_PREFLIGHT_GATE_KEYS.has(result.key));
+  const riskCeilingResult = (currentPreflightData?.evaluation.results ?? []).find((result) => !result.passed && RISK_CEILING_GATE_KEYS.has(result.key));
   const preflightBusy = preflightEnabled && (preflightInput == null || !preflightMatchesTicket || preflight.isFetching);
   const optionEvidenceBlocked = isOption && ["option_chain_market_evidence", "option_contract_verified"].includes(hardPreflightResult?.key ?? "");
   const optionChainItems = optionChain.data?.items ?? [];
   const optionChainHasSelectableContract = optionChainItems.some((item) => item.quoteReady);
   const optionResolutionNeeded = isOption && (optionEvidenceBlocked || (optionChain.isFetched && !optionChainHasSelectableContract));
+  const riskResolutionNeeded = isOption && riskCeilingResult != null;
+  const riskCeilingCents = riskCeilingResult?.key === "planned_risk_per_play"
+    && optionMaxLossCents != null
+    && riskCeilingResult.observed != null
+    && riskCeilingResult.observed > 0
+    && riskCeilingResult.ceiling != null
+      ? Math.floor(optionMaxLossCents * riskCeilingResult.ceiling / riskCeilingResult.observed)
+      : null;
   const selectQuotedContract = (item: (typeof optionChainItems)[number]) => {
     setOptionStrikeDollars((item.contract.strikePriceCents / 100).toFixed(2));
     if (item.market?.askPriceCents != null) setOptionPremiumDollars((item.market.askPriceCents / 100).toFixed(2));
@@ -252,6 +270,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
     if (preflightEnabled) await preflight.refetch();
   };
   const preserveCashReason = `${candidate?.symbol ?? "This play"} preserved as cash — current option quote/liquidity evidence unavailable for the selected contract. No proposal or order was created.`;
+  const preserveRiskCashReason = `${candidate?.symbol ?? "This play"} preserved as cash — the selected option ticket exceeded the current paper-account risk ceiling. No proposal or order was created.`;
   const readiness = buildProposalReadiness({
     recipeReady: isOption ? true : recipeCanPrepare,
     unavailableReason: constructedPlay?.unavailableReasons[0],
@@ -355,6 +374,8 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
 
       {optionResolutionNeeded && <section aria-labelledby="quote-recovery-heading" className="rounded-lg border p-3" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 5%, var(--sh-surface))" }}><div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><h3 id="quote-recovery-heading" className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Live quote unavailable — choose the safe next step</h3><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Nothing has been proposed or sent. Retry the market data, choose another quoted contract above, or finish this decision at $0 risk.</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-3"><Button type="button" variant="outline" className="min-h-11" disabled={optionChain.isFetching || preflight.isFetching} onClick={() => void retryOptionEvidence()}>{optionChain.isFetching || preflight.isFetching ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}Retry live quote</Button><Button type="button" variant="outline" className="min-h-11" onClick={() => { contractPickerRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); }}>Choose another contract</Button><Button type="button" className="min-h-11" disabled={preserveCash.isPending} onClick={() => preserveCash.mutate({ runId, candidateId: candidate.id, decision: "skipped", reason: preserveCashReason })}>{preserveCash.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CircleSlash2 className="mr-1.5 h-3.5 w-3.5" />}Preserve cash · $0 risk</Button></div></section>}
 
+      {riskResolutionNeeded && <section aria-labelledby="risk-recovery-heading" className="rounded-lg border p-3" style={{ borderColor: "var(--sh-red)", background: "color-mix(in srgb, var(--sh-red) 4%, var(--sh-surface))" }}><div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-red)" }} /><div><h3 id="risk-recovery-heading" className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>This contract is over the current risk limit</h3><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Selected maximum loss <strong style={{ color: "var(--sh-text-primary)" }}>{money(optionMaxLossCents)}</strong>{riskCeilingCents != null ? <> · current per-play ceiling <strong style={{ color: "var(--sh-text-primary)" }}>{money(riskCeilingCents)}</strong></> : null}. Nothing has been proposed or sent.</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-2"><Button type="button" variant="outline" className="min-h-11" onClick={() => { contractPickerRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); }}>Choose a lower-premium contract</Button><Button type="button" className="min-h-11" disabled={preserveCash.isPending} onClick={() => preserveCash.mutate({ runId, candidateId: candidate.id, decision: "skipped", reason: preserveRiskCashReason })}>{preserveCash.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CircleSlash2 className="mr-1.5 h-3.5 w-3.5" />}Preserve cash · $0 risk</Button></div></section>}
+
       <details className="rounded-lg border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="cursor-pointer px-3 py-2 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Change review timing or size</summary><section className="grid gap-3 border-t p-3 sm:grid-cols-[1fr_auto] sm:items-end" style={{ borderColor: "var(--sh-border-1)" }}><label className="space-y-1.5 text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Review horizon<div className="grid grid-cols-2 gap-1 sm:grid-cols-5" role="radiogroup" aria-label="Planned holding horizon">{(["intraday", "overnight", "swing", "catalyst_window", "position"] as HoldingPeriod[]).map((period) => <button key={period} type="button" role="radio" aria-checked={holdingPeriod === period} onClick={() => setHoldingPeriod(period)} className="min-h-11 rounded-md border px-2 py-2 text-xs" style={{ borderColor: holdingPeriod === period ? "var(--sh-signal)" : "var(--sh-border-1)", background: holdingPeriod === period ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "transparent", color: "var(--sh-text-primary)" }}>{holdingPeriodLabel(period)}</button>)}</div></label>{!isOption && !isIntraday && <label className="block text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>Modeled paper size<input value={notionalDollars} onChange={(event) => setNotionalDollars(event.target.value)} type="number" min="1" inputMode="decimal" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm sm:w-36" style={{ borderColor: "var(--sh-border-1)" }} /></label>}</section></details>
 
       {!isOption && recipeCanPrepare && <div className="rounded-md px-3 py-2 text-xs leading-5" style={{ background: "color-mix(in srgb, var(--sh-signal) 7%, var(--sh-surface))", color: "var(--sh-fg-muted)" }}><Sparkles className="mr-1 inline h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} />Prefilled model: {constructedPlay?.side} · entry {money(constructedPlay?.entry?.priceCents)} · stop {money(constructedPlay?.stop?.priceCents)} · planned loss {money(constructedPlay?.plannedLossCents)}. Confirm against a real-time terminal.</div>}
@@ -373,7 +394,7 @@ export function PaperProposalForm({ runId, candidate, account, run, onReturnToBr
       </div></details>
 
       {(isOption ? optionTermsReady : recipeCanPrepare) && currentPreflightData?.wouldPass && <label className="block rounded-lg border p-3 text-xs font-medium" style={{ borderColor: "var(--sh-border-1)" }}>Type <span className="font-mono">PAPER</span> to acknowledge a paper-only proposal<input ref={acknowledgementRef} value={paperAcknowledgement} onChange={(event) => setPaperAcknowledgement(event.target.value)} autoComplete="off" placeholder="PAPER" className="mt-2 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>}
-      {!optionResolutionNeeded && <div className="sticky bottom-3 z-10 flex flex-col gap-2 rounded-lg border p-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="px-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Next guarded action: <strong style={{ color: "var(--sh-text-primary)" }}>{readiness.actionLabel}</strong></p><div className="flex gap-2">{readiness.action === "return_to_evidence" && <Button className="min-h-11" variant="outline" size="sm" onClick={onReturnToBrief}>Open evidence</Button>}<Button className="min-h-11 flex-1 sm:flex-none" size="sm" onClick={takeReadinessAction} disabled={create.isPending || constructed.isLoading || preflightBusy}>{create.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : readiness.action === "create_proposal" ? <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> : <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />}{readiness.actionLabel}</Button></div></div>}
+      {!optionResolutionNeeded && !riskResolutionNeeded && <div className="sticky bottom-3 z-10 flex flex-col gap-2 rounded-lg border p-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="px-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Next guarded action: <strong style={{ color: "var(--sh-text-primary)" }}>{readiness.actionLabel}</strong></p><div className="flex gap-2">{readiness.action === "return_to_evidence" && <Button className="min-h-11" variant="outline" size="sm" onClick={onReturnToBrief}>Open evidence</Button>}<Button className="min-h-11 flex-1 sm:flex-none" size="sm" onClick={takeReadinessAction} disabled={create.isPending || constructed.isLoading || preflightBusy}>{create.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : readiness.action === "create_proposal" ? <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> : <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />}{readiness.actionLabel}</Button></div></div>}
     </CardContent>
   </Card>;
 }
