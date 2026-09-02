@@ -19,8 +19,9 @@ import { GEMINI_FAST } from "../shared/models";
 import { normalizeCanonicalThesisRead } from "../shared/thesisReadContract";
 import { isCapitalThesisEligible } from "../shared/capitalThesisEligibility";
 import { manualThesisProjection } from "../shared/manualThesisProjection";
-import { detailsFromCanonicalFields, normalizeCapitalThesisDetails, buildCapitalThesisCompilationFields } from "../shared/capitalThesisStructure";
+import { detailsFromCanonicalRecord, normalizeCapitalThesisDetails, buildCapitalThesisCompilationFields } from "../shared/capitalThesisStructure";
 import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
+import { operatorDeclaredProjectionIfReady } from "./aperture/operatorDeclaredProjection";
 
 const capitalThesisDetailsSchema = z.object({
   belief: z.string().max(1000).optional(),
@@ -633,11 +634,15 @@ export const thesisRouter = router({
         .where(and(eq(capitalTheses.sourceCompilationId, source.id), eq(capitalTheses.userId, ctx.user.id)))
         .limit(1);
 
-      const declared = detailsFromCanonicalFields(source);
+      const operatorProjection = operatorDeclaredProjectionIfReady(source);
+      const declared = operatorProjection?.declared ?? detailsFromCanonicalRecord(source);
       let graph;
       let providerCompiled = true;
       if (isQualifiedPlayIsolatedUat(ctx)) {
         graph = illustrativeUatGraph(source.thesisText, source.name);
+      } else if (operatorProjection) {
+        graph = operatorProjection.graph;
+        providerCompiled = false;
       } else {
         try {
           graph = await compileThesis(source.thesisText);
