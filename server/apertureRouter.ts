@@ -1954,6 +1954,12 @@ export const apertureRouter = router({
         eq(apertureEvidenceReviews.userId, ctx.user.id),
         inArray(apertureEvidenceReviews.candidateId, candidateIds),
       )) : [];
+      const skippedDecisions = candidateIds.length ? await db!.select({ candidateId: aperturePlayDecisions.candidateId }).from(aperturePlayDecisions).where(and(
+        eq(aperturePlayDecisions.userId, ctx.user.id),
+        inArray(aperturePlayDecisions.candidateId, candidateIds),
+        eq(aperturePlayDecisions.decision, "skipped"),
+      )) : [];
+      const skippedCandidateIds = new Set(skippedDecisions.map((decision) => decision.candidateId));
       const activeOrderRows = candidateIds.length ? await db!.select({
         candidateId: brokerOrders.candidateId,
         status: brokerOrders.status,
@@ -1999,7 +2005,7 @@ export const apertureRouter = router({
             symbol: candidate.symbol,
             hasActiveOrder: activeCandidateIds.has(candidate.id),
             catalystDeadlineAt: run.catalystDeadlineAt,
-            paperStageDeclined: candidateReadiness.paperStageDeclined,
+            paperStageDeclined: candidateReadiness.paperStageDeclined || skippedCandidateIds.has(candidate.id),
             unreviewedChecks: candidateReadiness.unreviewedChecks.length,
             runFailed: run.status === "failed",
           });

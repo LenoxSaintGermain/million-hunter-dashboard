@@ -26,6 +26,13 @@ describe("Capital Aperture Play Desk contract", () => {
     expect(page).not.toContain(".useMutation(");
   });
 
+  it("removes recorded cash decisions from the choice lane", () => {
+    const router = readFileSync(resolve(process.cwd(), "server/apertureRouter.ts"), "utf8");
+
+    expect(router).toContain("const skippedCandidateIds = new Set");
+    expect(router).toContain("candidateReadiness.paperStageDeclined || skippedCandidateIds.has(candidate.id)");
+  });
+
   it("gives a skipped memo a safe continuation instead of a dead end", () => {
     const memo = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/MemoDrawer.tsx"), "utf8");
 
