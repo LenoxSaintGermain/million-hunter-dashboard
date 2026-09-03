@@ -297,7 +297,10 @@ function OrderQueue({ runId, focusCandidateId, ticketBuilderActive = false }: { 
 // ── Check whether thesis still holds ─────────────────────────────────────────
 
 function MonitoringPanel({ runId, candidate, thesisSummary }: { runId: number; candidate?: { id: number; symbol: string }; thesisSummary?: string | null }) {
-  const { data: checks, refetch } = trpc.aperture.monitor.list.useQuery({ runId });
+  const { data: checks, refetch } = trpc.aperture.monitor.list.useQuery(
+    { runId, candidateId: candidate?.id ?? -1 },
+    { enabled: candidate != null },
+  );
   const runCheck = trpc.aperture.monitor.run.useMutation({
     onSuccess: (results) => {
       const reviewCount = results.filter((result) => monitoringReviewState(result).needsReview).length;

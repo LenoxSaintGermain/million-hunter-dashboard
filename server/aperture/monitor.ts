@@ -197,13 +197,16 @@ export async function runMonitoringChecks(
   return results;
 }
 
-// ── Get recent checks for a run ───────────────────────────────────────────────
+// ── Get recent checks for one candidate ───────────────────────────────────────
 
-export async function getMonitoringChecks(runId: number): Promise<MonitoringCheck[]> {
+export async function getMonitoringChecks(runId: number, candidateId: number): Promise<MonitoringCheck[]> {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(monitoringChecks)
-    .where(eq(monitoringChecks.runId, runId))
+    .where(and(
+      eq(monitoringChecks.runId, runId),
+      eq(monitoringChecks.candidateId, candidateId),
+    ))
     .orderBy(desc(monitoringChecks.checkedAt));
 }
 

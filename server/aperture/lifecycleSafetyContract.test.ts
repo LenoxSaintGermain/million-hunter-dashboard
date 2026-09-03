@@ -41,14 +41,19 @@ describe("Capital Aperture lifecycle safety contracts", () => {
   it("preserves the selected candidate and refuses monitoring without open filled exposure", () => {
     const page = read("client/src/pages/aperture/ApertureExecute.tsx");
     const router = read("server/apertureRouter.ts");
+    const monitor = read("server/aperture/monitor.ts");
 
     expect(page).toContain('onProposalCreated={() => openLifecycle("orders")}');
     expect(page).toContain('lifecycleTab: "monitoring"');
     expect(page).toContain("<MonitoringPanel runId={runId} candidate={proposalCandidate}");
     expect(page).not.toContain("candidate={proposalCandidate ?? data?.candidates[0]}");
+    expect(page).toContain("{ runId, candidateId: candidate?.id ?? -1 }");
     expect(router).toContain("const netFilledQty = filledOrders.reduce");
     expect(router).toContain('eq(brokerOrders.status, "filled")');
     expect(router).toContain("No open filled paper exposure exists for this candidate");
+    expect(router).toContain('z.object({ runId: z.number(), candidateId: z.number() })');
+    expect(router).toContain("return getMonitoringChecks(input.runId, input.candidateId)");
+    expect(monitor).toContain("eq(monitoringChecks.candidateId, candidateId)");
   });
 
   it("refreshes a created proposal in place instead of navigating to the same URL", () => {

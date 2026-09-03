@@ -3677,13 +3677,21 @@ export const apertureRouter = router({
       }),
 
     list: capitalOperatorProcedure
-      .input(z.object({ runId: z.number() }))
+      .input(z.object({ runId: z.number(), candidateId: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
-        const [run] = await db!.select({ id: apertureRuns.id }).from(apertureRuns)
-          .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id))).limit(1);
-        if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
-        return getMonitoringChecks(input.runId);
+        const [owned] = await db!.select({ runId: apertureRuns.id, candidateId: apertureCandidates.id })
+          .from(apertureRuns)
+          .innerJoin(apertureCandidates, and(
+            eq(apertureCandidates.id, input.candidateId),
+            eq(apertureCandidates.runId, apertureRuns.id),
+          ))
+          .where(and(
+            eq(apertureRuns.id, input.runId),
+            eq(apertureRuns.userId, ctx.user.id),
+          )).limit(1);
+        if (!owned) throw new TRPCError({ code: "NOT_FOUND", message: "Monitored candidate not found" });
+        return getMonitoringChecks(input.runId, input.candidateId);
       }),
 
     flagged: capitalOperatorProcedure
