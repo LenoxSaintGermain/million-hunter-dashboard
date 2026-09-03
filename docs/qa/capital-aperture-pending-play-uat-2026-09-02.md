@@ -107,3 +107,47 @@
 - New broker orders created during repair UAT: 0.
 - Existing broker-order count before / after: 5 / 5.
 - No provider configuration, invitation, database migration, or real-money rail changed.
+
+## Remaining-play completion UAT — 2026-09-02 19:58–20:16 EDT
+
+- Final source commit: `f122c891e9f3cac22bb95810e11e049903d8274b`.
+- Final Cloud Build: `b838a313-ac1f-44fc-bce2-3f0d8d26d96f` — `SUCCESS`.
+- Final image digest: `sha256:a463b55ded8216b7ef320c5cf13997e2c7dc9cc8081c5d5e284398ae53408826`.
+- Final Cloud Run revision: `capital-aperture-00040-ccf`, explicitly routed to 100% of traffic.
+- Paper destination: `Alpaca Paper — AI Thesis`, external account `PA3X46OF7EKJ`.
+- Account snapshot refreshed at 2026-09-02 20:05:38 EDT: equity `$98,068`, cash `$59,482`, buying power `$344,839`. The product confirmed that the sync created or changed no order.
+
+### Completed decisions
+
+| Thesis | Run / candidate | Live evidence and refusal | Final disposition |
+| --- | --- | --- | --- |
+| CH Capital — AI Growth Watchlist Options | `510001 / 360001` · MRVL | Selected quoted `MRVL261120C00210000`: Nov. 20, 2026 `$210` call, bid `$21.60`, ask `$22.15`, 2.5% spread, volume 135, OI 839. Maximum premium loss `$2,215` exceeded the `$735` per-play ceiling; 30-day ADV remained unknown. The repaired refusal names underlying `MRVL`, not the OCC symbol. | Preserved as cash at `$0` risk. No proposal or order created. |
+| UAT — Football Season Regulatory Split (Defined-Risk Options) | `300001 / 180002` · MGM | Selected quoted `MGM261120C00040000`: Nov. 20, 2026 `$40` call, bid `$3.30`, ask `$4.30`, 26.3% spread, volume 38, OI 3, maximum premium loss `$430`. Preflight failed closed because 30-day ADV was unknown. The repaired hard-block card exposed both `Choose another play` and `Preserve cash · $0 risk` in place. | Preserved as cash at `$0` risk. No proposal or order created. |
+| UAT — Football Season Regulatory Split (Defined-Risk Options) | `300001 / 180001` · CZR | No contract was selectable. The nearest `$30` call showed bid `$0.01`, ask `$2.53`, 198.4% spread, volume 82, OI 121. The ticket exposed retry, another-contract, and cash choices on the same screen. | Preserved as cash at `$0` risk. No proposal or order created. |
+| UAT — Football Season Regulatory Split (Defined-Risk Options) | `270001 / 150001` · CZR | No contract was selectable; the same nearest contract showed a 198.4% spread. The ticket failed closed and kept the resolution on the ticket. | Preserved as cash at `$0` risk. No proposal or order created. |
+| UAT — Football Season Regulatory Split (Defined-Risk Options) | `240001 / 120001` · CZR | No contract was selectable; the live chain remained unusable rather than being inferred or manually overridden. | Preserved as cash at `$0` risk. No proposal or order created. |
+
+### Repairs proven in production
+
+1. Commit `3981c543be8566968f3ef0107b37409bb1d0fa48` changed option-liquidity refusal copy to identify the underlying and added an inline `$0`-risk resolution for generic hard option blocks.
+2. Commit `f122c891e9f3cac22bb95810e11e049903d8274b` made recorded skipped/cash decisions retire from the Play Desk choice lane.
+3. MRVL exposed the corrected underlying label and its measured risk-ceiling choice. MGM exposed the new inline hard-block actions. Both CZR paths retained the quote-unavailable recovery actions.
+4. Each completed cash decision produced a visible success receipt. The choice queue moved from 4 run cards / 5 ready candidates to 0. Cash state is visible in the expanded research backlog.
+
+### Final safety and queue receipt
+
+- Choice queue before / after: 4 run cards representing 5 candidates / 0.
+- Approve-or-send queue before / after: 0 / 0.
+- Existing broker-order and in-motion count before / after: 5 / 5.
+- New proposals: 0.
+- Approvals: 0.
+- Submissions: 0.
+- New broker orders: 0.
+- Existing in-motion instruments remained `MGM261120C00040000`, `DKNG261120P00020000`, IWM, `DKNG261120C00025000`, and `NU261120C00014000`.
+- No approve or submit action was reached. A fresh action-time confirmation remains required before any future approval or paper-broker submission.
+
+### Validation
+
+- First repair suite: 136 focused tests passed; TypeScript check and production build passed.
+- Retirement repair suite: 28 focused tests passed; TypeScript check and production build passed.
+- Browser UAT used the authenticated owner session against the public Firebase URL after each final revision was promoted.
