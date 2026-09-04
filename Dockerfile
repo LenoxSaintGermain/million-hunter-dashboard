@@ -33,6 +33,14 @@ ENV VITE_FIREBASE_AUTH_DOMAIN=$VITE_FIREBASE_AUTH_DOMAIN
 ENV VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID
 ENV VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
 
+# A production image without these public Firebase identifiers can serve the
+# app but cannot establish any new operator session. Refuse that broken image
+# at build time instead of discovering it after deployment.
+RUN test -n "$VITE_FIREBASE_API_KEY" \
+  && test -n "$VITE_FIREBASE_AUTH_DOMAIN" \
+  && test -n "$VITE_FIREBASE_PROJECT_ID" \
+  && test -n "$VITE_FIREBASE_APP_ID"
+
 # Build Vite frontend + bundle Express server
 RUN pnpm build
 

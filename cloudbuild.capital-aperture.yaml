@@ -1,4 +1,25 @@
 steps:
+  - name: bash:5.2
+    entrypoint: bash
+    env:
+      - VITE_FIREBASE_API_KEY=${_VITE_FIREBASE_API_KEY}
+      - VITE_FIREBASE_AUTH_DOMAIN=${_VITE_FIREBASE_AUTH_DOMAIN}
+      - VITE_FIREBASE_PROJECT_ID=${_VITE_FIREBASE_PROJECT_ID}
+      - VITE_FIREBASE_APP_ID=${_VITE_FIREBASE_APP_ID}
+    args:
+      - -ceu
+      - |
+        for name in \
+          VITE_FIREBASE_API_KEY \
+          VITE_FIREBASE_AUTH_DOMAIN \
+          VITE_FIREBASE_PROJECT_ID \
+          VITE_FIREBASE_APP_ID
+        do
+          if [[ -z "${!name:-}" ]]; then
+            echo "Required Firebase build input is missing: ${name}" >&2
+            exit 1
+          fi
+        done
   - name: gcr.io/cloud-builders/docker
     args:
       - build
