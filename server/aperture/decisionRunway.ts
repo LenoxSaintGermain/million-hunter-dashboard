@@ -18,6 +18,8 @@ export type DecisionAuthorizationSnapshot = {
   effectiveBranch: DecisionBranch;
   accountId: number | null;
   researchRunId: number | null;
+  /** Effective absolute loss limit persisted on the authoritative mission revision. */
+  maxPlannedLossCents: number | null;
 };
 
 export class DecisionRunwayBlockedError extends Error {
@@ -107,6 +109,7 @@ export async function authorizeDecisionAction(input: {
         effectiveBranch: "cash",
         accountId: decisionRun.accountId,
         researchRunId: decisionRun.researchRunId,
+        maxPlannedLossCents: null,
       };
     }
     const [revision] = await db.select().from(apertureDecisionRevisions).where(and(
@@ -122,6 +125,7 @@ export async function authorizeDecisionAction(input: {
           effectiveBranch: "cash",
           accountId: decisionRun.accountId,
           researchRunId: decisionRun.researchRunId,
+          maxPlannedLossCents: null,
         };
       }
       throw new DecisionRunwayBlockedError(
@@ -142,6 +146,7 @@ export async function authorizeDecisionAction(input: {
       effectiveBranch: revision.effectiveBranch,
       accountId: decisionRun.accountId,
       researchRunId: decisionRun.researchRunId,
+      maxPlannedLossCents: revision.maxPlannedLossCents,
     };
     const block = decisionActionBlock(snapshot, input.action, input.intent ?? "unknown", {
       runId: input.runId,
@@ -171,6 +176,7 @@ export async function authorizeDecisionAction(input: {
     effectiveBranch: legacy.branch,
     accountId: legacy.accountId,
     researchRunId: legacy.runId,
+    maxPlannedLossCents: null,
   };
   const block = decisionActionBlock(snapshot, input.action, input.intent ?? "unknown");
   if (block) throw new DecisionRunwayBlockedError(block);

@@ -24,4 +24,11 @@ describe("Capital Aperture client honesty contract", () => {
     expect(rail).toContain('role="list"');
     expect(rail).toContain('role="listitem"');
   });
+
+  it("shows option maximum loss and mandate fit in each live-chain row", () => {
+    const source = read("client/src/components/aperture/PaperProposalForm.tsx");
+    expect(source).toContain("Maximum loss");
+    expect(source).toContain("Fits limit");
+    expect(source).toContain("Over limit");
+  });
 });

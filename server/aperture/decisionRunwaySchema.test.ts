@@ -33,6 +33,8 @@ describe("Decision Runway authoritative schema", () => {
     expect(orderFlow).toContain("queuePaperOutcome");
     expect(orderFlow).toContain('for("update")');
     expect(orderFlow).toContain("lockCurrentDecisionRevision");
+    expect(orderFlow).toContain("decisionAuthorization?.maxPlannedLossCents");
+    expect(orderFlow).toContain("resolveEffectiveRiskCeilingPct");
     expect(router).toContain('eq(brokerOrders.status, "submitted")');
     expect(router).toContain("isNull(brokerOrders.brokerOrderId)");
     expect(orderFlow).toContain("getOrderByClientOrderId(order.clientOrderId)");

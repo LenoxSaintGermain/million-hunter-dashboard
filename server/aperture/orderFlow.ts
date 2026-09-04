@@ -55,6 +55,7 @@ import {
   type DecisionAuthorizationSnapshot,
   type PaperDecisionAction,
 } from "./decisionRunway";
+import { resolveEffectiveRiskCeilingPct } from "../../shared/effectiveRiskLimit";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -209,7 +210,7 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
   const portfolioContextAccount = contextRows[0];
   if (!portfolioContextAccount) throw new Error("portfolio context account not found");
 
-  const mandate: Mandate = effectiveMandate(CURRENT_MANDATE, input.portfolioRules);
+  const baseMandate: Mandate = effectiveMandate(CURRENT_MANDATE, input.portfolioRules);
   const session = marketSession(now);
   const accountState = await loadOrderAccountState({
     db, account: portfolioContextAccount, symbol, exposureSymbol, runId: input.runId, userId: input.userId, now, excludeOrderId: input.excludeOrderId,
@@ -236,6 +237,16 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
     accountId: portfolioContextAccount.id,
     intent: resolvedIntent.intent,
   });
+  const mandate: Mandate = resolvedIntent.intent === "close"
+    ? baseMandate
+    : {
+        ...baseMandate,
+        maxPlannedRiskPctPerPlay: resolveEffectiveRiskCeilingPct(
+          baseMandate.maxPlannedRiskPctPerPlay,
+          portfolioContextAccount.equityValueCents,
+          decisionAuthorization?.maxPlannedLossCents,
+        ),
+      };
 
   const gateEvaluation = evaluateOrderGates({
     input: {

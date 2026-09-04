@@ -16,6 +16,7 @@ const eligible: DecisionAuthorizationSnapshot = {
   effectiveBranch: "eligible",
   accountId: 4,
   researchRunId: 22,
+  maxPlannedLossCents: 50_000,
 };
 
 describe("Decision Runway authorization", () => {
