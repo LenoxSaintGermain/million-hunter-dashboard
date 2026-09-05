@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { ArrowRight, ChevronDown, FileCheck2, Loader2, Pencil, Save, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolatedUatIdentity";
 import { isCapitalThesisEligible } from "@shared/capitalThesisEligibility";
 import { canonicalThesisLabel } from "@shared/canonicalThesisLabel";
+import type { ThesisSaveReceipt } from "@shared/thesisSaveReceipt";
 
 type Purpose = "capital" | "acquisition" | "property";
 type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
@@ -37,6 +39,7 @@ export function CapitalThesisWorkspace() {
   const [showMore, setShowMore] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [missionError, setMissionError] = useState<string | null>(null);
+  const [saveReceipt, setSaveReceipt] = useState<ThesisSaveReceipt | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftText, setDraftText] = useState(STARTER);
   const [detail, setDetail] = useState(EMPTY_DETAIL);
@@ -71,9 +74,10 @@ export function CapitalThesisWorkspace() {
   }, [selected?.id]);
 
   const createCapital = trpc.thesis.createCapital.useMutation({
-    onSuccess: async ({ compilationId }) => {
+    onSuccess: async ({ compilationId, persistedName, nameMatchesRequest }) => {
       await utils.thesis.list.invalidate();
       setSelectedId(compilationId);
+      setSaveReceipt({ compilationId, persistedName, nameMatchesRequest });
       setCreating(false);
       setEditing(false);
     },
@@ -94,6 +98,7 @@ export function CapitalThesisWorkspace() {
   const createInline = async (openMission = false) => {
     if (draftText.trim().length < 20) return;
     const result = await createCapital.mutateAsync({ thesisText: detailedThesisText(), name: draftName.trim() || undefined, details: { ...detail } });
+    toast.success(`Saved exactly as “${result.persistedName}”`, { description: openMission ? "Opening Capital Mission." : `Canonical thesis #${result.compilationId}` });
     if (openMission) await useInMissionFor(result.compilationId);
   };
   const useInMissionFor = async (compilationId: number) => {
@@ -166,6 +171,8 @@ export function CapitalThesisWorkspace() {
           }} aria-pressed={purpose === item.id} className="min-h-10 rounded px-2 text-left text-xs font-semibold transition-colors" style={purpose === item.id ? { background: "var(--sh-paper)", color: "var(--sh-text-primary)", boxShadow: "0 1px 2px rgb(0 0 0 / .08)" } : { color: "var(--sh-fg-muted)" }}>{item.label}</button>)}
         </div>
       </section>
+
+      {saveReceipt && <section role="status" className="flex items-start gap-3 rounded-lg border p-3" style={{ borderColor: "var(--sh-emerald)", background: "var(--sh-surface-2)" }}><FileCheck2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div className="min-w-0"><p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Saved exactly as</p><p className="mt-1 break-words font-serif text-lg" style={{ color: "var(--sh-text-primary)" }}>{saveReceipt.persistedName}</p><p className="mt-1 font-mono text-[10px]" style={{ color: "var(--sh-fg-muted)" }}>Canonical thesis #{saveReceipt.compilationId}</p></div></section>}
 
       {purpose !== "capital" ? (
         <section className="rounded-lg border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>

@@ -22,6 +22,7 @@ import { manualThesisProjection } from "../shared/manualThesisProjection";
 import { detailsFromCanonicalRecord, normalizeCapitalThesisDetails, buildCapitalThesisCompilationFields } from "../shared/capitalThesisStructure";
 import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
 import { operatorDeclaredProjectionIfReady } from "./aperture/operatorDeclaredProjection";
+import { buildThesisSaveReceipt, DEFAULT_CAPITAL_THESIS_NAME } from "../shared/thesisSaveReceipt";
 
 const capitalThesisDetailsSchema = z.object({
   belief: z.string().max(1000).optional(),
@@ -516,12 +517,13 @@ export const thesisRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const requestedName = input.name?.trim() || DEFAULT_CAPITAL_THESIS_NAME;
       const details = normalizeCapitalThesisDetails(input.details);
       const fields = buildCapitalThesisCompilationFields(details);
       const [result] = await db.insert(thesisCompilations).values({
         userId: ctx.user.id,
         thesisText: input.thesisText,
-        name: input.name ?? "Capital / Trade Thesis",
+        name: requestedName,
         templateUsed: "capital_trade",
         compiledFilters: fields.compiledFilters,
         scoringWeights: [],
@@ -531,8 +533,16 @@ export const thesisRouter = router({
         status: "review",
       });
       const compilationId = Number((result as any).insertId);
+      const [saved] = await db.select({ id: thesisCompilations.id, name: thesisCompilations.name })
+        .from(thesisCompilations)
+        .where(and(eq(thesisCompilations.id, compilationId), eq(thesisCompilations.userId, ctx.user.id)))
+        .limit(1);
+      const receipt = buildThesisSaveReceipt({ compilationId, requestedName, persistedName: saved?.name });
+      if (!saved || !receipt.nameMatchesRequest) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The thesis was not saved under the complete name. Review the saved record before continuing." });
+      }
       await db.update(users).set({ activeCapitalThesisId: compilationId }).where(eq(users.id, ctx.user.id));
-      return { compilationId };
+      return receipt;
     }),
 
   /** Operator-owned thesis sharing. A share grants visibility/use, never edit or delete rights. */

@@ -30,5 +30,19 @@ describe("Capital Aperture client honesty contract", () => {
     expect(source).toContain("Maximum loss");
     expect(source).toContain("Fits limit");
     expect(source).toContain("Over limit");
+    expect(source).toContain("over by");
+    expect(source).toContain("Available headroom");
+  });
+
+  it("explains the account mandate with its percentage and synced equity", () => {
+    const source = read("client/src/components/aperture/DecisionVisualLanguage.tsx");
+    expect(source).toContain("of synced equity");
+    expect(source).toContain("Change the account mandate through governance");
+  });
+
+  it("shows the exact persisted thesis name after saving", () => {
+    const source = read("client/src/components/aperture/CapitalThesisWorkspace.tsx");
+    expect(source).toContain("Saved exactly as");
+    expect(source).toContain("persistedName");
   });
 });
