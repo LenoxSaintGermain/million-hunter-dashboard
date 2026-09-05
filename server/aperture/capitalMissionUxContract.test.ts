@@ -88,6 +88,7 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(runway).toContain('id="mission-math"');
     expect(runway).toContain("onDiagnosticSelect");
     expect(runway).toContain('placeholder="Enter amount"');
+    expect(runway).toContain("disabled={!currentBindingMatches || authoritativeLatest?.runId == null}");
   });
 
   it("lets suggested missions explicitly apply their parameters", () => {
