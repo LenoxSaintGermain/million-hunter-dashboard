@@ -108,7 +108,7 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain("held for the next eligible regular session");
     expect(execute).not.toContain("If the options session is closed");
     expect(execute).toContain("Accepted / queued at paper broker");
-    expect(desk).toContain("Accepted / queued at paper broker");
+    expect(desk).toContain("Queued at paper broker");
   });
 
   it("replaces a duplicate ticket builder with the existing paper-order receipt", () => {

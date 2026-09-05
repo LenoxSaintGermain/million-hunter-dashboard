@@ -52,7 +52,7 @@ describe("Capital Aperture Play Desk contract", () => {
 
   it("opens decision-ready work at the play instead of forcing another evidence loop", () => {
     const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
-    const decisionReadySection = page.slice(page.indexOf("!isLoading && decisionReady.length"), page.indexOf("!isLoading && (inMotionOrders.length"));
+    const decisionReadySection = page.slice(page.indexOf('id="play-desk-choose"'), page.indexOf('id="play-desk-monitor"'));
 
     expect(page).toContain('"Choose play"');
     expect(decisionReadySection).toContain("navigate(deferred ?");
@@ -95,5 +95,40 @@ describe("Capital Aperture Play Desk contract", () => {
     expect(page).toContain("Show research backlog");
     expect(page).not.toContain("Nothing in this lane.");
     expect(shell).toContain('compactOnly={location === "/aperture/plays" || location.startsWith("/aperture/run/")}');
+  });
+
+  it("turns stage metrics into accessible filters and jump targets", () => {
+    const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
+
+    expect(page).toContain('type StageFilter = "all" | "choose" | "approve" | "monitor"');
+    expect(page).toContain('aria-pressed={active}');
+    expect(page).toContain('id="play-desk-choose"');
+    expect(page).toContain('id="play-desk-approve"');
+    expect(page).toContain('id="play-desk-monitor"');
+    expect(page).toContain("Show all stages");
+  });
+
+  it("uses human option labels and keeps OCC symbols secondary", () => {
+    const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
+
+    expect(page).toContain("paperInstrumentDisplayLabel");
+    expect(page).toContain("Raw contract");
+    expect(page).toContain("View queued order");
+    expect(page).toContain("Monitor position");
+  });
+
+  it("applies the instrument filter to plays and scheduled order reviews", () => {
+    const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
+
+    expect(page).toContain("visiblePendingOutcomes");
+    expect(page).toContain("Filter applies to plays and scheduled order reviews");
+  });
+
+  it("identifies the dominant holding and exact headroom in the compact rail", () => {
+    const rail = readFileSync(resolve(process.cwd(), "client/src/components/aperture/CapitalCockpitRail.tsx"), "utf8");
+
+    expect(rail).toContain("bindingSubject");
+    expect(rail).toContain("Remaining headroom");
+    expect(rail).toContain("must fall below");
   });
 });

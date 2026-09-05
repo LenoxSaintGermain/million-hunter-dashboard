@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildOccOptionSymbol, nextStandardMonthlyOptionExpiration, optionPremiumAtRiskCents, parseOccOptionSymbol, validatePaperInstrument } from "./paperInstrument";
+import { buildOccOptionSymbol, nextStandardMonthlyOptionExpiration, optionPremiumAtRiskCents, paperInstrumentDisplayLabel, parseOccOptionSymbol, validatePaperInstrument } from "./paperInstrument";
 
 describe("paper option contract identity", () => {
   it("defaults tickets to the next standard monthly expiration", () => {
@@ -12,6 +12,11 @@ describe("paper option contract identity", () => {
     const symbol = buildOccOptionSymbol({ underlyingSymbol: "AAPL", expirationDate: "2027-01-15", optionType: "call", strikePriceCents: 25000 });
     expect(symbol).toBe("AAPL270115C00250000");
     expect(parseOccOptionSymbol(symbol!)).toMatchObject({ instrumentType: "long_call", underlyingSymbol: "AAPL", expirationDate: "2027-01-15", strikePriceCents: 25000, contractMultiplier: 100 });
+  });
+
+  it("formats an OCC contract for instant operator scanning", () => {
+    expect(paperInstrumentDisplayLabel({ instrumentType: "long_call", symbol: "MGM261120C00040000" })).toBe("MGM · $40 Call · Nov 20, 2026");
+    expect(paperInstrumentDisplayLabel({ instrumentType: "long_put", symbol: "CSCO261120P00110000" })).toBe("CSCO · $110 Put · Nov 20, 2026");
   });
 
   it("refuses mismatched or stale declared terms", () => {

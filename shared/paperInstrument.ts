@@ -154,3 +154,20 @@ export function paperInstrumentLabel(input: Pick<PaperInstrumentInput, "instrume
   const strike = input.optionStrikePriceCents == null ? "—" : `$${(input.optionStrikePriceCents / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   return `${normalizeUnderlyingSymbol(input.underlyingSymbol ?? input.symbol)} ${input.optionExpirationDate ?? "—"} ${strike} ${right}`;
 }
+
+/** Human-first contract identity for decision surfaces; raw OCC stays secondary. */
+export function paperInstrumentDisplayLabel(input: Pick<PaperInstrumentInput, "instrumentType" | "symbol" | "underlyingSymbol" | "optionExpirationDate" | "optionStrikePriceCents">): string {
+  if (!isOptionInstrument(input.instrumentType)) return `${normalizeUnderlyingSymbol(input.symbol)} shares`;
+  const parsed = parseOccOptionSymbol(input.symbol);
+  const underlying = normalizeUnderlyingSymbol(input.underlyingSymbol ?? parsed?.underlyingSymbol ?? input.symbol);
+  const expirationDate = input.optionExpirationDate ?? parsed?.expirationDate ?? null;
+  const strikePriceCents = input.optionStrikePriceCents ?? parsed?.strikePriceCents ?? null;
+  const right = input.instrumentType === "long_call" ? "Call" : "Put";
+  const strike = strikePriceCents == null
+    ? "Strike not recorded"
+    : `$${(strikePriceCents / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  const expiration = expirationDate == null
+    ? "Expiration not recorded"
+    : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${expirationDate}T00:00:00Z`));
+  return `${underlying} · ${strike} ${right} · ${expiration}`;
+}
