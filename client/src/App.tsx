@@ -55,6 +55,7 @@ import CsvImport from "./pages/CsvImport";
 import SourcingSchedules from "./pages/SourcingSchedules";
 import OffMarketDiscovery from "./pages/OffMarketDiscovery";
 import ApertureHome from "./pages/aperture/ApertureHome";
+import ApertureMission from "./pages/aperture/ApertureMission";
 import ThesisGraphEditor from "./pages/aperture/ThesisGraphEditor";
 import ApertureTheses from "./pages/aperture/ApertureTheses";
 import ApertureDisclosure from "./pages/aperture/ApertureDisclosure";
@@ -263,7 +264,8 @@ function Router() {
         <Route path="/wingate/asset/:id">{() => <ProtectedRoute component={AssetDossier} />}</Route>
 
         {/* ── Capital Aperture — liquid securities engine ── */}
-        <Route path="/aperture/decision/:decisionRunId/revision/:revisionId">{() => <ApertureRoute component={ApertureHome} />}</Route>
+        <Route path="/aperture/decision/:decisionRunId/revision/:revisionId">{() => <ApertureRoute component={ApertureMission} />}</Route>
+        <Route path="/aperture/mission">{() => <ApertureRoute component={ApertureMission} />}</Route>
         <Route path="/aperture">{() => <ApertureRoute component={ApertureHome} />}</Route>
         <Route path="/aperture/theses">{() => <ApertureRoute component={ApertureTheses} />}</Route>
         <Route path="/aperture/disclosures">{() => <ApertureRoute component={ApertureDisclosure} />}</Route>

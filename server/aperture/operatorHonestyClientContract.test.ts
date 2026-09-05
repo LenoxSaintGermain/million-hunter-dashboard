@@ -17,10 +17,12 @@ describe("Capital Aperture client honesty contract", () => {
     expect(source).not.toContain('<BasisMark basis={catalystLabel ? "measured" : "unknown"} label="Catalyst" />');
   });
 
-  it("does not expose static Argument Rail nodes as buttons", () => {
+  it("exposes Argument Rail nodes as diagnostic buttons with concise next actions", () => {
     const source = read("client/src/components/aperture/DecisionVisualLanguage.tsx");
     const rail = source.slice(source.indexOf("export function ArgumentRail"), source.indexOf("export function RiskBudgetBar"));
-    expect(rail).not.toContain("<button");
+    expect(rail).toContain("<button");
+    expect(rail).toContain("onDiagnosticSelect");
+    expect(rail).toContain("What to do next");
     expect(rail).toContain('role="list"');
     expect(rail).toContain('role="listitem"');
   });

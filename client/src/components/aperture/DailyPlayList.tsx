@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, ChevronDown, CircleSlash2, FileSearch, GitCompareArrows, Loader2 } from "lucide-react";
+import { ArrowRight, ChevronDown, CircleSlash2, FileSearch, GitCompareArrows, Loader2, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
@@ -25,7 +25,8 @@ function IntradayTrigger({ runId, candidateId, holdingPeriod }: { runId: number;
   return <div><p style={{ color: "var(--sh-fg-muted)" }}>VWAP trigger · 15m hold {data.triggerSide}</p><p className="mt-1 font-semibold" style={{ color: tone }}>{label} · {data.playSide} recipe</p><p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.basis}</p>{range && <p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>Opening range: {range.complete ? `${range.widthPct?.toFixed(2) ?? "not measured"}% wide` : range.unavailableReason ?? "still forming"} · {range.feed.toUpperCase()} tape.</p>}</div>;
 }
 
-export function DailyPlayList({ onNewResearch, onOpenRun }: {
+export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
+  onNewMission: () => void;
   onNewResearch: () => void;
   onOpenRun: (runId: number, candidateId: number, view?: string) => void;
 }) {
@@ -113,7 +114,7 @@ export function DailyPlayList({ onNewResearch, onOpenRun }: {
         <div className="flex items-center gap-1"><h1 className="mt-1 font-serif text-3xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Today’s plays</h1><ContextHelp title="What happens here?" what="Choose a researched setup, move an existing ticket forward, or monitor a play already in motion." next="The account-mode label below tells you whether an approved submission goes to paper or live execution." align="start" /></div>
         <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Choose one setup, record a skip, or preserve cash. Open details only when you need to validate.</p>
       </div>
-      <div className="flex flex-wrap gap-2"><Button className="min-h-11" variant="outline" disabled={!hasTodayPlay || captureComparison.isPending} title={hasTodayPlay ? "Capture today's eligible paper plays before choosing a disposition" : "Available on the declared ET decision date"} onClick={() => captureComparison.mutate({ windowKey: "operator_decision" })}>{captureComparison.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitCompareArrows className="mr-2 h-4 w-4" />}Start today’s comparison</Button><Button className="min-h-11" variant="outline" onClick={onNewResearch}><FileSearch className="mr-2 h-4 w-4" />New research brief</Button></div>
+      <div className="flex flex-wrap gap-2"><Button className="min-h-11" onClick={onNewMission}><Target className="mr-2 h-4 w-4" />New Capital Mission</Button><Button className="min-h-11" variant="outline" disabled={!hasTodayPlay || captureComparison.isPending} title={hasTodayPlay ? "Capture today's eligible paper plays before choosing a disposition" : "Available on the declared ET decision date"} onClick={() => captureComparison.mutate({ windowKey: "operator_decision" })}>{captureComparison.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitCompareArrows className="mr-2 h-4 w-4" />}Compare today</Button><Button className="min-h-11" variant="ghost" onClick={onNewResearch}><FileSearch className="mr-2 h-4 w-4" />Research brief</Button></div>
     </header>
 
     <div className="grid gap-px overflow-hidden rounded-xl border sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
