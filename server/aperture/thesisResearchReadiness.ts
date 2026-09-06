@@ -23,7 +23,10 @@ export function evaluateThesisResearchReadiness(
   if ((graph.evidenceRequirements ?? []).length === 0 && graph.seek.length === 0) missing.push("evidence requirement");
   if (!(run.invalidationRule?.trim() || (graph.invalidationConditions ?? []).length)) missing.push("invalidation condition");
   if (!(run.holdingPeriod || graph.horizons.length)) missing.push("holding horizon");
-  if (!run.instrumentPreference || run.instrumentPreference === "either") missing.push("instrument preference");
+  // `either` is an explicit operator choice: research may compare shares and
+  // defined-risk options, while the exact expression is selected at the ticket.
+  // Only an absent value means the mission has not declared its instrument scope.
+  if (!run.instrumentPreference) missing.push("instrument preference");
   if (graph.instrumentPreference === "options" && run.instrumentPreference === "shares") {
     incompatibilities.push("The thesis requires options, but this run is configured for shares.");
   }

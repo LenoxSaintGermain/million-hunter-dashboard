@@ -41,6 +41,14 @@ describe("Capital thesis research readiness", () => {
     })).toMatchObject({ ready: true, declaredSymbols: ["DKNG"] });
   });
 
+  it("accepts either when the operator delegates instrument selection to eligibility", () => {
+    expect(evaluateThesisResearchReadiness(graph({ instrumentPreference: "either" }), {
+      holdingPeriod: "position",
+      instrumentPreference: "either",
+      invalidationRule: "Invalidate if the mechanism cannot be verified.",
+    })).toMatchObject({ ready: true, missing: [], declaredSymbols: ["DKNG"] });
+  });
+
   it("fails closed when a run silently changes an options thesis into shares", () => {
     const result = evaluateThesisResearchReadiness(graph(), {
       holdingPeriod: "position",
