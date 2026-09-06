@@ -55,6 +55,8 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(form).toContain("optionResolutionNeeded");
     expect(form).toContain("aperture.play.decide.useMutation");
     expect(form).toContain("No proposal or order was created.");
+    expect(form).toContain("ticketEntryRef");
+    expect(form).toContain("scrollIntoView");
   });
 
   it("formats ticket deadlines as local wall-clock values for datetime-local inputs", () => {

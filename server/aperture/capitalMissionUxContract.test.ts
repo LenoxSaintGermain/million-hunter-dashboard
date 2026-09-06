@@ -88,7 +88,17 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(runway).toContain('id="mission-math"');
     expect(runway).toContain("onDiagnosticSelect");
     expect(runway).toContain('placeholder="Enter amount"');
-    expect(runway).toContain("disabled={!currentBindingMatches || authoritativeLatest?.runId == null}");
+    expect(runway).toContain('const canOpenSlate = currentBindingMatches && authoritativeLatest?.runId != null && (latestBranch === "research" || latestBranch === "eligible");');
+    expect(runway).toContain("disabled={!canOpenSlate}");
+  });
+
+  it("fails closed on deep links when the current mission revision no longer authorizes research", () => {
+    const board = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/CandidateBoard.tsx"), "utf8");
+    const execute = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/ApertureExecute.tsx"), "utf8");
+
+    expect(router).toContain("decisionAuthority:");
+    expect(board).toContain("<DecisionStepLock authority={data.decisionAuthority}");
+    expect(execute).toContain("<DecisionStepLock authority={data.decisionAuthority}");
   });
 
   it("lets suggested missions explicitly apply their parameters", () => {

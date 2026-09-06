@@ -30,6 +30,7 @@ import {
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { PaperProposalForm } from "@/components/aperture/PaperProposalForm";
+import { DecisionStepLock, decisionAuthorityAllowsDownstream } from "@/components/aperture/DecisionStepLock";
 import { format, formatDistanceToNow } from "date-fns";
 import { normalizeStringList } from "@shared/stringList";
 import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
@@ -879,6 +880,9 @@ export default function ApertureExecute() {
 
   const { data } = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
   const { data: runOrders } = trpc.aperture.order.list.useQuery({ runId }, { enabled: !!runId });
+  if (data?.decisionAuthority && !decisionAuthorityAllowsDownstream(data.decisionAuthority)) {
+    return <DashboardLayout><DecisionStepLock authority={data.decisionAuthority} step="Ticket" onOpenReceipt={() => navigate(`/aperture/decision/${data.decisionAuthority!.decisionRunId}/revision/${data.decisionAuthority!.revisionId}`)} /></DashboardLayout>;
+  }
   const run = data?.run;
   const candidateId = Number(new URLSearchParams(window.location.search).get("candidate"));
   const proposalCandidate = Number.isFinite(candidateId) && candidateId > 0 ? data?.candidates.find((candidate) => candidate.id === candidateId) : undefined;

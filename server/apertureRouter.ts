@@ -2029,6 +2029,21 @@ export const apertureRouter = router({
           .where(and(eq(apertureRuns.id, input.id), eq(apertureRuns.userId, ctx.user.id)))
           .limit(1);
         if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+        const [decisionAuthority] = await db!.select({
+          decisionRunId: apertureDecisionRuns.id,
+          revisionId: apertureDecisionRevisions.id,
+          branch: apertureDecisionRevisions.effectiveBranch,
+          blocker: apertureDecisionRevisions.blocker,
+        }).from(apertureDecisionRuns)
+          .innerJoin(apertureDecisionRevisions, and(
+            eq(apertureDecisionRevisions.id, apertureDecisionRuns.currentRevisionId),
+            eq(apertureDecisionRevisions.decisionRunId, apertureDecisionRuns.id),
+          ))
+          .where(and(
+            eq(apertureDecisionRuns.userId, ctx.user.id),
+            eq(apertureDecisionRuns.researchRunId, run.id),
+          ))
+          .limit(1);
         const candidateRows = await db!.select().from(apertureCandidates)
           .where(eq(apertureCandidates.runId, input.id))
           .orderBy(desc(apertureCandidates.compositeScore));
@@ -2079,6 +2094,7 @@ export const apertureRouter = router({
         });
         return {
           run,
+          decisionAuthority: decisionAuthority ?? null,
           stale: isRunStale(run),
           candidates,
           strategies,
@@ -2603,6 +2619,12 @@ export const apertureRouter = router({
               unavailableReasons: ["Current tape and live pricing are intentionally unavailable in this isolated fixture."],
               assumptions: ["Named values are modeled for a UAT review path only.", "No return, fill, or current-price outcome is represented."],
             },
+            marketContext: {
+              session: "unknown" as const,
+              nextRegularSessionOpenAt: null,
+              referencePriceCents: null,
+              referenceAsOf: null,
+            },
             disclosure: "Illustrative UAT fixture — not current market data. This paper-review surface cannot create, approve, or submit an order.",
           };
         }
@@ -2614,6 +2636,7 @@ export const apertureRouter = router({
             ?? accounts.find((item) => item.isPaper)
             ?? null;
         const now = Date.now();
+        const currentMarketSession = marketSession(now);
         const [decisionAuthority] = await db!.select({ revision: apertureDecisionRevisions })
           .from(apertureDecisionRuns)
           .innerJoin(apertureDecisionRevisions, and(
@@ -2688,6 +2711,12 @@ export const apertureRouter = router({
             ...play,
             assumptions: sideAssumption ? [sideAssumption, ...play.assumptions] : play.assumptions,
             unavailableReasons: !queueAtOpenRequested && tape.unavailableReason ? [tape.unavailableReason, ...play.unavailableReasons] : play.unavailableReasons,
+          },
+          marketContext: {
+            session: currentMarketSession.session,
+            nextRegularSessionOpenAt: currentMarketSession.session === "regular" ? null : nextRegularSessionOpen(now),
+            referencePriceCents: lastPriceFact?.valueNum == null ? null : Math.round(lastPriceFact.valueNum * 100),
+            referenceAsOf: lastPriceFact?.asOf ?? lastPriceFact?.fetchedAt ?? null,
           },
           disclosure: queueAtOpenRequested ? QUEUE_AT_OPEN_PLAY_DISCLOSURE : CONSTRUCTED_PLAY_DISCLOSURE,
         };
@@ -3400,8 +3429,15 @@ export const apertureRouter = router({
         const db = await getDb();
         const account = await requireAccount(db, input.accountId, ctx.user.id);
         const broker = brokerFor(account.brokerId, account.id);
+        const now = Date.now();
+        const session = marketSession(now);
+        const sessionContext = {
+          marketSession: session.session,
+          marketSessionBasis: session.basis,
+          nextRegularSessionOpenAt: session.session === "regular" ? null : nextRegularSessionOpen(now),
+        };
         if (!broker.available() || !broker.getOptionChain) {
-          return { items: [], unavailableReason: broker.unavailableReason() ?? `${broker.label} does not provide an option chain.` };
+          return { items: [], unavailableReason: broker.unavailableReason() ?? `${broker.label} does not provide an option chain.`, ...sessionContext };
         }
         const target = input.targetPriceCents;
         try {
@@ -3413,8 +3449,7 @@ export const apertureRouter = router({
             strikePriceLteCents: target == null ? undefined : Math.round(target * 1.2),
             limit: 40,
           });
-          const now = Date.now();
-          const maxQuoteAgeMs = marketSession(now).session === "regular" ? 5 * 60_000 : 8 * 60 * 60_000;
+          const maxQuoteAgeMs = session.session === "regular" ? 5 * 60_000 : 8 * 60 * 60_000;
           const items = chain.map(({ contract, market }) => {
             const midpointCents = market ? Math.round((market.bidPriceCents + market.askPriceCents) / 2) : null;
             const spreadPct = market && midpointCents && midpointCents > 0
@@ -3438,9 +3473,10 @@ export const apertureRouter = router({
           return {
             items,
             unavailableReason: items.length ? null : `No active ${input.expirationDate} ${input.type} contracts were returned for ${normSymbol(input.underlyingSymbol)}.`,
+            ...sessionContext,
           };
         } catch (error) {
-          return { items: [], unavailableReason: error instanceof Error ? error.message : "The option chain is temporarily unavailable." };
+          return { items: [], unavailableReason: error instanceof Error ? error.message : "The option chain is temporarily unavailable.", ...sessionContext };
         }
       }),
 

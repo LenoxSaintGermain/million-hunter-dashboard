@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { PriceRiskVisual } from "@/components/aperture/PriceRiskVisual";
+import { marketAvailabilityCopy } from "@shared/marketAvailability";
 
 function money(cents: number | null | undefined) {
   return cents == null ? "Not measured" : `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -60,12 +61,13 @@ export function PlayRecipeCard({
     </section>;
   }
 
-  const { play, disclosure } = data;
+  const { play, disclosure, marketContext } = data;
   const copy = readinessCopy[play.readiness];
   const noPlay = ["budget_too_small", "needs_equity", "needs_tape", "needs_range", "expired"].includes(play.readiness);
   const taxonomy = play.taxonomy;
   const optionIntent = taxonomy?.execution?.instrument === "option";
   const exactOptionTicketCanResolve = optionIntent && noPlay;
+  const availability = marketAvailabilityCopy(play.unavailableReasons[0], marketContext);
   const decisiveChecks = Array.isArray(candidate.verifyFields)
     ? candidate.verifyFields.filter((check: unknown): check is string => typeof check === "string")
     : [];
@@ -88,10 +90,11 @@ export function PlayRecipeCard({
     {noPlay ? <div className="space-y-4 p-4 sm:p-5">
       <div className="rounded-lg border p-4" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}>
         <div className="flex gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-signal)" }} /><div>
-          <p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>This play cannot move yet.</p>
-          <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{play.unavailableReasons[0] ?? "Required inputs are not measurable."}</p>
+          <p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{availability.title}</p>
+          <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{availability.summary}</p>
         </div></div>
       </div>
+      {availability.providerDetail && <details className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><summary className="cursor-pointer font-semibold" style={{ color: "var(--sh-text-primary)" }}>Provider detail</summary><p className="mt-2 break-words font-mono">{availability.providerDetail}</p></details>}
       <div className="flex flex-wrap gap-2"><Button type="button" size="sm" className="min-h-11" onClick={exactOptionTicketCanResolve ? onPrepareProposal : onReviewEvidence}>{exactOptionTicketCanResolve ? "Open paper ticket" : "Resolve blocker"}</Button><Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={onOpenResearch}>View research</Button></div>
       {play.unavailableReasons.length > 1 && <details className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><summary className="cursor-pointer font-semibold" style={{ color: "var(--sh-text-primary)" }}>Other blockers</summary><ul className="mt-2 space-y-1">{play.unavailableReasons.slice(1).map((reason: string) => <li key={reason}>{reason}</li>)}</ul></details>}
     </div> : <>

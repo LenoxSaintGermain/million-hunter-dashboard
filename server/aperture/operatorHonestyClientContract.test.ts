@@ -36,6 +36,21 @@ describe("Capital Aperture client honesty contract", () => {
     expect(source).toContain("Available headroom");
   });
 
+  it("explains disabled contracts instead of presenting dead rows", () => {
+    const source = read("client/src/components/aperture/PaperProposalForm.tsx");
+    expect(source).toContain("Market closed");
+    expect(source).toContain("Live quote unavailable");
+    expect(source).toContain("aria-describedby");
+    expect(source).toContain("Reference only");
+  });
+
+  it("translates raw SIP gaps into operator-facing market context", () => {
+    const source = read("client/src/components/aperture/PlayRecipeCard.tsx");
+    expect(source).toContain("marketAvailabilityCopy");
+    expect(source).toContain("Provider detail");
+    expect(source).not.toContain('{play.unavailableReasons[0] ?? "Required inputs are not measurable."}');
+  });
+
   it("explains the account mandate with its percentage and synced equity", () => {
     const source = read("client/src/components/aperture/DecisionVisualLanguage.tsx");
     expect(source).toContain("of synced equity");
