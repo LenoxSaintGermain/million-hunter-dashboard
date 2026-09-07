@@ -112,3 +112,18 @@ Complete the Google account chooser once and confirm the verified owner lands in
 - The Firebase production URL returned HTTP 200 and its client bundle exposed the exact `009a2f9503d3a54e4173abad627e0074986be48d` release marker.
 - UAT stopped at the explicit action-time approval dialog. No paper approval, paper submission, or broker order occurred in this repair pass.
 - Rollback revision: `capital-aperture-00037-maf`.
+
+## 2026-09-06 operator decision brief and thesis-label repair
+
+- Deployed source: `45445e93f4ebad917dac81ca2efbddbd9cabfd40`.
+- Cloud Build: `8773f33a-fd37-4f1b-abe9-c88904540362` — `SUCCESS`.
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:45445e93-firebase`.
+- Image digest: `sha256:0de5410f3b5441a22dfb9c0afd02f630cb95ed316309d98aa5a65d0e7e3006e0`.
+- Ready revision: `capital-aperture-00050-66w`, serving 100% of Cloud Run traffic.
+- Release behavior: the cockpit now labels the selected canonical thesis separately from the binding portfolio constraint, so `PW` can remain visibly active while `NVDA` is honestly identified as the holding consuming single-name headroom.
+- Play Desk now opens with one concise `What to do now` action card, a collapsed three-bucket `$5,000` weekly target plan labeled as a target rather than a forecast, and a `Watch my six` panel backed only by current cited monitoring records.
+- Negative monitoring records may suggest a defensive paper expression for human evaluation, but no hedge, order, approval, or submission is created automatically. Verified gains are shown only from verified position snapshots.
+- `DATABASE_URL= Poe_api_key=uat-placeholder-not-a-provider-key pnpm test:unit` passed 899 tests; 2 provider integration tests were intentionally skipped. `pnpm check`, `pnpm build`, and `git diff --check` passed.
+- Public `/aperture/plays` returned HTTP 200, same-origin `system.health` returned `ok: true`, and the served bundle contained the exact source release marker.
+- No schema migration, provider configuration change, proposal creation, paper approval, paper submission, or broker order occurred in this release.
+- Rollback revision: `capital-aperture-00049-52g`.
