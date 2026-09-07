@@ -378,6 +378,10 @@ export interface CockpitMandateSummary {
   maxPlannedRiskPctPerPlay: number;
   maxDailyPlannedRiskPct: number;
   maxCorrelatedPlannedRiskPct: number;
+  maxHighConvictionRiskPctPerPlay: number;
+  maxAggregateOpenRiskPct: number;
+  maxWeeklyPlannedRiskPct: number;
+  maxEventRiskPct: number;
   minAdvUsd30d: number;
   maxOrderPctOfAdv: number;
   intradayCutoffEtMinutes: number;
@@ -408,6 +412,10 @@ export function buildCockpitMandateSummary(m: Mandate): CockpitMandateSummary {
     maxPlannedRiskPctPerPlay: m.maxPlannedRiskPctPerPlay,
     maxDailyPlannedRiskPct: m.maxDailyPlannedRiskPct,
     maxCorrelatedPlannedRiskPct: m.maxCorrelatedPlannedRiskPct,
+    maxHighConvictionRiskPctPerPlay: m.maxHighConvictionRiskPctPerPlay,
+    maxAggregateOpenRiskPct: m.maxAggregateOpenRiskPct,
+    maxWeeklyPlannedRiskPct: m.maxWeeklyPlannedRiskPct,
+    maxEventRiskPct: m.maxEventRiskPct,
     minAdvUsd30d: m.minAdvUsd30d,
     maxOrderPctOfAdv: m.maxOrderPctOfAdv,
     intradayCutoffEtMinutes: m.intradayCutoffEtMinutes,

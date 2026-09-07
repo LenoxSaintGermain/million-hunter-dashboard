@@ -91,6 +91,34 @@ export async function collectSecurityFacts(
   return result;
 }
 
+/**
+ * Fast market-only collection for an underwriting preview. Full company and
+ * catalyst research remains downstream in the existing research lifecycle.
+ */
+export async function collectMarketFacts(
+  symbol: string,
+  ctx: FetchCtx = { now: Date.now(), timeoutMs: 10_000 },
+  opts: { persist?: boolean } = { persist: true },
+): Promise<CollectResult> {
+  const result: CollectResult = { symbol, facts: [], ranProviders: [], skippedProviders: [], errors: [] };
+  const marketProviders = PROVIDERS.filter((provider) => provider.kind === "security" && provider.fetchSecurityFacts && ["alpaca", "polygon"].includes(provider.id));
+  await Promise.all(marketProviders.map(async (provider) => {
+    const status = statusOf(provider);
+    if (!status.available) {
+      result.skippedProviders.push({ id: provider.id, reason: status.reason ?? "unavailable" });
+      return;
+    }
+    try {
+      result.facts.push(...await provider.fetchSecurityFacts!(symbol, ctx));
+      result.ranProviders.push(provider.id);
+    } catch (error: any) {
+      result.errors.push({ id: provider.id, message: String(error?.message ?? error) });
+    }
+  }));
+  if (opts.persist && result.facts.length) await recordFacts(symbol, result.facts, ctx.now);
+  return result;
+}
+
 /** Macro series, stored against the __MACRO__ pseudo-symbol. */
 export async function collectMacroFacts(
   ctx: FetchCtx = { now: Date.now(), timeoutMs: 15_000 },

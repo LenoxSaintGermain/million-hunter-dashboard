@@ -12,6 +12,14 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/mysql-core";
+import type {
+  CapitalObjective,
+  MarketRegimeSnapshot,
+  NoTradeDecision,
+  TacticalMarketThesis,
+  TargetFeasibility,
+  TradePlayBlueprint,
+} from "../shared/playUnderwriting";
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 export const users = mysqlTable("users", {
@@ -1493,8 +1501,11 @@ export const apertureDecisionRevisions = mysqlTable("aperture_decision_revisions
   includeHeldResearch: boolean("include_held_research").default(false).notNull(),
   deployableCapitalCents: bigint("deployable_capital_cents", { mode: "number" }).notNull(),
   desiredEndingValueCents: bigint("desired_ending_value_cents", { mode: "number" }),
+  targetProfitCents: bigint("target_profit_cents", { mode: "number" }),
+  targetPeriod: mysqlEnum("target_period", ["session", "week", "month"]),
   maxPlannedLossCents: bigint("max_planned_loss_cents", { mode: "number" }).notNull(),
   holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window", "position"]).notNull(),
+  holdingPeriods: json("holding_periods").$type<Array<"intraday" | "overnight" | "swing" | "catalyst_window" | "position">>(),
   invalidationRule: text("invalidation_rule").notNull(),
   operatorChoice: mysqlEnum("operator_choice", ["research", "conditional", "cash", "selected_play"]).default("research").notNull(),
   effectiveBranch: mysqlEnum("effective_branch", ["research", "eligible", "conditional", "cash"]).default("research").notNull(),
@@ -1516,6 +1527,50 @@ export const apertureDecisionRevisions = mysqlTable("aperture_decision_revisions
   byDecisionCreated: index("aperture_decision_revisions_decision_created_idx").on(table.decisionRunId, table.createdAt),
 }));
 export type ApertureDecisionRevision = typeof apertureDecisionRevisions.$inferSelect;
+
+/** One owner-scoped underwriting head per Decision Run. Revisions remain immutable. */
+export const apertureUnderwritingRuns = mysqlTable("aperture_underwriting_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  decisionRunId: int("decision_run_id").notNull(),
+  currentRevisionId: int("current_revision_id"),
+  selectedPlayId: varchar("selected_play_id", { length: 96 }),
+  selectedAt: bigint("selected_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  decisionRunUnique: uniqueIndex("aperture_underwriting_runs_decision_uq").on(table.decisionRunId),
+  byOwnerUpdated: index("aperture_underwriting_runs_owner_updated_idx").on(table.userId, table.updatedAt),
+}));
+export type ApertureUnderwritingRun = typeof apertureUnderwritingRuns.$inferSelect;
+
+/** Immutable facts, math, theses, and plays produced from one accepted assumption set. */
+export const apertureUnderwritingRevisions = mysqlTable("aperture_underwriting_revisions", {
+  id: int("id").autoincrement().primaryKey(),
+  underwritingRunId: int("underwriting_run_id").notNull(),
+  decisionRevisionId: int("decision_revision_id").notNull(),
+  version: int("version").notNull(),
+  previousRevisionId: int("previous_revision_id"),
+  objective: json("objective").$type<CapitalObjective>().notNull(),
+  feasibility: json("feasibility").$type<TargetFeasibility>().notNull(),
+  marketSnapshot: json("market_snapshot").$type<MarketRegimeSnapshot>().notNull(),
+  tacticalTheses: json("tactical_theses").$type<TacticalMarketThesis[]>().notNull(),
+  plays: json("plays").$type<TradePlayBlueprint[]>().notNull(),
+  noTrade: json("no_trade").$type<NoTradeDecision | null>(),
+  portfolioRisk: json("portfolio_risk").$type<{
+    beforeCents: number;
+    hypotheticalAfterCents: number;
+    bindingConstraint: string | null;
+    remainingHeadroomCents: number | null;
+  }>().notNull(),
+  providerAvailability: json("provider_availability").$type<Record<string, boolean>>(),
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  versionUnique: uniqueIndex("aperture_underwriting_revisions_version_uq").on(table.underwritingRunId, table.version),
+  byDecisionRevision: index("aperture_underwriting_revisions_decision_idx").on(table.decisionRevisionId, table.createdAt),
+}));
+export type ApertureUnderwritingRevision = typeof apertureUnderwritingRevisions.$inferSelect;
 
 /** Horizon-aware review queue. It prompts a human; it never exits a position. */
 export const aperturePendingOutcomes = mysqlTable("aperture_pending_outcomes", {

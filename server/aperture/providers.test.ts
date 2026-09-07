@@ -138,6 +138,7 @@ describe("market data derivations", () => {
     const facts = __marketDataInternals.barsToFacts(bars, "alpaca", "Alpaca IEX", "https://x", 45, 0);
     expect(facts.find((f) => f.factKey === "last_price")!.basis).toBe("verified");
     expect(facts.find((f) => f.factKey === "volatility_30d")!.basis).toBe("modeled");
+    expect(facts.find((f) => f.factKey === "return_20d")!.basis).toBe("modeled");
   });
 
   it("carries the selected feed into every generated fact's source metadata", () => {

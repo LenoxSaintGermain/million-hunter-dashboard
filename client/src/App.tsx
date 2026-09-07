@@ -70,6 +70,7 @@ import ApertureRuns from "./pages/aperture/ApertureRuns";
 import ApertureRecord from "./pages/aperture/ApertureRecord";
 import AperturePlayDesk from "./pages/aperture/AperturePlayDesk";
 import CapitalWalkthrough from "./pages/aperture/CapitalWalkthrough";
+import ApertureUnderwriting from "./pages/aperture/ApertureUnderwriting";
 import AuthUnavailable from "./pages/AuthUnavailable";
 import FirebaseSignIn from "./pages/FirebaseSignIn";
 import { getLoginUrl } from "./const";
@@ -264,6 +265,7 @@ function Router() {
         <Route path="/wingate/asset/:id">{() => <ProtectedRoute component={AssetDossier} />}</Route>
 
         {/* ── Capital Aperture — liquid securities engine ── */}
+        <Route path="/aperture/decision/:decisionRunId/revision/:revisionId/underwrite">{() => <ApertureRoute component={ApertureUnderwriting} />}</Route>
         <Route path="/aperture/decision/:decisionRunId/revision/:revisionId">{() => <ApertureRoute component={ApertureMission} />}</Route>
         <Route path="/aperture/mission">{() => <ApertureRoute component={ApertureMission} />}</Route>
         <Route path="/aperture">{() => <ApertureRoute component={ApertureHome} />}</Route>

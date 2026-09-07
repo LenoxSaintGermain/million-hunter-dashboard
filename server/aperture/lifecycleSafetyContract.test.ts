@@ -77,4 +77,29 @@ describe("Capital Aperture lifecycle safety contracts", () => {
     expect(flow).toContain("return { orderId: existingOrder.id, created: false }");
     expect(flow).toContain("return { orderId: (result as any).insertId as number, created: true }");
   });
+
+  it("keeps underwriting selection upstream of research and every paper action", () => {
+    const router = read("server/apertureRouter.ts");
+    const start = router.indexOf("underwriter: router({");
+    const end = router.indexOf("runway: router({", start);
+    const underwriter = router.slice(start, end);
+
+    expect(start).toBeGreaterThan(-1);
+    expect(underwriter).toContain("createdResearchRun: false");
+    expect(underwriter).toContain("createdProposal: false");
+    expect(underwriter).toContain("createdBrokerOrder: false");
+    expect(underwriter).not.toContain("createOrder");
+    expect(underwriter).not.toContain("submitOrder");
+  });
+
+  it("opens existing research only after an operator validates a blueprint", () => {
+    const page = read("client/src/pages/aperture/ApertureUnderwriting.tsx");
+    const selectIndex = page.indexOf("await validatePlay.mutateAsync");
+    const researchIndex = page.indexOf("await startResearch.mutateAsync", selectIndex);
+
+    expect(selectIndex).toBeGreaterThan(-1);
+    expect(researchIndex).toBeGreaterThan(selectIndex);
+    expect(page).toContain("no ticket or order exists yet");
+    expect(read("server/apertureRouter.ts")).toContain("Validate one current underwriting blueprint before starting research.");
+  });
 });

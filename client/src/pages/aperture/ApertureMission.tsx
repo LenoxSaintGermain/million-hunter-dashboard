@@ -26,6 +26,7 @@ export default function ApertureMission() {
       receiptTarget={receiptTarget}
       onNewResearch={() => navigate("/aperture?setup=1&draft=1")}
       onOpenResearchRun={(runId) => navigate(`/aperture/run/${runId}`)}
+      onOpenUnderwriting={(decisionRunId, revisionId) => navigate(`/aperture/decision/${decisionRunId}/revision/${revisionId}/underwrite`)}
     />
   </DashboardLayout>;
 }

@@ -32,6 +32,8 @@ import {
   apertureRunwayStates,
   apertureDecisionRuns,
   apertureDecisionRevisions,
+  apertureUnderwritingRuns,
+  apertureUnderwritingRevisions,
   aperturePendingOutcomes,
   apertureSetAside,
   disclosurePlans,
@@ -102,6 +104,8 @@ import { resolveCapitalMissionDefaults } from "../shared/capitalMissionDefaults"
 import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
 import { detailsFromCanonicalRecord } from "../shared/capitalThesisStructure";
 import { classifyDeskCandidate, summarizeDeskCandidates } from "../shared/playDeskState";
+import { underwriteCapitalMission } from "./aperture/underwriter";
+import type { CapitalObjective, PlayUnderwritingResult } from "../shared/playUnderwriting";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -423,6 +427,172 @@ const orderPreflightInput = orderCreateInput.extend({
   catalystDeadlineAt: z.number().optional(),
   paperAcknowledgement: z.string().max(64).optional(),
 });
+
+const underwritingHoldingPeriods = z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]);
+const capitalObjectiveInput = z.object({
+  deployableCapitalCents: z.number().int().positive(),
+  targetProfitCents: z.number().int().positive().nullable(),
+  targetPeriod: z.enum(["session", "week", "month"]).nullable(),
+  maxPlannedLossCents: z.number().int().positive(),
+  maxPortfolioOpenRiskCents: z.number().int().nonnegative().nullable().optional(),
+  weeklyLossLimitCents: z.number().int().nonnegative().nullable().optional(),
+  eventRiskLimitCents: z.number().int().nonnegative().nullable().optional(),
+  holdingPeriods: z.array(underwritingHoldingPeriods).min(1).max(5),
+  instrumentPreference: z.enum(["shares", "options", "either"]),
+});
+
+function objectiveFromDecisionRevision(revision: typeof apertureDecisionRevisions.$inferSelect): CapitalObjective {
+  return {
+    deployableCapitalCents: revision.deployableCapitalCents,
+    targetProfitCents: revision.targetProfitCents ?? ((revision.desiredEndingValueCents == null
+      ? null : Math.max(0, revision.desiredEndingValueCents - revision.deployableCapitalCents)) || null),
+    targetPeriod: revision.targetPeriod ?? null,
+    maxPlannedLossCents: revision.maxPlannedLossCents,
+    maxPortfolioOpenRiskCents: null,
+    weeklyLossLimitCents: null,
+    eventRiskLimitCents: null,
+    holdingPeriods: (revision.holdingPeriods?.length ? revision.holdingPeriods : [revision.holdingPeriod]) as CapitalObjective["holdingPeriods"],
+    instrumentPreference: revision.instrumentPreference,
+  };
+}
+
+function underwritingResponse(
+  head: typeof apertureUnderwritingRuns.$inferSelect,
+  revision: typeof apertureUnderwritingRevisions.$inferSelect,
+) {
+  const result: PlayUnderwritingResult = {
+    asOf: revision.marketSnapshot.asOf,
+    objective: revision.objective,
+    feasibility: revision.feasibility,
+    market: revision.marketSnapshot,
+    tacticalTheses: revision.tacticalTheses,
+    plays: revision.plays,
+    noTrade: revision.noTrade ?? null,
+    portfolioRisk: revision.portfolioRisk,
+  };
+  return {
+    underwritingRunId: head.id,
+    underwritingRevisionId: revision.id,
+    version: revision.version,
+    decisionRunId: head.decisionRunId,
+    decisionRevisionId: revision.decisionRevisionId,
+    selectedPlayId: head.selectedPlayId,
+    selectedAt: head.selectedAt,
+    providerAvailability: revision.providerAvailability ?? {},
+    ...result,
+  };
+}
+
+async function executeUnderwriting(input: {
+  userId: number;
+  decisionRunId: number;
+  decisionRevisionId: number;
+  requestedPlayCount: 1 | 2 | 3;
+  objective?: CapitalObjective;
+  appendRevision: boolean;
+  illustrativeUatFixture?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Capital database unavailable." });
+  const [decisionRun] = await db.select().from(apertureDecisionRuns).where(and(
+    eq(apertureDecisionRuns.id, input.decisionRunId),
+    eq(apertureDecisionRuns.userId, input.userId),
+  )).limit(1);
+  if (!decisionRun || decisionRun.currentRevisionId !== input.decisionRevisionId || decisionRun.researchRunId != null) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current pre-research mission revision before underwriting it." });
+  }
+  const [decisionRevision] = await db.select().from(apertureDecisionRevisions).where(and(
+    eq(apertureDecisionRevisions.id, input.decisionRevisionId),
+    eq(apertureDecisionRevisions.decisionRunId, decisionRun.id),
+  )).limit(1);
+  if (!decisionRevision || decisionRevision.effectiveBranch !== "research") {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash and conditional receipts are already resolved decisions and cannot generate plays." });
+  }
+  const [existingHead] = await db.select().from(apertureUnderwritingRuns).where(and(
+    eq(apertureUnderwritingRuns.decisionRunId, decisionRun.id),
+    eq(apertureUnderwritingRuns.userId, input.userId),
+  )).limit(1);
+  if (existingHead?.currentRevisionId && !input.appendRevision) {
+    const [existingRevision] = await db.select().from(apertureUnderwritingRevisions).where(and(
+      eq(apertureUnderwritingRevisions.id, existingHead.currentRevisionId),
+      eq(apertureUnderwritingRevisions.underwritingRunId, existingHead.id),
+      eq(apertureUnderwritingRevisions.decisionRevisionId, decisionRevision.id),
+    )).limit(1);
+    if (existingRevision) return underwritingResponse(existingHead, existingRevision);
+  }
+  const projection = await requireThesis(db, decisionRun.capitalThesisId, input.userId);
+  const cockpit = await buildCockpit({ userId: input.userId, accountId: decisionRun.accountId });
+  const openRiskRows = await db.select({ plannedRiskCents: brokerOrders.plannedRiskCents }).from(brokerOrders).where(and(
+    eq(brokerOrders.userId, input.userId),
+    inArray(brokerOrders.status, ["pending_approval", "approved", "submitted", "filled"]),
+  ));
+  const aggregateOpenRiskCents = openRiskRows.reduce((sum, row) => sum + (row.plannedRiskCents ?? 0), 0);
+  const objective = input.objective ?? objectiveFromDecisionRevision(decisionRevision);
+  const { result, providerAvailability } = await underwriteCapitalMission({
+    projection,
+    objective,
+    cockpit,
+    requestedPlayCount: input.requestedPlayCount,
+    aggregateOpenRiskCents,
+    illustrativeUatFixture: input.illustrativeUatFixture,
+  });
+  const now = Date.now();
+  return db.transaction(async (tx) => {
+    const [currentDecision] = await tx.select().from(apertureDecisionRuns).where(and(
+      eq(apertureDecisionRuns.id, decisionRun.id),
+      eq(apertureDecisionRuns.userId, input.userId),
+      eq(apertureDecisionRuns.currentRevisionId, decisionRevision.id),
+      isNull(apertureDecisionRuns.researchRunId),
+    )).for("update").limit(1);
+    if (!currentDecision) throw new TRPCError({ code: "CONFLICT", message: "The mission changed while underwriting was running. Reopen the current mission." });
+    let [head] = await tx.select().from(apertureUnderwritingRuns).where(and(
+      eq(apertureUnderwritingRuns.decisionRunId, decisionRun.id),
+      eq(apertureUnderwritingRuns.userId, input.userId),
+    )).for("update").limit(1);
+    if (!head) {
+      const [inserted] = await tx.insert(apertureUnderwritingRuns).values({
+        userId: input.userId,
+        decisionRunId: decisionRun.id,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const id = Number((inserted as any).insertId);
+      [head] = await tx.select().from(apertureUnderwritingRuns).where(eq(apertureUnderwritingRuns.id, id)).limit(1);
+    }
+    if (!head) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Underwriting head could not be recorded." });
+    const [prior] = head.currentRevisionId == null ? [undefined] : await tx.select().from(apertureUnderwritingRevisions).where(and(
+      eq(apertureUnderwritingRevisions.id, head.currentRevisionId),
+      eq(apertureUnderwritingRevisions.underwritingRunId, head.id),
+    )).limit(1);
+    const [insertedRevision] = await tx.insert(apertureUnderwritingRevisions).values({
+      underwritingRunId: head.id,
+      decisionRevisionId: decisionRevision.id,
+      version: (prior?.version ?? 0) + 1,
+      previousRevisionId: prior?.id ?? null,
+      objective: result.objective,
+      feasibility: result.feasibility,
+      marketSnapshot: result.market,
+      tacticalTheses: result.tacticalTheses,
+      plays: result.plays,
+      noTrade: result.noTrade,
+      portfolioRisk: result.portfolioRisk,
+      providerAvailability,
+      createdByUserId: input.userId,
+      createdAt: now,
+    });
+    const revisionId = Number((insertedRevision as any).insertId);
+    await tx.update(apertureUnderwritingRuns).set({
+      currentRevisionId: revisionId,
+      selectedPlayId: null,
+      selectedAt: null,
+      updatedAt: now,
+    }).where(eq(apertureUnderwritingRuns.id, head.id));
+    const [updatedHead] = await tx.select().from(apertureUnderwritingRuns).where(eq(apertureUnderwritingRuns.id, head.id)).limit(1);
+    const [createdRevision] = await tx.select().from(apertureUnderwritingRevisions).where(eq(apertureUnderwritingRevisions.id, revisionId)).limit(1);
+    if (!updatedHead || !createdRevision) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Underwriting receipt could not be read back." });
+    return underwritingResponse(updatedHead, createdRevision);
+  });
+}
 
 // ── Router ────────────────────────────────────────────────────────────────────
 
@@ -1057,6 +1227,112 @@ export const apertureRouter = router({
   }),
 
   // ── Decision Runway ──────────────────────────────────────────────────────
+  // Strategy generation only. This namespace never creates a research run,
+  // proposal, approval, submission, or broker order.
+  underwriter: router({
+    run: capitalOperatorProcedure.input(z.object({
+      decisionRunId: z.number().int().positive(),
+      decisionRevisionId: z.number().int().positive(),
+      requestedPlayCount: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(3),
+      uatCase: z.literal("qualified-play").optional(),
+    })).mutation(({ ctx, input }) => {
+      const qualifiedPlayFixture = isExactIsolatedUatRuntime()
+        && input.uatCase === "qualified-play"
+        && ["uat_jim_9c18799", "uat_ch_capital_9c18799"].includes(ctx.user.openId);
+      if (input.uatCase && !qualifiedPlayFixture) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The qualified-play fixture is available only to approved owner identities in the exact isolated development UAT environment." });
+      }
+      return executeUnderwriting({
+        userId: ctx.user.id,
+        decisionRunId: input.decisionRunId,
+        decisionRevisionId: input.decisionRevisionId,
+        requestedPlayCount: input.requestedPlayCount,
+        appendRevision: false,
+        illustrativeUatFixture: qualifiedPlayFixture,
+      });
+    }),
+
+    get: capitalOperatorProcedure.input(z.object({
+      decisionRunId: z.number().int().positive(),
+    })).query(async ({ ctx, input }) => {
+      const db = await getDb();
+      const [head] = await db!.select().from(apertureUnderwritingRuns).where(and(
+        eq(apertureUnderwritingRuns.decisionRunId, input.decisionRunId),
+        eq(apertureUnderwritingRuns.userId, ctx.user.id),
+      )).limit(1);
+      if (!head?.currentRevisionId) return null;
+      const [revision] = await db!.select().from(apertureUnderwritingRevisions).where(and(
+        eq(apertureUnderwritingRevisions.id, head.currentRevisionId),
+        eq(apertureUnderwritingRevisions.underwritingRunId, head.id),
+      )).limit(1);
+      return revision ? underwritingResponse(head, revision) : null;
+    }),
+
+    revise: capitalOperatorProcedure.input(z.object({
+      decisionRunId: z.number().int().positive(),
+      decisionRevisionId: z.number().int().positive(),
+      requestedPlayCount: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(3),
+      objective: capitalObjectiveInput,
+    })).mutation(({ ctx, input }) => executeUnderwriting({
+      userId: ctx.user.id,
+      decisionRunId: input.decisionRunId,
+      decisionRevisionId: input.decisionRevisionId,
+      requestedPlayCount: input.requestedPlayCount,
+      objective: input.objective as CapitalObjective,
+      appendRevision: true,
+    })),
+
+    validatePlay: capitalOperatorProcedure.input(z.object({
+      underwritingRunId: z.number().int().positive(),
+      underwritingRevisionId: z.number().int().positive(),
+      playId: z.string().trim().min(1).max(96),
+    })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      const [row] = await db!.select({
+        head: apertureUnderwritingRuns,
+        revision: apertureUnderwritingRevisions,
+        decision: apertureDecisionRuns,
+      }).from(apertureUnderwritingRuns)
+        .innerJoin(apertureUnderwritingRevisions, and(
+          eq(apertureUnderwritingRevisions.id, input.underwritingRevisionId),
+          eq(apertureUnderwritingRevisions.underwritingRunId, apertureUnderwritingRuns.id),
+        ))
+        .innerJoin(apertureDecisionRuns, eq(apertureDecisionRuns.id, apertureUnderwritingRuns.decisionRunId))
+        .where(and(
+          eq(apertureUnderwritingRuns.id, input.underwritingRunId),
+          eq(apertureUnderwritingRuns.userId, ctx.user.id),
+          eq(apertureUnderwritingRuns.currentRevisionId, input.underwritingRevisionId),
+          eq(apertureDecisionRuns.userId, ctx.user.id),
+          isNull(apertureDecisionRuns.researchRunId),
+        )).limit(1);
+      if (!row || row.decision.currentRevisionId !== row.revision.decisionRevisionId) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current underwriting revision before choosing a play." });
+      }
+      const play = row.revision.plays.find((item) => item.id === input.playId);
+      if (!play || ["invalidated", "expired"].includes(play.status)) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This play is not available for research validation." });
+      }
+      if (play.instrument.kind === "debit_spread") {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Debit spreads are research-only and cannot enter the current order builder." });
+      }
+      const now = Date.now();
+      await db!.update(apertureUnderwritingRuns).set({ selectedPlayId: play.id, selectedAt: now, updatedAt: now }).where(and(
+        eq(apertureUnderwritingRuns.id, row.head.id),
+        eq(apertureUnderwritingRuns.currentRevisionId, row.revision.id),
+      ));
+      return {
+        selected: true,
+        playId: play.id,
+        decisionRunId: row.decision.id,
+        decisionRevisionId: row.revision.decisionRevisionId,
+        // Deliberately explicit for contract tests and client copy.
+        createdResearchRun: false,
+        createdProposal: false,
+        createdBrokerOrder: false,
+      };
+    }),
+  }),
+
   // Durable operator context only. A cash branch cannot be attached to a run
   // and is separately checked when a paper-order proposal is attempted.
   runway: router({
@@ -1251,8 +1527,11 @@ export const apertureRouter = router({
         includeHeldResearch: z.boolean().default(false),
         deployableCapitalCents: z.number().positive(),
         desiredEndingValueCents: z.number().positive().nullable().optional(),
+        targetProfitCents: z.number().positive().nullable().optional(),
+        targetPeriod: z.enum(["session", "week", "month"]).nullable().optional(),
         maxPlannedLossCents: z.number().positive(),
         holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]),
+        holdingPeriods: z.array(z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]])).min(1).max(5).optional(),
         invalidationRule: z.string().trim().min(MIN_NARRATIVE_CHARS).max(2_000),
         reason: z.string().trim().max(1_000).nullable().optional(),
         blocker: z.string().trim().max(1_000).nullable().optional(),
@@ -1295,8 +1574,11 @@ export const apertureRouter = router({
           instrumentPreference: input.instrumentPreference,
           deployableCapitalCents: input.deployableCapitalCents,
           desiredEndingValueCents: input.desiredEndingValueCents ?? null,
+          targetProfitCents: input.targetProfitCents ?? null,
+          targetPeriod: input.targetPeriod ?? null,
           maxPlannedLossCents,
           holdingPeriod: input.holdingPeriod,
+          holdingPeriods: input.holdingPeriods ?? [input.holdingPeriod],
         })).digest("hex");
         const revisionValues = {
           missionText: input.missionText,
@@ -1307,8 +1589,11 @@ export const apertureRouter = router({
           includeHeldResearch: input.includeHeldResearch,
           deployableCapitalCents: input.deployableCapitalCents,
           desiredEndingValueCents: input.desiredEndingValueCents ?? null,
+          targetProfitCents: input.targetProfitCents ?? null,
+          targetPeriod: input.targetPeriod ?? null,
           maxPlannedLossCents,
           holdingPeriod: input.holdingPeriod as any,
+          holdingPeriods: (input.holdingPeriods ?? [input.holdingPeriod]) as any,
           invalidationRule: input.invalidationRule,
           operatorChoice: input.branch,
           effectiveBranch: input.branch,
@@ -1596,6 +1881,22 @@ export const apertureRouter = router({
           eq(apertureDecisionRevisions.decisionRunId, decisionRun.id),
         )).limit(1);
         if (!revision || revision.effectiveBranch !== "research") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash and conditional branches cannot start research." });
+        const [underwritingSelection] = await db!.select({
+          selectedPlayId: apertureUnderwritingRuns.selectedPlayId,
+          revision: apertureUnderwritingRevisions,
+        }).from(apertureUnderwritingRuns)
+          .innerJoin(apertureUnderwritingRevisions, eq(apertureUnderwritingRevisions.id, apertureUnderwritingRuns.currentRevisionId))
+          .where(and(
+            eq(apertureUnderwritingRuns.decisionRunId, decisionRun.id),
+            eq(apertureUnderwritingRuns.userId, ctx.user.id),
+            eq(apertureUnderwritingRevisions.decisionRevisionId, revision.id),
+          )).limit(1);
+        const selectedBlueprint = underwritingSelection?.selectedPlayId == null
+          ? null
+          : underwritingSelection.revision.plays.find((play) => play.id === underwritingSelection.selectedPlayId) ?? null;
+        if (!selectedBlueprint) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Validate one current underwriting blueprint before starting research." });
+        }
         let thesis = await requireThesis(db, decisionRun.capitalThesisId, ctx.user.id);
         if (!thesis.graph) {
           thesis = await ensureThesisReady(thesis, {
@@ -1619,7 +1920,11 @@ export const apertureRouter = router({
           thesisId: thesis.id,
           accountId: account.id,
           deployableCapitalCents: revision.deployableCapitalCents,
-          intendedTrades: [] as Array<{ symbol: string; dollarsCents: number; note?: string }>,
+          intendedTrades: [{
+            symbol: selectedBlueprint.underlyingSymbol,
+            dollarsCents: selectedBlueprint.sizing.proposedNotionalCents,
+            note: `Selected underwriting blueprint ${selectedBlueprint.id}; exact ticket remains downstream.`,
+          }],
           holdingPeriod: revision.holdingPeriod,
           instrumentPreference: revision.instrumentPreference,
           liquidityFloorAdvUsd: CURRENT_MANDATE.minAdvUsd30d,
@@ -1646,7 +1951,7 @@ export const apertureRouter = router({
             thesisId: thesis.id,
             accountId: account.id,
             deployableCapitalCents: revision.deployableCapitalCents,
-            intendedTrades: [],
+            intendedTrades: runInput.intendedTrades,
             holdingPeriod: revision.holdingPeriod,
             instrumentPreference: revision.instrumentPreference,
             catalystDeadlineAt,
@@ -1960,6 +2265,15 @@ export const apertureRouter = router({
         if (!snapshotByOrderKey.has(key)) snapshotByOrderKey.set(key, snapshot);
       }
 
+      const [latestUnderwriting] = await db!.select({
+        objective: apertureUnderwritingRevisions.objective,
+        updatedAt: apertureUnderwritingRuns.updatedAt,
+      }).from(apertureUnderwritingRuns)
+        .innerJoin(apertureUnderwritingRevisions, eq(apertureUnderwritingRevisions.id, apertureUnderwritingRuns.currentRevisionId))
+        .where(eq(apertureUnderwritingRuns.userId, ctx.user.id))
+        .orderBy(desc(apertureUnderwritingRuns.updatedAt))
+        .limit(1);
+
       return {
         orders: orders.map((order) => ({
           ...order,
@@ -1967,6 +2281,9 @@ export const apertureRouter = router({
           latestSnapshot: snapshotByOrderKey.get(`${order.accountId}:${order.runId}:${normSymbol(order.symbol)}`) ?? null,
         })),
         activePlays,
+        executionTarget: latestUnderwriting?.objective.targetProfitCents != null && latestUnderwriting.objective.targetPeriod === "week"
+          ? { targetProfitCents: latestUnderwriting.objective.targetProfitCents, targetPeriod: "week" as const, asOf: latestUnderwriting.updatedAt }
+          : null,
       };
     }),
   }),

@@ -1,0 +1,10 @@
+import type { MarketRegimeSnapshot } from "@shared/playUnderwriting";
+import { BasisMark, StateMark } from "./DecisionVisualLanguage";
+
+export function MarketRegimeBrief({ market }: { market: MarketRegimeSnapshot }) {
+  return <section className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Market regime</p><h2 className="mt-1 font-serif text-2xl capitalize">{market.regime.replaceAll("_", " ")}</h2><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{market.marketSession.replaceAll("_", " ")} · as of {new Date(market.asOf).toLocaleString()}</p></div><StateMark state={market.confidence > 0 ? "researchable" : "stale"} label={`${market.confidence}% confidence`} compact /></div>
+    <div className="mt-4 grid gap-px overflow-hidden rounded-lg border sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>{Object.entries(market.indexTrend).map(([symbol, metric]) => <div key={symbol} className="p-3" style={{ background: "var(--sh-surface-2)" }}><div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold uppercase">{symbol}</p><StateMark state={metric.freshness === "fresh" ? "rule_qualified" : "stale"} label={metric.freshness} compact /></div><p className="mt-1 font-mono text-xs" style={{ color: "var(--sh-fg-muted)" }}>{metric.value == null ? "Price withheld" : `$${metric.value.toFixed(2)}`} · trend {metric.direction}</p><BasisMark basis="measured" label={metric.source} /></div>)}</div>
+    {market.regime === "unknown" && <p className="mt-3 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The current provider surface verifies reference prices and volatility, but not enough breadth or trend inputs to assert a directional regime.</p>}
+  </section>;
+}

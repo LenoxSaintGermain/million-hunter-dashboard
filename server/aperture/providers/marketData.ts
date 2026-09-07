@@ -119,7 +119,7 @@ export async function fetchIntradayBars(
   };
 }
 
-const KEYS = ["last_price", "adv_usd_30d", "volatility_30d"];
+const KEYS = ["last_price", "adv_usd_30d", "volatility_30d", "return_20d"];
 
 function alpacaCredentials() {
   return {
@@ -158,6 +158,15 @@ function volatility(bars: Bar[]): number | null {
   return Math.sqrt(variance) * Math.sqrt(252);
 }
 
+/** Twenty-session price return as a ratio, derived only when the window exists. */
+function return20d(bars: Bar[]): number | null {
+  if (bars.length < 21) return null;
+  const start = bars[bars.length - 21]?.c;
+  const end = bars[bars.length - 1]?.c;
+  if (!start || !end || start <= 0 || end <= 0) return null;
+  return end / start - 1;
+}
+
 function barsToFacts(
   bars: Bar[],
   providerId: string,
@@ -171,6 +180,7 @@ function barsToFacts(
   const last = bars[bars.length - 1];
   const adv = advUsd(bars);
   const vol = volatility(bars);
+  const twentyDayReturn = return20d(bars);
   const out: Fact[] = [];
 
   out.push({
@@ -194,6 +204,23 @@ function barsToFacts(
           unit: "usd",
           basis: "modeled",
           assumption: `mean of close x volume over the last ${bars.length} daily bars (${windowDays}-day window)`,
+          providerId,
+          sourceName,
+          sourceUrl,
+          asOf: last.t,
+          ttlMs: DAY,
+        },
+  );
+
+  out.push(
+    twentyDayReturn == null
+      ? unknownFact("return_20d", providerId, sourceName)
+      : {
+          factKey: "return_20d",
+          valueNum: twentyDayReturn,
+          unit: "ratio",
+          basis: "modeled",
+          assumption: "last daily close divided by the close 20 sessions earlier, minus one",
           providerId,
           sourceName,
           sourceUrl,
@@ -284,4 +311,4 @@ export const polygonProvider: ProviderAdapter = {
   },
 };
 
-export const __marketDataInternals = { advUsd, volatility, barsToFacts, intradayFeed, alpacaFeedSource };
+export const __marketDataInternals = { advUsd, volatility, return20d, barsToFacts, intradayFeed, alpacaFeedSource };

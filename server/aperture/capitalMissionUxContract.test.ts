@@ -33,16 +33,16 @@ describe("Capital Mission decision-path UX contract", () => {
     "utf8",
   );
 
-  it("keeps the mission-to-submit path visible without implying automatic execution", () => {
+  it("keeps the mission-to-paper path visible without implying automatic execution", () => {
     expect(runway).toContain("Mission");
-    expect(runway).toContain("Play Slate");
-    expect(runway).toContain("Ticket");
-    expect(runway).toContain("Submit");
-    expect(runway).toContain("Nothing is sent automatically");
+    expect(runway).toContain("Underwrite");
+    expect(runway).toContain("Research");
+    expect(runway).toContain("Paper");
+    expect(runway).toContain("Research, proposal, approval, and submission remain separate");
   });
 
   it("explains Capital Mission and ranked suggestions in concise, actionable language", () => {
-    expect(runway).toContain("Set the goal, budget, risk limit, and timeframe.");
+    expect(runway).toContain("Set the objective. The target never increases allowed risk.");
     expect(runway).toContain("Suggested missions");
     expect(runway).toContain("best-supported research path—not the highest-return forecast");
     expect(runway).not.toContain("Top missions only. Ranking reflects known thesis");
@@ -78,11 +78,11 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(app).toContain('path="/aperture/mission"');
   });
 
-  it("exposes one primary slate action and distinct disposition choices", () => {
+  it("exposes one primary underwriting action and distinct disposition choices", () => {
     expect(runway).toContain("Search for a play");
     expect(runway).toContain("Hold for a condition");
     expect(runway).toContain("Preserve cash");
-    expect(runway).toContain('branch === "research" ? "Build Play Slate"');
+    expect(runway).toContain('branch === "research" ? "Underwrite this mission"');
     expect(runway).not.toContain("Compile Play Slate");
   });
 
@@ -129,6 +129,6 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(brief).toContain("What to do now");
     expect(brief).toContain("Weekly execution plan");
     expect(brief).toContain("Watch my six");
-    expect(brief).toContain("Target—not a forecast");
+    expect(brief).toContain("From underwriting · not a forecast");
   });
 });

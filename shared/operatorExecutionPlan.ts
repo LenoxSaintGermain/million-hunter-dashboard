@@ -1,35 +1,42 @@
 import { MONITORING_FRESHNESS_MS } from "./monitoringState";
 
-export const WEEKLY_EXECUTION_TARGET_CENTS = 500_000;
-
 export type ExecutionBucketId = "dip_buying" | "swings" | "defined_risk_options";
 
-export const WEEKLY_EXECUTION_BUCKETS = [
+const EXECUTION_BUCKET_TEMPLATES = [
   {
     id: "dip_buying" as const,
     label: "Dip buying",
-    targetLowCents: 150_000,
-    targetHighCents: 200_000,
+    targetLowPct: 30,
+    targetHighPct: 40,
     mandate: "Shares near a verified support level",
     actionRule: "Stage entries only after the demand floor and protective stop are recorded.",
   },
   {
     id: "swings" as const,
     label: "Swings",
-    targetLowCents: 200_000,
-    targetHighCents: 250_000,
+    targetLowPct: 40,
+    targetHighPct: 50,
     mandate: "3–10 session catalyst moves",
     actionRule: "Carry one invalidation level, one review date, and explicit profit milestones.",
   },
   {
     id: "defined_risk_options" as const,
     label: "Defined-risk options",
-    targetLowCents: 100_000,
-    targetHighCents: 150_000,
+    targetLowPct: 20,
+    targetHighPct: 30,
     mandate: "Directional premium or paper hedges",
     actionRule: "Use a fixed debit and maximum loss. Multi-leg spreads are not supported in this build.",
   },
 ] as const;
+
+/** Presentation only. The canonical target comes from an underwriting revision. */
+export function buildWeeklyExecutionBuckets(targetProfitCents: number) {
+  return EXECUTION_BUCKET_TEMPLATES.map((bucket) => ({
+    ...bucket,
+    targetLowCents: Math.round(targetProfitCents * bucket.targetLowPct / 100),
+    targetHighCents: Math.round(targetProfitCents * bucket.targetHighPct / 100),
+  }));
+}
 
 export type OperatorMonitoringObservation = {
   id: number;

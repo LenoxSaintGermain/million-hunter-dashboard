@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  WEEKLY_EXECUTION_TARGET_CENTS,
+  buildWeeklyExecutionBuckets,
   buildOperatorAction,
   executionBucketFor,
 } from "../../shared/operatorExecutionPlan";
 
 describe("operator execution plan", () => {
   it("classifies the three execution buckets without treating the target as a forecast", () => {
-    expect(WEEKLY_EXECUTION_TARGET_CENTS).toBe(500_000);
+    expect(buildWeeklyExecutionBuckets(600_000).map((bucket) => [bucket.targetLowCents, bucket.targetHighCents])).toEqual([
+      [180_000, 240_000], [240_000, 300_000], [120_000, 180_000],
+    ]);
     expect(executionBucketFor({ instrumentType: "shares", holdingPeriod: "intraday" })).toBe("dip_buying");
     expect(executionBucketFor({ instrumentType: "shares", holdingPeriod: "swing" })).toBe("swings");
     expect(executionBucketFor({ instrumentType: "long_put", holdingPeriod: "swing" })).toBe("defined_risk_options");

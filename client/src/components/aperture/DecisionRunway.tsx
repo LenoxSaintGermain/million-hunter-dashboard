@@ -18,6 +18,7 @@ type Objective = "best_qualified_play" | "deploy_today" | "verify_catalyst" | "p
 type Props = {
   onNewResearch: () => void;
   onOpenResearchRun: (runId: number) => void;
+  onOpenUnderwriting: (decisionRunId: number, revisionId: number) => void;
   receiptTarget?: { decisionRunId: number; revisionId: number } | null;
 };
 
@@ -59,7 +60,7 @@ function branchState(branch: Branch | string | null | undefined): WorkflowState 
   return "researchable";
 }
 
-export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget = null }: Props) {
+export function DecisionRunway({ onNewResearch, onOpenResearchRun, onOpenUnderwriting, receiptTarget = null }: Props) {
   const utils = trpc.useUtils();
   const { data: runway, error: receiptError, isLoading: receiptLoading } = trpc.aperture.runway.latest.useQuery(receiptTarget ?? undefined, { retry: false });
   const { data: pendingOutcomes } = trpc.aperture.runway.pending.useQuery();
@@ -80,8 +81,11 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
 
   const [capital, setCapital] = useState("");
   const [desiredEnding, setDesiredEnding] = useState("");
+  const [targetProfit, setTargetProfit] = useState("");
+  const [targetPeriod, setTargetPeriod] = useState<"session" | "week" | "month">("week");
   const [maxLoss, setMaxLoss] = useState("");
   const [holdingPeriod, setHoldingPeriod] = useState<HoldingPeriod>("intraday");
+  const [holdingPeriods, setHoldingPeriods] = useState<HoldingPeriod[]>(["intraday"]);
   const [objective, setObjective] = useState<Objective>("deploy_today");
   const [instrument, setInstrument] = useState<"shares" | "options" | "either">("shares");
   const [includeHeld, setIncludeHeld] = useState(false);
@@ -116,8 +120,11 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     const defaults = projection.missionDefaults;
     setCapital(defaults.deployableCapitalCents == null ? "" : String(defaults.deployableCapitalCents / 100));
     setDesiredEnding(defaults.desiredEndingValueCents == null ? "" : String(defaults.desiredEndingValueCents / 100));
+    setTargetProfit(defaults.desiredEndingValueCents != null && defaults.deployableCapitalCents != null
+      ? String(Math.max(0, defaults.desiredEndingValueCents - defaults.deployableCapitalCents) / 100) : "");
     setMaxLoss(defaults.maxPlannedLossCents == null ? "" : String(defaults.maxPlannedLossCents / 100));
     setHoldingPeriod(defaults.holdingPeriod ?? "intraday");
+    setHoldingPeriods([defaults.holdingPeriod ?? "intraday"]);
     setInstrument(defaults.instrumentPreference ?? "either");
     setDeclaredCatalystAt(defaults.catalystAt);
     setDeclaredCatalystLabel(defaults.catalystLabel);
@@ -145,9 +152,8 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const createThesis = trpc.thesis.createCapital.useMutation();
   const projectThesis = trpc.thesis.useInAperture.useMutation();
   const saveMission = trpc.aperture.runway.begin.useMutation();
-  const startResearch = trpc.aperture.runway.startResearch.useMutation();
   const resolveCashOutcome = trpc.aperture.runway.resolveCashOutcome.useMutation();
-  const busy = createThesis.isPending || projectThesis.isPending || saveMission.isPending || startResearch.isPending || resolveCashOutcome.isPending;
+  const busy = createThesis.isPending || projectThesis.isPending || saveMission.isPending || resolveCashOutcome.isPending;
 
   const buildThesisHere = async () => {
     try {
@@ -183,9 +189,14 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     setBranch(nextBranch);
     if (catalystPreset) {
       setHoldingPeriod("catalyst_window");
+      setHoldingPeriods(["catalyst_window"]);
       setDesiredEnding("");
+      setTargetProfit("");
     }
-    if (item.key === "preserve_cash") setDesiredEnding("");
+    if (item.key === "preserve_cash") {
+      setDesiredEnding("");
+      setTargetProfit("");
+    }
     if (nextBranch !== "research") {
       setReason(item.reasons[0] ?? "A named boundary must clear before research proceeds.");
       setBlocker(nextBranch === "cash" ? "No setup clears the current evidence, freshness, and portfolio boundaries." : catalystPreset ? "No verified dated catalyst is attached to this mission." : "Required context is not verified.");
@@ -245,9 +256,12 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
         instrumentPreference: instrument,
         includeHeldResearch: includeHeld,
         deployableCapitalCents: parseMoney(capital),
-        desiredEndingValueCents: parseMoney(desiredEnding) || null,
+        desiredEndingValueCents: parseMoney(targetProfit) ? parseMoney(capital) + parseMoney(targetProfit) : parseMoney(desiredEnding) || null,
+        targetProfitCents: parseMoney(targetProfit) || null,
+        targetPeriod: parseMoney(targetProfit) ? targetPeriod : null,
         maxPlannedLossCents: parseMoney(maxLoss),
         holdingPeriod,
+        holdingPeriods: holdingPeriods.length ? holdingPeriods : [holdingPeriod],
         invalidationRule: "Invalidate this mission if the assigned thesis, named horizon, liquidity evidence, or planned-loss boundary is no longer true.",
         reason: branch === "research" ? null : reason.trim(),
         blocker: branch === "research" ? null : blocker.trim(),
@@ -258,16 +272,8 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
       });
       await utils.aperture.runway.latest.invalidate();
       if (branch === "research") {
-        const uatCase = new URLSearchParams(window.location.search).get("uat_case") === "qualified-play" ? "qualified-play" as const : undefined;
-        const started = await startResearch.mutateAsync({ decisionRunId: receipt.decisionRunId, revisionId: receipt.revisionId, uatCase });
-        await Promise.all([utils.aperture.runway.latest.invalidate(), utils.aperture.runway.pending.invalidate()]);
-        if (started.status === "blocked") {
-          setRevisingReceipt(false);
-          toast.error(started.message, { description: "No research run, provider dispatch, proposal, or broker action occurred. Open the conditional receipt to review the required recovery step." });
-          return;
-        }
-        toast.success("Research started from the exact mission revision");
-        onOpenResearchRun(started.runId);
+        toast.success("Mission recorded. Underwriting can now test the target and risk envelope.");
+        onOpenUnderwriting(receipt.decisionRunId, receipt.revisionId);
       } else {
         setRevisingReceipt(false);
         toast.success(branch === "cash" ? "Cash / no-trade recorded at $0 risk" : "Conditional review queued");
@@ -296,8 +302,11 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     setMission(receipt.missionText);
     setCapital(String(Math.round(receipt.deployableCapitalCents / 100)));
     setDesiredEnding(receipt.desiredEndingValueCents == null ? "" : String(Math.round(receipt.desiredEndingValueCents / 100)));
+    setTargetProfit(receipt.targetProfitCents == null ? "" : String(Math.round(receipt.targetProfitCents / 100)));
+    setTargetPeriod((receipt.targetPeriod ?? "week") as "session" | "week" | "month");
     setMaxLoss(String(Math.round(receipt.maxPlannedLossCents / 100)));
     setHoldingPeriod(receipt.holdingPeriod as HoldingPeriod);
+    setHoldingPeriods((receipt.holdingPeriods?.length ? receipt.holdingPeriods : [receipt.holdingPeriod]) as HoldingPeriod[]);
     setObjective(receipt.objective as Objective);
     setInstrument(receipt.instrumentPreference);
     setIncludeHeld(receipt.includeHeldResearch);
@@ -318,8 +327,8 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const visualWorkflowState = branchState(receiptActive ? latestBranch : branch);
   const concentrationBlocked = (concentrationLine?.usedPct ?? 0) >= 85;
   const capitalCents = parseMoney(capital);
-  const desiredCents = parseMoney(desiredEnding);
-  const targetStretchPct = capitalCents > 0 && desiredCents > capitalCents ? ((desiredCents - capitalCents) / capitalCents) * 100 : null;
+  const desiredCents = parseMoney(targetProfit) ? capitalCents + parseMoney(targetProfit) : parseMoney(desiredEnding);
+  const targetStretchPct = capitalCents > 0 && parseMoney(targetProfit) > 0 ? (parseMoney(targetProfit) / capitalCents) * 100 : capitalCents > 0 && desiredCents > capitalCents ? ((desiredCents - capitalCents) / capitalCents) * 100 : null;
   const sameSessionStretch = holdingPeriod === "intraday" && targetStretchPct != null && targetStretchPct >= 20;
   const dispositionReady = branch === "research" || (reason.trim().length >= 3 && blocker.trim().length >= 3 && reopen.trim().length >= 3 && (branch !== "conditional" || gateLabel.trim().length >= 3));
   const missionConfigured = capitalCents > 0 && parseMoney(maxLoss) > 0;
@@ -336,8 +345,11 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     setMissionDirty(true);
     setCapital(String(Math.round(receipt.deployableCapitalCents / 100)));
     setDesiredEnding(receipt.desiredEndingValueCents == null ? "" : String(Math.round(receipt.desiredEndingValueCents / 100)));
+    setTargetProfit(receipt.targetProfitCents == null ? "" : String(Math.round(receipt.targetProfitCents / 100)));
+    setTargetPeriod((receipt.targetPeriod ?? "week") as "session" | "week" | "month");
     setMaxLoss(String(Math.round(receipt.maxPlannedLossCents / 100)));
     setHoldingPeriod(receipt.holdingPeriod as HoldingPeriod);
+    setHoldingPeriods((receipt.holdingPeriods?.length ? receipt.holdingPeriods : [receipt.holdingPeriod]) as HoldingPeriod[]);
     setObjective(receipt.objective as Objective);
     setInstrument(receipt.instrumentPreference);
     setIncludeHeld(receipt.includeHeldResearch);
@@ -352,6 +364,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     setRevisingReceipt(true);
   };
   const authoritativeLatest = runway?.latest?.authority === "authoritative" ? runway.latest : null;
+  const canOpenUnderwriting = currentBindingMatches && authoritativeLatest != null && authoritativeLatest.runId == null && latestBranch === "research";
   const canOpenSlate = currentBindingMatches && authoritativeLatest?.runId != null && (latestBranch === "research" || latestBranch === "eligible");
   const currentCashOutcome = authoritativeLatest
     ? (pendingOutcomes ?? []).find((item) => item.revisionId === authoritativeLatest.decisionRevisionId && item.kind === "play_outcome") ?? null
@@ -396,8 +409,8 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
 
     {activeThesis && <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_23rem]">
       <article className="overflow-hidden rounded-2xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-        <header className="flex items-center justify-between gap-3 border-b p-4 sm:p-5" style={{ borderColor: "var(--sh-border-1)" }}><div className="min-w-0"><div className="flex items-center gap-1"><p className="flex items-center gap-2 text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}><Target className="h-3.5 w-3.5" />Set the Capital Mission</p><ContextHelp title="What is a Capital Mission?" what="Your instruction for one decision: what to look for, how much capital to use, and the most you will risk." next="Build a Play Slate, choose a play, build its exact ticket, then approve and submit to the selected account." /></div><p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>Set the goal, budget, risk limit, and timeframe.</p></div><span className="shrink-0 rounded border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>{holdingPeriod.replace("_", " ")}</span></header>
-        <nav aria-label="Mission to submission path" className="border-b" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><ol className="grid grid-cols-4 gap-px text-[0.55rem] font-semibold uppercase tracking-[0.06em] sm:text-[0.62rem] sm:tracking-[0.1em]" style={{ background: "var(--sh-border-1)" }}><li><button type="button" aria-current="step" className="flex min-h-11 w-full items-center justify-center gap-1 px-1 text-center sm:gap-2 sm:px-3" style={{ background: "var(--sh-surface-2)", color: "var(--sh-signal)" }} onClick={() => document.getElementById("mission-math")?.scrollIntoView({ behavior: "smooth", block: "center" })}><span className="font-mono tabular-nums">1</span>Mission</button></li><li><button type="button" disabled={!canOpenSlate} aria-disabled={!canOpenSlate} title={canOpenSlate ? "Open the current Play Slate" : latestBranch === "conditional" ? "Resolve the conditional receipt before opening the Play Slate" : latestBranch === "cash" ? "This mission preserves cash; revise it before opening a Play Slate" : "Build a Play Slate from this mission first"} className="flex min-h-11 w-full items-center justify-center gap-1 px-1 text-center disabled:cursor-not-allowed disabled:opacity-55 sm:gap-2 sm:px-3" style={{ background: "var(--sh-surface-2)", color: canOpenSlate ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }} onClick={() => canOpenSlate && onOpenResearchRun(authoritativeLatest!.runId!)}><span className="font-mono tabular-nums">2</span>{canOpenSlate ? "Open Slate" : "Play Slate"}</button></li>{[["3", "Ticket"], ["4", "Submit"]].map(([number, label]) => <li key={label}><button type="button" disabled className="flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-1 px-1 text-center opacity-55 sm:gap-2 sm:px-3" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }} title={label === "Ticket" ? "Available after you choose a play" : "Available after proposal approval"}><span className="font-mono tabular-nums">{number}</span>{label}</button></li>)}</ol></nav>
+        <header className="flex items-center justify-between gap-3 border-b p-4 sm:p-5" style={{ borderColor: "var(--sh-border-1)" }}><div className="min-w-0"><div className="flex items-center gap-1"><p className="flex items-center gap-2 text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}><Target className="h-3.5 w-3.5" />Set the Capital Mission</p><ContextHelp title="What is a Capital Mission?" what="Your instruction for one decision: what to look for, the target to test, and the most you will risk." next="Underwrite the mission, validate one conditional play, then enter the existing research and paper lifecycle." /></div><p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>Set the objective. The target never increases allowed risk.</p></div><span className="shrink-0 rounded border px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>{holdingPeriod.replace("_", " ")}</span></header>
+        <nav aria-label="Mission to paper lifecycle" className="border-b" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><ol className="grid grid-cols-4 gap-px text-[0.55rem] font-semibold uppercase tracking-[0.06em] sm:text-[0.62rem] sm:tracking-[0.1em]" style={{ background: "var(--sh-border-1)" }}><li><button type="button" aria-current="step" className="flex min-h-11 w-full items-center justify-center gap-1 px-1 text-center sm:gap-2 sm:px-3" style={{ background: "var(--sh-surface-2)", color: "var(--sh-signal)" }} onClick={() => document.getElementById("mission-math")?.scrollIntoView({ behavior: "smooth", block: "center" })}><span className="font-mono tabular-nums">1</span>Mission</button></li><li><button type="button" disabled={!canOpenUnderwriting} className="flex min-h-11 w-full items-center justify-center gap-1 px-1 text-center disabled:cursor-not-allowed disabled:opacity-55 sm:gap-2 sm:px-3" style={{ background: "var(--sh-surface-2)", color: canOpenUnderwriting ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }} title={canOpenUnderwriting ? "Open the current underwriting brief" : "Record a research mission first"} onClick={() => canOpenUnderwriting && onOpenUnderwriting(authoritativeLatest!.decisionRunId, authoritativeLatest!.decisionRevisionId)}><span className="font-mono tabular-nums">2</span>Underwrite</button></li><li><button type="button" disabled={!canOpenSlate} className="flex min-h-11 w-full items-center justify-center gap-1 px-1 text-center disabled:cursor-not-allowed disabled:opacity-55 sm:gap-2 sm:px-3" style={{ background: "var(--sh-surface-2)", color: canOpenSlate ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }} title={canOpenSlate ? "Open validated research" : "Validate an underwritten play first"} onClick={() => canOpenSlate && onOpenResearchRun(authoritativeLatest!.runId!)}><span className="font-mono tabular-nums">3</span>Research</button></li><li><button type="button" disabled className="flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-1 px-1 text-center opacity-55 sm:gap-2 sm:px-3" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }} title="Paper stage opens only after research validation"><span className="font-mono tabular-nums">4</span>Paper</button></li></ol></nav>
         {receiptActive ? <DecisionReceipt branch={latestBranch as "cash" | "conditional"} reason={latestReason} blocker={latestBlocker} reopen={latestReopen} gateLabel={latestGate} reviewAt={latestReviewAt} revision={latestRevision} recordedAt={latestRecordedAt} binding={immutableReceipt?.binding} pendingCashOutcome={currentCashOutcome} recordedCashOutcome={authoritativeLatest?.cashOutcome} onRecordCashOutcome={recordCashOutcome} resolvingCashOutcome={resolveCashOutcome.isPending} onGateReview={reviseReceipt} onRevise={reviseReceipt} /> : <><div className="space-y-5 p-5 sm:p-7">
           <div id="assigned-thesis" className="rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 32%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" }}>
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div className="flex gap-3"><BookOpen className="mt-0.5 h-5 w-5" style={{ color: "var(--sh-signal)" }} /><div><p className="text-[0.62rem] font-semibold uppercase tracking-[0.13em]" style={{ color: "var(--sh-fg-muted)" }}>Assigned thesis loaded</p><p className="mt-1 text-sm font-semibold">{canonicalThesisLabel(activeThesis)}</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Run-specific edits create a new receipt. The saved thesis remains unchanged.</p></div></div><select aria-label="Switch assigned thesis" className="min-h-10 rounded-md border bg-transparent px-2 text-xs" style={{ borderColor: "var(--sh-border-1)" }} value={activeCanonicalId ?? ""} onChange={(event) => { setSelectedCanonicalId(Number(event.target.value)); setMissionDirty(false); }}><option value="" disabled>Switch thesis</option>{(canonicalTheses ?? []).map((item) => <option key={item.id} value={item.id}>{canonicalThesisLabel(item)}</option>)}</select></div>
@@ -415,7 +428,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
               setCapital(value);
               setMissionDirty(true); // Preserve the operator-authored mission across parameter edits.
             }} help="Mission capital" />
-            {branch === "research" ? <MoneyField label="Target stretch" value={desiredEnding} onChange={setDesiredEnding} help="Aspiration · never a forecast" /> : <div className="border-b p-3 text-[0.68rem] sm:border-b-0 sm:border-r" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Target stretch<p className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Not used</p><span className="text-[10px]">{branch === "cash" ? "Cash carries $0 risk." : "Gate review, not return target."}</span></div>}
+            {branch === "research" ? <TargetProfitField value={targetProfit} onChange={setTargetProfit} period={targetPeriod} onPeriodChange={setTargetPeriod} /> : <div className="border-b p-3 text-[0.68rem] sm:border-b-0 sm:border-r" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Profit target<p className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Not used</p><span className="text-[10px]">{branch === "cash" ? "Cash carries $0 risk." : "Gate review, not return target."}</span></div>}
             <label className="border-b p-3 text-[0.68rem] sm:border-b-0 sm:border-r" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Horizon<select aria-label="Holding horizon" className="mt-1 min-h-11 w-full bg-transparent font-serif text-xl" style={{ color: "var(--sh-text-primary)" }} value={holdingPeriod} onChange={(event) => { setHoldingPeriod(event.target.value as HoldingPeriod); setMissionDirty(true); }}><option value="intraday">Today</option><option value="overnight">Next close</option><option value="swing">This week</option><option value="catalyst_window">Named catalyst</option><option value="position">Long term · review every 30 days</option></select><span className="text-[10px]">Outcome or review queued at horizon</span></label>
             <MoneyField label="Max planned loss" value={maxLoss} onChange={setMaxLoss} help={`${capitalCents > 0 ? `${((parseMoney(maxLoss) / capitalCents) * 100).toFixed(1)}% of mission capital` : "Can tighten, never loosen"}`} />
           </div>{!missionConfigured && <div role="status" className="mt-2 rounded-lg border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Mission not configured.</strong> Enter Capital and Max planned loss above $0. Preserve cash is a separate recorded decision.</div>}</div>
@@ -431,9 +444,9 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
             <label className="text-xs font-semibold">Objective<select aria-label="Mission objective" className="mt-1 min-h-10 w-full rounded-md border bg-transparent px-2" style={{ borderColor: "var(--sh-border-1)" }} value={objective} onChange={(event) => setObjective(event.target.value as Objective)}><option value="best_qualified_play">Best qualified play</option><option value="deploy_today">Deploy today</option><option value="verify_catalyst">Verify catalyst</option><option value="portfolio_gap">Portfolio gap</option><option value="preserve_optionality">Preserve optionality</option></select></label>
             <label className="text-xs font-semibold">Instrument preference<select aria-label="Instrument preference" className="mt-1 min-h-10 w-full rounded-md border bg-transparent px-2" style={{ borderColor: "var(--sh-border-1)" }} value={instrument} onChange={(event) => setInstrument(event.target.value as "shares" | "options" | "either")}><option value="shares">Shares</option><option value="either">Either, if eligible</option><option value="options">Defined-risk options</option></select></label>
             <label className="flex min-h-10 items-center gap-2 self-end text-xs font-semibold"><input type="checkbox" checked={includeHeld} onChange={(event) => setIncludeHeld(event.target.checked)} /> Include held research</label>
-          </div></details>
+          </div><fieldset className="border-t p-4" style={{ borderColor: "var(--sh-border-1)" }}><legend className="px-1 text-xs font-semibold">Underwriting horizons</legend><div className="mt-2 flex flex-wrap gap-2">{(["intraday", "overnight", "swing", "catalyst_window", "position"] as HoldingPeriod[]).map((period) => <label key={period} className="flex min-h-10 items-center gap-2 rounded-md border px-3 text-xs" style={{ borderColor: holdingPeriods.includes(period) ? "var(--sh-signal)" : "var(--sh-border-1)" }}><input type="checkbox" checked={holdingPeriods.includes(period)} onChange={(event) => setHoldingPeriods((current) => event.target.checked ? Array.from(new Set([...current, period])) : current.length === 1 ? current : current.filter((item) => item !== period))} />{horizonLabel(period)}</label>)}</div></fieldset></details>
 
-          <div id="mission-disposition" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold">Choose the outcome</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Search opens research. Hold and cash record a decision now.</p>
+          <div id="mission-disposition" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold">Choose the outcome</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Search opens underwriting. Hold and cash record a decision now.</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">{([
               { id: "research", label: "Search for a play", icon: FileSearch },
               { id: "conditional", label: "Hold for a condition", icon: ShieldCheck },
@@ -442,12 +455,12 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
             {branch !== "research" && <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold sm:col-span-2">Why this is the right outcome<Textarea value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1 min-h-16" placeholder="State the decision basis." /></label><TextField label="Current blocker" value={blocker} onChange={setBlocker} /><TextField label="Reopen when" value={reopen} onChange={setReopen} />{branch === "conditional" && <div className="sm:col-span-2"><TextField label="Named gate" value={gateLabel} onChange={setGateLabel} /></div>}</div>}
           </div>
         </div>
-        <footer className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><p className="max-w-xl text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{branch === "cash" ? "Records $0 at risk, removes the order path, and keeps the outcome look-back." : branch === "conditional" ? "Queues the named gate; no proposal or broker path opens." : "Creates research only. Proposal, approval, and account submission remain separate. Nothing is sent automatically."}</p><Button id="mission-primary-action" className="min-h-11 w-full sm:w-auto" disabled={busy || mission.trim().length < 20 || !missionConfigured || !dispositionReady} onClick={commit}>{busy ? "Recording…" : branch === "cash" ? "Record cash · $0 risk" : branch === "conditional" ? "Queue conditional review" : branch === "research" ? "Build Play Slate" : "Continue"}<ArrowRight className="ml-2 h-4 w-4" /></Button></footer></>}
+        <footer className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><p className="max-w-xl text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{branch === "cash" ? "Records $0 at risk, removes the order path, and keeps the outcome look-back." : branch === "conditional" ? "Queues the named gate; no proposal or broker path opens." : "Creates an underwriting receipt only. Research, proposal, approval, and submission remain separate."}</p><Button id="mission-primary-action" className="min-h-11 w-full sm:w-auto" disabled={busy || mission.trim().length < 20 || !missionConfigured || !dispositionReady} onClick={commit}>{busy ? "Recording…" : branch === "cash" ? "Record cash · $0 risk" : branch === "conditional" ? "Queue conditional review" : branch === "research" ? "Underwrite this mission" : "Continue"}<ArrowRight className="ml-2 h-4 w-4" /></Button></footer></>}
       </article>
 
       <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
         <section className="rounded-2xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-          <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: "var(--sh-signal)" }} /><p className="text-sm font-semibold">Suggested missions</p><ContextHelp title="How are these ranked?" what="The system compares thesis fit, account headroom, available evidence, and timing." next="Apply one to fill the mission. Build Play Slate creates research only; it does not send an order." align="start" /></div>
+          <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: "var(--sh-signal)" }} /><p className="text-sm font-semibold">Suggested missions</p><ContextHelp title="How are these ranked?" what="The system compares thesis fit, account headroom, available evidence, and timing." next="Apply one to fill the mission. Underwrite it to test feasibility before research; no order is sent." align="start" /></div>
           <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Ranked for this thesis, account, and timeframe. #1 is the best-supported research path—not the highest-return forecast.</p>
           {!libraryBindings.ready ? <p className="mt-3 rounded-lg border border-dashed p-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Mission Library is waiting for {libraryBindings.missing.join(", ")}. No contextual mission can be shown yet.</p> : library.isLoading ? <p className="mt-3 rounded-lg border border-dashed p-3 text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Loading contextual Mission Library…</p> : library.isError ? <p role="alert" className="mt-3 rounded-lg border border-dashed p-3 text-xs leading-5" style={{ borderColor: "var(--sh-red)", color: "var(--sh-red)" }}>Mission Library is unavailable. Contextual ranking is withheld until the API returns verified data.</p> : (library.data?.length ?? 0) === 0 ? <p className="mt-3 rounded-lg border border-dashed p-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>No contextual missions are available for this thesis, account, and horizon. No fallback missions are shown.</p> : <><div className="mt-3 space-y-2">{(showAllMissions ? library.data ?? [] : (library.data ?? []).slice(0, 3)).map((item, index) => <article key={item.key} className="rounded-xl border p-3" style={{ borderColor: item.objective === objective ? "var(--sh-signal)" : "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold">{index + 1}. {item.label}</p><StateMark state={item.readiness === "conditional" ? "conditional" : "researchable"} compact /></div><p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{item.reasons[0]}</p><Button type="button" variant="outline" size="sm" className="mt-3 min-h-11 w-full" onClick={() => chooseMission(item)}>Apply mission parameters</Button></article>)}</div>{(library.data?.length ?? 0) > 3 && <Button variant="ghost" size="sm" className="mt-2 w-full min-h-10" aria-expanded={showAllMissions} onClick={() => setShowAllMissions((value) => !value)}>{showAllMissions ? "Show common missions" : "Show " + ((library.data?.length ?? 3) - 3) + " more"}<ChevronDown className={"ml-2 h-4 w-4 " + (showAllMissions ? "rotate-180" : "")} /></Button>}</>}
         </section>
@@ -475,6 +488,10 @@ function ReceiptFact({ label, value }: { label: string; value: string }) {
 
 function MoneyField({ label, value, onChange, help }: { label: string; value: string; onChange: (value: string) => void; help: string }) {
   return <label className="border-b p-3 text-[0.68rem] sm:border-b-0 sm:border-r" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>{label}<div className="mt-1 flex items-center font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}><span aria-hidden="true">$</span><input aria-label={label} inputMode="decimal" placeholder="Enter amount" value={value ? displayMoney(value) : ""} onChange={(event) => onChange(event.target.value.replace(/[^0-9.]/g, ""))} className="min-w-0 w-full bg-transparent outline-none placeholder:font-sans placeholder:text-sm" /></div><span className="text-[10px]">{help}</span></label>;
+}
+
+function TargetProfitField({ value, onChange, period, onPeriodChange }: { value: string; onChange: (value: string) => void; period: "session" | "week" | "month"; onPeriodChange: (value: "session" | "week" | "month") => void }) {
+  return <label className="border-b p-3 text-[0.68rem] sm:border-b-0 sm:border-r" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Target profit<div className="mt-1 flex items-center font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}><span aria-hidden="true">$</span><input aria-label="Target profit" inputMode="decimal" placeholder="Optional" value={value ? displayMoney(value) : ""} onChange={(event) => onChange(event.target.value.replace(/[^0-9.]/g, ""))} className="min-w-0 w-full bg-transparent outline-none placeholder:font-sans placeholder:text-sm" /></div><select aria-label="Target period" className="mt-1 min-h-11 w-full rounded border bg-transparent px-2 text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} value={period} onChange={(event) => onPeriodChange(event.target.value as typeof period)}><option value="session">Per session</option><option value="week">Per week</option><option value="month">Per month</option></select><span className="mt-1 block text-[10px]">Aspiration to test · never sizes risk</span></label>;
 }
 
 function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {

@@ -130,6 +130,14 @@ export interface Mandate {
   maxDailyPlannedRiskPct: number;
   /** Most plays sharing a correlated cluster may plan to lose, combined. */
   maxCorrelatedPlannedRiskPct: number;
+  /** Underwriter-only ceiling for an unusually strong setup; downstream gates still control. */
+  maxHighConvictionRiskPctPerPlay: number;
+  /** Underwriter portfolio-wide open-risk envelope. */
+  maxAggregateOpenRiskPct: number;
+  /** Underwriter weekly stop. This never loosens the daily order gate. */
+  maxWeeklyPlannedRiskPct: number;
+  /** Maximum risk allocated across a known event window. */
+  maxEventRiskPct: number;
 }
 
 /**
@@ -154,6 +162,10 @@ export const MANDATE_V1: Mandate = {
   maxPlannedRiskPctPerPlay: 0.75,
   maxDailyPlannedRiskPct: 2,
   maxCorrelatedPlannedRiskPct: 1.25,
+  maxHighConvictionRiskPctPerPlay: 1.25,
+  maxAggregateOpenRiskPct: 3,
+  maxWeeklyPlannedRiskPct: 4,
+  maxEventRiskPct: 1.5,
 };
 
 /**

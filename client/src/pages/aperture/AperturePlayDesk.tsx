@@ -123,7 +123,7 @@ export default function AperturePlayDesk() {
       <ShieldCheck className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} />Review, approval, and submission remain separate human actions.
     </div>
 
-    {!isLoading && <OperatorDecisionBrief chooseCount={decisionReady.length} orders={operatorOrders} onOpenAction={({ runId, candidateId, lifecycle }) => {
+    {!isLoading && <OperatorDecisionBrief chooseCount={decisionReady.length} orders={operatorOrders} weeklyTargetCents={desk.data?.executionTarget?.targetProfitCents ?? null} onOpenAction={({ runId, candidateId, lifecycle }) => {
       if (runId == null) {
         selectStage("choose");
         return;
