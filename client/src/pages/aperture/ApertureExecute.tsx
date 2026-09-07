@@ -318,11 +318,13 @@ function MonitoringPanel({ runId, candidate, thesisSummary }: { runId: number; c
     .filter(({ review }) => review.needsReview);
   const primaryNextAction = reviewItems.find(({ review }) => review.state === "unknown")?.review.nextAction
     ?? reviewItems[0]?.review.nextAction;
+  const hasNegativeCatalyst = reviewItems.some(({ check, review }) => review.state === "flagged"
+    && (check.checkType === "thesis_invalidation" || check.checkType === "macro"));
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
-        <div className="min-w-0"><p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Check whether thesis still holds</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{candidate ? `Run sourced catalyst, invalidation, earnings, and macro checks for ${candidate.symbol}. A finding never submits or exits an order.` : "Choose a candidate from the decision brief before running monitored checks."}</p></div>
+        <div className="min-w-0"><p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Watch my six · thesis checks</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{candidate ? `Run sourced catalyst, invalidation, earnings, and macro checks for ${candidate.symbol}. A finding never submits, hedges, or exits an order.` : "Choose a candidate from the decision brief before running monitored checks."}</p></div>
         <Button variant="outline" className="min-h-11 w-full shrink-0 sm:w-auto" disabled={!candidate || runCheck.isPending} onClick={() => candidate && runCheck.mutate({ runId, candidateId: candidate.id, symbol: candidate.symbol, thesisSummary: thesisSummary?.trim() || `Monitor ${candidate.symbol} against the recorded paper thesis and its invalidation conditions.` })}>{runCheck.isPending ? <Loader2 aria-hidden="true" className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />}Run reviewed checks</Button>
       </div>
       {reviewItems.length > 0 && (
@@ -339,6 +341,7 @@ function MonitoringPanel({ runId, candidate, thesisSummary }: { runId: number; c
             </p>
           ))}
           <p className="ml-6 mt-2 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Next: {primaryNextAction}.</p>
+          {hasNegativeCatalyst && <p className="ml-6 mt-2 rounded-md border p-2 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><strong>Paper expression to evaluate:</strong> review a long put for bounded downside. Bear debit spreads are not supported in this build, and no offset is created automatically.</p>}
         </div>
       )}
 

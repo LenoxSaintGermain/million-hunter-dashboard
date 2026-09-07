@@ -28,6 +28,10 @@ describe("Capital Mission decision-path UX contract", () => {
     resolve(process.cwd(), "server/apertureRouter.ts"),
     "utf8",
   );
+  const cockpit = readFileSync(
+    resolve(process.cwd(), "client/src/components/aperture/CapitalCockpitRail.tsx"),
+    "utf8",
+  );
 
   it("keeps the mission-to-submit path visible without implying automatic execution", () => {
     expect(runway).toContain("Mission");
@@ -104,5 +108,27 @@ describe("Capital Mission decision-path UX contract", () => {
   it("lets suggested missions explicitly apply their parameters", () => {
     expect(runway).toContain("Apply mission parameters");
     expect(runway).not.toContain('label="Thesis match"');
+  });
+
+  it("separates the active thesis from the account portfolio constraint", () => {
+    expect(cockpit).toContain("Active thesis");
+    expect(cockpit).toContain("Portfolio constraint");
+    expect(cockpit).toContain("data.activeThesis.name");
+  });
+
+  it("adds a concise operator action card and three-bucket weekly plan", () => {
+    const desk = readFileSync(
+      resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"),
+      "utf8",
+    );
+    const brief = readFileSync(
+      resolve(process.cwd(), "client/src/components/aperture/OperatorDecisionBrief.tsx"),
+      "utf8",
+    );
+    expect(desk).toContain("<OperatorDecisionBrief");
+    expect(brief).toContain("What to do now");
+    expect(brief).toContain("Weekly execution plan");
+    expect(brief).toContain("Watch my six");
+    expect(brief).toContain("Target—not a forecast");
   });
 });

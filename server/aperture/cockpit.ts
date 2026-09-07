@@ -30,6 +30,7 @@ import { and, eq, gte, inArray } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   apertureRuns, brokerOrders, portfolioAccounts, positions as positionsTable,
+  thesisCompilations, users,
   type ApertureRun, type PortfolioAccount,
 } from "../../drizzle/schema";
 import { getFacts, normSymbol } from "./facts";
@@ -388,6 +389,8 @@ export interface Cockpit {
   liveTrading: false;
   mandate: CockpitMandateSummary;
   session: SessionRail;
+  /** The user's selected canonical thesis. Never inferred from a holding. */
+  activeThesis: { id: number; name: string } | null;
   account: AccountRail;
   headroom: HeadroomRail;
   run: RunRail | null;
@@ -484,6 +487,23 @@ export async function buildCockpit(args: BuildCockpitArgs): Promise<Cockpit> {
         .limit(1))[0] ?? null
     : null;
 
+  const [profile] = await db.select({ activeCapitalThesisId: users.activeCapitalThesisId })
+    .from(users)
+    .where(eq(users.id, args.userId))
+    .limit(1);
+  const activeThesisRow = profile?.activeCapitalThesisId == null
+    ? null
+    : (await db.select({ id: thesisCompilations.id, name: thesisCompilations.name })
+        .from(thesisCompilations)
+        .where(and(
+          eq(thesisCompilations.id, profile.activeCapitalThesisId),
+          eq(thesisCompilations.userId, args.userId),
+        ))
+        .limit(1))[0] ?? null;
+  const activeThesis = activeThesisRow == null
+    ? null
+    : { id: activeThesisRow.id, name: activeThesisRow.name?.trim() || "Untitled thesis" };
+
   // An explicit accountId wins; otherwise the run's own account is the subject.
   const accountId = args.accountId ?? run?.accountId ?? null;
   const account = accountId != null
@@ -566,6 +586,7 @@ export async function buildCockpit(args: BuildCockpitArgs): Promise<Cockpit> {
     liveTrading: false,
     mandate: buildCockpitMandateSummary(CURRENT_MANDATE),
     session: sessionRail(now),
+    activeThesis,
     account: accountRail(account ?? null, now),
     headroom: computeHeadroom({
       equityCents: account?.equityValueCents ?? null,

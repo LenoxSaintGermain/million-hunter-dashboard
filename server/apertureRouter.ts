@@ -65,7 +65,7 @@ import { buildCockpit } from "./aperture/cockpit";
 import { CURRENT_MANDATE, HOLDING_PERIOD_KEYS, MIN_NARRATIVE_CHARS, PAPER_ACKNOWLEDGEMENT } from "./aperture/mandate";
 import { runMonitoringChecks, getMonitoringChecks, getFlaggedChecks } from "./aperture/monitor";
 import { computeAlpha, getAlpha } from "./aperture/alpha";
-import { brokerOrders, monitoringChecks } from "../drizzle/schema";
+import { brokerOrders, monitoringChecks, positionSnapshots } from "../drizzle/schema";
 import { desc } from "drizzle-orm";
 import { buildCapitalDecisionBrief } from "./aperture/decisionBrief";
 import { ensureThesisReady } from "./aperture/thesisReadiness";
@@ -1855,6 +1855,7 @@ export const apertureRouter = router({
         filledQty: brokerOrders.filledQty,
         notionalCents: brokerOrders.notionalCents,
         plannedRiskCents: brokerOrders.plannedRiskCents,
+        holdingPeriod: brokerOrders.holdingPeriod,
         status: brokerOrders.status,
         brokerOrderId: brokerOrders.brokerOrderId,
         dispatchError: brokerOrders.dispatchError,
@@ -1926,7 +1927,47 @@ export const apertureRouter = router({
         .orderBy(desc(apertureActivePlayContexts.updatedAt))
         .limit(200);
 
-      return { orders, activePlays };
+      const candidateIds = Array.from(new Set(orders.flatMap((order) => order.candidateId == null ? [] : [order.candidateId])));
+      const monitoringRows = candidateIds.length
+        ? await db!.select().from(monitoringChecks)
+            .where(inArray(monitoringChecks.candidateId, candidateIds))
+            .orderBy(desc(monitoringChecks.checkedAt))
+        : [];
+      const monitoringByCandidate = new Map<number, typeof monitoringRows>();
+      for (const check of monitoringRows) {
+        const current = monitoringByCandidate.get(check.candidateId) ?? [];
+        if (current.some((item) => item.checkType === check.checkType)) continue;
+        monitoringByCandidate.set(check.candidateId, [...current, check]);
+      }
+
+      const accountIds = Array.from(new Set(orders.map((order) => order.accountId)));
+      const snapshotRows = accountIds.length
+        ? await db!.select({
+            accountId: positionSnapshots.accountId,
+            runId: positionSnapshots.runId,
+            symbol: positionSnapshots.symbol,
+            unrealizedPnlCents: positionSnapshots.unrealizedPnlCents,
+            priceBasis: positionSnapshots.priceBasis,
+            snapshotAt: positionSnapshots.snapshotAt,
+          }).from(positionSnapshots)
+            .where(inArray(positionSnapshots.accountId, accountIds))
+            .orderBy(desc(positionSnapshots.snapshotAt))
+            .limit(500)
+        : [];
+      const snapshotByOrderKey = new Map<string, typeof snapshotRows[number]>();
+      for (const snapshot of snapshotRows) {
+        const key = `${snapshot.accountId}:${snapshot.runId ?? ""}:${normSymbol(snapshot.symbol)}`;
+        if (!snapshotByOrderKey.has(key)) snapshotByOrderKey.set(key, snapshot);
+      }
+
+      return {
+        orders: orders.map((order) => ({
+          ...order,
+          monitoring: order.candidateId == null ? [] : monitoringByCandidate.get(order.candidateId) ?? [],
+          latestSnapshot: snapshotByOrderKey.get(`${order.accountId}:${order.runId}:${normSymbol(order.symbol)}`) ?? null,
+        })),
+        activePlays,
+      };
     }),
   }),
 

@@ -10,6 +10,7 @@ import { trpc } from "@/lib/trpc";
 import { buildResearchJourneys } from "@shared/runWorkspace";
 import { playDeskJourneyLane } from "@shared/playDeskState";
 import { isOptionInstrument, paperInstrumentDisplayLabel, parseOccOptionSymbol } from "@shared/paperInstrument";
+import { OperatorDecisionBrief } from "@/components/aperture/OperatorDecisionBrief";
 
 const money = (cents?: number | null) => cents == null
   ? "—"
@@ -80,6 +81,25 @@ export default function AperturePlayDesk() {
   const showChoose = stageFilter === "all" || stageFilter === "choose";
   const showApprove = stageFilter === "all" || stageFilter === "approve";
   const showMonitor = stageFilter === "all" || stageFilter === "monitor";
+  const operatorOrders = (desk.data?.orders ?? []).map((order) => ({
+    id: order.id,
+    runId: order.runId,
+    candidateId: order.candidateId,
+    symbol: order.underlyingSymbol ?? order.symbol,
+    instrumentType: order.instrumentType,
+    holdingPeriod: order.holdingPeriod,
+    status: order.status,
+    plannedRiskCents: order.plannedRiskCents,
+    monitoring: (order.monitoring ?? []).map((check) => ({
+      id: check.id,
+      checkType: check.checkType,
+      finding: check.finding,
+      flagged: check.flagged,
+      citations: Array.isArray(check.citations) ? check.citations.filter((citation): citation is string => typeof citation === "string") : [],
+      checkedAt: check.checkedAt,
+    })),
+    latestSnapshot: order.latestSnapshot,
+  }));
 
   const selectStage = (stage: Exclude<StageFilter, "all">) => {
     const next = stageFilter === stage ? "all" : stage;
@@ -102,6 +122,16 @@ export default function AperturePlayDesk() {
     <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}>
       <ShieldCheck className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} />Review, approval, and submission remain separate human actions.
     </div>
+
+    {!isLoading && <OperatorDecisionBrief chooseCount={decisionReady.length} orders={operatorOrders} onOpenAction={({ runId, candidateId, lifecycle }) => {
+      if (runId == null) {
+        selectStage("choose");
+        return;
+      }
+      const candidateQuery = candidateId == null ? "" : `?candidate=${candidateId}`;
+      const lifecycleQuery = lifecycle == null ? "" : `${candidateQuery ? "&" : "?"}lifecycle=${lifecycle}`;
+      navigate(`/aperture/run/${runId}${candidateId == null ? "" : "/execute"}${candidateQuery}${lifecycleQuery}`);
+    }} />}
 
     <section className="grid grid-cols-3 overflow-hidden rounded-xl border" aria-label="Filter by workflow stage" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
       <StageMetric label="Choose" value={decisionReady.length} detail="plays to decide" active={stageFilter === "choose"} onSelect={() => selectStage("choose")} />
