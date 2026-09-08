@@ -81,6 +81,17 @@ describe("guided underwriting and returning check-in UX contracts", () => {
     expect(suggestions).toBeGreaterThan(-1);
   });
 
+  it("withholds the underwriting action while the persisted result is still loading", () => {
+    const runway = read("client/src/components/aperture/DecisionRunway.tsx");
+
+    expect(runway).toContain("const persistedUnderwritingLoading");
+    expect(runway).toContain("currentDecisionRunId != null && currentUnderwriting.isLoading");
+    expect(runway).toContain("underwritingResult.decisionRevisionId === currentDecisionRevisionId");
+    expect(runway).toContain("Checking saved underwriting…");
+    expect(runway).toContain("Checking saved result");
+    expect(runway).toContain("persistedUnderwritingLoading || underwritingComplete");
+  });
+
   it("makes the persisted completed result reachable from Today without inventing client lifecycle state", () => {
     const briefing = read("client/src/components/aperture/TodayAttentionBriefing.tsx");
     const attention = read("shared/apertureAttention.ts");
