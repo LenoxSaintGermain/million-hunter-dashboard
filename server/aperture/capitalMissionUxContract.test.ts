@@ -38,7 +38,7 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(runway).toContain("Underwrite");
     expect(runway).toContain("Research");
     expect(runway).toContain("Paper");
-    expect(runway).toContain("Research, proposal, approval, and submission remain separate");
+    expect(runway).toContain("No research run, paper ticket, approval, submission, or broker order has been created");
   });
 
   it("explains Capital Mission and ranked suggestions in concise, actionable language", () => {
@@ -49,7 +49,7 @@ describe("Capital Mission decision-path UX contract", () => {
   });
 
   it("uses account-mode wording instead of repeating paper in the play-list heading", () => {
-    expect(plays).toContain("Today’s plays");
+    expect(plays).toContain("Research queue");
     expect(plays).toContain("Account · as of");
     expect(plays).toContain("Paper account · human approval required");
     expect(plays).not.toContain("Today’s paper plays");
@@ -82,7 +82,8 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(runway).toContain("Search for a play");
     expect(runway).toContain("Hold for a condition");
     expect(runway).toContain("Preserve cash");
-    expect(runway).toContain('branch === "research" ? "Underwrite this mission"');
+    expect(runway).toContain('"Underwrite my mission"');
+    expect(runway).toContain("Builds a research playbook. Does not create or submit an order.");
     expect(runway).not.toContain("Compile Play Slate");
   });
 
@@ -92,8 +93,11 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(runway).toContain('id="mission-math"');
     expect(runway).toContain("onDiagnosticSelect");
     expect(runway).toContain('placeholder="Enter amount"');
-    expect(runway).toContain('const canOpenSlate = currentBindingMatches && authoritativeLatest?.runId != null && (latestBranch === "research" || latestBranch === "eligible");');
-    expect(runway).toContain("disabled={!canOpenSlate}");
+    expect(runway).toContain('aria-label="Capital Mission sections"');
+    expect(runway).toContain("Thesis & horizon");
+    expect(runway).toContain("Account & risk");
+    expect(runway).toContain("Review & underwrite");
+    expect(runway).not.toContain("canOpenSlate");
   });
 
   it("fails closed on deep links when the current mission revision no longer authorizes research", () => {

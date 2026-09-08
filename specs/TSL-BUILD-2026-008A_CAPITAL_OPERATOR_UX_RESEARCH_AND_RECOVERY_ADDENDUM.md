@@ -270,3 +270,47 @@ For the next demo, the strict zero-order UAT boundary in this addendum governs. 
 - Can the operators provide a redacted Fidelity export, and which account and asset types must be supported?
 - What should be shared between the two operator identities, and what should remain private or separately attributable?
 - Which alert channels, quiet hours, and escalation rules are preferred?
+
+## 10. Play Underwriting interaction addendum — 2026-09-08
+
+This section supersedes the earlier mandatory screen sequence and default information visibility. It does not weaken evidence, risk, persistence, paper-only, approval, or submission controls.
+
+### Product entry and navigation
+
+- Derive `Start`, `Resume`, and `Check in` from persisted records. Never use visit count or a browser-only onboarding flag.
+- `Today` answers what changed and what needs attention. `Mission` creates or revises the plan. `Play Desk` manages detailed play and execution state. The Underwriter is a phase inside Mission, not another homepage.
+- Operators with active work open on a status briefing. Missing preferences are requested only when the selected action needs them.
+
+### Mission and underwriting
+
+- Use one guided Mission workspace with three sections: Thesis and horizon, Account and risk, Review and underwrite. Completed sections remain compact and editable; the active section is emphasized.
+- Permit a saved thesis or an inline belief. Preserve the draft when deeper thesis editing is necessary.
+- Show provenance beside reused values and distinguish allocated mission capital from total account value.
+- Expose the binding effective risk limit beside the operator-entered limit and explain why the tighter value controls.
+- Show target feasibility and assumptions before authorization. The single primary research action is `Underwrite my mission`, with the explicit effect: builds a research playbook and creates or submits no order.
+- Once authorized, run through to zero to three conditional plays or a clear no-trade result. Do not add an explanatory permission screen or a second “build playbook” click.
+- Lead with a concise synthesis and the plays. Market regime, tactical thesis, and feasibility support the result at Evidence depth.
+- `Validate this play` carries exact Mission and play identity into existing evidence review. The transition receipt states what remains and that no paper ticket exists.
+
+### Today attention model
+
+- The first meaningful mobile viewport shows account/mode, whether attention is required, and the most important next action.
+- Use one shared deterministic priority model across Today, Play Desk, and detail routes. Material exposure, unresolved dispatch, time-sensitive reviews, and blocking uncertainty outrank routine monitoring and optional research.
+- Keep `Updated`, `Seen`, `Acknowledged`, and `Resolved` separate. Capture the comparison baseline before marking displayed versions Seen. Ordinary Today reads must not mutate workflow records.
+- First baseline uses `Current status`; later comparisons use `Changed since your last review`. Deduplicate findings and ignore timestamp-only churn unless freshness changes eligibility.
+- A filter may not hide critical issues elsewhere in authorized active work. Show an out-of-filter count and exact route.
+- A quiet check-in is valid. Never manufacture urgency or imply continuous monitoring when checks are on demand.
+
+### Lifecycle, failure, and accessibility
+
+- Derive labels and actions from the existing lifecycle; do not invent parallel order states. Keep submitted, broker accepted, partial fill, open position, and dispatch unresolved distinct.
+- Disabled consequential actions require a nearby explanation and recovery path.
+- Distinguish loading, empty, stale, partial, failed, and complete. A failed source must not collapse to an empty all-clear, and a refresh preserves the last successful timestamped result.
+- Revisions require a visible before/after review and recomputation. They never silently alter orders or reuse an old approval under changed assumptions.
+- Use the existing design system, a single-column mobile reading order, at least 44 CSS pixel important controls, visible keyboard focus, non-color status cues, assistive-technology status updates, and reduced-motion-compatible transitions.
+
+### Acceptance evidence
+
+- Deterministic tests cover all three entry states, material priority, filter-independent critical attention, partial fills, read failures, timestamp deduplication, direct identity-preserving routes, and absence of unintended order or workflow mutations.
+- Provide annotated setup and returning check-in walkthroughs, representative desktop and mobile screenshots, behavioral results, and an explicit list of unverified interactions before claiming UX completion.
+- Screenshots and unit tests are implementation evidence, not proof of user-tested usability. The usability target is that a returning operator can identify status and next action in roughly ten seconds during observed UAT.

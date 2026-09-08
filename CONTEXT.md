@@ -8,3 +8,7 @@
 - **Validate this play** — the explicit handoff from a selected blueprint into the existing research and evidence lifecycle.
 - **Play Desk** — the existing downstream operator surface for researched plays, tickets, approval, submission, monitoring, and records.
 - **NO_TRADE / Sit Out** — a first-class underwriting decision with a reason and reopening condition. It creates no proposal or order.
+- **Entry state** — a persisted lifecycle-derived presentation mode: `Start` when no usable Mission exists, `Resume` when authorized work is incomplete, or `Check in` when plays, orders, positions, or waiting decisions already exist. It is never based on visit count or device-local onboarding state.
+- **Attention item** — a deterministic, material issue derived from authoritative lifecycle records. One item may be primary without hiding other critical issues.
+- **Updated / Seen / Acknowledged / Resolved** — separate states. Updated means the source record changed; Seen means that version was displayed; Acknowledged is an explicit operator act; Resolved means the workflow condition cleared.
+- **Information depth** — stable progressive disclosure: Glance for state and next action, Decision for implication and alternatives, Evidence for sources and calculations, and Record for prior revisions and events.

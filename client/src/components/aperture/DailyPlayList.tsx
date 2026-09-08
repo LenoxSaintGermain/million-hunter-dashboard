@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, ChevronDown, CircleSlash2, FileSearch, GitCompareArrows, Loader2, Target } from "lucide-react";
+import { ArrowRight, ChevronDown, CircleSlash2, FileSearch, GitCompareArrows, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
@@ -9,6 +9,7 @@ import { dailyPlayPrimaryDestination } from "@shared/dailyPlayActions";
 import { easternDateKeyFromEpoch } from "@shared/easternMarketTime";
 import { PlayRecipeCard } from "./PlayRecipeCard";
 import { ContextHelp } from "./ContextHelp";
+import { TodayAttentionBriefing } from "./TodayAttentionBriefing";
 
 function money(cents: number | null | undefined) {
   return cents == null ? "Not set" : `$${Math.round(cents / 100).toLocaleString()}`;
@@ -30,7 +31,8 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
   onNewResearch: () => void;
   onOpenRun: (runId: number, candidateId: number, view?: string) => void;
 }) {
-  const { data: playList, isLoading } = trpc.aperture.play.list.useQuery();
+  const { data: playList, isLoading, refetch: refetchPlays } = trpc.aperture.play.list.useQuery();
+  const desk = trpc.aperture.desk.summary.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const { data: accounts } = trpc.aperture.account.list.useQuery();
   const { data: activeCapitalContext } = trpc.thesis.activeCapital.useQuery();
   const { data: runway } = trpc.aperture.runway.latest.useQuery();
@@ -108,13 +110,23 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
   }, [expandedId, onOpenRun, ranked]);
 
   return <section className="space-y-5">
+    <TodayAttentionBriefing
+      attention={desk.data?.attention ?? null}
+      accountLabel={preferredAccount ? `${preferredAccount.label}${preferredAccount.lastSyncedAt ? ` · account snapshot ${new Date(preferredAccount.lastSyncedAt).toLocaleString()}` : " · account snapshot not measured"}` : "No execution account selected"}
+      modeLabel={preferredAccount?.isPaper ? "Paper" : preferredAccount ? "Execution unavailable" : "Account not selected"}
+      loading={desk.isLoading}
+      failed={desk.error?.message ?? null}
+      onOpen={(href) => window.location.assign(href)}
+      onRetry={() => { void Promise.all([desk.refetch(), refetchPlays()]); }}
+      onNewMission={onNewMission}
+    />
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
-        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture · today</p>
-        <div className="flex items-center gap-1"><h1 className="mt-1 font-serif text-3xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Today’s plays</h1><ContextHelp title="What happens here?" what="Choose a researched setup, move an existing ticket forward, or monitor a play already in motion." next="The account-mode label below tells you whether an approved submission goes to paper or live execution." align="start" /></div>
-        <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Choose one setup, record a skip, or preserve cash. Open details only when you need to validate.</p>
+        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Decision depth</p>
+        <div className="flex items-center gap-1"><h2 className="mt-1 font-serif text-2xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Research queue</h2><ContextHelp title="What is shown here?" what="Research candidates that still need a choice. Work already in motion remains summarized in the briefing above." next="Open only the play whose evidence or action you need to inspect." align="start" /></div>
+        <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Validate a setup, record a skip, or preserve cash without replaying the full research history.</p>
       </div>
-      <div className="flex flex-wrap gap-2"><Button className="min-h-11" onClick={onNewMission}><Target className="mr-2 h-4 w-4" />New Capital Mission</Button><Button className="min-h-11" variant="outline" disabled={!hasTodayPlay || captureComparison.isPending} title={hasTodayPlay ? "Capture today's eligible paper plays before choosing a disposition" : "Available on the declared ET decision date"} onClick={() => captureComparison.mutate({ windowKey: "operator_decision" })}>{captureComparison.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitCompareArrows className="mr-2 h-4 w-4" />}Compare today</Button><Button className="min-h-11" variant="ghost" onClick={onNewResearch}><FileSearch className="mr-2 h-4 w-4" />Research brief</Button></div>
+      <div className="flex flex-wrap gap-2"><Button className="min-h-11" variant="outline" disabled={!hasTodayPlay || captureComparison.isPending} title={hasTodayPlay ? "Capture today's eligible paper plays before choosing a disposition" : "Available on the declared ET decision date"} onClick={() => captureComparison.mutate({ windowKey: "operator_decision" })}>{captureComparison.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitCompareArrows className="mr-2 h-4 w-4" />}Compare today</Button><Button className="min-h-11" variant="ghost" onClick={onNewResearch}><FileSearch className="mr-2 h-4 w-4" />Research brief</Button></div>
     </header>
 
     <div className="grid gap-px overflow-hidden rounded-xl border sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>

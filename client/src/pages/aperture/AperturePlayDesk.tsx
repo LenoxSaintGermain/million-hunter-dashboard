@@ -123,6 +123,11 @@ export default function AperturePlayDesk() {
       <ShieldCheck className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} />Review, approval, and submission remain separate human actions.
     </div>
 
+    {desk.error && <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><p className="font-semibold">Play Desk status could not be verified.</p><p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>{desk.error.message} An empty result is not treated as an all-clear.</p></section>}
+    {desk.data?.attention.primary && <section className="rounded-xl border p-4" style={{ borderColor: desk.data.attention.primary.critical ? "var(--sh-red)" : "var(--sh-signal)", background: "var(--sh-surface)" }}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Needs you now · {desk.data.attention.primary.stateLabel}</p><h2 className="mt-1 font-serif text-xl">{desk.data.attention.primary.title}</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{desk.data.attention.primary.consequence}{desk.data.attention.otherCritical.length ? ` · ${desk.data.attention.otherCritical.length} other critical issue${desk.data.attention.otherCritical.length === 1 ? "" : "s"} remains visible above all filters.` : ""}</p></div><Button className="min-h-11 shrink-0" onClick={() => navigate(desk.data!.attention.primary!.href)}>{desk.data.attention.primary.actionLabel}<ArrowRight className="ml-2 h-4 w-4" /></Button></div>
+    </section>}
+
     {!isLoading && <OperatorDecisionBrief chooseCount={decisionReady.length} orders={operatorOrders} weeklyTargetCents={desk.data?.executionTarget?.targetProfitCents ?? null} onOpenAction={({ runId, candidateId, lifecycle }) => {
       if (runId == null) {
         selectStage("choose");

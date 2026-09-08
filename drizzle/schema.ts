@@ -20,6 +20,7 @@ import type {
   TargetFeasibility,
   TradePlayBlueprint,
 } from "../shared/playUnderwriting";
+import type { ApertureAttentionBaseline } from "../shared/apertureAttention";
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 export const users = mysqlTable("users", {
@@ -1571,6 +1572,26 @@ export const apertureUnderwritingRevisions = mysqlTable("aperture_underwriting_r
   byDecisionRevision: index("aperture_underwriting_revisions_decision_idx").on(table.decisionRevisionId, table.createdAt),
 }));
 export type ApertureUnderwritingRevision = typeof apertureUnderwritingRevisions.$inferSelect;
+
+/**
+ * Last attention snapshot actually displayed to one operator.
+ *
+ * This is a comparison baseline only. It never acknowledges a finding, resolves
+ * a gate, changes an order, or alters the authoritative lifecycle record.
+ */
+// Comparison only: seeing a rendered version never acknowledges or resolves it.
+export const apertureAttentionBaselines = mysqlTable("aperture_attention_baselines", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  snapshot: json("snapshot").$type<ApertureAttentionBaseline>().notNull(),
+  token: varchar("token", { length: 64 }).notNull(),
+  capturedAt: bigint("captured_at", { mode: "number" }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  ownerUnique: uniqueIndex("aperture_attention_baselines_owner_uq").on(table.userId),
+}));
+export type ApertureAttentionBaselineRow = typeof apertureAttentionBaselines.$inferSelect;
 
 /** Horizon-aware review queue. It prompts a human; it never exits a position. */
 export const aperturePendingOutcomes = mysqlTable("aperture_pending_outcomes", {

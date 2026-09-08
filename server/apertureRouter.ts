@@ -34,6 +34,7 @@ import {
   apertureDecisionRevisions,
   apertureUnderwritingRuns,
   apertureUnderwritingRevisions,
+  apertureAttentionBaselines,
   aperturePendingOutcomes,
   apertureSetAside,
   disclosurePlans,
@@ -105,6 +106,7 @@ import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadin
 import { detailsFromCanonicalRecord } from "../shared/capitalThesisStructure";
 import { classifyDeskCandidate, summarizeDeskCandidates } from "../shared/playDeskState";
 import { underwriteCapitalMission } from "./aperture/underwriter";
+import { attentionBaselineToken, deriveApertureAttention, type ApertureAttentionBaseline } from "../shared/apertureAttention";
 import type { CapitalObjective, PlayUnderwritingResult } from "../shared/playUnderwriting";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -2265,14 +2267,172 @@ export const apertureRouter = router({
         if (!snapshotByOrderKey.has(key)) snapshotByOrderKey.set(key, snapshot);
       }
 
-      const [latestUnderwriting] = await db!.select({
-        objective: apertureUnderwritingRevisions.objective,
-        updatedAt: apertureUnderwritingRuns.updatedAt,
-      }).from(apertureUnderwritingRuns)
-        .innerJoin(apertureUnderwritingRevisions, eq(apertureUnderwritingRevisions.id, apertureUnderwritingRuns.currentRevisionId))
-        .where(eq(apertureUnderwritingRuns.userId, ctx.user.id))
-        .orderBy(desc(apertureUnderwritingRuns.updatedAt))
+      const [latestMission] = await db!.select({
+        decisionRunId: apertureDecisionRuns.id,
+        revisionId: apertureDecisionRevisions.id,
+        researchRunId: apertureDecisionRuns.researchRunId,
+        lifecycle: apertureDecisionRuns.lifecycle,
+        missionText: apertureDecisionRevisions.missionText,
+        deployableCapitalCents: apertureDecisionRevisions.deployableCapitalCents,
+        maxPlannedLossCents: apertureDecisionRevisions.maxPlannedLossCents,
+        thesisName: thesisCompilations.name,
+        updatedAt: apertureDecisionRuns.updatedAt,
+      }).from(apertureDecisionRuns)
+        .innerJoin(apertureDecisionRevisions, and(
+          eq(apertureDecisionRevisions.id, apertureDecisionRuns.currentRevisionId),
+          eq(apertureDecisionRevisions.decisionRunId, apertureDecisionRuns.id),
+        ))
+        .innerJoin(thesisCompilations, eq(thesisCompilations.id, apertureDecisionRuns.canonicalThesisId))
+        .where(and(eq(apertureDecisionRuns.userId, ctx.user.id), eq(thesisCompilations.userId, ctx.user.id)))
+        .orderBy(desc(apertureDecisionRuns.updatedAt))
         .limit(1);
+
+      const [latestUnderwriting] = latestMission
+        ? await db!.select({
+            objective: apertureUnderwritingRevisions.objective,
+            decisionRevisionId: apertureUnderwritingRevisions.decisionRevisionId,
+            selectedPlayId: apertureUnderwritingRuns.selectedPlayId,
+            updatedAt: apertureUnderwritingRuns.updatedAt,
+          }).from(apertureUnderwritingRuns)
+            .innerJoin(apertureUnderwritingRevisions, eq(apertureUnderwritingRevisions.id, apertureUnderwritingRuns.currentRevisionId))
+            .where(and(
+              eq(apertureUnderwritingRuns.userId, ctx.user.id),
+              eq(apertureUnderwritingRuns.decisionRunId, latestMission.decisionRunId),
+            ))
+            .limit(1)
+        : [undefined];
+
+      const evidenceTasks = latestMission?.researchRunId == null ? [] : await (async () => {
+        const candidates = await db!.select({
+          id: apertureCandidates.id,
+          symbol: apertureCandidates.symbol,
+          verifyFields: apertureCandidates.verifyFields,
+          createdAt: apertureCandidates.createdAt,
+        }).from(apertureCandidates).where(eq(apertureCandidates.runId, latestMission.researchRunId!));
+        if (!candidates.length) return [];
+        const reviews = await db!.select().from(apertureEvidenceReviews).where(and(
+          eq(apertureEvidenceReviews.userId, ctx.user.id),
+          eq(apertureEvidenceReviews.runId, latestMission.researchRunId!),
+          inArray(apertureEvidenceReviews.candidateId, candidates.map((candidate) => candidate.id)),
+        ));
+        return candidates.flatMap((candidate) => {
+          const readiness = getEvidenceReviewReadiness(
+            normalizeStringList(candidate.verifyFields),
+            reviews.filter((review) => review.candidateId === candidate.id),
+          );
+          return readiness.unreviewedChecks.length === 0 ? [] : [{
+            runId: latestMission.researchRunId!,
+            candidateId: candidate.id,
+            symbol: candidate.symbol,
+            remaining: readiness.unreviewedChecks.length,
+            finding: readiness.unreviewedChecks[0] ?? null,
+            updatedAt: Math.max(candidate.createdAt, ...reviews.filter((review) => review.candidateId === candidate.id).map((review) => review.reviewedAt)),
+          }];
+        });
+      })();
+
+      const pendingReviewRows = await db!.select({
+        id: aperturePendingOutcomes.id,
+        kind: aperturePendingOutcomes.kind,
+        dueAt: aperturePendingOutcomes.dueAt,
+        updatedAt: aperturePendingOutcomes.updatedAt,
+        decisionRunId: aperturePendingOutcomes.decisionRunId,
+        revisionId: aperturePendingOutcomes.revisionId,
+        gateLabel: apertureDecisionRevisions.namedGateLabel,
+        thesisName: thesisCompilations.name,
+        orderRunId: brokerOrders.runId,
+        orderCandidateId: brokerOrders.candidateId,
+        orderSymbol: brokerOrders.symbol,
+      }).from(aperturePendingOutcomes)
+        .innerJoin(apertureDecisionRuns, eq(aperturePendingOutcomes.decisionRunId, apertureDecisionRuns.id))
+        .innerJoin(apertureDecisionRevisions, eq(aperturePendingOutcomes.revisionId, apertureDecisionRevisions.id))
+        .innerJoin(thesisCompilations, eq(apertureDecisionRuns.canonicalThesisId, thesisCompilations.id))
+        .leftJoin(brokerOrders, and(eq(aperturePendingOutcomes.orderId, brokerOrders.id), eq(brokerOrders.userId, ctx.user.id)))
+        .where(and(
+          eq(aperturePendingOutcomes.userId, ctx.user.id),
+          eq(apertureDecisionRuns.userId, ctx.user.id),
+          inArray(aperturePendingOutcomes.status, ["pending", "due"]),
+        ))
+        .orderBy(asc(aperturePendingOutcomes.dueAt));
+      const [attentionBaseline] = await db!.select({ snapshot: apertureAttentionBaselines.snapshot })
+        .from(apertureAttentionBaselines)
+        .where(eq(apertureAttentionBaselines.userId, ctx.user.id))
+        .limit(1);
+      const [monitoringPreference] = await db!.select({ scheduled: users.dailyOutcomeRefreshEnabled })
+        .from(users).where(eq(users.id, ctx.user.id)).limit(1);
+      const lastMaterialAt = Math.max(
+        0,
+        latestMission?.updatedAt ?? 0,
+        latestUnderwriting?.updatedAt ?? 0,
+        ...orders.map((order) => order.updatedAt),
+        ...activePlays.map((play) => play.updatedAt),
+        ...monitoringRows.map((check) => check.checkedAt),
+      );
+      const attention = deriveApertureAttention({
+        now: Date.now(),
+        mission: latestMission ? {
+          decisionRunId: latestMission.decisionRunId,
+          revisionId: latestMission.revisionId,
+          state: latestMission.missionText.trim().length >= MIN_NARRATIVE_CHARS && latestMission.deployableCapitalCents > 0 && latestMission.maxPlannedLossCents > 0 ? "complete" : "incomplete",
+          title: latestMission.thesisName ?? "Capital Mission",
+          updatedAt: latestMission.updatedAt,
+        } : null,
+        underwriting: latestMission && latestMission.researchRunId == null ? {
+          decisionRunId: latestMission.decisionRunId,
+          revisionId: latestMission.revisionId,
+          state: latestUnderwriting?.decisionRevisionId === latestMission.revisionId ? "complete" : "not_started",
+          updatedAt: latestUnderwriting?.updatedAt ?? latestMission.updatedAt,
+        } : null,
+        evidenceTasks,
+        orders: orders.map((order) => ({
+          id: order.id,
+          runId: order.runId,
+          candidateId: order.candidateId,
+          symbol: order.underlyingSymbol ?? order.symbol,
+          status: order.status,
+          qty: order.qty,
+          filledQty: order.filledQty,
+          brokerOrderId: order.brokerOrderId,
+          dispatchError: order.dispatchError,
+          updatedAt: order.updatedAt,
+        })),
+        activePlays: activePlays.map((play) => ({
+          id: play.id,
+          symbol: play.symbol,
+          state: play.status === "watching" ? "watching" : "open_position",
+          detail: play.thesisNote,
+          href: "/aperture/plays",
+          updatedAt: play.updatedAt,
+          reviewAt: null,
+        })),
+        pendingReviews: pendingReviewRows.map((review) => ({
+          id: review.id,
+          kind: review.kind,
+          dueAt: review.dueAt,
+          updatedAt: review.updatedAt,
+          title: review.orderSymbol ? `${review.orderSymbol} review` : review.gateLabel ?? review.thesisName ?? "Decision review",
+          href: review.orderRunId != null
+            ? `/aperture/run/${review.orderRunId}/execute?candidate=${review.orderCandidateId ?? ""}`
+            : `/aperture/decision/${review.decisionRunId}/revision/${review.revisionId}`,
+        })),
+        monitoringFindings: Array.from(new Map(orders.flatMap((order) => (order.candidateId == null ? [] : (monitoringByCandidate.get(order.candidateId) ?? []))
+          .filter((check) => check.flagged && check.finding)
+          .map((check) => [check.id, {
+            id: check.id,
+            orderId: order.id,
+            runId: order.runId,
+            candidateId: order.candidateId,
+            symbol: order.underlyingSymbol ?? order.symbol,
+            kind: check.checkType === "thesis_invalidation" ? "invalidation" as const : "material_change" as const,
+            finding: check.finding!,
+            checkedAt: check.checkedAt,
+          }] as const))).values()),
+        checks: {
+          state: "complete",
+          asOf: lastMaterialAt || null,
+          monitoring: monitoringPreference?.scheduled ? "scheduled" : "on_demand",
+        },
+      }, attentionBaseline?.snapshot ?? null);
 
       return {
         orders: orders.map((order) => ({
@@ -2284,7 +2444,36 @@ export const apertureRouter = router({
         executionTarget: latestUnderwriting?.objective.targetProfitCents != null && latestUnderwriting.objective.targetPeriod === "week"
           ? { targetProfitCents: latestUnderwriting.objective.targetProfitCents, targetPeriod: "week" as const, asOf: latestUnderwriting.updatedAt }
           : null,
+        attention,
       };
+    }),
+    markSeen: capitalOperatorProcedure.input(z.object({
+      token: z.string().min(1).max(64),
+      snapshot: z.object({
+        capturedAt: z.number().int().nonnegative(),
+        items: z.array(z.object({ key: z.string().min(1).max(255), fingerprint: z.string().min(1).max(64) })).max(1_000),
+      }),
+    })).mutation(async ({ ctx, input }) => {
+      const snapshot = input.snapshot as ApertureAttentionBaseline;
+      if (attentionBaselineToken(snapshot) !== input.token) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The displayed attention snapshot could not be verified." });
+      }
+      const db = await getDb();
+      const now = Date.now();
+      await db!.insert(apertureAttentionBaselines).values({
+        userId: ctx.user.id,
+        snapshot,
+        token: input.token,
+        capturedAt: snapshot.capturedAt,
+        createdAt: now,
+        updatedAt: now,
+      }).onDuplicateKeyUpdate({ set: {
+        snapshot,
+        token: input.token,
+        capturedAt: snapshot.capturedAt,
+        updatedAt: now,
+      } });
+      return { seen: true, capturedAt: snapshot.capturedAt };
     }),
   }),
 
