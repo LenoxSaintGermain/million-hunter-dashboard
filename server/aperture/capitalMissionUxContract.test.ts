@@ -120,6 +120,16 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(cockpit).toContain("data.activeThesis.name");
   });
 
+  it("keeps the mobile glance compact without hiding mode, freshness, thesis, or the binding constraint", () => {
+    expect(cockpit).toContain('className="sm:hidden"');
+    expect(cockpit).toContain('label="Paper mode"');
+    expect(cockpit).toContain("staleText");
+    expect(cockpit).toContain("Thesis {data.activeThesis?.name");
+    expect(cockpit).toContain('label="Constraint"');
+    expect(cockpit).toContain("% used");
+    expect(cockpit).toContain("existing positions are unchanged");
+  });
+
   it("adds a concise operator action card and three-bucket weekly plan", () => {
     const desk = readFileSync(
       resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"),
