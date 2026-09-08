@@ -538,7 +538,7 @@ export async function buildCockpit(args: BuildCockpitArgs): Promise<Cockpit> {
     rows.filter((r) => r.side === "buy").reduce((s, r) => s + (r.gated ?? r.notional ?? 0), 0);
 
   const dayStart = startOfEtDay(now);
-  const todayRows = dayStart == null ? null : await db.select({
+  const todayRows = dayStart == null || account == null ? null : await db.select({
     gated: brokerOrders.gatedNotionalCents,
     notional: brokerOrders.notionalCents,
     side: brokerOrders.side,
@@ -546,6 +546,7 @@ export async function buildCockpit(args: BuildCockpitArgs): Promise<Cockpit> {
     plannedRisk: brokerOrders.plannedRiskCents,
   }).from(brokerOrders).where(and(
     eq(brokerOrders.userId, args.userId),
+    eq(brokerOrders.accountId, account.id),
     gte(brokerOrders.createdAt, dayStart),
     inArray(brokerOrders.status, [...LIVE_ORDER_STATUSES]),
   ));

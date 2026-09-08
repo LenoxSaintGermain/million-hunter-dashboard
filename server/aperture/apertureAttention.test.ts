@@ -140,4 +140,44 @@ describe("Capital Aperture attention briefing", () => {
     expect(result.primary).toBeNull();
     expect(result.inMotion[0]?.symbol).toBe("MRVL");
   });
+
+  it("shows a completed no-trade underwriting receipt without manufacturing urgency", () => {
+    const result = deriveApertureAttention(base({
+      mission: { decisionRunId: 42, revisionId: 7, state: "complete", title: "MRVL", updatedAt: now - 8_000 },
+      underwriting: {
+        decisionRunId: 42,
+        revisionId: 7,
+        state: "complete",
+        outcome: "no_trade",
+        resultSummary: "No play clears the current portfolio headroom.",
+        reopenCondition: "Reassess after open risk falls.",
+        updatedAt: now - 1_000,
+      },
+    }), null);
+
+    expect(result.primary).toBeNull();
+    expect(result.quiet).toBe(true);
+    expect(result.changed[0]).toMatchObject({
+      kind: "underwriting_complete",
+      actionLabel: "Review no-trade result",
+      href: "/aperture/decision/42/revision/7/underwrite",
+    });
+  });
+
+  it("keeps unresolved dispatch primary while retaining a completed underwriting update", () => {
+    const result = deriveApertureAttention(base({
+      mission: { decisionRunId: 42, revisionId: 7, state: "complete", title: "Portfolio", updatedAt: now - 8_000 },
+      underwriting: {
+        decisionRunId: 42,
+        revisionId: 7,
+        state: "complete",
+        outcome: "no_trade",
+        updatedAt: now - 2_000,
+      },
+      orders: [{ id: 9, runId: 88, candidateId: 3, symbol: "MGM", status: "submitted", qty: 1, filledQty: 0, dispatchError: "timeout", updatedAt: now - 1_000 }],
+    }), null);
+
+    expect(result.primary?.kind).toBe("dispatch_unresolved");
+    expect(result.changed.some((item) => "kind" in item && item.kind === "underwriting_complete")).toBe(true);
+  });
 });

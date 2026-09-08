@@ -15,6 +15,9 @@ export type AttentionUnderwriting = {
   state: "not_started" | "queued" | "running" | "failed" | "complete";
   updatedAt: number;
   error?: string | null;
+  outcome?: "plays" | "no_trade" | null;
+  resultSummary?: string | null;
+  reopenCondition?: string | null;
 };
 
 export type AttentionEvidenceTask = {
@@ -93,6 +96,7 @@ export type ApertureAttentionItem = {
     | "incomplete_mission"
     | "underwriting_underway"
     | "underwriting_failed"
+    | "underwriting_complete"
     | "evidence_missing"
     | "invalidation_evidence"
     | "dispatch_unresolved"
@@ -234,6 +238,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
         : "check_in";
 
   const attention: ApertureAttentionItem[] = [];
+  const updates: ApertureAttentionItem[] = [];
   if (input.checks.state === "failed") {
     attention.push(item({
       key: "status:failed",
@@ -326,6 +331,24 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       reason: input.underwriting.error ?? "The underwriting job failed.",
       consequence: "The last successful result remains the record. No research or order was created.",
       actionLabel: "Review underwriting failure",
+      href: `/aperture/decision/${input.underwriting.decisionRunId}/revision/${input.underwriting.revisionId}/underwrite`,
+      updatedAt: input.underwriting.updatedAt,
+    }));
+  } else if (input.underwriting?.state === "complete") {
+    const noTrade = input.underwriting.outcome === "no_trade";
+    updates.push(item({
+      key: `underwriting:${input.underwriting.decisionRunId}:complete`,
+      kind: "underwriting_complete",
+      priority: 40,
+      stateLabel: noTrade ? "Underwriting complete · No trade" : "Underwriting complete · Playbook ready",
+      title: noTrade ? "Review the no-trade result" : "Review the underwriting result",
+      reason: input.underwriting.resultSummary ?? (noTrade
+        ? "No play cleared the recorded evidence and risk constraints."
+        : "The saved mission produced a conditional playbook."),
+      consequence: noTrade
+        ? `${input.underwriting.reopenCondition ?? "Reassess when the recorded condition changes."} No paper ticket was created.`
+        : "Validate a play to enter evidence review. No paper ticket was created.",
+      actionLabel: noTrade ? "Review no-trade result" : "Review underwriting result",
       href: `/aperture/decision/${input.underwriting.decisionRunId}/revision/${input.underwriting.revisionId}/underwrite`,
       updatedAt: input.underwriting.updatedAt,
     }));
@@ -437,16 +460,16 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     })),
   ].sort((left, right) => right.updatedAt - left.updatedAt || left.key.localeCompare(right.key));
 
-  const baselineItems = [...attention, ...inMotion].map((record) => {
+  const baselineItems = [...attention, ...updates, ...inMotion].map((record) => {
     const { updatedAt: _updatedAt, ...material } = record;
     return { key: record.key, fingerprint: attentionFingerprint(material) };
   });
   const baseline: ApertureAttentionBaseline = { capturedAt: input.now, items: baselineItems };
   const baselineToken = attentionBaselineToken(baseline);
   const priorMap = new Map((prior?.items ?? []).map((record) => [record.key, record.fingerprint]));
-  const currentByKey = new Map([...attention, ...inMotion].map((record) => [record.key, record]));
+  const currentByKey = new Map([...attention, ...updates, ...inMotion].map((record) => [record.key, record]));
   const changed = prior == null
-    ? [...attention, ...inMotion]
+    ? [...attention, ...updates, ...inMotion]
     : baselineItems.flatMap((record) => priorMap.get(record.key) === record.fingerprint ? [] : [currentByKey.get(record.key)!]);
 
   const futureReviews = input.pendingReviews.slice().sort((left, right) => left.dueAt - right.dueAt);

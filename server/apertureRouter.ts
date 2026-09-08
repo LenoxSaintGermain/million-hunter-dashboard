@@ -62,7 +62,7 @@ import { generateMemo } from "./aperture/memo";
 import { belongsInMemoLibrary } from "./aperture/memoLibrary";
 import { brokerFor, listBrokers } from "./aperture/brokers/index";
 import { normSymbol } from "./aperture/facts";
-import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills, preflightOrder, OrderGateError } from "./aperture/orderFlow";
+import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills, preflightOrder, OrderGateError, LIVE_ORDER_STATUSES } from "./aperture/orderFlow";
 import { evaluateRunPreset } from "./aperture/gates";
 import { buildCockpit } from "./aperture/cockpit";
 import { CURRENT_MANDATE, HOLDING_PERIOD_KEYS, MIN_NARRATIVE_CHARS, PAPER_ACKNOWLEDGEMENT } from "./aperture/mandate";
@@ -107,7 +107,7 @@ import { detailsFromCanonicalRecord } from "../shared/capitalThesisStructure";
 import { classifyDeskCandidate, summarizeDeskCandidates } from "../shared/playDeskState";
 import { underwriteCapitalMission } from "./aperture/underwriter";
 import { attentionBaselineToken, deriveApertureAttention, type ApertureAttentionBaseline } from "../shared/apertureAttention";
-import type { CapitalObjective, PlayUnderwritingResult } from "../shared/playUnderwriting";
+import { calculateTargetFeasibility, type CapitalObjective, type PlayUnderwritingResult, type UnderwritingRiskPolicy } from "../shared/playUnderwriting";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -444,17 +444,114 @@ const capitalObjectiveInput = z.object({
 });
 
 function objectiveFromDecisionRevision(revision: typeof apertureDecisionRevisions.$inferSelect): CapitalObjective {
+  const hasExplicitTarget = revision.targetProfitCents != null && revision.targetPeriod != null;
   return {
     deployableCapitalCents: revision.deployableCapitalCents,
-    targetProfitCents: revision.targetProfitCents ?? ((revision.desiredEndingValueCents == null
-      ? null : Math.max(0, revision.desiredEndingValueCents - revision.deployableCapitalCents)) || null),
-    targetPeriod: revision.targetPeriod ?? null,
+    targetProfitCents: hasExplicitTarget ? revision.targetProfitCents : null,
+    targetPeriod: hasExplicitTarget ? revision.targetPeriod : null,
     maxPlannedLossCents: revision.maxPlannedLossCents,
     maxPortfolioOpenRiskCents: null,
     weeklyLossLimitCents: null,
     eventRiskLimitCents: null,
     holdingPeriods: (revision.holdingPeriods?.length ? revision.holdingPeriods : [revision.holdingPeriod]) as CapitalObjective["holdingPeriods"],
     instrumentPreference: revision.instrumentPreference,
+  };
+}
+
+function normalizeExplicitTarget(objective: CapitalObjective): CapitalObjective {
+  const hasExplicitTarget = objective.targetProfitCents != null && objective.targetPeriod != null;
+  return {
+    ...objective,
+    targetProfitCents: hasExplicitTarget ? objective.targetProfitCents : null,
+    targetPeriod: hasExplicitTarget ? objective.targetPeriod : null,
+  };
+}
+
+type UnderwritingAuthority = {
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>;
+  decisionRun: typeof apertureDecisionRuns.$inferSelect;
+  decisionRevision: typeof apertureDecisionRevisions.$inferSelect;
+  objective: CapitalObjective;
+  cockpit: Awaited<ReturnType<typeof buildCockpit>>;
+  risk: UnderwritingRiskPolicy;
+  aggregateOpenRiskCents: number;
+  feasibility: ReturnType<typeof calculateTargetFeasibility>;
+};
+
+async function readAuthoritativeOpenRiskCents(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  userId: number,
+  accountId: number,
+) {
+  const rows = await db.select({ plannedRiskCents: brokerOrders.plannedRiskCents })
+    .from(brokerOrders)
+    .where(and(
+      eq(brokerOrders.userId, userId),
+      eq(brokerOrders.accountId, accountId),
+      inArray(brokerOrders.status, [...LIVE_ORDER_STATUSES]),
+    ));
+  return rows.reduce((sum, row) => sum + (row.plannedRiskCents ?? 0), 0);
+}
+
+function underwritingRiskFromCockpit(
+  cockpit: Awaited<ReturnType<typeof buildCockpit>>,
+  aggregateOpenRiskCents: number,
+): UnderwritingRiskPolicy {
+  const perPlay = cockpit.headroom.lines.find((line) => line.key === "planned_risk_per_play");
+  const daily = cockpit.headroom.lines.find((line) => line.key === "daily_planned_risk");
+  return {
+    normalPlayRiskPct: cockpit.mandate.maxPlannedRiskPctPerPlay,
+    highConvictionRiskPct: cockpit.mandate.maxHighConvictionRiskPctPerPlay,
+    maxAggregateOpenRiskPct: cockpit.mandate.maxAggregateOpenRiskPct,
+    weeklyLossLimitPct: cockpit.mandate.maxWeeklyPlannedRiskPct,
+    eventRiskAllocationPct: cockpit.mandate.maxEventRiskPct,
+    perPlayHeadroomCents: perPlay?.ceilingCents ?? null,
+    aggregateOpenRiskBeforeCents: aggregateOpenRiskCents,
+    weeklyLossUsedCents: daily?.usedCents ?? null,
+  };
+}
+
+async function resolveUnderwritingAuthority(input: {
+  userId: number;
+  decisionRunId: number;
+  decisionRevisionId: number;
+  objective?: CapitalObjective;
+}): Promise<UnderwritingAuthority> {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Capital database unavailable." });
+  const [decisionRun] = await db.select().from(apertureDecisionRuns).where(and(
+    eq(apertureDecisionRuns.id, input.decisionRunId),
+    eq(apertureDecisionRuns.userId, input.userId),
+  )).limit(1);
+  if (!decisionRun || decisionRun.currentRevisionId !== input.decisionRevisionId || decisionRun.researchRunId != null) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current pre-research mission revision before underwriting it." });
+  }
+  const [decisionRevision] = await db.select().from(apertureDecisionRevisions).where(and(
+    eq(apertureDecisionRevisions.id, input.decisionRevisionId),
+    eq(apertureDecisionRevisions.decisionRunId, decisionRun.id),
+  )).limit(1);
+  if (!decisionRevision || decisionRevision.effectiveBranch !== "research") {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash and conditional receipts are already resolved decisions and cannot generate plays." });
+  }
+  const objective = normalizeExplicitTarget(input.objective ?? objectiveFromDecisionRevision(decisionRevision));
+  const cockpit = await buildCockpit({ userId: input.userId, accountId: decisionRun.accountId });
+  if (!cockpit.account.linked || cockpit.account.accountId !== decisionRun.accountId) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "The mission paper account is not available to this operator." });
+  }
+  if (cockpit.account.isPaper !== true) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Capital Aperture underwriting is paper-only." });
+  }
+  const aggregateOpenRiskCents = await readAuthoritativeOpenRiskCents(db, input.userId, decisionRun.accountId);
+  const risk = underwritingRiskFromCockpit(cockpit, aggregateOpenRiskCents);
+  return {
+    db,
+    decisionRun,
+    decisionRevision,
+    objective,
+    cockpit,
+    risk,
+    aggregateOpenRiskCents,
+    feasibility: calculateTargetFeasibility(objective, risk),
   };
 }
 
@@ -494,22 +591,8 @@ async function executeUnderwriting(input: {
   appendRevision: boolean;
   illustrativeUatFixture?: boolean;
 }) {
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Capital database unavailable." });
-  const [decisionRun] = await db.select().from(apertureDecisionRuns).where(and(
-    eq(apertureDecisionRuns.id, input.decisionRunId),
-    eq(apertureDecisionRuns.userId, input.userId),
-  )).limit(1);
-  if (!decisionRun || decisionRun.currentRevisionId !== input.decisionRevisionId || decisionRun.researchRunId != null) {
-    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current pre-research mission revision before underwriting it." });
-  }
-  const [decisionRevision] = await db.select().from(apertureDecisionRevisions).where(and(
-    eq(apertureDecisionRevisions.id, input.decisionRevisionId),
-    eq(apertureDecisionRevisions.decisionRunId, decisionRun.id),
-  )).limit(1);
-  if (!decisionRevision || decisionRevision.effectiveBranch !== "research") {
-    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash and conditional receipts are already resolved decisions and cannot generate plays." });
-  }
+  const authority = await resolveUnderwritingAuthority(input);
+  const { db, decisionRun, decisionRevision, objective, cockpit, aggregateOpenRiskCents, feasibility } = authority;
   const [existingHead] = await db.select().from(apertureUnderwritingRuns).where(and(
     eq(apertureUnderwritingRuns.decisionRunId, decisionRun.id),
     eq(apertureUnderwritingRuns.userId, input.userId),
@@ -520,16 +603,17 @@ async function executeUnderwriting(input: {
       eq(apertureUnderwritingRevisions.underwritingRunId, existingHead.id),
       eq(apertureUnderwritingRevisions.decisionRevisionId, decisionRevision.id),
     )).limit(1);
-    if (existingRevision) return underwritingResponse(existingHead, existingRevision);
+    const objectiveMatches = existingRevision != null
+      && JSON.stringify(existingRevision.objective) === JSON.stringify(objective);
+    const feasibilityMatches = existingRevision != null
+      && JSON.stringify(existingRevision.feasibility) === JSON.stringify(feasibility);
+    const authoritativeRiskMatches = existingRevision != null
+      && existingRevision.portfolioRisk.beforeCents === aggregateOpenRiskCents;
+    if (existingRevision && objectiveMatches && feasibilityMatches && authoritativeRiskMatches) {
+      return underwritingResponse(existingHead, existingRevision);
+    }
   }
   const projection = await requireThesis(db, decisionRun.capitalThesisId, input.userId);
-  const cockpit = await buildCockpit({ userId: input.userId, accountId: decisionRun.accountId });
-  const openRiskRows = await db.select({ plannedRiskCents: brokerOrders.plannedRiskCents }).from(brokerOrders).where(and(
-    eq(brokerOrders.userId, input.userId),
-    inArray(brokerOrders.status, ["pending_approval", "approved", "submitted", "filled"]),
-  ));
-  const aggregateOpenRiskCents = openRiskRows.reduce((sum, row) => sum + (row.plannedRiskCents ?? 0), 0);
-  const objective = input.objective ?? objectiveFromDecisionRevision(decisionRevision);
   const { result, providerAvailability } = await underwriteCapitalMission({
     projection,
     objective,
@@ -547,6 +631,15 @@ async function executeUnderwriting(input: {
       isNull(apertureDecisionRuns.researchRunId),
     )).for("update").limit(1);
     if (!currentDecision) throw new TRPCError({ code: "CONFLICT", message: "The mission changed while underwriting was running. Reopen the current mission." });
+    const currentRiskRows = await tx.select({ plannedRiskCents: brokerOrders.plannedRiskCents }).from(brokerOrders).where(and(
+      eq(brokerOrders.userId, input.userId),
+      eq(brokerOrders.accountId, decisionRun.accountId),
+      inArray(brokerOrders.status, [...LIVE_ORDER_STATUSES]),
+    ));
+    const currentAggregateOpenRiskCents = currentRiskRows.reduce((sum, row) => sum + (row.plannedRiskCents ?? 0), 0);
+    if (currentAggregateOpenRiskCents !== aggregateOpenRiskCents) {
+      throw new TRPCError({ code: "CONFLICT", message: "Portfolio risk changed while underwriting was running. Reopen the current mission and retry." });
+    }
     let [head] = await tx.select().from(apertureUnderwritingRuns).where(and(
       eq(apertureUnderwritingRuns.decisionRunId, decisionRun.id),
       eq(apertureUnderwritingRuns.userId, input.userId),
@@ -1232,6 +1325,65 @@ export const apertureRouter = router({
   // Strategy generation only. This namespace never creates a research run,
   // proposal, approval, submission, or broker order.
   underwriter: router({
+    preview: capitalOperatorProcedure.input(z.object({
+      accountId: z.number().int().positive(),
+      objective: capitalObjectiveInput,
+    })).query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Capital database unavailable." });
+      const objective = normalizeExplicitTarget(input.objective as CapitalObjective);
+      const cockpit = await buildCockpit({ userId: ctx.user.id, accountId: input.accountId });
+      if (!cockpit.account.linked || cockpit.account.accountId !== input.accountId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "The selected account is not available to this operator." });
+      }
+      if (cockpit.account.isPaper !== true) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Capital Aperture underwriting is paper-only." });
+      }
+      const aggregateOpenRiskCents = await readAuthoritativeOpenRiskCents(
+        db,
+        ctx.user.id,
+        input.accountId,
+      );
+      const risk = underwritingRiskFromCockpit(cockpit, aggregateOpenRiskCents);
+      const feasibility = calculateTargetFeasibility(objective, risk);
+      const remainingHeadroomCents = Math.max(
+        0,
+        feasibility.maxOpenRiskCents - aggregateOpenRiskCents,
+      );
+      return {
+        asOf: cockpit.generatedAt,
+        account: {
+          id: input.accountId,
+          label: cockpit.account.label,
+          isPaper: cockpit.account.isPaper,
+          lastSyncedAt: cockpit.account.lastSyncedAt,
+        },
+        objective,
+        risk,
+        feasibility,
+        portfolioRisk: {
+          beforeCents: aggregateOpenRiskCents,
+          remainingHeadroomCents,
+          bindingConstraint: feasibility.riskBudgetCents <= 0
+            ? "portfolio_headroom_exhausted"
+            : feasibility.riskBudgetCents < objective.maxPlannedLossCents
+              ? "risk_policy_or_portfolio_headroom"
+              : "mission_max_loss",
+        },
+        provenance: {
+          scope: "owner_and_paper_account" as const,
+          accountId: input.accountId,
+          orderStatuses: [...LIVE_ORDER_STATUSES],
+          cockpitGeneratedAt: cockpit.generatedAt,
+        },
+        mutations: {
+          researchRunCreated: false,
+          proposalCreated: false,
+          brokerOrderCreated: false,
+        },
+      };
+    }),
+
     run: capitalOperatorProcedure.input(z.object({
       decisionRunId: z.number().int().positive(),
       decisionRevisionId: z.number().int().positive(),
@@ -2291,6 +2443,8 @@ export const apertureRouter = router({
         ? await db!.select({
             objective: apertureUnderwritingRevisions.objective,
             decisionRevisionId: apertureUnderwritingRevisions.decisionRevisionId,
+            noTrade: apertureUnderwritingRevisions.noTrade,
+            plays: apertureUnderwritingRevisions.plays,
             selectedPlayId: apertureUnderwritingRuns.selectedPlayId,
             updatedAt: apertureUnderwritingRuns.updatedAt,
           }).from(apertureUnderwritingRuns)
@@ -2382,6 +2536,15 @@ export const apertureRouter = router({
           revisionId: latestMission.revisionId,
           state: latestUnderwriting?.decisionRevisionId === latestMission.revisionId ? "complete" : "not_started",
           updatedAt: latestUnderwriting?.updatedAt ?? latestMission.updatedAt,
+          outcome: latestUnderwriting?.decisionRevisionId !== latestMission.revisionId
+            ? null
+            : latestUnderwriting.noTrade ? "no_trade"
+              : latestUnderwriting.plays.length > 0 ? "plays" : null,
+          resultSummary: latestUnderwriting?.noTrade?.explanation
+            ?? (latestUnderwriting?.plays.length
+              ? `${latestUnderwriting.plays.length} conditional play${latestUnderwriting.plays.length === 1 ? "" : "s"} ready for review.`
+              : null),
+          reopenCondition: latestUnderwriting?.noTrade?.reopenCondition ?? null,
         } : null,
         evidenceTasks,
         orders: orders.map((order) => ({
