@@ -26,6 +26,7 @@
    - The already-authorized underwriting request runs directly to a usable result in the same workspace.
    - Failure after persistence is reported as `Mission saved; underwriting stopped safely`, not as a failed Mission save.
    - A completed result becomes the current persisted state. The action cannot silently create a duplicate underwriting run unless a material assumption changes.
+   - While the saved underwriting result is unresolved, the effective-risk claim is withheld, the action reads `Checking saved underwriting…`, and the commit handler fails closed. A result is authoritative only when its decision-revision identity matches the active Mission revision.
 5. **The result leads with the decision.**
    - A concise synthesis is followed by zero to three conditional play cards or Sit Out.
    - Regime and feasibility detail live in `Evidence and calculations behind this result`.
@@ -90,13 +91,31 @@ The user-facing intent entry, persisted capital-allocation event ledger, and bro
 
 ## Visual and observed-UAT gate
 
-Representative desktop and mobile screenshots of this checkpoint were **not captured** because the isolated UAT database/runtime was not available locally, and production was not deployed or mutated for this implementation pass. The supplied browser screenshots document the prior production experience, not this checkpoint, so they are not relabeled as after-state evidence.
+Authenticated browser UAT was completed on the zero-traffic tagged revision `capital-aperture-00078-bim` (`6e665848543bf577b17893d2f7e6cac5136e5889`). Representative desktop (`2027 × 1251`) and mobile (`390 × 844` CSS pixels) screenshots were captured in the Codex UAT trace. Production remained pinned to `capital-aperture-00075-fig` throughout.
+
+Observed pass:
+
+- the persisted PW Mission opened with the named Alpaca Paper account and NVDA binding constraint;
+- the completed no-trade underwriting result showed `$0` effective risk, an explicit no-ticket receipt, and a disabled duplicate-underwriting action;
+- desktop and mobile Today distinguished broker-accepted/no-fill orders from open positions and kept secondary urgent issues visible;
+- the mobile Mission and Today flows retained single-column actions and the paper-only boundary;
+- temporary Firebase authorization for the exact tagged hostname was removed after UAT and the authorized-domain count returned from 11 to 10.
+
+Observed fail / unresolved:
+
+- Today briefly rendered `Account not selected` and `No execution account selected` while its independent queries were loading, before settling to the real paper account. Loading is therefore still capable of presenting a false zero-state.
+- A deterministic cold-network capture of the new `Checking saved underwriting…` interim Mission state was not obtained; the settled post-load state and source/test guard were verified.
+- Incomplete Mission drafts and the active section are not yet persisted across devices.
+- Underwriting does not yet have a durable queued/running/failed job identity; the dedicated route can still initiate work on mount.
+- Collapsed change items can be marked Seen, and the server baseline replacement can forget previously seen items outside the submitted subset.
+- Empty, stale, partial, and failed check states are not all wired through the production router/UI path; an unreviewed completed playbook can still be demoted into a quiet briefing.
+- `Run updated checks` refetches summaries rather than proving a new monitoring check, and active-play status links still land on the general Play Desk.
 
 Still required before calling the UX complete:
 
-- apply migration `0062_aperture_attention_baseline.sql` in an isolated or authorized target;
-- run the app against deterministic UAT records;
-- capture Mission setup/resume at 375, 768, 1024, and 1440 CSS pixels;
-- capture Today check-in with an urgent item, a quiet state, a partial fill, and a failed/partial source;
-- keyboard and screen-reader verification, including asynchronous status announcements;
-- observed operator walkthrough measuring whether status and next action are found in roughly ten seconds.
+- persist incomplete Mission drafts and underwriting job state with idempotent retry/reconciliation;
+- make Seen updates visibility-accurate and merge-safe;
+- fail closed across Today and Mission loading/failed/partial reads;
+- route every active-play action to its exact task identity;
+- capture deterministic Start, Resume, quiet, partial-fill, failed-source, revision, keyboard, screen-reader, and reduced-motion journeys at the required viewport set;
+- run an observed operator walkthrough before claiming the roughly ten-second usability target.
