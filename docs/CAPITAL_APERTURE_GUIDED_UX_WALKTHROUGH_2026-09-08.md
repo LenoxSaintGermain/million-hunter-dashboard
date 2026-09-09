@@ -1,10 +1,10 @@
 # Capital Aperture guided UX walkthrough
 
-**Implementation checkpoint:** 2026-09-09 local follow-up (production unchanged)
+**Implementation checkpoint:** 2026-09-09 production release `300fc55`, revision `capital-aperture-00080-cub`, 100% traffic
 
 **Scope:** Mission underwriting and returning Today check-in
 
-**Boundary:** Automated tests and agent-operated browser UAT against an isolated localhost database. This is not a human usability study or a production release. The earlier tagged-release observations below are historical.
+**Boundary:** Automated tests, isolated agent-operated desktop/mobile UAT, and public production release checks passed. Authenticated production desktop/mobile UAT remains pending operator sign-in. This is not a human usability study. The earlier local and tagged-release observations below are historical. See the [production handoff receipt](qa/CAPITAL_APERTURE_PRODUCTION_HANDOFF_2026-09-09.md) for exact verification and remaining acceptance gaps.
 
 ## September 9 gap-closure checkpoint
 
