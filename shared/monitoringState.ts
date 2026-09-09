@@ -19,7 +19,7 @@ export type MonitoringObservation = {
 
 /** Current review tasks use the newest recorded result per check type. History
  * remains available, including failures; an older success never replaces a newer failure. */
-export function partitionMonitoringHistory<T extends MonitoringObservation & { id: number; checkType: string }>(checks: readonly T[]) {
+export function partitionMonitoringHistory<T extends MonitoringObservation & { id: number; checkType: string }>(checks: readonly T[], now = Date.now()) {
   const ordered = [...checks].sort((a, b) => b.checkedAt - a.checkedAt || b.id - a.id);
   const seen = new Set<string>();
   const current: T[] = [], history: T[] = [];
@@ -27,6 +27,12 @@ export function partitionMonitoringHistory<T extends MonitoringObservation & { i
     if (seen.has(check.checkType)) history.push(check);
     else { seen.add(check.checkType); current.push(check); }
   }
+  const priority = (check: T) => {
+    const review = monitoringReviewState(check, now);
+    return review.state === "flagged" ? 2 : review.needsReview ? 1 : 0;
+  };
+  // A late-written routine check must not bury the finding that opened this view.
+  current.sort((a, b) => priority(b) - priority(a) || b.checkedAt - a.checkedAt || b.id - a.id);
   return { current, history };
 }
 
