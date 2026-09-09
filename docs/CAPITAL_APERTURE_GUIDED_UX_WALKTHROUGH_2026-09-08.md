@@ -205,7 +205,19 @@ mutation. Evidence can be explicitly opened and fresh checks requested; neither
 reading nor refreshing is labeled as an acknowledgement or automatic resolution.
 Do not claim that additional workflow is implemented.
 
-Integrated unit result before release: 1,205 passed, zero failed, six intentionally
-external/optional skips. Real authenticated desktop/mobile acceptance and production
-release receipts are recorded separately after execution; tests are not a usability
-claim and a valid zero-risk block is not a failed order-placement test.
+Final unit regression result: 1,213 passed, zero failed, six intentionally
+external/optional skips. The live repeat also established these disclosure rules:
+
+- Current monitoring uses the newest result per check type, with flagged findings
+  and unknown evidence before routine clear checks. All earlier records remain
+  in Previous checks; opening them does not create or resolve review tasks.
+- A stale-check notice distinguishes saved-status refresh from new sourced checks.
+  Compact motion rows use human-readable option names instead of raw OCC strings.
+- Share tickets say Planned loss at modeled stop with a slippage warning, not a
+  guaranteed maximum loss. Long options retain maximum-premium-loss language.
+
+Authenticated desktop/mobile observations, the scoped MGM check request, PWR
+ticket/chain path, exact builds and remaining acceptance boundaries are recorded
+in `docs/qa/CAPITAL_APERTURE_MARKET_OPEN_UAT_2026-09-09.md`. Tests and screenshots
+are not a ten-second usability claim; a valid zero-risk block is not a failed
+order-placement test. No new live proposal/approval/submission was exercised.
