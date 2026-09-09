@@ -398,9 +398,10 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
         <PriceRiskVisual entryCents={modeledEntryCents} stopCents={modeledStopCents} targets={modeledTargets} label={isOption ? `${candidate.symbol} underlying levels` : `${candidate.symbol} price plan`} />
         <div className="grid grid-cols-3 overflow-hidden rounded-lg border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
           <TicketValue label={isOption ? "Contracts" : "Quantity"} value={modeledQuantity} />
-          <TicketValue label="Maximum loss" value={money(modeledLoss)} />
+          <TicketValue label={isOption ? "Maximum premium loss" : "Planned loss at modeled stop"} value={money(modeledLoss)} />
           <TicketValue label={isOption ? "Premium at risk" : "Capital"} value={money(modeledCapital)} />
         </div>
+        {!isOption && <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Stop execution can differ from the modeled price; actual loss can be greater.</p>}
         {isOption && <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" }}><span><strong style={{ color: "var(--sh-text-primary)" }}>Live option quote required.</strong> <span style={{ color: "var(--sh-fg-muted)" }}>Choose the exact contract and limit below; no quote is inferred.</span></span><span className="shrink-0 font-mono tabular-nums" style={{ color: "var(--sh-text-primary)" }}>{suggestedRange}</span></div>}
       </section>
 

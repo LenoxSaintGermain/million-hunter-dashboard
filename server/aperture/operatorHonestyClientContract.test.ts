@@ -5,6 +5,13 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 
 describe("Capital Aperture client honesty contract", () => {
+  it("does not call stop-based share risk a guaranteed maximum loss", () => {
+    const source = read("client/src/components/aperture/PaperProposalForm.tsx");
+    expect(source).toContain('label={isOption ? "Maximum premium loss" : "Planned loss at modeled stop"}');
+    expect(source).toContain("Stop execution can differ from the modeled price; actual loss can be greater.");
+    expect(source).not.toContain('<TicketValue label="Maximum loss"');
+  });
+
   it("renders missing candidate confidence as Not measured", () => {
     const source = read("client/src/pages/aperture/CandidateBoard.tsx");
     expect(source).toContain('return value == null ? "Not measured"');
