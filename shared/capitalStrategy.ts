@@ -84,6 +84,9 @@ export type CapitalAllocationClaim = {
 
 export type CapitalEnvelopeBlocker =
   | "invalid_capital_amount"
+  | "invalid_capital_lineage"
+  | "account_unverified"
+  | "capital_after_cutoff"
   | "missing_closing_fill"
   | "gain_not_realized"
   | "gain_not_reconciled"
@@ -127,6 +130,11 @@ export type CausalEvidenceSource = {
   observedAt: number | null;
   publishedAt: number | null;
   retrievedAt: number;
+};
+
+export type StrategyEvidenceState = {
+  status: "available" | "partial" | "failed";
+  failures: string[];
 };
 
 export type CausalAssertion = {
@@ -188,10 +196,20 @@ export type CausalEconomicPath = {
   affectedEntities: string[];
   securityMapping: { entity: string; symbol: string | null; status: "verified" | "unverified" | "not_public" };
   whatChangedFromExpectations: string;
+  /** Explicit historical baseline; a launch already known here is not a new catalyst. */
+  expectationsBaseline?: {
+    asOf: number;
+    commercialLaunchStatus: TechnologyPermissionEvidence["commercialLaunchStatus"];
+    sources: CausalEvidenceSource[];
+    /** Sourced development after the baseline, not a prose relabeling of the launch. */
+    incrementalChange: CausalAssertion | null;
+  } | null;
   counterargument: string;
   technologyPermission: TechnologyPermissionEvidence | null;
   marketMeasurement: MarketMeasurementEvidence | null;
-  providerState: { status: "available" | "partial" | "failed"; failures: string[] };
+  providerState: StrategyEvidenceState;
+  /** Optional for callers that supply already-classified assertions without a model. */
+  classifierState?: StrategyEvidenceState;
   reviewAt: number | null;
   expiresAt: number | null;
 };
@@ -199,6 +217,19 @@ export type CausalEconomicPath = {
 export type CausalPathReason =
   | "provider_failure"
   | "provider_partial"
+  | "classifier_failure"
+  | "classifier_partial"
+  | "classification_unverified"
+  | "evaluation_time_unverified"
+  | "source_time_unverified"
+  | "source_after_cutoff"
+  | "source_provenance_unverified"
+  | "measurement_after_cutoff"
+  | "measurement_unverified"
+  | "expectations_baseline_unverified"
+  | "historical_launch_not_incremental"
+  | "path_expired"
+  | "path_expiry_unverified"
   | "too_many_hops"
   | "missing_evidence"
   | "missing_invalidation"
@@ -218,6 +249,8 @@ export type CausalPathAssessment = {
   reasons: CausalPathReason[];
   independentOriginCount: number;
   sources: CausalEvidenceSource[];
+  /** Ineligible source records remain auditable but never count as current evidence. */
+  excludedSources: Array<{ source: CausalEvidenceSource; reasons: CausalPathReason[] }>;
   unknowns: string[];
   contradictions: string[];
   confidence: number | null;
@@ -240,6 +273,8 @@ export type CapitalStrategyCandidate = {
     state: "qualified" | "research_required" | "blocked";
     overallScore: number | null;
     plannedRiskCents: number | null;
+    /** If measured by the Underwriter, also enforce funding, not just planned risk. */
+    proposedNotionalCents?: number | null;
   };
   whyThisUse: string;
   whyNow: string;
@@ -284,6 +319,7 @@ export type CapitalStrategyDecision = {
   };
   reviewedUniverse: string[];
   coverageGaps: string[];
+  /** Every non-selected hypothesis, including eligible candidates outside the shortlist. */
   rejectedHypotheses: Array<{ candidateId: string; reasons: string[] }>;
   sideEffects: {
     capitalReserved: false;
@@ -293,7 +329,26 @@ export type CapitalStrategyDecision = {
   };
 };
 
-const nonNegativeFinite = (value: number) => Number.isFinite(value) && value >= 0;
+const validCents = (value: number) => Number.isSafeInteger(value) && value >= 0;
+const nonBlank = (value: string) => typeof value === "string" && value.trim().length > 0;
+const validTime = (value: number | null | undefined): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+
+function sourceLineageId(source: CapitalSource): string {
+  if ("capitalEventId" in source) return source.capitalEventId;
+  if (source.kind === "operator_declared_excess") return source.declarationId;
+  if (source.kind === "reconciled_available_funds") return source.reconciliationId;
+  return source.sourcePlayId;
+}
+
+function capitalLineageBlockers(source: CapitalSource): CapitalEnvelopeBlocker[] {
+  const blockers: CapitalEnvelopeBlocker[] = [];
+  if (!nonBlank(source.account.id) || !nonBlank(source.account.name) || !["paper", "live"].includes(source.account.mode)) blockers.push("account_unverified");
+  if (!nonBlank(source.id) || !nonBlank(sourceLineageId(source))
+    || (source.kind === "realized_gains" && !nonBlank(source.sourcePlayId))
+    || (source.kind === "hypothetical_future_proceeds" && !nonBlank(source.assumption))
+    || (source.kind === "reconciled_available_funds" && !validTime(source.reconciledAt))) blockers.push("invalid_capital_lineage");
+  return blockers;
+}
 
 function activeAllocationState(input: CapitalEnvelopeInput, capitalEventId: string | null) {
   const blockers: CapitalEnvelopeBlocker[] = [];
@@ -306,28 +361,32 @@ function activeAllocationState(input: CapitalEnvelopeInput, capitalEventId: stri
   const claimIds = new Set<string>();
   let alreadyAllocatedCents = 0;
   for (const claim of activeClaims) {
+    if (!nonBlank(claim.allocationId)) blockers.push("invalid_capital_lineage");
     if (claimIds.has(claim.allocationId)) {
       if (!blockers.includes("duplicate_allocation_claim")) blockers.push("duplicate_allocation_claim");
       continue;
     }
     claimIds.add(claim.allocationId);
-    if (!nonNegativeFinite(claim.amountCents)) {
+    if (!validCents(claim.amountCents) || !validCents(alreadyAllocatedCents + claim.amountCents)) {
       if (!blockers.includes("invalid_capital_amount")) blockers.push("invalid_capital_amount");
       continue;
     }
-    alreadyAllocatedCents += Math.round(claim.amountCents);
+    alreadyAllocatedCents += claim.amountCents;
   }
   if (activeClaims.length) blockers.push("concurrent_allocation");
   return { blockers, alreadyAllocatedCents };
 }
 
-export function deriveCapitalEnvelope(input: CapitalEnvelopeInput): CapitalEnvelope {
+export function deriveCapitalEnvelope(input: CapitalEnvelopeInput, asOf?: number): CapitalEnvelope {
   const { source } = input;
-  const capitalEventId = "capitalEventId" in source ? source.capitalEventId : null;
+  // Claims on declared/reconciled funds use their lineage identity too. This is
+  // snapshot validation only; a transactional allocation ledger must enforce writes.
+  const capitalEventId = source.kind === "hypothetical_future_proceeds" ? null : sourceLineageId(source);
   const allocation = activeAllocationState(input, capitalEventId);
   if (source.kind !== "realized_gains") {
-    const amount = nonNegativeFinite(source.amountCents) ? Math.round(source.amountCents) : 0;
-    const blockers = [...allocation.blockers];
+    const amount = validCents(source.amountCents) ? source.amountCents : 0;
+    const blockers = [...capitalLineageBlockers(source), ...allocation.blockers];
+    if (source.kind === "reconciled_available_funds" && validTime(asOf) && source.reconciledAt > asOf) blockers.push("capital_after_cutoff");
     if (amount <= 0) blockers.push("invalid_capital_amount");
     const hypothetical = source.kind === "hypothetical_future_proceeds";
     const hardBlocked = blockers.length > 0;
@@ -349,20 +408,21 @@ export function deriveCapitalEnvelope(input: CapitalEnvelopeInput): CapitalEnvel
     };
   }
 
-  const blockers: CapitalEnvelopeBlocker[] = [...allocation.blockers];
+  const blockers: CapitalEnvelopeBlocker[] = [...capitalLineageBlockers(source), ...allocation.blockers];
   const values = [source.recordedCostBasisCents, source.netSaleProceedsCents, source.feesCents, source.profitReserveCents];
-  if (values.some((value) => !nonNegativeFinite(value))) blockers.push("invalid_capital_amount");
-  if (!source.closingFillIds.length) blockers.push("missing_closing_fill");
+  if (values.some((value) => !validCents(value))) blockers.push("invalid_capital_amount");
+  if (!source.closingFillIds.length || source.closingFillIds.some((id) => !nonBlank(id))) blockers.push("missing_closing_fill");
+  if (new Set(source.closingFillIds.map((id) => id.trim())).size !== source.closingFillIds.length) blockers.push("invalid_capital_lineage");
   if (source.realizationState !== "realized") blockers.push("gain_not_realized");
   if (source.reconciliationState !== "reconciled") blockers.push("gain_not_reconciled");
   if (source.availabilityState !== "verified_available") blockers.push("funds_not_available");
 
-  const costBasisCents = nonNegativeFinite(source.recordedCostBasisCents) ? Math.round(source.recordedCostBasisCents) : 0;
-  const netSaleProceedsCents = nonNegativeFinite(source.netSaleProceedsCents) ? Math.round(source.netSaleProceedsCents) : 0;
+  const costBasisCents = validCents(source.recordedCostBasisCents) ? source.recordedCostBasisCents : 0;
+  const netSaleProceedsCents = validCents(source.netSaleProceedsCents) ? source.netSaleProceedsCents : 0;
   const realizedProfitLossCents = netSaleProceedsCents - costBasisCents;
   const returnedPrincipalCents = Math.min(costBasisCents, netSaleProceedsCents);
   const realizedGainCents = Math.max(0, realizedProfitLossCents);
-  const reserveCents = nonNegativeFinite(source.profitReserveCents) ? Math.round(source.profitReserveCents) : 0;
+  const reserveCents = validCents(source.profitReserveCents) ? source.profitReserveCents : 0;
   if (reserveCents > realizedGainCents) blockers.push("reserve_exceeds_realized_profit");
 
   const uniqueBlockers = Array.from(new Set(blockers));
@@ -371,6 +431,8 @@ export function deriveCapitalEnvelope(input: CapitalEnvelopeInput): CapitalEnvel
   );
   const hardBlocked = uniqueBlockers.some((blocker) =>
     blocker === "invalid_capital_amount"
+    || blocker === "invalid_capital_lineage"
+    || blocker === "account_unverified"
     || blocker === "missing_closing_fill"
     || blocker === "reserve_exceeds_realized_profit"
     || blocker === "duplicate_capital_event"
@@ -396,47 +458,121 @@ export function deriveCapitalEnvelope(input: CapitalEnvelopeInput): CapitalEnvel
   };
 }
 
-export function assessCausalEconomicPath(path: CausalEconomicPath): CausalPathAssessment {
+/** All clocks are input facts. Never use Date.now() to replay an old decision. */
+function evidenceExclusions(source: CausalEvidenceSource, asOf?: number): CausalPathReason[] {
   const reasons: CausalPathReason[] = [];
-  const assertions = [path.originatingSignal, ...path.hops.map((hop) => hop.assertion)];
-  const allSources = assertions.flatMap((assertion) => assertion.sources);
+  let sourcedUrl = false;
+  try {
+    const url = new URL(source.sourceUrl);
+    sourcedUrl = url.protocol === "https:" || url.protocol === "http:";
+  } catch { /* Missing or malformed provenance is not evidence. */ }
+  if (![source.id, source.originId, source.sourceName].every(nonBlank) || !sourcedUrl) reasons.push("source_provenance_unverified");
+  const eventTimes = [source.observedAt, source.publishedAt].filter((time) => time != null);
+  if (!validTime(source.retrievedAt) || !eventTimes.length || eventTimes.some((time) => !validTime(time))) reasons.push("source_time_unverified");
+  if (validTime(asOf) && [source.retrievedAt, ...eventTimes].some((time) => validTime(time) && time > asOf)) reasons.push("source_after_cutoff");
+  return reasons;
+}
+
+/**
+ * Without a point-in-time cutoff, legacy callers can inspect a path but cannot
+ * promote it as verified. Deduplication does not change qualification; excluded
+ * source inputs require re-evaluating the assertion without hindsight evidence.
+ */
+export function assessCausalEconomicPath(path: CausalEconomicPath, asOf?: number): CausalPathAssessment {
+  const reasons: CausalPathReason[] = [];
+  const baseline = path.expectationsBaseline;
+  const assertions = [path.originatingSignal, ...path.hops.map((hop) => hop.assertion),
+    ...(baseline?.incrementalChange ? [baseline.incrementalChange] : [])];
   const sourcesByOrigin = new Map<string, CausalEvidenceSource>();
-  for (const source of allSources) if (!sourcesByOrigin.has(source.originId)) sourcesByOrigin.set(source.originId, source);
-  if (sourcesByOrigin.size < allSources.length) reasons.push("repeated_source_origin");
+  const excludedSources: CausalPathAssessment["excludedSources"] = [];
+  const eligibleByAssertion = new Map<CausalAssertion, CausalEvidenceSource[]>();
+  const collectSources = (sources: CausalEvidenceSource[], cutoff?: number) => {
+    const eligible: CausalEvidenceSource[] = [];
+    for (const source of sources) {
+      const exclusions = evidenceExclusions(source, cutoff);
+      if (exclusions.length) {
+        reasons.push(...exclusions);
+        excludedSources.push({ source, reasons: exclusions });
+        continue;
+      }
+      eligible.push(source);
+      const origin = source.originId.trim();
+      if (sourcesByOrigin.has(origin)) reasons.push("repeated_source_origin");
+      else sourcesByOrigin.set(origin, source);
+    }
+    return eligible;
+  };
+  for (const assertion of assertions) eligibleByAssertion.set(assertion, collectSources(assertion.sources, asOf));
+  const baselineSources = baseline ? collectSources(baseline.sources, validTime(asOf) && validTime(baseline.asOf) ? Math.min(asOf, baseline.asOf) : asOf) : [];
+  if (!validTime(asOf)) reasons.push("evaluation_time_unverified");
   if (path.providerState.status === "failed") reasons.push("provider_failure");
   if (path.providerState.status === "partial") reasons.push("provider_partial");
+  if (path.classifierState?.status === "failed") reasons.push("classifier_failure");
+  if (path.classifierState?.status === "partial") reasons.push("classifier_partial");
+  if (assertions.some((assertion) => !["reported_observation", "issuer_claim", "analyst_inference", "user_hypothesis"].includes(assertion.assertionClass))) reasons.push("classification_unverified");
   if (path.hops.length > 3) reasons.push("too_many_hops");
-  if (assertions.some((assertion) => !assertion.sources.length)) reasons.push("missing_evidence");
-  if (assertions.some((assertion) => !assertion.invalidation.trim())) reasons.push("missing_invalidation");
-  if (!path.whatChangedFromExpectations.trim()) reasons.push("missing_expectations_delta");
-  if (!path.counterargument.trim()) reasons.push("missing_counterargument");
-  if (path.securityMapping.status !== "verified") reasons.push("security_mapping_unverified");
+  if (assertions.some((assertion) => !eligibleByAssertion.get(assertion)?.length || !nonBlank(assertion.statement))) reasons.push("missing_evidence");
+  if (assertions.some((assertion) => !nonBlank(assertion.invalidation))) reasons.push("missing_invalidation");
+  if (!nonBlank(path.whatChangedFromExpectations)) reasons.push("missing_expectations_delta");
+  if (!nonBlank(path.counterargument)) reasons.push("missing_counterargument");
+  if (path.securityMapping.status !== "verified" || !path.securityMapping.symbol?.trim() || !nonBlank(path.securityMapping.entity)) reasons.push("security_mapping_unverified");
+  if (path.expiresAt != null) {
+    if (!validTime(path.expiresAt)) reasons.push("path_expiry_unverified");
+    else if (validTime(asOf) && path.expiresAt <= asOf) reasons.push("path_expired");
+  }
 
   for (const hop of path.hops) {
     if (hop.mechanism.kind === "fixed_fee" && hop.estimatedImpact?.basis === "usage_driven") reasons.push("fixed_fee_has_no_usage_uplift");
-    if (hop.mechanism.commercialTermsStatus !== "verified") reasons.push("commercial_terms_unverified");
+    if (hop.mechanism.commercialTermsStatus !== "verified" || hop.mechanism.kind === "unknown") reasons.push("commercial_terms_unverified");
   }
-  if (path.technologyPermission?.permissionStatus === "unverified") reasons.push("permission_unverified");
-  if (path.marketMeasurement?.kind === "odds" && !path.marketMeasurement.volumeObserved) {
-    reasons.push("odds_feed_has_no_volume");
-    if (path.marketMeasurement.claimedMetrics.some((metric) => ["handle", "customer_count", "revenue", "profitability"].includes(metric))) {
-      reasons.push("unsupported_activity_inference");
+  const permission = path.technologyPermission;
+  if (permission && (
+    permission.permissionStatus === "unverified"
+    || !permission.jurisdictionAndProductIdentified
+    || (permission.permissionStatus === "verified" && !permission.rightsDocumented)
+  )) reasons.push("permission_unverified");
+  if (permission?.commercialLaunchStatus === "launched" && !baseline) reasons.push("expectations_baseline_unverified");
+  if (baseline) {
+    if (!validTime(baseline.asOf) || !validTime(asOf) || baseline.asOf > asOf || !baselineSources.length) reasons.push("expectations_baseline_unverified");
+    if (baseline.commercialLaunchStatus === "launched") {
+      const changeSources = baseline.incrementalChange ? eligibleByAssertion.get(baseline.incrementalChange) ?? [] : [];
+      // Retrieval of the same old announcement does not establish a new change.
+      const hasSubsequentDevelopment = changeSources.some((source) =>
+        !baselineSources.some((prior) => prior.originId.trim() === source.originId.trim())
+        && [source.observedAt, source.publishedAt].some((time) => validTime(time) && time > baseline.asOf));
+      if (!baseline.incrementalChange || !nonBlank(baseline.incrementalChange.statement) || !hasSubsequentDevelopment) reasons.push("historical_launch_not_incremental");
+    }
+  }
+
+  const measurement = path.marketMeasurement;
+  if (measurement) {
+    if (!validTime(measurement.asOf) || !nonBlank(measurement.methodology) || !nonBlank(measurement.coverage)) reasons.push("measurement_unverified");
+    if (validTime(asOf) && measurement.asOf > asOf) reasons.push("measurement_after_cutoff");
+    if (measurement.kind === "odds" && !measurement.volumeObserved) reasons.push("odds_feed_has_no_volume");
+    if (measurement.kind === "odds" || measurement.kind === "listed_markets") {
+      // Availability and prices are not activity, even if an inconsistent volume
+      // flag is attached. Activity requires its own measurement and provenance.
+      if (measurement.claimedMetrics.some((metric) => ["handle", "customer_count", "revenue", "profitability"].includes(metric))) reasons.push("unsupported_activity_inference");
     }
   }
 
   const uniqueReasons = Array.from(new Set(reasons));
   const hardRejected = uniqueReasons.some((reason) =>
-    reason === "too_many_hops" || reason === "fixed_fee_has_no_usage_uplift" || reason === "unsupported_activity_inference",
+    reason === "too_many_hops" || reason === "fixed_fee_has_no_usage_uplift" || reason === "unsupported_activity_inference"
+    || reason === "historical_launch_not_incremental" || reason === "path_expired",
   );
-  const unavailable = uniqueReasons.includes("provider_failure");
+  const unavailable = uniqueReasons.includes("provider_failure") || uniqueReasons.includes("classifier_failure");
+  const needsResearch = uniqueReasons.some((reason) => reason !== "repeated_source_origin");
   return {
     pathId: path.id,
-    status: unavailable ? "unavailable" : hardRejected ? "rejected" : uniqueReasons.length ? "conditional_research" : "verified",
+    status: unavailable ? "unavailable" : hardRejected ? "rejected" : needsResearch ? "conditional_research" : "verified",
     reasons: uniqueReasons,
     independentOriginCount: sourcesByOrigin.size,
     sources: Array.from(sourcesByOrigin.values()),
+    excludedSources,
     unknowns: Array.from(new Set(assertions.flatMap((assertion) => assertion.unknowns))),
     contradictions: Array.from(new Set(assertions.flatMap((assertion) => assertion.contradictions))),
-    confidence: uniqueReasons.length ? null : 100,
+    // Passing structural checks is not a calibrated 100% probability.
+    confidence: null,
   };
 }

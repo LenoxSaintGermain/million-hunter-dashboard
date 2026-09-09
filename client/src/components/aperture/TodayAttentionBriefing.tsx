@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CheckCircle2, Clock3, RefreshCw, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { attentionDisclosure, canShowQuietBriefing, displayedAttentionBaseline, safeStatusError, type AttentionStatusSource, type ApertureAttentionBriefing, type ApertureAttentionItem, type ApertureMotionItem } from "@shared/apertureAttention";
+import { arbitrateTodayRead, displayedAttentionBaseline, safeStatusError, type AttentionStatusSource, type ApertureAttentionBriefing, type ApertureAttentionItem, type ApertureMotionItem } from "@shared/apertureAttention";
 
 function localTime(value: number | null) {
   return value == null ? "Not scheduled" : new Date(value).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
@@ -52,19 +52,20 @@ export function TodayAttentionBriefing({
   const [allMotion, setAllMotion] = useState(false);
   const [primaryKey, setPrimaryKey] = useState<string | null>(null);
   const [observed, setObserved] = useState<Map<string, string>>(() => new Map());
-  const layout = useMemo(() => attention ? attentionDisclosure(attention, primaryKey) : null, [attention, primaryKey]);
+  const read = useMemo(() => arbitrateTodayRead({ briefing: attention, refreshing: loading, failed: !!failed, failedSources, primaryKey }), [attention, loading, failed, failedSources, primaryKey]);
+  const layout = read.layout;
   const primary = layout?.primary ?? null;
   const visibleChanged = layout?.changed ?? [];
   const visibleMotion = allMotion ? layout?.inMotion ?? [] : layout?.inMotion.slice(0, 4) ?? [];
   const fingerprints = useMemo(() => new Map(attention?.baseline.items.map(item => [item.key, item.fingerprint]) ?? []), [attention]);
   const changedKeys = new Set(attention?.changeHeading === "Changed since your last review" ? attention.changed.map(item => item.key) : []);
-  const quiet = canShowQuietBriefing(attention, loading, failed);
+  const quiet = read.quiet;
   useEffect(() => { setPrimaryKey(primary?.key ?? null); }, [primary?.key]);
 
   // Mounted below the fold or inside collapsed details is not Seen. Without
   // viewport observation, navigation works but no automatic Seen write is made.
   useEffect(() => {
-    if (!attention || !root.current || typeof IntersectionObserver === "undefined") return;
+    if (!read.canRecordSeen || !attention || !root.current || typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver((entries) => {
       if (document.visibilityState !== "visible") return;
       const displayed = entries.filter(entry => entry.isIntersecting && entry.intersectionRatio >= 0.5);
@@ -87,11 +88,11 @@ export function TodayAttentionBriefing({
     observe();
     document.addEventListener("visibilitychange", observe);
     return () => { observer.disconnect(); document.removeEventListener("visibilitychange", observe); };
-  }, [attention, changesOpen, tasksOpen, allMotion, primary?.key]);
+  }, [attention, changesOpen, tasksOpen, allMotion, primary?.key, read.canRecordSeen]);
 
   const displayedBaseline = useMemo(() => attention ? displayedAttentionBaseline(attention, observed) : null, [attention, observed]);
   useEffect(() => {
-    if (!displayedBaseline?.snapshot.items.length || inFlight.current || seenError) return;
+    if (!read.canRecordSeen || !displayedBaseline?.snapshot.items.length || inFlight.current || seenError) return;
     if (displayedBaseline.snapshot.items.every(item => sent.current.get(item.key) === item.fingerprint)) return;
     inFlight.current = true;
     markSeen.mutate(displayedBaseline, {
@@ -99,22 +100,32 @@ export function TodayAttentionBriefing({
       onError: () => setSeenError(true),
       onSettled: () => { inFlight.current = false; setSeenRetry(value => value + 1); },
     });
-  }, [displayedBaseline, markSeen, seenError, seenRetry]);
+  }, [displayedBaseline, markSeen, seenError, seenRetry, read.canRecordSeen]);
 
   const openTask = (item: ApertureAttentionItem) => item.kind === "status_unavailable" ? onRetry() : onOpen(item.href);
   const row = (item: ApertureAttentionItem | ApertureMotionItem) => <BriefRow key={item.key} item={item} fingerprint={fingerprints.get(item.key)} changed={changedKeys.has(item.key)} onOpen={() => "kind" in item ? openTask(item) : onOpen(item.href)} />;
+  const notice = read.state === "loading" ? { title: "Loading the last recorded briefing…", detail: "Existing work is unchanged. Wait for saved status before choosing a next step." }
+    : read.state === "refreshing" ? { title: "Refreshing recorded status.", detail: "The last successful briefing remains below; it is not a current all-clear. The refresh is already in progress." }
+      : read.state === "failed" ? { title: "Current status could not be verified.", detail: `An empty result is not treated as an all-clear.${attention ? " Last successful records remain below." : ""} Retry status refresh to reconcile what is available.` }
+        : read.state === "partial" ? { title: "Status is partially available.", detail: "Review the available records below. Missing sources may hide other decisions; refresh status to retry them." }
+          : read.state === "stale" ? { title: "Recorded status is stale.", detail: "The last successful records remain below. Refresh status before relying on current eligibility." }
+            : read.state === "empty" ? { title: "No verified briefing is available.", detail: "Refresh status to retrieve recorded work. This does not mean no work exists." } : null;
+  const failedDetail = failed && read.state !== "refreshing" && read.state !== "loading"
+    ? (failedSources?.length ? failedSources : ["status" as const]).map(safeStatusError).join(" ") : null;
 
-  return <section ref={root} aria-labelledby="today-briefing-title" aria-busy={loading} className="overflow-hidden rounded-2xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+  return <section ref={root} aria-labelledby="today-briefing-title" aria-busy={read.busy} data-read-state={read.state} className="overflow-hidden rounded-2xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
     <header className="border-b p-4" style={{ borderColor: "var(--sh-border-1)" }}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><p className="text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Today · {modeLabel}</p><h1 id="today-briefing-title" className="mt-1 font-serif text-2xl leading-tight sm:text-3xl">What needs you now.</h1></div>
-        <Button variant="ghost" size="sm" className="min-h-11" disabled={loading} onClick={onRetry}><RefreshCw className="mr-2 h-4 w-4" />{loading ? "Refreshing status…" : "Refresh status"}</Button>
+        <Button variant="ghost" size="sm" className="min-h-11 aria-disabled:opacity-50" aria-disabled={read.busy} onClick={() => { if (!read.busy) onRetry(); }}><RefreshCw className="mr-2 h-4 w-4" />{read.busy ? "Refreshing status…" : read.state === "failed" ? "Retry status refresh" : "Refresh status"}</Button>
       </div>
       <p className="mt-2 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{accountLabel}</p>
     </header>
 
-    {loading && <div role="status" aria-live="polite" className="px-4 py-3 text-sm" style={{ color: "var(--sh-fg-muted)" }}>{attention ? "Refreshing recorded status. The last successful briefing remains below; it is not a current all-clear." : "Loading the last recorded briefing…"}</div>}
-    {failed && <div role="alert" className="p-4"><div className="flex gap-3"><ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-red)" }} /><div><p className="font-semibold">Current status could not be verified.</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{(failedSources?.length ? failedSources : ["status" as const]).map(safeStatusError).join(" ")} An empty result is not treated as an all-clear.{attention ? " Last successful records remain below." : ""}</p><Button className="mt-3 min-h-11" variant="outline" onClick={onRetry}>Retry status refresh</Button></div></div></div>}
+    {notice && <div data-status-notice role={read.state === "failed" ? "alert" : "status"} className="flex gap-3 p-4">
+      {!read.busy && <ShieldAlert aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-signal)" }} />}
+      <div><p className="font-semibold">{notice.title}</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{notice.detail}</p>{failedDetail && <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{failedDetail}</p>}</div>
+    </div>}
 
     {attention && <>
       {primary ? <div data-attention-key={primary.key} data-attention-fingerprint={fingerprints.get(primary.key)} className="p-4 sm:p-5" style={{ background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" }}>
@@ -122,7 +133,7 @@ export function TodayAttentionBriefing({
           <div className="max-w-3xl"><p className="text-xs font-semibold" style={{ color: primary.critical ? "var(--sh-red)" : "var(--sh-signal)" }}>{primary.stateLabel}</p><h2 className="mt-1 font-serif text-2xl">{primary.title}</h2><p className="mt-2 text-sm leading-6">{primary.reason}</p><p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Why this matters:</strong> {primary.consequence}</p></div>
           <Button className="min-h-11 shrink-0 whitespace-normal" disabled={primary.kind === "status_unavailable" && loading} onClick={() => openTask(primary)}>{primary.actionLabel}<ArrowRight className="ml-2 h-4 w-4 shrink-0" /></Button>
         </div>
-      </div> : quiet ? <div className="flex gap-3 p-4"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div><p className="font-semibold">No new action identified in recorded status.</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{attention.quietMessage}</p></div></div> : !loading && !failed ? <div role="status" className="p-4 text-sm">Current status is not fully verified. Refresh status before relying on this briefing.</div> : null}
+      </div> : quiet ? <div className="flex gap-3 p-4"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div><p className="font-semibold">No new action identified in recorded status.</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{attention.quietMessage}</p></div></div> : null}
 
       {(layout?.otherCritical.length ?? 0) > 0 && <section aria-label="Other critical issues" className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">Other critical issues · {layout!.otherCritical.length}</h2><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>All authorized plays, regardless of thesis or instrument filters.</p></div>{layout!.otherCritical.map(row)}</section>}
 
@@ -132,13 +143,12 @@ export function TodayAttentionBriefing({
 
       {visibleMotion.length > 0 && <section className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2></div>{visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
 
-      {attention.nextCheckpoint && <footer className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div className="flex gap-3"><Clock3 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><p className="text-xs font-semibold">Next checkpoint · {attention.nextCheckpoint.title}</p><p className="mt-1 text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>{attention.nextCheckpoint.detail}{attention.nextCheckpoint.at ? ` · ${localTime(attention.nextCheckpoint.at)}` : ""}</p></div></div>{attention.nextCheckpoint.href && <Button variant="outline" size="sm" className="min-h-11" onClick={() => onOpen(attention.nextCheckpoint!.href!)}>Open checkpoint</Button>}</footer>}
+      {attention.nextCheckpoint && <footer className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div className="flex gap-3"><Clock3 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><p className="text-sm font-semibold">Next checkpoint · {attention.nextCheckpoint.title}</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.nextCheckpoint.detail}{attention.nextCheckpoint.at ? ` · ${localTime(attention.nextCheckpoint.at)}` : ""}</p></div></div>{attention.nextCheckpoint.href && <Button variant="outline" size="sm" className="min-h-11" onClick={() => onOpen(attention.nextCheckpoint!.href!)}>Open checkpoint</Button>}</footer>}
       <div className="space-y-3 border-t px-4 py-3" style={{ borderColor: "var(--sh-border-1)" }}>
         <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.scopeNote} Refresh status reads saved records; it does not run underwriting or new monitoring checks.</p>
         {seenError && <div role="status" className="text-sm">Your displayed-status baseline was not saved. This does not acknowledge or resolve any finding.<Button variant="outline" className="mt-2 min-h-11 sm:ml-2" onClick={() => { setSeenError(false); setSeenRetry(value => value + 1); }}>Retry saving viewed status</Button></div>}
         {attention.entryState !== "start" && <div className="flex justify-end"><Button variant="ghost" size="sm" className="min-h-11" onClick={onNewMission}>Review / revise mission</Button></div>}
       </div>
     </>}
-    {!attention && !loading && !failed && <p role="status" className="p-4 text-sm">No verified briefing is available. Refresh status to retrieve recorded work.</p>}
   </section>;
 }

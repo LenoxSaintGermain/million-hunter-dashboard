@@ -122,7 +122,47 @@ describe("Today component rendering against deterministic records", () => {
     const html = render(briefing(), { loading: true });
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain("Refreshing recorded status");
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).not.toContain('disabled=""');
     expect(html).not.toContain("No new action identified in recorded status");
+  });
+
+  it("arbitrates a partial saved snapshot plus an in-flight retry into one recovery, not a second task", () => {
+    const html = render(briefing({ checks: { state: "partial", asOf: now, monitoring: "on_demand" } }), { loading: true, failed: rawFailure });
+    expect(html).toContain("Refreshing recorded status");
+    expect(html).not.toContain("Retry status refresh");
+    expect(html).not.toContain('data-attention-key="status:partial"');
+    expect(html).not.toContain("Some decisions cannot be verified");
+    expect(html).not.toContain("No new action identified");
+  });
+
+  it("does not propose starting a missing mission from a cached snapshot during failed refresh", () => {
+    const html = render(briefing({ mission: null }), { failed: rawFailure });
+    expect(html).not.toContain("Start Capital Mission");
+    expect(html).toContain("Retry status refresh");
+  });
+
+  it("keeps unresolved dispatch visible while partial status is retried", () => {
+    const html = render(briefing({
+      checks: { state: "partial", asOf: now, monitoring: "on_demand" },
+      orders: [{ id: 9, runId: 10, candidateId: 11, symbol: "MGM", status: "submitted", qty: 1, filledQty: 0, brokerOrderId: null, updatedAt: now }],
+    }), { loading: true });
+    expect(html).toContain("Reconcile dispatch");
+    expect(html).not.toContain('data-attention-key="status:partial"');
+    expect(html).not.toContain("No new action identified");
+    expect(mocks.mutate).not.toHaveBeenCalled();
+  });
+
+  it("does not keep the whole briefing loading while only optional research is fetching", () => {
+    for (const query of [mocks.account, mocks.thesis, mocks.desk]) { query.isLoading = false; query.isFetching = false; }
+    mocks.account.data = [{ id: 1, isPaper: true, brokerId: "alpaca_paper", label: "Fixture Paper" }];
+    mocks.thesis.data = { thesis: { name: "Fixture thesis" } };
+    mocks.desk.data = { attention: briefing() };
+    const html = renderToStaticMarkup(createElement(DailyPlayList, { onNewMission: vi.fn(), onNewResearch: vi.fn(), onOpenRun: vi.fn() }));
+    expect(html).not.toContain("Refreshing recorded status");
+    expect(html).not.toContain('aria-busy="true"');
+    expect(html).toContain("Loading the saved research queue");
+    expect(mocks.mutate).not.toHaveBeenCalled();
   });
 
   it.each(["partial", "stale", "empty", "loading", "failed"] as const)("renders a recovery instead of no action for %s", state => {

@@ -132,7 +132,7 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
       attention={desk.data?.attention ?? null}
       accountLabel={accountLabel}
       modeLabel={preferredAccount && !preferredAccount.isPaper ? "Execution unavailable" : "Paper"}
-      loading={desk.isFetching || accountQuery.isFetching || thesisQuery.isFetching || playsRefreshing}
+      loading={desk.isFetching}
       failed={statusErrors}
       failedSources={failedSources}
       onOpen={(href) => window.location.assign(href)}

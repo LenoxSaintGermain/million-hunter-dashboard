@@ -4,13 +4,15 @@ import baseConfig from "./vitest.config";
 /**
  * Pure/local lane. It intentionally excludes the files whose assertions
  * require a schema, seed data, or durable database writes. It does not skip
- * individual production assertions: those remain mandatory in test:integration.
+ * individual production assertions: database checks remain in test:integration;
+ * deployment credential presence remains in test:credentials, unchanged.
  */
 export default mergeConfig(baseConfig, defineConfig({
   test: {
     include: ["shared/**/*.test.ts"],
     exclude: [
       "**/node_modules/**",
+      "server/api-keys.test.ts",
       "server/aperture/activeCapitalThesisSchema.test.ts",
       "server/aperture/playOutcomeLedgerSchema.test.ts",
       "server/scan-pipeline.test.ts",

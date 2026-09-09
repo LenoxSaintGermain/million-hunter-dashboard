@@ -7,6 +7,7 @@ import {
   type CapitalStrategyCandidate,
   type CapitalStrategyDecision,
   type StrategyIntent,
+  type StrategyEvidenceState,
 } from "../../shared/capitalStrategy";
 import type { UnderwritingHoldingPeriod } from "../../shared/playUnderwriting";
 
@@ -17,7 +18,8 @@ export type CapitalStrategistInput = {
   searchScope: CapitalSearchScope;
   reviewedUniverse: string[];
   coverageGaps: string[];
-  providerState: { status: "available" | "partial" | "failed"; failures: string[] };
+  providerState: StrategyEvidenceState;
+  classifierState?: StrategyEvidenceState;
   comparisonHorizon?: UnderwritingHoldingPeriod | null;
   now: number;
   reviewAt: number | null;
@@ -33,22 +35,33 @@ const compareCandidates = (left: CapitalStrategyCandidate, right: CapitalStrateg
  * It is pure: no persistence, proposal, order, broker, or buying-power mutation.
  */
 export function buildCapitalStrategyDecision(input: CapitalStrategistInput): CapitalStrategyDecision {
-  const envelope = deriveCapitalEnvelope(input.capital);
-  const assessed = input.candidates.map((candidate) => ({
-    candidate,
-    assessment: assessCausalEconomicPath(candidate.causalPath),
-  }));
-  const unavailable = input.providerState.status === "failed";
+  const envelope = deriveCapitalEnvelope(input.capital, input.now);
+  const unavailable = input.providerState.status === "failed" || input.classifierState?.status === "failed";
   const capitalUsableForComparison = envelope.status === "verified" || envelope.status === "operator_declared";
+  const assessed = input.candidates.map((candidate) => {
+    const assessment = assessCausalEconomicPath(candidate.causalPath, input.now);
+    const reasons: string[] = assessment.status === "verified" ? [] : [...assessment.reasons];
+    if (input.providerState.status === "failed") reasons.push("provider_failure");
+    if (input.classifierState?.status === "failed") reasons.push("classifier_failure");
+    if (input.classifierState?.status === "partial") reasons.push("classifier_partial");
+    if (!capitalUsableForComparison) reasons.push("capital_unavailable", ...envelope.blockers);
+    else if (envelope.deployableCents <= 0) reasons.push("capital_envelope_empty");
+    if (candidate.underwriter.state !== "qualified") reasons.push(`underwriter_${candidate.underwriter.state}`);
+    const score = candidate.underwriter.overallScore;
+    if (score == null || !Number.isFinite(score) || score < 0) reasons.push("underwriter_score_unavailable");
+    const risk = candidate.underwriter.plannedRiskCents;
+    if (risk == null || !Number.isSafeInteger(risk) || risk < 0) reasons.push("underwriter_risk_unavailable");
+    else if (capitalUsableForComparison && envelope.deployableCents > 0 && risk > envelope.deployableCents) reasons.push("capital_envelope_exceeded");
+    if (candidate.underwriter.proposedNotionalCents !== undefined) {
+      const notional = candidate.underwriter.proposedNotionalCents;
+      if (notional == null || !Number.isSafeInteger(notional) || notional < 0) reasons.push("underwriter_capital_unavailable");
+      else if (capitalUsableForComparison && notional > envelope.deployableCents) reasons.push("capital_envelope_exceeded");
+    }
+    if (input.comparisonHorizon != null && candidate.horizon !== input.comparisonHorizon) reasons.push("horizon_mismatch");
+    return { candidate, assessment, exclusionReasons: Array.from(new Set(reasons)) };
+  });
   const qualified = assessed
-    .filter(({ candidate, assessment }) =>
-      !unavailable
-      && capitalUsableForComparison
-      && candidate.underwriter.state === "qualified"
-      && candidate.underwriter.overallScore != null
-      && assessment.status === "verified"
-      && (input.comparisonHorizon == null || candidate.horizon === input.comparisonHorizon),
-    )
+    .filter(({ exclusionReasons }) => !exclusionReasons.length)
     .map(({ candidate }) => candidate)
     .sort(compareCandidates);
 
@@ -82,10 +95,12 @@ export function buildCapitalStrategyDecision(input: CapitalStrategistInput): Cap
 
   const first = investmentAlternatives[0];
   const retainExplanation = unavailable
-    ? "Retain capital because required provider evidence is unavailable; no confidence is inferred from the failure."
+    ? "Retain capital because required evidence or classification is unavailable; no confidence is inferred from the failure."
     : !capitalUsableForComparison
       ? "Retain capital because the source is hypothetical, unavailable, or already claimed."
-      : "Retain capital until a reviewed candidate clears both causal evidence and existing underwriting gates.";
+      : envelope.deployableCents <= 0
+        ? "Retain capital: no eligible gains remain after cost basis and reserve. Returned principal is not profit."
+        : "Retain capital until a reviewed candidate clears both causal evidence and existing underwriting gates.";
   const primaryConclusion: CapitalStrategyDecision["primaryConclusion"] = first
     ? { kind: first.kind, candidateId: first.candidateId, explanation: `${first.whyThisUse} ${first.whyNow}` }
     : { kind: "retain_capital", candidateId: null, explanation: retainExplanation };
@@ -94,7 +109,9 @@ export function buildCapitalStrategyDecision(input: CapitalStrategistInput): Cap
     intent: input.intent,
     status: unavailable
       ? "unavailable"
-      : input.providerState.status === "partial" || envelope.status === "hypothetical_only" || envelope.status === "blocked"
+      : input.providerState.status === "partial" || input.classifierState?.status === "partial"
+        || envelope.status === "hypothetical_only" || envelope.status === "blocked"
+        || assessed.some(({ assessment }) => assessment.status === "unavailable" || assessment.status === "conditional_research")
         ? "incomplete"
         : "complete",
     asOf: input.now,
@@ -110,15 +127,17 @@ export function buildCapitalStrategyDecision(input: CapitalStrategistInput): Cap
       reviewAt: input.reviewAt,
     },
     reviewedUniverse: Array.from(new Set(input.reviewedUniverse)),
-    coverageGaps: Array.from(new Set([...input.coverageGaps, ...input.providerState.failures])),
+    coverageGaps: Array.from(new Set([
+      ...input.coverageGaps, ...input.providerState.failures, ...(input.classifierState?.failures ?? []),
+      ...assessed.flatMap(({ candidate }) => [
+        ...candidate.causalPath.providerState.failures, ...(candidate.causalPath.classifierState?.failures ?? []),
+      ]),
+    ])),
     rejectedHypotheses: assessed
-      .filter(({ candidate, assessment }) => candidate.underwriter.state !== "qualified" || assessment.status !== "verified")
-      .map(({ candidate, assessment }) => ({
+      .filter(({ candidate }) => !selected.includes(candidate))
+      .map(({ candidate, exclusionReasons }) => ({
         candidateId: candidate.id,
-        reasons: Array.from(new Set([
-          ...assessment.reasons,
-          ...(candidate.underwriter.state === "qualified" ? [] : [`underwriter_${candidate.underwriter.state}`]),
-        ])),
+        reasons: exclusionReasons.length ? exclusionReasons : ["not_shortlisted"],
       })),
     sideEffects: {
       capitalReserved: false,

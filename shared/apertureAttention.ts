@@ -219,6 +219,45 @@ export function canShowQuietBriefing(briefing: ApertureAttentionBriefing | null,
   return !!briefing && briefing.quiet && briefing.primary == null && briefing.readState === "complete" && !loading && !failed;
 }
 
+/** Read presentation only. Never changes lifecycle eligibility or acknowledges a finding.
+ * Transport retries outrank an old transport error; substantive risk tasks survive
+ * either. Context queries cannot hold the recorded-status surface in Loading.
+ */
+export function arbitrateTodayRead({ briefing, refreshing, failed, failedSources = [], primaryKey }: {
+  briefing: ApertureAttentionBriefing | null;
+  refreshing: boolean;
+  failed: boolean;
+  failedSources?: AttentionStatusSource[];
+  primaryKey?: string | null;
+}) {
+  const coreFailed = failed && (!failedSources.length || failedSources.includes("status"));
+  const state = refreshing ? briefing ? "refreshing" : "loading"
+    : coreFailed ? "failed"
+      : !briefing ? "empty"
+        : failed ? "partial" : briefing.readState;
+  const uncertain = state !== "complete";
+  const layout = briefing ? attentionDisclosure(briefing, primaryKey) : null;
+  // Availability has one stable notice, never another pseudo-workflow card.
+  // A cached absence of work cannot instruct the operator to create a new mission.
+  const keep = (task: ApertureAttentionItem) => task.kind !== "status_unavailable"
+    && !(uncertain && task.key === "mission:missing");
+  const tasks = layout ? [layout.primary, ...layout.otherCritical, ...layout.otherAttention]
+    .filter((task): task is ApertureAttentionItem => task != null && keep(task)) : [];
+  const primary = tasks[0] ?? null;
+  return {
+    state,
+    busy: refreshing,
+    quiet: state === "complete" && canShowQuietBriefing(briefing, false, null),
+    canRecordSeen: !refreshing && !coreFailed && briefing?.readState === "complete",
+    layout: layout ? {
+      ...layout, primary,
+      otherCritical: tasks.slice(1).filter(task => task.critical),
+      otherAttention: tasks.slice(1).filter(task => !task.critical),
+      changed: layout.changed.filter(task => !("kind" in task) || keep(task)),
+    } : null,
+  };
+}
+
 export type AttentionStatusSource = "status" | "account" | "thesis" | "research" | "trigger" | "underwriting" | "dispatch" | "comparison";
 
 /** Present an authored recovery message, never a database/provider exception. */

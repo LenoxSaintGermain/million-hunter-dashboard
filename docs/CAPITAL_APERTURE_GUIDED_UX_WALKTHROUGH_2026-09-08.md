@@ -8,6 +8,26 @@
 
 ## September 9 gap-closure checkpoint
 
+### Follow-up: Today loading / partial-state arbitration
+
+`arbitrateTodayRead` is a read-presentation layer over the existing shared attention result, not another lifecycle or priority engine. It establishes one status notice:
+
+| Transport / saved record | Today presentation | Records and actions |
+| --- | --- | --- |
+| Initial status request | Loading recorded briefing; account loading is not account missing | No absence-based setup or all-clear |
+| Status refresh underway | One refreshing notice; earlier errors do not create a second retry task | Retain known critical decisions; refresh is already in progress |
+| Failed status refresh | One failed notice and one retry control | Last records retained, no all-clear or cached missing-mission prompt |
+| Partial or stale snapshot | One scoped availability notice | Unaffected decisions remain usable; uncertainty is visible |
+| Only optional research loading | Briefing is not globally busy | Research queue has its own loading state |
+| Optional source failed | Scoped partial notice, with the unavailable source | No global all-clear; useful recorded status remains |
+| Complete, no pending task | Timestamped quiet check-in | No new mission pressure or implied monitoring run |
+
+Availability messages are not additional workflow cards or Seen findings. A failed/in-flight core read cannot advance Seen state. A substantive dispatch problem remains visible during any read state, and the stable primary-task key still prevents refresh-driven button reordering. Refresh uses a focus-preserving `aria-disabled` control with a guarded click handler; a keyboard user retains focus while the request runs. No auto-scroll is introduced. The checkpoint explanation now uses body-sized text.
+
+Verification includes failing-before/fixed-after component regressions, a deterministic transport/snapshot combination matrix, a zero-API renderer harness using the real `DailyPlayList` and `TodayAttentionBriefing`, and a repeat of the same isolated persisted desktop/mobile journey. The harness is a separate localhost-only Vite entry, absent from the production build. It does not claim to exercise a broker or the backend.
+
+Detailed follow-up evidence and the Capital Strategist acceptance boundary are in [Today arbitration and Strategist acceptance](qa/CAPITAL_APERTURE_TODAY_ARBITRATION_2026-09-09.md).
+
 The shared attention/disclosure model remains the single next-action authority for Today and Play Desk. The guided workspace uses the same persisted Mission/revision and underwriting state; it is not a second homepage.
 
 - Incomplete draft fields and active section now persist per user, with version-conflict detection and append-only draft revisions. A second authenticated tab resumes the saved section. Account capital remains explicitly declared, not copied from total equity.

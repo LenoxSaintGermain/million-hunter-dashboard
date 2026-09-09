@@ -2,7 +2,15 @@
 import { spawn, execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 
-const config = JSON.parse(execFileSync("docker", ["inspect", "sh-ch-capital-uat-db", "--format", "{{json .Config.Env}}"], { encoding: "utf8" }));
+const server = process.argv[2] === "--server";
+const test = process.argv[2] === "--test";
+const seed = process.argv[2] === "--seed";
+const shuffle = test && process.argv[3] === "--shuffle";
+if ((!server && !test && !seed) || process.argv.length > (shuffle ? 4 : 3)) throw new Error("Use --server, --seed, or --test [--shuffle].");
+const container = JSON.parse(execFileSync("docker", ["inspect", "sh-ch-capital-uat-db", "--format", "{{json .}}"], { encoding: "utf8" }));
+const bindings = container.NetworkSettings?.Ports?.["3306/tcp"];
+if (!container.State?.Running || bindings?.length !== 1 || bindings[0].HostIp !== "127.0.0.1" || bindings[0].HostPort !== "3307") throw new Error("The isolated database must be running and bound only to 127.0.0.1:3307.");
+const config = container.Config.Env;
 const local = Object.fromEntries(config.map((entry) => { const split = entry.indexOf("="); return [entry.slice(0, split), entry.slice(split + 1)]; }));
 if (local.MARIADB_DATABASE !== "capital_aperture_uat_9c18799" || !local.MARIADB_ROOT_PASSWORD) throw new Error("The exact isolated UAT database identity could not be verified.");
 const env = { ...process.env };
@@ -21,12 +29,10 @@ Object.assign(env, {
   JWT_SECRET: "isolated-uat-no-production-authority", PORT: "3110",
   VITE_ANALYTICS_ENDPOINT: "", VITE_ANALYTICS_WEBSITE_ID: "",
 });
-const server = process.argv[2] === "--server";
-const test = process.argv[2] === "--test";
-const seed = process.argv[2] === "--seed";
-if (!server && !test && !seed) throw new Error("Use --server, --seed, or --test.");
 const command = test ? "./node_modules/.bin/vitest" : "./node_modules/.bin/tsx";
-const args = server ? ["server/_core/index.ts"] : seed ? ["scripts/seed-guided-capital-uat.ts"] : ["run", "server/aperture/persistedJourneys.integration.test.ts"];
+// --test never seeds or starts a server. Shuffling has a fixed replayable seed
+// and cannot broaden the test-file scope through arbitrary forwarded arguments.
+const args = server ? ["server/_core/index.ts"] : seed ? ["scripts/seed-guided-capital-uat.ts"] : ["run", "server/aperture/persistedJourneys.integration.test.ts", ...(shuffle ? ["--sequence.shuffle", "--sequence.seed=630001"] : [])];
 const child = spawn(command, args, { env, stdio: "inherit" });
 process.on("SIGINT", () => child.kill("SIGINT"));
 process.on("SIGTERM", () => child.kill("SIGTERM"));
