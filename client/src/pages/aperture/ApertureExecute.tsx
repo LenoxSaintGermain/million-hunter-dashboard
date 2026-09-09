@@ -35,7 +35,7 @@ import { DecisionStepLock, decisionAuthorityAllowsDownstream } from "@/component
 import { format, formatDistanceToNow } from "date-fns";
 import { normalizeStringList } from "@shared/stringList";
 import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
-import { monitoringReviewState } from "@shared/monitoringState";
+import { monitoringReviewState, partitionMonitoringHistory } from "@shared/monitoringState";
 import { isOptionInstrument, paperInstrumentLabel } from "@shared/paperInstrument";
 
 const DISCLAIMER = "Internal research tool — not investment advice. Paper only — no real capital.";
@@ -321,7 +321,8 @@ function MonitoringPanel({ runId, candidate, thesisSummary, order }: {
       thesisSummary: [order?.reason, thesisSummary].filter(Boolean).join(" · ") || `Monitor ${candidate.symbol} against the recorded paper thesis and its invalidation conditions.`,
     });
   };
-  const reviewItems = (checks ?? []).filter((check) => monitoringReviewState(check).needsReview);
+  const { current: currentChecks, history: previousChecks } = partitionMonitoringHistory(checks ?? []);
+  const reviewItems = currentChecks.filter((check) => monitoringReviewState(check).needsReview);
   return <div className="space-y-4">
     <section className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
       <h2 className="text-base font-semibold">Thesis checks · {order ? orderInstrumentLabel(order) : candidate?.symbol ?? "Select a play"}</h2>
@@ -332,7 +333,8 @@ function MonitoringPanel({ runId, candidate, thesisSummary, order }: {
     {query.isLoading && <p role="status">Loading recorded checks…</p>}
     {query.isError && <div role="alert" className="rounded-lg border p-4"><p>Recorded monitoring could not load. Available records are retained; no all-clear is established.</p><Button variant="outline" className="mt-2 min-h-11" disabled={query.isFetching} onClick={() => void query.refetch()}>Retry saved status</Button></div>}
     {reviewItems.length > 0 && <p role="status" className="text-sm font-medium">{reviewItems.length} check{reviewItems.length === 1 ? " needs" : "s need"} review. Open the evidence beside each finding.</p>}
-    <div className="space-y-3">{checks?.map((check) => <MonitoringFindingCard key={check.id} check={check} instrument={order} rationale={order?.reason ?? thesisSummary} onRefresh={canCheck ? runScopedChecks : undefined} refreshing={runCheck.isPending} />)}</div>
+    <div className="space-y-3">{currentChecks.map((check) => <MonitoringFindingCard key={check.id} check={check} instrument={order} rationale={order?.reason ?? thesisSummary} onRefresh={canCheck ? runScopedChecks : undefined} refreshing={runCheck.isPending} />)}</div>
+    {previousChecks.length > 0 && <details className="rounded-lg border p-3"><summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">Previous checks · {previousChecks.length}</summary><p className="mb-3 text-sm">Historical versions, not additional current review tasks. No finding is acknowledged or erased.</p><div className="space-y-3">{previousChecks.map(check => <MonitoringFindingCard key={check.id} check={check} instrument={order} rationale={order?.reason ?? thesisSummary} />)}</div></details>}
     {!query.isLoading && !query.isError && checks?.length === 0 && <p className="text-sm">No monitoring checks recorded for this play. No conclusion about its current thesis is available.</p>}
   </div>;
 }

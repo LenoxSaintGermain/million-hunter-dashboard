@@ -17,6 +17,19 @@ export type MonitoringObservation = {
   checkedAt: number;
 };
 
+/** Current review tasks use the newest recorded result per check type. History
+ * remains available, including failures; an older success never replaces a newer failure. */
+export function partitionMonitoringHistory<T extends MonitoringObservation & { id: number; checkType: string }>(checks: readonly T[]) {
+  const ordered = [...checks].sort((a, b) => b.checkedAt - a.checkedAt || b.id - a.id);
+  const seen = new Set<string>();
+  const current: T[] = [], history: T[] = [];
+  for (const check of ordered) {
+    if (seen.has(check.checkType)) history.push(check);
+    else { seen.add(check.checkType); current.push(check); }
+  }
+  return { current, history };
+}
+
 export type MonitoringInstrumentContext = Pick<PaperInstrumentInput, "symbol" | "instrumentType" | "underlyingSymbol" | "optionExpirationDate" | "optionStrikePriceCents">;
 
 /** Presentation, not sentiment classification. Never infer direction or hedge intent from prose. */

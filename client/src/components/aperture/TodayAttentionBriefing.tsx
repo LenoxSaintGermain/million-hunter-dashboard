@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { AttentionDecisionCard } from "./AttentionDecisionCard";
 import { AttentionSourceRecovery } from "./AttentionSourceRecovery";
+import { paperInstrumentDisplayLabel, parseOccOptionSymbol } from "@shared/paperInstrument";
 import { arbitrateTodayRead, displayedAttentionBaseline, safeStatusError, type AttentionStatusSource, type ApertureAttentionBriefing, type ApertureAttentionItem, type ApertureMotionItem } from "@shared/apertureAttention";
 
 function localTime(value: number | null) {
@@ -13,10 +14,12 @@ function localTime(value: number | null) {
 function BriefRow({ item, fingerprint, changed, onOpen }: { item: ApertureAttentionItem | ApertureMotionItem; fingerprint?: string; changed?: boolean; onOpen: (href: string) => void }) {
   const attention = "actionLabel" in item;
   if (attention) return <AttentionDecisionCard item={item} fingerprint={fingerprint} onOpen={onOpen} />;
+  const parsed = parseOccOptionSymbol(item.symbol);
+  const label = parsed ? paperInstrumentDisplayLabel({ symbol: item.symbol, instrumentType: parsed.instrumentType }) : item.symbol;
   return <article data-attention-key={item.key} data-attention-fingerprint={fingerprint} className="flex flex-col gap-3 border-t px-4 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)" }}>
     <div className="min-w-0">
       <p className="text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>{item.stateLabel}{changed ? " · Changed since your last review" : ""}</p>
-      <p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{`${item.symbol} · ${item.detail}`}</p>
+      <p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{`${label} · ${item.detail}`}</p>
     </div>
     <Button variant="outline" size="sm" className="min-h-11 shrink-0 whitespace-normal" onClick={() => onOpen(item.href)}>View status<ArrowRight className="ml-2 h-3.5 w-3.5 shrink-0" /></Button>
   </article>;
@@ -110,7 +113,7 @@ export function TodayAttentionBriefing({
     : read.state === "refreshing" ? { title: "Refreshing recorded status.", detail: "The last successful briefing remains below; it is not a current all-clear. The refresh is already in progress." }
       : read.state === "failed" ? { title: "Current status could not be verified.", detail: `An empty result is not treated as an all-clear.${attention ? " Last successful records remain below." : ""} Retry status refresh to reconcile what is available.` }
         : read.state === "partial" ? { title: "Status is partially available.", detail: attention?.sourceIssues?.length ? `${Array.from(new Set(attention.sourceIssues.map(issue => issue.source === "monitoring" ? "Monitoring" : issue.label))).join(" · ")} needs verification. Recovery below.` : "Missing source not identified in this saved snapshot. Refresh status to identify the gap." }
-          : read.state === "stale" ? { title: "Recorded status is stale.", detail: "The last successful records remain below. Refresh status before relying on current eligibility." }
+          : read.state === "stale" ? { title: "Recorded checks need review.", detail: read.sourceRecoveryMessage }
             : read.state === "empty" ? { title: "No verified briefing is available.", detail: "Refresh status to retrieve recorded work. This does not mean no work exists." } : null;
   const failedDetail = failed && read.state !== "refreshing" && read.state !== "loading"
     ? (failedSources?.length ? failedSources : ["status" as const]).map(safeStatusError).join(" ") : null;

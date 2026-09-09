@@ -32,6 +32,20 @@ beforeEach(() => {
 });
 
 describe("Authenticated UAT attention regressions — illustrative records, zero APIs", () => {
+  it("formats compact in-motion option rows without raw OCC headings", () => {
+    const html = today(deriveApertureAttention(input({ monitoringFindings: [] }), null));
+    expect(html).toContain("DKNG · $20 Put · Nov 20, 2026");
+    expect(html).not.toContain("DKNG261120P00020000 · 1 filled");
+  });
+
+  it("does not tell an operator that saved-status refresh cures stale monitoring", () => {
+    const attention = deriveApertureAttention(input({ checks: { state: "stale", asOf: now, monitoring: "on_demand", issues: [{ source: "monitoring", state: "stale", label: "MGM monitoring", impact: "Fresh checks needed", lastSuccessAt: now - 86_400_001, actionLabel: "Review MGM checks", href: "/aperture/run/360001/execute?candidate=240002&lifecycle=monitoring", recovery: "review_checks" }] } }), null);
+    const html = today(attention);
+    expect(html).not.toContain("Refresh status before relying on current eligibility");
+    expect(html).toContain("Open the affected play below for new checks");
+    expect(fixture.refetch).not.toHaveBeenCalled();
+  });
+
   it("UAT02 gives mobile a bounded decision summary before its action; retains the complete cited record in Evidence", () => {
     const attention = deriveApertureAttention(input(), null);
     expect(attention.primary!.reason.length).toBeLessThan(180);

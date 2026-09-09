@@ -269,6 +269,9 @@ export function arbitrateTodayRead({ briefing, refreshing, failed, failedSources
   return {
     state,
     busy: refreshing,
+    sourceRecoveryMessage: briefing?.sourceIssues?.some(issue => issue.recovery === "review_checks")
+      ? "Open the affected play below for new checks. Refresh only reloads saved status."
+      : "Some saved records need verification. Retry status; available work stays visible.",
     quiet: state === "complete" && canShowQuietBriefing(briefing, false, null),
     canRecordSeen: !refreshing && !coreFailed && briefing?.readState === "complete",
     layout: layout ? {
