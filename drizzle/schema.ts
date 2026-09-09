@@ -2047,3 +2047,5 @@ export const apertureAlpha = mysqlTable("aperture_alpha", {
 });
 export type ApertureAlpha = typeof apertureAlpha.$inferSelect;
 export type InsertApertureAlpha = typeof apertureAlpha.$inferInsert;
+export { apertureUnderwritingJobs } from "./apertureUnderwritingJobSchema";
+export { apertureMissionDrafts, apertureMissionDraftRevisions } from "./apertureMissionDraftSchema";

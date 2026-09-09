@@ -22,6 +22,56 @@ function base(overrides: Partial<ApertureAttentionInput> = {}): ApertureAttentio
 }
 
 describe("Capital Aperture attention briefing", () => {
+  const savedMission = { decisionRunId: 42, revisionId: 7, state: "complete" as const, title: "MRVL", updatedAt: now - 8_000 };
+
+  it.each(["loading", "empty", "stale", "partial", "failed"] as const)("never presents %s status as quiet or setup absence", (state) => {
+    const result = deriveApertureAttention(base({ mission: savedMission, checks: { state, asOf: null, monitoring: "on_demand" } }), null);
+    expect(result.quiet).toBe(false);
+    expect(result.quietMessage).toBeNull();
+    expect(result.primary?.kind).toBe("status_unavailable");
+    expect(result.scopeNote).not.toContain("Checks last completed");
+  });
+
+  it("does not assert a verified quiet session without a successful status timestamp", () => {
+    const result = deriveApertureAttention(base({ mission: savedMission, checks: { state: "complete", asOf: null, monitoring: "on_demand" } }), null);
+    expect(result.quiet).toBe(false);
+    expect(result.scopeNote).not.toContain("Checks last completed");
+  });
+
+  it("promotes a completed playbook awaiting choice, even after it was seen", () => {
+    const input = base({ mission: savedMission, underwriting: { decisionRunId: 42, revisionId: 7, state: "complete", outcome: "plays", updatedAt: now } });
+    const first = deriveApertureAttention(input, null);
+    const seen = deriveApertureAttention(input, first.baseline);
+    expect(seen.quiet).toBe(false);
+    expect(seen.primary?.kind).toBe("underwriting_complete");
+    expect(seen.primary?.actionLabel).toBe("Review underwriting result");
+  });
+
+  it("does not resume a closed mission or its old not-started underwriting", () => {
+    const result = deriveApertureAttention(base({
+      mission: { ...savedMission, lifecycle: "closed" },
+      underwriting: { decisionRunId: 42, revisionId: 7, state: "not_started", updatedAt: now },
+    }), null);
+    expect(result.entryState).toBe("start");
+    expect(result.primary?.actionLabel).toBe("Start Capital Mission");
+    expect(result.changed.some(item => item.key === "underwriting:42")).toBe(false);
+  });
+
+  it("resumes a persisted draft on a new device without fabricating mission identities", () => {
+    const result = deriveApertureAttention(base({ draft: { updatedAt: now, section: 2 } }), null);
+    expect(result.entryState).toBe("resume");
+    expect(result.primary).toMatchObject({ key: "mission:draft", title: "Resume Account & risk", href: "/aperture/mission" });
+    expect(result.primary?.href).not.toContain("undefined");
+    expect(result.primary?.consequence).toContain("No underwriting or order");
+  });
+
+  it("keeps active dispatch ahead of a persisted draft while retaining its resume task", () => {
+    const result = deriveApertureAttention(base({ draft: { updatedAt: now, section: 1 }, orders: [{ id: 9, runId: 88, candidateId: 3, symbol: "MGM", status: "submitted", qty: 1, filledQty: 0, dispatchError: "timeout", updatedAt: now - 1_000 }] }), null);
+    expect(result.entryState).toBe("check_in");
+    expect(result.primary?.kind).toBe("dispatch_unresolved");
+    expect(result.otherAttention.some(item => item.key === "mission:draft")).toBe(true);
+  });
+
   it("starts at the missing mission and names what the action does not do", () => {
     const result = deriveApertureAttention(base(), null);
 
@@ -77,10 +127,29 @@ describe("Capital Aperture attention briefing", () => {
     expect(result.otherCritical.map((item) => item.kind)).toContain("ready_for_paper_review");
   });
 
+  it.each([undefined, null, "", "   "])("elevates submitted orders with broker ID %s even without a dispatch error", (brokerOrderId) => {
+    const data = base({
+      orders: [{ id: 9, runId: 88, candidateId: 3, symbol: "MGM", status: "submitted", qty: 1, filledQty: 0, brokerOrderId, dispatchError: "", updatedAt: now }],
+    });
+    const first = deriveApertureAttention(data, null);
+    const seen = deriveApertureAttention(data, first.baseline);
+    expect(seen.primary).toMatchObject({ key: "order:9:dispatch", kind: "dispatch_unresolved", critical: true, actionLabel: "Reconcile dispatch", href: "/aperture/run/88/execute?candidate=3" });
+    expect(seen.primary?.reason).toContain("broker order ID");
+    expect(seen.primary?.consequence).toContain("Do not submit a duplicate");
+    expect(seen.quiet).toBe(false);
+    expect(seen.inMotion).toEqual([]);
+  });
+
+  it("keeps recorded partial-fill quantities visible in the unresolved-dispatch task", () => {
+    const result = deriveApertureAttention(base({ orders: [{ id: 9, runId: 88, candidateId: 3, symbol: "MGM", status: "submitted", qty: 3, filledQty: 1, brokerOrderId: null, dispatchError: null, updatedAt: now }] }), null);
+    expect(result.primary?.kind).toBe("dispatch_unresolved");
+    expect(result.primary?.reason).toContain("1 filled · 2 remaining");
+  });
+
   it("represents partial fills with filled and remaining quantities", () => {
     const result = deriveApertureAttention(base({
       mission: { decisionRunId: 42, revisionId: 7, state: "complete", title: "MGM", updatedAt: now - 8_000 },
-      orders: [{ id: 9, runId: 88, candidateId: 3, symbol: "MGM", status: "submitted", qty: 3, filledQty: 1, dispatchError: null, updatedAt: now - 1_000 }],
+      orders: [{ id: 9, runId: 88, candidateId: 3, symbol: "MGM", status: "submitted", qty: 3, filledQty: 1, brokerOrderId: "paper-9", dispatchError: null, updatedAt: now - 1_000 }],
     }), null);
 
     expect(result.inMotion[0]).toMatchObject({ stateLabel: "Partially filled" });

@@ -9,6 +9,7 @@ import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolate
 
 const APERTURE_NAV = [
   { href: "/aperture", label: "Today", icon: LayoutDashboard },
+  { href: "/aperture/mission", label: "Mission", icon: FileText },
   { href: "/aperture/plays", label: "Play Desk", icon: ListTodo },
   { href: "/aperture/runs", label: "Research", icon: Route },
   { href: "/aperture/accounts", label: "Portfolio", icon: Wallet },
@@ -18,6 +19,7 @@ const APERTURE_NAV = [
 
 const TRADER_NAV = [
   { href: "/aperture", label: "Today", icon: LayoutDashboard },
+  { href: "/aperture/mission", label: "Mission", icon: FileText },
   { href: "/aperture/plays", label: "Play Desk", icon: ListTodo },
   { href: "/aperture/runs", label: "Follow-ups", icon: Route },
   { href: "/aperture/accounts", label: "Portfolio", icon: Wallet },

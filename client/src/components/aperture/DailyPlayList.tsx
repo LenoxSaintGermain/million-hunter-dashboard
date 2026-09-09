@@ -10,15 +10,17 @@ import { easternDateKeyFromEpoch } from "@shared/easternMarketTime";
 import { PlayRecipeCard } from "./PlayRecipeCard";
 import { ContextHelp } from "./ContextHelp";
 import { TodayAttentionBriefing } from "./TodayAttentionBriefing";
+import { attentionContextLabel, safeStatusError, type AttentionStatusSource } from "@shared/apertureAttention";
 
 function money(cents: number | null | undefined) {
   return cents == null ? "Not set" : `$${Math.round(cents / 100).toLocaleString()}`;
 }
 
-function IntradayTrigger({ runId, candidateId, holdingPeriod }: { runId: number; candidateId: number; holdingPeriod: string | null }) {
+export function IntradayTrigger({ runId, candidateId, holdingPeriod }: { runId: number; candidateId: number; holdingPeriod: string | null }) {
   const enabled = holdingPeriod === "intraday";
-  const { data, isLoading } = trpc.aperture.play.trigger.useQuery({ runId, candidateId }, { enabled, staleTime: 30_000 });
+  const { data, isLoading, error, refetch } = trpc.aperture.play.trigger.useQuery({ runId, candidateId }, { enabled, staleTime: 30_000 });
   if (!enabled) return <div><p style={{ color: "var(--sh-fg-muted)" }}>Trigger state</p><p className="mt-1 font-semibold" style={{ color: "var(--sh-text-primary)" }}>Not applicable</p><p className="mt-1 leading-5" style={{ color: "var(--sh-fg-muted)" }}>VWAP hold is only evaluated for intraday plays.</p></div>;
+  if (error) return <div role="alert"><p className="font-semibold">Trigger could not be verified</p><p className="mt-1 leading-5">{safeStatusError("trigger")} No entry confirmation is implied.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void refetch()}>Refresh trigger evidence</Button></div>;
   if (isLoading || !data) return <div><p style={{ color: "var(--sh-fg-muted)" }}>VWAP trigger</p><p className="mt-1 font-semibold" style={{ color: "var(--sh-text-primary)" }}>Measuring tape…</p></div>;
   const label = data.state === "confirmed" ? "Confirmed on available tape" : data.state === "rejected" ? "Not holding on available tape" : "Needs terminal confirmation";
   const tone = data.state === "confirmed" ? "oklch(0.55 0.15 145)" : data.state === "rejected" ? "var(--sh-red)" : "var(--sh-signal)";
@@ -31,10 +33,12 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
   onNewResearch: () => void;
   onOpenRun: (runId: number, candidateId: number, view?: string) => void;
 }) {
-  const { data: playList, isLoading, refetch: refetchPlays } = trpc.aperture.play.list.useQuery();
+  const { data: playList, isLoading, isFetching: playsRefreshing, error: playsError, refetch: refetchPlays } = trpc.aperture.play.list.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const desk = trpc.aperture.desk.summary.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
-  const { data: accounts } = trpc.aperture.account.list.useQuery();
-  const { data: activeCapitalContext } = trpc.thesis.activeCapital.useQuery();
+  const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false });
+  const accounts = accountQuery.data;
+  const thesisQuery = trpc.thesis.activeCapital.useQuery(undefined, { retry: false });
+  const activeCapitalContext = thesisQuery.data;
   const { data: runway } = trpc.aperture.runway.latest.useQuery();
   const currentCashReopen = runway?.latest && "reopenCondition" in runway.latest ? runway.latest.reopenCondition : null;
   const preferredAccount = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")
@@ -43,9 +47,23 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
     ? preferredAccount.isPaper
       ? "Paper account · human approval required"
       : "Live account · human approval required"
-    : "No execution account selected";
+    : accountQuery.isLoading ? "Loading account mode…" : accountQuery.error ? "Account mode unavailable" : "No paper execution account selected";
+  const accountLabel = attentionContextLabel({
+    value: preferredAccount?.label, loading: accountQuery.isLoading, failed: !!accountQuery.error,
+    subject: "paper account", emptyLabel: "No paper execution account selected",
+  });
+  const thesisLabel = attentionContextLabel({
+    value: activeCapitalContext?.thesis?.name, loading: thesisQuery.isLoading, failed: !!thesisQuery.error,
+    subject: "active thesis", emptyLabel: "No active Capital thesis",
+  });
   const preferredAccountId = preferredAccount?.id;
-  const { data: cockpit } = trpc.aperture.cockpit.useQuery(preferredAccountId ? { accountId: preferredAccountId } : undefined);
+  const { data: cockpit, refetch: refetchCockpit } = trpc.aperture.cockpit.useQuery(preferredAccountId ? { accountId: preferredAccountId } : undefined, { enabled: preferredAccountId != null });
+  const failedSources: AttentionStatusSource[] = [];
+  if (desk.error) failedSources.push("status");
+  if (accountQuery.error) failedSources.push("account");
+  if (thesisQuery.error) failedSources.push("thesis");
+  if (playsError) failedSources.push("research");
+  const statusErrors = failedSources.map(safeStatusError).join(" ") || null;
   const utils = trpc.useUtils();
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [showAllPlays, setShowAllPlays] = useState(false);
@@ -68,7 +86,7 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
         ? "Outcome comparison started. Submit, reject, skip, or defer actions from this captured slate will remain in the paper record."
         : "The existing outcome comparison is active for this thesis and session.");
     },
-    onError: (error) => setDecisionAnnouncement(`Outcome comparison was not started: ${error.message}`),
+    onError: () => setDecisionAnnouncement(safeStatusError("comparison")),
   });
   const ranked = useMemo(() => orderDailyPlayQueue((playList?.plays ?? [])
     .filter((play) => !play.decision)
@@ -112,12 +130,13 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
   return <section className="space-y-5">
     <TodayAttentionBriefing
       attention={desk.data?.attention ?? null}
-      accountLabel={preferredAccount ? `${preferredAccount.label}${preferredAccount.lastSyncedAt ? ` · account snapshot ${new Date(preferredAccount.lastSyncedAt).toLocaleString()}` : " · account snapshot not measured"}` : "No execution account selected"}
-      modeLabel={preferredAccount?.isPaper ? "Paper" : preferredAccount ? "Execution unavailable" : "Account not selected"}
-      loading={desk.isLoading}
-      failed={desk.error?.message ?? null}
+      accountLabel={accountLabel}
+      modeLabel={preferredAccount && !preferredAccount.isPaper ? "Execution unavailable" : "Paper"}
+      loading={desk.isFetching || accountQuery.isFetching || thesisQuery.isFetching || playsRefreshing}
+      failed={statusErrors}
+      failedSources={failedSources}
       onOpen={(href) => window.location.assign(href)}
-      onRetry={() => { void Promise.all([desk.refetch(), refetchPlays()]); }}
+      onRetry={() => { void Promise.all([desk.refetch(), refetchPlays(), accountQuery.refetch(), thesisQuery.refetch(), ...(preferredAccountId != null ? [refetchCockpit()] : [])]); }}
       onNewMission={onNewMission}
     />
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -129,20 +148,23 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
       <div className="flex flex-wrap gap-2"><Button className="min-h-11" variant="outline" disabled={!hasTodayPlay || captureComparison.isPending} title={hasTodayPlay ? "Capture today's eligible paper plays before choosing a disposition" : "Available on the declared ET decision date"} onClick={() => captureComparison.mutate({ windowKey: "operator_decision" })}>{captureComparison.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitCompareArrows className="mr-2 h-4 w-4" />}Compare today</Button><Button className="min-h-11" variant="ghost" onClick={onNewResearch}><FileSearch className="mr-2 h-4 w-4" />Research brief</Button></div>
     </header>
 
+    <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Research context · {thesisLabel}</summary>
     <div className="grid gap-px overflow-hidden rounded-xl border sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
-      <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Active thesis</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{activeCapitalContext?.thesis?.name ?? "No active Capital thesis"}</p></div>
-      <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Account · as of</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{preferredAccount ? `${preferredAccount.label} · ${preferredAccount.lastSyncedAt ? new Date(preferredAccount.lastSyncedAt).toLocaleString() : "not synced"}` : "No execution account selected"}</p></div>
+      <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Active thesis</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{thesisLabel}</p></div>
+      <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Account · as of</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{preferredAccount ? `${accountLabel} · account snapshot ${preferredAccount.lastSyncedAt ? new Date(preferredAccount.lastSyncedAt).toLocaleString() : "not measured"}` : accountLabel}</p></div>
       <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Account mode</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{accountModeLabel}</p></div>
-    </div>
+    </div></details>
 
     <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><summary className="min-h-10 cursor-pointer px-4 py-3 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Why / correlated budget and provenance</summary><div className="border-t px-4 py-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Correlated planned-loss budget:</strong> {correlation?.usedCents != null && correlation.ceilingCents != null ? `${money(correlation.usedCents)} committed${correlation.subject ? ` in ${correlation.subject}` : ""} of ${money(correlation.ceilingCents)}.` : correlation?.reason ?? "Not measured."} Theme overlap is not assigned until factual preflight.</div></details>
 
-    {runway?.latest?.branch === "cash" && <div className="flex gap-3 rounded-xl border px-4 py-3" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 5%, var(--sh-surface))" }}><CircleSlash2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Current decision</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>CASH · $0 risk</p><p className="mt-0.5 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{runway.latest.reason ?? "A cash receipt is recorded for this mission."} Reopen: {currentCashReopen ?? "record a new revision"}.</p></div></div>}
-    {decisionAnnouncement && <div role="status" className="rounded-lg border px-4 py-3 text-sm" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}><strong>Decision recorded.</strong> {decisionAnnouncement}</div>}
+    {runway?.latest?.branch === "cash" && <div className="flex gap-3 rounded-xl border px-4 py-3" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 5%, var(--sh-surface))" }}><CircleSlash2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Current decision</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No new trade · $0 additional planned risk</p><p className="mt-0.5 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{runway.latest.reason ?? "A cash receipt is recorded for this mission."} Reopen: {currentCashReopen ?? "record a new revision"}. Existing positions and portfolio risk are unchanged.</p></div></div>}
+    {decisionAnnouncement && <div role="status" className="rounded-lg border px-4 py-3 text-sm" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}><strong>{decisionAnnouncement === safeStatusError("comparison") ? "Request unconfirmed." : "Decision recorded."}</strong> {decisionAnnouncement}</div>}
 
-    {isLoading && <div className="flex items-center gap-2 py-10 text-sm" style={{ color: "var(--sh-fg-muted)" }}><Loader2 className="h-4 w-4 animate-spin" />Building today’s ranked play list…</div>}
-    {!isLoading && ranked.length === 0 && (playList?.inMotionPlayCount ?? 0) > 0 && <div className="rounded-xl border p-5" style={{ borderColor: "color-mix(in srgb, var(--sh-emerald) 42%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-emerald)" }}>Already in motion</p><p className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{playList?.inMotionPlayCount} active or queued play{playList?.inMotionPlayCount === 1 ? "" : "s"}</p><p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>This thesis has no new decision to make here. Monitor the existing receipt instead of creating a duplicate.</p></div><Button className="min-h-11 shrink-0" onClick={() => window.location.assign("/aperture/plays")}>Open Play Desk <ArrowRight className="ml-2 h-4 w-4" /></Button></div></div>}
-    {!isLoading && ranked.length === 0 && (playList?.inMotionPlayCount ?? 0) === 0 && <div className="rounded-xl border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div className="flex items-start gap-3"><CircleSlash2 className="mt-0.5 h-5 w-5" style={{ color: "var(--sh-signal)" }} /><div><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Today’s decision</p><p className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>CASH · $0 risk</p><p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>No completed play has a future catalyst window.</p><details className="mt-3 text-xs" style={{ color: "var(--sh-fg-muted)" }}><summary className="cursor-pointer font-semibold" style={{ color: "var(--sh-text-primary)" }}>Why</summary><p className="mt-2 leading-5">A new paper action needs a completed intraday or catalyst-window research play. {playList?.expiredPlayCount ? `${playList.expiredPlayCount} past-catalyst play${playList.expiredPlayCount === 1 ? " was" : "s were"} excluded.` : "No eligible research play is present."}</p></details></div></div></div>}
+    {playsError && <div role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)" }}><p className="font-semibold">Research queue could not be refreshed</p><p className="mt-1 text-sm">{safeStatusError("research")}{playList ? " The last successful queue remains below; eligibility has not been reverified." : " An unavailable queue is not an empty queue."}</p><Button variant="outline" className="mt-3 min-h-11" onClick={() => void refetchPlays()}>Retry research queue</Button></div>}
+    {playsRefreshing && !isLoading && <p role="status" className="text-sm">Refreshing saved research records…</p>}
+    {isLoading && <div role="status" className="flex items-center gap-2 py-6 text-sm" style={{ color: "var(--sh-fg-muted)" }}><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />Loading the saved research queue…</div>}
+    {!isLoading && !playsError && playList != null && ranked.length === 0 && (playList.inMotionPlayCount ?? 0) > 0 && <div className="rounded-xl border p-5" style={{ borderColor: "color-mix(in srgb, var(--sh-emerald) 42%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-emerald)" }}>Already in motion</p><p className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{playList?.inMotionPlayCount} active or queued play{playList?.inMotionPlayCount === 1 ? "" : "s"}</p><p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>No new research candidate awaits a choice in this thesis queue. Review the briefing above for existing play decisions.</p></div><Button className="min-h-11 shrink-0" onClick={() => window.location.assign("/aperture/plays")}>Open Play Desk <ArrowRight className="ml-2 h-4 w-4" /></Button></div></div>}
+    {!isLoading && !playsError && playList != null && ranked.length === 0 && (playList.inMotionPlayCount ?? 0) === 0 && <div className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><p className="font-semibold">No research candidate awaiting a choice</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This queue covers the active thesis only. An empty queue does not record a cash decision or change existing positions.{playList.expiredPlayCount ? ` ${playList.expiredPlayCount} past-catalyst candidates are outside this queue.` : ""}</p></div>}
 
     {ranked.length > 0 && <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Queue order reflects readiness, then the nearest live catalyst deadline. It is not a predicted return ranking or a claim that the first play should be taken.</p>}
     <div className="space-y-3">
@@ -162,7 +184,7 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
           <button type="button" aria-controls={`daily-play-detail-${item.candidate.id}`} className="grid min-h-11 w-full gap-3 p-4 text-left sm:grid-cols-[8rem_1fr_auto] sm:items-center sm:p-5" onClick={() => setExpandedId(expanded ? null : item.candidate.id)} aria-expanded={expanded}>
             <div><p className="font-serif text-xl" translate="no" style={{ color: "var(--sh-text-primary)" }}>{item.candidate.symbol}</p><p className="text-[11px] uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>{item.run.holdingPeriod ?? "research"}</p></div>
             <div className="min-w-0"><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{item.thesisName ?? "Capital research play"}</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{play.readiness === "ready_to_prepare" ? "Ready to prepare for human approval." : mainBlocker}</p></div>
-            <div className="flex items-center gap-2 sm:text-right"><span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{researchCoverageLabel(item.candidate.confidenceScore, openChecks)}</span><ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} /></div>
+            <div className="flex items-center gap-2 sm:text-right"><span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{researchCoverageLabel(item.candidate.confidenceScore, openChecks)}</span><ChevronDown className={`h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} /></div>
           </button>
           {expanded && <div id={`daily-play-detail-${item.candidate.id}`} className="border-t p-4 sm:p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
             {proposalBlockedReason && <div className="mb-3 flex gap-3 rounded-lg border px-3 py-3 text-xs leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 42%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))", color: "var(--sh-fg-muted)" }}><CircleSlash2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><strong style={{ color: "var(--sh-text-primary)" }}>{item.decisionAuthority !== "authoritative" ? "Research-only · no authoritative receipt" : item.decisionBranch === "cash" ? "Cash · $0 planned risk" : "Conditional · proposal held"}</strong><p className="mt-0.5">{proposalBlockedReason}</p></div></div>}

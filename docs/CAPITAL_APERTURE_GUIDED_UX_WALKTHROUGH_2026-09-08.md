@@ -1,10 +1,29 @@
 # Capital Aperture guided UX walkthrough
 
-**Implementation checkpoint:** 2026-09-08
+**Implementation checkpoint:** 2026-09-09 local follow-up (production unchanged)
 
 **Scope:** Mission underwriting and returning Today check-in
 
-**Boundary:** Code and deterministic contract evidence only. No deployment or browser-based user test is claimed by this document.
+**Boundary:** Automated tests and agent-operated browser UAT against an isolated localhost database. This is not a human usability study or a production release. The earlier tagged-release observations below are historical.
+
+## September 9 gap-closure checkpoint
+
+The shared attention/disclosure model remains the single next-action authority for Today and Play Desk. The guided workspace uses the same persisted Mission/revision and underwriting state; it is not a second homepage.
+
+- Incomplete draft fields and active section now persist per user, with version-conflict detection and append-only draft revisions. A second authenticated tab resumes the saved section. Account capital remains explicitly declared, not copied from total equity.
+- Completing a field no longer automatically moves to another section. Review includes target feasibility, primary and underwriting horizons, and the effective normal-play risk. A pending risk calculation says it is checking, never substitutes the larger account ceiling.
+- Existing inconsistent horizons are exposed with an explicit draft-only repair and before/after confirmation. Old receipts are never normalized into a different financial assumption.
+- Underwriting has a durable owner/request/revision identity, lease, real milestones, attempt fencing, and explicit retry. Status reads cannot start a job. A stale attempt cannot publish over a recovered attempt.
+- MySQL native JSON and MariaDB JSON-text values are decoded and validated at receipt boundaries. Invalid storage does not become an empty successful result.
+- Today waits for named-account hydration. Status failures identify the unavailable source without showing raw SQL; failed, stale, and partial states cannot become an all-clear. Unknown open risk blocks underwriting instead of contributing zero.
+- Seen state is recorded only for actually displayed item versions. Concurrent-device updates merge by item timestamp without acknowledging or resolving findings. Collapsed items are not marked seen.
+- Play Desk filters preserve location and keep critical out-of-filter work visible. An exact `?play=` link surfaces that record. Submitted without a broker ID always requires reconciliation, even without a dispatch error string.
+- A no-trade check-in points to its recorded reopening condition, not a nonexistent monitoring task. Status refresh explicitly reads records; it does not claim to run new monitoring checks.
+- Navigation now explicitly separates Today, Mission, and Play Desk. Mobile account/thesis text no longer crowds out the account, and explicit result navigation has sticky-header clearance.
+
+Observed local journey: $25,000 declared capital, $6,000/week aspiration, $249 input loss ceiling -> 24% required weekly return, extreme target, $187.50 effective normal-play risk. Missing provider evidence produced NO_TRADE, not invented quotes. A deliberate horizon revision produced a second immutable underwriting revision while the original remained intact. Reloads/status reads did not create further analysis. Four pre-existing isolated broker-order rows remained four.
+
+Verification and remaining gates: [September 9 UAT receipt](qa/CAPITAL_APERTURE_GAP_CLOSURE_UAT_2026-09-09.md). The approximately ten-second usability target remains unmeasured; browser screenshots and automated assertions are not human acceptance.
 
 ## Setup / resume walkthrough
 
@@ -89,7 +108,7 @@ This checkpoint adds the decision core upstream of the existing Underwriter with
 
 The user-facing intent entry, persisted capital-allocation event ledger, and broad provider-backed discovery orchestration remain subsequent increments. Their absence must not be relabeled as a completed end-to-end Strategist workflow.
 
-## Visual and observed-UAT gate
+## Historical September 8 tagged UAT and original gap list
 
 Authenticated browser UAT was completed on the zero-traffic tagged revision `capital-aperture-00078-bim` (`6e665848543bf577b17893d2f7e6cac5136e5889`). Representative desktop (`2027 × 1251`) and mobile (`390 × 844` CSS pixels) screenshots were captured in the Codex UAT trace. Production remained pinned to `capital-aperture-00075-fig` throughout.
 
@@ -101,7 +120,7 @@ Observed pass:
 - the mobile Mission and Today flows retained single-column actions and the paper-only boundary;
 - temporary Firebase authorization for the exact tagged hostname was removed after UAT and the authorized-domain count returned from 11 to 10.
 
-Observed fail / unresolved:
+Observed fail / unresolved at that release (local September 9 repairs listed above):
 
 - Today briefly rendered `Account not selected` and `No execution account selected` while its independent queries were loading, before settling to the real paper account. Loading is therefore still capable of presenting a false zero-state.
 - A deterministic cold-network capture of the new `Checking saved underwriting…` interim Mission state was not obtained; the settled post-load state and source/test guard were verified.
@@ -111,7 +130,7 @@ Observed fail / unresolved:
 - Empty, stale, partial, and failed check states are not all wired through the production router/UI path; an unreviewed completed playbook can still be demoted into a quiet briefing.
 - `Run updated checks` refetches summaries rather than proving a new monitoring check, and active-play status links still land on the general Play Desk.
 
-Still required before calling the UX complete:
+Original release-blocking checklist (do not treat the local follow-up as production validation):
 
 - persist incomplete Mission drafts and underwriting job state with idempotent retry/reconciliation;
 - make Seen updates visibility-accurate and merge-safe;

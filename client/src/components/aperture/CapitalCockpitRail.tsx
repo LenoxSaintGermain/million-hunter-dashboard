@@ -46,12 +46,16 @@ function MeasureLine({ line }: { line: HeadroomLine }) {
 }
 
 export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: number; compactOnly?: boolean }) {
-  const { data: accounts } = trpc.aperture.account.list.useQuery();
+  const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false });
+  const accounts = accountQuery.data;
   const preferredAccountId = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")?.id
     ?? accounts?.find((account) => account.isPaper)?.id
     ?? null;
   const cockpitInput = useMemo(() => runId ? { runId } : preferredAccountId ? { accountId: preferredAccountId } : undefined, [runId, preferredAccountId]);
-  const { data, isLoading } = trpc.aperture.cockpit.useQuery(cockpitInput, { refetchInterval: 60_000, refetchIntervalInBackground: true });
+  // Do not ask for an unscoped cockpit while the operator's account is still
+  // loading. That response can falsely claim no account on a cold device.
+  const cockpitQuery = trpc.aperture.cockpit.useQuery(cockpitInput, { enabled: !!runId || (!accountQuery.isLoading && !accountQuery.error), retry: false, refetchInterval: 60_000, refetchIntervalInBackground: false });
+  const { data, isLoading } = cockpitQuery;
   const preference = trpc.aperture.cockpitPreference.get.useQuery();
   const setPreference = trpc.aperture.cockpitPreference.set.useMutation();
   const [clockNow, setClockNow] = useState(() => Date.now());
@@ -76,7 +80,8 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
     preferenceApplied.current = true;
     setExpanded(preference.data.expanded);
   }, [compactOnly, preference.data]);
-  if (isLoading || !data || !summary) return <section className="mb-5 animate-pulse motion-reduce:animate-none rounded-xl border px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Loading paper-research context…</span></section>;
+  if ((!runId && accountQuery.error) || cockpitQuery.error) return <section role="alert" className="mb-5 rounded-xl border px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><p className="text-sm">Paper account constraints could not be verified. This is not a zero-risk or no-account state.</p><button type="button" className="mt-2 min-h-11 rounded border px-3 text-sm" onClick={() => { void accountQuery.refetch(); void cockpitQuery.refetch(); }}>Retry account context</button></section>;
+  if ((!runId && accountQuery.isLoading) || isLoading || !data || !summary) return <section role="status" className="mb-5 animate-pulse motion-reduce:animate-none rounded-xl border px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Loading paper-research context…</span></section>;
 
   const elapsedMs = Math.max(0, clockNow - responseAt.current);
   const boundaryMs = data.session.msToNextBoundary == null ? null : data.session.msToNextBoundary - elapsedMs;
@@ -115,7 +120,7 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
       <div className="flex min-h-11 items-center gap-2 border-b px-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
         <StateMark state="rule_qualified" label="Paper mode" compact />
         <span className="min-w-0 flex-1 truncate text-[11px]" title={`${data.account.label || "Paper account"} · ${staleText}`} style={{ color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-text-primary)" }}>{data.account.label || "Paper account"} · {staleText}</span>
-        <span className="shrink-0 text-[11px] font-semibold" title={data.activeThesis?.name ?? "No active thesis"} style={{ color: "var(--sh-text-primary)" }}>Thesis {data.activeThesis?.name ?? "—"}</span>
+        <span className="max-w-[7rem] shrink-0 truncate text-[11px] font-semibold" title={data.activeThesis?.name ?? "No active thesis"} style={{ color: "var(--sh-text-primary)" }}>Thesis {data.activeThesis?.name ?? "—"}</span>
       </div>
       <div className="flex min-h-11 items-center gap-2 px-3" style={{ background: summary.severity === "critical" ? "color-mix(in srgb, var(--sh-red) 5%, var(--sh-surface))" : "var(--sh-surface)" }}>
         <StateMark state={summary.severity === "critical" ? "blocked" : summary.severity === "unmeasurable" ? "unknown" : "rule_qualified"} label="Constraint" compact />

@@ -25,9 +25,10 @@ describe("Aperture attention persistence contracts", () => {
   it("captures the comparison baseline only from items actually displayed", () => {
     const briefing = read("client/src/components/aperture/TodayAttentionBriefing.tsx");
 
-    expect(briefing).toContain("visibleKeys");
-    expect(briefing).toContain("attention.baseline.items.filter");
-    expect(briefing).toContain("markSeen.mutate(displayedBaseline)");
+    expect(briefing).toContain("displayedAttentionBaseline(attention, observed)");
+    expect(briefing).toContain("IntersectionObserver");
+    expect(briefing).toContain('document.visibilityState !== "visible"');
+    expect(briefing).toContain("markSeen.mutate(displayedBaseline,");
     expect(briefing).not.toContain("invalidate()");
   });
 

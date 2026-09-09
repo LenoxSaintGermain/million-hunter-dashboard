@@ -11,8 +11,15 @@
  * so the contract is visible in the server code too.
  */
 import { z } from "zod";
-import { eq, and, or, inArray, gte, lt, sql, asc, isNull } from "drizzle-orm";
+import { eq, ne, and, or, inArray, gte, lt, sql, asc, isNull } from "drizzle-orm";
 import { createHash } from "node:crypto";
+import { apertureUnderwritingJobs } from "../drizzle/apertureUnderwritingJobSchema";
+import { claimUnderwritingJob, readUnderwritingJob } from "./aperture/underwritingJobs";
+import { mayPublishUnderwriting, underwritingJobStatus } from "../shared/underwritingJob";
+import { missionDraftRouter, missionDraftStore } from "./aperture/missionDraftRouter";
+import { parsePersistedJson } from "../shared/persistedJson";
+import { readOptionalStatusSource } from "./aperture/optionalStatusSource";
+import { decodeHoldingPeriods } from "../shared/underwritingPersistence";
 import { getDb } from "./db";
 import {
   capitalTheses,
@@ -49,6 +56,7 @@ import {
 } from "../drizzle/schema";
 import { capitalOperatorProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { sumMeasuredOpenRiskCents } from "../shared/measuredOpenRisk";
 import { applyCanonicalDeclarations, compileThesis, flattenExposureTree, resolveRunGraph, validateGraphForPersistence, type ThesisGraph } from "./aperture/thesisGraph";
 import { discoverUniverse, operatorDeclaredUniverse, thesisSummary } from "./aperture/universe";
 import { collectSecurityFacts, collectMacroFacts, describeAvailability, availabilityMap, MACRO_SYMBOL } from "./aperture/providers/index";
@@ -106,7 +114,8 @@ import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadin
 import { detailsFromCanonicalRecord } from "../shared/capitalThesisStructure";
 import { classifyDeskCandidate, summarizeDeskCandidates } from "../shared/playDeskState";
 import { underwriteCapitalMission } from "./aperture/underwriter";
-import { attentionBaselineToken, deriveApertureAttention, type ApertureAttentionBaseline } from "../shared/apertureAttention";
+import { attentionBaselineToken, mergeAttentionBaseline, deriveApertureAttention, type ApertureAttentionBaseline } from "../shared/apertureAttention";
+import { monitoringReviewState } from "../shared/monitoringState";
 import { calculateTargetFeasibility, type CapitalObjective, type PlayUnderwritingResult, type UnderwritingRiskPolicy } from "../shared/playUnderwriting";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -211,6 +220,8 @@ async function readImmutableDecisionReceipt(
   decisionRun: typeof apertureDecisionRuns.$inferSelect,
   revision: typeof apertureDecisionRevisions.$inferSelect,
 ) {
+  const holdingPeriods = revision.holdingPeriods == null ? null : parsePersistedJson(revision.holdingPeriods);
+  if (holdingPeriods != null && (!Array.isArray(holdingPeriods) || holdingPeriods.some((period) => !["intraday", "overnight", "swing", "catalyst_window", "position"].includes(period)))) receiptBindingUnavailable();
   const context = snapshotRecord(revision.contextSnapshot);
   const gateSnapshot = snapshotRecord(revision.gateSnapshot);
   if (!context || !gateSnapshot) receiptBindingUnavailable();
@@ -246,6 +257,7 @@ async function readImmutableDecisionReceipt(
     : [undefined];
   return {
     ...revision,
+    holdingPeriods,
     id: decisionRun.id,
     decisionRunId: decisionRun.id,
     decisionRevisionId: revision.id,
@@ -453,12 +465,13 @@ function objectiveFromDecisionRevision(revision: typeof apertureDecisionRevision
     maxPortfolioOpenRiskCents: null,
     weeklyLossLimitCents: null,
     eventRiskLimitCents: null,
-    holdingPeriods: (revision.holdingPeriods?.length ? revision.holdingPeriods : [revision.holdingPeriod]) as CapitalObjective["holdingPeriods"],
+    holdingPeriods: decodeHoldingPeriods(revision.holdingPeriods ?? [revision.holdingPeriod]),
     instrumentPreference: revision.instrumentPreference,
   };
 }
 
 function normalizeExplicitTarget(objective: CapitalObjective): CapitalObjective {
+  objective = capitalObjectiveInput.parse({ ...objective, holdingPeriods: decodeHoldingPeriods(objective.holdingPeriods) }) as CapitalObjective;
   const hasExplicitTarget = objective.targetProfitCents != null && objective.targetPeriod != null;
   return {
     ...objective,
@@ -490,7 +503,12 @@ async function readAuthoritativeOpenRiskCents(
       eq(brokerOrders.accountId, accountId),
       inArray(brokerOrders.status, [...LIVE_ORDER_STATUSES]),
     ));
-  return rows.reduce((sum, row) => sum + (row.plannedRiskCents ?? 0), 0);
+  const measuredRisk = sumMeasuredOpenRiskCents(rows);
+  if (!measuredRisk.ok) throw new TRPCError({
+    code: "PRECONDITION_FAILED",
+    message: "Open portfolio risk is not fully measured in valid integer cents. Reconcile the active orders' risk before underwriting; unknown risk is not zero.",
+  });
+  return measuredRisk.totalCents;
 }
 
 function underwritingRiskFromCockpit(
@@ -559,6 +577,12 @@ function underwritingResponse(
   head: typeof apertureUnderwritingRuns.$inferSelect,
   revision: typeof apertureUnderwritingRevisions.$inferSelect,
 ) {
+  revision = { ...revision,
+    objective: normalizeExplicitTarget(parsePersistedJson(revision.objective)), feasibility: parsePersistedJson(revision.feasibility),
+    marketSnapshot: parsePersistedJson(revision.marketSnapshot), tacticalTheses: parsePersistedJson(revision.tacticalTheses),
+    plays: parsePersistedJson(revision.plays), noTrade: parsePersistedJson(revision.noTrade),
+    portfolioRisk: parsePersistedJson(revision.portfolioRisk), providerAvailability: parsePersistedJson(revision.providerAvailability),
+  };
   const result: PlayUnderwritingResult = {
     asOf: revision.marketSnapshot.asOf,
     objective: revision.objective,
@@ -590,6 +614,8 @@ async function executeUnderwriting(input: {
   objective?: CapitalObjective;
   appendRevision: boolean;
   illustrativeUatFixture?: boolean;
+  revisionRequestId?: string;
+  retryJobId?: number;
 }) {
   const authority = await resolveUnderwritingAuthority(input);
   const { db, decisionRun, decisionRevision, objective, cockpit, aggregateOpenRiskCents, feasibility } = authority;
@@ -604,15 +630,29 @@ async function executeUnderwriting(input: {
       eq(apertureUnderwritingRevisions.decisionRevisionId, decisionRevision.id),
     )).limit(1);
     const objectiveMatches = existingRevision != null
-      && JSON.stringify(existingRevision.objective) === JSON.stringify(objective);
+      && JSON.stringify(normalizeExplicitTarget(parsePersistedJson(existingRevision.objective))) === JSON.stringify(objective);
     const feasibilityMatches = existingRevision != null
-      && JSON.stringify(existingRevision.feasibility) === JSON.stringify(feasibility);
+      && JSON.stringify(parsePersistedJson(existingRevision.feasibility)) === JSON.stringify(feasibility);
     const authoritativeRiskMatches = existingRevision != null
-      && existingRevision.portfolioRisk.beforeCents === aggregateOpenRiskCents;
+      && parsePersistedJson(existingRevision.portfolioRisk).beforeCents === aggregateOpenRiskCents;
     if (existingRevision && objectiveMatches && feasibilityMatches && authoritativeRiskMatches) {
       return underwritingResponse(existingHead, existingRevision);
     }
   }
+  const request = { objective, requestedPlayCount: input.requestedPlayCount, appendRevision: input.appendRevision, revisionRequestId: input.revisionRequestId, illustrativeUatFixture: input.illustrativeUatFixture };
+  const requestKey = createHash("sha256").update(JSON.stringify({ decisionRevisionId: decisionRevision.id, request, feasibility, aggregateOpenRiskCents })).digest("hex");
+  const [retryJob] = input.retryJobId == null ? [] : await db.select().from(apertureUnderwritingJobs).where(and(
+    eq(apertureUnderwritingJobs.id, input.retryJobId), eq(apertureUnderwritingJobs.userId, input.userId),
+    eq(apertureUnderwritingJobs.decisionRunId, decisionRun.id), eq(apertureUnderwritingJobs.decisionRevisionId, decisionRevision.id),
+  )).limit(1);
+  const claim = await claimUnderwritingJob(db, { userId: input.userId, decisionRunId: decisionRun.id, decisionRevisionId: decisionRevision.id, requestKey: retryJob?.requestKey ?? requestKey, request, retryJobId: input.retryJobId });
+  if (claim.reused) {
+    const [revision] = await db.select().from(apertureUnderwritingRevisions).where(eq(apertureUnderwritingRevisions.id, claim.job.resultRevisionId!)).limit(1);
+    const [head] = revision ? await db.select().from(apertureUnderwritingRuns).where(and(eq(apertureUnderwritingRuns.id, revision.underwritingRunId), eq(apertureUnderwritingRuns.userId, input.userId))).limit(1) : [];
+    if (!head || !revision) throw new TRPCError({ code: "CONFLICT", message: "The recorded analysis result needs reconciliation. No new analysis was started." });
+    return underwritingResponse(head, revision);
+  }
+  try {
   const projection = await requireThesis(db, decisionRun.capitalThesisId, input.userId);
   const { result, providerAvailability } = await underwriteCapitalMission({
     projection,
@@ -623,7 +663,8 @@ async function executeUnderwriting(input: {
     illustrativeUatFixture: input.illustrativeUatFixture,
   });
   const now = Date.now();
-  return db.transaction(async (tx) => {
+  await db.update(apertureUnderwritingJobs).set({ milestone: "recording_result", updatedAt: now }).where(and(eq(apertureUnderwritingJobs.id, claim.job.id), eq(apertureUnderwritingJobs.attemptToken, claim.job.attemptToken)));
+  return await db.transaction(async (tx) => {
     const [currentDecision] = await tx.select().from(apertureDecisionRuns).where(and(
       eq(apertureDecisionRuns.id, decisionRun.id),
       eq(apertureDecisionRuns.userId, input.userId),
@@ -631,12 +672,19 @@ async function executeUnderwriting(input: {
       isNull(apertureDecisionRuns.researchRunId),
     )).for("update").limit(1);
     if (!currentDecision) throw new TRPCError({ code: "CONFLICT", message: "The mission changed while underwriting was running. Reopen the current mission." });
+    const [job] = await tx.select().from(apertureUnderwritingJobs).where(eq(apertureUnderwritingJobs.id, claim.job.id)).for("update").limit(1);
+    if (!job || !mayPublishUnderwriting(job, claim.job.attemptToken, Date.now())) throw new TRPCError({ code: "CONFLICT", message: "This analysis attempt no longer owns the job. Reconcile its saved progress before retrying." });
     const currentRiskRows = await tx.select({ plannedRiskCents: brokerOrders.plannedRiskCents }).from(brokerOrders).where(and(
       eq(brokerOrders.userId, input.userId),
       eq(brokerOrders.accountId, decisionRun.accountId),
       inArray(brokerOrders.status, [...LIVE_ORDER_STATUSES]),
     ));
-    const currentAggregateOpenRiskCents = currentRiskRows.reduce((sum, row) => sum + (row.plannedRiskCents ?? 0), 0);
+    const measuredCurrentRisk = sumMeasuredOpenRiskCents(currentRiskRows);
+    if (!measuredCurrentRisk.ok) throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "Open portfolio risk could not be verified before publishing this result. Reconcile the active orders' risk; no underwriting result was published and unknown risk is not zero.",
+    });
+    const currentAggregateOpenRiskCents = measuredCurrentRisk.totalCents;
     if (currentAggregateOpenRiskCents !== aggregateOpenRiskCents) {
       throw new TRPCError({ code: "CONFLICT", message: "Portfolio risk changed while underwriting was running. Reopen the current mission and retry." });
     }
@@ -685,8 +733,13 @@ async function executeUnderwriting(input: {
     const [updatedHead] = await tx.select().from(apertureUnderwritingRuns).where(eq(apertureUnderwritingRuns.id, head.id)).limit(1);
     const [createdRevision] = await tx.select().from(apertureUnderwritingRevisions).where(eq(apertureUnderwritingRevisions.id, revisionId)).limit(1);
     if (!updatedHead || !createdRevision) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Underwriting receipt could not be read back." });
+    await tx.update(apertureUnderwritingJobs).set({ state: "complete", milestone: "complete", resultRevisionId: revisionId, updatedAt: Date.now() }).where(eq(apertureUnderwritingJobs.id, job.id));
     return underwritingResponse(updatedHead, createdRevision);
   });
+  } catch (error) {
+    await db.update(apertureUnderwritingJobs).set({ state: "failed", milestone: "failed", failure: error instanceof TRPCError ? error.message : "The market analysis could not finish. Your mission and last result remain saved. Retry this analysis after checking availability.", updatedAt: Date.now() }).where(and(eq(apertureUnderwritingJobs.id, claim.job.id), eq(apertureUnderwritingJobs.attemptToken, claim.job.attemptToken), eq(apertureUnderwritingJobs.state, "running")));
+    throw error;
+  }
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -714,7 +767,7 @@ export const apertureRouter = router({
         const normalized = normalizeCapitalThesisRead(row);
         const compiledFilters = row.sourceCompilationId == null
           ? null
-          : canonicalById.get(row.sourceCompilationId)?.compiledFilters;
+          : parsePersistedJson(canonicalById.get(row.sourceCompilationId)?.compiledFilters);
         return {
           ...normalized,
           missionDefaults: resolveCapitalMissionDefaults(
@@ -1406,6 +1459,24 @@ export const apertureRouter = router({
       });
     }),
 
+    status: capitalOperatorProcedure.input(z.object({
+      decisionRunId: z.number().int().positive(),
+      decisionRevisionId: z.number().int().positive(),
+    })).query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Analysis status unavailable." });
+      return underwritingJobStatus(await readUnderwritingJob(db, ctx.user.id, input.decisionRunId, input.decisionRevisionId), Date.now());
+    }),
+
+    retry: capitalOperatorProcedure.input(z.object({ jobId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      const [job] = await db!.select().from(apertureUnderwritingJobs).where(and(eq(apertureUnderwritingJobs.id, input.jobId), eq(apertureUnderwritingJobs.userId, ctx.user.id))).limit(1);
+      if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Analysis job unavailable." });
+      const request = parsePersistedJson(job.request);
+      if (request.illustrativeUatFixture && !isExactIsolatedUatRuntime()) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Illustrative analysis is isolated-UAT only." });
+      return executeUnderwriting({ ...request, userId: ctx.user.id, decisionRunId: job.decisionRunId, decisionRevisionId: job.decisionRevisionId, retryJobId: job.id });
+    }),
+
     get: capitalOperatorProcedure.input(z.object({
       decisionRunId: z.number().int().positive(),
     })).query(async ({ ctx, input }) => {
@@ -1427,6 +1498,7 @@ export const apertureRouter = router({
       decisionRevisionId: z.number().int().positive(),
       requestedPlayCount: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(3),
       objective: capitalObjectiveInput,
+      revisionRequestId: z.string().uuid(),
     })).mutation(({ ctx, input }) => executeUnderwriting({
       userId: ctx.user.id,
       decisionRunId: input.decisionRunId,
@@ -1434,6 +1506,7 @@ export const apertureRouter = router({
       requestedPlayCount: input.requestedPlayCount,
       objective: input.objective as CapitalObjective,
       appendRevision: true,
+      revisionRequestId: input.revisionRequestId,
     })),
 
     validatePlay: capitalOperatorProcedure.input(z.object({
@@ -1462,7 +1535,7 @@ export const apertureRouter = router({
       if (!row || row.decision.currentRevisionId !== row.revision.decisionRevisionId) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current underwriting revision before choosing a play." });
       }
-      const play = row.revision.plays.find((item) => item.id === input.playId);
+      const play = parsePersistedJson(row.revision.plays).find((item) => item.id === input.playId);
       if (!play || ["invalidated", "expired"].includes(play.status)) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This play is not available for research validation." });
       }
@@ -1490,6 +1563,7 @@ export const apertureRouter = router({
   // Durable operator context only. A cash branch cannot be attached to a run
   // and is separately checked when a paper-order proposal is attempted.
   runway: router({
+    draft: missionDraftRouter,
     latest: capitalOperatorProcedure.input(z.object({
       decisionRunId: z.number().positive().optional(),
       revisionId: z.number().positive().optional(),
@@ -1502,7 +1576,7 @@ export const apertureRouter = router({
           eq(apertureDecisionRuns.userId, ctx.user.id),
         )).limit(1)
         : await db!.select().from(apertureDecisionRuns)
-          .where(eq(apertureDecisionRuns.userId, ctx.user.id))
+          .where(and(eq(apertureDecisionRuns.userId, ctx.user.id), ne(apertureDecisionRuns.lifecycle, "closed")))
           .orderBy(desc(apertureDecisionRuns.updatedAt))
           .limit(1);
       if (input?.decisionRunId != null && !decisionRun) receiptBindingUnavailable();
@@ -2387,11 +2461,12 @@ export const apertureRouter = router({
         .limit(200);
 
       const candidateIds = Array.from(new Set(orders.flatMap((order) => order.candidateId == null ? [] : [order.candidateId])));
-      const monitoringRows = candidateIds.length
+      const monitoringRead = await readOptionalStatusSource("Sourced monitoring", async () => candidateIds.length
         ? await db!.select().from(monitoringChecks)
             .where(inArray(monitoringChecks.candidateId, candidateIds))
             .orderBy(desc(monitoringChecks.checkedAt))
-        : [];
+        : []);
+      const monitoringRows = monitoringRead.value ?? [];
       const monitoringByCandidate = new Map<number, typeof monitoringRows>();
       for (const check of monitoringRows) {
         const current = monitoringByCandidate.get(check.candidateId) ?? [];
@@ -2400,7 +2475,7 @@ export const apertureRouter = router({
       }
 
       const accountIds = Array.from(new Set(orders.map((order) => order.accountId)));
-      const snapshotRows = accountIds.length
+      const snapshotRead = await readOptionalStatusSource("Position snapshots", async () => accountIds.length
         ? await db!.select({
             accountId: positionSnapshots.accountId,
             runId: positionSnapshots.runId,
@@ -2412,7 +2487,8 @@ export const apertureRouter = router({
             .where(inArray(positionSnapshots.accountId, accountIds))
             .orderBy(desc(positionSnapshots.snapshotAt))
             .limit(500)
-        : [];
+        : []);
+      const snapshotRows = snapshotRead.value ?? [];
       const snapshotByOrderKey = new Map<string, typeof snapshotRows[number]>();
       for (const snapshot of snapshotRows) {
         const key = `${snapshot.accountId}:${snapshot.runId ?? ""}:${normSymbol(snapshot.symbol)}`;
@@ -2439,7 +2515,7 @@ export const apertureRouter = router({
         .orderBy(desc(apertureDecisionRuns.updatedAt))
         .limit(1);
 
-      const [latestUnderwriting] = latestMission
+      const [storedUnderwriting] = latestMission
         ? await db!.select({
             objective: apertureUnderwritingRevisions.objective,
             decisionRevisionId: apertureUnderwritingRevisions.decisionRevisionId,
@@ -2456,6 +2532,10 @@ export const apertureRouter = router({
             .limit(1)
         : [undefined];
 
+      const latestUnderwriting = storedUnderwriting ? { ...storedUnderwriting,
+        objective: parsePersistedJson(storedUnderwriting.objective),
+        noTrade: parsePersistedJson(storedUnderwriting.noTrade), plays: parsePersistedJson(storedUnderwriting.plays),
+      } : undefined;
       const evidenceTasks = latestMission?.researchRunId == null ? [] : await (async () => {
         const candidates = await db!.select({
           id: apertureCandidates.id,
@@ -2512,21 +2592,25 @@ export const apertureRouter = router({
         .from(apertureAttentionBaselines)
         .where(eq(apertureAttentionBaselines.userId, ctx.user.id))
         .limit(1);
-      const [monitoringPreference] = await db!.select({ scheduled: users.dailyOutcomeRefreshEnabled })
-        .from(users).where(eq(users.id, ctx.user.id)).limit(1);
-      const lastMaterialAt = Math.max(
-        0,
-        latestMission?.updatedAt ?? 0,
-        latestUnderwriting?.updatedAt ?? 0,
-        ...orders.map((order) => order.updatedAt),
-        ...activePlays.map((play) => play.updatedAt),
-        ...monitoringRows.map((check) => check.checkedAt),
-      );
+      const now = Date.now();
+      const jobRecord = latestMission ? await readUnderwritingJob(db!, ctx.user.id, latestMission.decisionRunId, latestMission.revisionId) : null;
+      const jobState = underwritingJobStatus(jobRecord, now);
+      const latestChecks = Array.from(monitoringByCandidate.values()).flat();
+      const monitoringAsOf = latestChecks.length ? Math.min(...latestChecks.map((check) => check.checkedAt)) : null;
+      const monitoringIncomplete = activePlays.some((play) => !orders.some((order) => order.accountId === play.accountId && (order.underlyingSymbol ?? order.symbol) === play.symbol && order.candidateId != null)) || candidateIds.some((id) => {
+        const checks = monitoringByCandidate.get(id) ?? [];
+        return ["catalyst", "thesis_invalidation", "earnings", "macro"].some((type) => !checks.some((check) => check.checkType === type));
+      });
+      const unknownMonitoring = latestChecks.some((check) => monitoringReviewState(check, now).state === "unknown");
+      const unavailableSources = [monitoringRead.unavailable, snapshotRead.unavailable].filter(Boolean).join(" ");
+      const draft = await missionDraftStore.get(ctx.user.id);
       const attention = deriveApertureAttention({
-        now: Date.now(),
+        now,
+        draft: draft && draft.completedAt == null ? { updatedAt: draft.updatedAt, section: draft.values.activeSection } : null,
         mission: latestMission ? {
           decisionRunId: latestMission.decisionRunId,
           revisionId: latestMission.revisionId,
+          lifecycle: latestMission.lifecycle,
           state: latestMission.missionText.trim().length >= MIN_NARRATIVE_CHARS && latestMission.deployableCapitalCents > 0 && latestMission.maxPlannedLossCents > 0 ? "complete" : "incomplete",
           title: latestMission.thesisName ?? "Capital Mission",
           updatedAt: latestMission.updatedAt,
@@ -2534,8 +2618,10 @@ export const apertureRouter = router({
         underwriting: latestMission && latestMission.researchRunId == null ? {
           decisionRunId: latestMission.decisionRunId,
           revisionId: latestMission.revisionId,
-          state: latestUnderwriting?.decisionRevisionId === latestMission.revisionId ? "complete" : "not_started",
-          updatedAt: latestUnderwriting?.updatedAt ?? latestMission.updatedAt,
+          state: jobState.state === "running" ? "running" : jobState.canRetry ? "failed" : latestUnderwriting?.decisionRevisionId === latestMission.revisionId ? "complete" : "not_started",
+          error: jobState.canRetry ? jobState.message : null,
+          selectedPlayId: latestUnderwriting?.selectedPlayId ?? null,
+          updatedAt: jobState.updatedAt ?? latestUnderwriting?.updatedAt ?? latestMission.updatedAt,
           outcome: latestUnderwriting?.decisionRevisionId !== latestMission.revisionId
             ? null
             : latestUnderwriting.noTrade ? "no_trade"
@@ -2564,7 +2650,7 @@ export const apertureRouter = router({
           symbol: play.symbol,
           state: play.status === "watching" ? "watching" : "open_position",
           detail: play.thesisNote,
-          href: "/aperture/plays",
+          href: `/aperture/plays?play=${play.id}`,
           updatedAt: play.updatedAt,
           reviewAt: null,
         })),
@@ -2591,11 +2677,13 @@ export const apertureRouter = router({
             checkedAt: check.checkedAt,
           }] as const))).values()),
         checks: {
-          state: "complete",
-          asOf: lastMaterialAt || null,
-          monitoring: monitoringPreference?.scheduled ? "scheduled" : "on_demand",
+          state: unavailableSources || monitoringIncomplete ? "partial" : unknownMonitoring ? "stale" : "complete",
+          asOf: now,
+          monitoringAsOf,
+          error: unavailableSources || (monitoringIncomplete ? "Status records loaded. Sourced monitoring is incomplete for one or more active plays; open the affected play to run its checks." : unknownMonitoring ? "Some monitoring evidence is stale, unavailable, or uncited. Refresh the affected play's sourced checks before relying on them." : null),
+          monitoring: "on_demand",
         },
-      }, attentionBaseline?.snapshot ?? null);
+      }, attentionBaseline?.snapshot ? parsePersistedJson(attentionBaseline.snapshot) : null);
 
       return {
         orders: orders.map((order) => ({
@@ -2623,19 +2711,15 @@ export const apertureRouter = router({
       }
       const db = await getDb();
       const now = Date.now();
-      await db!.insert(apertureAttentionBaselines).values({
-        userId: ctx.user.id,
-        snapshot,
-        token: input.token,
-        capturedAt: snapshot.capturedAt,
-        createdAt: now,
-        updatedAt: now,
-      }).onDuplicateKeyUpdate({ set: {
-        snapshot,
-        token: input.token,
-        capturedAt: snapshot.capturedAt,
-        updatedAt: now,
-      } });
+      if (snapshot.capturedAt > now + 5_000) throw new TRPCError({ code: "BAD_REQUEST", message: "Seen time cannot be in the future." });
+      await db!.transaction(async (tx) => {
+        // Lock a row that exists even before the first baseline is recorded.
+        await tx.select({ id: users.id }).from(users).where(eq(users.id, ctx.user.id)).for("update");
+        const [prior] = await tx.select().from(apertureAttentionBaselines).where(eq(apertureAttentionBaselines.userId, ctx.user.id)).for("update").limit(1);
+        const merged = mergeAttentionBaseline(prior?.snapshot ? parsePersistedJson(prior.snapshot) : null, snapshot);
+        await tx.insert(apertureAttentionBaselines).values({ userId: ctx.user.id, snapshot: merged, token: attentionBaselineToken(merged), capturedAt: merged.capturedAt, createdAt: now, updatedAt: now })
+          .onDuplicateKeyUpdate({ set: { snapshot: merged, token: attentionBaselineToken(merged), capturedAt: merged.capturedAt, updatedAt: now } });
+      });
       return { seen: true, capturedAt: snapshot.capturedAt };
     }),
   }),

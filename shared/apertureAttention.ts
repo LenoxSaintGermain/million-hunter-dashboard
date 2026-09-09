@@ -5,6 +5,7 @@ export type AttentionMission = {
   decisionRunId: number;
   revisionId: number;
   state: "incomplete" | "complete";
+  lifecycle?: "mission" | "researching" | "conditional" | "eligible" | "cash" | "pending_outcome" | "closed";
   title: string;
   updatedAt: number;
 };
@@ -18,6 +19,7 @@ export type AttentionUnderwriting = {
   outcome?: "plays" | "no_trade" | null;
   resultSummary?: string | null;
   reopenCondition?: string | null;
+  selectedPlayId?: string | null;
 };
 
 export type AttentionEvidenceTask = {
@@ -74,6 +76,8 @@ export type AttentionMonitoringFinding = {
 
 export type ApertureAttentionInput = {
   now: number;
+  /** Persisted unfinished form; section matches MissionDraftValues.activeSection. */
+  draft?: { updatedAt: number; section: 1 | 2 | 3 } | null;
   mission: AttentionMission | null;
   underwriting: AttentionUnderwriting | null;
   evidenceTasks: AttentionEvidenceTask[];
@@ -84,6 +88,8 @@ export type ApertureAttentionInput = {
   checks: {
     state: AttentionReadState;
     asOf: number | null;
+    /** Actual monitoring record time, never a mission/order updatedAt. */
+    monitoringAsOf?: number | null;
     monitoring: "on_demand" | "scheduled";
     error?: string | null;
   };
@@ -113,6 +119,7 @@ export type ApertureAttentionItem = {
   href: string;
   updatedAt: number;
   critical: boolean;
+  deadlineAt?: number | null;
 };
 
 export type ApertureMotionItem = {
@@ -126,13 +133,15 @@ export type ApertureMotionItem = {
 
 export type ApertureAttentionBaseline = {
   capturedAt: number;
-  items: Array<{ key: string; fingerprint: string }>;
+  items: Array<{ key: string; fingerprint: string; seenAt?: number }>;
 };
 
 export type ApertureAttentionBriefing = {
   entryState: ApertureEntryState;
   primary: ApertureAttentionItem | null;
   otherCritical: ApertureAttentionItem[];
+  otherAttention: ApertureAttentionItem[];
+  readState: AttentionReadState;
   changed: Array<ApertureAttentionItem | ApertureMotionItem>;
   inMotion: ApertureMotionItem[];
   nextCheckpoint: { title: string; detail: string; at: number | null; href: string | null } | null;
@@ -175,6 +184,67 @@ export function attentionBaselineToken(baseline: ApertureAttentionBaseline): str
   return hashCanonical(baseline.items);
 }
 
+/** Call inside the persistence transaction. Seen is per-item; it never resolves work. */
+export function mergeAttentionBaseline(prior: ApertureAttentionBaseline | null, displayed: ApertureAttentionBaseline): ApertureAttentionBaseline {
+  const items = new Map((prior?.items ?? []).map((record) => [record.key, { ...record, seenAt: record.seenAt ?? prior!.capturedAt }]));
+  for (const record of displayed.items) {
+    const previous = items.get(record.key);
+    if (!previous || previous.seenAt <= displayed.capturedAt) items.set(record.key, { key: record.key, fingerprint: record.fingerprint, seenAt: displayed.capturedAt });
+  }
+  return { capturedAt: Math.max(prior?.capturedAt ?? 0, displayed.capturedAt), items: Array.from(items.values()).sort((a, b) => a.key.localeCompare(b.key)) };
+}
+
+/** Select only versions observed in the visible viewport, not merely mounted or collapsed. */
+export function displayedAttentionBaseline(briefing: ApertureAttentionBriefing, displayed: ReadonlyMap<string, string>) {
+  const snapshot = { ...briefing.baseline, items: briefing.baseline.items.filter((item) => displayed.get(item.key) === item.fingerprint) };
+  return { snapshot, token: attentionBaselineToken(snapshot) };
+}
+
+/** Stable reading layout. New urgency stays visible without moving the current primary button. */
+export function attentionDisclosure(briefing: ApertureAttentionBriefing, primaryKey?: string | null) {
+  const tasks = [briefing.primary, ...briefing.otherCritical, ...briefing.otherAttention].filter((value): value is ApertureAttentionItem => value != null);
+  const primary = tasks.find((task) => task.key === primaryKey) ?? briefing.primary;
+  const otherCritical = tasks.filter((task) => task.key !== primary?.key && task.critical);
+  const otherAttention = tasks.filter((task) => task.key !== primary?.key && !task.critical);
+  const taskKeys = new Set(tasks.map((task) => task.key));
+  const motionKeys = new Set(briefing.inMotion.map((task) => task.key));
+  return {
+    primary, otherCritical, otherAttention,
+    changed: briefing.changed.filter((item) => !taskKeys.has(item.key) && !motionKeys.has(item.key)),
+    inMotion: briefing.inMotion,
+  };
+}
+
+export function canShowQuietBriefing(briefing: ApertureAttentionBriefing | null, loading: boolean, failed: string | null): boolean {
+  return !!briefing && briefing.quiet && briefing.primary == null && briefing.readState === "complete" && !loading && !failed;
+}
+
+export type AttentionStatusSource = "status" | "account" | "thesis" | "research" | "trigger" | "underwriting" | "dispatch" | "comparison";
+
+/** Present an authored recovery message, never a database/provider exception. */
+export function safeStatusError(source: AttentionStatusSource): string {
+  const messages: Record<AttentionStatusSource, string> = {
+    status: "Some recorded status is unavailable. Refresh status to retry.",
+    account: "Account context is unavailable. Refresh status to retry.",
+    thesis: "Thesis context is unavailable. Refresh status to retry.",
+    research: "Research records are unavailable. Retry the research queue.",
+    trigger: "Trigger evidence is unavailable. Refresh trigger evidence to retry.",
+    underwriting: "The saved analysis could not be completed. Open the underwriting task to review recovery options.",
+    dispatch: "The broker dispatch receipt could not be verified. Reconcile dispatch before taking another action.",
+    comparison: "The comparison request could not be confirmed. Refresh status before retrying to check whether it was recorded.",
+  };
+  return messages[source] ?? messages.status;
+}
+
+export function attentionContextLabel({ value, loading, failed, subject, emptyLabel }: {
+  value: string | null | undefined; loading: boolean; failed: boolean; subject: string; emptyLabel: string;
+}): string {
+  if (value) return failed ? `${value} · refresh failed; last known value` : value;
+  if (loading) return `Loading ${subject}…`;
+  if (failed) return `${subject[0].toUpperCase()}${subject.slice(1)} unavailable · retry status`;
+  return emptyLabel;
+}
+
 function orderHref(order: AttentionOrder) {
   const candidate = order.candidateId == null ? "" : `?candidate=${order.candidateId}`;
   return `/aperture/run/${order.runId}/execute${candidate}`;
@@ -184,7 +254,13 @@ function evidenceHref(task: AttentionEvidenceTask) {
   return `/aperture/run/${task.runId}?candidate=${task.candidateId}&view=evidence`;
 }
 
+/** Submission is a local lifecycle state, not a broker acceptance receipt. */
+export function isAttentionDispatchUnresolved(order: Pick<AttentionOrder, "status" | "brokerOrderId" | "dispatchError">): boolean {
+  return Boolean(order.dispatchError?.trim()) || (order.status === "submitted" && !order.brokerOrderId?.trim());
+}
+
 function orderMotion(order: AttentionOrder): ApertureMotionItem | null {
+  if (isAttentionDispatchUnresolved(order)) return null;
   if (order.status !== "submitted" && order.status !== "filled") return null;
   const ordered = Math.abs(order.qty ?? 0);
   const filled = Math.abs(order.filledQty ?? 0);
@@ -220,10 +296,14 @@ function item(input: Omit<ApertureAttentionItem, "critical">): ApertureAttention
 }
 
 export function deriveApertureAttention(input: ApertureAttentionInput, prior: ApertureAttentionBaseline | null): ApertureAttentionBriefing {
+  // A closed plan remains history, not a draft to resume. Exposure is evaluated independently.
+  if (input.mission?.lifecycle === "closed") input = { ...input, mission: null, underwriting: null };
+  const readState = input.checks.state === "complete" && (input.checks.asOf == null || !Number.isFinite(input.checks.asOf))
+    ? "partial" : input.checks.state;
   const hasExistingWork = input.orders.some((order) => ["pending_approval", "approved", "submitted", "filled"].includes(order.status))
     || input.activePlays.length > 0
     || input.pendingReviews.length > 0;
-  const needsResume = input.mission?.state === "incomplete"
+  const needsResume = input.draft != null || input.mission?.state === "incomplete"
     || input.underwriting?.state === "not_started"
     || input.underwriting?.state === "queued"
     || input.underwriting?.state === "running"
@@ -231,7 +311,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     || input.evidenceTasks.length > 0;
   const entryState: ApertureEntryState = hasExistingWork
     ? "check_in"
-    : !input.mission
+    : !input.mission && !input.draft
       ? "start"
       : needsResume
         ? "resume"
@@ -239,35 +319,55 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
 
   const attention: ApertureAttentionItem[] = [];
   const updates: ApertureAttentionItem[] = [];
-  if (input.checks.state === "failed") {
+  if (readState === "failed") {
     attention.push(item({
       key: "status:failed",
       kind: "status_unavailable",
-      priority: 110,
+      priority: 98,
       stateLabel: "Status unavailable",
       title: "Current status could not be verified",
-      reason: input.checks.error ?? "A required status source failed.",
+      reason: safeStatusError("status"),
       consequence: "An empty result is not treated as an all-clear. Existing records remain unchanged.",
-      actionLabel: "Retry status checks",
+      actionLabel: "Refresh status",
       href: "/aperture",
       updatedAt: input.now,
     }));
-  } else if (input.checks.state === "partial") {
+  } else if (readState === "partial") {
     attention.push(item({
       key: "status:partial",
       kind: "status_unavailable",
-      priority: 68,
+      priority: 94,
       stateLabel: "Partially available",
       title: "Some decisions cannot be verified",
-      reason: input.checks.error ?? "One or more sources are unavailable.",
+      reason: safeStatusError("status"),
       consequence: "Useful unaffected records remain visible; unsupported decisions stay withheld.",
-      actionLabel: "Review available status",
-      href: "/aperture/plays",
+      actionLabel: "Refresh status",
+      href: "/aperture",
       updatedAt: input.now,
+    }));
+  } else if (readState !== "complete") {
+    const stale = readState === "stale";
+    const loading = readState === "loading";
+    attention.push(item({
+      key: `status:${readState}`, kind: "status_unavailable", priority: stale ? 94 : 68,
+      stateLabel: stale ? "Stale status" : loading ? "Loading status" : "Status not measured",
+      title: stale ? "The last recorded status needs refreshing" : loading ? "Loading recorded work" : "No verified status is available yet",
+      reason: stale ? "Current eligibility cannot be inferred from this older snapshot. Refresh status to retry." : "A usable status snapshot has not been returned. Refresh status to retry.",
+      consequence: "Existing work remains unchanged. This is not an all-clear or a new analysis.",
+      actionLabel: "Refresh status", href: "/aperture", updatedAt: input.now,
     }));
   }
 
-  if (!input.mission && !hasExistingWork) {
+  if (input.draft) {
+    const section = input.draft.section === 1 ? "Thesis & horizon" : input.draft.section === 2 ? "Account & risk" : "Review mission";
+    attention.push(item({
+      key: "mission:draft", kind: "incomplete_mission", priority: 60,
+      stateLabel: "Saved draft", title: `Resume ${section}`,
+      reason: "An unfinished mission is saved to your account.",
+      consequence: "Return to the saved section without re-entering information. No underwriting or order has been authorized by this draft.",
+      actionLabel: "Resume mission setup", href: "/aperture/mission", updatedAt: input.draft.updatedAt,
+    }));
+  } else if (!input.mission && !hasExistingWork && readState === "complete") {
     attention.push(item({
       key: "mission:missing",
       kind: "incomplete_mission",
@@ -328,7 +428,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       priority: 74,
       stateLabel: "Underwriting stopped",
       title: "The mission did not produce a usable playbook",
-      reason: input.underwriting.error ?? "The underwriting job failed.",
+      reason: safeStatusError("underwriting"),
       consequence: "The last successful result remains the record. No research or order was created.",
       actionLabel: "Review underwriting failure",
       href: `/aperture/decision/${input.underwriting.decisionRunId}/revision/${input.underwriting.revisionId}/underwrite`,
@@ -336,10 +436,11 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     }));
   } else if (input.underwriting?.state === "complete") {
     const noTrade = input.underwriting.outcome === "no_trade";
-    updates.push(item({
+    const needsChoice = !noTrade && input.underwriting.selectedPlayId == null;
+    (needsChoice ? attention : updates).push(item({
       key: `underwriting:${input.underwriting.decisionRunId}:complete`,
       kind: "underwriting_complete",
-      priority: 40,
+      priority: needsChoice ? 72 : 40,
       stateLabel: noTrade ? "Underwriting complete · No trade" : "Underwriting complete · Playbook ready",
       title: noTrade ? "Review the no-trade result" : "Review the underwriting result",
       reason: input.underwriting.resultSummary ?? (noTrade
@@ -347,7 +448,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
         : "The saved mission produced a conditional playbook."),
       consequence: noTrade
         ? `${input.underwriting.reopenCondition ?? "Reassess when the recorded condition changes."} No paper ticket was created.`
-        : "Validate a play to enter evidence review. No paper ticket was created.",
+        : needsChoice ? "Validate a play to enter evidence review. No paper ticket was created." : "A play selection is recorded. Its evidence and ticket status are shown separately.",
       actionLabel: noTrade ? "Review no-trade result" : "Review underwriting result",
       href: `/aperture/decision/${input.underwriting.decisionRunId}/revision/${input.underwriting.revisionId}/underwrite`,
       updatedAt: input.underwriting.updatedAt,
@@ -370,9 +471,14 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     }));
   }
 
+  const findings = new Map<string, AttentionMonitoringFinding>();
   for (const finding of input.monitoringFindings) {
+    const key = `finding:${finding.orderId}:${finding.kind}:${hashCanonical(finding.finding.trim().replace(/\s+/g, " "))}`;
+    if (!findings.has(key) || findings.get(key)!.checkedAt < finding.checkedAt) findings.set(key, finding);
+  }
+  for (const [key, finding] of Array.from(findings.entries())) {
     attention.push(item({
-      key: `finding:${finding.id}`,
+      key,
       kind: "invalidation_evidence",
       priority: finding.kind === "invalidation" ? 100 : 92,
       symbol: finding.symbol,
@@ -387,7 +493,12 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
   }
 
   for (const order of input.orders) {
-    if (order.dispatchError) {
+    if (isAttentionDispatchUnresolved(order)) {
+      const recordedFill = order.filledQty != null && Number.isFinite(order.filledQty) && order.filledQty > 0
+        ? order.qty != null && Number.isFinite(order.qty) && order.qty >= order.filledQty
+          ? ` Recorded quantities: ${order.filledQty} filled · ${order.qty - order.filledQty} remaining.`
+          : ` Recorded filled quantity: ${order.filledQty}; remaining quantity needs reconciliation.`
+        : "";
       attention.push(item({
         key: `order:${order.id}:dispatch`,
         kind: "dispatch_unresolved",
@@ -395,7 +506,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
         symbol: order.symbol,
         stateLabel: "Dispatch unresolved",
         title: `Reconcile ${order.symbol} paper dispatch`,
-        reason: order.dispatchError,
+        reason: `${order.dispatchError?.trim() ? safeStatusError("dispatch") : "Submission is recorded, but no broker order ID confirms acceptance. Reconcile the dispatch receipt."}${recordedFill}`,
         consequence: "Broker acceptance is not confirmed. Do not submit a duplicate order.",
         actionLabel: "Reconcile dispatch",
         href: orderHref(order),
@@ -444,10 +555,11 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       actionLabel: review.kind === "gate_review" ? "Review the exact gate" : "Review recorded outcome",
       href: review.href,
       updatedAt: review.updatedAt,
+      deadlineAt: review.dueAt,
     }));
   }
 
-  attention.sort((left, right) => right.priority - left.priority || right.updatedAt - left.updatedAt || left.key.localeCompare(right.key));
+  attention.sort((left, right) => right.priority - left.priority || (left.deadlineAt ?? Infinity) - (right.deadlineAt ?? Infinity) || left.key.localeCompare(right.key));
   const inMotion = [
     ...input.orders.map(orderMotion).filter((value): value is ApertureMotionItem => value != null),
     ...input.activePlays.map((play): ApertureMotionItem => ({
@@ -458,7 +570,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       href: play.href,
       updatedAt: play.updatedAt,
     })),
-  ].sort((left, right) => right.updatedAt - left.updatedAt || left.key.localeCompare(right.key));
+  ].sort((left, right) => left.key.localeCompare(right.key));
 
   const baselineItems = [...attention, ...updates, ...inMotion].map((record) => {
     const { updatedAt: _updatedAt, ...material } = record;
@@ -472,37 +584,48 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     ? [...attention, ...updates, ...inMotion]
     : baselineItems.flatMap((record) => priorMap.get(record.key) === record.fingerprint ? [] : [currentByKey.get(record.key)!]);
 
-  const futureReviews = input.pendingReviews.slice().sort((left, right) => left.dueAt - right.dueAt);
-  const futurePlays = input.activePlays.filter((play) => play.reviewAt != null).sort((left, right) => (left.reviewAt ?? Infinity) - (right.reviewAt ?? Infinity));
+  const futureReviews = input.pendingReviews.filter((review) => review.dueAt > input.now).sort((left, right) => left.dueAt - right.dueAt);
+  const futurePlays = input.activePlays.filter((play) => play.reviewAt != null && play.reviewAt > input.now).sort((left, right) => (left.reviewAt ?? Infinity) - (right.reviewAt ?? Infinity));
   const nextReview = futureReviews[0];
   const nextPlay = futurePlays[0];
+  const noTrade = input.underwriting?.state === "complete" && input.underwriting.outcome === "no_trade" ? input.underwriting : null;
+  const noTradeCondition = noTrade?.reopenCondition?.trim();
   const nextCheckpoint = nextReview && (!nextPlay || nextReview.dueAt <= (nextPlay.reviewAt ?? Infinity))
     ? { title: nextReview.title, detail: "Recorded human review time", at: nextReview.dueAt, href: nextReview.href }
     : nextPlay
       ? { title: `${nextPlay.symbol} review`, detail: nextPlay.detail, at: nextPlay.reviewAt ?? null, href: nextPlay.href }
-      : input.checks.asOf == null
-        ? null
-        : { title: "Run updated checks", detail: input.checks.monitoring === "on_demand" ? "Monitoring is on demand" : "Scheduled checks are configured", at: null, href: "/aperture/plays" };
+      : noTrade && noTradeCondition
+        ? { title: "No-trade reopening condition", detail: `${noTradeCondition} This is a recorded condition, not an automatic check.`, at: null, href: `/aperture/decision/${noTrade.decisionRunId}/revision/${noTrade.revisionId}/underwrite` }
+        : input.checks.asOf == null || inMotion.length === 0
+          ? null
+          : { title: "Review recorded play status", detail: input.checks.monitoring === "on_demand" ? "On demand · open a play to inspect order status or request its monitoring checks" : "Scheduled checks are configured; a review date alone is not a completed check", at: null, href: "/aperture/plays" };
 
-  const quiet = attention.length === 0 && input.checks.state === "complete";
-  const asOf = input.checks.asOf == null ? "an unverified time" : new Date(input.checks.asOf).toLocaleString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
-  const scopeNote = input.checks.state === "partial"
-    ? `Status is partially available${input.checks.error ? `: ${input.checks.error}` : "."}`
-    : input.checks.state === "stale"
+  const quiet = attention.length === 0 && readState === "complete";
+  const time = (at: number | null | undefined) => at == null || !Number.isFinite(at) ? "not available" : new Date(at).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+  const asOf = time(input.checks.asOf);
+  const statusNote = readState === "partial"
+    ? "Status is partially available. Refresh status to retry unavailable sources."
+    : readState === "stale"
       ? `Last successful status is stale as of ${asOf}.`
-      : `Checks last completed ${asOf}. Monitoring: ${input.checks.monitoring === "on_demand" ? "On demand" : "Scheduled"}.`;
+      : readState === "failed" ? "Status refresh failed; retained records are not a current all-clear."
+        : readState === "loading" ? "Loading recorded status."
+          : readState === "empty" ? "No verified status snapshot is available."
+            : `Status snapshot as of ${asOf}.`;
+  const scopeNote = `${statusNote} Monitoring: ${input.checks.monitoring === "on_demand" ? "On demand" : "Scheduled"}. Last recorded monitoring check: ${time(input.checks.monitoringAsOf)}.`;
 
   return {
     entryState,
     primary: attention[0] ?? null,
     otherCritical: attention.slice(1).filter((candidate) => candidate.critical),
+    otherAttention: attention.slice(1).filter((candidate) => !candidate.critical),
+    readState,
     changed,
     inMotion,
     nextCheckpoint,
     changeHeading: prior == null ? "Current status" : "Changed since your last review",
     scopeNote,
     quiet,
-    quietMessage: quiet ? `No new action identified in the checks completed at ${asOf}.` : null,
+    quietMessage: quiet ? `No new action identified in the recorded status as of ${asOf}. Refreshing status does not run new monitoring checks.` : null,
     baseline,
     baselineToken,
   };

@@ -1,0 +1,20 @@
+CREATE TABLE `aperture_underwriting_jobs` (
+  `id` int AUTO_INCREMENT NOT NULL,
+  `userId` int NOT NULL,
+  `decisionRunId` int NOT NULL,
+  `decisionRevisionId` int NOT NULL,
+  `requestKey` varchar(64) NOT NULL,
+  `request` json NOT NULL,
+  `state` enum('running','complete','failed') NOT NULL,
+  `milestone` enum('market_evidence','recording_result','complete','failed') NOT NULL,
+  `attemptToken` varchar(36) NOT NULL,
+  `attempt` int NOT NULL DEFAULT 1,
+  `leaseUntil` bigint NOT NULL,
+  `resultRevisionId` int,
+  `failure` text,
+  `createdAt` bigint NOT NULL,
+  `updatedAt` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `underwriting_job_request` (`userId`,`decisionRunId`,`requestKey`),
+  KEY `underwriting_job_owner_revision` (`userId`,`decisionRevisionId`,`updatedAt`)
+);

@@ -130,19 +130,17 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(cockpit).toContain("existing positions are unchanged");
   });
 
-  it("adds a concise operator action card and three-bucket weekly plan", () => {
+  it("uses shared attention instead of a competing Play Desk action algorithm", () => {
     const desk = readFileSync(
       resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"),
       "utf8",
     );
-    const brief = readFileSync(
-      resolve(process.cwd(), "client/src/components/aperture/OperatorDecisionBrief.tsx"),
-      "utf8",
-    );
-    expect(desk).toContain("<OperatorDecisionBrief");
-    expect(brief).toContain("What to do now");
-    expect(brief).toContain("Weekly execution plan");
-    expect(brief).toContain("Watch my six");
-    expect(brief).toContain("From underwriting · not a forecast");
+    // playDeskBehavior.test.ts renders critical, uncertain and order-state journeys.
+    expect(desk).toContain('from "@shared/apertureAttention"');
+    expect(desk).toContain("attentionDisclosure(briefing, primaryKey)");
+    expect(desk).toContain("<AttentionTask item={disclosure.primary}");
+    expect(desk).toContain("disclosure.otherCritical.map");
+    expect(desk).not.toContain("<OperatorDecisionBrief");
+    expect(desk).not.toContain("buildOperatorAction");
   });
 });

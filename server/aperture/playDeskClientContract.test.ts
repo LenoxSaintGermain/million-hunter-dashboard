@@ -21,7 +21,10 @@ describe("Capital Aperture Play Desk contract", () => {
     expect(router).toContain("eq(apertureDecisionRuns.userId, ctx.user.id)");
     expect(router).toContain("state.netQty > 0 && state.latestOpenId === order.id");
     expect(page).toContain("Review, approval, and submission remain separate human actions.");
-    expect(page).toContain("Dispatch unresolved");
+    expect(page).toContain("deskOrderPresentation(order.id, briefing)");
+    expect(page).toContain('from "@shared/apertureAttention"');
+    expect(page).not.toContain("const orderState =");
+    expect(page).not.toContain("OperatorDecisionBrief");
     expect(page).toContain('order.status === "filled" && order.intent !== "close"');
     expect(page).not.toContain(".useMutation(");
   });
@@ -73,7 +76,9 @@ describe("Capital Aperture Play Desk contract", () => {
   it("opens filled plays on monitoring instead of returning to the ticket form", () => {
     const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
 
-    expect(page).toContain('order.status === "filled" ? "&lifecycle=monitoring" : ""');
+    // Rendered-page behavioral tests assert the exact shared monitoring URL.
+    expect(page).toContain("href: task?.href ?? motion?.href ?? null");
+    expect(page).toContain("state.href ? navigate(state.href) : refresh()");
   });
 
   it("uses per-candidate state rather than completed-run status for the choose lane", () => {
@@ -108,13 +113,24 @@ describe("Capital Aperture Play Desk contract", () => {
     expect(page).toContain("Show all stages");
   });
 
+  it("leaves scrolling and focus in the operator's control during refresh", () => {
+    const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
+    expect(page).not.toContain("scrollIntoView");
+    expect(page).not.toContain(".focus(");
+    expect(page).not.toContain("autoFocus");
+    expect(page).toContain("useSearch()");
+    expect(page).toContain('id={`play-${selectedPlayId}`}');
+    expect(page).not.toContain("min-h-9");
+    expect(page).not.toContain("min-h-10");
+  });
+
   it("uses human option labels and keeps OCC symbols secondary", () => {
     const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
 
     expect(page).toContain("paperInstrumentDisplayLabel");
     expect(page).toContain("Raw contract");
-    expect(page).toContain("View queued order");
-    expect(page).toContain("Monitor position");
+    expect(page).toContain("View order status");
+    expect(page).toContain("label: task?.stateLabel ?? motion?.stateLabel");
   });
 
   it("applies the instrument filter to plays and scheduled order reviews", () => {
