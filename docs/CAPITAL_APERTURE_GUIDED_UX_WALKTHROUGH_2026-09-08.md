@@ -4,9 +4,23 @@
 
 **Scope:** Mission underwriting and returning Today check-in
 
-**Boundary:** Automated tests, isolated agent-operated desktop/mobile UAT, and public production release checks passed. Authenticated production desktop/mobile UAT remains pending operator sign-in. This is not a human usability study. The earlier local and tagged-release observations below are historical. See the [production handoff receipt](qa/CAPITAL_APERTURE_PRODUCTION_HANDOFF_2026-09-09.md) for exact verification and remaining acceptance gaps.
+**Boundary:** Automated tests, isolated agent-operated desktop/mobile UAT, and public production release checks passed. The subsequent authenticated production pass verified access but reproduced workflow and mobile usability gaps; overall UX acceptance is not passed. This is not a human usability study. The earlier local and tagged-release observations below are historical. See the [production handoff receipt](qa/CAPITAL_APERTURE_PRODUCTION_HANDOFF_2026-09-09.md) and [authenticated UAT report](qa/CAPITAL_APERTURE_AUTHENTICATED_UAT_2026-09-09.md) for exact verification and remaining acceptance gaps.
 
 ## September 9 gap-closure checkpoint
+
+### Authenticated production follow-up
+
+The operator completed Chrome sign-in. A bounded production desktop/mobile pass
+verified named-account hydration, persisted Mission resume, cross-tab saved
+section restoration, no-trade continuity, exact monitoring navigation, and
+critical issues remaining visible outside instrument filters. **UX acceptance
+remains open:** PWR still loops between completed evidence and a pre-session
+blocked ticket, and the populated mobile attention card pushes its primary action
+below the first viewport. Generic partial-state recovery, put-specific evidence
+implication, constraint inspection, and review-label inconsistencies were also
+reproduced. See [authenticated production UAT](qa/CAPITAL_APERTURE_AUTHENTICATED_UAT_2026-09-09.md)
+for exact routes, screenshots, limits and prioritized fixes. This supersedes only
+the prior sign-in blocker, not the remaining end-to-end acceptance requirements.
 
 ### Production handoff: mobile information density
 
