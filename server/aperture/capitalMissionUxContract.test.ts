@@ -137,7 +137,9 @@ describe("Capital Mission decision-path UX contract", () => {
     );
     // playDeskBehavior.test.ts renders critical, uncertain and order-state journeys.
     expect(desk).toContain('from "@shared/apertureAttention"');
-    expect(desk).toContain("attentionDisclosure(briefing, primaryKey)");
+    expect(desk).toContain("arbitrateTodayRead({ briefing: briefing ?? null");
+    expect(desk).toContain("const disclosure = read.layout");
+    expect(desk).not.toContain("attentionDisclosure(briefing, primaryKey)");
     expect(desk).toContain("<AttentionTask item={disclosure.primary}");
     expect(desk).toContain("disclosure.otherCritical.map");
     expect(desk).not.toContain("<OperatorDecisionBrief");

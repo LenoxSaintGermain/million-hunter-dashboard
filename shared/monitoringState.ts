@@ -1,3 +1,5 @@
+import { paperInstrumentDisplayLabel, parseOccOptionSymbol, type PaperInstrumentInput } from "./paperInstrument";
+
 export const MONITORING_FRESHNESS_MS = 24 * 60 * 60 * 1000;
 export const UNKNOWN_MONITORING_PREFIX = "UNKNOWN ·";
 
@@ -8,12 +10,43 @@ export type MonitoringReviewState = {
   reason: string;
 };
 
-type MonitoringObservation = {
+export type MonitoringObservation = {
   finding: string | null | undefined;
   flagged: boolean;
   citations: unknown;
   checkedAt: number;
 };
+
+export type MonitoringInstrumentContext = Pick<PaperInstrumentInput, "symbol" | "instrumentType" | "underlyingSymbol" | "optionExpirationDate" | "optionStrikePriceCents">;
+
+/** Presentation, not sentiment classification. Never infer direction or hedge intent from prose. */
+export function monitoringFindingPresentation({ check, instrument, rationale, now = Date.now() }: {
+  check: MonitoringObservation & { checkType?: string; symbol?: string };
+  instrument?: MonitoringInstrumentContext | null;
+  rationale?: string | null;
+  now?: number;
+}) {
+  const parsed = instrument ? parseOccOptionSymbol(instrument.symbol) : null;
+  const kind = instrument?.instrumentType ?? parsed?.instrumentType;
+  const symbol = instrument?.underlyingSymbol ?? parsed?.underlyingSymbol ?? check.symbol ?? instrument?.symbol ?? "Selected play";
+  const label = instrument && kind
+    ? paperInstrumentDisplayLabel({ ...instrument, instrumentType: kind })
+    : `${symbol} · instrument not recorded`;
+  const checkLabel = ({ catalyst: "Catalyst", thesis_invalidation: "Invalidation", earnings: "Earnings", macro: "Market context" } as Record<string, string>)[check.checkType ?? ""] ?? "Monitoring";
+  const review = monitoringReviewState(check, now);
+  const expression = kind === "long_put" ? "selected put" : kind === "long_call" ? "selected call" : kind === "shares" ? "share position" : "selected play";
+  const summary = review.state === "unknown" ? `${checkLabel} evidence needs verification for this ${expression}.`
+    : review.state === "flagged" ? `${checkLabel} check flagged a change for this ${expression}.`
+      : `${checkLabel} check recorded no flagged change.`;
+  const implication = kind === "long_put"
+    ? "Stock outlook alone does not establish whether this put or a recorded hedge rationale still holds. Review the evidence; no automatic exit."
+    : kind === "long_call"
+      ? "Stock outlook alone does not establish whether this call still fits its recorded rationale. Review the evidence; no automatic exit."
+      : "Compare the finding with this play’s recorded rationale and invalidation. Its effect is not verified by the flag alone; no automatic exit.";
+  return { label, checkLabel, review, summary, implication,
+    evidence: { finding: check.finding ?? "No finding recorded.", citations: validMonitoringCitations(check.citations), checkedAt: check.checkedAt, rationale: rationale?.trim() || null },
+  };
+}
 
 export function validMonitoringCitations(citations: unknown): string[] {
   if (!Array.isArray(citations)) return [];

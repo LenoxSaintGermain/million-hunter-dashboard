@@ -54,6 +54,14 @@ describe("Capital Aperture lifecycle safety contracts", () => {
     expect(router).toContain('z.object({ runId: z.number(), candidateId: z.number() })');
     expect(router).toContain("return getMonitoringChecks(input.runId, input.candidateId)");
     expect(monitor).toContain("eq(monitoringChecks.candidateId, candidateId)");
+    expect(page).toContain("instrument={order}");
+    expect(page).toContain("order={candidateActiveOrder}");
+    expect(page).toContain("reading a finding does not acknowledge or resolve it");
+    expect(page).not.toContain("Paper expression to evaluate:");
+    expect(router).toContain('const monitoredOrders = orders.filter(order => order.status === "filled")');
+    expect(router).toContain("monitoringFindings: deskMonitoringFindings(monitoredOrders, monitoringByCandidate)");
+    expect(router).toContain("reason: brokerOrders.reason");
+    expect(router).toContain("issues: sourceIssues");
   });
 
   it("refreshes a created proposal in place instead of navigating to the same URL", () => {

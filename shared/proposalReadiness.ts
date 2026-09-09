@@ -2,7 +2,7 @@ export type ProposalReadiness = {
   title: string;
   explanation: string;
   actionLabel: string;
-  action: "return_to_evidence" | "return_to_decision" | "complete_ticket" | "review_recipe" | "confirm_paper" | "create_proposal";
+  action: "return_to_evidence" | "refresh_recipe" | "return_to_decision" | "complete_ticket" | "review_recipe" | "confirm_paper" | "create_proposal";
 };
 
 function readableList(items: string[]): string {
@@ -19,6 +19,7 @@ function enterLabel(field: string | undefined): string {
 /** Translate a technical research/preflight state into the operator's next safe action. */
 export function buildProposalReadiness(input: {
   recipeReady: boolean;
+  evidenceReviewComplete?: boolean;
   unavailableReason?: string | null;
   ticketReady?: boolean;
   ticketMissing?: string[];
@@ -28,6 +29,14 @@ export function buildProposalReadiness(input: {
   paperAcknowledged?: boolean;
 }): ProposalReadiness {
   if (!input.recipeReady) {
+    if (input.evidenceReviewComplete) {
+      return {
+        title: "Market checks needed",
+        explanation: `${input.unavailableReason || "Entry, stop, or trigger inputs are not yet verified."} Your evidence answers are saved. Refresh market checks here. No paper ticket has been created.`,
+        actionLabel: "Refresh market checks",
+        action: "refresh_recipe",
+      };
+    }
     return {
       title: "No paper proposal yet",
       explanation: input.unavailableReason || "The measured recipe is not available yet. Do not fill a ticket around an unmeasured setup.",

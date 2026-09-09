@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
+import { MonitoringFindingCard } from "@/components/aperture/MonitoringFindingCard";
 import { PaperProposalForm } from "@/components/aperture/PaperProposalForm";
 import { DecisionStepLock, decisionAuthorityAllowsDownstream } from "@/components/aperture/DecisionStepLock";
 import { format, formatDistanceToNow } from "date-fns";
@@ -124,7 +125,7 @@ function OrderQueue({ runId, focusCandidateId, ticketBuilderActive = false }: { 
   const submitted = scopedOrders.filter((o) => o.status === "submitted");
   const terminal = scopedOrders.filter((o) => ["filled", "rejected", "cancelled"].includes(o.status));
   const nextAction = ticketBuilderActive
-    ? "Finish the exact ticket above. A proposal appears here only after preflight passes."
+    ? "No ticket created. Resolve the current blocker or review the measured terms above; approval and submission remain separate."
     : pending.length
     ? "Review the waiting paper ticket. Approval changes only its paper-workflow state."
     : approved.length
@@ -297,98 +298,43 @@ function OrderQueue({ runId, focusCandidateId, ticketBuilderActive = false }: { 
 
 // ── Check whether thesis still holds ─────────────────────────────────────────
 
-function MonitoringPanel({ runId, candidate, thesisSummary }: { runId: number; candidate?: { id: number; symbol: string }; thesisSummary?: string | null }) {
-  const { data: checks, refetch } = trpc.aperture.monitor.list.useQuery(
-    { runId, candidateId: candidate?.id ?? -1 },
-    { enabled: candidate != null },
+function MonitoringPanel({ runId, candidate, thesisSummary, order }: {
+  runId: number; candidate?: { id: number; symbol: string }; thesisSummary?: string | null;
+  order?: NonNullable<inferRouterOutputs<AppRouter>["aperture"]["order"]["list"]>[number];
+}) {
+  const query = trpc.aperture.monitor.list.useQuery(
+    { runId, candidateId: candidate?.id ?? -1 }, { enabled: candidate != null },
   );
+  const checks = query.data;
   const runCheck = trpc.aperture.monitor.run.useMutation({
     onSuccess: (results) => {
       const reviewCount = results.filter((result) => monitoringReviewState(result).needsReview).length;
       toast.success(`${results.length} checks run, ${reviewCount} require review`);
-      refetch();
+      void query.refetch();
     },
     onError: (e) => toast.error(e.message),
   });
-
-  const checkTypeColor = (t: string) => t === "thesis_invalidation" ? "var(--sh-red)" :
-    t === "catalyst" ? "oklch(0.55 0.15 145)" :
-    t === "earnings" ? "var(--sh-signal)" : "var(--sh-fg-muted)";
-  const reviewItems = (checks ?? []).map((check) => ({ check, review: monitoringReviewState(check) }))
-    .filter(({ review }) => review.needsReview);
-  const primaryNextAction = reviewItems.find(({ review }) => review.state === "unknown")?.review.nextAction
-    ?? reviewItems[0]?.review.nextAction;
-  const hasNegativeCatalyst = reviewItems.some(({ check, review }) => review.state === "flagged"
-    && (check.checkType === "thesis_invalidation" || check.checkType === "macro"));
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
-        <div className="min-w-0"><p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Watch my six · thesis checks</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{candidate ? `Run sourced catalyst, invalidation, earnings, and macro checks for ${candidate.symbol}. A finding never submits, hedges, or exits an order.` : "Choose a candidate from the decision brief before running monitored checks."}</p></div>
-        <Button variant="outline" className="min-h-11 w-full shrink-0 sm:w-auto" disabled={!candidate || runCheck.isPending} onClick={() => candidate && runCheck.mutate({ runId, candidateId: candidate.id, symbol: candidate.symbol, thesisSummary: thesisSummary?.trim() || `Monitor ${candidate.symbol} against the recorded paper thesis and its invalidation conditions.` })}>{runCheck.isPending ? <Loader2 aria-hidden="true" className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />}Run reviewed checks</Button>
-      </div>
-      {reviewItems.length > 0 && (
-        <div role="alert" className="min-w-0 rounded-lg p-3" style={{ background: "oklch(0.97 0.02 30)", border: "1px solid var(--sh-signal)" }}>
-          <div className="flex items-center gap-2 mb-2">
-            <Flag aria-hidden="true" className="h-4 w-4" style={{ color: "var(--sh-signal)" }} />
-            <span className="text-sm font-medium" style={{ color: "var(--sh-signal)" }}>
-              {reviewItems.length} check{reviewItems.length !== 1 ? "s" : ""} require operator review
-            </span>
-          </div>
-          {reviewItems.slice(0, 3).map(({ check, review }) => (
-            <p key={check.id} className="ml-6 break-words text-xs" style={{ color: "var(--sh-text-primary)" }}>
-              <span className="font-mono">{check.symbol}</span> · {review.state === "unknown" ? "UNKNOWN" : check.checkType.replace("_", " ")} · {review.reason}
-            </p>
-          ))}
-          <p className="ml-6 mt-2 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Next: {primaryNextAction}.</p>
-          {hasNegativeCatalyst && <p className="ml-6 mt-2 rounded-md border p-2 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><strong>Paper expression to evaluate:</strong> review a long put for bounded downside. Bear debit spreads are not supported in this build, and no offset is created automatically.</p>}
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {checks?.map((c) => {
-          const review = monitoringReviewState(c);
-          return <Card key={c.id} className="min-w-0 overflow-hidden">
-            <CardContent className="min-w-0 pb-3 pt-3">
-              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="min-w-0 break-all font-mono text-sm font-bold" style={{ color: "var(--sh-text-primary)" }}>{c.symbol}</span>
-                    <Badge variant="outline" className="text-xs" style={{ color: checkTypeColor(c.checkType) }}>
-                      {c.checkType.replace("_", " ")}
-                    </Badge>
-                    {review.state === "unknown" ? <Badge variant="outline" className="text-xs">UNKNOWN</Badge> : c.flagged && <Flag aria-label="Flagged for review" className="h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} />}
-                  </div>
-                  <p className="break-words text-xs leading-5" style={{ color: review.needsReview ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>
-                    {c.finding ?? "No finding."}
-                  </p>
-                  {review.needsReview && <p className="mt-1 text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>Next: {review.nextAction}.</p>}
-                  {normalizeStringList(c.citations).length > 0 && (
-                    <div className="flex gap-1 mt-1 flex-wrap">
-                      {normalizeStringList(c.citations).slice(0, 2).map((url, i) => (
-                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded text-xs underline" style={{ color: "var(--sh-signal)" }}>
-                          Source {i + 1}
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <span className="shrink-0 text-xs tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>
-                  {formatDistanceToNow(c.checkedAt)} ago
-                </span>
-              </div>
-            </CardContent>
-          </Card>;
-        })}
-        {checks?.length === 0 && (
-          <p className="text-sm text-center py-8" style={{ color: "var(--sh-fg-muted)" }}>
-              No monitoring checks yet. Add a reviewed paper position, then use this surface to challenge its catalyst and invalidation conditions.
-          </p>
-        )}
-      </div>
-    </div>
-  );
+  const canCheck = Boolean(candidate && order?.status === "filled");
+  const runScopedChecks = () => {
+    if (!candidate || !canCheck || runCheck.isPending) return;
+    runCheck.mutate({ runId, candidateId: candidate.id, symbol: candidate.symbol,
+      thesisSummary: [order?.reason, thesisSummary].filter(Boolean).join(" · ") || `Monitor ${candidate.symbol} against the recorded paper thesis and its invalidation conditions.`,
+    });
+  };
+  const reviewItems = (checks ?? []).filter((check) => monitoringReviewState(check).needsReview);
+  return <div className="space-y-4">
+    <section className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+      <h2 className="text-base font-semibold">Thesis checks · {order ? orderInstrumentLabel(order) : candidate?.symbol ?? "Select a play"}</h2>
+      <p className="mt-2 text-sm leading-5">Check this play’s catalyst and invalidation. Checks run on demand; reading a finding does not acknowledge or resolve it.</p>
+      <Button variant="outline" className="mt-3 min-h-11" disabled={!canCheck || runCheck.isPending} onClick={runScopedChecks}>{runCheck.isPending ? <Loader2 aria-hidden="true" className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw aria-hidden="true" className="mr-1.5 h-4 w-4" />}{runCheck.isPending ? "Checking this play…" : "Run sourced checks"}</Button>
+      <p className="mt-2 text-sm" role="status">{!canCheck ? "New monitoring checks require a verified open fill. Review the order status first." : runCheck.isPending ? "New checks are running for this play only." : "Creates new monitoring evidence for this play only. Does not submit, hedge, or exit an order."}</p>
+    </section>
+    {query.isLoading && <p role="status">Loading recorded checks…</p>}
+    {query.isError && <div role="alert" className="rounded-lg border p-4"><p>Recorded monitoring could not load. Available records are retained; no all-clear is established.</p><Button variant="outline" className="mt-2 min-h-11" disabled={query.isFetching} onClick={() => void query.refetch()}>Retry saved status</Button></div>}
+    {reviewItems.length > 0 && <p role="status" className="text-sm font-medium">{reviewItems.length} check{reviewItems.length === 1 ? " needs" : "s need"} review. Open the evidence beside each finding.</p>}
+    <div className="space-y-3">{checks?.map((check) => <MonitoringFindingCard key={check.id} check={check} instrument={order} rationale={order?.reason ?? thesisSummary} onRefresh={canCheck ? runScopedChecks : undefined} refreshing={runCheck.isPending} />)}</div>
+    {!query.isLoading && !query.isError && checks?.length === 0 && <p className="text-sm">No monitoring checks recorded for this play. No conclusion about its current thesis is available.</p>}
+  </div>;
 }
 
 // ── Alpha Dashboard ───────────────────────────────────────────────────────────
@@ -972,7 +918,7 @@ export default function ApertureExecute() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Current human decision</p>
-                <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title ?? (paperStageDeclined ? "Paper stage declined — preserve cash for this candidate" : evidenceReviewRequired ? data.brief.nextDecision.title : `${proposalCandidate.symbol} evidence review complete · finish the exact paper ticket`)}</p>
+                <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title ?? (paperStageDeclined ? "Paper stage declined — preserve cash for this candidate" : evidenceReviewRequired ? data.brief.nextDecision.title : `${proposalCandidate.symbol} evidence review complete · check ticket readiness`)}</p>
                 <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{candidateOrderDecision?.detail ?? (paperStageDeclined ? "A required evidence answer was recorded as not confirmed. This revision cannot prepare a proposal or create an order." : evidenceReviewRequired ? data.brief.nextDecision.detail : "The remaining path is exact contract → proposal → approve → submit. Each step stays separate and nothing is sent automatically.")}</p>
               </div>
               {candidateOrderDecision ? <Button size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => openLifecycle(candidateOrderDecision.lifecycleTab)}>{candidateOrderDecision.action}</Button> : evidenceReviewRequired && <Button variant="outline" size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => navigate(evidenceUrl)}>{`Review ${unreviewedEvidenceChecks.length} required check${unreviewedEvidenceChecks.length === 1 ? "" : "s"}`}</Button>}
@@ -980,7 +926,7 @@ export default function ApertureExecute() {
           </div>
         )}
 
-        {proposalCandidate && candidateActiveOrder ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "color-mix(in srgb, var(--sh-emerald) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div className="min-w-0"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-emerald)" }}>Paper order already exists · do not duplicate</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{orderInstrumentLabel(candidateActiveOrder)}</h2><p className="mt-1 text-sm tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>{orderSizeLabel(candidateActiveOrder)} · {candidateActiveOrder.orderType.toUpperCase()} · {candidateActiveOrder.timeInForce.toUpperCase()}{candidateActiveOrder.limitPriceCents ? ` · limit ${fmtPrice(candidateActiveOrder.limitPriceCents)}` : ""}</p><p className="mt-2 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title}</p></div></div></section> : proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(evidenceUrl)}>Review the recorded evidence decision</Button></section> : proposalCandidate && evidenceReviewRequired ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper ticket locked · step 1 of 4</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Review {unreviewedEvidenceChecks.length} decision-critical check{unreviewedEvidenceChecks.length === 1 ? "" : "s"} before building the ticket.</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This is the only blocker to address on this screen. After the final positive review, the flow advances to exact contract → proposal → approve → submit. A negative review preserves cash instead.</p><ol className="mt-4 space-y-2">{unreviewedEvidenceChecks.map((check, index) => <li key={check} className="flex gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}><span className="font-mono text-xs tabular-nums" style={{ color: "var(--sh-signal)" }}>{index + 1}</span><span>{check}</span></li>)}</ol><Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={() => navigate(evidenceUrl)}>Review {unreviewedEvidenceChecks.length} required check{unreviewedEvidenceChecks.length === 1 ? "" : "s"}</Button></section> : proposalCandidate && <PaperProposalForm runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} onReturnToBrief={() => navigate(evidenceUrl)} onReturnToDecisionBrief={() => setShowAlternatives(true)} onProposalCreated={() => openLifecycle("orders")} onCashPreserved={() => navigate("/aperture/plays")} />}
+        {proposalCandidate && candidateActiveOrder ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "color-mix(in srgb, var(--sh-emerald) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div className="min-w-0"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-emerald)" }}>Paper order already exists · do not duplicate</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{orderInstrumentLabel(candidateActiveOrder)}</h2><p className="mt-1 text-sm tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>{orderSizeLabel(candidateActiveOrder)} · {candidateActiveOrder.orderType.toUpperCase()} · {candidateActiveOrder.timeInForce.toUpperCase()}{candidateActiveOrder.limitPriceCents ? ` · limit ${fmtPrice(candidateActiveOrder.limitPriceCents)}` : ""}</p><p className="mt-2 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title}</p></div></div></section> : proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(evidenceUrl)}>Review the recorded evidence decision</Button></section> : proposalCandidate && evidenceReviewRequired ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper ticket locked · step 1 of 4</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Review {unreviewedEvidenceChecks.length} decision-critical check{unreviewedEvidenceChecks.length === 1 ? "" : "s"} before building the ticket.</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This is the only blocker to address on this screen. After the final positive review, the flow advances to exact contract → proposal → approve → submit. A negative review preserves cash instead.</p><ol className="mt-4 space-y-2">{unreviewedEvidenceChecks.map((check, index) => <li key={check} className="flex gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}><span className="font-mono text-xs tabular-nums" style={{ color: "var(--sh-signal)" }}>{index + 1}</span><span>{check}</span></li>)}</ol><Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={() => navigate(evidenceUrl)}>Review {unreviewedEvidenceChecks.length} required check{unreviewedEvidenceChecks.length === 1 ? "" : "s"}</Button></section> : proposalCandidate && <PaperProposalForm key={`${runId}:${proposalCandidate.id}`} runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} evidenceReviewComplete={proposalEvidence?.paperProposalReady === true} onReturnToBrief={() => navigate(evidenceUrl)} onReturnToDecisionBrief={() => setShowAlternatives(true)} onProposalCreated={() => openLifecycle("orders")} onCashPreserved={() => navigate("/aperture/plays")} />}
 
         {showAlternatives && proposalCandidate && <section className="scroll-mt-4 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }} aria-live="polite">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -1010,7 +956,7 @@ export default function ApertureExecute() {
             <OrderQueue runId={runId} focusCandidateId={proposalCandidate?.id} ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired && !candidateActiveOrder)} />
           </TabsContent>
           <TabsContent value="monitoring" className="mt-4 min-w-0" aria-label="Check whether thesis still holds">
-            <MonitoringPanel runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule} />
+            <MonitoringPanel runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule} order={candidateActiveOrder} />
           </TabsContent>
           <TabsContent value="alpha" className="mt-4 min-w-0" aria-label="Outcome and notes">
             <AlphaDashboard runId={runId} />

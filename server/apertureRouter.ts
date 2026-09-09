@@ -18,6 +18,7 @@ import { claimUnderwritingJob, readUnderwritingJob } from "./aperture/underwriti
 import { mayPublishUnderwriting, underwritingJobStatus } from "../shared/underwritingJob";
 import { missionDraftRouter, missionDraftStore } from "./aperture/missionDraftRouter";
 import { parsePersistedJson } from "../shared/persistedJson";
+import { deskAttentionSourceIssues, deskMonitoringFindings } from "./aperture/deskAttentionPresentation";
 import { readOptionalStatusSource } from "./aperture/optionalStatusSource";
 import { decodeHoldingPeriods } from "../shared/underwritingPersistence";
 import { getDb } from "./db";
@@ -2378,6 +2379,7 @@ export const apertureRouter = router({
         accountLabel: portfolioAccounts.label,
         thesisName: capitalTheses.name,
         symbol: brokerOrders.symbol,
+        reason: brokerOrders.reason,
         instrumentType: brokerOrders.instrumentType,
         underlyingSymbol: brokerOrders.underlyingSymbol,
         optionExpirationDate: brokerOrders.optionExpirationDate,
@@ -2595,12 +2597,14 @@ export const apertureRouter = router({
       const now = Date.now();
       const jobRecord = latestMission ? await readUnderwritingJob(db!, ctx.user.id, latestMission.decisionRunId, latestMission.revisionId) : null;
       const jobState = underwritingJobStatus(jobRecord, now);
-      const latestChecks = Array.from(monitoringByCandidate.values()).flat();
+      // Accepted but unfilled orders are status tasks, not missing post-entry research.
+      const monitoredOrders = orders.filter(order => order.status === "filled");
+      const monitoredCandidateIds = new Set(monitoredOrders.flatMap(order => order.candidateId == null ? [] : [order.candidateId]));
+      const latestChecks = Array.from(monitoringByCandidate.entries()).filter(([id]) => monitoredCandidateIds.has(id)).flatMap(([, checks]) => checks);
       const monitoringAsOf = latestChecks.length ? Math.min(...latestChecks.map((check) => check.checkedAt)) : null;
-      const monitoringIncomplete = activePlays.some((play) => !orders.some((order) => order.accountId === play.accountId && (order.underlyingSymbol ?? order.symbol) === play.symbol && order.candidateId != null)) || candidateIds.some((id) => {
-        const checks = monitoringByCandidate.get(id) ?? [];
-        return ["catalyst", "thesis_invalidation", "earnings", "macro"].some((type) => !checks.some((check) => check.checkType === type));
-      });
+      const sourceIssues = deskAttentionSourceIssues({ orders: monitoredOrders, activePlays, monitoringByCandidate,
+        monitoringUnavailable: Boolean(monitoringRead.unavailable), positionsUnavailable: Boolean(snapshotRead.unavailable), now });
+      const monitoringIncomplete = sourceIssues.some(issue => issue.state === "missing");
       const unknownMonitoring = latestChecks.some((check) => monitoringReviewState(check, now).state === "unknown");
       const unavailableSources = [monitoringRead.unavailable, snapshotRead.unavailable].filter(Boolean).join(" ");
       const draft = await missionDraftStore.get(ctx.user.id);
@@ -2637,7 +2641,11 @@ export const apertureRouter = router({
           id: order.id,
           runId: order.runId,
           candidateId: order.candidateId,
-          symbol: order.underlyingSymbol ?? order.symbol,
+          symbol: order.symbol,
+          underlyingSymbol: order.underlyingSymbol,
+          instrumentType: order.instrumentType,
+          optionExpirationDate: order.optionExpirationDate,
+          optionStrikePriceCents: order.optionStrikePriceCents,
           status: order.status,
           qty: order.qty,
           filledQty: order.filledQty,
@@ -2664,19 +2672,9 @@ export const apertureRouter = router({
             ? `/aperture/run/${review.orderRunId}/execute?candidate=${review.orderCandidateId ?? ""}`
             : `/aperture/decision/${review.decisionRunId}/revision/${review.revisionId}`,
         })),
-        monitoringFindings: Array.from(new Map(orders.flatMap((order) => (order.candidateId == null ? [] : (monitoringByCandidate.get(order.candidateId) ?? []))
-          .filter((check) => check.flagged && check.finding)
-          .map((check) => [check.id, {
-            id: check.id,
-            orderId: order.id,
-            runId: order.runId,
-            candidateId: order.candidateId,
-            symbol: order.underlyingSymbol ?? order.symbol,
-            kind: check.checkType === "thesis_invalidation" ? "invalidation" as const : "material_change" as const,
-            finding: check.finding!,
-            checkedAt: check.checkedAt,
-          }] as const))).values()),
+        monitoringFindings: deskMonitoringFindings(monitoredOrders, monitoringByCandidate),
         checks: {
+          issues: sourceIssues,
           state: unavailableSources || monitoringIncomplete ? "partial" : unknownMonitoring ? "stale" : "complete",
           asOf: now,
           monitoringAsOf,

@@ -17,6 +17,7 @@ import {
   Sheet,
   SheetContent,
   SheetTrigger,
+  SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import {
@@ -672,6 +673,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Open navigation menu"
                   className="md:hidden h-11 w-11 text-[var(--sh-fg-2)]"
                 >
                   <Menu className="w-4 h-4" />
@@ -679,17 +681,18 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
               </SheetTrigger>
               <SheetContent
                 side="right"
-                className="w-72 bg-[var(--paper)] border-[var(--rule)] p-0"
+                aria-describedby={undefined}
+                className="w-72 max-w-full bg-[var(--paper)] border-[var(--rule)] p-0 [&>button]:min-h-11 [&>button]:min-w-11 [&>button]:flex [&>button]:items-center [&>button]:justify-center motion-reduce:animate-none motion-reduce:transition-none"
               >
                 <div className="flex flex-col h-full">
                   {/* Mobile nav header */}
                   <div className="px-6 py-5 border-b border-[var(--rule)]">
-                    <p
+                    <SheetTitle
                       className="text-[11px] tracking-[0.18em] uppercase text-[var(--sh-fg-4)]"
                       style={{ fontFamily: "var(--font-mono)" }}
                     >
                       Navigation
-                    </p>
+                    </SheetTitle>
                   </div>
 
                   {/* Mobile nav items */}
@@ -705,7 +708,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                         >
                           <div
                             className={cn(
-                              "flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors cursor-pointer",
+                              "flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-md transition-colors cursor-pointer",
                               active
                                 ? "bg-[var(--bone)] text-[var(--ink)]"
                                 : "text-[var(--sh-fg-2)] hover:bg-[var(--bone)] hover:text-[var(--ink)]"
@@ -724,7 +727,7 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
                     <div className="px-4 py-4 border-t border-[var(--rule)]">
                       <button
                         onClick={() => { logout(); setMobileOpen(false); }}
-                        className="flex items-center gap-2 text-[13px] text-[var(--clay)] w-full px-3 py-2"
+                        className="flex min-h-11 items-center gap-2 text-[13px] text-[var(--clay)] w-full px-3 py-2"
                       >
                         <LogOut className="w-4 h-4" />
                         Sign out

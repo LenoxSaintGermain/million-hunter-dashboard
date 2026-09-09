@@ -95,11 +95,24 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain("showAlternatives");
     expect(execute).toContain("Choose another play in this run");
     expect(execute).toContain("setShowAlternatives(true)");
-    expect(execute).toContain("A proposal appears here only after preflight passes.");
+    expect(execute).toContain("No ticket created. Resolve the current blocker or review the measured terms above");
     expect(execute).toContain("focusCandidateId={proposalCandidate?.id}");
     expect(execute).toContain("other paper order");
     expect(execute).toContain("Monitor in Play Desk");
     expect(execute).toContain("ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired && !candidateActiveOrder)}");
+  });
+
+  it("keeps completed evidence out of the market-data recovery path", () => {
+    const form = readFileSync(resolve(process.cwd(), "client/src/components/aperture/PaperProposalForm.tsx"), "utf8");
+    const execute = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/ApertureExecute.tsx"), "utf8");
+    const board = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/CandidateBoard.tsx"), "utf8");
+    expect(form).toContain('if (readiness.action === "refresh_recipe") return void refreshRecipe()');
+    expect(form).toContain("await constructed.refetch()");
+    expect(form).toContain("A waiting trigger is not an order queued for market open");
+    expect(execute).toContain("evidenceReviewComplete={proposalEvidence?.paperProposalReady === true}");
+    expect(board).toContain("unreviewedChecks.length} unanswered question");
+    expect(board).not.toContain("{brief?.evidence.decisionCriticalCheckCount ?? 0} question");
+    expect(board).toContain("Check ticket readiness</Button>");
   });
 
   it("presents any eligible closed-session DAY submission as a broker queue instead of an evidence loop", () => {
@@ -110,7 +123,7 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain("held for the next eligible regular session");
     expect(execute).not.toContain("If the options session is closed");
     expect(execute).toContain("Accepted / queued at paper broker");
-    expect(desk).toContain("attentionDisclosure");
+    expect(desk).toContain("arbitrateTodayRead({ briefing: briefing ?? null");
     const sharedAttention = readFileSync(resolve(process.cwd(), "shared/apertureAttention.ts"), "utf8");
     expect(sharedAttention).toContain("Paper broker accepted; no fill yet");
   });

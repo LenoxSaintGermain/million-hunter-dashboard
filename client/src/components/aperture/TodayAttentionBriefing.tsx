@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CheckCircle2, Clock3, RefreshCw, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+import { AttentionDecisionCard } from "./AttentionDecisionCard";
+import { AttentionSourceRecovery } from "./AttentionSourceRecovery";
 import { arbitrateTodayRead, displayedAttentionBaseline, safeStatusError, type AttentionStatusSource, type ApertureAttentionBriefing, type ApertureAttentionItem, type ApertureMotionItem } from "@shared/apertureAttention";
 
 function localTime(value: number | null) {
@@ -10,13 +12,13 @@ function localTime(value: number | null) {
 
 function BriefRow({ item, fingerprint, changed, onOpen }: { item: ApertureAttentionItem | ApertureMotionItem; fingerprint?: string; changed?: boolean; onOpen: (href: string) => void }) {
   const attention = "actionLabel" in item;
+  if (attention) return <AttentionDecisionCard item={item} fingerprint={fingerprint} onOpen={onOpen} />;
   return <article data-attention-key={item.key} data-attention-fingerprint={fingerprint} className="flex flex-col gap-3 border-t px-4 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)" }}>
     <div className="min-w-0">
       <p className="text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>{item.stateLabel}{changed ? " · Changed since your last review" : ""}</p>
-      <p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{attention ? item.title : `${item.symbol} · ${item.detail}`}</p>
-      {attention && <p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{item.reason}</p>}
+      <p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{`${item.symbol} · ${item.detail}`}</p>
     </div>
-    <Button variant="outline" size="sm" className="min-h-11 shrink-0 whitespace-normal" onClick={() => onOpen(item.href)}>{attention ? item.actionLabel : "View status"}<ArrowRight className="ml-2 h-3.5 w-3.5 shrink-0" /></Button>
+    <Button variant="outline" size="sm" className="min-h-11 shrink-0 whitespace-normal" onClick={() => onOpen(item.href)}>View status<ArrowRight className="ml-2 h-3.5 w-3.5 shrink-0" /></Button>
   </article>;
 }
 
@@ -107,7 +109,7 @@ export function TodayAttentionBriefing({
   const notice = read.state === "loading" ? { title: "Loading the last recorded briefing…", detail: "Existing work is unchanged. Wait for saved status before choosing a next step." }
     : read.state === "refreshing" ? { title: "Refreshing recorded status.", detail: "The last successful briefing remains below; it is not a current all-clear. The refresh is already in progress." }
       : read.state === "failed" ? { title: "Current status could not be verified.", detail: `An empty result is not treated as an all-clear.${attention ? " Last successful records remain below." : ""} Retry status refresh to reconcile what is available.` }
-        : read.state === "partial" ? { title: "Status is partially available.", detail: "Review the available records below. Missing sources may hide other decisions; refresh status to retry them." }
+        : read.state === "partial" ? { title: "Status is partially available.", detail: attention?.sourceIssues?.length ? `${Array.from(new Set(attention.sourceIssues.map(issue => issue.source === "monitoring" ? "Monitoring" : issue.label))).join(" · ")} needs verification. Recovery below.` : "Missing source not identified in this saved snapshot. Refresh status to identify the gap." }
           : read.state === "stale" ? { title: "Recorded status is stale.", detail: "The last successful records remain below. Refresh status before relying on current eligibility." }
             : read.state === "empty" ? { title: "No verified briefing is available.", detail: "Refresh status to retrieve recorded work. This does not mean no work exists." } : null;
   const failedDetail = failed && read.state !== "refreshing" && read.state !== "loading"
@@ -128,14 +130,11 @@ export function TodayAttentionBriefing({
     </div>}
 
     {attention && <>
-      {primary ? <div data-attention-key={primary.key} data-attention-fingerprint={fingerprints.get(primary.key)} className="p-4 sm:p-5" style={{ background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" }}>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="max-w-3xl"><p className="text-xs font-semibold" style={{ color: primary.critical ? "var(--sh-red)" : "var(--sh-signal)" }}>{primary.stateLabel}</p><h2 className="mt-1 font-serif text-2xl">{primary.title}</h2><p className="mt-2 text-sm leading-6">{primary.reason}</p><p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Why this matters:</strong> {primary.consequence}</p></div>
-          <Button className="min-h-11 shrink-0 whitespace-normal" disabled={primary.kind === "status_unavailable" && loading} onClick={() => openTask(primary)}>{primary.actionLabel}<ArrowRight className="ml-2 h-4 w-4 shrink-0" /></Button>
-        </div>
-      </div> : quiet ? <div data-quiet-status className="flex gap-3 p-4"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div><p className="font-semibold">No new action identified.</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.quietMessage}</p></div></div> : null}
+      {primary ? <AttentionDecisionCard item={primary} prominent fingerprint={fingerprints.get(primary.key)} busy={primary.kind === "status_unavailable" && loading} onOpen={() => openTask(primary)} /> : quiet ? <div data-quiet-status className="flex gap-3 p-4"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div><p className="font-semibold">No new action identified.</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.quietMessage}</p></div></div> : null}
 
       {(layout?.otherCritical.length ?? 0) > 0 && <section aria-label="Other critical issues" className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">Other critical issues · {layout!.otherCritical.length}</h2><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>All authorized plays, regardless of thesis or instrument filters.</p></div>{layout!.otherCritical.map(row)}</section>}
+
+      <AttentionSourceRecovery issues={attention.sourceIssues ?? []} onOpen={onOpen} onRetry={onRetry} busy={read.busy} />
 
       {(layout?.otherAttention.length ?? 0) > 0 && <details open={tasksOpen} onToggle={event => setTasksOpen(event.currentTarget.open)} className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Other pending decisions · {layout!.otherAttention.length}</summary>{tasksOpen && layout!.otherAttention.map(row)}</details>}
 

@@ -1,3 +1,6 @@
+import { monitoringFindingPresentation, type MonitoringInstrumentContext } from "./monitoringState";
+import { paperInstrumentDisplayLabel, parseOccOptionSymbol } from "./paperInstrument";
+
 export type ApertureEntryState = "start" | "resume" | "check_in";
 export type AttentionReadState = "loading" | "empty" | "stale" | "partial" | "failed" | "complete";
 
@@ -31,7 +34,7 @@ export type AttentionEvidenceTask = {
   updatedAt: number;
 };
 
-export type AttentionOrder = {
+export type AttentionOrder = MonitoringInstrumentContext & {
   id: number;
   runId: number;
   candidateId: number | null;
@@ -72,6 +75,21 @@ export type AttentionMonitoringFinding = {
   kind: "invalidation" | "material_change";
   finding: string;
   checkedAt: number;
+  checkType?: string;
+  citations?: unknown;
+  instrument?: MonitoringInstrumentContext | null;
+  rationale?: string | null;
+};
+
+export type AttentionSourceIssue = {
+  source: AttentionStatusSource | "monitoring" | "positions";
+  state: "unavailable" | "missing" | "stale";
+  label: string;
+  impact: string;
+  lastSuccessAt: number | null;
+  actionLabel: string;
+  href: string | null;
+  recovery: "refresh_status" | "review_checks" | "inspect_record";
 };
 
 export type ApertureAttentionInput = {
@@ -92,6 +110,7 @@ export type ApertureAttentionInput = {
     monitoringAsOf?: number | null;
     monitoring: "on_demand" | "scheduled";
     error?: string | null;
+    issues?: AttentionSourceIssue[];
   };
 };
 
@@ -120,6 +139,7 @@ export type ApertureAttentionItem = {
   updatedAt: number;
   critical: boolean;
   deadlineAt?: number | null;
+  evidence?: { finding: string; citations: string[]; checkedAt: number; rationale: string | null };
 };
 
 export type ApertureMotionItem = {
@@ -152,6 +172,7 @@ export type ApertureAttentionBriefing = {
   quietMessage: string | null;
   baseline: ApertureAttentionBaseline;
   baselineToken: string;
+  sourceIssues?: AttentionSourceIssue[];
 };
 
 function canonical(value: unknown): string {
@@ -517,15 +538,21 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     if (!findings.has(key) || findings.get(key)!.checkedAt < finding.checkedAt) findings.set(key, finding);
   }
   for (const [key, finding] of Array.from(findings.entries())) {
+    const order = input.orders.find(order => order.id === finding.orderId);
+    const presentation = monitoringFindingPresentation({
+      check: { ...finding, flagged: true, citations: finding.citations },
+      instrument: finding.instrument ?? order, rationale: finding.rationale, now: input.now,
+    });
     attention.push(item({
       key,
       kind: "invalidation_evidence",
       priority: finding.kind === "invalidation" ? 100 : 92,
       symbol: finding.symbol,
       stateLabel: finding.kind === "invalidation" ? "Invalidation evidence" : "Material change",
-      title: `Review what changed for ${finding.symbol}`,
-      reason: finding.finding,
-      consequence: "This may change whether the recorded play thesis still holds; it does not trigger an automatic exit.",
+      title: `Review ${presentation.label}`,
+      reason: presentation.summary,
+      consequence: presentation.implication,
+      evidence: presentation.evidence,
       actionLabel: "Review what changed",
       href: `/aperture/run/${finding.runId}/execute?candidate=${finding.candidateId ?? ""}&lifecycle=monitoring`,
       updatedAt: finding.checkedAt,
@@ -589,7 +616,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       kind: "review_due",
       priority: 80,
       stateLabel: review.kind === "gate_review" ? "Gate review due" : "Outcome review due",
-      title: review.title,
+      title: attentionReviewTitle(review.title),
       reason: "The recorded review time has arrived.",
       consequence: "This is a human checkpoint, not proof that an automatic check or exit occurred.",
       actionLabel: review.kind === "gate_review" ? "Review the exact gate" : "Review recorded outcome",
@@ -614,7 +641,10 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
 
   const baselineItems = [...attention, ...updates, ...inMotion].map((record) => {
     const { updatedAt: _updatedAt, ...material } = record;
-    return { key: record.key, fingerprint: attentionFingerprint(material) };
+    // New check timestamps alone are not new findings; the full text/source set remains material.
+    const comparable = "evidence" in material && material.evidence
+      ? { ...material, evidence: { ...material.evidence, checkedAt: 0 } } : material;
+    return { key: record.key, fingerprint: attentionFingerprint(comparable) };
   });
   const baseline: ApertureAttentionBaseline = { capturedAt: input.now, items: baselineItems };
   const baselineToken = attentionBaselineToken(baseline);
@@ -631,7 +661,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
   const noTrade = input.underwriting?.state === "complete" && input.underwriting.outcome === "no_trade" ? input.underwriting : null;
   const noTradeCondition = noTrade?.reopenCondition?.trim();
   const nextCheckpoint = nextReview && (!nextPlay || nextReview.dueAt <= (nextPlay.reviewAt ?? Infinity))
-    ? { title: nextReview.title, detail: "Recorded human review time", at: nextReview.dueAt, href: nextReview.href }
+    ? { title: attentionReviewTitle(nextReview.title), detail: "Recorded human review time", at: nextReview.dueAt, href: nextReview.href }
     : nextPlay
       ? { title: `${nextPlay.symbol} review`, detail: nextPlay.detail, at: nextPlay.reviewAt ?? null, href: nextPlay.href }
       : noTrade && noTradeCondition
@@ -671,5 +701,14 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     quietMessage: quiet ? `Recorded status as of ${asOf}.` : null,
     baseline,
     baselineToken,
+    sourceIssues: input.checks.issues ?? [],
   };
+}
+
+/** Persisted OCC identity is formatted, not replaced with an inferred instrument. */
+export function attentionReviewTitle(title: string): string {
+  return title.replace(/\b[A-Z]{1,6}\d{6}[CP]\d{8}\b/g, symbol => {
+    const parsed = parseOccOptionSymbol(symbol);
+    return parsed ? paperInstrumentDisplayLabel({ symbol, instrumentType: parsed.instrumentType }) : symbol;
+  });
 }

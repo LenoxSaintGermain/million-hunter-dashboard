@@ -9,7 +9,8 @@ import { aperturePathForFixture, readIsolatedUatCase, readIsolatedUatIdentity } 
 import { easternDateTimeInputFromEpoch, easternDateTimeInputToEpoch } from "@shared/easternMarketTime";
 import { canonicalThesisLabel } from "@shared/canonicalThesisLabel";
 import { initialMissionSection, missionSectionReducer, missionDraftFingerprint, missionDraftSaveState, validMissionHorizonCollection, validReceiptHorizonShape, replacePrimaryMissionHorizon, type MissionDraftRecord, type MissionDraftValues } from "@shared/apertureMissionDraft";
-import type { TargetFeasibility } from "@shared/playUnderwriting";
+import type { TargetFeasibility, UnderwritingRiskPolicy } from "@shared/playUnderwriting";
+import { STALE_ACCOUNT_MS, type CockpitHeadroomLine } from "@shared/cockpitRailSummary";
 import { ArgumentRail, BasisMark, StateMark, TypedStatusStrip, type WorkflowState } from "./DecisionVisualLanguage";
 import { ContextHelp } from "./ContextHelp";
 import { PlayUnderwritingBrief } from "./PlayUnderwritingBrief";
@@ -672,6 +673,28 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     && !runUnderwriting.error;
   const feasibilityForDisplay = persistedUnderwritingLoading ? null : underwritingComplete ? underwritingResult?.feasibility ?? previewFeasibility : previewFeasibility;
   const effectiveRiskSummary = missionEffectiveRiskSummary(feasibilityForDisplay);
+  // Inspect current limits without editing the draft, navigating away, or
+  // mixing another account's cached cockpit with the selected account.
+  const previewForAccount = authoritativePreview.data?.account.id === paperAccount?.id ? authoritativePreview.data : null;
+  const cockpitForAccount = cockpit.data?.account.accountId === paperAccount?.id ? cockpit.data : null;
+  const riskInspection: MissionRiskInspectionContext = {
+    accountId: paperAccount?.id ?? null,
+    accountLabel: paperAccount?.label ?? "No paper account selected",
+    accountAsOf: previewForAccount?.account.lastSyncedAt ?? paperAccount?.lastSyncedAt ?? null,
+    calculationAsOf: previewForAccount?.asOf ?? null,
+    calculationBasis: "Current mission preview",
+    feasibility: previewForAccount?.feasibility ?? null,
+    risk: previewForAccount?.risk ?? null,
+    loading: authoritativePreview.isFetching || cockpit.isFetching,
+    failed: authoritativePreview.isError || cockpit.isError,
+    lines: cockpitForAccount?.headroom.lines ?? [],
+    headroomAsOf: cockpitForAccount?.generatedAt ?? null,
+  };
+  const refreshRiskInspection = () => {
+    if (!paperAccount) return;
+    void cockpit.refetch();
+    if (missionConfigured) void authoritativePreview.refetch();
+  };
   const feasibilityHasExplicitTarget = feasibilityForDisplay?.targetProfitCents != null && feasibilityForDisplay.targetPeriod != null;
   const primaryActionBlocker = missionContextError
     ? "Saved context is unavailable. Refresh saved context; your visible edits will not be replaced."
@@ -817,7 +840,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
             <MoneyField label="Max planned loss" value={maxLoss} onChange={(value) => { setMaxLoss(value); setUnderwritingDirty(true); }} help={`${capitalCents > 0 ? `${((parseMoney(maxLoss) / capitalCents) * 100).toFixed(1)}% of mission capital` : "Can tighten, never loosen"}`} />
           </div>{!missionConfigured && <div role="status" className="mt-2 rounded-lg border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Mission not configured.</strong> Enter Capital and Max planned loss above $0. Preserve cash is a separate recorded decision.</div>}</section>
           {branch === "research" && targetStretchPct != null && explicitTargetProfitCents != null && <div className="flex flex-col gap-2 rounded-lg border px-3 py-3 text-xs" style={{ borderColor: sameSessionStretch ? "var(--sh-red)" : "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-serif text-lg" style={{ color: "var(--sh-text-primary)" }}>+{formatCents(explicitTargetProfitCents)} · +{targetStretchPct.toFixed(0)}% · aspiration</p><BasisMark basis="aspirational" label="Aspirational" /></div><p>Research may conclude that no qualifying play reaches this value within the declared risk limit.{sameSessionStretch ? " Same-session stretch requires horizon verification." : ""}</p></div>}
-          <p className="text-xs font-semibold" style={{ color: "var(--sh-fg-muted)" }}>Target feasibility · {underwritingComplete ? "completed result" : "before underwriting"}</p><MissionReviewFeasibility feasibility={feasibilityForDisplay} enteredLossCents={parseMoney(maxLoss)} normalPolicyPct={cockpit.data?.mandate.maxPlannedRiskPctPerPlay ?? null} policyVersion={cockpit.data?.mandate.version ?? null} accountCeilingCents={plannedRiskCeiling} openRiskCents={previewPortfolioRisk?.beforeCents ?? null} remainingHeadroomCents={previewPortfolioRisk?.remainingHeadroomCents ?? null} onInspect={() => setShowTune(true)} />
+          <p className="text-xs font-semibold" style={{ color: "var(--sh-fg-muted)" }}>Target feasibility · {underwritingComplete ? "completed result" : "before underwriting"}</p><MissionReviewFeasibility feasibility={feasibilityForDisplay} enteredLossCents={parseMoney(maxLoss)} normalPolicyPct={cockpit.data?.mandate.maxPlannedRiskPctPerPlay ?? null} policyVersion={cockpit.data?.mandate.version ?? null} accountCeilingCents={plannedRiskCeiling} openRiskCents={previewPortfolioRisk?.beforeCents ?? null} remainingHeadroomCents={previewPortfolioRisk?.remainingHeadroomCents ?? null} inspection={riskInspection} onInspect={refreshRiskInspection} />
 
         {missionConfigured && authoritativePreview.isLoading && !underwritingComplete && <p role="status" aria-live="polite" className="rounded-lg border p-3 text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Checking the effective account and portfolio constraint…</p>}
         {missionConfigured && authoritativePreview.isError && !underwritingComplete && <p role="alert" className="rounded-lg border p-3 text-xs leading-5" style={{ borderColor: "var(--sh-red)", color: "var(--sh-red)" }}>The effective portfolio constraint could not be verified. Your current inputs remain visible; check draft status above. Underwriting is withheld until the constraint can be verified.</p>}
@@ -835,7 +858,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
 
           <div hidden={visibleMissionSection !== 3}><section id="mission-disposition" aria-labelledby="mission-section-review" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>3 · Review & underwrite</p><h2 id="mission-section-review" className="mt-1 text-sm font-semibold">Confirm the mission before analysis.</h2><dl className="mt-3 grid gap-px overflow-hidden rounded-lg border text-xs sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}><ReceiptFact label="Thesis" value={canonicalThesisLabel(activeThesis)} /><ReceiptFact label="Capital / instruments" value={`${formatCents(capitalCents)} · ${instrument === "either" ? "Shares or options" : instrument}`} /><ReceiptFact label="Target / effective risk" value={`${explicitTargetProfitCents != null ? `${formatCents(explicitTargetProfitCents)} / ${targetPeriod}` : "No explicit target"} · ${effectiveRiskSummary}`} /></dl><p className="mt-3 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Choose how to finish setup. Underwriting builds a research playbook; it does not create or submit an order.</p>
             <MissionHorizonSummary primary={holdingPeriod} underwriting={holdingPeriods} onUsePrimary={() => { markDraftEdited(); setHoldingPeriods([holdingPeriod]); setUnderwritingDirty(true); setRevisingReceipt(true); }} />
-            {branch === "research" && <MissionReviewFeasibility feasibility={feasibilityForDisplay} enteredLossCents={parseMoney(maxLoss)} normalPolicyPct={cockpit.data?.mandate.maxPlannedRiskPctPerPlay ?? null} policyVersion={cockpit.data?.mandate.version ?? null} accountCeilingCents={plannedRiskCeiling} openRiskCents={previewPortfolioRisk?.beforeCents ?? null} remainingHeadroomCents={previewPortfolioRisk?.remainingHeadroomCents ?? null} onInspect={() => openDiagnostic("risk")} />}
+            {branch === "research" && <MissionReviewFeasibility feasibility={feasibilityForDisplay} enteredLossCents={parseMoney(maxLoss)} normalPolicyPct={cockpit.data?.mandate.maxPlannedRiskPctPerPlay ?? null} policyVersion={cockpit.data?.mandate.version ?? null} accountCeilingCents={plannedRiskCeiling} openRiskCents={previewPortfolioRisk?.beforeCents ?? null} remainingHeadroomCents={previewPortfolioRisk?.remainingHeadroomCents ?? null} inspection={riskInspection} onInspect={refreshRiskInspection} />}
             {changedAssumptions.length > 0 && <section className="mt-4 rounded-lg border p-3 text-sm" style={{ borderColor: "var(--sh-signal)" }}><h3 className="font-semibold">Review changed assumptions</h3><dl className="mt-2 space-y-3">{changedAssumptions.map((item) => <div key={item.label}><dt className="font-semibold">{item.label}</dt><dd className="mt-1 break-words"><span style={{ color: "var(--sh-fg-muted)" }}>{item.before}</span> → {item.after}</dd></div>)}</dl><p className="mt-3 leading-6">A new Mission revision will re-evaluate eligibility. Existing orders, approvals, and history remain unchanged.</p><label className="mt-2 flex min-h-11 items-center gap-2"><input type="checkbox" checked={!needsRevisionReview} onChange={(event) => setReviewedAssumptions(event.target.checked ? assumptionFingerprint : null)} />I reviewed these changed assumptions</label></section>}
             <div data-draft-edit className="mt-3 grid gap-2 sm:grid-cols-3">{([
               { id: "research", label: "Search for a play", icon: FileSearch },
@@ -893,8 +916,11 @@ function DraftDifference({ local, remote }: { local: MissionDraftValues; remote:
   return <dl className="mt-3 divide-y rounded-lg border px-3" style={{ borderColor: "var(--sh-border-1)" }}>{changed.map((key) => <div key={key} className="py-3"><dt className="font-semibold">{key.replace(/([A-Z])/g, " $1")}</dt><dd className="mt-1 break-words"><strong>Saved:</strong> {display(remote[key])}</dd><dd className="mt-1 break-words"><strong>Your edits:</strong> {display(local[key])}</dd></div>)}{changed.length === 0 && <div className="py-3">Both versions contain the same input. Accept the saved version to continue.</div>}</dl>;
 }
 
-export function MissionReviewFeasibility({ feasibility, enteredLossCents, normalPolicyPct, policyVersion = null, accountCeilingCents = null, openRiskCents = null, remainingHeadroomCents, onInspect }: { feasibility: TargetFeasibility | null; enteredLossCents: number; normalPolicyPct: number | null; policyVersion?: string | null; accountCeilingCents?: number | null; openRiskCents?: number | null; remainingHeadroomCents: number | null; onInspect: () => void }) {
-  if (!feasibility) return <section role="status" className="mt-4 rounded-lg border p-3 text-sm" style={{ borderColor: "var(--sh-signal)" }}><p>Effective risk and target feasibility are not verified yet. No analysis can start while the saved constraint is unavailable.</p><Button variant="outline" className="mt-2 min-h-11" onClick={onInspect}>Inspect account & risk</Button></section>;
+export function MissionReviewFeasibility({ feasibility, enteredLossCents, normalPolicyPct, policyVersion = null, accountCeilingCents = null, openRiskCents = null, remainingHeadroomCents, inspection, onInspect }: { feasibility: TargetFeasibility | null; enteredLossCents: number; normalPolicyPct: number | null; policyVersion?: string | null; accountCeilingCents?: number | null; openRiskCents?: number | null; remainingHeadroomCents: number | null; inspection?: MissionRiskInspectionContext; onInspect: () => void }) {
+  const disclosure = inspection
+    ? <>{(inspection.loading || inspection.failed) && <p role="status" className="mt-2 leading-6" style={{ color: "var(--sh-signal)" }}>{inspection.loading ? "Refreshing constraints." : "Constraint refresh failed."} Recorded values remain visible; current eligibility is not confirmed.</p>}<MissionRiskInspection context={inspection} enteredLossCents={enteredLossCents} policyVersion={policyVersion} onRefresh={onInspect} /></>
+    : <Button variant="outline" className="mt-2 min-h-11" onClick={onInspect}>{feasibility ? "Inspect effective constraint" : "Inspect account & risk"}</Button>;
+  if (!feasibility) return <section className="mt-4 rounded-lg border p-3 text-sm" style={{ borderColor: "var(--sh-signal)" }}><p role="status">Effective risk and target feasibility are not verified yet. No analysis can start while the saved constraint is unavailable.</p>{disclosure}</section>;
   const hasTarget = feasibility.targetProfitCents != null && feasibility.targetPeriod != null;
   const policyCents = normalPolicyPct == null ? null : Math.floor(feasibility.capitalBaseCents * normalPolicyPct / 100);
   const policyBinds = policyCents != null && policyCents === feasibility.riskBudgetCents && policyCents < enteredLossCents;
@@ -906,8 +932,69 @@ export function MissionReviewFeasibility({ feasibility, enteredLossCents, normal
     <p className="mt-2 leading-6" style={{ color: "var(--sh-fg-muted)" }}>{policyBinds ? `The normal-play policy caps risk at ${normalPolicyPct}% of your ${formatCents(feasibility.capitalBaseCents)} declared capital (${formatCents(policyCents)}).` : remainingHeadroomCents === 0 ? "Existing open risk has exhausted the aggregate portfolio headroom." : "The smallest measured mission, normal-play policy, account, aggregate, or loss headroom limit controls."} Your entered loss limit has not been changed.</p>
     {policyVersion != null && <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Policy source: loaded account mandate {policyVersion}. {normalPolicyPct != null ? `Normal-play setting: ${normalPolicyPct}% of declared mission capital, not total account value.` : "Normal-play setting unavailable."}{accountCeilingCents != null ? ` Account ceiling: ${formatCents(accountCeilingCents)}; a higher ceiling does not override the effective limit above.` : ""}</p>}
     {openRiskCents != null && remainingHeadroomCents != null && <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Aggregate open risk: {formatCents(openRiskCents)}. Remaining aggregate headroom: {formatCents(remainingHeadroomCents)}.</p>}
-    <Button variant="outline" className="mt-2 min-h-11" onClick={onInspect}>Inspect effective constraint</Button>
+    {disclosure}
   </section>;
+}
+
+type MissionRiskInspectionContext = {
+  accountId: number | null;
+  accountLabel: string;
+  accountAsOf: number | null;
+  calculationAsOf: number | null;
+  calculationBasis: string;
+  feasibility: TargetFeasibility | null;
+  risk: UnderwritingRiskPolicy | null;
+  loading: boolean;
+  failed: boolean;
+  lines: CockpitHeadroomLine[];
+  headroomAsOf: number | null;
+};
+
+function RiskTimestamp({ at }: { at: number | null }) {
+  return at == null ? <>Not measured</> : <time dateTime={new Date(at).toISOString()}>{new Date(at).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" })} ET</time>;
+}
+
+export function MissionRiskInspection({ context, enteredLossCents, policyVersion, onRefresh }: { context: MissionRiskInspectionContext; enteredLossCents: number; policyVersion: string | null; onRefresh: () => void }) {
+  const { feasibility, risk } = context;
+  const capitalCents = feasibility?.capitalBaseCents ?? null;
+  const normalCents = capitalCents != null && risk ? Math.floor(capitalCents * risk.normalPlayRiskPct / 100) : null;
+  const aggregateUsed = risk?.aggregateOpenRiskBeforeCents ?? null;
+  const aggregateRemaining = feasibility && aggregateUsed != null ? Math.max(0, feasibility.maxOpenRiskCents - aggregateUsed) : null;
+  const weeklyUsed = risk?.weeklyLossUsedCents ?? null;
+  const weeklyRemaining = feasibility && weeklyUsed != null ? Math.max(0, feasibility.lossLimitCents - weeklyUsed) : null;
+  const limits = [
+    { label: "Mission planned-loss limit", value: enteredLossCents, basis: "Operator-declared; unchanged by inspection" },
+    { label: "Normal-play policy", value: normalCents, basis: normalCents == null ? "Policy calculation unavailable" : `${risk!.normalPlayRiskPct}% × ${formatCents(capitalCents)} = ${formatCents(normalCents)}` },
+    { label: "Account per-play ceiling", value: risk?.perPlayHeadroomCents ?? null, basis: "Loaded account mandate and account snapshot" },
+    { label: "Aggregate risk headroom", value: aggregateRemaining, basis: aggregateRemaining == null ? "Open-risk calculation unavailable" : `${formatCents(feasibility!.maxOpenRiskCents)} − ${formatCents(aggregateUsed)} = ${formatCents(aggregateRemaining)} (floor at $0)` },
+    { label: "Loss-budget headroom", value: weeklyRemaining, basis: weeklyRemaining == null ? "Loss-budget calculation unavailable" : `${formatCents(feasibility!.lossLimitCents)} − ${formatCents(weeklyUsed)} = ${formatCents(weeklyRemaining)} (floor at $0). Uses the server's recorded loss-budget usage; not verified weekly realized P&L.` },
+  ];
+  const binding = feasibility ? limits.filter(line => line.value === feasibility.riskBudgetCents).map(line => line.label) : [];
+  return <details data-risk-inspection className="mt-3 rounded-lg border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+    <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Inspect effective constraint</summary>
+    <div className="space-y-3 border-t p-3 text-sm leading-6" style={{ borderColor: "var(--sh-border-1)" }}>
+      <p className="font-semibold">{context.accountLabel} · Paper{context.accountId != null ? ` · Account #${context.accountId}` : ""}</p>
+      <p style={{ color: "var(--sh-fg-muted)" }}>Account snapshot as of <RiskTimestamp at={context.accountAsOf} />. {context.calculationBasis} as of <RiskTimestamp at={context.calculationAsOf} />.</p>
+      {context.accountAsOf != null && context.calculationAsOf != null && context.calculationAsOf - context.accountAsOf > STALE_ACCOUNT_MS && <p style={{ color: "var(--sh-signal)" }}>Account snapshot was stale at calculation time. Refreshing constraints reads saved account data; sync the paper account before relying on current capacity.</p>}
+      <p><strong>Effective normal-play risk: {formatCents(feasibility?.riskBudgetCents)}.</strong> {binding.length ? `Binding: ${binding.join(" and ")}.` : "The binding limit is not fully measured here."}</p>
+      <p>The smallest applicable measured limit controls. Policy {policyVersion ?? "not available"}; declared mission capital {formatCents(capitalCents)} is not total account equity.</p>
+      <dl className="divide-y" style={{ borderColor: "var(--sh-border-1)" }}>{limits.map(line => <div key={line.label} className="py-2">
+        <dt className="flex flex-wrap justify-between gap-2 font-semibold"><span>{line.label}</span><span className="tabular-nums">{formatCents(line.value)}</span></dt>
+        <dd style={{ color: "var(--sh-fg-muted)" }}>{line.basis}</dd>
+      </div>)}</dl>
+      <p style={{ color: "var(--sh-fg-muted)" }}>This preview does not set an event-specific limit. Exact play, liquidity, concentration, and ticket checks still apply. Planned loss at a share stop is not a guaranteed maximum loss.</p>
+      <h4 className="font-semibold">Portfolio constraints</h4>
+      <p style={{ color: "var(--sh-fg-muted)" }}>Cockpit snapshot as of <RiskTimestamp at={context.headroomAsOf} />. These are account limits, not additional mission capital; notional capacity is distinct from planned-loss capacity.</p>
+      {context.lines.length ? <dl className="divide-y">{context.lines.map(line => <div key={line.key} className="py-2">
+        <dt className="font-semibold">{line.label}{line.subject ? ` · ${line.subject}` : ""}</dt>
+        <dd>Used {formatCents(line.usedCents)} · Limit {formatCents(line.ceilingCents)} · Remaining {formatCents(line.remainingCents)}</dd>
+        <dd style={{ color: "var(--sh-fg-muted)" }}>Basis: {line.basis.replaceAll("_", " ")}.{line.reason ? ` ${line.reason}` : ""}</dd>
+      </div>)}</dl> : <p>Portfolio headroom not measured. Refresh constraints to inspect it.</p>}
+      <p>Your saved inputs, account selection, approvals, and orders remain unchanged.</p>
+      <Button type="button" variant="outline" className="min-h-11" aria-disabled={context.loading || context.accountId == null} onClick={() => { if (!context.loading && context.accountId != null) onRefresh(); }}>Refresh constraints</Button>
+      {context.accountId == null && <p>Select a paper account in this Mission before refreshing.</p>}
+    </div>
+  </details>;
 }
 
 function ReceiptFact({ label, value }: { label: string; value: string }) {

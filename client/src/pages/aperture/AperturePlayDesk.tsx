@@ -7,10 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import { AttentionDecisionCard } from "@/components/aperture/AttentionDecisionCard";
+import { AttentionSourceRecovery } from "@/components/aperture/AttentionSourceRecovery";
 import { buildResearchJourneys } from "@shared/runWorkspace";
 import { playDeskJourneyLane } from "@shared/playDeskState";
 import { isOptionInstrument, paperInstrumentDisplayLabel, parseOccOptionSymbol } from "@shared/paperInstrument";
-import { attentionDisclosure, canShowQuietBriefing, type ApertureAttentionBriefing, type ApertureAttentionItem } from "@shared/apertureAttention";
+import { arbitrateTodayRead, canShowQuietBriefing, type ApertureAttentionBriefing, type ApertureAttentionItem } from "@shared/apertureAttention";
 
 const money = (cents?: number | null) => cents == null
   ? "—"
@@ -103,7 +105,8 @@ export default function AperturePlayDesk() {
   const outcomes = trpc.aperture.runway.pending.useQuery(undefined, { retry: false });
   const [primaryKey, setPrimaryKey] = useState<string | null>(null);
   const briefing = desk.data?.attention;
-  const disclosure = briefing ? attentionDisclosure(briefing, primaryKey) : null;
+  const read = arbitrateTodayRead({ briefing: briefing ?? null, refreshing: desk.isFetching, failed: !!desk.error, primaryKey });
+  const disclosure = read.layout;
   useEffect(() => {
     if (disclosure?.primary) setPrimaryKey(disclosure.primary.key);
   }, [disclosure?.primary?.key]);
@@ -162,14 +165,14 @@ export default function AperturePlayDesk() {
 
     <div id="desk-refresh-scope" role="status" aria-live="polite" className="text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
       {isRefreshing ? "Loading recorded status. Existing records stay visible. " : desk.dataUpdatedAt ? `Status loaded ${new Date(desk.dataUpdatedAt).toLocaleString()}. ` : "Status has not loaded yet. "}
-      Refresh reads saved records; it does not run market or broker checks. {briefing?.scopeNote}
+      Refresh reads saved records; it does not run market or broker checks.
     </div>
     {unavailable.length > 0 && <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}>
       {unavailable.map(({ label, query }) => <div key={label} className="mb-3 last:mb-0"><p className="font-semibold">{label} status unavailable</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{query.data != null ? "Refresh failed. Last known records remain visible; they may be stale." : "This part of the desk could not be verified."}</p></div>)}
       <p className="text-sm">This is not an all-clear. Refresh status to retry; no order will be resubmitted.</p>
       <Button variant="outline" className="mt-3 min-h-11" onClick={refresh} disabled={isRefreshing}>Retry status</Button>
     </section>}
-    {briefing && briefing.readState !== "complete" && <section role="status" className="rounded-xl border p-4 text-sm leading-6" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}><p className="font-semibold">Recorded checks: {briefing.readState}. Status is not an all-clear.</p><p>{briefing.scopeNote} Open the relevant play to review missing or stale evidence.</p></section>}
+    {briefing && read.state !== "complete" && <section role="status" className="rounded-xl border px-4 py-3 text-sm leading-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}><p className="font-semibold">Recorded checks: {read.state}. Status is not an all-clear.</p>{!briefing.sourceIssues?.length && <p>Missing source not identified in this saved snapshot. Refresh status to identify the gap.</p>}</section>}
 
     <section id="desk-attention" aria-label="Attention across all plays" className="space-y-3">
       {disclosure?.primary && <AttentionTask item={disclosure.primary} prominent onOpen={navigate} />}
@@ -177,6 +180,8 @@ export default function AperturePlayDesk() {
       {outsideFilters.length > 0 && <p role="status" className="text-sm leading-6" style={{ color: "var(--sh-text-primary)" }}>{outsideFilters.length} critical issue{outsideFilters.length === 1 ? "" : "s"} outside these filters. Their review actions remain above. <button type="button" className="min-h-11 font-semibold underline underline-offset-4" onClick={() => navigate(playDeskFilterHref(search, { instrument: "all", stage: "all" }))}>Show all plays and stages</button></p>}
       {!!disclosure?.otherAttention.length && <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer p-3 text-sm font-semibold">Other decisions ({disclosure.otherAttention.length})</summary><div className="space-y-2 p-3 pt-0">{disclosure.otherAttention.map((item) => <AttentionTask key={item.key} item={item} onOpen={navigate} />)}</div></details>}
     </section>
+
+    <AttentionSourceRecovery issues={briefing?.sourceIssues ?? []} onOpen={navigate} onRetry={refresh} busy={desk.isFetching} />
 
     {selectedPlayId != null && <section id={`play-${selectedPlayId}`} tabIndex={-1} aria-label={`Selected play ${selectedPlayId}`} className="scroll-mt-24 rounded-xl border-2 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}>
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">Selected play · #{selectedPlayId}</h2><Button variant="outline" className="min-h-11" onClick={() => navigate(playDeskFilterHref(search, { play: null }))}>Return to filtered desk</Button></div>
@@ -224,7 +229,7 @@ export default function AperturePlayDesk() {
         const destination = actionableCandidateId == null
           ? `/aperture/run/${journey.latest.id}`
           : `/aperture/run/${journey.latest.id}?candidate=${actionableCandidateId}`;
-        return <DeskItem key={journey.rootId} eyebrow={deferred ? "Queued for next regular session" : "Ready to choose"} title={journey.thesisName} meta={deferred ? `Returns ${new Date(deferred.resumeAt!).toLocaleString()} · ${deferred.reason}` : `${journey.latest.candidateStates?.label ?? `${journey.evidenceCandidates} plays compared`} · ${formatDistanceToNow(Number(journey.latest.createdAt))} ago`} action={deferred ? "Review queue" : actionableSymbol ? `Review ${actionableSymbol}` : "Choose play"} primary={!deferred} onAction={() => navigate(deferred ? `/aperture/run/${journey.latest.id}` : destination)} />;
+        return <DeskItem key={journey.rootId} eyebrow={deferred ? "Queued for next regular session" : "Ready to choose"} title={journey.thesisName} meta={`Run #${journey.latest.id} · ${deferred ? `Returns ${new Date(deferred.resumeAt!).toLocaleString()} · ${deferred.reason}` : `${journey.latest.candidateStates?.label ?? `${journey.evidenceCandidates} plays compared`} · ${formatDistanceToNow(Number(journey.latest.createdAt))} ago`}`} action={deferred ? "Review queue" : actionableSymbol ? `Review ${actionableSymbol}` : "Choose play"} primary={!deferred} onAction={() => navigate(deferred ? `/aperture/run/${journey.latest.id}` : destination)} />;
       })}</div>
       {decisionReady.length === 0 && <p className="px-4 py-6 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>No choice-ready play in the returned research records.</p>}
     </section>}
@@ -234,12 +239,14 @@ export default function AperturePlayDesk() {
       <div className="grid gap-3 md:grid-cols-2">{visibleOrders.map((order) => {
         const state = deskOrderPresentation(order.id, briefing);
         const quantities = deskOrderQuantities(order);
+        const humanReview = deskHumanReview(order, pendingOutcomes);
         return <article key={`order-${order.id}`} id={`order-${order.id}`} className="min-w-0 rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
           <Badge variant="outline">{instrumentLabel(order.instrumentType)}</Badge><h3 className="mt-2 break-words font-serif text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{paperInstrumentDisplayLabel(order)}</h3>
           <p className="mt-2 text-sm font-semibold" style={{ color: "var(--sh-signal)" }}>{state.label}</p><p className="mt-1 text-sm leading-6">{state.detail}</p>
           {isOptionInstrument(order.instrumentType) && <p className="mt-1 break-all font-mono text-xs" style={{ color: "var(--sh-fg-muted)" }}>Raw contract · {order.symbol}</p>}
           <div className="mt-4 grid grid-cols-3 gap-3 border-y py-3" style={{ borderColor: "var(--sh-border-1)" }}><SmallValue label="Ordered" value={quantities.ordered} /><SmallValue label="Filled" value={quantities.filled} /><SmallValue label="Remaining" value={quantities.remaining} /></div>
-          <div className="mt-3 grid grid-cols-2 gap-3"><SmallValue label={isOptionInstrument(order.instrumentType) ? "Premium at risk" : "Planned loss at modeled stop"} value={money(order.plannedRiskCents)} /><SmallValue label="Review" value={order.timeStopAt ? new Date(order.timeStopAt).toLocaleString() : "Not scheduled"} /></div>
+          <div className="mt-3 grid grid-cols-2 gap-3"><SmallValue label={isOptionInstrument(order.instrumentType) ? "Premium at risk" : "Planned loss at modeled stop"} value={money(order.plannedRiskCents)} /><SmallValue label="Human review" value={humanReview ? new Date(humanReview.dueAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : outcomes.error || outcomes.data == null ? "Review status unavailable" : "No checkpoint recorded"} /></div>
+          {order.timeStopAt != null && <p className="mt-2 text-sm">Modeled time stop: {new Date(order.timeStopAt).toLocaleString()}. Not an automatic exit.</p>}
           {!isOptionInstrument(order.instrumentType) && <p className="mt-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}>Stop execution may differ from the modeled price.</p>}
           <p className="mt-3 text-sm">{order.accountLabel}</p>{order.thesisName && <p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>{order.thesisName}</p>}<Button className="mt-3 min-h-11 w-full whitespace-normal sm:w-auto" size="sm" variant="outline" onClick={() => state.href ? navigate(state.href) : refresh()}>{state.action}<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>
         </article>;
@@ -251,7 +258,7 @@ export default function AperturePlayDesk() {
 
     {stageFilter === "all" && researchBacklog.length > 0 && <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}><span>Show research backlog</span><Badge variant="outline">{researchBacklog.length}</Badge></summary>
-      <div className="divide-y border-t" style={{ borderColor: "var(--sh-border-1)" }}>{researchBacklog.map((journey) => <DeskItem key={journey.rootId} eyebrow={journey.state === "paper_stage_declined" ? "Cash / no paper stage" : journey.latest.candidateStates?.expired ? "Expired setup" : "Research follow-up"} title={journey.thesisName} meta={journey.latest.candidateStates?.label ?? `${journey.evidenceCandidates} research candidate${journey.evidenceCandidates === 1 ? "" : "s"}`} action={journey.state === "paper_stage_declined" ? "View receipt" : journey.latest.candidateStates?.expired ? "Review expiry" : "Open research"} onAction={() => navigate(`/aperture/run/${journey.latest.id}?view=evidence`)} />)}</div>
+      <div className="divide-y border-t" style={{ borderColor: "var(--sh-border-1)" }}>{researchBacklog.map((journey) => <DeskItem key={journey.rootId} eyebrow={journey.state === "paper_stage_declined" ? "Cash / no paper stage" : journey.latest.candidateStates?.expired ? "Expired setup" : "Research follow-up"} title={journey.thesisName} meta={`Run #${journey.latest.id} · ${journey.latest.candidateStates?.label ?? `${journey.evidenceCandidates} research candidate${journey.evidenceCandidates === 1 ? "" : "s"}`}`} action={journey.state === "paper_stage_declined" ? "View receipt" : journey.latest.candidateStates?.expired ? "Review expiry" : "Open research"} onAction={() => navigate(`/aperture/run/${journey.latest.id}?view=evidence`)} />)}</div>
     </details>}
   </div></DashboardLayout>;
 }
@@ -268,9 +275,15 @@ export function deskOrderQuantities(order: { qty: number | null; filledQty: numb
 }
 
 function AttentionTask({ item, prominent = false, onOpen }: { item: ApertureAttentionItem; prominent?: boolean; onOpen: (href: string) => void }) {
-  return <article className="rounded-xl border p-4" style={{ borderColor: item.critical ? "var(--sh-red)" : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--sh-signal)" }}>{prominent ? "Needs you now · " : ""}{item.stateLabel}</p><h2 className={prominent ? "mt-1 font-serif text-xl" : "mt-1 text-base font-semibold"}>{item.title}</h2><p className="mt-1 whitespace-pre-line break-words text-sm leading-6">{item.reason}</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{item.consequence}</p></div><Button variant={prominent ? "default" : "outline"} className="min-h-11 shrink-0 whitespace-normal sm:max-w-60" onClick={() => onOpen(item.href)}>{item.actionLabel}<ArrowRight className="ml-2 h-4 w-4" /></Button></div>
-  </article>;
+  return <AttentionDecisionCard item={item} prominent={prominent} onOpen={onOpen} />;
+}
+
+/** Match the persisted order identity, never another position in the same ticker. */
+export function deskHumanReview(order: { id: number; runId: number; candidateId: number | null; symbol: string }, reviews: ReadonlyArray<{ orderId?: number | null; orderRunId?: number | null; orderCandidateId?: number | null; orderSymbol?: string | null; kind: string; dueAt: number }>) {
+  return reviews.filter(review => review.kind === "play_outcome" && Number.isFinite(review.dueAt) && (review.orderId != null
+    ? review.orderId === order.id
+    : review.orderRunId === order.runId && order.candidateId != null && review.orderCandidateId === order.candidateId && review.orderSymbol === order.symbol))
+    .sort((a, b) => a.dueAt - b.dueAt)[0] ?? null;
 }
 
 function ActivePlayDetails({ play, state, compact = false }: { play: { id: number; symbol: string; instrumentType: string; accountLabel: string; thesisNote?: string | null; horizon?: string | null; asOf: number | null }; state?: string; compact?: boolean }) {

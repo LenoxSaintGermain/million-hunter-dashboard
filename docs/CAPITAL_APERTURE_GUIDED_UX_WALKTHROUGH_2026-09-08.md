@@ -176,3 +176,36 @@ Original release-blocking checklist (do not treat the local follow-up as product
 - route every active-play action to its exact task identity;
 - capture deterministic Start, Resume, quiet, partial-fill, failed-source, revision, keyboard, screen-reader, and reduced-motion journeys at the required viewport set;
 - run an observed operator walkthrough before claiming the roughly ten-second usability target.
+
+## September 9 market-open UAT repair
+
+The authenticated gap report in `docs/qa/CAPITAL_APERTURE_AUTHENTICATED_UAT_2026-09-09.md`
+remains the before-state evidence. The following behavior supersedes its failing
+interaction design, without superseding any risk or approval authority:
+
+- A completed evidence review cannot be reopened merely because an entry recipe
+  lacks current market inputs. The ticket offers an explicit in-place market-check
+  refresh, preserves recorded answers, and says that a waiting trigger is not a
+  queued order. Evidence headings count unanswered questions for the selected play.
+- Today and Play Desk use the same read-state arbitration and decision card.
+  The selected instrument, concise implication, and action lead; the complete
+  recorded finding, rationale, citations, and timestamp stay in adjacent Evidence.
+  No sentiment-to-trade recommendation is inferred from a flag or headline.
+- Source gaps name the affected monitoring/position record and recovery action.
+  Unfilled accepted orders are order-status tasks, not missing post-fill monitoring.
+  Reading saved status is distinct from deliberately running new sourced checks.
+- Human review checkpoints use the persisted order identity and are not described
+  as automatic monitoring. Same-title research cards expose their run identity.
+- Both Mission risk-inspection actions open the same adjacent calculation, named
+  account, provenance, and headroom; they do not change the draft or risk policy.
+- The mobile menu is named, keyboard accessible, and uses 44px touch controls.
+
+The monitoring API still has no dedicated finding acknowledgement/resolution
+mutation. Evidence can be explicitly opened and fresh checks requested; neither
+reading nor refreshing is labeled as an acknowledgement or automatic resolution.
+Do not claim that additional workflow is implemented.
+
+Integrated unit result before release: 1,205 passed, zero failed, six intentionally
+external/optional skips. Real authenticated desktop/mobile acceptance and production
+release receipts are recorded separately after execution; tests are not a usability
+claim and a valid zero-risk block is not a failed order-placement test.

@@ -189,7 +189,9 @@ describe("Capital Aperture attention briefing", () => {
     }), null);
 
     expect(result.primary).toMatchObject({ kind: "invalidation_evidence", symbol: "WBD" });
-    expect(result.primary?.reason).toContain("challenges");
+    expect(result.primary?.reason).toContain("needs verification");
+    expect(result.primary?.evidence?.finding).toBe("New evidence challenges the catalyst.");
+    expect(result.primary?.evidence?.citations).toEqual([]); // An uncited flag is not verified analysis.
   });
 
   it("does not force active work back into setup when a mission preference is missing", () => {
