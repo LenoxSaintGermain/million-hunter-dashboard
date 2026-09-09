@@ -3,12 +3,15 @@ import path from "path";
 
 /**
  * Schema/integration lane. These tests are never silently skipped: the setup
- * file fails immediately and explicitly when an isolated database is absent.
+ * file fails before collection unless the exact disposable DB is supplied.
+ * Run node scripts/with-isolated-integration.mjs --integration to provision,
+ * verify, and remove that DB without using production or the browser fixture.
  */
 const templateRoot = path.resolve(import.meta.dirname);
 
 export default defineConfig({
   root: templateRoot,
+  server: { host: "127.0.0.1" },
   resolve: {
     alias: {
       "@": path.resolve(templateRoot, "client", "src"),
@@ -17,6 +20,8 @@ export default defineConfig({
     },
   },
   test: {
+    environment: "node",
+    fileParallelism: false,
     include: [
       "server/aperture/activeCapitalThesisSchema.test.ts",
       "server/aperture/playOutcomeLedgerSchema.test.ts",

@@ -17,6 +17,7 @@ import {
   type InsertScanJob,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { parsePersistedJson } from "../shared/persistedJson";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -311,7 +312,8 @@ export async function getLatestScanJob() {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(scanJobs).orderBy(desc(scanJobs.createdAt)).limit(1);
-  return result[0];
+  const job = result[0];
+  return job ? { ...job, sources: parsePersistedJson(job.sources) } : undefined;
 }
 
 export async function createScanJob(data: InsertScanJob) {

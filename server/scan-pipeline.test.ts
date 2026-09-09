@@ -4,7 +4,7 @@
  * and that insert/update/select work correctly.
  */
 import { describe, it, expect } from "vitest";
-import { getDb } from "./db";
+import { getDb, getLatestScanJob } from "./db";
 import { scanJobs } from "../drizzle/schema";
 import { desc, eq } from "drizzle-orm";
 
@@ -24,9 +24,9 @@ describe("Scan Pipeline", () => {
       dealsScored: 0,
     });
 
-    // Read the most recent row back
-    const rows = await db!.select().from(scanJobs).orderBy(desc(scanJobs.id)).limit(1);
-    const job = rows[0];
+    // Exercise the actual scan.getLatest / dashboard.summary read boundary.
+    // MariaDB's JSON alias arrives as text; consumers require decoded sources.
+    const job = (await getLatestScanJob())!;
 
     expect(job).toBeDefined();
     expect(job.status).toBe("pending");
@@ -35,6 +35,7 @@ describe("Scan Pipeline", () => {
     expect(job.progressPct).toBe(2);
     expect(job.dealsScored).toBe(0);
     expect(Array.isArray(job.sources)).toBe(true);
+    expect(job.sources).toEqual(["bizbuysell", "dealstream"]);
 
     // Clean up
     await db!.delete(scanJobs).where(eq(scanJobs.id, job.id));

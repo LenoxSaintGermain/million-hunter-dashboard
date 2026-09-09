@@ -115,7 +115,11 @@ export const deals = mysqlTable("deals", {
   eventRevenueHigh: bigint("event_revenue_high", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => ({
+  // Existing global catalog index, verified by main's read-only metadata audit.
+  // Production also has a redundant second index; do not drop or recreate it.
+  nameSourceUnique: uniqueIndex("uq_deals_name_source").on(table.name, table.source),
+}));
 
 export type Deal = typeof deals.$inferSelect;
 export type InsertDeal = typeof deals.$inferInsert;
@@ -2049,3 +2053,4 @@ export type ApertureAlpha = typeof apertureAlpha.$inferSelect;
 export type InsertApertureAlpha = typeof apertureAlpha.$inferInsert;
 export { apertureUnderwritingJobs } from "./apertureUnderwritingJobSchema";
 export { apertureMissionDrafts, apertureMissionDraftRevisions } from "./apertureMissionDraftSchema";
+export { capitalStackTemplates, capitalStacks, capitalStackLayers } from "./legacyCapitalStackSchema";

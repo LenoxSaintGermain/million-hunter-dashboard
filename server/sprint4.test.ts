@@ -87,6 +87,28 @@ describe("Deal Deduplication", () => {
     // Revenue should be updated to the latest value
     expect(rows[0].revenue).toBe(1200000);
   });
+
+  it("uses the historical name/source unique index, not name alone", async () => {
+    const db = await getDb();
+    const [indexes] = await db!.execute(
+      "SHOW INDEX FROM deals WHERE Key_name = 'uq_deals_name_source'"
+    ) as any;
+    const columns = [...indexes].sort((a, b) => Number(a.Seq_in_index) - Number(b.Seq_in_index));
+    expect(columns.map((column: any) => column.Column_name)).toEqual(["name", "source"]);
+    expect(columns.every((column: any) => Number(column.Non_unique) === 0)).toBe(true);
+  });
+
+  it("preserves different source identities for deals with the same name", async () => {
+    await createDeal({ name: TEST_DEAL_NAME, source: "source_a", revenue: 1000000, stage: "new" });
+    await createDeal({ name: TEST_DEAL_NAME, source: "source_b", revenue: 2000000, stage: "new" });
+    const db = await getDb();
+    const rows = await db!.select().from(deals).where(eq(deals.name, TEST_DEAL_NAME));
+    expect(rows).toHaveLength(2);
+    expect(rows.map(row => ({ source: row.source, revenue: Number(row.revenue) })).sort((a, b) => a.source!.localeCompare(b.source!))).toEqual([
+      { source: "source_a", revenue: 1000000 },
+      { source: "source_b", revenue: 2000000 },
+    ]);
+  });
 });
 
 // ─── 2. OZ/TAD Schema Fields ─────────────────────────────────────────────────
