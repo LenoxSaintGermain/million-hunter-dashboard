@@ -8,6 +8,10 @@
 
 ## September 9 gap-closure checkpoint
 
+### Production handoff: mobile information density
+
+The operator authorized production traffic after the isolated UAT. Today now uses a compact `At a glance` heading, a 44px mobile refresh control with an explicit accessible name, and one quiet-state conclusion with its recorded timestamp. `Revisit when` shows the full recorded condition without repeating an automation disclaimer. Monitoring mode and refresh semantics stay visible; the separate status/check timestamps remain in `Status details`. Critical warnings and actions are not collapsed. This is copy/disclosure refinement, not a change to eligibility, order states, or monitoring behavior. Release and live-UAT receipts are recorded separately; approval to deploy is not itself proof of a successful deployment.
+
 ### Follow-up: Today loading / partial-state arbitration
 
 `arbitrateTodayRead` is a read-presentation layer over the existing shared attention result, not another lifecycle or priority engine. It establishes one status notice:

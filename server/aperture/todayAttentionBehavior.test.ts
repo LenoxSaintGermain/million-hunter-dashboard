@@ -51,6 +51,26 @@ describe("Today component rendering against deterministic records", () => {
 
   const rawFailure = "SQL_UAT_SENTINEL: select private_payload from internal_table; /api/trpc failed at db.ts:401";
 
+  it("keeps the quiet mobile summary concise without hiding scope, condition, or monitoring mode", () => {
+    const html = render(briefing({ underwriting: { decisionRunId: 1, revisionId: 2, state: "complete", outcome: "no_trade", reopenCondition: "Portfolio headroom restored", updatedAt: now } }));
+    expect(html.match(/No new action identified/g)).toHaveLength(1);
+    expect(html).toContain("Recorded status as of Sep 9");
+    expect(html).toContain("Fixture Paper");
+    expect(html).toContain("Portfolio headroom restored");
+    expect(html).toContain("Checks run on demand. Refresh reads saved status only.");
+    expect(html).toContain('aria-label="Refresh status"');
+    expect(html).toContain("Status details");
+    expect(html).not.toContain("This is a recorded condition, not an automatic check.");
+    expect(mocks.mutate).not.toHaveBeenCalled();
+  });
+
+  it("does not describe configured scheduled checks as on-demand monitoring", () => {
+    const html = render(briefing({ checks: { state: "complete", asOf: now, monitoring: "scheduled", monitoringAsOf: now - 3_600_000 } }));
+    expect(html).toContain("Scheduled checks configured. Refresh reads saved status only.");
+    expect(html).toContain("Last recorded monitoring check:");
+    expect(html).not.toContain("Checks run on demand");
+  });
+
   it("never prints raw query failures in the briefing or research queue", () => {
     for (const query of [mocks.account, mocks.thesis, mocks.desk, mocks.plays]) {
       query.isLoading = false; query.isFetching = false; query.error = { message: rawFailure };
@@ -61,14 +81,14 @@ describe("Today component rendering against deterministic records", () => {
     expect(html).not.toContain("private_payload");
     expect(html).toContain("Research queue could not be refreshed");
     expect(html).toContain("Retry research queue");
-    expect(html).not.toContain("No new action identified in recorded status");
+    expect(html).not.toContain("No new action identified");
   });
 
   it("sanitizes the failed prop even if the caller sends a raw API error", () => {
     const html = render(briefing(), { failed: rawFailure });
     expect(html).not.toContain("SQL_UAT_SENTINEL");
     expect(html).toContain("Retry status refresh");
-    expect(html).not.toContain("No new action identified in recorded status");
+    expect(html).not.toContain("No new action identified");
   });
 
   it("sanitizes trigger read failures without implying confirmation", () => {
@@ -99,7 +119,7 @@ describe("Today component rendering against deterministic records", () => {
 
   it("shows a no-trade reopening condition without sending an empty portfolio to monitoring", () => {
     const html = render(briefing({ underwriting: { decisionRunId: 1, revisionId: 2, state: "complete", outcome: "no_trade", reopenCondition: "Portfolio headroom restored", updatedAt: now } }));
-    expect(html).toContain("No-trade reopening condition");
+    expect(html).toContain("Revisit when");
     expect(html).toContain("Portfolio headroom restored");
     expect(html).not.toContain("Review monitoring");
   });
@@ -114,7 +134,7 @@ describe("Today component rendering against deterministic records", () => {
     const html = render(briefing(), { failed: "Orders temporarily unavailable" });
     expect(html).toContain("Current status could not be verified");
     expect(html).toContain("Last successful records remain below");
-    expect(html).not.toContain("No new action identified in recorded status");
+    expect(html).not.toContain("No new action identified");
     expect(html).toContain("Retry status refresh");
   });
 
@@ -124,7 +144,7 @@ describe("Today component rendering against deterministic records", () => {
     expect(html).toContain("Refreshing recorded status");
     expect(html).toContain('aria-disabled="true"');
     expect(html).not.toContain('disabled=""');
-    expect(html).not.toContain("No new action identified in recorded status");
+    expect(html).not.toContain("No new action identified");
   });
 
   it("arbitrates a partial saved snapshot plus an in-flight retry into one recovery, not a second task", () => {
@@ -167,8 +187,8 @@ describe("Today component rendering against deterministic records", () => {
 
   it.each(["partial", "stale", "empty", "loading", "failed"] as const)("renders a recovery instead of no action for %s", state => {
     const html = render(briefing({ checks: { state, asOf: now, monitoring: "on_demand" } }));
-    expect(html).not.toContain("No new action identified in recorded status");
-    expect(html).toContain("Refresh status");
+    expect(html).not.toContain("No new action identified");
+    expect(html).toContain(state === "failed" ? "Retry status refresh" : "Refresh status");
   });
 
   it("shows a ready playbook and its reason once, with the exact research destination", () => {
@@ -176,7 +196,7 @@ describe("Today component rendering against deterministic records", () => {
     expect(html).toContain("Two conditional choices fit the recorded mission");
     expect(html.match(/data-attention-key="underwriting:1:complete"/g)).toHaveLength(1);
     expect(html).toContain("Validate a play to enter evidence review");
-    expect(html).not.toContain("No new action identified in recorded status");
+    expect(html).not.toContain("No new action identified");
   });
 
   it("does not mount a collapsed result as a displayed/seen item", () => {
@@ -203,7 +223,7 @@ describe("Today component rendering against deterministic records", () => {
     expect(html).toContain("Reconcile dispatch");
     expect(html).toContain("1 filled · 2 remaining");
     expect(html).not.toContain("Paper broker accepted");
-    expect(html).not.toContain("No new action identified in recorded status");
+    expect(html).not.toContain("No new action identified");
   });
 
   it("does not call an empty research list a new cash decision", () => {

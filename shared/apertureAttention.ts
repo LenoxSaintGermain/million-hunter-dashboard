@@ -147,6 +147,7 @@ export type ApertureAttentionBriefing = {
   nextCheckpoint: { title: string; detail: string; at: number | null; href: string | null } | null;
   changeHeading: "Current status" | "Changed since your last review";
   scopeNote: string;
+  monitoringNote: string;
   quiet: boolean;
   quietMessage: string | null;
   baseline: ApertureAttentionBaseline;
@@ -634,7 +635,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     : nextPlay
       ? { title: `${nextPlay.symbol} review`, detail: nextPlay.detail, at: nextPlay.reviewAt ?? null, href: nextPlay.href }
       : noTrade && noTradeCondition
-        ? { title: "No-trade reopening condition", detail: `${noTradeCondition} This is a recorded condition, not an automatic check.`, at: null, href: `/aperture/decision/${noTrade.decisionRunId}/revision/${noTrade.revisionId}/underwrite` }
+        ? { title: "Revisit when", detail: noTradeCondition, at: null, href: `/aperture/decision/${noTrade.decisionRunId}/revision/${noTrade.revisionId}/underwrite` }
         : input.checks.asOf == null || inMotion.length === 0
           ? null
           : { title: "Review recorded play status", detail: input.checks.monitoring === "on_demand" ? "On demand · open a play to inspect order status or request its monitoring checks" : "Scheduled checks are configured; a review date alone is not a completed check", at: null, href: "/aperture/plays" };
@@ -663,8 +664,11 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     nextCheckpoint,
     changeHeading: prior == null ? "Current status" : "Changed since your last review",
     scopeNote,
+    monitoringNote: input.checks.monitoring === "on_demand"
+      ? "Checks run on demand. Refresh reads saved status only."
+      : "Scheduled checks configured. Refresh reads saved status only.",
     quiet,
-    quietMessage: quiet ? `No new action identified in the recorded status as of ${asOf}. Refreshing status does not run new monitoring checks.` : null,
+    quietMessage: quiet ? `Recorded status as of ${asOf}.` : null,
     baseline,
     baselineToken,
   };
