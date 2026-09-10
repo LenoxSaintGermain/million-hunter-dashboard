@@ -73,3 +73,57 @@ release receipt. Physical-device, screen-reader, enlarged-text and complete
 keyboard traversal are not established by this mobile emulation. The original
 Strategist/excess-capital/gains/revision lifecycle remains unfinished; this UAT
 does not narrow that scope or prove positive expectancy or ten-second comprehension.
+
+## Production receipt — 2026-09-10 08:31 UTC
+
+- UI-only release `a42b16bd8ae474ea4af849c14b5200b3aaa69821`, branch
+  `codex/aperture-review-handoff-release`, based on production `070d04c`.
+- Cloud Build `050676f1-318a-4e0e-827d-1035bb6800b5` succeeded;
+  `capital-aperture-00094-hay` now serves 100% traffic. Revision 92 remains
+  available for rollback. Runtime settings unchanged except image.
+- Public Firebase app returned 200 and exact release marker; health returned
+  200 JSON with `ok:true` at 08:29 UTC. No migration or broker action.
+- **Authenticated production UAT remains failing:** Today review button focused
+  without navigating after accessibility click, Enter and direct pointer click.
+  Browser attachment also timed out twice. Isolated connected success above does
+  not prove production browser success; root cause remains undetermined.
+- THI-266 release/blocker comment: `f89f7cbc-96d6-4136-a284-fa92f8a4ea97`.
+- Next: diagnose this signed-in navigation discrepancy, then repeat the exact
+  desktop/mobile task. Full UAT and gains backend remain open.
+
+### Fresh authenticated production tab comparison
+
+A new tab in the same signed-in Chrome profile successfully opened Today and
+activated Review unresolved finding. The destination retained run 360001,
+candidate 240003, order 2, finding 120001 and version v1-951cb173. Loading showed
+“Loading selected play and order… No checks are being run.” before focusing the
+selected finding and expanding catalyst evidence. Save review remained disabled;
+no check generation or review/approval/submission action was invoked.
+
+The previous failure is therefore session/tab-specific so far, not universal.
+Its root cause remains unverified. Fresh production desktop passes this bounded
+handoff; post-release mobile remains pending. Screenshot:
+`routing-2026-09-10/production-fresh-finding-desktop.png` in the evidence folder.
+Raw Markdown and citation markers in the finding body remain a visible polish
+gap; safe rich-text/source rendering needs follow-through.
+
+## Evidence readability increment — local, not deployed
+
+FindingEvidence now uses the existing Markdown parser (react-markdown 10.1.0,
+already present transitively, now an explicit dependency). Recorded emphasis and
+paragraph structure render normally; no rewriting or summarization is performed.
+Raw HTML and embedded images are excluded. Inline and recorded source links are
+restricted to HTTP(S) without embedded credentials. Invalid source slots retain
+their original number with “link unavailable,” so references are not renumbered.
+Numeric citation markers remain literal references to the numbered source list.
+Headings are visually restrained and cannot replace the page heading hierarchy.
+
+Regression was reproduced before the change. Four new rendering/safety tests
+cover formatted evidence, non-embedding, invalid source slots, and inline URL
+safety. Existing complete-narrative assertion now compares all visible text
+rather than requiring literal Markdown delimiters. Full unit suite: 1,963 pass,
+0 failures, 8 existing skips (`/tmp/aperture-evidence-render-unit.json`). Typecheck,
+production build and diff whitespace check pass. Existing chunk-size and Node
+deprecation warnings remain. No data, risk or lifecycle mutation added.
+
+Browser visual verification and deployment of this increment are still pending.
