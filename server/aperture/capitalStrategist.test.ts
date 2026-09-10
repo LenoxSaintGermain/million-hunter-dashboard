@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   assessCausalEconomicPath,
   deriveCapitalEnvelope,
+  capitalSourceLineageId,
+  type CapitalEnvelopeInput,
+  type CapitalLedgerReceipt,
+  type CapitalStrategyBindingReceipt,
   type CausalEconomicPath,
   type CapitalStrategyCandidate,
   type CapitalSource,
@@ -99,13 +103,153 @@ const strategyCandidate = (id = "candidate-1", overrides: Partial<CapitalStrateg
   changeCondition: "Reassess when the economic mechanism changes.",
   ...overrides,
 });
-const strategyInput = (overrides: Partial<CapitalStrategistInput> = {}): CapitalStrategistInput => ({
-  intent: "redeploy_realized_gains", capital: { source: realizedGainSource() },
-  candidates: [strategyCandidate()], searchScope: "related_opportunities",
-  reviewedUniverse: ["DATA"], coverageGaps: [],
-  providerState: { status: "available", failures: [] },
-  comparisonHorizon: "swing", now: decisionTime, reviewAt: decisionTime + 86_400_000,
-  ...overrides,
+/** Explicit successful ledger-read fixture, not the absence of a ledger. */
+function checkedCapital(source: CapitalSource, receipt: Partial<CapitalLedgerReceipt> = {}): CapitalEnvelopeInput {
+  const capitalEventId = capitalSourceLineageId(source);
+  return { source, ledgerReceipt: {
+    receiptId: "fixture-ledger-read", status: "complete", sourceId: source.id, accountId: source.account.id,
+    capitalEventId, asOf: decisionTime, allocationClaims: [], observedCapitalEventIds: [capitalEventId], ...receipt,
+  } };
+}
+/** Independently supplied persistence-lookup fixture for the test's selected records. */
+function checkedBindings(input: CapitalStrategistInput): CapitalStrategyBindingReceipt {
+  return {
+    receiptId: "fixture-owned-underwriting-read", status: "complete", sourceId: input.capital.source.id,
+    accountId: input.capital.source.account.id, capitalEventId: capitalSourceLineageId(input.capital.source), asOf: input.now,
+    candidates: input.candidates.map(candidate => ({ candidateId: candidate.id, symbol: candidate.symbol,
+      causalPathId: candidate.causalPath.id, underwritingResultId: candidate.underwriter.resultId, playId: candidate.underwriter.playId })),
+  };
+}
+const strategyInput = (overrides: Partial<CapitalStrategistInput> = {}): CapitalStrategistInput => {
+  const input: CapitalStrategistInput = {
+    intent: "redeploy_realized_gains", capital: checkedCapital(realizedGainSource()),
+    candidates: [strategyCandidate()], searchScope: "related_opportunities",
+    reviewedUniverse: ["DATA"], coverageGaps: [],
+    providerState: { status: "available", failures: [] },
+    comparisonHorizon: "swing", now: decisionTime, reviewAt: decisionTime + 86_400_000,
+    ...overrides,
+  };
+  return { ...input, bindingReceipt: overrides.bindingReceipt === undefined ? checkedBindings(input) : overrides.bindingReceipt };
+};
+
+// Explicit, deterministic receipts standing in for future owned persistence reads.
+// They are not provider/model assertions and never establish a real ledger.
+function proofFixture() {
+  const input = strategyInput();
+  const source = input.capital.source;
+  const capitalEventId = "capital-event-close-1";
+  const ledgerReceipt = {
+    receiptId: "fixture-ledger-read", status: "complete" as const,
+    sourceId: source.id, accountId: source.account.id, capitalEventId, asOf: input.now,
+    allocationClaims: [], observedCapitalEventIds: [capitalEventId],
+  };
+  const bindingReceipt = {
+    receiptId: "fixture-owned-underwriting-read", status: "complete" as const,
+    sourceId: source.id, accountId: source.account.id, capitalEventId, asOf: input.now,
+    candidates: input.candidates.map(candidate => ({
+      candidateId: candidate.id, symbol: candidate.symbol, causalPathId: candidate.causalPath.id,
+      underwritingResultId: candidate.underwriter.resultId, playId: candidate.underwriter.playId,
+    })),
+  };
+  return Object.assign(input, { capital: { ...input.capital, ledgerReceipt }, bindingReceipt });
+}
+
+describe("review regressions: identity, ledger proof, and unknown arithmetic", () => {
+  it("allows an explicitly checked empty ledger and matching owned underwriting receipt", () => {
+    const input = proofFixture();
+    expect(buildCapitalStrategyDecision(input).investmentAlternatives).toHaveLength(1);
+    expect(deriveCapitalEnvelope(input.capital, input.now)).toMatchObject({ status: "verified", alreadyAllocatedCents: 0, deployableCents: 120_000 });
+  });
+  it("does not treat omitted ledger proof or legacy empty arrays as a checked empty ledger", () => {
+    const input = proofFixture();
+    const capital = { source: input.capital.source, allocationClaims: [], observedCapitalEventIds: ["capital-event-close-1"] };
+    expect(deriveCapitalEnvelope(capital, input.now)).toMatchObject({ status: "blocked", alreadyAllocatedCents: null, deployableCents: 0 });
+    expect(buildCapitalStrategyDecision({ ...input, capital }).investmentAlternatives).toEqual([]);
+  });
+  it.each(["sourceId", "accountId", "capitalEventId", "asOf", "status"] as const)("rejects an unrelated, stale or incomplete ledger receipt: %s", field => {
+    const input = proofFixture();
+    Object.assign(input.capital.ledgerReceipt, { [field]: field === "asOf" ? input.now - 1 : field === "status" ? "partial" : "other" });
+    expect(deriveCapitalEnvelope(input.capital, input.now)).toMatchObject({ status: "blocked", alreadyAllocatedCents: null, deployableCents: 0 });
+  });
+  it.each(["allocationClaims", "observedCapitalEventIds"] as const)("requires explicit %s in the checked receipt", field => {
+    const input = proofFixture(); delete (input.capital.ledgerReceipt as any)[field];
+    expect(deriveCapitalEnvelope(input.capital, input.now)).toMatchObject({ status: "blocked", alreadyAllocatedCents: null });
+  });
+  it("does not accept a receipt which never observed the selected capital event", () => {
+    const input = proofFixture(); input.capital.ledgerReceipt.observedCapitalEventIds = [];
+    expect(deriveCapitalEnvelope(input.capital, input.now).status).toBe("blocked");
+  });
+  it("requires a deterministic decision time and never reuses a future ledger receipt", () => {
+    const input = proofFixture();
+    expect(deriveCapitalEnvelope(input.capital).status).toBe("blocked");
+    input.capital.ledgerReceipt.asOf = input.now + 1;
+    expect(deriveCapitalEnvelope(input.capital, input.now)).toMatchObject({ status: "blocked", alreadyAllocatedCents: null });
+  });
+  it("keeps compatible legacy arrays only when they agree with explicit ledger evidence", () => {
+    const input = proofFixture();
+    const compatible = { ...input.capital, allocationClaims: [], observedCapitalEventIds: ["capital-event-close-1"] };
+    expect(deriveCapitalEnvelope(compatible, input.now).status).toBe("verified");
+    const conflicting = { ...compatible, allocationClaims: [{ allocationId: "pending", capitalEventId: "capital-event-close-1", amountCents: 100, state: "pending" as const }] };
+    expect(deriveCapitalEnvelope(conflicting, input.now)).toMatchObject({ status: "blocked", alreadyAllocatedCents: null, blockers: ["allocation_ledger_mismatch"] });
+    expect(deriveCapitalEnvelope({ ...compatible, observedCapitalEventIds: [] }, input.now).status).toBe("blocked");
+  });
+  it.each(["symbol", "path", "underwriting_result", "play", "empty_result", "empty_play", "unreviewed", "source", "account", "event", "missing_receipt", "stale_receipt"])("does not promote mismatched authoritative identity: %s", mismatch => {
+    const input = proofFixture(); const candidate = input.candidates[0];
+    if (mismatch === "symbol") candidate.symbol = "UNREVIEWED";
+    if (mismatch === "path") candidate.causalPath.id = "other-path";
+    if (mismatch === "underwriting_result") candidate.underwriter.resultId = "other-result";
+    if (mismatch === "play") candidate.underwriter.playId = "other-play";
+    if (mismatch === "empty_result") candidate.underwriter.resultId = "";
+    if (mismatch === "empty_play") candidate.underwriter.playId = "";
+    if (mismatch === "unreviewed") input.reviewedUniverse = [];
+    if (mismatch === "source") input.bindingReceipt.sourceId = "other-source";
+    if (mismatch === "account") input.bindingReceipt.accountId = "other-account";
+    if (mismatch === "event") input.bindingReceipt.capitalEventId = "other-event";
+    if (mismatch === "missing_receipt") delete (input as any).bindingReceipt;
+    if (mismatch === "stale_receipt") input.bindingReceipt.asOf -= 1;
+    const result = buildCapitalStrategyDecision(input);
+    expect(result.investmentAlternatives).toEqual([]);
+    expect(result.primaryConclusion.kind).toBe("retain_capital");
+    expect(result.rejectedHypotheses).toHaveLength(1);
+  });
+  it("rejects mismatched evidence security even if the candidate and underwriting lookup agree", () => {
+    const input = proofFixture(); input.candidates[0].causalPath.securityMapping.symbol = "OTHER";
+    const result = buildCapitalStrategyDecision(input);
+    expect(result.investmentAlternatives).toEqual([]);
+    expect(result.rejectedHypotheses[0].reasons).toContain("candidate_security_mismatch");
+  });
+  it("rejects missing or ambiguous binding rows instead of picking the first match", () => {
+    const input = proofFixture(); input.bindingReceipt.candidates = [];
+    expect(buildCapitalStrategyDecision(input).investmentAlternatives).toEqual([]);
+    const duplicate = proofFixture(); duplicate.bindingReceipt.candidates.push({ ...duplicate.bindingReceipt.candidates[0] });
+    expect(buildCapitalStrategyDecision(duplicate).rejectedHypotheses[0].reasons).toContain("underwriting_binding_ambiguous");
+    const reused = proofFixture(); reused.candidates.push({ ...reused.candidates[0], id: "second" });
+    reused.bindingReceipt.candidates.push({ ...reused.bindingReceipt.candidates[0], candidateId: "second" });
+    expect(buildCapitalStrategyDecision(reused).investmentAlternatives).toEqual([]);
+  });
+  it("keeps failed/malformed binding reads incomplete and cannot infer proof from candidate fields", () => {
+    const input = proofFixture(); Object.assign(input.bindingReceipt, { status: "failed" });
+    expect(buildCapitalStrategyDecision(input)).toMatchObject({ status: "incomplete", investmentAlternatives: [] });
+    const malformed = proofFixture(); delete (malformed.bindingReceipt.candidates[0] as any).playId;
+    expect(buildCapitalStrategyDecision(malformed).investmentAlternatives).toEqual([]);
+  });
+  it.each([null, undefined, NaN, -1, Infinity])("does not invent principal or profit from invalid basis %s", basis => {
+    const input = proofFixture(); Object.assign(input.capital.source, { recordedCostBasisCents: basis, profitReserveCents: 0 });
+    expect(deriveCapitalEnvelope(input.capital, input.now)).toMatchObject({
+      status: "blocked", netSaleProceedsCents: 1_180_000, returnedPrincipalCents: null,
+      realizedProfitLossCents: null, deployableCents: 0,
+    });
+  });
+  it("does not invent zero proceeds or a loss when proceeds are unmeasured", () => {
+    const input = proofFixture(); Object.assign(input.capital.source, { netSaleProceedsCents: null });
+    expect(deriveCapitalEnvelope(input.capital, input.now)).toMatchObject({ status: "blocked", netSaleProceedsCents: null, grossSourceCents: null, returnedPrincipalCents: null, realizedProfitLossCents: null });
+  });
+  it("preserves an explicitly measured zero basis and keeps an unmeasured reserve null", () => {
+    const input = proofFixture(); Object.assign(input.capital.source, { recordedCostBasisCents: 0, profitReserveCents: 0 });
+    expect(deriveCapitalEnvelope(input.capital, input.now)).toMatchObject({ status: "verified", returnedPrincipalCents: 0, realizedProfitLossCents: 1_180_000, reserveCents: 0 });
+    Object.assign(input.capital.source, { profitReserveCents: null });
+    expect(deriveCapitalEnvelope(input.capital, input.now)).toMatchObject({ status: "blocked", reserveCents: null, deployableCents: 0 });
+  });
 });
 
 describe("Capital Strategist point-in-time acceptance", () => {
@@ -125,7 +269,9 @@ describe("Capital Strategist point-in-time acceptance", () => {
     const candidate = strategyCandidate();
     candidate.causalPath.originatingSignal.sources[0].retrievedAt = decisionTime + 1;
     expect(buildCapitalStrategyDecision(strategyInput({ candidates: [candidate] })).primaryConclusion.kind).toBe("retain_capital");
-    expect(buildCapitalStrategyDecision(strategyInput({ candidates: [candidate], now: decisionTime + 1 })).investmentAlternatives).toHaveLength(1);
+    expect(buildCapitalStrategyDecision(strategyInput({ candidates: [candidate], now: decisionTime + 1,
+      capital: checkedCapital(realizedGainSource(), { asOf: decisionTime + 1 }),
+    })).investmentAlternatives).toHaveLength(1);
   });
 
   it("does not launder a hindsight-derived assertion by adding an older citation", () => {
@@ -258,7 +404,7 @@ describe("Capital Strategist exclusion audit acceptance", () => {
       { candidateId: "missing-score", reasons: ["underwriter_score_unavailable"] },
     ]));
     expect([...result.investmentAlternatives.map((item) => item.candidateId), ...result.rejectedHypotheses.map((item) => item.candidateId)].sort()).toEqual(candidates.map((item) => item.id).sort());
-    const blocked = buildCapitalStrategyDecision(strategyInput({ candidates, capital: { source: realizedGainSource({ availabilityState: "unavailable" }) } }));
+    const blocked = buildCapitalStrategyDecision(strategyInput({ candidates, capital: checkedCapital(realizedGainSource({ availabilityState: "unavailable" })) }));
     expect(blocked.rejectedHypotheses).toHaveLength(candidates.length);
     expect(blocked.rejectedHypotheses.every((item) => item.reasons.includes("capital_unavailable"))).toBe(true);
     expect(blocked.rejectedHypotheses.find((item) => item.candidateId === "horizon")?.reasons).toContain("horizon_mismatch");
@@ -273,7 +419,7 @@ describe("Capital Strategist exclusion audit acceptance", () => {
   });
 
   it("retains capital when the realized gain envelope is empty even though source reconciliation succeeded", () => {
-    const result = buildCapitalStrategyDecision(strategyInput({ capital: { source: realizedGainSource({ netSaleProceedsCents: 900_000, profitReserveCents: 0 }) } }));
+    const result = buildCapitalStrategyDecision(strategyInput({ capital: checkedCapital(realizedGainSource({ netSaleProceedsCents: 900_000, profitReserveCents: 0 })) }));
     expect(result.envelope).toMatchObject({ status: "verified", returnedPrincipalCents: 900_000, realizedProfitLossCents: -100_000, deployableCents: 0 });
     expect(result.investmentAlternatives).toEqual([]);
     expect(result.rejectedHypotheses[0].reasons).toContain("capital_envelope_empty");
@@ -320,36 +466,36 @@ describe("Capital Strategist exclusion audit acceptance", () => {
 
 describe("Capital Strategist envelope boundary acceptance", () => {
   it.each([0.5, Number.MAX_SAFE_INTEGER + 1, Number.NaN, Number.POSITIVE_INFINITY, -1])("rejects non-integral, unsafe, or invalid cents %s without rounding up capital", (value) => {
-    const result = deriveCapitalEnvelope({ source: realizedGainSource({ netSaleProceedsCents: value }) });
+    const result = deriveCapitalEnvelope(checkedCapital(realizedGainSource({ netSaleProceedsCents: value })), decisionTime);
     expect(result).toMatchObject({ status: "blocked", deployableCents: 0 });
     expect(result.blockers).toContain("invalid_capital_amount");
   });
 
   it.each([[], [" "], ["fill-1", "fill-1"]].map((closingFillIds) => ({ closingFillIds })))("requires usable unique closing-fill lineage $closingFillIds", ({ closingFillIds }) => {
-    expect(deriveCapitalEnvelope({ source: realizedGainSource({ closingFillIds }) }).status).toBe("blocked");
+    expect(deriveCapitalEnvelope(checkedCapital(realizedGainSource({ closingFillIds })), decisionTime).status).toBe("blocked");
   });
 
   it.each(["pending", "failed"] as const)("keeps %s reconciliation gains unavailable", (reconciliationState) => {
-    expect(deriveCapitalEnvelope({ source: realizedGainSource({ reconciliationState }) })).toMatchObject({ status: "hypothetical_only", deployableCents: 0 });
+    expect(deriveCapitalEnvelope(checkedCapital(realizedGainSource({ reconciliationState })), decisionTime)).toMatchObject({ status: "hypothetical_only", deployableCents: 0 });
   });
 
   it("blocks duplicate capital-event and allocation records without double-counting claims", () => {
     const claim = { allocationId: "claim-1", capitalEventId: "capital-event-close-1", amountCents: 50_000, state: "committed" as const };
-    const result = deriveCapitalEnvelope({ source: realizedGainSource(), allocationClaims: [claim, claim], observedCapitalEventIds: [claim.capitalEventId, claim.capitalEventId] });
+    const result = deriveCapitalEnvelope(checkedCapital(realizedGainSource(), { allocationClaims: [claim, claim], observedCapitalEventIds: [claim.capitalEventId, claim.capitalEventId] }), decisionTime);
     expect(result).toMatchObject({ status: "blocked", alreadyAllocatedCents: 50_000, deployableCents: 0 });
     expect(result.blockers).toEqual(expect.arrayContaining(["duplicate_capital_event", "duplicate_allocation_claim"]));
   });
 
   it("ignores released and unrelated claims but cannot reserve the remainder itself", () => {
-    const result = deriveCapitalEnvelope({ source: realizedGainSource(), allocationClaims: [
+    const result = deriveCapitalEnvelope(checkedCapital(realizedGainSource(), { allocationClaims: [
       { allocationId: "released", capitalEventId: "capital-event-close-1", amountCents: 120_000, state: "released" },
       { allocationId: "unrelated", capitalEventId: "other-event", amountCents: 120_000, state: "pending" },
-    ] });
+    ] }), decisionTime);
     expect(result).toMatchObject({ status: "verified", deployableCents: 120_000, alreadyAllocatedCents: 0 });
   });
 
   it("requires a named account and traceable source, without treating an unverified account as allocated capital", () => {
-    const result = deriveCapitalEnvelope({ source: realizedGainSource({ account: { id: "", name: "", mode: "unknown" }, capitalEventId: "" }) });
+    const result = deriveCapitalEnvelope(checkedCapital(realizedGainSource({ account: { id: "", name: "", mode: "unknown" }, capitalEventId: "" })), decisionTime);
     expect(result).toMatchObject({ status: "blocked", deployableCents: 0 });
     expect(result.blockers).toEqual(expect.arrayContaining(["account_unverified", "invalid_capital_lineage"]));
   });
@@ -362,28 +508,28 @@ describe("Capital Strategist envelope boundary acceptance", () => {
     { source: { id: "hypothetical", kind: "hypothetical_future_proceeds", account: namedAccount, amountCents: 100_000, sourcePlayId: "play-1", assumption: "Illustrative future sale, not a reconciled fill." }, status: "hypothetical_only", deployable: 0 },
   ];
   it.each(sourceCases)("keeps $source.kind availability and provenance distinct", ({ source, status, deployable }) => {
-    expect(deriveCapitalEnvelope({ source })).toMatchObject({ status, deployableCents: deployable, realizedProfitLossCents: null, mayIncreaseRiskBudget: false });
+    expect(deriveCapitalEnvelope(checkedCapital(source), decisionTime)).toMatchObject({ status, deployableCents: deployable, realizedProfitLossCents: null, mayIncreaseRiskBudget: false });
   });
 
   it.each(sourceCases)("rejects invalid cents in $source.kind", ({ source }) => {
-    expect(deriveCapitalEnvelope({ source: { ...source, amountCents: 0.5 } as CapitalSource })).toMatchObject({ status: "blocked", deployableCents: 0 });
+    expect(deriveCapitalEnvelope(checkedCapital({ ...source, amountCents: 0.5 } as CapitalSource), decisionTime)).toMatchObject({ status: "blocked", deployableCents: 0 });
   });
 
   it("honors claims against declared capital lineage, not only sale events", () => {
-    const result = deriveCapitalEnvelope({ source: sourceCases[0].source, allocationClaims: [{ allocationId: "pending-1", capitalEventId: "declaration-1", amountCents: 50_000, state: "pending" }] });
+    const result = deriveCapitalEnvelope(checkedCapital(sourceCases[0].source, { allocationClaims: [{ allocationId: "pending-1", capitalEventId: "declaration-1", amountCents: 50_000, state: "pending" }] }), decisionTime);
     expect(result).toMatchObject({ status: "blocked", deployableCents: 0, alreadyAllocatedCents: 50_000 });
   });
 
   it("does not use a reconciliation completed after the historical decision cutoff", () => {
     const source: CapitalSource = { id: "later-reconciliation", kind: "reconciled_available_funds", account: namedAccount, amountCents: 100_000, reconciliationId: "later-1", reconciledAt: decisionTime + 1 };
-    const result = buildCapitalStrategyDecision(strategyInput({ capital: { source } }));
+    const result = buildCapitalStrategyDecision(strategyInput({ capital: checkedCapital(source) }));
     expect(result.investmentAlternatives).toEqual([]);
     expect(result.envelope.blockers).toContain("capital_after_cutoff");
     expect(result.rejectedHypotheses[0].reasons).toContain("capital_after_cutoff");
   });
 
   it.each([180_000, 180_001])("honors reserve boundary %s without redeploying principal", (profitReserveCents) => {
-    const result = deriveCapitalEnvelope({ source: realizedGainSource({ profitReserveCents }) });
+    const result = deriveCapitalEnvelope(checkedCapital(realizedGainSource({ profitReserveCents })), decisionTime);
     expect(result.deployableCents).toBe(0);
     expect(result.status).toBe(profitReserveCents === 180_000 ? "verified" : "blocked");
     expect(result.returnedPrincipalCents).toBe(1_000_000);
@@ -392,7 +538,8 @@ describe("Capital Strategist envelope boundary acceptance", () => {
   it("keeps each portion of valid gains conserved with fees deducted exactly once", () => {
     for (const profit of [0, 1, 10_000, 180_000]) {
       for (const reserve of [0, profit]) {
-        const result = deriveCapitalEnvelope({ source: realizedGainSource({ netSaleProceedsCents: 1_000_000 + profit, profitReserveCents: reserve }) });
+        const result = deriveCapitalEnvelope(checkedCapital(realizedGainSource({ netSaleProceedsCents: 1_000_000 + profit, profitReserveCents: reserve })), decisionTime);
+        if (result.returnedPrincipalCents == null || result.reserveCents == null) throw new Error("The checked conservation fixture must have measured principal and reserve");
         expect(result.returnedPrincipalCents + result.reserveCents + result.deployableCents).toBe(result.netSaleProceedsCents);
         expect(result.deployableCents).toBe(profit - reserve);
       }
@@ -403,7 +550,7 @@ describe("Capital Strategist envelope boundary acceptance", () => {
 
 describe("Capital Strategist capital lineage", () => {
   it("offers only realized gains remaining after returned principal and reserve", () => {
-    expect(deriveCapitalEnvelope({ source: realizedGainSource() })).toMatchObject({
+    expect(deriveCapitalEnvelope(checkedCapital(realizedGainSource()), decisionTime)).toMatchObject({
       status: "verified",
       netSaleProceedsCents: 1_180_000,
       returnedPrincipalCents: 1_000_000,
@@ -415,17 +562,16 @@ describe("Capital Strategist capital lineage", () => {
   });
 
   it("keeps unrealized gains hypothetical and unavailable for allocation", () => {
-    const result = deriveCapitalEnvelope({ source: realizedGainSource({ realizationState: "unrealized" }) });
+    const result = deriveCapitalEnvelope(checkedCapital(realizedGainSource({ realizationState: "unrealized" })), decisionTime);
     expect(result.status).toBe("hypothetical_only");
     expect(result.deployableCents).toBe(0);
     expect(result.hypotheticalDeployableCents).toBe(120_000);
   });
 
   it("blocks a second allocation claim on the same capital event", () => {
-    const result = deriveCapitalEnvelope({
-      source: realizedGainSource(),
+    const result = deriveCapitalEnvelope(checkedCapital(realizedGainSource(), {
       allocationClaims: [{ allocationId: "allocation-pending-1", capitalEventId: "capital-event-close-1", amountCents: 120_000, state: "pending" }],
-    });
+    }), decisionTime);
     expect(result).toMatchObject({ status: "blocked", deployableCents: 0, alreadyAllocatedCents: 120_000 });
     expect(result.blockers).toContain("concurrent_allocation");
   });
@@ -474,16 +620,16 @@ describe("Capital Strategist comparison", () => {
       title: id,
       symbol: id.startsWith("increment") ? "PW" : "DATA",
       horizon: "swing" as const,
-      causalPath: causalPath({ id: `path-${id}` }),
+      causalPath: causalPath({ id: `path-${id}`, securityMapping: { entity: "Illustrative mapped issuer", symbol: id.startsWith("increment") ? "PW" : "DATA", status: "verified" } }),
       underwriter: { resultId: `underwriting-${id}`, playId: `play-${id}`, state: "qualified" as const, overallScore: score, plannedRiskCents: 6_000 },
       whyThisUse: "Strongest qualified fit in the reviewed set.",
       whyNow: "A sourced development changed the baseline.",
       whyNotAlternatives: "Other candidates have weaker evidence or fit.",
       changeCondition: "Reassess if the economic mechanism is invalidated.",
     }));
-    const result = buildCapitalStrategyDecision({
+    const result = buildCapitalStrategyDecision(strategyInput({
       intent: "redeploy_realized_gains",
-      capital: { source: realizedGainSource() },
+      capital: checkedCapital(realizedGainSource()),
       candidates,
       searchScope: "related_opportunities",
       reviewedUniverse: ["DATA", "PW", "ALT"],
@@ -491,7 +637,7 @@ describe("Capital Strategist comparison", () => {
       providerState: { status: "available", failures: [] },
       now: Date.UTC(2026, 8, 8, 14),
       reviewAt: Date.UTC(2026, 8, 15, 14),
-    });
+    }));
     expect(result.primaryConclusion).toMatchObject({ kind: "new_play", candidateId: "new-1" });
     expect(result.investmentAlternatives.map((item) => item.candidateId)).toEqual(["new-1", "increment-1"]);
     expect(result.retainCapital).toMatchObject({ alwaysAvailable: true, amountCents: 120_000 });

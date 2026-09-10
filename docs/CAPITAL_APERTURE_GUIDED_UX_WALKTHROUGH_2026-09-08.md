@@ -1,10 +1,10 @@
 # Capital Aperture guided UX walkthrough
 
-**Implementation checkpoint:** 2026-09-09 production release `300fc55`, revision `capital-aperture-00080-cub`, 100% traffic
+**Production checkpoint:** 2026-09-09 release `fba1b41`, revision `capital-aperture-00090-hal`, 100% traffic. Later local changes are not implied deployed.
 
 **Scope:** Mission underwriting and returning Today check-in
 
-**Boundary:** Automated tests, isolated agent-operated desktop/mobile UAT, and public production release checks passed. The subsequent authenticated production pass verified access but reproduced workflow and mobile usability gaps; overall UX acceptance is not passed. This is not a human usability study. The earlier local and tagged-release observations below are historical. See the [production handoff receipt](qa/CAPITAL_APERTURE_PRODUCTION_HANDOFF_2026-09-09.md) and [authenticated UAT report](qa/CAPITAL_APERTURE_AUTHENTICATED_UAT_2026-09-09.md) for exact verification and remaining acceptance gaps.
+**Boundary:** The four annotated presentation gaps have an authenticated production repeat in the [stakeholder refinement receipt](qa/CAPITAL_APERTURE_STAKEHOLDER_REFINEMENT_2026-09-09.md). Overall acceptance remains open; this is not a human usability study or completed market-open execution UAT. The [completion matrix](qa/CAPITAL_APERTURE_COMPLETION_MATRIX_2026-09-09.md) distinguishes original requirements, verified increments, and missing end-to-end capabilities. Earlier dated observations below remain historical.
 
 ## September 9 gap-closure checkpoint
 
@@ -131,20 +131,20 @@ Verification and remaining gates: [September 9 UAT receipt](qa/CAPITAL_APERTURE_
 - Optional target semantics and measured risk headroom remain identical between the saved Mission, preview, and executed underwriting result.
 - Revision changes require a before/after review.
 
-## Capital Strategist bounded increment
+## Capital Strategist decision core — not an end-to-end product
 
 This checkpoint adds the decision core upstream of the existing Underwriter without introducing another homepage, risk authority, or execution lifecycle.
 
-- The operator intent is explicit: deploy excess capital, redeploy realized gains, explore an opportunity, or review a material change.
+- The type system carries intent: deploy excess capital, redeploy realized gains, explore an opportunity, or review a material change. There is not yet a user-facing persisted entry for this intent.
 - Capital lineage distinguishes operator-declared excess funds, reconciled available funds, returned principal, realized gains, and hypothetical future proceeds.
-- Realized gains are computed from recorded net sale proceeds and attributed cost basis. Returned principal and the selected reserve remain unavailable for redeployment.
-- Duplicate capital events, active allocation claims, unrealized gains, unreconciled gains, and unavailable funds fail closed.
+- Supplied fixture gains are computed from net proceeds and attributed basis. Returned principal and the selected reserve are excluded. The present broker schema does not supply the required authoritative closing-lot, fee, reconciliation and availability proofs; production gains are not thereby verified.
+- The pure helper rejects supplied duplicate capital events and conflicting allocation claims. This is not a transactional production reservation ledger and does not prove concurrent proposal safety end to end.
 - The comparison contains no more than two already-underwritten investment alternatives and always retains cash as a valid alternative.
 - Causal economic paths are limited to three consequential hops, preserve sources by originating record, and require an expectations change, counterargument, invalidation, and verified security mapping.
 - A fixed-fee supplier relationship cannot be promoted as usage-driven revenue, and an odds feed without observed volume cannot substantiate handle, customer, revenue, or profitability claims.
 - The Strategist is pure decision support in this increment: it reserves no capital, creates no proposal or order, and invokes no broker.
 
-The user-facing intent entry, persisted capital-allocation event ledger, and broad provider-backed discovery orchestration remain subsequent increments. Their absence must not be relabeled as a completed end-to-end Strategist workflow.
+The user-facing intent entry, persisted capital-allocation event ledger, and provider-backed discovery orchestration are unfinished original acceptance requirements, not optional scope removed from this goal. Their absence must not be relabeled as a completed end-to-end Strategist workflow. Qualified review required by the original spec must precede public release of personalized allocation recommendations.
 
 ## Historical September 8 tagged UAT and original gap list
 

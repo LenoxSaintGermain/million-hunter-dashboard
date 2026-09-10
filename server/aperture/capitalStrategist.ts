@@ -1,11 +1,14 @@
 import {
   assessCausalEconomicPath,
   deriveCapitalEnvelope,
+  capitalSourceLineageId,
+  capitalStrategyBindingReceiptSchema,
   type CapitalEnvelopeInput,
   type CapitalInvestmentAlternative,
   type CapitalSearchScope,
   type CapitalStrategyCandidate,
   type CapitalStrategyDecision,
+  type CapitalStrategyBindingReceipt,
   type StrategyIntent,
   type StrategyEvidenceState,
 } from "../../shared/capitalStrategy";
@@ -23,12 +26,49 @@ export type CapitalStrategistInput = {
   comparisonHorizon?: UnderwritingHoldingPeriod | null;
   now: number;
   reviewAt: number | null;
+  /** Server-owned persisted identity lookup; never constructed from model/browser claims.
+   * Optional for caller compatibility, but required before an alternative can qualify. */
+  bindingReceipt?: CapitalStrategyBindingReceipt | null;
 };
 
 const compareCandidates = (left: CapitalStrategyCandidate, right: CapitalStrategyCandidate) => {
   const scoreDelta = (right.underwriter.overallScore ?? -1) - (left.underwriter.overallScore ?? -1);
   return scoreDelta || left.id.localeCompare(right.id);
 };
+
+const nonBlank = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
+const symbolKey = (value: unknown) => nonBlank(value) ? value.trim().toUpperCase() : null;
+
+function candidateIdentityChecks(input: CapitalStrategistInput) {
+  const parsed = capitalStrategyBindingReceiptSchema.safeParse(input.bindingReceipt);
+  const receipt = parsed.success ? parsed.data : null;
+  let globalReason: string | null = !receipt || receipt.status !== "complete" ? "underwriting_binding_unverified" : null;
+  if (receipt && !globalReason && (!Number.isSafeInteger(input.now) || input.now < 0 || receipt.asOf !== input.now
+    || receipt.sourceId !== input.capital.source.id || receipt.accountId !== input.capital.source.account.id
+    || receipt.capitalEventId !== capitalSourceLineageId(input.capital.source))) globalReason = "underwriting_source_mismatch";
+  const bindings = new Map<string, CapitalStrategyBindingReceipt["candidates"][number]>();
+  const boundPlays = new Set<string>();
+  for (const binding of receipt?.candidates ?? []) {
+    const playKey = JSON.stringify([binding.underwritingResultId, binding.playId]);
+    if (bindings.has(binding.candidateId) || boundPlays.has(playKey)) globalReason = "underwriting_binding_ambiguous";
+    bindings.set(binding.candidateId, binding);
+    boundPlays.add(playKey);
+  }
+  const counts = new Map<string, number>();
+  for (const candidate of input.candidates) counts.set(candidate.id, (counts.get(candidate.id) ?? 0) + 1);
+  const reviewed = new Set(input.reviewedUniverse.map(symbolKey));
+  return (candidate: CapitalStrategyCandidate): string[] => {
+    const reasons = globalReason ? [globalReason] : [];
+    const symbol = symbolKey(candidate.symbol);
+    if (!symbol || symbol !== symbolKey(candidate.causalPath.securityMapping.symbol) || !reviewed.has(symbol)) reasons.push("candidate_security_mismatch");
+    if (!nonBlank(candidate.id) || counts.get(candidate.id) !== 1 || !nonBlank(candidate.causalPath.id)
+      || !nonBlank(candidate.underwriter.resultId) || !nonBlank(candidate.underwriter.playId)) reasons.push("underwriting_identity_unverified");
+    const binding = bindings.get(candidate.id);
+    if (!binding || binding.causalPathId !== candidate.causalPath.id || symbolKey(binding.symbol) !== symbol
+      || binding.underwritingResultId !== candidate.underwriter.resultId || binding.playId !== candidate.underwriter.playId) reasons.push("underwriting_identity_mismatch");
+    return reasons;
+  };
+}
 
 /**
  * Deterministically compares capital uses already sized by the Play Underwriter.
@@ -38,9 +78,10 @@ export function buildCapitalStrategyDecision(input: CapitalStrategistInput): Cap
   const envelope = deriveCapitalEnvelope(input.capital, input.now);
   const unavailable = input.providerState.status === "failed" || input.classifierState?.status === "failed";
   const capitalUsableForComparison = envelope.status === "verified" || envelope.status === "operator_declared";
+  const identityReasons = candidateIdentityChecks(input);
   const assessed = input.candidates.map((candidate) => {
     const assessment = assessCausalEconomicPath(candidate.causalPath, input.now);
-    const reasons: string[] = assessment.status === "verified" ? [] : [...assessment.reasons];
+    const reasons: string[] = [...identityReasons(candidate), ...(assessment.status === "verified" ? [] : assessment.reasons)];
     if (input.providerState.status === "failed") reasons.push("provider_failure");
     if (input.classifierState?.status === "failed") reasons.push("classifier_failure");
     if (input.classifierState?.status === "partial") reasons.push("classifier_partial");
@@ -112,6 +153,7 @@ export function buildCapitalStrategyDecision(input: CapitalStrategistInput): Cap
       : input.providerState.status === "partial" || input.classifierState?.status === "partial"
         || envelope.status === "hypothetical_only" || envelope.status === "blocked"
         || assessed.some(({ assessment }) => assessment.status === "unavailable" || assessment.status === "conditional_research")
+        || assessed.some(({ exclusionReasons }) => exclusionReasons.some(reason => reason.startsWith("underwriting_binding_") || reason.startsWith("underwriting_identity_") || reason === "underwriting_source_mismatch" || reason === "candidate_security_mismatch"))
         ? "incomplete"
         : "complete",
     asOf: input.now,

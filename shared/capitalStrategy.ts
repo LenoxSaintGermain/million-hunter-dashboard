@@ -1,4 +1,5 @@
 import type { UnderwritingHoldingPeriod } from "./playUnderwriting";
+import { z } from "zod";
 
 export type StrategyIntent =
   | "deploy_excess_capital"
@@ -82,6 +83,36 @@ export type CapitalAllocationClaim = {
   state: "pending" | "committed" | "consumed" | "released";
 };
 
+const receiptId = z.string().refine(value => value.trim().length > 0);
+const receiptTime = z.number().int().nonnegative().safe();
+const allocationClaimsSchema = z.array(z.object({
+  allocationId: receiptId, capitalEventId: receiptId,
+  amountCents: z.number().int().nonnegative().safe(),
+  state: z.enum(["pending", "committed", "consumed", "released"]),
+}).strict());
+const observedEventsSchema = z.array(receiptId);
+const receiptIdentitySchema = z.object({
+  receiptId, status: z.enum(["complete", "partial", "failed"]),
+  sourceId: receiptId, accountId: receiptId, capitalEventId: receiptId, asOf: receiptTime,
+});
+
+/** Supplied by an authorized, complete ledger read for this exact source and decision time.
+ * Never accept this receipt from browser/model claims. It is not a reservation. */
+export const capitalLedgerReceiptSchema = receiptIdentitySchema.extend({
+  allocationClaims: allocationClaimsSchema, observedCapitalEventIds: observedEventsSchema,
+}).strict();
+export type CapitalLedgerReceipt = z.infer<typeof capitalLedgerReceiptSchema>;
+
+/** Independent owned-record lookup, not a candidate's self-declared linkage.
+ * A future adapter must authorize/join the persisted source and underwriting rows. */
+export const capitalStrategyBindingReceiptSchema = receiptIdentitySchema.extend({
+  candidates: z.array(z.object({
+    candidateId: receiptId, symbol: receiptId, causalPathId: receiptId,
+    underwritingResultId: receiptId, playId: receiptId,
+  }).strict()),
+}).strict();
+export type CapitalStrategyBindingReceipt = z.infer<typeof capitalStrategyBindingReceiptSchema>;
+
 export type CapitalEnvelopeBlocker =
   | "invalid_capital_amount"
   | "invalid_capital_lineage"
@@ -94,19 +125,22 @@ export type CapitalEnvelopeBlocker =
   | "reserve_exceeds_realized_profit"
   | "duplicate_capital_event"
   | "duplicate_allocation_claim"
-  | "concurrent_allocation";
+  | "concurrent_allocation"
+  | "allocation_ledger_unverified"
+  | "allocation_ledger_mismatch";
 
 export type CapitalEnvelope = {
   sourceId: string;
   sourceKind: CapitalSourceKind;
   account: NamedCapitalAccount;
   status: "verified" | "operator_declared" | "hypothetical_only" | "blocked";
-  grossSourceCents: number;
+  grossSourceCents: number | null;
   netSaleProceedsCents: number | null;
-  returnedPrincipalCents: number;
+  returnedPrincipalCents: number | null;
   realizedProfitLossCents: number | null;
-  reserveCents: number;
-  alreadyAllocatedCents: number;
+  reserveCents: number | null;
+  alreadyAllocatedCents: number | null;
+  /** Permitted allocation, not a claim that an unknown cash balance equals zero. */
   deployableCents: number;
   hypotheticalDeployableCents: number;
   blockers: CapitalEnvelopeBlocker[];
@@ -115,7 +149,11 @@ export type CapitalEnvelope = {
 
 export type CapitalEnvelopeInput = {
   source: CapitalSource;
+  /** Optional for source compatibility; absent/incomplete proof blocks real allocation. */
+  ledgerReceipt?: CapitalLedgerReceipt | null;
+  /** @deprecated Only consistency-checked against ledgerReceipt; never proof by themselves. */
   allocationClaims?: CapitalAllocationClaim[];
+  /** @deprecated Only consistency-checked against ledgerReceipt; never proof by itself. */
   observedCapitalEventIds?: string[];
 };
 
@@ -333,8 +371,8 @@ const validCents = (value: number) => Number.isSafeInteger(value) && value >= 0;
 const nonBlank = (value: string) => typeof value === "string" && value.trim().length > 0;
 const validTime = (value: number | null | undefined): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 
-function sourceLineageId(source: CapitalSource): string {
-  if ("capitalEventId" in source) return source.capitalEventId;
+export function capitalSourceLineageId(source: CapitalSource): string {
+  if (source.kind === "realized_gains" || source.kind === "returned_principal") return source.capitalEventId;
   if (source.kind === "operator_declared_excess") return source.declarationId;
   if (source.kind === "reconciled_available_funds") return source.reconciliationId;
   return source.sourcePlayId;
@@ -343,19 +381,39 @@ function sourceLineageId(source: CapitalSource): string {
 function capitalLineageBlockers(source: CapitalSource): CapitalEnvelopeBlocker[] {
   const blockers: CapitalEnvelopeBlocker[] = [];
   if (!nonBlank(source.account.id) || !nonBlank(source.account.name) || !["paper", "live"].includes(source.account.mode)) blockers.push("account_unverified");
-  if (!nonBlank(source.id) || !nonBlank(sourceLineageId(source))
+  if (!nonBlank(source.id) || !nonBlank(capitalSourceLineageId(source))
     || (source.kind === "realized_gains" && !nonBlank(source.sourcePlayId))
     || (source.kind === "hypothetical_future_proceeds" && !nonBlank(source.assumption))
     || (source.kind === "reconciled_available_funds" && !validTime(source.reconciledAt))) blockers.push("invalid_capital_lineage");
   return blockers;
 }
 
-function activeAllocationState(input: CapitalEnvelopeInput, capitalEventId: string | null) {
+function activeAllocationState(input: CapitalEnvelopeInput, capitalEventId: string | null, asOf?: number): { blockers: CapitalEnvelopeBlocker[]; alreadyAllocatedCents: number | null } {
   const blockers: CapitalEnvelopeBlocker[] = [];
-  if (capitalEventId && (input.observedCapitalEventIds ?? [capitalEventId]).filter((id) => id === capitalEventId).length > 1) {
+  // Hypothetical proceeds cannot have an available event ledger or reserve capital.
+  if (capitalEventId == null) return { blockers, alreadyAllocatedCents: null };
+  const parsed = capitalLedgerReceiptSchema.safeParse(input.ledgerReceipt);
+  if (!parsed.success || parsed.data.status !== "complete") return { blockers: ["allocation_ledger_unverified"], alreadyAllocatedCents: null };
+  const receipt = parsed.data;
+  if (!validTime(asOf) || receipt.asOf !== asOf || receipt.sourceId !== input.source.id
+    || receipt.accountId !== input.source.account.id || receipt.capitalEventId !== capitalEventId
+    || !receipt.observedCapitalEventIds.includes(capitalEventId)) {
+    return { blockers: ["allocation_ledger_mismatch"], alreadyAllocatedCents: null };
+  }
+  // Keep old typed callers compatible, but refuse contradictory parallel ledgers.
+  const claimSignature = (claims: CapitalAllocationClaim[]) => JSON.stringify(claims.map(claim => JSON.stringify([claim.allocationId, claim.capitalEventId, claim.amountCents, claim.state])).sort());
+  if (input.allocationClaims !== undefined) {
+    const legacy = allocationClaimsSchema.safeParse(input.allocationClaims);
+    if (!legacy.success || claimSignature(legacy.data) !== claimSignature(receipt.allocationClaims)) return { blockers: ["allocation_ledger_mismatch"], alreadyAllocatedCents: null };
+  }
+  if (input.observedCapitalEventIds !== undefined) {
+    const legacy = observedEventsSchema.safeParse(input.observedCapitalEventIds);
+    if (!legacy.success || JSON.stringify([...legacy.data].sort()) !== JSON.stringify([...receipt.observedCapitalEventIds].sort())) return { blockers: ["allocation_ledger_mismatch"], alreadyAllocatedCents: null };
+  }
+  if (receipt.observedCapitalEventIds.filter((id) => id === capitalEventId).length > 1) {
     blockers.push("duplicate_capital_event");
   }
-  const activeClaims = capitalEventId == null ? [] : (input.allocationClaims ?? []).filter((claim) =>
+  const activeClaims = receipt.allocationClaims.filter((claim) =>
     claim.capitalEventId === capitalEventId && claim.state !== "released",
   );
   const claimIds = new Set<string>();
@@ -381,13 +439,13 @@ export function deriveCapitalEnvelope(input: CapitalEnvelopeInput, asOf?: number
   const { source } = input;
   // Claims on declared/reconciled funds use their lineage identity too. This is
   // snapshot validation only; a transactional allocation ledger must enforce writes.
-  const capitalEventId = source.kind === "hypothetical_future_proceeds" ? null : sourceLineageId(source);
-  const allocation = activeAllocationState(input, capitalEventId);
+  const capitalEventId = source.kind === "hypothetical_future_proceeds" ? null : capitalSourceLineageId(source);
+  const allocation = activeAllocationState(input, capitalEventId, asOf);
   if (source.kind !== "realized_gains") {
-    const amount = validCents(source.amountCents) ? source.amountCents : 0;
+    const amount = validCents(source.amountCents) ? source.amountCents : null;
     const blockers = [...capitalLineageBlockers(source), ...allocation.blockers];
     if (source.kind === "reconciled_available_funds" && validTime(asOf) && source.reconciledAt > asOf) blockers.push("capital_after_cutoff");
-    if (amount <= 0) blockers.push("invalid_capital_amount");
+    if (amount == null || amount <= 0) blockers.push("invalid_capital_amount");
     const hypothetical = source.kind === "hypothetical_future_proceeds";
     const hardBlocked = blockers.length > 0;
     return {
@@ -401,8 +459,8 @@ export function deriveCapitalEnvelope(input: CapitalEnvelopeInput, asOf?: number
       realizedProfitLossCents: null,
       reserveCents: 0,
       alreadyAllocatedCents: allocation.alreadyAllocatedCents,
-      deployableCents: hardBlocked || hypothetical ? 0 : amount,
-      hypotheticalDeployableCents: hypothetical && !hardBlocked ? amount : 0,
+      deployableCents: hardBlocked || hypothetical ? 0 : amount!,
+      hypotheticalDeployableCents: hypothetical && !hardBlocked ? amount! : 0,
       blockers: Array.from(new Set(blockers)),
       mayIncreaseRiskBudget: false,
     };
@@ -417,13 +475,13 @@ export function deriveCapitalEnvelope(input: CapitalEnvelopeInput, asOf?: number
   if (source.reconciliationState !== "reconciled") blockers.push("gain_not_reconciled");
   if (source.availabilityState !== "verified_available") blockers.push("funds_not_available");
 
-  const costBasisCents = validCents(source.recordedCostBasisCents) ? source.recordedCostBasisCents : 0;
-  const netSaleProceedsCents = validCents(source.netSaleProceedsCents) ? source.netSaleProceedsCents : 0;
-  const realizedProfitLossCents = netSaleProceedsCents - costBasisCents;
-  const returnedPrincipalCents = Math.min(costBasisCents, netSaleProceedsCents);
-  const realizedGainCents = Math.max(0, realizedProfitLossCents);
-  const reserveCents = validCents(source.profitReserveCents) ? source.profitReserveCents : 0;
-  if (reserveCents > realizedGainCents) blockers.push("reserve_exceeds_realized_profit");
+  const costBasisCents = validCents(source.recordedCostBasisCents) ? source.recordedCostBasisCents : null;
+  const netSaleProceedsCents = validCents(source.netSaleProceedsCents) ? source.netSaleProceedsCents : null;
+  const realizedProfitLossCents = netSaleProceedsCents == null || costBasisCents == null ? null : netSaleProceedsCents - costBasisCents;
+  const returnedPrincipalCents = costBasisCents == null || netSaleProceedsCents == null ? null : Math.min(costBasisCents, netSaleProceedsCents);
+  const realizedGainCents = realizedProfitLossCents == null ? null : Math.max(0, realizedProfitLossCents);
+  const reserveCents = validCents(source.profitReserveCents) ? source.profitReserveCents : null;
+  if (reserveCents != null && realizedGainCents != null && reserveCents > realizedGainCents) blockers.push("reserve_exceeds_realized_profit");
 
   const uniqueBlockers = Array.from(new Set(blockers));
   const hypotheticalOnly = uniqueBlockers.some((blocker) =>
@@ -437,9 +495,11 @@ export function deriveCapitalEnvelope(input: CapitalEnvelopeInput, asOf?: number
     || blocker === "reserve_exceeds_realized_profit"
     || blocker === "duplicate_capital_event"
     || blocker === "duplicate_allocation_claim"
-    || blocker === "concurrent_allocation",
+    || blocker === "concurrent_allocation"
+    || blocker === "allocation_ledger_unverified"
+    || blocker === "allocation_ledger_mismatch",
   );
-  const gainsAfterReserveCents = Math.max(0, realizedGainCents - reserveCents);
+  const gainsAfterReserveCents = realizedGainCents == null || reserveCents == null ? null : Math.max(0, realizedGainCents - reserveCents);
   return {
     sourceId: source.id,
     sourceKind: source.kind,
@@ -451,8 +511,8 @@ export function deriveCapitalEnvelope(input: CapitalEnvelopeInput, asOf?: number
     realizedProfitLossCents,
     reserveCents,
     alreadyAllocatedCents: allocation.alreadyAllocatedCents,
-    deployableCents: uniqueBlockers.length ? 0 : gainsAfterReserveCents,
-    hypotheticalDeployableCents: uniqueBlockers.length && !hardBlocked ? gainsAfterReserveCents : 0,
+    deployableCents: uniqueBlockers.length ? 0 : gainsAfterReserveCents!,
+    hypotheticalDeployableCents: uniqueBlockers.length && !hardBlocked ? gainsAfterReserveCents! : 0,
     blockers: uniqueBlockers,
     mayIncreaseRiskBudget: false,
   };

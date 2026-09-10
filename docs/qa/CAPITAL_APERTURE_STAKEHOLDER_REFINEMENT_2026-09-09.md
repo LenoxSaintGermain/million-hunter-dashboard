@@ -147,3 +147,63 @@ This closes the four annotated presentation defects and exact-review refinement,
 not the remaining broader acceptance boundaries above. Next live UAT: use the
 existing exact paper workflow during an open market; do not relax risk or evidence
 gates to obtain a trade. No-trade remains a valid completed decision.
+
+## Local keyboard and readability follow-up — not yet deployed
+
+Actual keyboard inspection required nineteen Tab presses to reach the saved
+Mission task. Aperture now has a first-focus `Skip to workspace` link and one
+named main landmark. Enter focuses the workspace without hiding the account rail;
+the control is 44px high and visible above the fixed navigation. Non-Aperture
+layouts keep their prior container behavior.
+
+Play Desk refresh/retry controls remain focusable while busy, guard duplicate
+activation before query state repaints, and wait for all sources to settle.
+Failures retain known tasks and exact-record recovery; retry never resubmits an
+order. An actual mobile Enter activation retained focus through `Refreshing…`
+and settled `Refresh status`.
+
+Muted explanations were below 4.5:1 on ten tested light/dark opaque palette
+surface pairs (approximately 2.62–3.48:1). The Aperture scope now reuses the
+existing secondary foreground token. Ten pair tests pass. This does not certify
+all status colors, composited backgrounds or WCAG conformance.
+
+Observed local sizes: 390×844 mobile and 1297×1196 desktop, no page-width overflow.
+Screenshots in the same artifact directory:
+
+- `isolated-playdesk-mobile-keyboard-contrast.png`
+- `isolated-desktop-skip-workspace.png`
+
+The resumed conditional draft exposed a further copy mismatch: the target field
+said `Not used`, while its feasibility panel showed an extreme weekly target.
+Waiting/no-allocation decisions now keep the target for later research without
+presenting it as the current objective. Effective risk remains visible, labeled
+as future-research context. Cash receipts say `$0 new allocation`, not zero total
+portfolio risk or a closed position.
+
+The explicit mobile `Review mission` transition originally left the operator at
+the bottom of the newly displayed section. User-directed section navigation now
+focuses its heading; provider updates and hydration do not request focus. Actual
+mobile click/Enter checks focused the risk and review headings at y≈80px, below
+the fixed header, with no horizontal overflow. The saved draft changed only its
+viewed section; no conditional receipt or order was created. Before/fixed captures:
+`isolated-conditional-review-mobile.png` and
+`isolated-conditional-review-mobile-focused.png`.
+
+Final local verification: 1,475 unit tests passed, zero failed, six existing skips;
+TypeScript and client/server builds passed. Four isolated persisted journeys
+passed with deterministic shuffle seed 630001. The full isolated integration lane
+also passed 72 tests with two external-URL skips. Owned disposable rows/database
+and test user were cleaned; browser-operator records were not touched. Reports:
+`/tmp/aperture-final-refinement-unit.json` and
+`/tmp/capital-isolated-integration.f1VDnX/summary.json`.
+These are agent-operated checks, not stakeholder-tested usability.
+
+UI changes are isolated in commit `070d04ca4d2e0190a346fb4105187671ebdecdf5`.
+The build archives that exact commit; unfinished local Strategist changes are
+excluded. A later attempt to repeat the authenticated browser checks was blocked
+by the locked Mac. Do not infer a signed-in post-deployment repeat from health
+checks alone. Viewport reset/handoff is pending while the browser is inaccessible.
+
+The original [completion matrix](CAPITAL_APERTURE_COMPLETION_MATRIX_2026-09-09.md)
+now makes the unimplemented gains/intent/discovery/persistence path explicit.
+Safe parser and read-adapter increments are not advertised as completed E2E UAT.
