@@ -6,6 +6,8 @@ import { TodayAttentionBriefing } from "../../client/src/components/aperture/Tod
 import { DailyPlayList, IntradayTrigger } from "../../client/src/components/aperture/DailyPlayList";
 import { deriveApertureAttention, type ApertureAttentionInput } from "../../shared/apertureAttention";
 
+vi.mock("wouter", async original => ({ ...await original<typeof import("wouter")>(), useLocation: () => ["/aperture", vi.fn()] }));
+
 const mocks = vi.hoisted(() => {
   const query = () => ({ data: undefined as any, isLoading: true, isFetching: true, error: null as null | { message: string }, refetch: vi.fn() });
   return { account: query(), thesis: query(), desk: query(), plays: query(), runway: query(), cockpit: query(), trigger: query(), mutate: vi.fn(), invalidate: vi.fn() };

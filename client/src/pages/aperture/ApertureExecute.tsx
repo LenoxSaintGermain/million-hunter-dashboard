@@ -300,11 +300,13 @@ function OrderQueue({ runId, focusCandidateId, ticketBuilderActive = false }: { 
 
 // ── Check whether thesis still holds ─────────────────────────────────────────
 
-export function MonitoringPanel({ runId, candidate, thesisSummary, order, selection, onOpenFinding }: {
+export function MonitoringPanel({ runId, candidate, thesisSummary, order, selection, onOpenFinding, contextState = "ready", onRetryContext }: {
   runId: number; candidate?: { id: number; symbol: string }; thesisSummary?: string | null;
   order?: NonNullable<inferRouterOutputs<AppRouter>["aperture"]["order"]["list"]>[number];
   selection: MonitoringFindingRoute;
   onOpenFinding: (href: string) => void;
+  contextState?: "loading" | "failed" | "ready";
+  onRetryContext?: () => void;
 }) {
   const selectedElement = useRef<HTMLDivElement>(null);
   const focusedVersion = useRef<string | null>(null);
@@ -328,7 +330,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
     },
     onError: (e) => toast.error(e.message),
   });
-  const canCheck = Boolean(candidate && order?.status === "filled");
+  const canCheck = Boolean(contextState === "ready" && candidate && order?.status === "filled");
   const runScopedChecks = () => {
     if (!candidate || !canCheck || runCheck.isPending) return;
     runCheck.mutate({ runId, candidateId: candidate.id, symbol: candidate.symbol,
@@ -344,9 +346,13 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
     if (!showSelected || !selectionKey || focusedVersion.current === selectionKey || !selectedElement.current) return;
     focusedVersion.current = selectionKey;
     revealMonitoringFinding(selectedElement.current, interrupted.current);
-  }, [showSelected, selectionKey]);
+  }, [showSelected, selectionKey, contextState]);
   const reviewItems = currentChecks.filter((check) => monitoringReviewState(check).needsReview);
+  if (contextState === "loading") return <p role="status">Loading selected play and order… No checks are being run.</p>;
+  const contextError = contextState === "failed" ? <div role="alert" className="rounded-lg border p-4"><p>Selected play or order could not refresh. No monitoring eligibility is confirmed.</p>{onRetryContext && <Button variant="outline" className="mt-2 min-h-11" onClick={onRetryContext}>Retry play and order</Button>}</div> : null;
+  if (contextError && (!candidate || !order)) return contextError;
   return <div className="space-y-4">
+    {contextError}
     <section className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
       <h2 className="text-base font-semibold">Thesis checks · {order ? orderInstrumentLabel(order) : candidate?.symbol ?? "Select a play"}</h2>
       <p className="mt-2 text-sm leading-5">Check this play’s catalyst and invalidation. Checks run on demand; reading a finding does not acknowledge or resolve it.</p>
@@ -355,7 +361,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
     </section>
     {query.isLoading && <p role="status">Loading recorded checks…</p>}
     {query.isError && <div role="alert" className="rounded-lg border p-4"><p>Recorded monitoring could not load. Available records are retained; no all-clear is established.</p><Button variant="outline" className="mt-2 min-h-11" disabled={query.isFetching} onClick={() => void query.refetch()}>Retry saved status</Button></div>}
-    {selection && !query.isLoading && !query.isError && (!selectedCheck || !selectedOrderMatches) && <div role="alert" className="rounded-lg border p-4"><p>The exact finding or selected order could not be matched. No other finding has been substituted, and no review was saved.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void query.refetch()}>Reload recorded checks</Button><p className="mt-2 text-sm">Open a specific finding below, or return to Play Desk to recover the selected order.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding("/aperture/plays")}>Return to Play Desk</Button></div>}
+    {selection && contextState === "ready" && !query.isLoading && !query.isError && (!selectedCheck || !selectedOrderMatches) && <div role="alert" className="rounded-lg border p-4"><p>The exact finding or selected order could not be matched. No other finding has been substituted, and no review was saved.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void query.refetch()}>Reload recorded checks</Button><p className="mt-2 text-sm">Open a specific finding below, or return to Play Desk to recover the selected order.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding("/aperture/plays")}>Return to Play Desk</Button></div>}
     {showSelected && <div ref={selectedElement} tabIndex={-1} data-selected-monitoring-finding={selectedCheck.id} className="scroll-mt-28 rounded-xl outline-offset-4" aria-label="Selected monitoring finding">
       <p className="mb-2 text-sm font-semibold">{selected.historical ? "Selected historical finding" : "Selected finding"} · {monitoringFindingPresentation({ check: selectedCheck, instrument: order }).stateLabel}</p>
       {selected.historical && <p className="mb-2 text-sm">A newer check exists below. This is the exact version you opened, not a current market claim.</p>}
@@ -868,8 +874,12 @@ export default function ApertureExecute() {
     window.requestAnimationFrame(() => document.getElementById("paper-lifecycle")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
-  const { data } = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
-  const { data: runOrders } = trpc.aperture.order.list.useQuery({ runId }, { enabled: !!runId });
+  const runQuery = trpc.aperture.run.get.useQuery({ id: runId }, { enabled: !!runId });
+  const ordersQuery = trpc.aperture.order.list.useQuery({ runId }, { enabled: !!runId });
+  const { data } = runQuery;
+  const { data: runOrders } = ordersQuery;
+  const monitoringContextState = runQuery.isError || ordersQuery.isError ? "failed"
+    : runQuery.isLoading || ordersQuery.isLoading ? "loading" : "ready";
   if (data?.decisionAuthority && !decisionAuthorityAllowsDownstream(data.decisionAuthority)) {
     return <DashboardLayout><DecisionStepLock authority={data.decisionAuthority} step="Ticket" onOpenReceipt={() => navigate(`/aperture/decision/${data.decisionAuthority!.decisionRunId}/revision/${data.decisionAuthority!.revisionId}`)} /></DashboardLayout>;
   }
@@ -1002,7 +1012,7 @@ export default function ApertureExecute() {
             <OrderQueue runId={runId} focusCandidateId={proposalCandidate?.id} ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired && !candidateActiveOrder)} />
           </TabsContent>
           <TabsContent value="monitoring" className="mt-4 min-w-0" aria-label="Check whether thesis still holds">
-            <MonitoringPanel key={`${runId}:${proposalCandidate?.id}:${requestedOrderId ?? "default"}`} runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule} order={monitoringOrder} selection={findingSelection} onOpenFinding={navigate} />
+            <MonitoringPanel key={`${runId}:${proposalCandidate?.id}:${requestedOrderId ?? "default"}`} runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule} order={monitoringOrder} selection={findingSelection} onOpenFinding={navigate} contextState={monitoringContextState} onRetryContext={() => { void runQuery.refetch(); void ordersQuery.refetch(); }} />
           </TabsContent>
           <TabsContent value="alpha" className="mt-4 min-w-0" aria-label="Outcome and notes">
             <AlphaDashboard runId={runId} />
