@@ -20,7 +20,7 @@ describe("Capital Aperture Play Desk contract", () => {
     expect(router).toContain("eq(portfolioAccounts.userId, ctx.user.id)");
     expect(router).toContain("eq(apertureDecisionRuns.userId, ctx.user.id)");
     expect(router).toContain("state.netQty > 0 && state.latestOpenId === order.id");
-    expect(page).toContain("Review, approval, and submission remain separate human actions.");
+    expect(page).toContain("Refresh reads records only; no new checks.");
     expect(page).toContain("deskOrderPresentation(order.id, briefing)");
     expect(page).toContain('from "@shared/apertureAttention"');
     expect(page).not.toContain("const orderState =");
@@ -93,7 +93,8 @@ describe("Capital Aperture Play Desk contract", () => {
     const page = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
     const shell = readFileSync(resolve(process.cwd(), "client/src/components/aperture/ApertureShell.tsx"), "utf8");
 
-    expect(page).toContain("Make the next decision");
+    expect(page).toContain("data-desk-header");
+    expect(page).toContain(">Play Desk</h1>");
     expect(page).toContain("Shares");
     expect(page).toContain("Calls");
     expect(page).toContain("Puts");

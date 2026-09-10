@@ -267,3 +267,10 @@ above. This bounded refinement is not a claim that those workflows are complete.
 Local desktop/mobile walkthrough and test outcomes are recorded separately in
 the September 9 stakeholder refinement receipt. Automated/rendered checks do not
 establish user-tested usability, WCAG conformance or the ten-second target.
+
+The signed-in mobile repeat also requires a compact read-only Play Desk header:
+title and refresh share a wrapping row, with one timestamp/scope statement.
+Do not repeat the introductory workflow or gate disclaimer above attention when
+the named paper mode and the consequential workflow gates are already present.
+Keep stale/partial warnings and every critical action outside disclosures. Verify
+the resulting first-viewport action placement on the actual deployed page.

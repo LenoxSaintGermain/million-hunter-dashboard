@@ -71,3 +71,38 @@ provider-backed discovery orchestration remain outside this bounded refinement.
 The evidence attachment currently uses the existing review-note contract; it is
 operator-entered evidence, not a new provider verification authority. No new live
 proposal/approval/submission was exercised. Fresh market-open validation remains.
+
+## Authenticated production repeat — 82dee65
+
+Build `5da7a388-3d1c-4a32-9ff5-40977dcc5106` succeeded. Revision
+`capital-aperture-00088-xus` was checked at zero traffic, then received 100% of
+production traffic under the existing deployment authorization. The public
+Firebase domain served JSON health and the exact release marker
+`82dee659a9a4590e0c2f1e8d1f7955c0a9f318e4`.
+
+- Signed-in Chrome Today kept PW distinct from the NVDA portfolio constraint.
+  The DKNG concern remained an unresolved finding with stale evidence.
+- Its review action opened run 360001, candidate 240003, order 2, finding 120001,
+  version `v1-951cb173`, with that exact evidence expanded. The review form
+  loaded; saving stayed disabled without assessment and explanation. No review
+  was saved, no new provider check ran, and no broker action was taken.
+- Mission opened the saved PW result, not setup: $8,000 allocated, $500 entered
+  limit and $0 effective at the recorded analysis. No-trade reason and reopening
+  condition appeared once. Desktop 1297×1196 and mobile 390×844 were captured.
+- Play Desk exposed all three secondary critical rows. Selecting Puts preserved
+  the MGM call concern and displayed three critical issues outside the filters.
+  All was restored. Reading DKNG did not resolve it. Chrome error log was empty.
+- Six records remained in motion: two filled and four accepted without a fill.
+  No new order, approval, submission or exit was requested by this walkthrough.
+
+Live mobile inspection found one remaining presentation defect: repetitive Desk
+introductory/status copy pushed the primary review action below the first 844px
+viewport. The follow-up removes the duplicate introduction and read-only safety
+banner, pairs the title with a 44px refresh control, and states refresh scope once.
+Account/mode, stale/partial warnings, exact actions and all critical rows remain.
+Local 390×844 verification places its illustrative primary action at y=500.5–544.5,
+with no horizontal page overflow. This is a geometry observation, not a usability
+score. The production repeat for this follow-up is recorded separately below.
+
+Follow-up verification: 1,305 unit tests passed, 0 failed, 6 skipped. TypeScript
+and production Vite build passed; the existing large-client-chunk warning remains.

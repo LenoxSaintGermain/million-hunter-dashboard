@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowRight, CheckCircle2, RefreshCw, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -150,22 +150,14 @@ export default function AperturePlayDesk() {
   const refresh = () => Promise.all([desk.refetch(), runs.refetch(), playList.refetch(), outcomes.refetch()]);
 
   return <DashboardLayout><div className="mx-auto max-w-6xl space-y-5 pb-12">
-    <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture · Play Desk</p>
-        <h1 className="mt-1 font-serif text-3xl" style={{ color: "var(--sh-text-primary)" }}>Make the next decision.</h1>
-        <p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>Choose a play, move a paper ticket, or monitor what is already in motion.</p>
-      </div>
-      <Button variant="outline" size="sm" className="min-h-11" onClick={refresh} disabled={isRefreshing} aria-describedby="desk-refresh-scope"><RefreshCw className="mr-2 h-4 w-4" />{isRefreshing ? "Refreshing status…" : "Refresh status"}</Button>
+    <header data-desk-header className="flex flex-wrap items-center justify-between gap-3">
+      <h1 className="font-serif text-2xl sm:text-3xl" style={{ color: "var(--sh-text-primary)" }}>Play Desk</h1>
+      <Button variant="outline" size="sm" className="min-h-11" onClick={refresh} disabled={isRefreshing} aria-describedby="desk-refresh-scope"><RefreshCw className="mr-2 h-4 w-4" />{isRefreshing ? "Refreshing…" : "Refresh status"}</Button>
     </header>
 
-    <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}>
-      <ShieldCheck className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} />Review, approval, and submission remain separate human actions.
-    </div>
-
-    <div id="desk-refresh-scope" role="status" aria-live="polite" className="text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
-      {isRefreshing ? "Loading recorded status. Existing records stay visible. " : desk.dataUpdatedAt ? `Status loaded ${new Date(desk.dataUpdatedAt).toLocaleString()}. ` : "Status has not loaded yet. "}
-      Refresh reads saved records; it does not run market or broker checks.
+    <div id="desk-refresh-scope" role="status" aria-live="polite" className="text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>
+      <p>{isRefreshing ? "Loading status; existing records stay visible." : desk.dataUpdatedAt ? <>Records loaded <time dateTime={new Date(desk.dataUpdatedAt).toISOString()}>{new Date(desk.dataUpdatedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time>.</> : "Status has not loaded yet."}</p>
+      <p>Refresh reads records only; no new checks.</p>
     </div>
     {unavailable.length > 0 && <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}>
       {unavailable.map(({ label, query }) => <div key={label} className="mb-3 last:mb-0"><p className="font-semibold">{label} status unavailable</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{query.data != null ? "Refresh failed. Last known records remain visible; they may be stale." : "This part of the desk could not be verified."}</p></div>)}

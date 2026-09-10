@@ -43,6 +43,21 @@ beforeEach(() => {
 });
 
 describe("Play Desk compact attention — illustrative records, no API calls", () => {
+  it("keeps the read-only header compact without losing refresh scope or stale warnings", () => {
+    const $ = render();
+    const header = $('header[data-desk-header]');
+    expect(header.find('h1').text()).toBe('Play Desk');
+    expect(header.attr('class')).toContain('flex-wrap');
+    expect(header.find('button').attr('class')).toContain('min-h-11');
+    expect(header.find('button').attr('aria-describedby')).toBe('desk-refresh-scope');
+    expect($('#desk-refresh-scope time').attr('datetime')).toBe(new Date(now).toISOString());
+    expect($('#desk-refresh-scope').text()).toContain('Refresh reads records only; no new checks.');
+    expect($('h1')).toHaveLength(1);
+    expect($.text()).not.toContain('Choose a play, move a paper ticket');
+    expect($.text()).toContain('Recorded checks: stale. Status is not an all-clear.');
+    expect(fixture.refetch).not.toHaveBeenCalled();
+  });
+
   it.each(["", "instrument=shares", "instrument=puts&stage=choose", "instrument=calls&stage=approve"])("keeps one primary and every critical row exposed for %s", (search) => {
     fixture.search = search;
     const $ = render();
@@ -133,7 +148,7 @@ describe("Play Desk compact attention — illustrative records, no API calls", (
   it("keeps the last recorded critical issues visible during a refresh", () => {
     fixture.queries.desk.isFetching = true;
     const $ = render();
-    expect(visibleText($.html())).toContain("Loading recorded status. Existing records stay visible.");
+    expect(visibleText($.html())).toContain("Loading status; existing records stay visible.");
     expect($('[data-attention-key="order:12:dispatch"]').parents("details,[hidden]")).toHaveLength(0);
     expect(visibleText($.html())).toContain("Do not submit a duplicate order.");
     expect(fixture.refetch).not.toHaveBeenCalled();
