@@ -54,7 +54,9 @@ describe("Authenticated UAT attention regressions — illustrative records, zero
     const action = html.indexOf(">Review what changed<");
     expect(action).toBeGreaterThan(0);
     expect(html.slice(0, action)).not.toContain("Illustrative underlying outlook");
-    expect(html).toContain(narrative);
+    // Evidence is formatted, not truncated: compare its complete visible text.
+    expect(html.replace(/<[^>]+>/g, "")).toContain(narrative.replace(/\*\*/g, "").trim());
+    expect(html).toContain("<strong>Illustrative underlying outlook</strong>");
     expect(html).toContain("https://example.org/fixture-source");
     expect(html.indexOf(">Evidence<")).toBeGreaterThan(action);
   });

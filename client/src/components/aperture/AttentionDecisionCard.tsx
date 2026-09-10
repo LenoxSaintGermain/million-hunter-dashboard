@@ -1,6 +1,15 @@
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ApertureAttentionItem } from "@shared/apertureAttention";
+import Markdown from "react-markdown";
+
+function evidenceUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return (url.protocol === "https:" || url.protocol === "http:") && !url.username && !url.password ? value : undefined;
+  } catch { return undefined; }
+}
 
 export function FindingEvidence({ evidence, label = "Evidence" }: { evidence: NonNullable<ApertureAttentionItem["evidence"]>; label?: string }) {
   const date = Number.isFinite(evidence.checkedAt) && Number.isFinite(new Date(evidence.checkedAt).getTime()) ? new Date(evidence.checkedAt).toLocaleString() : "Not recorded";
@@ -9,8 +18,24 @@ export function FindingEvidence({ evidence, label = "Evidence" }: { evidence: No
     <div className="space-y-3 pb-3 text-sm leading-6">
       <p>Recorded check: {date}. Opening evidence does not acknowledge or resolve this finding.</p>
       <p><strong>Selected-play rationale:</strong> {evidence.rationale ?? "Not included in this record. Inspect the selected play’s thesis before deciding; hedge intent is not assumed."}</p>
-      <p className="whitespace-pre-wrap break-words">{evidence.finding}</p>
-      {evidence.citations.length ? <div className="flex flex-wrap gap-2">{evidence.citations.map((url, index) => <a key={`${index}:${url}`} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center break-all underline underline-offset-4" style={{ color: "var(--sh-signal)" }}>Source {index + 1}</a>)}</div> : <p>No source links recorded. This finding is not verified evidence.</p>}
+      <div className="min-w-0 break-words [&_p]:my-2 [&_li]:ml-5 [&_ul]:list-disc [&_ol]:list-decimal"><Markdown
+        rehypePlugins={[]}
+        remarkPlugins={[]}
+        skipHtml
+        allowedElements={["p", "strong", "em", "ul", "ol", "li", "blockquote", "br", "a", "code", "pre", "hr", "h1", "h2", "h3", "h4", "h5", "h6"]}
+        components={{
+          a: ({ href, children }) => evidenceUrl(href) ? <a href={evidenceUrl(href)} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4" style={{ color: "var(--sh-signal)" }}>{children}</a> : <span>{children} (link unavailable)</span>,
+          code: ({ children }) => <code className="whitespace-pre-wrap break-words">{children}</code>,
+          pre: ({ children }) => <pre className="whitespace-pre-wrap break-words">{children}</pre>,
+          h1: ({ children }) => <p className="font-semibold">{children}</p>,
+          h2: ({ children }) => <p className="font-semibold">{children}</p>,
+          h3: ({ children }) => <p className="font-semibold">{children}</p>,
+          h4: ({ children }) => <p className="font-semibold">{children}</p>,
+          h5: ({ children }) => <p className="font-semibold">{children}</p>,
+          h6: ({ children }) => <p className="font-semibold">{children}</p>,
+        }}
+      >{evidence.finding}</Markdown></div>
+      {evidence.citations.length ? <div className="flex flex-wrap gap-2">{evidence.citations.map((url, index) => evidenceUrl(url) ? <a key={`${index}:${url}`} href={evidenceUrl(url)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center break-all underline underline-offset-4" style={{ color: "var(--sh-signal)" }}>Source {index + 1}</a> : <span key={`${index}:${url}`} className="inline-flex min-h-11 items-center">Source {index + 1} · link unavailable</span>)}</div> : <p>No source links recorded. This finding is not verified evidence.</p>}
     </div>
   </details>;
 }
