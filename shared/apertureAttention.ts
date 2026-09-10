@@ -1,4 +1,5 @@
 import { monitoringFindingPresentation, type MonitoringInstrumentContext } from "./monitoringState";
+import { monitoringFindingHref } from "./monitoringFinding";
 import { paperInstrumentDisplayLabel, parseOccOptionSymbol } from "./paperInstrument";
 
 export type ApertureEntryState = "start" | "resume" | "check_in";
@@ -154,6 +155,8 @@ export type ApertureMotionItem = {
 export type ApertureAttentionBaseline = {
   capturedAt: number;
   items: Array<{ key: string; fingerprint: string; seenAt?: number }>;
+  /** Separate explicit review ledger. Never copied from a client Seen request. */
+  monitoringReviews?: import("./monitoringFinding").MonitoringReviewReceipt[];
 };
 
 export type ApertureAttentionBriefing = {
@@ -213,7 +216,7 @@ export function mergeAttentionBaseline(prior: ApertureAttentionBaseline | null, 
     const previous = items.get(record.key);
     if (!previous || previous.seenAt <= displayed.capturedAt) items.set(record.key, { key: record.key, fingerprint: record.fingerprint, seenAt: displayed.capturedAt });
   }
-  return { capturedAt: Math.max(prior?.capturedAt ?? 0, displayed.capturedAt), items: Array.from(items.values()).sort((a, b) => a.key.localeCompare(b.key)) };
+  return { capturedAt: Math.max(prior?.capturedAt ?? 0, displayed.capturedAt), items: Array.from(items.values()).sort((a, b) => a.key.localeCompare(b.key)), ...(prior?.monitoringReviews ? { monitoringReviews: prior.monitoringReviews } : {}) };
 }
 
 /** Select only versions observed in the visible viewport, not merely mounted or collapsed. */
@@ -360,6 +363,8 @@ function item(input: Omit<ApertureAttentionItem, "critical">): ApertureAttention
 }
 
 export function deriveApertureAttention(input: ApertureAttentionInput, prior: ApertureAttentionBaseline | null): ApertureAttentionBriefing {
+  // A receipt can predate the first displayed baseline; it is not Seen history.
+  if (prior?.capturedAt === 0 && prior.items.length === 0) prior = null;
   // A closed plan remains history, not a draft to resume. Exposure is evaluated independently.
   if (input.mission?.lifecycle === "closed") input = { ...input, mission: null, underwriting: null };
   const readState = input.checks.state === "complete" && (input.checks.asOf == null || !Number.isFinite(input.checks.asOf))
@@ -551,13 +556,13 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       kind: "invalidation_evidence",
       priority: finding.kind === "invalidation" ? 100 : 92,
       symbol: finding.symbol,
-      stateLabel: finding.kind === "invalidation" ? "Invalidation evidence" : "Material change",
+      stateLabel: presentation.stateLabel,
       title: `Review ${presentation.label}`,
       reason: presentation.summary,
       consequence: presentation.implication,
       evidence: presentation.evidence,
-      actionLabel: "Review what changed",
-      href: `/aperture/run/${finding.runId}/execute?candidate=${finding.candidateId ?? ""}&lifecycle=monitoring`,
+      actionLabel: presentation.review.state === "unknown" ? "Review unresolved finding" : "Review what changed",
+      href: monitoringFindingHref({ ...finding, flagged: true, citations: finding.citations }),
       updatedAt: finding.checkedAt,
     }));
   }
@@ -646,7 +651,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     const { updatedAt: _updatedAt, ...material } = record;
     // New check timestamps alone are not new findings; the full text/source set remains material.
     const comparable = "evidence" in material && material.evidence
-      ? { ...material, evidence: { ...material.evidence, checkedAt: 0 } } : material;
+      ? { ...material, href: material.href?.replace(/&finding=[^&]+&findingVersion=[^&]+/, ""), evidence: { ...material.evidence, checkedAt: 0 } } : material;
     return { key: record.key, fingerprint: attentionFingerprint(comparable) };
   });
   const baseline: ApertureAttentionBaseline = { capturedAt: input.now, items: baselineItems };

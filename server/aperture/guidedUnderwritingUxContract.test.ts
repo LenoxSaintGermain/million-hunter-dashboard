@@ -5,6 +5,14 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 
 describe("guided underwriting and returning check-in UX contracts", () => {
+  it("hydrates an exact immutable receipt before rendering actionable inputs without loading another device's draft", () => {
+    const runway = read("client/src/components/aperture/DecisionRunway.tsx");
+    expect(runway).toContain("const persisted = receiptTarget ? null : draftQuery.data ?? null");
+    expect(runway).toContain("hydratedDecisionRevisionId.current !== receiptTarget.revisionId");
+    expect(runway).not.toContain("if (receiptTarget || draftInitialized || receiptLoading");
+    expect(runway).toContain("setCapital(String(receipt.deployableCapitalCents / 100))");
+    expect(runway).toContain("setMaxLoss(String(receipt.maxPlannedLossCents / 100))");
+  });
   it("runs an authorized mission through to its usable result without another route or click", () => {
     const runway = read("client/src/components/aperture/DecisionRunway.tsx");
     const mission = read("client/src/pages/aperture/ApertureMission.tsx");
@@ -26,7 +34,7 @@ describe("guided underwriting and returning check-in UX contracts", () => {
 
     expect(feasibility).toBeGreaterThan(-1);
     expect(action).toBeGreaterThan(feasibility);
-    expect(runway).toContain("Target excluded from risk sizing");
+    expect(runway).toContain("never increases allowed risk");
     expect(runway).toContain("Allocated to this mission · not total account value");
     expect(runway).toContain("Your horizon determines which catalysts and review dates matter.");
     expect(runway).toContain("const explicitTargetProfitCents");
@@ -67,18 +75,18 @@ describe("guided underwriting and returning check-in UX contracts", () => {
 
   it("makes a completed underwriting result the current mission state and prevents duplicate action", () => {
     const runway = read("client/src/components/aperture/DecisionRunway.tsx");
-    const receipt = runway.indexOf('id="mission-underwriting-receipt"');
-    const result = runway.indexOf('id="mission-underwriting-result"');
+    const result = runway.indexOf("return <MissionResultWorkspace");
     const suggestions = runway.indexOf("Suggested missions");
 
     expect(runway).toContain("const underwritingMatchesInputs");
     expect(runway).toContain("const underwritingComplete");
     expect(runway).toContain("Underwriting complete · review result");
-    expect(runway).toContain("Underwriting complete. Review the result below.");
+    expect(runway).toContain("!editingCompletedMission && !draftError && !missionContextError");
     expect(runway).toContain("No paper ticket has been created.");
-    expect(receipt).toBeGreaterThan(-1);
-    expect(result).toBeGreaterThan(receipt);
-    expect(suggestions).toBeGreaterThan(-1);
+    expect(result).toBeGreaterThan(-1);
+    expect(suggestions).toBeGreaterThan(result);
+    expect(runway).toContain("{!underwritingComplete && <footer");
+    expect(runway).not.toContain('id="mission-underwriting-receipt"');
   });
 
   it("withholds the underwriting action while the persisted result is still loading", () => {

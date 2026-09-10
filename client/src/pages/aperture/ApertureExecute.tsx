@@ -9,8 +9,8 @@
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
  * Paper only. No live capital.
  */
-import { useState } from "react";
-import { useRoute, useLocation } from "wouter";
+import { useEffect, useRef, useState } from "react";
+import { useRoute, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../../server/routers";
@@ -30,12 +30,14 @@ import {
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { MonitoringFindingCard } from "@/components/aperture/MonitoringFindingCard";
+import { MonitoringFindingReview, revealMonitoringFinding } from "@/components/aperture/MonitoringFindingReview";
+import { monitoringFindingHref, monitoringFindingVersion, parseMonitoringFindingSelection, selectMonitoringFinding, type MonitoringFindingRoute } from "@shared/monitoringFinding";
 import { PaperProposalForm } from "@/components/aperture/PaperProposalForm";
 import { DecisionStepLock, decisionAuthorityAllowsDownstream } from "@/components/aperture/DecisionStepLock";
 import { format, formatDistanceToNow } from "date-fns";
 import { normalizeStringList } from "@shared/stringList";
 import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
-import { monitoringReviewState, partitionMonitoringHistory } from "@shared/monitoringState";
+import { monitoringFindingPresentation, monitoringReviewState, partitionMonitoringHistory } from "@shared/monitoringState";
 import { isOptionInstrument, paperInstrumentLabel } from "@shared/paperInstrument";
 
 const DISCLAIMER = "Internal research tool — not investment advice. Paper only — no real capital.";
@@ -298,10 +300,22 @@ function OrderQueue({ runId, focusCandidateId, ticketBuilderActive = false }: { 
 
 // ── Check whether thesis still holds ─────────────────────────────────────────
 
-function MonitoringPanel({ runId, candidate, thesisSummary, order }: {
+export function MonitoringPanel({ runId, candidate, thesisSummary, order, selection, onOpenFinding }: {
   runId: number; candidate?: { id: number; symbol: string }; thesisSummary?: string | null;
   order?: NonNullable<inferRouterOutputs<AppRouter>["aperture"]["order"]["list"]>[number];
+  selection: MonitoringFindingRoute;
+  onOpenFinding: (href: string) => void;
 }) {
+  const selectedElement = useRef<HTMLDivElement>(null);
+  const focusedVersion = useRef<string | null>(null);
+  const interrupted = useRef(false);
+  const selectionKey = selection && !("invalid" in selection) ? `${selection.orderId}:${selection.findingId}:${selection.findingVersion}` : null;
+  useEffect(() => {
+    interrupted.current = false;
+    const interrupt = () => { interrupted.current = true; };
+    window.addEventListener("pointerdown", interrupt); window.addEventListener("keydown", interrupt); window.addEventListener("wheel", interrupt, { passive: true });
+    return () => { window.removeEventListener("pointerdown", interrupt); window.removeEventListener("keydown", interrupt); window.removeEventListener("wheel", interrupt); };
+  }, [selectionKey]);
   const query = trpc.aperture.monitor.list.useQuery(
     { runId, candidateId: candidate?.id ?? -1 }, { enabled: candidate != null },
   );
@@ -322,6 +336,15 @@ function MonitoringPanel({ runId, candidate, thesisSummary, order }: {
     });
   };
   const { current: currentChecks, history: previousChecks } = partitionMonitoringHistory(checks ?? []);
+  const selected = selectMonitoringFinding(checks ?? [], selection);
+  const selectedCheck = selected.check;
+  const selectedOrderMatches = Boolean(order && selection && !("invalid" in selection) && order.id === selection.orderId);
+  const showSelected = selectedCheck && selectedOrderMatches;
+  useEffect(() => {
+    if (!showSelected || !selectionKey || focusedVersion.current === selectionKey || !selectedElement.current) return;
+    focusedVersion.current = selectionKey;
+    revealMonitoringFinding(selectedElement.current, interrupted.current);
+  }, [showSelected, selectionKey]);
   const reviewItems = currentChecks.filter((check) => monitoringReviewState(check).needsReview);
   return <div className="space-y-4">
     <section className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
@@ -332,9 +355,19 @@ function MonitoringPanel({ runId, candidate, thesisSummary, order }: {
     </section>
     {query.isLoading && <p role="status">Loading recorded checks…</p>}
     {query.isError && <div role="alert" className="rounded-lg border p-4"><p>Recorded monitoring could not load. Available records are retained; no all-clear is established.</p><Button variant="outline" className="mt-2 min-h-11" disabled={query.isFetching} onClick={() => void query.refetch()}>Retry saved status</Button></div>}
+    {selection && !query.isLoading && !query.isError && (!selectedCheck || !selectedOrderMatches) && <div role="alert" className="rounded-lg border p-4"><p>The exact finding or selected order could not be matched. No other finding has been substituted, and no review was saved.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void query.refetch()}>Reload recorded checks</Button><p className="mt-2 text-sm">Open a specific finding below, or return to Play Desk to recover the selected order.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding("/aperture/plays")}>Return to Play Desk</Button></div>}
+    {showSelected && <div ref={selectedElement} tabIndex={-1} data-selected-monitoring-finding={selectedCheck.id} className="scroll-mt-28 rounded-xl outline-offset-4" aria-label="Selected monitoring finding">
+      <p className="mb-2 text-sm font-semibold">{selected.historical ? "Selected historical finding" : "Selected finding"} · {monitoringFindingPresentation({ check: selectedCheck, instrument: order }).stateLabel}</p>
+      {selected.historical && <p className="mb-2 text-sm">A newer check exists below. This is the exact version you opened, not a current market claim.</p>}
+      <MonitoringFindingCard check={selectedCheck} instrument={order} rationale={order?.reason ?? thesisSummary} onRefresh={canCheck ? runScopedChecks : undefined} refreshing={runCheck.isPending} />
+      <MonitoringFindingReview key={selectionKey} target={{ runId, candidateId: candidate!.id, orderId: order!.id, findingId: selectedCheck.id, findingVersion: monitoringFindingVersion(selectedCheck) }} />
+    </div>}
     {reviewItems.length > 0 && <p role="status" className="text-sm font-medium">{reviewItems.length} check{reviewItems.length === 1 ? " needs" : "s need"} review. Open the evidence beside each finding.</p>}
-    <div className="space-y-3">{currentChecks.map((check) => <MonitoringFindingCard key={check.id} check={check} instrument={order} rationale={order?.reason ?? thesisSummary} onRefresh={canCheck ? runScopedChecks : undefined} refreshing={runCheck.isPending} />)}</div>
-    {previousChecks.length > 0 && <details className="rounded-lg border p-3"><summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">Previous checks · {previousChecks.length}</summary><p className="mb-3 text-sm">Historical versions, not additional current review tasks. No finding is acknowledged or erased.</p><div className="space-y-3">{previousChecks.map(check => <MonitoringFindingCard key={check.id} check={check} instrument={order} rationale={order?.reason ?? thesisSummary} />)}</div></details>}
+    <div className="space-y-3">{currentChecks.filter(check => !showSelected || check.id !== selectedCheck.id).map((check) => <div key={check.id}>
+      <MonitoringFindingCard check={check} instrument={order} rationale={order?.reason ?? thesisSummary} onRefresh={canCheck ? runScopedChecks : undefined} refreshing={runCheck.isPending} />
+      {order && candidate && <Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding(monitoringFindingHref({ ...check, runId, candidateId: candidate.id, orderId: order.id }))}>Review this finding</Button>}
+    </div>)}</div>
+    {previousChecks.length > 0 && <details className="rounded-lg border p-3"><summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">Previous checks · {previousChecks.length}</summary><p className="mb-3 text-sm">Historical versions, not additional current review tasks. No finding is acknowledged or erased.</p><div className="space-y-3">{previousChecks.filter(check => !showSelected || check.id !== selectedCheck.id).map(check => <div key={check.id}><MonitoringFindingCard check={check} instrument={order} rationale={order?.reason ?? thesisSummary} />{order && candidate && <Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding(monitoringFindingHref({ ...check, runId, candidateId: candidate.id, orderId: order.id }))}>Review this recorded version</Button>}</div>)}</div></details>}
     {!query.isLoading && !query.isError && checks?.length === 0 && <p className="text-sm">No monitoring checks recorded for this play. No conclusion about its current thesis is available.</p>}
   </div>;
 }
@@ -819,11 +852,17 @@ export default function ApertureExecute() {
   const [, params] = useRoute("/aperture/run/:id/execute");
   const runId = Number(params?.id);
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const findingSelection = parseMonitoringFindingSelection(search);
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [lifecycleTab, setLifecycleTab] = useState<"orders" | "monitoring" | "alpha">(() => {
     const requested = new URLSearchParams(window.location.search).get("lifecycle");
     return requested === "monitoring" || requested === "alpha" ? requested : "orders";
   });
+  useEffect(() => {
+    const requested = new URLSearchParams(search).get("lifecycle");
+    if (requested === "monitoring" || requested === "alpha") setLifecycleTab(requested);
+  }, [search]);
   const openLifecycle = (tab: "orders" | "monitoring" | "alpha") => {
     setLifecycleTab(tab);
     window.requestAnimationFrame(() => document.getElementById("paper-lifecycle")?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -835,7 +874,8 @@ export default function ApertureExecute() {
     return <DashboardLayout><DecisionStepLock authority={data.decisionAuthority} step="Ticket" onOpenReceipt={() => navigate(`/aperture/decision/${data.decisionAuthority!.decisionRunId}/revision/${data.decisionAuthority!.revisionId}`)} /></DashboardLayout>;
   }
   const run = data?.run;
-  const candidateId = Number(new URLSearchParams(window.location.search).get("candidate"));
+  const candidateId = Number(new URLSearchParams(search).get("candidate"));
+  const requestedOrderId = new URLSearchParams(search).get("order");
   const proposalCandidate = Number.isFinite(candidateId) && candidateId > 0 ? data?.candidates.find((candidate) => candidate.id === candidateId) : undefined;
   const proposalEvidence = proposalCandidate
     ? getEvidenceReviewReadiness(
@@ -847,8 +887,12 @@ export default function ApertureExecute() {
   const unreviewedEvidenceChecks = proposalEvidence?.unreviewedChecks ?? [];
   const evidenceReviewRequired = unreviewedEvidenceChecks.length > 0;
   const candidateActiveOrder = proposalCandidate
-    ? runOrders?.find((order) => order.candidateId === proposalCandidate.id && ["pending_approval", "approved", "submitted", "filled"].includes(order.status))
+    ? runOrders?.find((order) => order.candidateId === proposalCandidate.id && (requestedOrderId == null || order.id === Number(requestedOrderId)) && ["pending_approval", "approved", "submitted", "filled"].includes(order.status))
     : undefined;
+  // A historical finding retains the exact order expression even if that order
+  // is no longer active. Do not substitute the first same-candidate order.
+  const monitoringOrder = requestedOrderId == null ? candidateActiveOrder
+    : runOrders?.find(order => order.id === Number(requestedOrderId) && order.candidateId === proposalCandidate?.id);
   const candidateOrderDecision = candidateActiveOrder
     ? candidateActiveOrder.status === "submitted"
       ? {
@@ -905,7 +949,7 @@ export default function ApertureExecute() {
               <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             </Button>
             <h1 className="min-w-0 text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>
-              Paper ticket
+              {lifecycleTab === "monitoring" ? "Review play" : "Paper ticket"}
             </h1>
           </div>
           {run && (
@@ -923,12 +967,12 @@ export default function ApertureExecute() {
                 <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title ?? (paperStageDeclined ? "Paper stage declined — preserve cash for this candidate" : evidenceReviewRequired ? data.brief.nextDecision.title : `${proposalCandidate.symbol} evidence review complete · check ticket readiness`)}</p>
                 <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{candidateOrderDecision?.detail ?? (paperStageDeclined ? "A required evidence answer was recorded as not confirmed. This revision cannot prepare a proposal or create an order." : evidenceReviewRequired ? data.brief.nextDecision.detail : "The remaining path is exact contract → proposal → approve → submit. Each step stays separate and nothing is sent automatically.")}</p>
               </div>
-              {candidateOrderDecision ? <Button size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => openLifecycle(candidateOrderDecision.lifecycleTab)}>{candidateOrderDecision.action}</Button> : evidenceReviewRequired && <Button variant="outline" size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => navigate(evidenceUrl)}>{`Review ${unreviewedEvidenceChecks.length} required check${unreviewedEvidenceChecks.length === 1 ? "" : "s"}`}</Button>}
+              {candidateOrderDecision ? candidateOrderDecision.lifecycleTab !== lifecycleTab && <Button size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => openLifecycle(candidateOrderDecision.lifecycleTab)}>{candidateOrderDecision.action}</Button> : evidenceReviewRequired && <Button variant="outline" size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => navigate(evidenceUrl)}>{`Review ${unreviewedEvidenceChecks.length} required check${unreviewedEvidenceChecks.length === 1 ? "" : "s"}`}</Button>}
             </div>
           </div>
         )}
 
-        {proposalCandidate && candidateActiveOrder ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "color-mix(in srgb, var(--sh-emerald) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div className="min-w-0"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-emerald)" }}>Paper order already exists · do not duplicate</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{orderInstrumentLabel(candidateActiveOrder)}</h2><p className="mt-1 text-sm tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>{orderSizeLabel(candidateActiveOrder)} · {candidateActiveOrder.orderType.toUpperCase()} · {candidateActiveOrder.timeInForce.toUpperCase()}{candidateActiveOrder.limitPriceCents ? ` · limit ${fmtPrice(candidateActiveOrder.limitPriceCents)}` : ""}</p><p className="mt-2 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title}</p></div></div></section> : proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(evidenceUrl)}>Review the recorded evidence decision</Button></section> : proposalCandidate && evidenceReviewRequired ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper ticket locked · step 1 of 4</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Review {unreviewedEvidenceChecks.length} decision-critical check{unreviewedEvidenceChecks.length === 1 ? "" : "s"} before building the ticket.</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This is the only blocker to address on this screen. After the final positive review, the flow advances to exact contract → proposal → approve → submit. A negative review preserves cash instead.</p><ol className="mt-4 space-y-2">{unreviewedEvidenceChecks.map((check, index) => <li key={check} className="flex gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}><span className="font-mono text-xs tabular-nums" style={{ color: "var(--sh-signal)" }}>{index + 1}</span><span>{check}</span></li>)}</ol><Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={() => navigate(evidenceUrl)}>Review {unreviewedEvidenceChecks.length} required check{unreviewedEvidenceChecks.length === 1 ? "" : "s"}</Button></section> : proposalCandidate && <PaperProposalForm key={`${runId}:${proposalCandidate.id}`} runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} evidenceReviewComplete={proposalEvidence?.paperProposalReady === true} onReturnToBrief={() => navigate(evidenceUrl)} onReturnToDecisionBrief={() => setShowAlternatives(true)} onProposalCreated={() => openLifecycle("orders")} onCashPreserved={() => navigate("/aperture/plays")} />}
+        {lifecycleTab !== "monitoring" && (proposalCandidate && candidateActiveOrder ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "color-mix(in srgb, var(--sh-emerald) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div className="min-w-0"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-emerald)" }}>Paper order already exists · do not duplicate</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{orderInstrumentLabel(candidateActiveOrder)}</h2><p className="mt-1 text-sm tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>{orderSizeLabel(candidateActiveOrder)} · {candidateActiveOrder.orderType.toUpperCase()} · {candidateActiveOrder.timeInForce.toUpperCase()}{candidateActiveOrder.limitPriceCents ? ` · limit ${fmtPrice(candidateActiveOrder.limitPriceCents)}` : ""}</p><p className="mt-2 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title}</p></div></div></section> : proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(evidenceUrl)}>Review the recorded evidence decision</Button></section> : proposalCandidate && evidenceReviewRequired ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper ticket locked · step 1 of 4</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Review {unreviewedEvidenceChecks.length} decision-critical check{unreviewedEvidenceChecks.length === 1 ? "" : "s"} before building the ticket.</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This is the only blocker to address on this screen. After the final positive review, the flow advances to exact contract → proposal → approve → submit. A negative review preserves cash instead.</p><ol className="mt-4 space-y-2">{unreviewedEvidenceChecks.map((check, index) => <li key={check} className="flex gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}><span className="font-mono text-xs tabular-nums" style={{ color: "var(--sh-signal)" }}>{index + 1}</span><span>{check}</span></li>)}</ol><Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={() => navigate(evidenceUrl)}>Review {unreviewedEvidenceChecks.length} required check{unreviewedEvidenceChecks.length === 1 ? "" : "s"}</Button></section> : proposalCandidate && <PaperProposalForm key={`${runId}:${proposalCandidate.id}`} runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} evidenceReviewComplete={proposalEvidence?.paperProposalReady === true} onReturnToBrief={() => navigate(evidenceUrl)} onReturnToDecisionBrief={() => setShowAlternatives(true)} onProposalCreated={() => openLifecycle("orders")} onCashPreserved={() => navigate("/aperture/plays")} />)}
 
         {showAlternatives && proposalCandidate && <section className="scroll-mt-4 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }} aria-live="polite">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -958,7 +1002,7 @@ export default function ApertureExecute() {
             <OrderQueue runId={runId} focusCandidateId={proposalCandidate?.id} ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired && !candidateActiveOrder)} />
           </TabsContent>
           <TabsContent value="monitoring" className="mt-4 min-w-0" aria-label="Check whether thesis still holds">
-            <MonitoringPanel runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule} order={candidateActiveOrder} />
+            <MonitoringPanel key={`${runId}:${proposalCandidate?.id}:${requestedOrderId ?? "default"}`} runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule} order={monitoringOrder} selection={findingSelection} onOpenFinding={navigate} />
           </TabsContent>
           <TabsContent value="alpha" className="mt-4 min-w-0" aria-label="Outcome and notes">
             <AlphaDashboard runId={runId} />

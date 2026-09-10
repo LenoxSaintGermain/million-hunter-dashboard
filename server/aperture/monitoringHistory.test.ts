@@ -30,10 +30,19 @@ describe("Current monitoring versus recorded history", () => {
     const result = partitionMonitoringHistory([check(1, "catalyst", now - 2, true), check(2, "thesis_invalidation", now - 1, false, "UNKNOWN · source unavailable"), check(3, "macro", now)], now);
     expect(result.current.map(item => item.id)).toEqual([1, 2, 3]);
   });
+  it("keeps an unresolved catalyst first when every check is stale without claiming fresh evidence", () => {
+    const checkedAt = now - 2 * 86_400_000;
+    const records = [check(1, "catalyst", checkedAt, true), check(2, "thesis_invalidation", checkedAt), check(3, "earnings", checkedAt), check(4, "macro", checkedAt)];
+    const result = partitionMonitoringHistory(records, now);
+    expect(result.current.map(item => item.id)).toEqual([1, 4, 3, 2]);
+    expect(monitoringReviewState(result.current[0], now).state).toBe("unknown");
+    expect(monitoringReviewState(result.current[0], now).reason).toContain("unresolved");
+  });
   it("wires only current checks into the live review count, with history retained separately", () => {
     const source = readFileSync("client/src/pages/aperture/ApertureExecute.tsx", "utf8");
     expect(source).toContain("const reviewItems = currentChecks.filter");
     expect(source).toContain("Previous checks · {previousChecks.length}");
-    expect(source).toContain("previousChecks.map(check => <MonitoringFindingCard");
+    expect(source).toContain("previousChecks.filter(check => !showSelected || check.id !== selectedCheck.id)");
+    expect(source).toContain("Selected historical finding");
   });
 });

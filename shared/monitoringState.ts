@@ -29,7 +29,7 @@ export function partitionMonitoringHistory<T extends MonitoringObservation & { i
   }
   const priority = (check: T) => {
     const review = monitoringReviewState(check, now);
-    return review.state === "flagged" ? 2 : review.needsReview ? 1 : 0;
+    return hasRecordedMonitoringConcern(check) ? 2 : review.needsReview ? 1 : 0;
   };
   // A late-written routine check must not bury the finding that opened this view.
   current.sort((a, b) => priority(b) - priority(a) || b.checkedAt - a.checkedAt || b.id - a.id);
@@ -54,7 +54,13 @@ export function monitoringFindingPresentation({ check, instrument, rationale, no
   const checkLabel = ({ catalyst: "Catalyst", thesis_invalidation: "Invalidation", earnings: "Earnings", macro: "Market context" } as Record<string, string>)[check.checkType ?? ""] ?? "Monitoring";
   const review = monitoringReviewState(check, now);
   const expression = kind === "long_put" ? "selected put" : kind === "long_call" ? "selected call" : kind === "shares" ? "share position" : "selected play";
-  const summary = review.state === "unknown" ? `${checkLabel} evidence needs verification for this ${expression}.`
+  const unresolved = hasRecordedMonitoringConcern(check);
+  const stale = !Number.isFinite(check.checkedAt) || now - check.checkedAt > MONITORING_FRESHNESS_MS;
+  const stateLabel = unresolved && stale ? "Unresolved finding · stale evidence"
+    : review.state === "unknown" ? "Evidence not verified"
+      : unresolved ? "Flagged finding · unresolved" : "No flagged change";
+  const summary = unresolved && stale ? `${checkLabel} was previously flagged for this ${expression}. Refresh its evidence before relying on it.`
+    : review.state === "unknown" ? `${checkLabel} evidence needs verification for this ${expression}.`
     : review.state === "flagged" ? `${checkLabel} check flagged a change for this ${expression}.`
       : `${checkLabel} check recorded no flagged change.`;
   const implication = kind === "long_put"
@@ -62,7 +68,7 @@ export function monitoringFindingPresentation({ check, instrument, rationale, no
     : kind === "long_call"
       ? "Stock outlook alone does not establish whether this call still fits its recorded rationale. Review the evidence; no automatic exit."
       : "Compare the finding with this play’s recorded rationale and invalidation. Its effect is not verified by the flag alone; no automatic exit.";
-  return { label, checkLabel, review, summary, implication,
+  return { label, checkLabel, review, summary, implication, stateLabel,
     evidence: { finding: check.finding ?? "No finding recorded.", citations: validMonitoringCitations(check.citations), checkedAt: check.checkedAt, rationale: rationale?.trim() || null },
   };
 }
@@ -74,6 +80,13 @@ export function validMonitoringCitations(citations: unknown): string[] {
   );
 }
 
+/** Freshness does not erase a sourced concern. A provider failure is not a sourced concern. */
+export function hasRecordedMonitoringConcern(observation: MonitoringObservation): boolean {
+  return observation.flagged && Boolean(observation.finding?.trim())
+    && !observation.finding!.trim().startsWith(UNKNOWN_MONITORING_PREFIX)
+    && validMonitoringCitations(observation.citations).length > 0;
+}
+
 export function monitoringReviewState(
   observation: MonitoringObservation,
   now = Date.now(),
@@ -83,7 +96,9 @@ export function monitoringReviewState(
       state: "unknown",
       needsReview: true,
       nextAction: "Refresh sourced monitoring evidence",
-      reason: "Monitoring evidence is stale.",
+      reason: hasRecordedMonitoringConcern(observation)
+        ? "Monitoring evidence is stale. The previously flagged concern remains unresolved."
+        : "Monitoring evidence is stale.",
     };
   }
   if (

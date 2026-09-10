@@ -176,7 +176,10 @@ export default function AperturePlayDesk() {
 
     <section id="desk-attention" aria-label="Attention across all plays" className="space-y-3">
       {disclosure?.primary && <AttentionTask item={disclosure.primary} prominent onOpen={navigate} />}
-      {!!disclosure?.otherCritical.length && <div id="desk-critical" className="space-y-3"><h2 className="text-sm font-semibold">Other critical issues · visible across all filters</h2>{disclosure.otherCritical.map((item) => <AttentionTask key={item.key} item={item} onOpen={navigate} />)}</div>}
+      {!!disclosure?.otherCritical.length && <section id="desk-critical" aria-labelledby="desk-critical-heading" className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b px-4 py-3" style={{ borderColor: "var(--sh-border-1)" }}><h2 id="desk-critical-heading" className="text-base font-semibold">Also needs you · {disclosure.otherCritical.length}</h2><p className="text-sm" style={{ color: "var(--sh-text-secondary)" }}>Visible across all filters</p></header>
+        <div>{disclosure.otherCritical.map((item) => <AttentionTask key={item.key} item={item} compact onOpen={navigate} />)}</div>
+      </section>}
       {outsideFilters.length > 0 && <p role="status" className="text-sm leading-6" style={{ color: "var(--sh-text-primary)" }}>{outsideFilters.length} critical issue{outsideFilters.length === 1 ? "" : "s"} outside these filters. Their review actions remain above. <button type="button" className="min-h-11 font-semibold underline underline-offset-4" onClick={() => navigate(playDeskFilterHref(search, { instrument: "all", stage: "all" }))}>Show all plays and stages</button></p>}
       {!!disclosure?.otherAttention.length && <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer p-3 text-sm font-semibold">Other decisions ({disclosure.otherAttention.length})</summary><div className="space-y-2 p-3 pt-0">{disclosure.otherAttention.map((item) => <AttentionTask key={item.key} item={item} onOpen={navigate} />)}</div></details>}
     </section>
@@ -274,8 +277,8 @@ export function deskOrderQuantities(order: { qty: number | null; filledQty: numb
   };
 }
 
-function AttentionTask({ item, prominent = false, onOpen }: { item: ApertureAttentionItem; prominent?: boolean; onOpen: (href: string) => void }) {
-  return <AttentionDecisionCard item={item} prominent={prominent} onOpen={onOpen} />;
+function AttentionTask({ item, prominent = false, compact = false, onOpen }: { item: ApertureAttentionItem; prominent?: boolean; compact?: boolean; onOpen: (href: string) => void }) {
+  return <AttentionDecisionCard item={item} prominent={prominent} compact={compact} onOpen={onOpen} />;
 }
 
 /** Match the persisted order identity, never another position in the same ticker. */

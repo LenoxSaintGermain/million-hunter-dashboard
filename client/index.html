@@ -54,10 +54,31 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script
-      defer
-      src="%VITE_ANALYTICS_ENDPOINT%/umami"
-      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+    <script type="module" data-optional-analytics>
+      // Optional telemetry must never emit an unresolved placeholder request.
+      // Keep the existing public configuration; no configuration means no script.
+      const endpoint = import.meta.env.VITE_ANALYTICS_ENDPOINT?.trim();
+      const websiteId = import.meta.env.VITE_ANALYTICS_WEBSITE_ID?.trim();
+      const fixturePage = ["/demo", "/demo-tour", "/brief", "/walkthrough", "/aperture/walkthrough"].includes(location.pathname.replace(/\/$/, ""));
+      if (!fixturePage && endpoint && websiteId && !/\x25VITE_[A-Z_]+\x25/.test(endpoint + websiteId) && !document.querySelector("script[data-sh-analytics]")) {
+        try {
+          // Accept an absolute HTTP(S) endpoint or an explicit same-origin path.
+          const validBase = /^https?:\/\//.test(endpoint) || /^\/(?!\/)/.test(endpoint);
+          const url = new URL(endpoint, location.origin);
+          if (validBase && ["https:", "http:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash) {
+            url.pathname = `${url.pathname.replace(/\/+$/, "")}/umami`;
+            const script = document.createElement("script");
+            script.defer = true;
+            script.src = url.href;
+            script.dataset.websiteId = websiteId;
+            script.dataset.shAnalytics = "true";
+            document.head.appendChild(script);
+          }
+        } catch {
+          // Invalid optional analytics must not interrupt application startup.
+        }
+      }
+    </script>
   </body>
 
 </html>

@@ -21,7 +21,14 @@ const PURPOSES: Array<{ id: Purpose; label: string }> = [
   { id: "property", label: "Property" },
 ];
 
-const STARTER = "I am researching a paper-only capital thesis. State the belief, evidence basis, what it seeks, what it avoids, time horizon, invalidation condition, and risk boundary. Do not infer missing facts or create an order.";
+const THESIS_GUIDANCE = "Describe your belief, why you hold it, and what would change your mind.";
+
+export function thesisDraftValidation(statement: string, submittedText: string, name: string) {
+  if (statement.trim().length < 20) return "Write your own thesis statement (at least 20 characters) before saving.";
+  if (submittedText.length > 4_000) return "Shorten the statement and thesis detail to 4,000 characters total.";
+  if (name.trim().length > 120) return "Shorten the version name to 120 characters.";
+  return null;
+}
 
 function route(path: string) {
   return aperturePathForFixture(path, readIsolatedUatIdentity());
@@ -41,7 +48,9 @@ export function CapitalThesisWorkspace() {
   const [missionError, setMissionError] = useState<string | null>(null);
   const [saveReceipt, setSaveReceipt] = useState<ThesisSaveReceipt | null>(null);
   const [draftName, setDraftName] = useState("");
-  const [draftText, setDraftText] = useState(STARTER);
+  const [draftText, setDraftText] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [showSavedRecords, setShowSavedRecords] = useState(false);
   const [detail, setDetail] = useState(EMPTY_DETAIL);
 
   const capitalTheses = useMemo(
@@ -50,6 +59,12 @@ export function CapitalThesisWorkspace() {
   );
   const active = capitalTheses.find((thesis: any) => thesis.isActiveCapital) ?? capitalTheses[0] ?? null;
   const selected = creating ? null : capitalTheses.find((thesis: any) => thesis.id === selectedId) ?? active;
+
+  useEffect(() => {
+    // Once the empty workspace opens a draft, a later list refresh must not
+    // select a newly discovered saved row over the operator's unsaved text.
+    if (!isLoading && !error && !selected) setCreating(true);
+  }, [isLoading, error, selected?.id]);
 
   useEffect(() => {
     if (selected) {
@@ -92,14 +107,17 @@ export function CapitalThesisWorkspace() {
     ].filter(([, value]) => value.trim()).map(([label, value]) => `${label}: ${value.trim()}`);
     return rows.length ? `${draftText.trim()}\n\nThesis detail\n${rows.join("\n")}` : draftText.trim();
   };
-  const applyFraming = (starter: string) => {
-    setDraftText((current) => current.trim() ? `${starter} ${current.trim()}` : starter);
-  };
+  const validationError = thesisDraftValidation(draftText, detailedThesisText(), draftName);
   const createInline = async (openMission = false) => {
-    if (draftText.trim().length < 20) return;
-    const result = await createCapital.mutateAsync({ thesisText: detailedThesisText(), name: draftName.trim() || undefined, details: { ...detail } });
-    toast.success(`Saved exactly as “${result.persistedName}”`, { description: openMission ? "Opening Capital Mission." : `Canonical thesis #${result.compilationId}` });
-    if (openMission) await useInMissionFor(result.compilationId);
+    if (validationError || createCapital.isPending || activate.isPending || project.isPending) return;
+    setSaveError(null);
+    try {
+      const result = await createCapital.mutateAsync({ thesisText: detailedThesisText(), name: draftName.trim() || undefined, details: { ...detail } });
+      toast.success(`Saved exactly as “${result.persistedName}”`, { description: openMission ? "Opening Capital Mission." : `Canonical thesis #${result.compilationId}` });
+      if (openMission) await useInMissionFor(result.compilationId);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "No save confirmation was received.");
+    }
   };
   const useInMissionFor = async (compilationId: number) => {
     setMissionError(null);
@@ -137,11 +155,11 @@ export function CapitalThesisWorkspace() {
   const alternatives = capitalTheses.filter((thesis: any) => thesis.id !== selected?.id);
   const visibleAlternatives = showMore ? alternatives : alternatives.slice(0, 3);
   const deadline = selected?.latestCatalystDeadlineAt ? new Date(Number(selected.latestCatalystDeadlineAt)) : null;
-  const Composer = ({ versioning = false }: { versioning?: boolean }) => <section className="mt-4 space-y-3 rounded-md border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+  // Render as part of this component: a nested component type remounts on every keystroke.
+  const renderComposer = (versioning = false) => <section className="mt-4 space-y-3 rounded-md border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
     <div><p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>{versioning ? "New canonical version" : "New canonical thesis"}</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{versioning ? "The active source and every prior mission receipt remain unchanged." : "Save a source first. Starting a mission remains a separate choice."}</p></div>
-    <label className="block text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Thesis statement<textarea value={draftText} onChange={(event) => setDraftText(event.target.value)} aria-label="Thesis statement" className="mt-2 min-h-32 w-full resize-y rounded border bg-transparent p-3 text-sm leading-6" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} /></label>
-    <div className="flex flex-wrap gap-2" aria-label="Thesis framing helpers">{[["Where can I…", "Where can I find evidence for this paper-only thesis?"], ["How can I…", "How can I test this belief without exceeding the stated risk boundary?"], ["What would…", "What would invalidate the current thesis framing?" ]].map(([label, starter]) => <button key={label} type="button" onClick={() => applyFraming(starter)} className="min-h-9 rounded-full border px-3 text-xs font-semibold" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}>{label}</button>)}</div>
-    <p className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>Helpers prepend an editable framing prompt and preserve your current statement. They never replace content.</p>
+    <label className="block text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Thesis statement<textarea value={draftText} onChange={(event) => setDraftText(event.target.value)} aria-label="Thesis statement" aria-describedby="thesis-guidance thesis-validation" placeholder={THESIS_GUIDANCE} className="mt-2 min-h-32 w-full resize-y rounded border bg-transparent p-3 text-sm leading-6" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} /></label>
+    <p id="thesis-guidance" className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{THESIS_GUIDANCE} Guidance is not saved as your belief.</p>
     <button type="button" onClick={() => setShowDetails((current) => !current)} aria-expanded={showDetails} className="inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}><ChevronDown className={showDetails ? "h-3.5 w-3.5 rotate-180" : "h-3.5 w-3.5"} />Add thesis detail</button>
     {showDetails && <div className="grid gap-2 sm:grid-cols-2">
       {[["belief", "Belief"], ["evidence", "Evidence basis"], ["seeks", "Seeks"], ["avoids", "Avoids"], ["horizon", "Horizon"], ["invalidation", "Invalidation"], ["risk", "Risk boundary"], ["symbols", "Symbols or research universe"]].map(([key, label]) => <label key={key} className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{label}<input value={detail[key as keyof typeof detail]} onChange={(event) => setDetail((current) => ({ ...current, [key]: event.target.value }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} /></label>)}
@@ -149,7 +167,9 @@ export function CapitalThesisWorkspace() {
       <label className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Instrument<select value={detail.instrument} onChange={(event) => setDetail((current) => ({ ...current, instrument: event.target.value as Instrument }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><option value="shares">Shares only</option><option value="options">Defined-risk options</option><option value="either">Either; keep explicit at mission setup</option></select></label>
     </div>}
     <label className="block text-xs" style={{ color: "var(--sh-fg-muted)" }}>Version name<input value={draftName} onChange={(event) => setDraftName(event.target.value)} aria-label="Thesis name" placeholder="Name this thesis version" className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} /></label>
-    <div className="flex flex-col gap-2 sm:flex-row"><Button type="button" variant="outline" className="min-h-11" onClick={() => void createInline(false)} disabled={createCapital.isPending || draftText.trim().length < 20}>{createCapital.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save without starting a run</Button><Button type="button" className="min-h-11 flex-1" onClick={() => void createInline(true)} disabled={createCapital.isPending || activate.isPending || project.isPending || draftText.trim().length < 20}>{createCapital.isPending || activate.isPending || project.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}Save and use in Capital Mission</Button></div>
+    <p id="thesis-validation" aria-live="polite" className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{validationError ?? "Ready to save. This does not create an order."}</p>
+    {saveError && <div role="alert" className="space-y-2 text-sm" style={{ color: "var(--sh-red)" }}><p>Save not confirmed: {saveError} Your draft is preserved. Check saved theses before retrying.</p><Button type="button" variant="outline" className="min-h-11" onClick={() => { setShowSavedRecords(true); void utils.thesis.list.invalidate(); }}>Check saved theses</Button>{showSavedRecords && <section aria-label="Last loaded saved theses" style={{ color: "var(--sh-text-primary)" }}><p className="font-semibold">Last loaded saved theses</p>{capitalTheses.length ? <ul className="mt-1 space-y-1">{capitalTheses.map((thesis) => <li key={thesis.id}>{canonicalThesisLabel(thesis)}</li>)}</ul> : <p>No saved thesis was returned by the last successful list request.</p>}</section>}</div>}
+    <div className="flex flex-col gap-2 sm:flex-row"><Button type="button" variant="outline" className="min-h-11" onClick={() => void createInline(false)} disabled={createCapital.isPending || activate.isPending || project.isPending || Boolean(validationError)}>{createCapital.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save without starting a run</Button><Button type="button" className="min-h-11 flex-1" onClick={() => void createInline(true)} disabled={createCapital.isPending || activate.isPending || project.isPending || Boolean(validationError)}>{createCapital.isPending || activate.isPending || project.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}Save and use in Capital Mission</Button></div>
   </section>;
 
   return (
@@ -187,8 +207,8 @@ export function CapitalThesisWorkspace() {
               <button type="button" onClick={() => setChoosing((current) => !current)} aria-expanded={choosing} className="inline-flex min-h-10 items-center gap-1.5 rounded border px-3 text-xs font-semibold" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><Pencil className="h-3.5 w-3.5" />Change thesis</button>
             </div>
             <div className="mt-3 flex flex-wrap gap-2 font-mono text-[0.65rem] uppercase tracking-[0.08em]" style={{ color: "var(--sh-fg-muted)" }}><span>Capital</span><span>·</span><span>{selected.status ?? "review"}</span><span>·</span><span>{deadline ? `freshness due ${deadline.toLocaleDateString()}` : "freshness not measured"}</span><span>·</span><span>version {selected.id}</span></div>
-            {choosing && <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Owner-scoped alternatives</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{alternatives.map((thesis: any) => <button type="button" key={thesis.id} onClick={() => { setSelectedId(thesis.id); setChoosing(false); setEditing(false); }} className="min-h-10 rounded border px-3 text-left text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}>{canonicalThesisLabel(thesis)}</button>)}</div><button type="button" onClick={() => { setCreating(true); setChoosing(false); setDraftName(""); setDraftText(STARTER); setDetail(EMPTY_DETAIL); }} className="mt-3 min-h-10 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Create a new thesis</button><button type="button" onClick={() => { setEditing(true); setChoosing(false); }} className="ml-4 min-h-10 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Edit as new version</button></div>}
-            {editing ? <Composer versioning /> : <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm leading-6" style={{ color: "var(--sh-text-primary)" }}>{selected.thesisText}</p>}
+            {choosing && <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Owner-scoped alternatives</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{alternatives.map((thesis: any) => <button type="button" key={thesis.id} onClick={() => { setSelectedId(thesis.id); setChoosing(false); setEditing(false); }} className="min-h-10 rounded border px-3 text-left text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}>{canonicalThesisLabel(thesis)}</button>)}</div><button type="button" onClick={() => { setCreating(true); setChoosing(false); setDraftName(""); setDraftText(""); setSaveError(null); setSaveReceipt(null); setDetail(EMPTY_DETAIL); }} className="mt-3 min-h-10 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Create a new thesis</button><button type="button" onClick={() => { setEditing(true); setChoosing(false); }} className="ml-4 min-h-10 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Edit as new version</button></div>}
+            {editing ? renderComposer(true) : <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm leading-6" style={{ color: "var(--sh-text-primary)" }}>{selected.thesisText}</p>}
           </section>
 
           <section className="grid gap-3 lg:grid-cols-[1.15fr_.85fr]">
@@ -199,9 +219,9 @@ export function CapitalThesisWorkspace() {
           <section className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-paper)" }}><div className="flex items-center justify-between gap-3"><div><p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Contextual Thesis Library</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Owner-scoped Capital alternatives. Ranking is descriptive, never approval.</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-3">{visibleAlternatives.map((thesis: any) => <button key={thesis.id} type="button" onClick={() => { setSelectedId(thesis.id); setEditing(false); }} className="min-h-16 rounded border p-3 text-left text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><span className="block font-semibold">{thesis.name ?? "Untitled thesis"}</span><span className="mt-1 block" style={{ color: "var(--sh-fg-muted)" }}>{thesis.status ?? "review"} · v{thesis.id}</span></button>)}</div>{alternatives.length > 3 && <button type="button" onClick={() => setShowMore((current) => !current)} className="mt-3 inline-flex min-h-10 items-center gap-1 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}><ChevronDown className="h-3.5 w-3.5" /> {showMore ? "Show less" : `Show ${alternatives.length - 3} more`}</button>}</section>
 
           {missionError && <p role="alert" className="rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-red)", color: "var(--sh-red)" }}>{missionError}</p>}
-          <div className="flex flex-col gap-2 sm:flex-row"><Button className="min-h-11 flex-1" onClick={() => void useInMission()} disabled={activate.isPending || project.isPending}>{activate.isPending || project.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}Use in Capital Mission</Button><Button variant="outline" className="min-h-11" onClick={() => { setMissionError(null); setCreating(true); setDraftName(""); setDraftText(STARTER); setDetail(EMPTY_DETAIL); setEditing(false); }}>Create new Capital thesis</Button></div>
+          <div className="flex flex-col gap-2 sm:flex-row"><Button className="min-h-11 flex-1" onClick={() => void useInMission()} disabled={activate.isPending || project.isPending}>{activate.isPending || project.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}Use in Capital Mission</Button><Button variant="outline" className="min-h-11" onClick={() => { setMissionError(null); setCreating(true); setDraftName(""); setDraftText(""); setSaveError(null); setSaveReceipt(null); setDetail(EMPTY_DETAIL); setEditing(false); }}>Create new Capital thesis</Button></div>
         </>
-      ) : <section className="rounded-lg border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-paper)" }}><p className="font-mono text-[0.65rem] uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>New Capital thesis</p><h2 className="mt-2 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>Frame the decision in one statement.</h2><Composer /></section>}
+      ) : <section className="rounded-lg border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-paper)" }}><p className="font-mono text-[0.65rem] uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>New Capital thesis</p><h2 className="mt-2 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>Frame the decision in one statement.</h2>{renderComposer()}</section>}
     </main>
   );
 }

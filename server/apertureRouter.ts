@@ -19,6 +19,7 @@ import { mayPublishUnderwriting, underwritingJobStatus } from "../shared/underwr
 import { missionDraftRouter, missionDraftStore } from "./aperture/missionDraftRouter";
 import { parsePersistedJson } from "../shared/persistedJson";
 import { deskAttentionSourceIssues, deskMonitoringFindings } from "./aperture/deskAttentionPresentation";
+import { monitoringReviewRouter } from "./aperture/monitoringReviewReceipt";
 import { readOptionalStatusSource } from "./aperture/optionalStatusSource";
 import { decodeHoldingPeriods } from "../shared/underwritingPersistence";
 import { getDb } from "./db";
@@ -4454,6 +4455,7 @@ export const apertureRouter = router({
   // ── Monitoring ─────────────────────────────────────────────────────────────
 
   monitor: router({
+    reviews: monitoringReviewRouter,
     run: capitalOperatorProcedure
       .input(z.object({
         runId: z.number(),

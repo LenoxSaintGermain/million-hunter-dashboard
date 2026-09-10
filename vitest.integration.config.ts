@@ -23,6 +23,7 @@ export default defineConfig({
     environment: "node",
     fileParallelism: false,
     include: [
+      "server/aperture/monitoringReviewReceipt.integration.test.ts",
       "server/aperture/activeCapitalThesisSchema.test.ts",
       "server/aperture/playOutcomeLedgerSchema.test.ts",
       "server/scan-pipeline.test.ts",

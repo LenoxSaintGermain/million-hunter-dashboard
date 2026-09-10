@@ -18,8 +18,7 @@ export default function ApertureMission() {
       <div>
         <Button variant="ghost" className="min-h-11 px-0" onClick={() => navigate("/aperture")}><ArrowLeft className="mr-2 h-4 w-4" />Today</Button>
         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture · Mission</p>
-        <h1 className="mt-1 font-serif text-3xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>{receiptTarget ? "Review this mission revision." : "Create or revise the plan."}</h1>
-        <p className="mt-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}>Three sections, one underwriting action. Saved decisions remain available when you return.</p>
+        <h1 className="sr-only">{receiptTarget ? "Mission revision" : "Mission"}</h1>
       </div>
     </div>
     <DecisionRunway

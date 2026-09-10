@@ -45,7 +45,7 @@ describe("Capital Aperture lifecycle safety contracts", () => {
 
     expect(page).toContain('onProposalCreated={() => openLifecycle("orders")}');
     expect(page).toContain('lifecycleTab: "monitoring"');
-    expect(page).toContain("<MonitoringPanel runId={runId} candidate={proposalCandidate}");
+    expect(page).toContain("runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule}");
     expect(page).not.toContain("candidate={proposalCandidate ?? data?.candidates[0]}");
     expect(page).toContain("{ runId, candidateId: candidate?.id ?? -1 }");
     expect(router).toContain("const netFilledQty = filledOrders.reduce");
@@ -55,7 +55,8 @@ describe("Capital Aperture lifecycle safety contracts", () => {
     expect(router).toContain("return getMonitoringChecks(input.runId, input.candidateId)");
     expect(monitor).toContain("eq(monitoringChecks.candidateId, candidateId)");
     expect(page).toContain("instrument={order}");
-    expect(page).toContain("order={candidateActiveOrder}");
+    expect(page).toContain("order={monitoringOrder} selection={findingSelection}");
+    expect(page).toContain("order.id === Number(requestedOrderId) && order.candidateId === proposalCandidate?.id");
     expect(page).toContain("reading a finding does not acknowledge or resolve it");
     expect(page).not.toContain("Paper expression to evaluate:");
     expect(router).toContain('const monitoredOrders = orders.filter(order => order.status === "filled")');

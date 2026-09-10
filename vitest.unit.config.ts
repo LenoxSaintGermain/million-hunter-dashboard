@@ -15,6 +15,7 @@ export default mergeConfig(baseConfig, defineConfig({
       "server/api-keys.test.ts",
       "server/aperture/activeCapitalThesisSchema.test.ts",
       "server/aperture/playOutcomeLedgerSchema.test.ts",
+      "server/aperture/monitoringReviewReceipt.integration.test.ts",
       "server/scan-pipeline.test.ts",
       "server/sprint11.test.ts",
       "server/sprint4.test.ts",

@@ -200,10 +200,9 @@ interaction design, without superseding any risk or approval authority:
   account, provenance, and headroom; they do not change the draft or risk policy.
 - The mobile menu is named, keyboard accessible, and uses 44px touch controls.
 
-The monitoring API still has no dedicated finding acknowledgement/resolution
-mutation. Evidence can be explicitly opened and fresh checks requested; neither
-reading nor refreshing is labeled as an acknowledgement or automatic resolution.
-Do not claim that additional workflow is implemented.
+At this earlier checkpoint the monitoring API had no dedicated finding review
+receipt. The September 9 evening addendum below supersedes that limitation for
+explicit unresolved review receipts only; it does not add automatic resolution.
 
 Final unit regression result: 1,213 passed, zero failed, six intentionally
 external/optional skips. The live repeat also established these disclosure rules:
@@ -221,3 +220,50 @@ ticket/chain path, exact builds and remaining acceptance boundaries are recorded
 in `docs/qa/CAPITAL_APERTURE_MARKET_OPEN_UAT_2026-09-09.md`. Tests and screenshots
 are not a ten-second usability claim; a valid zero-risk block is not a failed
 order-placement test. No new live proposal/approval/submission was exercised.
+
+## September 9 evening — result-first Mission and exact finding review
+
+The four operator annotations and the authenticated Chrome walkthrough are
+tracked in THI-266. Interaction design is acceptance scope, not a cosmetic pass.
+
+- **Completed Mission:** open the persisted result first. Named paper account,
+  material stale/failed-context warning, analysis timestamp, one conclusion,
+  reason, reopening condition, and what has not happened lead. A compact saved
+  assumption summary and adjacent constraint inspection follow. Edit mission
+  reveals the existing guided workspace; it does not itself revise the mission.
+- **Setup:** keep the three sections. Other mission ideas and integrity context
+  are collapsed below the active workspace, never between completion and result.
+  Remove repeated no-target explanations. Entered loss, effective allowance and
+  binding reason remain visible; detailed calculation/provenance stays adjacent.
+- **Exact receipt hydration:** an immutable decision/revision URL restores that
+  receipt, even when a different unfinished draft exists. It shows a loading state
+  until those inputs are restored, not an actionable blank/default form. Cents are
+  preserved. Viewing or editing a completed result does not create another job.
+- **No-trade semantics:** a new-allocation decision says No new trade; it never
+  implies existing positions are closed or total portfolio risk is zero.
+- **Play Desk:** one primary decision, then compact critical rows with explicit
+  state, reason, consequence and action. Critical records remain across filters.
+  The existing shared deterministic attention model still owns priority.
+- **Monitoring:** links carry run, candidate, order, finding and version. A stale
+  sourced concern remains unresolved and prominent. A historical version cannot
+  silently become a different check. Explicit navigation opens its evidence;
+  provider refreshes do not steal focus after operator interaction.
+- **Review receipt:** an explicit assessment/note persists in a separate ledger
+  field of the existing owner-scoped attention snapshot. Owner locking prevents
+  concurrent Seen writes from erasing receipts. A read never records a review.
+  Review does not acknowledge/resolve the source finding, schedule a check, alter
+  risk, create an order, approve, submit, or exit a position. Retries reuse identity.
+- **Evidence question:** state the proposition, observed fact/date, criterion and
+  source required for a human answer. Do not invent a valuation threshold or
+  upgrade operator-entered evidence to independently verified provider evidence.
+- **Thesis entry:** begin blank; explanatory prompts are not saved beliefs. Avoid
+  remounting the composer on each keystroke. Preserve edits on query refresh and
+  uncertain save, with a saved-record recovery action.
+
+No new schema migration or provider is required. The broader Strategist intent
+surface, allocation ledger and discovery orchestration remain deferred as stated
+above. This bounded refinement is not a claim that those workflows are complete.
+
+Local desktop/mobile walkthrough and test outcomes are recorded separately in
+the September 9 stakeholder refinement receipt. Automated/rendered checks do not
+establish user-tested usability, WCAG conformance or the ten-second target.
