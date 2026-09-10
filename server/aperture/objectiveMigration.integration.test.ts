@@ -4,6 +4,9 @@ import http from "node:http";
 import https from "node:https";
 import type { Connection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { describe, expect, it, vi } from "vitest";
+import { buildReleasePlan, reconcileReleaseStep } from "../../scripts/aperture-release-plan.mjs";
+import { inspectMigrationStep } from "../../scripts/aperture-release-schema-state.mjs";
+import { executeReleasePlan, REVIEWED_PLAN_SHA256 } from "../../scripts/aperture-release-executor.mjs";
 import {
   INTEGRATION_DATABASE,
   INTEGRATION_USER,
@@ -24,8 +27,10 @@ const SOURCES = {
   options: ["0059_aperture_defined_risk_options.sql", "f2e1822114cb7405037ef4ab6060a720846ff73bf76449b1464f7c164612108c"],
   underwriting: ["0061_aperture_play_underwriting.sql", "aaedf5d92610fa2daedd0d71bd97643e1c0989e76eba69d4b9ad22d8ca5e5979"],
   ledger: ["0065_aperture_capital_ledger.sql", "d6566591dde81ca68665622f9aebc3ddec92ce1088cf0b41279ed70b01f4b03e"],
-  objective: ["0066_aperture_objective_mission.sql", "2c44d798c0c049a4d478753f94fe7a0edd0d93b50e063e912dd7aed13f6c0a18"],
+  objective: ["0066_aperture_objective_mission.sql", "001102be1a7dcdcaa6a6c36fb4f4c8f98904f0df3e792b7de10491e7b4df1cca"],
   discovery: ["0067_aperture_strategy_discovery.sql", "9e2472d3e3cb7e232f2fe7efba3d66b440cf5073f6440f528879a9e1b806c075"],
+  selection: ["0068_aperture_discovery_selection.sql", "51b5fbb93e555469b187731e7fe67fdf298e381128cd471368cab141736f4e75"],
+  executions: ["0069_aperture_execution_evidence.sql", "b6f8d5a68c05c8f67573edc56557788e4e5576064f4c721afba04ecb489db274"],
 } as const;
 const TABLES = {
   runs: "aperture_decision_runs",
@@ -33,6 +38,8 @@ const TABLES = {
   events: "aperture_capital_events",
   claims: "aperture_capital_claims",
   discoveries: "aperture_strategy_discoveries",
+  selections: "aperture_discovery_selections",
+  executions: "aperture_execution_evidence",
 } as const;
 type Table = keyof typeof TABLES;
 type Ddl = { sql: string; operation: "CREATE" | "ALTER"; table: string };
@@ -72,7 +79,7 @@ function renameTables(sql: string, names: ReadonlyMap<string, string>): string {
   });
 }
 
-describe("0065/0066/0067 existing receipt migration — owned disposable shadow tables", () => {
+describe("0065–0069 existing receipt migration — owned disposable shadow tables", () => {
   it("retains legacy receipts and enforces objective and ledger identities using actual migration SQL", async () => {
     const target = requireIsolatedIntegrationDatabase(process.env.DATABASE_URL, process.env.ISOLATED_INTEGRATION_DATABASE);
     const suffix = randomUUID().replaceAll("-", "");
@@ -82,7 +89,7 @@ describe("0065/0066/0067 existing receipt migration — owned disposable shadow 
     const allowed = new Set(Object.values(shadow));
     const owned: string[] = [];
     const quote = (name: string) => {
-      if (!allowed.has(name) || !/^objmig_[a-f0-9]{32}_(runs|revisions|events|claims|discoveries)$/.test(name)) {
+      if (!allowed.has(name) || !/^objmig_[a-f0-9]{32}_(runs|revisions|events|claims|discoveries|selections|executions)$/.test(name)) {
         throw new Error("Refusing SQL outside this test's exact shadow tables");
       }
       return `\`${name}\``;
@@ -98,13 +105,17 @@ describe("0065/0066/0067 existing receipt migration — owned disposable shadow 
     const ledger = statements("ledger");
     const objective = statements("objective");
     const discovery = statements("discovery");
+    const selection = statements("selection");
+    const executions = statements("executions");
     const shape = (ddl: Ddl[]) => ddl.map(({ operation, table }) => [operation, table]);
     expect(shape(base)).toEqual([["CREATE", TABLES.runs], ["CREATE", TABLES.revisions]]);
     expect(shape(options)).toEqual([["ALTER", TABLES.revisions]]);
     expect(shape(underwriting)).toEqual([["ALTER", TABLES.revisions]]);
     expect(shape(ledger)).toEqual([["CREATE", TABLES.events], ["CREATE", TABLES.claims]]);
-    expect(shape(objective)).toEqual([["ALTER", TABLES.runs], ["ALTER", TABLES.revisions]]);
+    expect(shape(objective)).toEqual([["ALTER", TABLES.runs], ["ALTER", TABLES.runs], ["ALTER", TABLES.revisions]]);
     expect(shape(discovery)).toEqual([["CREATE", TABLES.discoveries]]);
+    expect(shape(selection)).toEqual([["ALTER", TABLES.runs], ["CREATE", TABLES.selections]]);
+    expect(shape(executions)).toEqual([["CREATE", TABLES.executions]]);
 
     const network = vi.fn(() => { throw new Error("Provider/broker calls forbidden in migration test"); });
     vi.stubGlobal("fetch", network);
@@ -118,6 +129,16 @@ describe("0065/0066/0067 existing receipt migration — owned disposable shadow 
       db = await mysql.createConnection(target.toString());
       const connection = db;
       const rows = async (sql: string, values: unknown[] = []) => (await connection.query<RowDataPacket[]>(sql, values))[0];
+      const releasePlan = buildReleasePlan((file: string) => readFileSync(new URL(`../../drizzle/${file}`, import.meta.url)));
+      const schemaState = async () => {
+        const map = (data: RowDataPacket[]) => data.filter(r => reverse.has(r.TABLE_NAME)).map(r => ({ ...r, TABLE_NAME: reverse.get(r.TABLE_NAME) }));
+        return {
+          tables: map(await rows("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()")).map(r => r.TABLE_NAME),
+          columns: map(await rows("SELECT TABLE_NAME,COLUMN_NAME,COLUMN_TYPE,IS_NULLABLE,COLUMN_DEFAULT,EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE()")),
+          statistics: map(await rows("SELECT TABLE_NAME,INDEX_NAME,COLUMN_NAME,SEQ_IN_INDEX,NON_UNIQUE,SUB_PART FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE()")),
+          checks: map(await rows("SELECT tc.TABLE_NAME,cc.CHECK_CLAUSE FROM information_schema.TABLE_CONSTRAINTS tc JOIN information_schema.CHECK_CONSTRAINTS cc ON tc.CONSTRAINT_SCHEMA=cc.CONSTRAINT_SCHEMA AND tc.CONSTRAINT_NAME=cc.CONSTRAINT_NAME WHERE tc.TABLE_SCHEMA=DATABASE() AND tc.CONSTRAINT_TYPE='CHECK'")),
+        };
+      };
       const identity = async () => {
         requireIsolatedIntegrationDatabase(process.env.DATABASE_URL, process.env.ISOLATED_INTEGRATION_DATABASE);
         const [actual] = await rows("SELECT DATABASE() AS db, SUBSTRING_INDEX(CURRENT_USER(), '@', 1) AS user");
@@ -125,12 +146,13 @@ describe("0065/0066/0067 existing receipt migration — owned disposable shadow 
       };
       await identity();
       const existingShadows = () => rows(
-        "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?, ?)",
+        `SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (${Object.values(shadow).map(() => '?').join(',')})`,
         Object.values(shadow),
       );
       // Never pre-drop/reuse a table, even in the approved database.
       expect(await existingShadows()).toEqual([]);
 
+      const inspectedSteps = new Set<string>();
       const apply = async (ddl: Ddl[]) => {
         for (const statement of ddl) {
           const renamed = names.get(statement.table);
@@ -138,6 +160,9 @@ describe("0065/0066/0067 existing receipt migration — owned disposable shadow 
           quote(renamed);
           if (statement.operation === "ALTER" && !owned.includes(renamed)) throw new Error("Cannot alter an unowned table");
           const sql = renameTables(statement.sql, names);
+          const normalize = (sql: string) => sql.trim().replace(/;$/, '').replace(/\s+/g, ' ');
+          const releaseStep = releasePlan.steps.find((s: {sql: string}) => normalize(s.sql) === normalize(statement.sql));
+          if (releaseStep) expect(inspectMigrationStep(releaseStep, await schemaState()).state, releaseStep.id).toBe('before');
           expect(sql).not.toBe(statement.sql);
           expect(renameTables(sql, reverse)).toBe(statement.sql);
           const [result] = await connection.query<ResultSetHeader>(sql);
@@ -149,6 +174,12 @@ describe("0065/0066/0067 existing receipt migration — owned disposable shadow 
             expect(warnings).toEqual([]);
           }
           expect(result.warningStatus).toBe(0);
+          if (releaseStep) {
+            const observed = inspectMigrationStep(releaseStep, await schemaState());
+            expect(observed.state, `${releaseStep.id}: ${JSON.stringify(observed.issues)}`).toBe('after');
+            inspectedSteps.add(releaseStep.id);
+            expect(reconcileReleaseStep(releaseStep, { stepId: releaseStep.id, statementSha256: releaseStep.statementSha256, state: 'started' }, observed)).toBe('verify_and_record');
+          }
         }
       };
       const insert = async (table: Table, values: Record<string, unknown>) => {
@@ -320,6 +351,57 @@ describe("0065/0066/0067 existing receipt migration — owned disposable shadow 
         await insert("discoveries", { ...discoveryFixture, job_id: 9002 });
         expect(await all("discoveries")).toHaveLength(3);
         expect({ runs: await all("runs"), revisions: await all("revisions"), events: await all("events"), claims: await all("claims") }).toEqual(beforeDiscovery);
+
+        const beforeSelection = { runs: await all("runs"), revisions: await all("revisions"), discoveries: await all("discoveries"), events: await all("events"), claims: await all("claims") };
+        await apply(selection);
+        expect({ runs: await all("runs"), revisions: await all("revisions"), discoveries: await all("discoveries"), events: await all("events"), claims: await all("claims") }).toEqual(beforeSelection);
+        expect((await columns("runs")).context_kind.Type).toBe("enum('thesis','objective','discovery')");
+        expect(await all("selections")).toEqual([]);
+        const selectionFixture = { user_id: OWNER, source_decision_run_id: objectiveId, source_revision_id: objectiveRevisionId,
+          discovery_receipt_id: 9101, hypothesis_id: "illustrative-lead", research_decision_run_id: 9201,
+          research_revision_id: 9301, capital_thesis_id: 9401, source_record_hash: "d".repeat(64),
+          context: JSON.stringify({ fixture: true }), record_hash: "e".repeat(64), created_at: NOW };
+        await insert("selections", selectionFixture);
+        await duplicate(insert("selections", selectionFixture));
+        await duplicate(insert("selections", { ...selectionFixture, hypothesis_id: "other", capital_thesis_id: 9402 }));
+        await duplicate(insert("selections", { ...selectionFixture, hypothesis_id: "other", research_decision_run_id: 9202 }));
+        await insert("selections", { ...selectionFixture, user_id: OTHER_OWNER, research_decision_run_id: 9203, capital_thesis_id: 9403 });
+        expect(await all("selections")).toHaveLength(2);
+        const beforeExecutions = { runs: await all("runs"), revisions: await all("revisions"), selections: await all("selections") };
+        // Real DDL succeeds but its caller loses the response. Resume must
+        // inspect all nine postconditions and never issue this CREATE twice.
+        const journal = new Map<string, any>();
+        let executeCalls = 0;
+        const releaseOptions = {
+          plan: releasePlan, approvedPlanSha256: REVIEWED_PLAN_SHA256, expectedTarget: INTEGRATION_DATABASE,
+          readTarget: async () => { await identity(); return INTEGRATION_DATABASE; },
+          verifyLease: async () => true, // Exact private shadow names, owned by this test only.
+          verifyRecovery: async () => true, // Disposable fixture; not production recovery evidence.
+          readSchema: schemaState, readJournal: async (id: string) => journal.get(id),
+          writeJournal: async (entry: any) => { journal.set(entry.stepId, entry); },
+          execute: async (_sql: string, id: string) => {
+            expect(id).toBe('0069_aperture_execution_evidence.sql:1');
+            executeCalls++;
+            await apply(executions);
+            throw new Error('Illustrative lost DDL response');
+          },
+        };
+        await expect(executeReleasePlan(releaseOptions)).rejects.toThrow('Illustrative lost DDL response');
+        expect(journal.get('0069_aperture_execution_evidence.sql:1').state).toBe('started');
+        const resumed = await executeReleasePlan(releaseOptions);
+        expect(resumed).toMatchObject({ complete: true, applied: [] });
+        expect(resumed.reconciled).toHaveLength(9);
+        expect(executeCalls).toBe(1);
+        expect(inspectedSteps.size).toBe(9);
+        expect(await all("executions")).toEqual([]);
+        const executionFixture = { user_id: OWNER, account_id: 81, run_id: 82, candidate_id: 83,
+          order_id: 84, request_id: REQUEST, external_account_id: "illustrative-paper",
+          broker_order_id: "illustrative-order", state: "pending", created_at: NOW };
+        await insert("executions", executionFixture);
+        await duplicate(insert("executions", { ...executionFixture, order_id: 85 }));
+        await insert("executions", { ...executionFixture, user_id: OTHER_OWNER });
+        expect(await all("executions")).toHaveLength(2);
+        expect({ runs: await all("runs"), revisions: await all("revisions"), selections: await all("selections") }).toEqual(beforeExecutions);
 
         // Identity, history links, cents, timestamps, nullable values, exact text
         // and JSON survive both DDL and all rejected/successful new inserts.

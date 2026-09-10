@@ -38,7 +38,7 @@ describe("Decision Runway authoritative schema", () => {
     expect(router).toContain('eq(brokerOrders.status, "submitted")');
     expect(router).toContain("isNull(brokerOrders.brokerOrderId)");
     expect(orderFlow).toContain("getOrderByClientOrderId(order.clientOrderId)");
-    expect(orderFlow).toContain("The order remains locked for broker reconciliation");
+    expect(orderFlow).toContain("reconcile any unresolved dispatch; do not resubmit it");
     expect(router).toContain("A paper order dispatch is still resolving for this Decision Run");
     expect(router).toContain("Arbitrary run attachment is retired");
     expect(router).toContain("Decision history is immutable");

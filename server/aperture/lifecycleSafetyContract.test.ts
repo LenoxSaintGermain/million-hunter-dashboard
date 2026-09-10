@@ -84,7 +84,7 @@ describe("Capital Aperture lifecycle safety contracts", () => {
     expect(retryCheck).toBeGreaterThan(-1);
     expect(evaluation).toBeGreaterThan(retryCheck);
     expect(flow).toContain("return { orderId: existingOrder.id, created: false }");
-    expect(flow).toContain("return { orderId: (result as any).insertId as number, created: true }");
+    expect(flow).toContain("return { orderId, created: true }");
   });
 
   it("keeps underwriting selection upstream of research and every paper action", () => {

@@ -23,11 +23,13 @@ export default defineConfig({
     environment: "node",
     fileParallelism: false,
     include: [
+      "server/aperture/executionEvidence.integration.test.ts",
       "server/aperture/monitoringReviewReceipt.integration.test.ts",
       "server/aperture/capitalLedger.integration.test.ts",
       "server/aperture/objectiveMission.integration.test.ts",
       "server/aperture/objectiveMigration.integration.test.ts",
       "server/aperture/strategyDiscoveryWorkflow.integration.test.ts",
+      "server/aperture/discoverySelection.integration.test.ts",
       "server/aperture/persistedJourneys.integration.test.ts",
       "server/aperture/activeCapitalThesisSchema.test.ts",
       "server/aperture/playOutcomeLedgerSchema.test.ts",

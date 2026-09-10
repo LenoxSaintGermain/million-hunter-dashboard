@@ -11,9 +11,9 @@ function evidenceUrl(value: string | undefined): string | undefined {
   } catch { return undefined; }
 }
 
-export function FindingEvidence({ evidence, label = "Evidence" }: { evidence: NonNullable<ApertureAttentionItem["evidence"]>; label?: string }) {
+export function FindingEvidence({ evidence, label = "Evidence", expanded = false }: { evidence: NonNullable<ApertureAttentionItem["evidence"]>; label?: string; expanded?: boolean }) {
   const date = Number.isFinite(evidence.checkedAt) && Number.isFinite(new Date(evidence.checkedAt).getTime()) ? new Date(evidence.checkedAt).toLocaleString() : "Not recorded";
-  return <details className="mt-2 border-t" style={{ borderColor: "var(--sh-border-1)" }}>
+  return <details open={expanded || undefined} className="mt-2 border-t" style={{ borderColor: "var(--sh-border-1)" }}>
     <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">{label}</summary>
     <div className="space-y-3 pb-3 text-sm leading-6">
       <p>Recorded check: {date}. Opening evidence does not acknowledge or resolve this finding.</p>

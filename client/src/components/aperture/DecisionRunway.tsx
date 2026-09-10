@@ -801,7 +801,27 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   };
 
   if (!receiptTarget && !draftInitialized && missionContextError) {
-    return <section role="alert" className="mx-auto max-w-3xl rounded-2xl border p-5" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h1 className="font-serif text-2xl">Saved Mission context unavailable</h1><p className="mt-2 text-sm leading-6">The saved draft, receipt, thesis, or account could not be loaded. This is not an empty Mission. No new analysis has started.</p><Button className="mt-4 min-h-11" onClick={() => void refreshMissionContext()}>Retry loading saved context</Button></section>;
+    return <section role="alert" className="mx-auto max-w-3xl rounded-2xl border p-5" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-serif text-2xl">Saved Mission context unavailable</h2><p className="mt-2 text-sm leading-6">The saved draft, receipt, thesis, or account could not be loaded. This is not an empty Mission. No new analysis has started.</p><Button className="mt-4 min-h-11" onClick={() => void refreshMissionContext()}>Retry loading saved context</Button></section>;
+  }
+  const discoveryReceipt = runway?.latest?.authority === "authoritative" && runway.latest.contextKind === "discovery"
+    && (receiptTarget || !hasUnfinishedDraft) && !receiptError ? runway.latest : null;
+  if (discoveryReceipt?.discoveryContext) {
+    const source = discoveryReceipt.discoveryContext;
+    const taskPath = discoveryReceipt.runId ? `/aperture/run/${discoveryReceipt.runId}`
+      : `/aperture/decision/${discoveryReceipt.decisionRunId}/revision/${discoveryReceipt.decisionRevisionId}/underwrite`;
+    return <section aria-label="Selected research context" className="mx-auto max-w-3xl space-y-4 rounded-xl border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+      <p className="text-sm">Paper · {discoveryReceipt.binding.accountLabel}</p>
+      <h2 className="font-serif text-2xl">{discoveryReceipt.binding.capitalThesisName}</h2>
+      <p className="text-sm">Selected research context, not an active canonical thesis. The original Mission is unchanged.</p>
+      <p className="text-sm">{formatCents(discoveryReceipt.deployableCapitalCents)} declared capital · {horizonLabel(discoveryReceipt.holdingPeriod)} · {discoveryReceipt.instrumentPreference}</p>
+      <p className="text-sm">Research only. Capital-source and allocation verification remain unresolved; no new paper exposure is authorized.</p>
+      <a className="inline-flex min-h-11 items-center rounded border px-4 py-2 text-sm font-semibold" href={taskPath}>{discoveryReceipt.runId ? "Open selected research" : "Review selected analysis"}</a>
+      <details><summary className="min-h-11 cursor-pointer py-3 text-sm">Source and accepted assumptions</summary>
+        <p className="whitespace-pre-wrap text-sm">{discoveryReceipt.missionText}</p>
+        <p className="mt-2 text-sm">Entered planned-loss ceiling: {formatCents(discoveryReceipt.maxPlannedLossCents)}. Effective risk is checked by underwriting, not established by selection.</p>
+        <a className="mt-2 inline-flex min-h-11 items-center text-sm underline" href={`/aperture/decision/${source.sourceDecisionRunId}/revision/${source.sourceRevisionId}`}>Open original Mission and findings</a>
+      </details>
+    </section>;
   }
   if (missionContextLoading || (receiptTarget && (receiptLoading || (!receiptError && immutableReceipt?.binding && hydratedDecisionRevisionId.current !== receiptTarget.revisionId)))) {
     return <section role="status" aria-live="polite" className="mx-auto max-w-3xl rounded-2xl border p-6 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>{receiptTarget ? "Loading immutable decision receipt…" : "Loading saved Mission and draft… No new analysis is starting."}</section>;
@@ -847,7 +867,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     <fieldset disabled={busy} className="min-w-0 space-y-5">
     {!activeThesis && <section className="rounded-2xl border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
       <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Start here</p>
-      <h1 className="mt-1 font-serif text-3xl" style={{ color: "var(--sh-text-primary)" }}>Build the thesis for this mission.</h1>
+      <h2 className="mt-1 font-serif text-3xl" style={{ color: "var(--sh-text-primary)" }}>Build the thesis for this mission.</h2>
       <p className="mt-2 max-w-2xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Name the belief and state what you expect to be true. Aperture keeps you on this operator surface.</p>
       {(canonicalTheses?.length ?? 0) > 0 && <label className="mt-4 block text-sm font-semibold">Or choose a saved thesis<select aria-label="Choose saved thesis" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3" style={{ borderColor: "var(--sh-border-1)" }} value={activeCanonicalId ?? ""} onChange={(event) => { setSelectedCanonicalId(Number(event.target.value)); setMissionDirty(false); setUnderwritingDirty(true); }}><option value="">Choose a thesis</option>{canonicalTheses?.map((thesis) => <option key={thesis.id} value={thesis.id}>{canonicalThesisLabel(thesis)}</option>)}</select></label>}
       <div className="mt-4 grid gap-3 md:grid-cols-[18rem_1fr_auto] md:items-end">
@@ -872,7 +892,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
           </div>
 
           <div><div className="flex items-start justify-between gap-3"><p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Capital Mission</p><Button data-draft-edit variant="ghost" size="sm" className="min-h-11" onClick={() => setEditing((value) => !value)}><Pencil className="mr-2 h-3.5 w-3.5" />{editing ? "Done" : "Edit mission"}</Button></div>
-            {editing ? <><Textarea value={mission} onChange={(event) => { setMission(event.target.value); setMissionDirty(true); setUnderwritingDirty(true); }} className="mt-2 min-h-28 font-serif text-lg leading-snug sm:text-xl" /><div className="mt-2 flex flex-wrap items-center gap-2"><span className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Frame it as</span>{["Where can I…", "How can I…", "What must…"].map((starter) => <button key={starter} type="button" className="min-h-11 rounded-md border px-2.5 text-xs" style={{ borderColor: "var(--sh-border-1)" }} onClick={() => { setMission(starter + " "); setMissionDirty(true); setUnderwritingDirty(true); }}>{starter}</button>)}</div></> : <h1 className="mt-2 max-w-3xl font-serif text-[1.25rem] leading-[1.2] sm:text-[1.65rem] lg:text-[1.9rem]" style={{ color: "var(--sh-text-primary)" }}>{mission}</h1>}
+            {editing ? <><Textarea value={mission} onChange={(event) => { setMission(event.target.value); setMissionDirty(true); setUnderwritingDirty(true); }} className="mt-2 min-h-28 font-serif text-lg leading-snug sm:text-xl" /><div className="mt-2 flex flex-wrap items-center gap-2"><span className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Frame it as</span>{["Where can I…", "How can I…", "What must…"].map((starter) => <button key={starter} type="button" className="min-h-11 rounded-md border px-2.5 text-xs" style={{ borderColor: "var(--sh-border-1)" }} onClick={() => { setMission(starter + " "); setMissionDirty(true); setUnderwritingDirty(true); }}>{starter}</button>)}</div></> : <h3 className="mt-2 max-w-3xl font-serif text-[1.25rem] leading-[1.2] sm:text-[1.65rem] lg:text-[1.9rem]" style={{ color: "var(--sh-text-primary)" }}>{mission}</h3>}
           </div><p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Your horizon determines which catalysts and review dates matter.</p><Button type="button" variant="outline" className="min-h-11" onClick={() => setExpandedMissionSection(2)}>Review account & risk<ArrowRight className="ml-2 h-4 w-4" /></Button></section>
 
           <TypedStatusStrip state={visualWorkflowState} horizon={horizonLabel(holdingPeriod)} operatorCapCents={parseMoney(maxLoss) || null} syncedAt={paperAccount?.lastSyncedAt ?? null} catalystLabel={(currentBindingMatches ? latestGate : null) ?? (declaredCatalystAt != null ? `Declared ${new Date(declaredCatalystAt).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}` : declaredCatalystLabel ? `Declared · ${declaredCatalystLabel} · date/time not normalized` : null)} />

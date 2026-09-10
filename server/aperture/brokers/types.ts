@@ -138,6 +138,8 @@ export interface BrokerAdapter {
   getOrder(brokerOrderId: string): Promise<OrderResult | null>;
   /** One order by our stable client id, used after an ambiguous dispatch. */
   getOrderByClientOrderId(clientOrderId: string): Promise<OrderResult | null>;
+  /** Individual executions, not verified gains, fees or settled availability. */
+  getOrderExecutions?(input: { brokerOrderId: string; expectedExternalAccountId: string }): Promise<import("./orderExecutions").OrderExecutionReceipt>;
   /** Exact contract lookup used by the proposal, approval and submission gates. */
   getOptionContract?(symbol: string): Promise<OptionContractResult | null>;
   /** Current exact-contract market evidence used by every option lifecycle gate. */

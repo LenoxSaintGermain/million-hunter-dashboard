@@ -8,13 +8,13 @@ import { createRequire } from "node:module";
 import { INTEGRATION_DATABASE as database, INTEGRATION_USER as username } from "./isolated-integration-identity.mjs";
 
 const mode = process.argv[2];
-if (!["--integration", "--credentials"].includes(mode) || process.argv.length !== 3) throw new Error("Use --integration or --credentials. No arbitrary forwarded commands.");
+if (!["--integration", "--credentials", "--browser", "--browser-positive", "--browser-monitor"].includes(mode) || process.argv.length !== 3) throw new Error("Use --integration, --credentials, --browser, --browser-positive or --browser-monitor. No arbitrary forwarded commands.");
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const output = mkdtempSync("/tmp/capital-isolated-integration.");
 const snapshot = join(output, "snapshot");
 mkdirSync(snapshot);
 const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: repo, encoding: "utf8" }).split("\0").filter(Boolean);
-const harness = ["scripts/with-isolated-integration.mjs", "scripts/isolated-integration-identity.mjs", "scripts/isolated-integration-network.cjs", "scripts/seed-isolated-integration.ts", "drizzle/legacyCapitalStackSchema.ts"];
+const harness = ["scripts/with-isolated-integration.mjs", "scripts/isolated-integration-identity.mjs", "scripts/isolated-integration-network.cjs", "scripts/seed-isolated-integration.ts", "scripts/isolated-objective-browser.ts", "scripts/objective-positive-browser-fixture.ts", "drizzle/legacyCapitalStackSchema.ts"];
 const copied = [...new Set([...tracked, ...harness])];
 const hashes = {};
 for (const file of copied) {
@@ -25,7 +25,7 @@ for (const file of copied) {
   hashes[file] = createHash("sha256").update(readFileSync(join(snapshot, file))).digest("hex");
 }
 symlinkSync(join(repo, "node_modules"), join(snapshot, "node_modules"), "dir");
-const lane = mode.slice(2);
+const lane = mode.startsWith("--browser") ? "browser" : mode.slice(2);
 const configName = `vitest.${lane}.config.ts`;
 writeFileSync(join(snapshot, "isolated.config.ts"), `import config from './${configName}';\nexport default {...config, server: {host:'127.0.0.1'}, test: {...config.test, maxWorkers:1, minWorkers:1, pool:'forks', fileParallelism:false, reporters:['json'], outputFile:${JSON.stringify(join(output, "raw.json"))}}};\n`);
 const env = {
@@ -42,7 +42,7 @@ for (const name of new Set([...Object.keys(process.env), ...Object.keys(dotEnv)]
 }
 const credentialNames = ["GEMINI_API_KEY", "OPENAI_API_KEY", "Poe_api_key", "ANTHROPIC_API_KEY"];
 const credentials = {};
-if (lane !== "integration") for (const name of credentialNames) {
+if (lane === "credentials") for (const name of credentialNames) {
   env[name] = process.env[name] || dotEnv[name] || "";
   credentials[name] = { present: Boolean(env[name]), meetsExistingLengthAssertion: env[name].length > 10, source: process.env[name] ? "process environment" : dotEnv[name] ? "repository .env" : "absent", providerValidated: false };
 }
@@ -55,8 +55,11 @@ const sql = statement => docker(["exec", "-i", "sh-ch-capital-uat-db", "sh", "-c
 const run = (args, label) => new Promise(resolveRun => {
   const child = spawn(process.execPath, args, { cwd: snapshot, env, stdio: ["ignore", "pipe", "pipe"] });
   let log = "";
-  for (const stream of [child.stdout, child.stderr]) stream.on("data", data => { log = (log + redact(String(data))).slice(-1024 * 1024); });
-  const timer = setTimeout(() => child.kill("SIGTERM"), 240000);
+  for (const stream of [child.stdout, child.stderr]) stream.on("data", data => {
+    const chunk = redact(String(data)); log = (log + chunk).slice(-1024 * 1024);
+    if (label === "browser" && chunk.includes("ISOLATED_OBJECTIVE_BROWSER_READY")) console.log("ISOLATED_OBJECTIVE_BROWSER_READY http://localhost:3114/aperture/mission");
+  });
+  const timer = setTimeout(() => child.kill("SIGTERM"), label === "browser" ? 900000 : 240000);
   const terminate = () => child.kill("SIGTERM");
   process.once("SIGINT", terminate); process.once("SIGTERM", terminate);
   child.on("error", error => { log += redact(String(error)); });
@@ -88,7 +91,13 @@ try {
     const schemaExit = await run(["--import", "tsx", "scripts/seed-isolated-integration.ts"], "schema");
     if (schemaExit) throw new Error("Isolated schema preparation failed; inspect schema.log.");
   }
-  process.exitCode = await run(["node_modules/vitest/vitest.mjs", "run", "--config", "isolated.config.ts"], lane);
+  if (lane === "browser") {
+    Object.assign(env, { NODE_ENV: "development", ISOLATED_UAT_MODE: "true", JWT_SECRET: "disposable-browser-fixture-only",
+      ISOLATED_BROWSER_HARNESS: "true",
+      ISOLATED_BROWSER_SCENARIO: mode === "--browser-positive" ? "positive" : mode === "--browser-monitor" ? "monitor" : "empty",
+      CAPITAL_OBJECTIVE_MISSIONS_ENABLED: "true", CAPITAL_STRATEGY_DISCOVERY_ENABLED: "true" });
+    process.exitCode = await run(["--import", "tsx", "scripts/isolated-objective-browser.ts"], "browser");
+  } else process.exitCode = await run(["node_modules/vitest/vitest.mjs", "run", "--config", "isolated.config.ts"], lane);
   if (existsSync(join(output, "raw.json"))) {
     const raw = JSON.parse(readFileSync(join(output, "raw.json"), "utf8"));
     const results = raw.testResults ?? [];

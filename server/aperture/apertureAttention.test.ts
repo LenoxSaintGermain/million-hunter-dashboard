@@ -22,6 +22,16 @@ function base(overrides: Partial<ApertureAttentionInput> = {}): ApertureAttentio
 }
 
 describe("Capital Aperture attention briefing", () => {
+  it("shows the saved gate condition without implying it was evaluated", () => {
+    const review = { id: 12, kind: "gate_review" as const, dueAt: now - 1, updatedAt: now - 100,
+      title: "Portfolio-gap deployment", href: "/aperture/decision/12/revision/4",
+      reviewBasis: "Recheck single-name headroom after the account snapshot refresh." };
+    const result = deriveApertureAttention(base({ pendingReviews: [review] }), null);
+    expect(result.primary?.reason).toBe(`Check now: ${review.reviewBasis}`);
+    expect(result.primary?.consequence).toContain("not proof");
+    expect(deriveApertureAttention(base({ pendingReviews: [{ ...review, reviewBasis: "" }] }), null).primary?.reason)
+      .toBe("Review is due, but its condition is not recorded. Inspect the saved decision before reassessing.");
+  });
   const savedMission = { decisionRunId: 42, revisionId: 7, state: "complete" as const, title: "MRVL", updatedAt: now - 8_000 };
 
   it("keeps an accepted objective visible without advertising unsupported analysis or inventing a thesis", () => {

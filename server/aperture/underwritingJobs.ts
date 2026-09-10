@@ -8,7 +8,7 @@ import { jobClaimDisposition, UNDERWRITING_JOB_LEASE_MS } from "../../shared/und
 import { parsePersistedJson } from "../../shared/persistedJson";
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
-export async function readUnderwritingJob(db: Db, userId: number, decisionRunId: number, decisionRevisionId: number) {
+export async function readUnderwritingJob(db: Pick<Db, "select">, userId: number, decisionRunId: number, decisionRevisionId: number) {
   const [row] = await db.select().from(apertureUnderwritingJobs).where(and(
     eq(apertureUnderwritingJobs.userId, userId), eq(apertureUnderwritingJobs.decisionRunId, decisionRunId),
     eq(apertureUnderwritingJobs.decisionRevisionId, decisionRevisionId),

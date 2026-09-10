@@ -146,12 +146,26 @@ afterEach(() => {
 });
 
 describe("ObjectiveDiscoveryResult controlled research findings", () => {
+  it("leads with an incomplete outcome and a useful next condition, not an instruction to select a nonexistent lead", () => {
+    const partial = payload([]); partial.coverageGaps = ["Illustrative missing activity evidence."];
+    const view = harness(snapshot(receipt(partial)), { renderLeadAction: () => <button>Underwrite lead</button> });
+    const { visible, text } = view.render();
+    expect(visible("h2").text()).toBe("Research incomplete");
+    expect(visible('[aria-label="Research outcome"]').text()).toContain("Reopen when:");
+    expect(text).toContain("Illustrative missing activity evidence.");
+    expect(text).toContain("No allocation or order is created");
+    expect(text).not.toContain("Underwrite a lead");
+    expect(text).not.toContain("Research recorded; review sources and conditions.");
+    expect(text).not.toContain("Incomplete research record: evidence or coverage gaps remain.");
+    expect(visible("details > summary").text()).toBe("Evidence & record");
+    expect(view.onStart).not.toHaveBeenCalled(); expect(view.onRetry).not.toHaveBeenCalled();
+  });
   it("renders the real parsed receipt, named Paper account and separate source/job clocks without investment authority", () => {
     const value = snapshot();
     expect(value.receipt?.result.status).toBe("complete");
     const view = harness(value), { $, visible, text } = view.render();
     expect($('section[aria-label="Research findings"]')).toHaveLength(1);
-    expect($("h2").text()).toBe("Research findings");
+    expect($("h2").text()).toBe("1 research lead");
     expect(text).toContain("Paper account: Illustrative Research Paper");
     for (const time of [at - 1000, at, at + 100]) expect($(`time[datetime="${new Date(time).toISOString()}"]`).length).toBeGreaterThan(0);
     expect(visible("time")).toHaveLength(1);
@@ -327,7 +341,7 @@ describe("ObjectiveDiscoveryResult controlled research findings", () => {
     expect(empty.text).toContain("Reopen when:");
     const partial = payload([]); partial.coverageGaps = ["Illustrative source coverage gap."];
     const incomplete = harness(snapshot(receipt(partial))).render();
-    expect(incomplete.text).toContain("Incomplete research record");
+    expect(incomplete.visible("h2").text()).toBe("Research incomplete");
     expect(incomplete.text).toContain("Illustrative source coverage gap");
     const invalid = { ...receipt(), result: parseStrategyDiscovery("malformed JSON", context()) };
     const failed = harness(withJob("failed", invalid)).render();
@@ -414,7 +428,8 @@ describe("ObjectiveDiscoveryResult controlled research findings", () => {
     const value = snapshot(receipt(payload(), manifest));
     const result = harness(value).render();
     expect(result.$('[aria-label="All hypotheses"]').text()).toContain("Excluded source: Illustrative issuer release — source after cutoff");
-    expect(result.text).toContain("Incomplete research record");
+    expect(result.visible("h2").text()).toBe("Research incomplete");
+    expect(result.text).toContain("Coverage uncertainty:");
     for (const url of ["javascript:alert(1)", "https://name:secret@example.test", "file:///private", ""]) {
       const unsafe = snapshot();
       unsafe.receipt!.result.hypotheses[0].assessment.sources[0].sourceUrl = url;

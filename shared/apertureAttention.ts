@@ -68,6 +68,7 @@ export type AttentionPendingReview = {
   updatedAt: number;
   title: string;
   href: string;
+  reviewBasis?: string | null;
 };
 
 export type AttentionMonitoringFinding = {
@@ -119,6 +120,7 @@ export type ApertureAttentionInput = {
 };
 
 export type ApertureAttentionItem = {
+  reviewKind?: "gate_review" | "play_outcome";
   key: string;
   kind:
     | "status_unavailable"
@@ -656,11 +658,14 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
   for (const review of input.pendingReviews.filter((candidate) => candidate.dueAt <= input.now)) {
     attention.push(item({
       key: `review:${review.id}`,
+      reviewKind: review.kind,
       kind: "review_due",
       priority: 80,
       stateLabel: review.kind === "gate_review" ? "Gate review due" : "Outcome review due",
       title: attentionReviewTitle(review.title),
-      reason: "The recorded review time has arrived.",
+      reason: review.reviewBasis?.trim()
+        ? `Check now: ${review.reviewBasis.trim()}`
+        : "Review is due, but its condition is not recorded. Inspect the saved decision before reassessing.",
       consequence: "This is a human checkpoint, not proof that an automatic check or exit occurred.",
       actionLabel: review.kind === "gate_review" ? "Review the exact gate" : "Review recorded outcome",
       href: review.href,

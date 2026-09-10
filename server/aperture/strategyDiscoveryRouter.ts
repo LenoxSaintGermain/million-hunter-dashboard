@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { capitalOperatorProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { executionEvidenceInput, refreshExecutionEvidenceInput, readExecutionEvidence, refreshExecutionEvidence, abandonExecutionEvidence, executionSourcesInput, listExecutionSources } from "./executionEvidence";
 import { acceptObjectiveMission, acceptObjectiveMissionInput } from "./objectiveMission";
 import { discoveryIdentityInput, discoveryRunInput, discoveryResumeInput, executeObjectiveDiscovery, objectiveDiscoveryEnabled, readObjectiveDiscovery, resumeObjectiveDiscovery, validateObjectiveDiscoveryDraft } from "./strategyDiscoveryWorkflow";
 
@@ -19,7 +20,17 @@ async function sanitized<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 export const strategyDiscoveryRouter = router({
-  capabilities: capitalOperatorProcedure.query(() => ({ enabled: objectiveDiscoveryEnabled(), mode: "paper" as const, monitoring: "on_demand" as const })),
+  executionSources: capitalOperatorProcedure.input(executionSourcesInput).query(({ ctx, input }) => sanitized(async () =>
+    listExecutionSources(await database(), ctx.user.id, input))),
+  abandonExecutionEvidence: capitalOperatorProcedure.input(refreshExecutionEvidenceInput).mutation(({ ctx, input }) => sanitized(async () =>
+    abandonExecutionEvidence(await database(), ctx.user.id, input))),
+  executionEvidence: capitalOperatorProcedure.input(executionEvidenceInput).query(({ ctx, input }) => sanitized(async () =>
+    readExecutionEvidence(await database(), ctx.user.id, input))),
+  refreshExecutionEvidence: capitalOperatorProcedure.input(refreshExecutionEvidenceInput).mutation(({ ctx, input }) => sanitized(async () => {
+    if (!objectiveDiscoveryEnabled() || process.env.ISOLATED_UAT_MODE === "true") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Execution refresh is not enabled in this environment. Saved evidence is unchanged." });
+    return refreshExecutionEvidence(await database(), ctx.user.id, input);
+  })),
+  capabilities: capitalOperatorProcedure.query(() => ({ enabled: objectiveDiscoveryEnabled(), selectionEnabled: objectiveDiscoveryEnabled(), executionRefreshEnabled: objectiveDiscoveryEnabled() && process.env.ISOLATED_UAT_MODE !== "true", mode: "paper" as const, monitoring: "on_demand" as const })),
   // One authorized action carries accepted assumptions through to a usable
   // receipt. A disconnect can be reconciled with the same draft/request identity.
   start: capitalOperatorProcedure.input(acceptObjectiveMissionInput).mutation(({ ctx, input }) => sanitized(async () => {

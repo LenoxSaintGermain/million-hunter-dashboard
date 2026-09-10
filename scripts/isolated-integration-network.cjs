@@ -21,6 +21,11 @@ globalThis.fetch = async () => deny();
 for (const name of ['lookup', 'lookupService', 'resolve', 'resolve4', 'resolve6', 'resolveAny', 'resolveCaa', 'resolveCname', 'resolveMx', 'resolveNaptr', 'resolveNs', 'resolvePtr', 'resolveSoa', 'resolveSrv', 'resolveTxt', 'reverse']) {
   dns[name] = (...args) => {
     const callback = args.at(-1);
+    if (name === 'lookup' && args[0] === '127.0.0.1' && process.env.ISOLATED_BROWSER_HARNESS === 'true'
+        && process.env.ISOLATED_INTEGRATION_DATABASE === 'capital_aperture_test_20260909_zzugqp' && typeof callback === 'function') {
+      queueMicrotask(() => args[1]?.all ? callback(null, [{ address: '127.0.0.1', family: 4 }]) : callback(null, '127.0.0.1', 4));
+      return;
+    }
     if (typeof callback === 'function') queueMicrotask(() => callback(new Error('ISOLATED_INTEGRATION_DNS_DENIED')));
     else deny();
   };

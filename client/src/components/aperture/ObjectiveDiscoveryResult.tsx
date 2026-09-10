@@ -12,6 +12,7 @@ export type ObjectiveDiscoveryResultProps = {
   onRefresh: () => void;
   onRetry: () => void;
   onStart: () => void;
+  renderLeadAction?: (hypothesisId: string) => React.ReactNode;
 };
 
 type Receipt = NonNullable<ObjectiveDiscoverySnapshot["receipt"]>;
@@ -61,7 +62,7 @@ function AssertionRecord({ assertion }: { assertion: Assertion }) {
   </div>;
 }
 
-function LeadSummary({ hypothesis }: { hypothesis: Hypothesis }) {
+function LeadSummary({ hypothesis, action }: { hypothesis: Hypothesis; action?: React.ReactNode }) {
   const path = hypothesis.causalPath;
   const uncertainty = unique([...hypothesis.assessment.unknowns, ...path.originatingSignal.unknowns,
     ...path.hops.flatMap(hop => hop.assertion.unknowns), ...hypothesis.reasons.map(words)]);
@@ -79,6 +80,7 @@ function LeadSummary({ hypothesis }: { hypothesis: Hypothesis }) {
     <p><strong>Invalidated if:</strong> {path.originatingSignal.invalidation || "Invalidation condition not supplied"}</p>
     <p><strong>Reopen when:</strong> {hypothesis.changeCondition || "A change condition is not supplied; review the evidence gaps first."}</p>
     <Citations sources={hypothesis.assessment.sources} />
+    {action}
     <details>
       <summary className={disclosure}>Evidence and conditions · {additionalConditions.length} additional conditions</summary>
       <div className="space-y-2">
@@ -203,7 +205,7 @@ function ReceiptRecord({ receipt }: { receipt: Receipt }) {
 }
 
 /** Controlled presentation only. The parent owns status reads and explicit job actions. */
-export function ObjectiveDiscoveryResult({ snapshot, busy, refreshing = false, failure, actionBlockedReason, onRefresh, onRetry, onStart }: ObjectiveDiscoveryResultProps) {
+export function ObjectiveDiscoveryResult({ snapshot, busy, refreshing = false, failure, actionBlockedReason, onRefresh, onRetry, onStart, renderLeadAction }: ObjectiveDiscoveryResultProps) {
   const { job, receipt, latestAttempt, usingPreviousResult } = snapshot;
   const result = receipt?.result;
   const unavailable = result?.status === "unavailable";
@@ -214,31 +216,42 @@ export function ObjectiveDiscoveryResult({ snapshot, busy, refreshing = false, f
   // Never manufacture a rank or promote rejected/unavailable dispositions.
   const leads = !unavailable ? result?.hypotheses.filter(item => item.disposition === "research_lead") ?? [] : [];
   const displayed = leads.slice(0, 3);
+  const heading = failed ? "Research needs attention" : status === "running" ? "Research in progress"
+    : status === "interrupted" ? "Research interrupted" : status === "not-started" ? "Ready to research"
+    : result?.status === "incomplete" ? "Research incomplete"
+    : leads.length ? `${leads.length} research ${leads.length === 1 ? "lead" : "leads"}` : "No research leads";
   const locked = busy || refreshing;
   const canStart = job.state === "not_started" && !failure && !receipt && !locked && !actionBlockedReason;
   const retryable = (job.state === "failed" || job.state === "interrupted") && job.canRetry;
   const canRetry = retryable && !locked && !actionBlockedReason;
   const message = failure || (missingCompleteResult ? "The completed job has no usable research record. Refresh the saved status; no eligibility is asserted."
-    : job.state === "complete" ? "Research recorded; review sources and conditions."
+    : job.state === "complete" ? displayed.length ? "Review a lead’s evidence before underwriting." : "No research leads in this bounded record. This is not a portfolio-risk assessment."
     : job.state === "not_started" ? "Review the saved Mission, then start research explicitly." : job.message);
+  const reopen = failed || status === "interrupted" || unavailable ? "The saved failure and evidence gaps have been reviewed and a retry is permitted."
+    : status === "running" ? "The job reports a recorded result; refresh status to check."
+    : result ? "New evidence resolves the recorded gaps or exclusions. Review the Mission before requesting new research."
+    : "The saved Mission is reviewed and research is explicitly requested.";
 
   return <section aria-label="Research findings" data-discovery-status={status} className="min-w-0 space-y-4 break-words text-sm leading-6" style={{ color: "var(--sh-text-primary)" }}>
     <header className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-xl font-semibold">Research findings</h2>
-        <span className="text-sm font-medium" style={failed || status === "interrupted" ? { color: "var(--sh-red)" } : muted}>{statusLabel}</span>
+        <h2 className="text-xl font-semibold">{heading}</h2>
+        <span className="text-sm font-medium" style={failed || status === "interrupted" ? { color: "var(--sh-red)" } : muted}>{status === "complete" ? "Analysis recorded" : statusLabel}</span>
       </div>
       <p>Paper account: <strong>{snapshot.account.label.trim() || "Name unavailable"}</strong></p>
       {receipt && <p style={muted}>Research as of <Timestamp at={result?.asOf} /></p>}
     </header>
 
-    <div role={failed || status === "interrupted" ? "alert" : "status"} aria-live={failed || status === "interrupted" ? "assertive" : "polite"} className="space-y-1 rounded-lg border px-4 py-3" style={surface}>
+    <div aria-label="Research outcome" role={failed || status === "interrupted" ? "alert" : "status"} aria-live={failed || status === "interrupted" ? "assertive" : "polite"} className="space-y-2 rounded-lg border px-4 py-3" style={surface}>
       <p>{message}</p>
       {busy && job.state !== "running" && <p>Request in progress; awaiting recorded job status.</p>}
       {usingPreviousResult && <p>Previous result retained · Attempt {receipt?.attempt}. Latest attempt has no usable replacement.</p>}
       {!usingPreviousResult && failed && result && !unavailable && <p>Saved findings are retained; the latest request failed. Current eligibility is not confirmed.</p>}
-      {result?.status === "incomplete" && <p>Incomplete research record: evidence or coverage gaps remain.</p>}
+      {result?.status === "incomplete" && (!result.coverageGaps.length || failed) && <p>Incomplete research record: evidence or coverage gaps remain.</p>}
       {unavailable && <p>Research evidence is unavailable. This is not a successful empty search.</p>}
+      {!!result?.coverageGaps.length && <p><strong>Coverage uncertainty:</strong> {result.coverageGaps.slice(0, 2).map(words).join(" · ")}{result.coverageGaps.length > 2 && ` · ${result.coverageGaps.length - 2} more gaps in the record below.`}</p>}
+      {result && !result.context?.sources.length && <p><strong>Source gap:</strong> {result.context ? "No source records supplied; evidence is unverified." : "Source manifest not supplied; provenance cannot be confirmed."}</p>}
+      {!displayed.length && <p><strong>Reopen when:</strong> {reopen}</p>}
     </div>
 
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -247,18 +260,15 @@ export function ObjectiveDiscoveryResult({ snapshot, busy, refreshing = false, f
       <button type="button" className={control} style={surface} disabled={locked} onClick={() => { if (!locked) onRefresh(); }}>{refreshing ? "Refreshing status…" : "Refresh status"}</button>
     </div>
     {actionBlockedReason && (retryable || job.state === "not_started") && <p role="status">{actionBlockedReason} Refresh status to check availability; saved findings remain readable.</p>}
-    <p style={muted}>Unverified hypotheses, not trade plays. No allocation or order is created. Research validation is not enabled in this release.</p>
+    <p style={muted}>{displayed.length > 0 && "Unverified hypotheses, not trade plays. "}No allocation or order is created. {displayed.length > 0 && (renderLeadAction ? "Underwrite a lead to assess it within the Mission’s risk limits." : "Research validation is not enabled in this release.")}</p>
 
-    {!!result?.coverageGaps.length && <p><strong>Coverage uncertainty:</strong> {result.coverageGaps.slice(0, 2).map(words).join(" · ")}{result.coverageGaps.length > 2 && ` · ${result.coverageGaps.length - 2} more gaps in the record below.`}</p>}
-    {result && !result.context?.sources.length && <p><strong>Source gap:</strong> {result.context ? "No source records supplied; evidence is unverified." : "Source manifest not supplied; provenance cannot be confirmed."}</p>}
     {displayed.length > 0 ? <section aria-label="Research lead summaries" className="space-y-3">
       <p style={muted}>Showing {displayed.length} of {leads.length} research leads in recorded order, not a ranking.</p>
-      <div className="grid min-w-0 gap-3 lg:grid-cols-3">{displayed.map(hypothesis => <LeadSummary key={hypothesis.id} hypothesis={hypothesis} />)}</div>
-    </section> : <p>{!result ? "No research result is recorded yet." : unavailable ? "No usable research leads can be shown from this attempt." : "No research leads in this bounded record. This is not a portfolio-risk assessment."}</p>}
-    {!displayed.length && <p><strong>Reopen when:</strong> {failed || status === "interrupted" || unavailable ? "The saved failure and evidence gaps have been reviewed and a retry is permitted." : status === "running" ? "The job reports a recorded result; refresh status to check." : result ? "New evidence addresses the recorded exclusions or coverage gaps; review the Mission before authorizing further research." : "The saved Mission is reviewed and research is explicitly requested."}</p>}
+      <div className="grid min-w-0 gap-3 lg:grid-cols-3">{displayed.map(hypothesis => <LeadSummary key={hypothesis.id} hypothesis={hypothesis} action={renderLeadAction?.(hypothesis.id)} />)}</div>
+    </section> : null}
 
     <details className="rounded-lg border px-4" style={surface}>
-      <summary className={disclosure}>{receipt ? "All hypotheses, rejections & source / calculation record" : "Research job record"}</summary>
+      <summary className={disclosure}>{receipt ? "Evidence & record" : "Research job record"}</summary>
       <div className="space-y-4 pb-4">
         <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-[auto_minmax(0,1fr)]">
           <dt>Account snapshot</dt><dd><Timestamp at={snapshot.account.asOf} /></dd>

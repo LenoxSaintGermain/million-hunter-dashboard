@@ -1,12 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { deriveApertureAttention, type ApertureAttentionInput } from "../../shared/apertureAttention";
-import { monitoringFindingHref, monitoringFindingVersion, parseMonitoringFindingSelection, selectMonitoringFinding } from "../../shared/monitoringFinding";
+import { validMonitoringCitations } from "../../shared/monitoringState";
+import { inlineMonitoringTarget, monitoringFindingHref, monitoringFindingVersion, parseMonitoringFindingSelection, selectMonitoringFinding } from "../../shared/monitoringFinding";
 
 const now = Date.UTC(2026, 8, 9, 18);
 const check = { id: 1, runId: 360001, candidateId: 240003, checkType: "catalyst", checkedAt: now - 2 * 86_400_000, flagged: true, finding: "Illustrative catalyst concern", citations: ["https://example.org/fixture"] };
 const input: ApertureAttentionInput = { now, mission: null, underwriting: null, evidenceTasks: [], orders: [], activePlays: [], pendingReviews: [], monitoringFindings: [{ ...check, orderId: 12, symbol: "DKNG", kind: "material_change", instrument: { symbol: "DKNG261120P00020000", instrumentType: "long_put" } }], checks: { state: "complete", asOf: now, monitoring: "on_demand" } };
 
 describe("exact monitoring finding handoff", () => {
+  it("retains persisted JSON citation arrays without treating malformed text as a source", () => {
+    expect(validMonitoringCitations(JSON.stringify(check.citations))).toEqual(check.citations);
+    for (const value of ['not JSON', '{"url":"https://example.org"}', '"https://example.org"', '["javascript:alert(1)"]']) expect(validMonitoringCitations(value)).toEqual([]);
+  });
+  it("preserves the exact version when reviewing on Today without a page route", () => {
+    expect(inlineMonitoringTarget(monitoringFindingHref({ ...check, orderId: 12 }))).toEqual({
+      runId: 360001, candidateId: 240003, orderId: 12, findingId: 1, findingVersion: monitoringFindingVersion(check),
+    });
+  });
+  it("refuses incomplete, external and non-monitoring inline targets", () => {
+    const href = monitoringFindingHref({ ...check, orderId: 12 });
+    for (const value of ["https://example.org" + href, href.replace('candidate=240003', 'candidate='), href.replace('lifecycle=monitoring', 'lifecycle=orders'), href.replace('finding=1', 'finding=0'), '/aperture']) {
+      expect(inlineMonitoringTarget(value)).toBeNull();
+    }
+  });
   it("carries order, candidate, finding and immutable version from attention to its exact record", () => {
     const task = deriveApertureAttention(input, null).primary!;
     const selection = parseMonitoringFindingSelection(new URL(task.href!, "https://fixture.invalid").search);

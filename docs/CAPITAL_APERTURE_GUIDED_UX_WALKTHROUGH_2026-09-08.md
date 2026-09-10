@@ -1,5 +1,29 @@
 # Capital Aperture guided UX walkthrough
 
+## September 10: review on Today (local follow-up)
+
+The next local increment also opens a gate’s exact saved blocker, condition,
+account and revision inline. A six-checkpoint connected repeat verified both
+finding and gate review on desktop/mobile, plus unchanged protected lifecycle
+rows. The current free-text gate is not automatically evaluable: refreshing a
+receipt must never be labeled a fresh gate check. Typed evaluation and
+market/broker-derived outcome automation remain acceptance work.
+
+Operator feedback requires the actual finding, its effect and the next decision
+on Today, rather than another navigation loop. Local inline monitoring review
+now preserves the exact finding/version, displays sourced evidence, and saves
+an explicit review receipt without leaving Today. Reading is not resolution;
+reviewing does not change an order. A fresh isolated desktop/mobile repeat
+passed, including receipt recovery after reload and mutation-count assertions.
+
+Pending reviews now carry their saved condition into the shared attention
+reason. This is not yet an inline automated gate evaluator. Observable outcomes
+should be calculated from timestamped market evidence; confirmed fills and
+realized gains require broker execution evidence. Human interpretation remains
+separate from those measured facts. Full automatic held-option outcomes remain
+open, as does reducing repeated inline context. See the September 10 review
+handoff for exact test receipts and deployment limitations.
+
 **Production checkpoint:** 2026-09-09 release `070d04c`, revision `capital-aperture-00092-yil`, 100% traffic; public JSON health and exact release marker verified. The preceding `fba1b41` has signed-in production evidence; the latest UI follow-up has local desktop/mobile interaction checks, but its signed-in post-deployment repeat is pending because the Mac is locked. Separate Strategist commit `9657373` is pushed, not deployed.
 
 **Scope:** Mission underwriting and returning Today check-in
@@ -432,3 +456,141 @@ The Mac was locked during this check, preventing a new authenticated browser
 walkthrough. Renderer/callback tests and isolated storage tests are development
 evidence, not mobile, keyboard, focus, cross-device authentication or user-tested
 usability evidence. The current market-open UAT requirement is not fulfilled.
+
+## September 10 — source-bound lead selection and recovery
+
+The discovery result remains inside Mission. Each available research lead has
+one deliberate **Underwrite this lead** action; an already-selected lead instead
+opens **Open saved analysis**. The controller checks the exact owner/source
+receipt before mutation, blocks duplicate pending clicks, and reconciles an
+uncertain response without resubmitting. Leaving the view prevents a late
+response from navigating over the operator's next task.
+
+Selection creates neither an active canonical thesis nor an allocation. Its
+transaction also registers the accepted excess-capital declaration once, keyed
+by the original declaration rather than the analysis request or selected lead.
+The child receipt retains that source identity. This remains operator-declared,
+not verified account cash; no pending claim is created. Other source types,
+including unreconciled gains, cannot enter through the declaration adapter.
+An amount conflict fails without changing the saved Mission; a later selection
+write failure rolls back the source registration with the rest of the transaction.
+The compact receipt names the paper account, the research context and declared
+assumptions, with source detail in a stable disclosure. It links to the child's
+current saved analysis or research task and back to the original Mission.
+The original objective is never overwritten. The existing Underwriter job
+continues within the same requested action; a genuinely unstarted saved job
+has an explicit recovery action rather than a Mission/result navigation loop.
+
+The mapper preserves the complete source narrative and dependencies, not a
+model-authored substitute. Unknown mapping, commercial terms, permissions,
+historical baseline, unavailable measurements and contradictions remain
+evidence requirements. Exact options and current prices still require their
+existing provider-backed checks. Unsupported structures remain blocked.
+
+Opening-order authorization for this context deliberately remains unavailable
+until source-capital verification and actual proposal claims are integrated.
+This is an incomplete requirement, not a permanent research-only replacement
+for the requested product. A revised source assumption likewise requires its
+own persisted review flow; the API refuses to substitute changed assumptions
+into this immutable selection. Existing thesis-based approval/submission and
+proven position-reducing paths remain separate.
+
+The added controller tests check read-only mounting, failure/missing/loading
+arbitration, cross-device selection reuse, exact identity, timeout recovery,
+double clicks and leaving mid-request. These tests do not measure browser
+focus, mobile scannability or stakeholder comprehension. On September 10,
+native Chrome became available and the production Today page was inspected
+read-only; the new local discovery flow is not deployed and has not yet passed
+authenticated desktop/mobile UAT. Keep the server feature gates off until the
+complete source/research/capital journey and release review pass.
+
+### Gains source evidence disclosure — September 10 local increment
+
+Inside objective setup's Account & risk section, the exact source gets a compact
+saved-execution panel. Default disclosure is the unverified-gains warning,
+recorded fill count/timestamp, and explicit refresh/status/source-inspection
+actions. It never displays an inferred profit or available balance. Reading the
+section does not initiate a broker refresh. A failed refresh preserves prior
+evidence; an uncertain refresh is reconciled before retry with the original
+request. Completed execution evidence is not completed gains reconciliation.
+Browser layout, keyboard behavior, interrupted-device recovery and the full
+gains allocation journey are still acceptance work, not claimed results.
+
+Interrupted execution refreshes have an explicit recovery disclosure: discard
+the exact unconfirmed attempt, preserve its record and ignore a late response.
+This does not cancel an order or stop network I/O. Completed evidence stays
+unchanged. A second device cannot start a different refresh while the current
+attempt remains pending. No new attempt starts until the operator requests it.
+
+Gains entry now begins in Question & scope through an expandable recorded-order
+picker. Read-only, paginated closing-order choices include their named account
+and exact order. The operator previews the change and explicitly uses a source;
+capital is not replaced by an account balance or inferred profit. The modified
+draft must be saved, and account/risk review retains the unverified-gains gate.
+Selection is local draft editing, not an allocation or broker instruction.
+# September 10 addendum: reviewed objective underwriting
+
+For an objective-led Mission, inspect the effective risk limit, then choose
+**Underwrite my mission**. This explicit action saves the exact reviewed inputs
+before starting research. A separate Save draft click is optional, for leaving
+midway. A failed or conflicting save stops the sequence; no analysis starts from
+unconfirmed inputs. A slow save does not extend a stale risk preview.
+
+The accepted view uses its exact decision/revision link. Incomplete discovery
+leads with the outcome, named paper account, source timestamp, visible gaps and
+reopening condition. No-lead results never invite selecting a nonexistent lead.
+The Evidence & record section preserves full history and sources. Underwriting
+does not create an allocation or order.
+
+This behavior was verified locally with an illustrative desktop no-leads
+fixture. Production deployment and the full stakeholder acceptance suite are
+still pending; do not present this addendum as live-provider or broker UAT proof.
+## September 10 mobile acceptance update — local, composite inputs
+
+The 390×844 connected walkthrough now verifies this bounded sequence:
+
+1. **Question and scope:** declare an objective without assigning a canonical
+   thesis. Select swing/shares and a named paper account.
+2. **Account and risk:** enter $2,000 capital and $100 requested loss. Save the
+   draft in this section; a fresh page resumes the same fields without a write.
+3. **Review:** inspect the authoritative $15 effective constraint and authorize
+   underwriting. The target and declared loss do not override that constraint.
+4. **Discovery and result:** select the composite lead and reach the exact child
+   underwriting revision. Unknown share sizing reads Not measured, not $0.
+5. **Return:** reload the result without a new analysis. At doubled root text,
+   content reflows and the Validate action wraps without clipped text or arrow.
+
+The preserved next step is Validate this play; it was not invoked in this pass.
+No research run, proposal, approval, submission or allocation claim resulted.
+Six connected checkpoints and relevant action-size/overflow assertions pass;
+this does not claim full accessibility or user-tested ten-second comprehension.
+See the September 10 review-handoff QA document for authoritative receipts,
+screenshots, rejected test-driver attempts and remaining lifecycle requirements.
+# September 10: interrupted research handoff
+
+After a saved selection or uncertain dispatch response, Mission result exposes
+**Check saved research**. This is a read-only reconciliation action. A matching
+persisted Mission/revision/selection opens its bound evidence run; failed,
+missing or mismatched records do not trigger another research request. Inline
+status explains uncertainty. Callback behavior is verified; connected browser
+and selected-but-never-dispatched recovery remain acceptance work. See the
+September 10 review-handoff receipt for exact test evidence.
+# September 10 operator addendum: Today is a decision surface
+
+- Show the recorded finding, play-specific consequence, relevant freshness and
+  next action on Today; do not require navigation just to learn the concern.
+- Review exact finding/version inline, reusing the existing review-receipt API.
+  Opening does not acknowledge, resolve, schedule a check or change an order.
+- Evaluate observable checkpoint outcomes from sourced market/broker evidence.
+  Distinguish modeled price-path outcomes, option marks, broker fills and realized
+  P&L. Market movement does not prove an order executed or a position closed.
+- Existing intraday slate evaluation is not an option-position outcome engine.
+  Unsupported or incomplete evaluation remains explicitly unverified.
+- Gate review should expose the actual condition and available observation in
+  place, with a deliberate refresh/evaluation action and visible failure recovery.
+- The operator supplies judgment and authorization, not facts available from
+  providers. Do not turn a review date into a claim of scheduled automation.
+
+Implementation checkpoint: inline exact-finding review and clearer stale copy
+are local. Browser interaction acceptance, inline gate evaluation and connected
+option/broker outcome calculation remain open; no production release claim.

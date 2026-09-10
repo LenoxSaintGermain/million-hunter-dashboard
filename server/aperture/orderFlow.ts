@@ -56,6 +56,8 @@ import {
   type PaperDecisionAction,
 } from "./decisionRunway";
 import { resolveEffectiveRiskCeilingPct } from "../../shared/effectiveRiskLimit";
+import { objectiveDiscoveryEnabled } from "./strategyDiscoveryWorkflow";
+import { withCapitalLedgerTransaction, withPaperOrderClaimTransaction, type CapitalLedgerTransaction } from "./capitalLedger";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -236,6 +238,7 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
     runId: input.runId,
     accountId: portfolioContextAccount.id,
     intent: resolvedIntent.intent,
+    orderId: input.excludeOrderId,
   });
   const mandate: Mandate = resolvedIntent.intent === "close"
     ? baseMandate
@@ -536,7 +539,17 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     throw new OrderGateError(evaluation, ((blocked as any)?.insertId as number) ?? null);
   }
 
-  return db.transaction(async (tx) => {
+  const discoveryOpening = decisionAuthorization?.contextKind === "discovery" && resolvedIntent.intent === "open";
+  if (discoveryOpening && (!objectiveDiscoveryEnabled() || decisionAuthorization.decisionRunId == null || decisionAuthorization.revisionId == null)) {
+    throw new Error("Discovery capital authorization is unavailable. No proposal was created.");
+  }
+  const create = async (tx: CapitalLedgerTransaction) => {
+    // Match ledger lifecycle lock order before taking research/decision locks.
+    // This is an existing declaration read, never a new pool or risk authority.
+    const discovery = discoveryOpening ? await import("./discoverySelection") : null;
+    if (discovery) await discovery.readDiscoveryDeclaredEnvelope(tx, input.userId, {
+      decisionRunId: decisionAuthorization!.decisionRunId!, decisionRevisionId: decisionAuthorization!.revisionId!,
+    });
     // Candidate proposals are one active lifecycle, not one row per click. Lock
     // the run before checking so simultaneous retries serialize, then return the
     // durable proposal that already owns this candidate instead of duplicating it.
@@ -549,8 +562,11 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       status: "pending_approval",
       paperAckAt: now,
     });
-    return { orderId: (result as any).insertId as number, created: true };
-  });
+    const orderId = (result as any).insertId as number;
+    if (discovery) await discovery.reserveDiscoveryProposalCapital(tx, input.userId, orderId);
+    return { orderId, created: true };
+  };
+  return discoveryOpening ? withCapitalLedgerTransaction(db, create) : db.transaction(create);
 }
 
 const STORED_HOLDING_PERIODS = ["intraday", "overnight", "swing", "catalyst_window", "position"] as const;
@@ -787,12 +803,14 @@ export async function approveOrder(orderId: number, userId: number, paperConfirm
   if (!rerun.evaluation.passed) throw new OrderGateError(rerun.evaluation, order.id);
 
   const now = rerun.now;
-  await db.transaction(async (tx) => {
+  const approve = async (tx: CapitalLedgerTransaction) => {
     await lockCurrentDecisionRevision(tx, rerun.decisionAuthorization);
     const update = await tx.update(brokerOrders).set({ status: "approved", approvalConfirmedAt: now, approvedAt: now, updatedAt: now })
-      .where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.status, "pending_approval")));
+      .where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.userId, userId), eq(brokerOrders.status, "pending_approval")));
     if (!update[0].affectedRows) throw new Error("order changed before approval could be recorded");
-  });
+  };
+  if (objectiveDiscoveryEnabled()) await withPaperOrderClaimTransaction(db, userId, orderId, approve);
+  else await db.transaction(approve);
   return { ...order, status: "approved", approvedAt: now, updatedAt: now };
 }
 
@@ -812,12 +830,16 @@ export async function rejectOrder(orderId: number, userId: number, reason?: stri
   const now = Date.now();
   // A simultaneous approval/dispatch may win after the read above. Reject only
   // the exact state the operator reviewed; never erase a dispatch lease or fill.
-  const [updated] = await db.update(brokerOrders).set({
-    status: "rejected",
-    rejectionReason: reason ?? "rejected by operator",
-    updatedAt: now,
-  }).where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.userId, userId), eq(brokerOrders.status, order.status)));
-  if (updated.affectedRows !== 1) throw new Error("Order changed before rejection could be recorded. Review its current status; no rejection was applied.");
+  const reject = async (writer: Pick<typeof db, "update">) => {
+    const [updated] = await writer.update(brokerOrders).set({
+      status: "rejected", rejectionReason: reason ?? "rejected by operator", updatedAt: now,
+    }).where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.userId, userId), eq(brokerOrders.status, order.status)));
+    if (updated.affectedRows !== 1) throw new Error("Order changed before rejection could be recorded. Review its current status; no rejection was applied.");
+  };
+  // The default-off discovery lane requires its ledger schema. Legacy releases
+  // retain the same CAS rejection without introducing a schema dependency.
+  if (objectiveDiscoveryEnabled()) await withPaperOrderClaimTransaction(db, userId, orderId, reject);
+  else await reject(db);
 }
 
 // ── Submit ────────────────────────────────────────────────────────────────────
@@ -858,12 +880,14 @@ export async function submitOrder(orderId: number, userId: number, paperConfirma
   // call. Cash recorded first blocks this transition. Until the broker response
   // persists an external order id (or a rejection), this row is also the durable
   // dispatch lease that prevents a new Decision Run revision from overtaking it.
-  await db.transaction(async (tx) => {
+  const authorizeDispatch = async (tx: CapitalLedgerTransaction) => {
     await lockCurrentDecisionRevision(tx, decisionAuthorization);
     const update = await tx.update(brokerOrders).set({ status: "submitted", clientOrderId, dispatchError: null, submitConfirmedAt: now, submittedAt: now, updatedAt: now })
-      .where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.status, "approved")));
+      .where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.userId, userId), eq(brokerOrders.status, "approved")));
     if (!update[0].affectedRows) throw new Error("order changed before submission could be authorized");
-  });
+  };
+  if (objectiveDiscoveryEnabled()) await withPaperOrderClaimTransaction(db, userId, orderId, authorizeDispatch);
+  else await db.transaction(authorizeDispatch);
 
   const req: OrderRequest = {
     clientOrderId,
@@ -878,18 +902,28 @@ export async function submitOrder(orderId: number, userId: number, paperConfirma
   };
 
   let result;
+  // A fill poll may finish while this broker response is in flight. Both the
+  // success and ambiguous-failure writes must still own the original lease and
+  // fill snapshot; never replace a newer reconciliation with an older response.
+  const dispatchResponseScope = () => and(eq(brokerOrders.id, orderId), eq(brokerOrders.userId, userId),
+    eq(brokerOrders.status, "submitted"), eq(brokerOrders.clientOrderId, clientOrderId),
+    order.brokerOrderId == null ? isNull(brokerOrders.brokerOrderId) : eq(brokerOrders.brokerOrderId, order.brokerOrderId),
+    order.filledQty == null ? isNull(brokerOrders.filledQty) : eq(brokerOrders.filledQty, order.filledQty),
+    order.filledAvgPriceCents == null ? isNull(brokerOrders.filledAvgPriceCents) : eq(brokerOrders.filledAvgPriceCents, order.filledAvgPriceCents));
   try {
     result = await broker.submitOrder(req, { isPaper: account.isPaper });
   } catch (e: any) {
     // Transport failures are ambiguous: Alpaca may have accepted the stable
     // client order id before the response was lost. Keep the dispatch lease
     // until mirrorFills reconciles that id; never invite an unsafe resubmit.
-    await db.update(brokerOrders).set({
+    const recordFailure = async (writer: Pick<typeof db, "update">) => writer.update(brokerOrders).set({
       status: "submitted",
       dispatchError: e?.message ?? String(e),
       updatedAt: Date.now(),
-    }).where(eq(brokerOrders.id, orderId));
-    throw new Error("Paper dispatch outcome is unknown. The order remains locked for broker reconciliation; do not resubmit it.");
+    }).where(dispatchResponseScope());
+    if (objectiveDiscoveryEnabled()) await withPaperOrderClaimTransaction(db, userId, orderId, recordFailure);
+    else await recordFailure(db);
+    throw new Error("Paper dispatch response was unavailable. Review the recorded order status and reconcile any unresolved dispatch; do not resubmit it.");
   }
 
   // Update with broker result
@@ -905,7 +939,16 @@ export async function submitOrder(orderId: number, userId: number, paperConfirma
   };
   if (newStatus === "filled") updates.filledAt = Date.now();
 
-  await db.update(brokerOrders).set(updates).where(eq(brokerOrders.id, orderId));
+  const recordResponse = async (writer: Pick<typeof db, "update">) => writer.update(brokerOrders).set(updates).where(dispatchResponseScope());
+  const [recorded] = objectiveDiscoveryEnabled()
+    ? await withPaperOrderClaimTransaction(db, userId, orderId, recordResponse)
+    : await recordResponse(db);
+  if (recorded.affectedRows !== 1) {
+    const [current] = await db.select().from(brokerOrders)
+      .where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.userId, userId))).limit(1);
+    if (!current) throw new Error("Order status could not be reconciled. Do not resubmit; review the recorded dispatch.");
+    return current;
+  }
 
   if (newStatus === "filled" && decisionAuthorization?.source === "authoritative" && decisionAuthorization.decisionRunId != null && decisionAuthorization.revisionId != null) {
     await queuePaperOutcome({
@@ -971,7 +1014,7 @@ export async function mirrorFills(userId: number): Promise<number> {
       if (newStatus === order.status && brokerOrderId === order.brokerOrderId && !order.dispatchError
         && filledQty === order.filledQty && filledAvgPriceCents === order.filledAvgPriceCents) continue;
       const now = Date.now();
-      const [mirrored] = await db.update(brokerOrders).set({
+      const recordMirror = async (writer: Pick<typeof db, "update">) => writer.update(brokerOrders).set({
         status: newStatus as any,
         brokerOrderId,
         dispatchError: null,
@@ -983,6 +1026,12 @@ export async function mirrorFills(userId: number): Promise<number> {
         eq(brokerOrders.status, order.status),
         order.filledQty == null ? isNull(brokerOrders.filledQty) : eq(brokerOrders.filledQty, order.filledQty),
         order.filledAvgPriceCents == null ? isNull(brokerOrders.filledAvgPriceCents) : eq(brokerOrders.filledAvgPriceCents, order.filledAvgPriceCents)));
+      // Polling is outside the transaction. Only the already-observed result and
+      // its existing capital reservation are reconciled together, never replaying
+      // a broker request when a database snapshot conflict requires a retry.
+      const [mirrored] = objectiveDiscoveryEnabled()
+        ? await withPaperOrderClaimTransaction(db, userId, order.id, recordMirror)
+        : await recordMirror(db);
       // Another poll may have recorded a newer fill while this request was in
       // flight. Never downgrade it or emit outcome/snapshot side effects twice.
       if (mirrored.affectedRows !== 1) continue;

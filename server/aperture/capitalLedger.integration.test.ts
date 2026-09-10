@@ -6,7 +6,7 @@ import https from "node:https";
 import { users, portfolioAccounts, capitalTheses, apertureRuns, apertureCandidates, brokerOrders, monitoringChecks } from "../../drizzle/schema";
 import { apertureCapitalEvents as events, apertureCapitalClaims as claims } from "../../drizzle/apertureCapitalLedgerSchema";
 import { capitalLedgerReceiptSchema } from "../../shared/capitalStrategy";
-import { claimCapital, readCapitalLedger, recordCapitalEvent, transitionCapitalClaim } from "./capitalLedger";
+import { claimCapital, readCapitalLedger, recordCapitalEvent, transitionCapitalClaim, paperOrderAllocationId, reconcilePaperOrderClaim } from "./capitalLedger";
 import { requireIsolatedIntegrationDatabase } from "../../scripts/isolated-integration-identity.mjs";
 
 // Main must export the new schema and add this file to the approved integration
@@ -284,6 +284,73 @@ describe("capital ledger — actual disposable database transactions", () => {
       expect(await ledgerRows()).toEqual({ events: [], claims: [] });
       expect(getOrder).toHaveBeenCalledTimes(race ? 1 : 2);
     } finally { broker.mockRestore(); }
+  });
+
+  it.each([
+    { label: "awaiting approval", order: { status: "pending_approval" }, state: "pending", uncertain: false },
+    { label: "approved not sent", order: { status: "approved" }, state: "pending", uncertain: false },
+    { label: "local rejection", order: { status: "rejected" }, state: "released", uncertain: false },
+    { label: "dispatch response lost", order: { status: "submitted", clientOrderId: "illustrative-client", dispatchError: "Illustrative timeout" }, state: "committed", uncertain: true },
+    { label: "accepted unfilled", order: { status: "submitted", brokerOrderId: "illustrative-broker", filledQty: 0 }, state: "committed", uncertain: false },
+    { label: "partial in motion", order: { status: "submitted", brokerOrderId: "illustrative-broker", filledQty: 0.5 }, state: "committed", uncertain: false },
+    { label: "filled", order: { status: "filled", brokerOrderId: "illustrative-broker", filledQty: 1 }, state: "consumed", uncertain: false },
+    { label: "cancelled partial", order: { status: "cancelled", brokerOrderId: "illustrative-broker", filledQty: 0.5 }, state: "consumed", uncertain: false },
+    { label: "broker zero-fill rejection", order: { status: "rejected", brokerOrderId: "illustrative-broker", filledQty: 0 }, state: "released", uncertain: false },
+    { label: "terminal fill unknown", order: { status: "rejected", brokerOrderId: "illustrative-broker", filledQty: null }, state: "committed", uncertain: true },
+    { label: "terminal transport ambiguity", order: { status: "rejected", brokerOrderId: "illustrative-broker", filledQty: 0, dispatchError: "Illustrative uncertainty" }, state: "committed", uncertain: true },
+  ])("reconciles $label without creating orders or recycling consumed money", async scenario => {
+    const order = (await unaffected()).orders.find(row => row.userId === fixtures[0].userId)!;
+    await record();
+    await reserve(claimInput(paperOrderAllocationId(order.id)));
+    await db.update(brokerOrders).set(scenario.order as any).where(eq(brokerOrders.id, order.id));
+    baseline = await unaffected(); // Only the explicit fixture transition above.
+    const result = await db.transaction(tx => reconcilePaperOrderClaim(tx, order.userId, order.id));
+    expect(result).toMatchObject({ status: "bound", state: scenario.state, needsReconciliation: scenario.uncertain });
+    const after = await ledgerRows();
+    expect(after.claims).toHaveLength(1);
+    expect(after.claims[0]).toMatchObject({ amountCents: 80_000, state: scenario.state });
+    expect(await db.transaction(tx => reconcilePaperOrderClaim(tx, order.userId, order.id))).toMatchObject({ changed: false, state: scenario.state });
+    expect(await ledgerRows()).toEqual(after);
+    expect(await unaffected()).toEqual(baseline);
+  });
+
+  it("keeps unbound legacy orders unbound and refuses foreign ownership", async () => {
+    const order = (await unaffected()).orders.find(row => row.userId === fixtures[0].userId)!;
+    expect(await db.transaction(tx => reconcilePaperOrderClaim(tx, order.userId, order.id))).toEqual({ status: "not_bound" });
+    await expect(db.transaction(tx => reconcilePaperOrderClaim(tx, fixtures[1].userId, order.id))).rejects.toMatchObject({ code: "CLAIM_CONFLICT" });
+    expect(await ledgerRows()).toEqual({ events: [], claims: [] });
+  });
+
+  it.each(["consumed", "released"] as const)("does not silently recycle a %s claim when later evidence conflicts", async state => {
+    const order = (await unaffected()).orders.find(row => row.userId === fixtures[0].userId)!;
+    await record(); await reserve(claimInput(paperOrderAllocationId(order.id)));
+    await db.update(brokerOrders).set(state === "consumed"
+      ? { status: "filled", brokerOrderId: "illustrative-broker", filledQty: 1 }
+      : { status: "rejected" }).where(eq(brokerOrders.id, order.id));
+    await db.transaction(tx => reconcilePaperOrderClaim(tx, order.userId, order.id));
+    const ledger = await ledgerRows();
+    await db.update(brokerOrders).set(state === "consumed"
+      ? { status: "cancelled", filledQty: 0 }
+      : { status: "filled", brokerOrderId: "illustrative-late-fill", filledQty: 1 }).where(eq(brokerOrders.id, order.id));
+    baseline = await unaffected();
+    const reconcile = () => db.transaction(tx => reconcilePaperOrderClaim(tx, order.userId, order.id));
+    if (state === "consumed") expect(await reconcile()).toMatchObject({ state: "consumed", changed: false, needsReconciliation: true });
+    else await expect(reconcile()).rejects.toMatchObject({ code: "LEDGER_INTEGRITY" });
+    expect(await ledgerRows()).toEqual(ledger);
+  });
+
+  it("rolls back order and allocation transitions together when the caller fails", async () => {
+    const order = (await unaffected()).orders.find(row => row.userId === fixtures[0].userId)!;
+    await record(); await reserve(claimInput(paperOrderAllocationId(order.id)));
+    const ledger = await ledgerRows();
+    await expect(db.transaction(async tx => {
+      await readCapitalLedger(tx, order.userId, target());
+      await tx.update(brokerOrders).set({ status: "filled", brokerOrderId: "illustrative-broker", filledQty: 1 }).where(eq(brokerOrders.id, order.id));
+      expect(await reconcilePaperOrderClaim(tx, order.userId, order.id)).toMatchObject({ state: "consumed" });
+      throw new Error("Illustrative final-write failure");
+    })).rejects.toThrow("Illustrative final-write failure");
+    expect(await ledgerRows()).toEqual(ledger);
+    expect(await unaffected()).toEqual(baseline);
   });
 
   it("rolls back an uncommitted claim when the caller fails after reading its receipt", async () => {

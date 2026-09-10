@@ -9,18 +9,23 @@ import {
   type MissionDraftRecord, type MissionDraftValues,
 } from "@shared/apertureMissionDraft";
 import { ObjectiveMissionWorkspace, type ObjectiveMissionRiskPreview } from "./ObjectiveMissionWorkspace";
+import { SourceExecutionEvidence } from "./SourceExecutionEvidence";
+import { GainsSourcePicker } from "./GainsSourcePicker";
 import { ObjectiveDiscoveryResult, type ObjectiveDiscoverySnapshot } from "./ObjectiveDiscoveryResult";
+import { DiscoveryLeadAction } from "./DiscoveryLeadAction";
 
 export type ObjectiveMissionFlowProps = {
   initialDraft?: MissionDraftRecord | null;
   receiptTarget?: { decisionRunId: number; revisionId: number } | null;
   newObjective?: boolean;
+  /** Replace the new-draft address only after the exact accepted identity is verified. */
+  onAccepted?: (target: { decisionRunId: number; revisionId: number }) => void;
 };
 type Identity = { decisionRunId: number; decisionRevisionId: number };
 type StartRequest = { requestId: string; expectedVersion: number };
 type RiskResponse = inferRouterOutputs<AppRouter>["aperture"]["underwriter"]["preview"];
 type Conflict = { remote: MissionDraftRecord | null; compared: boolean };
-type UncertainStart = { request: StartRequest; fingerprint: string; state: "checking" | "unknown" | "safe" };
+type UncertainStart = { request: StartRequest; fingerprint: string; state: "checking" | "unknown" | "safe"; failureReason?: string };
 const readOptions = { retry: false as const, refetchOnWindowFocus: false };
 const surface = { borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" };
 const message = (error: unknown) => error instanceof Error ? error.message : "The request could not be confirmed. Your inputs are retained.";
@@ -134,7 +139,7 @@ function DraftComparison({ local, remote, accounts, theses }: { local: MissionDr
   </div>;
 }
 
-export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective = false }: ObjectiveMissionFlowProps) {
+export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective = false, onAccepted }: ObjectiveMissionFlowProps) {
   const utils = trpc.useUtils();
   const draftQuery = trpc.aperture.runway.draft.get.useQuery(undefined, readOptions);
   // These endpoints are owner-scoped. Do not infer ownership from a label.
@@ -268,6 +273,7 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
       if (!mounted.current) return;
       if (result.version !== (base?.version ?? 0) + 1 || result.completedAt != null || !sameValues(result.values, exactValues)) throw new Error("The saved response does not match this draft. Compare the saved version before continuing.");
       setSaved(result); setConflict(null);
+      return result;
     } catch (error) {
       if (!mounted.current) return;
       setFailure(message(error));
@@ -310,7 +316,8 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
         setFailure("The accepted request has a different source version. Keep the original identity and compare its record.");
         setUncertain({ ...attempt, state: "unknown" }); return;
       }
-      showSnapshot(found); setUncertain(null); setFailure(null); return;
+      showSnapshot(found); setUncertain(null); setFailure(null);
+      onAccepted?.({ decisionRunId: found.decisionRunId, revisionId: found.decisionRevisionId }); return;
     }
     if (remote.status === "fulfilled") observeDraft(remote.value);
     const exactDraft = remote.status === "fulfilled" && remote.value?.completedAt == null && remote.value != null
@@ -319,15 +326,23 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
       && missionDraftFingerprint(remote.value.values) === attempt.fingerprint;
     if (accepted.status === "fulfilled" && accepted.value === null && exactDraft) {
       setUncertain({ ...attempt, state: "safe" });
-      setFailure("No accepted Mission was found and the exact saved draft is unchanged. Retry only this original request.");
+      setFailure([attempt.failureReason, "No accepted Mission was found and the exact saved draft is unchanged. Retry only this original request after addressing the cause."].filter(Boolean).join(" "));
     } else {
       setUncertain({ ...attempt, state: "unknown" });
       setFailure("Start outcome is unconfirmed. Your original request identity and local edits are retained. Check the saved start again; do not create another request.");
     }
   }
-  async function start(retry = false) {
-    if (operation.current || target || conflict || loading || contextFailure || capabilityBlock) return;
+  async function saveAndStart() {
+    if (operation.current || target || conflict || uncertain || loading || contextFailure || capabilityBlock || !riskCurrent) return;
     const local = current.current;
+    if (local.saved && local.saved.completedAt == null && sameValues(local.values, local.saved.values)) return start();
+    const confirmed = await save();
+    if (!confirmed || !mounted.current || !sameValues(current.current.values, confirmed.values)) return;
+    return start(false, confirmed);
+  }
+  async function start(retry = false, confirmedSave?: MissionDraftRecord) {
+    if (operation.current || target || conflict || loading || contextFailure || capabilityBlock) return;
+    const local = confirmedSave ? { ...current.current, saved: confirmedSave } : current.current;
     if (!local.saved || local.saved.completedAt != null || !local.values.strategyContext || !sameValues(local.values, local.saved.values)) return;
     if (!riskCurrent || !risk || !freshRisk(risk.data) || !freshAt(account?.lastSyncedAt) || !input || !account) return;
     if (retry ? local.uncertain?.state !== "safe" || local.uncertain.fingerprint !== missionDraftFingerprint(local.values) : !!local.uncertain) return;
@@ -355,9 +370,10 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
       if (!mounted.current) return;
       if (result.acceptedValues.strategyContext?.requestId !== attempt.request.requestId || result.sourceDraftVersion !== attempt.request.expectedVersion) throw new Error("The start response does not match the original saved request.");
       showSnapshot(result); setUncertain(null);
+      onAccepted?.({ decisionRunId: result.decisionRunId, revisionId: result.decisionRevisionId });
     } catch (error) {
       if (!mounted.current) return;
-      setFailure(message(error)); await reconcile(attempt);
+      setFailure(message(error)); await reconcile({ ...attempt, failureReason: message(error) });
     } finally { operation.current = false; if (mounted.current) setBusy(false); }
   }
   async function refreshResult() {
@@ -409,6 +425,10 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
       {snapshot && <ObjectiveDiscoveryResult snapshot={snapshot} busy={busy} refreshing={refreshing || resultQuery.isFetching}
         failure={failure || (resultQuery.error ? message(resultQuery.error) : null)}
         actionBlockedReason={capabilityBlock}
+        renderLeadAction={capabilities.data?.selectionEnabled && snapshot.receipt ? hypothesisId => <DiscoveryLeadAction
+          key={`${snapshot.receipt!.id}:${hypothesisId}`}
+          identity={{ ...target, discoveryReceiptId: snapshot.receipt!.id, hypothesisId }}
+          blockedReason={capabilityBlock || (busy || refreshing || snapshot.job.state !== "complete" || snapshot.usingPreviousResult || failure ? "Reconcile the current research result before selecting a lead." : null)} /> : undefined}
         onRefresh={refreshResult} onRetry={() => run(true)} onStart={() => run(false)} />}
       {!snapshot && <Button type="button" variant="outline" className="min-h-11" onClick={refreshResult} disabled={refreshing}>Refresh saved receipt</Button>}
       {snapshot && !sameValues(values, snapshot.acceptedValues) && <details className="rounded-xl border p-4" style={surface}>
@@ -417,9 +437,17 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
       </details>}
     </> : <>
       <ObjectiveMissionWorkspace values={values} onChange={next => { if (!operation.current) { setValues(next); setFailure(null); } }}
+        sourcePicker={values.strategyContext && values.activeSection === 1 ? <GainsSourcePicker source={values.strategyContext.sourceOrder}
+          disabled={loading || busy || saving} onChoose={sourceOrder => {
+            if (operation.current || !values.strategyContext) return;
+            setValues({ ...values, accountId: sourceOrder.accountId, strategyContext: { ...values.strategyContext, sourceOrder, intent: "redeploy_realized_gains" } }); setFailure(null);
+          }} /> : null}
+        sourceEvidence={values.strategyContext?.intent === "redeploy_realized_gains" && values.strategyContext.sourceOrder && values.activeSection === 2
+          ? <SourceExecutionEvidence key={JSON.stringify(values.strategyContext.sourceOrder)} source={values.strategyContext.sourceOrder}
+            refreshEnabled={!capabilities.error && !capabilities.isFetching && capabilities.data?.executionRefreshEnabled === true} /> : null}
         accounts={accounts} canonicalTheses={canonicalTheses} saveState={saveState} loading={loading}
         failure={failure || (contextFailure ? message(contextFailure) : null)} busy={busy || saving}
-        blockedReason={startBlock} onSave={() => save()} onUnderwrite={() => start()}
+        blockedReason={startBlock} onSave={() => save()} onUnderwrite={() => saveAndStart()} saveBeforeUnderwriting
         riskPreview={riskPreview} onInspectRisk={inspectRisk} />
       {(riskFailure || riskPending) && <p role={riskFailure ? "alert" : "status"} className="text-sm" style={{ color: "var(--sh-signal)" }}>{riskFailure || "Reading the effective constraint from the server…"}</p>}
       <Button type="button" variant="ghost" className="min-h-11" onClick={refreshDraft} disabled={refreshing || busy || saving}>Refresh saved draft</Button>

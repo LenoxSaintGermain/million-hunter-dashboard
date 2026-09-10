@@ -47,8 +47,11 @@ describe("Mission objective entry routing (isolated rendering, not browser UAT)"
     });
   it("opens the objective controller only for the deliberate objective route", () => {
     fixture.search = "objective=1"; renderToStaticMarkup(ApertureMission());
-    expect(fixture.flow).toHaveBeenCalledOnce(); expect(fixture.flow).toHaveBeenCalledWith({ newObjective: true });
+    expect(fixture.flow).toHaveBeenCalledOnce(); expect(fixture.flow).toHaveBeenCalledWith({ newObjective: true, onAccepted: expect.any(Function) });
     expect(fixture.runway).not.toHaveBeenCalled(); expect(fixture.navigate).not.toHaveBeenCalled();
+    fixture.flow.mock.calls[0][0].onAccepted({ decisionRunId: 77, revisionId: 88 });
+    expect(fixture.navigate).toHaveBeenCalledOnce();
+    expect(fixture.navigate).toHaveBeenCalledWith("/aperture/decision/77/revision/88", { replace: true });
   });
   it("keeps an exact receipt ahead of a conflicting new-objective query", () => {
     fixture.search = "objective=1"; fixture.receipt = true; fixture.params = { decisionRunId: "77", revisionId: "88" };

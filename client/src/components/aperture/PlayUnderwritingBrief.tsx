@@ -17,7 +17,7 @@ export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate
           <p className="mt-2 text-sm leading-6">{result.noTrade.explanation}</p>
           {result.noTrade.reopenCondition && <p className="mt-3 text-sm leading-6"><strong>Reassess when:</strong> {result.noTrade.reopenCondition}</p>}
           {result.noTrade.reviewAt != null && <p className="mt-2 text-sm">Review: {new Date(result.noTrade.reviewAt).toLocaleString()} · on demand</p>}
-          <p className="mt-3 text-sm" style={{ color: "var(--sh-fg-muted)" }}>No paper ticket has been created. Existing positions are unchanged.</p>
+          <p className="mt-3 text-sm" style={{ color: "var(--sh-fg-muted)" }}>No paper ticket created; existing positions unchanged.</p>
         </div>
       </div>
     </section> : <section aria-label="Conditional playbook">

@@ -14,8 +14,8 @@ export function MissionResultWorkspace({ result, accountLabel, accountAsOf, thes
 }) {
   return <section className="mx-auto max-w-5xl space-y-4 pb-12" aria-label="Completed mission">
     <header>
-      <p className="text-sm font-semibold">{accountLabel} · Paper</p>
-      <div className="mt-2 flex items-center justify-between gap-3"><h2 className="font-serif text-2xl">Mission result</h2><Button variant="outline" className="min-h-11" onClick={onEdit}>Edit mission</Button></div>
+      <div className="flex items-center justify-between gap-3"><h2 className="font-serif text-2xl">Mission result</h2><Button variant="outline" className="min-h-11" onClick={onEdit}>Edit mission</Button></div>
+      <p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>{accountLabel} · Paper</p>
     </header>
     {notice}
     <section id="mission-underwriting-result" aria-label="Underwriting result" className="scroll-mt-24 space-y-3">

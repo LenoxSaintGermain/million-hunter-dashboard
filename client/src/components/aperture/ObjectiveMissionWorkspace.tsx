@@ -37,8 +37,12 @@ export type ObjectiveMissionWorkspaceProps = {
   blockedReason?: string | null;
   onSave: () => void;
   onUnderwrite: () => void;
+  /** Controller guarantees an exact successful save before starting analysis. */
+  saveBeforeUnderwriting?: boolean;
   riskPreview?: ObjectiveMissionRiskPreview | null;
   onInspectRisk: () => void;
+  sourceEvidence?: React.ReactNode;
+  sourcePicker?: React.ReactNode;
 };
 
 const scopeLabels: Record<MissionStrategyDraft["searchScope"], string> = {
@@ -152,7 +156,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
     || (busy ? "Underwriting is in progress." : null)
     || (saveState === "saving" ? "Saving your draft. Wait for confirmation." : null)
     || failureText || blockedReason || previewWarning || issues[0]?.message
-    || (saveState !== "saved" ? "Save this draft before underwriting." : null);
+    || (saveState !== "saved" && !props.saveBeforeUnderwriting ? "Save this draft before underwriting." : null);
   const effectiveSaveState = failureText ? "failed" : loading ? "loading" : saveState;
   const saveLabel = { loading: "Loading draft", saving: "Saving…", saved: "Saved", unsaved: "Unsaved changes", failed: "Save or action failed" }[effectiveSaveState];
   const summaries = {
@@ -187,6 +191,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
     <section aria-labelledby={`${prefix}-heading-1`} className="rounded-xl border p-4" style={surface}>
       {sectionHeader(1, "Question & scope")}
       <div id={`${prefix}-section-1`} hidden={values.activeSection !== 1} className="mt-4 space-y-4">
+        {props.sourcePicker && <details><summary className="min-h-11 cursor-pointer py-2">Explore gains from a recorded order</summary>{props.sourcePicker}</details>}
         <FieldRow id={`${prefix}-mission`} label="What should we research?" error={errors("mission")}>
           <Input {...fieldProps("mission")} className="min-h-11" value={values.mission} disabled={locked}
             onChange={event => change({ mission: event.target.value, missionDirty: true })} />
@@ -250,6 +255,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
       {sectionHeader(2, "Account & risk")}
       {source && <p className="mt-2 break-words text-sm" style={{ color: "var(--sh-signal)" }}>Hypothetical until verified · Source account #{source.accountId} / run #{source.runId} / candidate #{source.candidateId} / order #{source.orderId}. This reference does not verify gains or available capital.</p>}
       <div id={`${prefix}-section-2`} hidden={values.activeSection !== 2} className="mt-4 space-y-4">
+        {source && props.sourceEvidence}
         <FieldRow id={`${prefix}-accountId`} label="Named Paper account" error={errors("accountId")}>
           <select {...fieldProps("accountId")} className={controlClass} style={surface} value={values.accountId ?? ""} disabled={locked}
             onChange={event => change({ accountId: event.target.value ? Number(event.target.value) : null })}>
@@ -307,7 +313,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
         <div className="flex flex-wrap gap-2">
           <Button type="button" className="min-h-11" disabled={!!actionBlock} aria-describedby={`${prefix}-effect ${prefix}-blocked`} onClick={() => { if (!actionBlock) onUnderwrite(); }}>{busy ? "Underwriting…" : "Underwrite my mission"}</Button>
         </div>
-        <p id={`${prefix}-effect`} className="text-sm" style={muted}>Builds research. No order is created or submitted.</p>
+        <p id={`${prefix}-effect`} className="text-sm" style={muted}>{props.saveBeforeUnderwriting && saveState !== "saved" ? "Saves these assumptions and builds research. No order is created or submitted." : "Builds research. No order is created or submitted."}</p>
         <p id={`${prefix}-blocked`} role="status" className="text-sm" style={{ color: actionBlock ? "var(--sh-signal)" : "var(--sh-fg-muted)" }}>{actionBlock ?? "Ready for your explicit request."}</p>
       </div>
     </section>

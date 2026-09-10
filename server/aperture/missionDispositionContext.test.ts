@@ -233,6 +233,16 @@ describe("persisted Mission disposition context", () => {
     }
   });
 
+  it("keeps the mission statement below the section heading instead of adding another page heading", () => {
+    fixture.queries.draft.data.values.activeSection = 1;
+    const { $ } = render();
+    expect($("h1")).toHaveLength(0); // The enclosing Mission page owns h1.
+    expect($("#mission-section-thesis").prop("tagName")).toBe("H2");
+    expect($("h3").filter((_, node) => $(node).text() === fixture.queries.draft.data.values.mission)).toHaveLength(1);
+    expect(fixture.mutations.begin.mutateAsync).not.toHaveBeenCalled();
+    expect(fixture.mutations.run.mutateAsync).not.toHaveBeenCalled();
+  });
+
   it("uses only the latest user section request and never focuses a hidden destination later", () => {
     setDraft("conditional", 2);
     let view = render();

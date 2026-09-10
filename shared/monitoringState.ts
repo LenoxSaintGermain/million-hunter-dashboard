@@ -74,6 +74,12 @@ export function monitoringFindingPresentation({ check, instrument, rationale, no
 }
 
 export function validMonitoringCitations(citations: unknown): string[] {
+  // SQL JSON columns can arrive decoded or serialized; neither form changes
+  // the original finding record used for version identity.
+  if (typeof citations === "string") {
+    try { citations = JSON.parse(citations); }
+    catch { return []; }
+  }
   if (!Array.isArray(citations)) return [];
   return citations.filter((citation): citation is string =>
     typeof citation === "string" && /^https?:\/\//i.test(citation.trim()),

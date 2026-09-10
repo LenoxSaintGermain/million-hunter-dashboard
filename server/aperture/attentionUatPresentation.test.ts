@@ -42,7 +42,8 @@ describe("Authenticated UAT attention regressions — illustrative records, zero
     const attention = deriveApertureAttention(input({ checks: { state: "stale", asOf: now, monitoring: "on_demand", issues: [{ source: "monitoring", state: "stale", label: "MGM monitoring", impact: "Fresh checks needed", lastSuccessAt: now - 86_400_001, actionLabel: "Review MGM checks", href: "/aperture/run/360001/execute?candidate=240002&lifecycle=monitoring", recovery: "review_checks" }] } }), null);
     const html = today(attention);
     expect(html).not.toContain("Refresh status before relying on current eligibility");
-    expect(html).toContain("Open the affected play below for new checks");
+    expect(html).toContain("Some play evidence is out of date.");
+    expect(html).toContain("Fresh checks are needed before relying on them; refreshing status only reloads saved records.");
     expect(fixture.refetch).not.toHaveBeenCalled();
   });
 

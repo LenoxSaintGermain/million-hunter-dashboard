@@ -46,7 +46,7 @@ vi.mock("@/lib/trpc", () => {
   const aperture = {
     account: { list: endpoint("accounts") },
     runway: { draft: { get: endpoint("draft"), save: endpoint("save") } },
-    strategy: { capabilities: endpoint("capabilities"), start: endpoint("start"), run: endpoint("run"), get: endpoint("get"), resume: endpoint("resume") },
+    strategy: { capabilities: endpoint("capabilities"), start: endpoint("start"), run: endpoint("run"), get: endpoint("get"), resume: endpoint("resume"), executionSources: endpoint("executionSources") },
     underwriter: { preview: endpoint("preview") },
   };
   return { trpc: { aperture, thesis, useUtils: () => ({ aperture, thesis }) } };
@@ -132,6 +132,7 @@ beforeEach(() => {
   ]), canonical: query([{ id: 7001, name: "Illustrative saved thesis" }]), capabilities: query({ enabled: true, mode: "paper", monitoring: "on_demand" }), get: query(undefined) };
   fixture.reads = Object.fromEntries(["draft", "get", "resume", "preview", "accounts", "canonical", "capabilities"].map(name => [name, vi.fn().mockResolvedValue(null)]));
   fixture.reads.draft.mockImplementation(async () => fixture.queries.draft.data);
+  fixture.queries.executionSources = query({ sources: [], nextCursor: null, gainsVerified: false });
   fixture.mutations = Object.fromEntries(["save", "start", "run"].map(name => [name, { isPending: false, mutateAsync: vi.fn() }]));
   fixture.reads.preview.mockImplementation(async (input: unknown) => preview(input));
   fixture.mutations.save.mutateAsync.mockImplementation(async ({ values: value, expectedVersion }: { values: MissionDraftValues; expectedVersion: number }) => record(value, expectedVersion + 1));
@@ -139,6 +140,74 @@ beforeEach(() => {
 afterEach(() => { fixture.cleanups.forEach(cleanup => cleanup?.()); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("connected Objective Mission", () => {
+  it("saves reviewed changes before underwriting with one click and deduplicates repeated clicks", async () => {
+    const view = harness(); view.render();
+    view.change({ mission: "Illustrative changed question: compare uses of declared capital." });
+    await view.workspace().onInspectRisk();
+    const write = deferred<MissionDraftRecord>();
+    fixture.mutations.save.mutateAsync.mockReturnValueOnce(write.promise);
+    const action = view.workspace().onUnderwrite;
+    const starting = action(); action();
+    expect(fixture.mutations.save.mutateAsync).toHaveBeenCalledOnce();
+    expect(fixture.mutations.start.mutateAsync).not.toHaveBeenCalled();
+    const changed = view.workspace().values;
+    fixture.mutations.start.mutateAsync.mockResolvedValueOnce({ ...snapshot("complete"), acceptedValues: changed, sourceDraftVersion: 5 });
+    write.resolve(record(changed, 5)); await starting;
+    expect(fixture.mutations.start.mutateAsync).toHaveBeenCalledOnce();
+    expect(fixture.mutations.start.mutateAsync).toHaveBeenCalledWith({ requestId, expectedVersion: 5 });
+    expect(fixture.mutations.run.mutateAsync).not.toHaveBeenCalled();
+  });
+  it.each(["rejected", "mismatched"])("does not start analysis after a %s automatic save", async mode => {
+    const view = harness(); view.render();
+    view.change({ mission: "Illustrative reviewed changes must remain local when saving fails." });
+    await view.workspace().onInspectRisk();
+    if (mode === "rejected") fixture.mutations.save.mutateAsync.mockRejectedValueOnce(new Error("Illustrative save conflict"));
+    else fixture.mutations.save.mutateAsync.mockResolvedValueOnce(record(values(), 5));
+    await view.workspace().onUnderwrite();
+    expect(fixture.mutations.save.mutateAsync).toHaveBeenCalledOnce();
+    expect(fixture.mutations.start.mutateAsync).not.toHaveBeenCalled();
+    expect(fixture.mutations.run.mutateAsync).not.toHaveBeenCalled();
+    expect(view.render().$.text()).toContain("Compare saved draft");
+  });
+  it("rechecks risk freshness after a slow automatic save", async () => {
+    const view = harness(); view.render(); view.change({ mission: "Illustrative slow save must not use an expired preview." });
+    await view.workspace().onInspectRisk();
+    const changed = view.workspace().values;
+    const write = deferred<MissionDraftRecord>(); fixture.mutations.save.mutateAsync.mockReturnValueOnce(write.promise);
+    const starting = view.workspace().onUnderwrite();
+    vi.setSystemTime(now + STALE_ACCOUNT_MS + 1);
+    write.resolve(record(changed, 5)); await starting;
+    expect(fixture.mutations.start.mutateAsync).not.toHaveBeenCalled();
+  });
+  it("hands a confirmed start to its exact persisted receipt route, never the new-draft URL", async () => {
+    const onAccepted = vi.fn();
+    const view = harness({ onAccepted } as ObjectiveMissionFlowProps);
+    view.render();
+    await view.workspace().onInspectRisk();
+    expect(onAccepted).not.toHaveBeenCalled();
+    const accepted = snapshot("complete");
+    fixture.mutations.start.mutateAsync.mockResolvedValueOnce(accepted);
+    await view.workspace().onUnderwrite();
+    expect(onAccepted).toHaveBeenCalledOnce();
+    expect(onAccepted).toHaveBeenCalledWith({
+      decisionRunId: accepted.decisionRunId, revisionId: accepted.decisionRevisionId,
+    });
+    expect(fixture.mutations.run.mutateAsync).not.toHaveBeenCalled();
+  });
+  it("choosing a source preserves declarations and requires saving the changed draft", () => {
+    const original = { ...values(), activeSection: 1 as const };
+    const view = harness({ initialDraft: record(original) });
+    const picker = view.workspace().sourcePicker as React.ReactElement<any>;
+    const source = { accountId: 32, runId: 42, candidateId: 53, orderId: 64 };
+    picker.props.onChoose(source);
+    const next = view.workspace();
+    expect(next.values.accountId).toBe(32);
+    expect(next.values.capital).toBe(original.capital); expect(next.values.maxLoss).toBe(original.maxLoss);
+    expect(next.values.canonicalThesisId).toBeNull();
+    expect(next.values.strategyContext).toEqual({ ...original.strategyContext, intent: "redeploy_realized_gains", sourceOrder: source });
+    expect(next.saveState).toBe("unsaved");
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+  });
   it("hydrates the exact draft, lists only named owned Paper accounts, and never auto-mutates", () => {
     const original = record(); const view = harness({ initialDraft: original });
     for (let i = 0; i < 4; i++) view.render();
@@ -342,6 +411,17 @@ describe("connected Objective Mission", () => {
     expect(fixture.reads.resume).toHaveBeenCalledTimes(2);
     expect(fixture.mutations.start.mutateAsync.mock.calls).toEqual([[{ requestId, expectedVersion: 4 }], [{ requestId, expectedVersion: 4 }]]);
     expect(view.result().snapshot.acceptedValues.strategyContext?.declarationId).toBe(declarationId);
+  });
+
+  it("retains the start refusal reason after reconciling an unchanged draft", async () => {
+    const view = harness(); view.render(); await view.workspace().onInspectRisk();
+    fixture.mutations.start.mutateAsync.mockRejectedValueOnce(new Error("The isolated UAT discovery fixture is not configured. No Mission or provider work was started."));
+    await view.workspace().onUnderwrite();
+    expect(view.render().$.text()).toContain("discovery fixture is not configured");
+    expect(view.render().$.text()).toContain("exact saved draft is unchanged");
+    await view.click("Check saved start");
+    expect(view.render().$.text()).toContain("discovery fixture is not configured");
+    expect(fixture.mutations.start.mutateAsync).toHaveBeenCalledOnce();
   });
 
   it.each(["resume unavailable", "draft unavailable", "draft replaced", "version changed"])("never retries an uncertain start when reconciliation reports %s", async condition => {

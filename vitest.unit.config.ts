@@ -9,7 +9,7 @@ import baseConfig from "./vitest.config";
  */
 export default mergeConfig(baseConfig, defineConfig({
   test: {
-    include: ["shared/**/*.test.ts", "server/aperture/objectiveMissionWorkspace.test.tsx", "server/aperture/objectiveMissionFlow.test.tsx", "server/aperture/objectiveDiscoveryResult.test.tsx", "server/aperture/objectiveMissionEntry.test.tsx"],
+    include: ["shared/**/*.test.ts", "server/aperture/objectiveMissionWorkspace.test.tsx", "server/aperture/objectiveMissionFlow.test.tsx", "server/aperture/objectiveDiscoveryResult.test.tsx", "server/aperture/objectiveMissionEntry.test.tsx", "server/aperture/discoveryLeadAction.test.tsx", "server/aperture/sourceExecutionEvidence.test.tsx", "server/aperture/gainsSourcePicker.test.tsx"],
     exclude: [
       "**/node_modules/**",
       "server/api-keys.test.ts",
@@ -20,6 +20,8 @@ export default mergeConfig(baseConfig, defineConfig({
       "server/aperture/objectiveMission.integration.test.ts",
       "server/aperture/objectiveMigration.integration.test.ts",
       "server/aperture/strategyDiscoveryWorkflow.integration.test.ts",
+      "server/aperture/discoverySelection.integration.test.ts",
+      "server/aperture/executionEvidence.integration.test.ts",
       "server/scan-pipeline.test.ts",
       "server/sprint11.test.ts",
       "server/sprint4.test.ts",

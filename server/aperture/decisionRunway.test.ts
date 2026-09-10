@@ -24,6 +24,14 @@ const eligible: DecisionAuthorizationSnapshot = {
 
 describe("Decision Runway authorization", () => {
   it.each(["preflight", "create_proposal", "approve", "submit"] as const)(
+    "keeps discovery %s research-only even with a claimed eligible binding", action => {
+      const selected = { ...eligible, contextKind: "discovery" as const, validBinding: true };
+      expect(decisionActionBlock(selected, action, "open")).toMatch(/capital source and allocation/);
+      expect(decisionActionBlock(selected, action, "unknown")).not.toBeNull();
+      expect(decisionActionBlock(selected, action, "close")).toBeNull();
+    },
+  );
+  it.each(["preflight", "create_proposal", "approve", "submit"] as const)(
     "blocks an opening action at %s when cash is current",
     (action) => {
       expect(decisionActionBlock({ ...eligible, effectiveBranch: "cash" }, action, "open"))

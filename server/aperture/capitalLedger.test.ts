@@ -4,7 +4,7 @@ import { MySqlDialect, getTableConfig } from "drizzle-orm/mysql-core";
 import { readFileSync } from "node:fs";
 import { apertureCapitalEvents, apertureCapitalClaims, type ApertureCapitalEvent, type ApertureCapitalClaim } from "../../drizzle/apertureCapitalLedgerSchema";
 import { capitalLedgerReceiptSchema, deriveCapitalEnvelope, type DeclaredCapitalSource } from "../../shared/capitalStrategy";
-import { claimCapital, readCapitalLedger, recordCapitalEvent, transitionCapitalClaim, type CapitalLedgerTransaction } from "./capitalLedger";
+import { claimCapital, readCapitalLedger, recordCapitalEvent, transitionCapitalClaim, withCapitalLedgerTransaction, type CapitalLedgerTransaction } from "./capitalLedger";
 
 const NOW = 1_800_000_000_000;
 const eventInput = { accountId: 11, sourceId: "source:declaration-1", sourceKey: "declaration:1", capitalEventId: "declaration:1", sourceKind: "operator_declared_excess", amountCents: 120_000, currency: "USD" } as const;
@@ -62,6 +62,22 @@ beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(NOW); vi.stubGlobal("fe
 afterEach(() => { expect(fetch).not.toHaveBeenCalled(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("capital ledger transaction interface", () => {
+  it.each(["ER_CHECKREAD", "ER_LOCK_DEADLOCK"])("restarts the whole rolled-back transaction for %s only", async code => {
+    const operation = vi.fn(async () => "saved");
+    const transaction = vi.fn().mockRejectedValueOnce({ cause: { code } }).mockImplementation(() => operation());
+    expect(await withCapitalLedgerTransaction({ transaction } as any, operation)).toBe("saved");
+    expect(transaction).toHaveBeenCalledTimes(2);
+  });
+  it.each(["ECONNRESET", "ETIMEDOUT", "ER_DUP_ENTRY"])("does not replay ambiguous or non-retryable %s", async code => {
+    const error = { cause: { code } }, transaction = vi.fn().mockRejectedValue(error);
+    await expect(withCapitalLedgerTransaction({ transaction } as any, vi.fn())).rejects.toBe(error);
+    expect(transaction).toHaveBeenCalledTimes(1);
+  });
+  it("bounds snapshot retries to three complete transactions", async () => {
+    const error = { code: "ER_CHECKREAD" }, transaction = vi.fn().mockRejectedValue(error);
+    await expect(withCapitalLedgerTransaction({ transaction } as any, vi.fn())).rejects.toBe(error);
+    expect(transaction).toHaveBeenCalledTimes(3);
+  });
   it("distinguishes an absent ledger from a checked-empty event, without asserting verified funds", async () => {
     const f = fixture();
     expect(await readCapitalLedger(f.tx, 7, target)).toEqual({ status: "missing", event: null, receipt: null });

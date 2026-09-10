@@ -99,7 +99,7 @@ function decodeReceipt(row: typeof apertureStrategyDiscoveries.$inferSelect) {
 }
 
 /** Status reads do not start/retry jobs or mark findings seen, reviewed or resolved. */
-export async function readObjectiveDiscovery(db: Db, userId: number, raw: Identity) {
+export async function readObjectiveDiscovery(db: ReceiptDb, userId: number, raw: Identity) {
   const input = discoveryIdentityInput.parse(raw);
   const mission = await readMission(db, userId, input);
   const job = await readUnderwritingJob(db, userId, input.decisionRunId, input.decisionRevisionId);
@@ -110,6 +110,7 @@ export async function readObjectiveDiscovery(db: Db, userId: number, raw: Identi
   const records = rows.map(row => {
     const receipt = decodeReceipt(row);
     if (!job || row.jobId !== job.id || receipt.request.missionHash !== mission.revision.missionHash
+      || row.attempt > job.attempt || (row.attempt === job.attempt && row.attemptToken !== job.attemptToken)
       || receipt.request.requestId !== mission.head.clientRequestId || !same(receipt.request, job.request?.discovery)) blocked("The discovery and Mission identities differ. Reconcile the exact saved record.");
     return receipt;
   });

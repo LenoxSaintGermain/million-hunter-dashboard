@@ -22,8 +22,10 @@ export type DecisionAuthorizationSnapshot = {
   /** Effective absolute loss limit persisted on the authoritative mission revision. */
   maxPlannedLossCents: number | null;
   /** Optional for legacy callers; production always supplies the head proof. */
-  contextKind?: "thesis" | "objective";
+  contextKind?: "thesis" | "objective" | "discovery";
   validBinding?: boolean;
+  /** Server-computed declaration/claim proof, never accepted from router input. */
+  declaredCapitalVerified?: boolean;
 };
 
 export class DecisionRunwayBlockedError extends Error {
@@ -56,7 +58,12 @@ export function decisionActionBlock(
   // intent is resolved from the held position before this helper is reached;
   // unknown intent remains fail-closed below.
   if (!requiresCurrentDecisionBinding(intent)) return null;
-  if ((snapshot.contextKind !== undefined && snapshot.contextKind !== "thesis")
+  const declaredDiscovery = snapshot.contextKind === "discovery" && snapshot.source === "authoritative"
+    && snapshot.validBinding === true && snapshot.declaredCapitalVerified === true;
+  if (snapshot.contextKind === "discovery" && !declaredDiscovery) {
+    return "The selected discovery is research-only. Its capital source and allocation have not been verified for an order. No new exposure is permitted.";
+  }
+  if ((!declaredDiscovery && snapshot.contextKind !== undefined && snapshot.contextKind !== "thesis")
     || (snapshot.validBinding !== undefined && snapshot.validBinding !== true)) {
     return "Decision Runway binding mismatch: an objective or incomplete thesis binding cannot authorize opening paper actions. Validate an explicit research handoff first.";
   }
@@ -88,6 +95,7 @@ export async function authorizeDecisionAction(input: {
   intent?: DecisionOrderIntent | null;
   decisionRunId?: number | null;
   decisionRevisionId?: number | null;
+  orderId?: number | null;
 }): Promise<DecisionAuthorizationSnapshot | null> {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
@@ -106,16 +114,35 @@ export async function authorizeDecisionAction(input: {
   }
 
   if (decisionRun) {
+    let declaredCapitalVerified = false;
+    if (requiresCurrentBinding && decisionRun.contextKind === "discovery") {
+      const { objectiveDiscoveryEnabled } = await import("./strategyDiscoveryWorkflow");
+      if (objectiveDiscoveryEnabled() && decisionRun.currentRevisionId != null) {
+        if ((input.action === "approve" || input.action === "submit") && input.orderId == null) {
+          throw new DecisionRunwayBlockedError("Review the exact reserved proposal before approval or submission.", "DECISION_BINDING_MISMATCH");
+        }
+        const { readDiscoveryDeclaredEnvelope } = await import("./discoverySelection");
+        const { withCapitalLedgerTransaction } = await import("./capitalLedger");
+        const envelope = await withCapitalLedgerTransaction(db, tx => readDiscoveryDeclaredEnvelope(tx, input.userId, {
+          decisionRunId: decisionRun.id, decisionRevisionId: decisionRun.currentRevisionId!,
+          ...(input.orderId != null ? { ownOrderId: input.orderId } : {}),
+        }));
+        declaredCapitalVerified = envelope.status === "operator_declared" && envelope.deployableCents > 0;
+      }
+    }
     const bindingProof = {
       contextKind: decisionRun.contextKind === undefined ? "thesis" as const : decisionRun.contextKind,
-      validBinding: hasThesisDecisionBinding(decisionRun),
+      validBinding: declaredCapitalVerified || hasThesisDecisionBinding(decisionRun),
+      ...(declaredCapitalVerified ? { declaredCapitalVerified: true } : {}),
     };
     // Objective acceptance is a planning receipt, never opening-order authority.
     // Reject before reading a permissive branch, even if a research ID was
     // incorrectly attached. A proven close retains the existing safety path.
     if (requiresCurrentBinding && !bindingProof.validBinding) {
       throw new DecisionRunwayBlockedError(
-        "Decision Runway binding mismatch: an objective or incomplete thesis binding cannot authorize opening paper actions.",
+        decisionRun.contextKind === "discovery"
+          ? "The selected discovery is research-only. Verify its capital source and allocation before opening paper actions; no order was created."
+          : "Decision Runway binding mismatch: an objective or incomplete thesis binding cannot authorize opening paper actions.",
         "DECISION_BINDING_MISMATCH",
       );
     }

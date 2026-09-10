@@ -29,3 +29,9 @@ test("preload blocks fetch and DNS promises", () => {
   const program = `const assert=require('node:assert/strict'); (async()=>{await assert.rejects(fetch('https://example.invalid'), /ISOLATED_INTEGRATION_NETWORK_DENIED/); await assert.rejects(require('node:dns').promises.lookup('example.invalid'), /ISOLATED_INTEGRATION_NETWORK_DENIED/);})().catch(()=>process.exitCode=1);`;
   assert.doesNotThrow(() => execFileSync(process.execPath, ["--require", preload, "-e", program], { env: {}, stdio: "pipe" }));
 });
+test("browser harness resolves only literal loopback without allowing external DNS", () => {
+  const program = `const a=require('node:assert/strict'),dns=require('node:dns'); dns.lookup('127.0.0.1',(e,address)=>{a.ifError(e);a.equal(address,'127.0.0.1')});dns.lookup('example.invalid',(e)=>a.match(e.message,/DNS_DENIED/));a.throws(()=>require('node:net').connect({host:'198.51.100.1',port:443}),/NETWORK_DENIED/);`;
+  assert.doesNotThrow(() => execFileSync(process.execPath, ["--require", preload, "-e", program], {
+    env: { ISOLATED_BROWSER_HARNESS: "true", ISOLATED_INTEGRATION_DATABASE: "capital_aperture_test_20260909_zzugqp" }, stdio: "pipe",
+  }));
+});

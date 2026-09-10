@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyMissionDraftValues } from "../../shared/apertureMissionDraft";
-import { prepareObjectiveMission, parseDeclaredCents } from "./objectiveMission";
+import { prepareObjectiveMission, parseDeclaredCents, declaredObjectiveCapitalEvent } from "./objectiveMission";
 
 const values = () => ({ ...emptyMissionDraftValues(), accountId: 31,
   mission: "Illustrative: compare uses of my excess capital over the next month.",
@@ -12,6 +12,23 @@ const values = () => ({ ...emptyMissionDraftValues(), accountId: 31,
 });
 
 describe("accepted objective Mission assumptions", () => {
+  it("binds a stable declaration independently of request and target, without verified cash", () => {
+    const source = declaredObjectiveCapitalEvent(prepareObjectiveMission(values()));
+    expect(source).toEqual({ accountId: 31, amountCents: 2_500_000, currency: "USD",
+      sourceKind: "operator_declared_excess", sourceId: "declared:00000000-0000-4000-8000-000000000012",
+      sourceKey: "declaration:00000000-0000-4000-8000-000000000012", capitalEventId: "declaration:00000000-0000-4000-8000-000000000012" });
+    const revised = values(); revised.targetProfit = "60,000";
+    revised.strategyContext.requestId = "00000000-0000-4000-8000-000000000013";
+    expect(declaredObjectiveCapitalEvent(prepareObjectiveMission(revised))).toEqual(source);
+  });
+  it.each(["explore_opportunity", "review_material_change", "redeploy_realized_gains"] as const)("does not register %s as declared cash", intent => {
+    const original = values();
+    const accepted = prepareObjectiveMission({ ...original, strategyContext: { ...original.strategyContext,
+      intent, declarationId: null, sourceOrder: intent === "redeploy_realized_gains"
+        ? { accountId: 31, runId: 1, candidateId: 2, orderId: 3 } : null } });
+    expect(declaredObjectiveCapitalEvent(accepted)).toBeNull();
+    expect(accepted.availableCapitalCents).toBeNull();
+  });
   it("accepts an explicit capital objective with no canonical thesis and no invented invalidation", () => {
     const result = prepareObjectiveMission(values());
     expect(result).toMatchObject({ canonicalThesisId: null, accountId: 31, deployableCapitalCents: 2_500_000,

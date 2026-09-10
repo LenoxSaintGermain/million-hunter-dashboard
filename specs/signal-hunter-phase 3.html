@@ -1,0 +1,264 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signal Hunter: deal verdicts in five days</title>
+<style>
+  :root{
+    --ledger:#E9EDE4;
+    --paper:#F8FAF5;
+    --ink:#1B2A25;
+    --ink-soft:#4A5A52;
+    --rule:#C3CDBE;
+    --kill:#9B2226;
+    --proceed:#2F5D50;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    background:var(--ledger);
+    color:var(--ink);
+    font-family:var(--serif);
+    font-size:18px;
+    line-height:1.62;
+    font-variant-numeric:tabular-nums;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+
+  /* two-column: marginal rail + content */
+  .band{
+    display:grid;
+    grid-template-columns:170px minmax(0,64ch);
+    gap:0 44px;
+    padding:64px 0;
+    border-bottom:1px solid var(--rule);
+  }
+  .rail{
+    font-family:var(--sans);
+    font-size:12.5px;
+    line-height:1.5;
+    letter-spacing:.01em;
+    color:var(--ink-soft);
+    padding-top:10px;
+    border-right:1px solid var(--rule);
+    padding-right:20px;
+    text-align:right;
+  }
+  .rail b{display:block;font-weight:600;color:var(--ink)}
+  .rail i{font-family:var(--serif);font-style:italic;display:block;margin-top:10px;font-size:14px}
+
+  h1{
+    font-size:clamp(30px,5vw,46px);
+    line-height:1.14;
+    font-weight:400;
+    margin:0 0 22px;
+    letter-spacing:-.012em;
+  }
+  h2{
+    font-size:clamp(23px,3.2vw,30px);
+    line-height:1.2;
+    font-weight:400;
+    margin:0 0 18px;
+    letter-spacing:-.01em;
+  }
+  p{margin:0 0 18px}
+  .lead{font-size:20px}
+  strong{font-weight:600}
+
+  /* masthead */
+  .top{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:24px 0 20px;border-bottom:2px solid var(--ink);
+    font-family:var(--sans);font-size:13.5px;
+  }
+  .top .mark{font-family:var(--serif);font-size:20px;letter-spacing:.01em}
+  .top .who{color:var(--ink-soft)}
+
+  /* the verdict artifact: the hero */
+  .verdict{
+    background:var(--paper);
+    border:1px solid var(--rule);
+    border-left:5px solid var(--kill);
+    padding:26px 28px 24px;
+    margin:6px 0 26px;
+    box-shadow:0 1px 0 var(--rule);
+  }
+  .verdict .hd{
+    display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+    font-family:var(--sans);font-size:12.5px;color:var(--ink-soft);
+    padding-bottom:12px;margin-bottom:16px;border-bottom:1px solid var(--rule);
+  }
+  .stamp{
+    font-family:var(--sans);
+    font-weight:700;
+    font-size:15px;
+    letter-spacing:.14em;
+    color:var(--kill);
+    border:2px solid var(--kill);
+    padding:5px 12px;
+    display:inline-block;
+    transform:rotate(-2.2deg);
+    opacity:0;
+    animation:settle .5s cubic-bezier(.2,.7,.3,1) .35s forwards;
+  }
+  @keyframes settle{
+    from{opacity:0;transform:rotate(-9deg) scale(1.16)}
+    to{opacity:1;transform:rotate(-2.2deg) scale(1)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .stamp{opacity:1;animation:none}
+  }
+  .finding{margin:0 0 14px;font-size:17.5px;line-height:1.55}
+  .finding:last-child{margin-bottom:0}
+  .finding q{quotes:none}
+  .tag{
+    font-family:var(--sans);font-size:11.5px;font-weight:600;
+    color:var(--kill);letter-spacing:.06em;display:block;margin-bottom:3px;
+  }
+  .tag.ok{color:var(--proceed)}
+
+  /* rate sheet */
+  table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:15px;margin:8px 0 22px}
+  th,td{text-align:left;padding:14px 14px 14px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-weight:600;font-size:12.5px;color:var(--ink-soft);border-bottom:1px solid var(--ink);padding-bottom:8px}
+  td.tier{font-family:var(--serif);font-size:19px;width:31%}
+  td.price{font-weight:600;white-space:nowrap;width:18%}
+  tr.feature td{background:var(--paper)}
+  tr.feature td.tier{border-left:4px solid var(--proceed);padding-left:14px}
+  td .sub{display:block;color:var(--ink-soft);font-size:13.5px;margin-top:4px}
+
+  ul{margin:0 0 18px;padding-left:0;list-style:none}
+  li{padding:0 0 12px 22px;position:relative}
+  li:before{content:"";position:absolute;left:0;top:11px;width:9px;height:1px;background:var(--ink-soft)}
+
+  .cta{
+    display:inline-block;background:var(--ink);color:var(--ledger);
+    font-family:var(--sans);font-size:15px;font-weight:600;
+    padding:15px 26px;text-decoration:none;border:1px solid var(--ink);
+  }
+  .cta:hover{background:var(--proceed);border-color:var(--proceed)}
+  .cta:focus-visible{outline:3px solid var(--kill);outline-offset:3px}
+  .after{font-family:var(--sans);font-size:13.5px;color:var(--ink-soft);margin-top:14px}
+
+  footer{padding:40px 0 64px;font-family:var(--sans);font-size:13.5px;color:var(--ink-soft)}
+  footer .sig{font-family:var(--serif);font-size:17px;color:var(--ink)}
+
+  .note{background:#FFF6D6;border:1px dashed #B08900;padding:10px 14px;font-family:var(--sans);font-size:13px;color:#5C4600;margin:0 0 18px}
+
+  @media (max-width:760px){
+    body{font-size:17px}
+    .band{grid-template-columns:1fr;gap:0;padding:44px 0}
+    .rail{border-right:0;border-left:1px solid var(--rule);text-align:left;padding:0 0 18px 16px;padding-top:0;margin-bottom:22px}
+    .rail i{margin-top:6px}
+    td.tier{width:auto}
+    table,tbody,tr,td{display:block;width:100%}
+    thead{display:none}
+    tr{border-bottom:1px solid var(--ink);padding:14px 0}
+    td{border-bottom:0;padding:2px 0}
+  }
+</style>
+
+<div class="wrap">
+
+  <div class="top">
+    <span class="mark">Signal Hunter</span>
+    <span class="who">Deal diligence for SBA lenders, sponsors, and search capital</span>
+  </div>
+
+  <section class="band">
+    <div class="rail">
+      <b>Verdict 1184</b>
+      Multi-trade services<br>Southeast US<br>$3.6M revenue
+      <i>Five days from intake.</i>
+    </div>
+    <div>
+      <h1>The deal you should have walked away from is already in your file.</h1>
+      <p class="lead">Signal Hunter reads the deal and returns one verdict: proceed, or don't, and the reason. Five business days. Not a data room. Not a scraper. A decision you can put in front of a credit committee.</p>
+
+      <div class="note">Build note for Lenox: the verdict below is illustrative structure, not a real engagement. Swap in a redacted finding from an actual run before this goes live. Nothing fabricated ships on a page selling judgment. [NEEDS: one anonymized real finding]</div>
+
+      <div class="verdict">
+        <div class="hd">
+          <span>Verdict 1184 &nbsp;/&nbsp; intake to delivery: 5 days</span>
+          <span class="stamp">DO NOT PROCEED</span>
+        </div>
+        <p class="finding"><span class="tag">Concentration</span> Two commercial contracts carry 40% of revenue. Both signed personally by the departing owner. Both renew inside 18 months.</p>
+        <p class="finding"><span class="tag">Financing risk</span> The deal is not overpriced. It is un-financeable. Debt service coverage breaks on either non-renewal, and the buyer finds out in month 19.</p>
+        <p class="finding"><span class="tag ok">What to ask the seller</span> Assignment language on both contracts, and whether the counterparties will sign a consent letter before close.</p>
+      </div>
+
+      <a class="cta" href="#book">Run one deal for $2,500</a>
+      <p class="after">Bring a deal you already have an opinion about. If we only tell you what you knew, you never call again.</p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="rail">
+      <b>Who buys this</b>
+      Lenders, sponsors, investors, advisors
+      <i>Anyone who eats the cost of a deal that dies late.</i>
+    </div>
+    <div>
+      <h2>Everyone in this market has data. Nobody has judgment at speed.</h2>
+      <ul>
+        <li><strong>SBA lenders and credit teams.</strong> A soured 7(a) costs you the unguaranteed slice, the servicing drag, and a file that gets second-guessed. Diligence at intake is loss prevention, not underwriting overhead.</li>
+        <li><strong>Search fund investors and independent sponsor LPs.</strong> You fund the search and you eat every blown LOI inside it. One killed target pays for a year of this.</li>
+        <li><strong>Business brokers and M&amp;A advisors.</strong> Deals dying in diligence is your largest revenue leak. A pre-listing check makes inventory close faster and keeps the surprise on your side of the table.</li>
+        <li><strong>Independent sponsors.</strong> $30,000 to $60,000 of QoE, legal, and travel burns before a bad deal shows itself. Three months of runway goes with it.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="rail">
+      <b>How it runs</b>
+      Parallel review, reconciled to one verdict
+      <i>You buy the decision, not the analysis.</i>
+    </div>
+    <div>
+      <h2>Specialized reviewers work the deal at once, each hunting a different failure mode.</h2>
+      <p>Customer and contract concentration. Owner dependency. Working capital and seasonality. Licensing and key-person credentials. Deferred maintenance and capex hiding in the add-backs. Findings get reconciled into one ranked verdict with the specific questions to put to the seller.</p>
+      <p>Every finding cites the document it came from. Nothing is asserted that a human on your side cannot check in the file. Lenox runs the read-out call personally.</p>
+    </div>
+  </section>
+
+  <section class="band" id="book">
+    <div class="rail">
+      <b>Rate sheet</b>
+      Priced against the cost of the deal, not the cost of the work
+      <i>Deal Verdict runs about 6% of what one bad close costs you.</i>
+    </div>
+    <div>
+      <h2>Three ways in.</h2>
+      <table>
+        <thead><tr><th>Engagement</th><th>Price</th><th>What you get</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="tier">Signal Check</td>
+            <td class="price">$2,500</td>
+            <td>One listing or CIM in, proceed-or-kill verdict out in 48 hours. <span class="sub">Less than a single wasted site visit.</span></td>
+          </tr>
+          <tr class="feature">
+            <td class="tier">Deal Verdict</td>
+            <td class="price">$9,500</td>
+            <td>Full diligence dossier, risk-ranked findings, seller question set, live read-out call. Five business days. <span class="sub">The one most buyers take.</span></td>
+          </tr>
+          <tr>
+            <td class="tier">Portfolio Watch</td>
+            <td class="price">$4,500 / month</td>
+            <td>Up to four deals a month for lenders and investors with recurring flow. <span class="sub">Standing capacity, no per-deal negotiation.</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <a class="cta" href="mailto:lenox@thirdsignal.ai?subject=Signal%20Check%3A%20one%20deal">Send a deal</a>
+      <p class="after">Reply with the listing or the CIM. You get the verdict, or your money back if we return nothing you can act on.</p>
+    </div>
+  </section>
+
+  <footer class="wrap" style="padding-left:0;padding-right:0">
+    <p class="sig">Lenox Paris</p>
+    <p>Founder, Third Signal Lab &nbsp;/&nbsp; thirdsignal.ai</p>
+  </footer>
+
+</div>

@@ -4,6 +4,19 @@ export type VersionedMonitoringFinding = MonitoringObservation & { id: number; c
 export type MonitoringFindingSelection = { orderId: number; findingId: number; findingVersion: string };
 export type MonitoringFindingRoute = MonitoringFindingSelection | { invalid: true } | null;
 
+/** Exact local task identity for inline review; ownership/version remain server-checked. */
+export function inlineMonitoringTarget(href: string): (MonitoringFindingSelection & { runId: number; candidateId: number }) | null {
+  const match = /^\/aperture\/run\/([1-9][0-9]*)\/execute\?([^#]+)$/.exec(href);
+  if (!match) return null;
+  const query = new URLSearchParams(match[2]);
+  const runId = Number(match[1]);
+  const candidateId = Number(query.get('candidate'));
+  const selected = parseMonitoringFindingSelection(match[2]);
+  if (query.get('lifecycle') !== 'monitoring' || !selected || 'invalid' in selected
+    || ![runId, candidateId].every(n => Number.isSafeInteger(n) && n > 0)) return null;
+  return { ...selected, runId, candidateId };
+}
+
 /** A consistency token, not authorization. The server re-reads the owned record. */
 export function monitoringFindingVersion(check: VersionedMonitoringFinding): string {
   const bytes = JSON.stringify([check.id, check.checkType ?? "", check.checkedAt, check.flagged, check.finding ?? null, check.citations ?? null]);

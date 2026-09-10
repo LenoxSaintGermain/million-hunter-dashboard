@@ -1472,7 +1472,7 @@ export type ApertureRunwayState = typeof apertureRunwayStates.$inferSelect;
 export const apertureDecisionRuns = mysqlTable("aperture_decision_runs", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("user_id").notNull(),
-  contextKind: mysqlEnum("context_kind", ["thesis", "objective"]).default("thesis").notNull(),
+  contextKind: mysqlEnum("context_kind", ["thesis", "objective", "discovery"]).default("thesis").notNull(),
   /** Thesis-led runs retain both bindings; objective acceptance invents neither. */
   canonicalThesisId: int("canonical_thesis_id"),
   capitalThesisId: int("capital_thesis_id"),
@@ -2057,6 +2057,8 @@ export type ApertureAlpha = typeof apertureAlpha.$inferSelect;
 export type InsertApertureAlpha = typeof apertureAlpha.$inferInsert;
 export { apertureUnderwritingJobs } from "./apertureUnderwritingJobSchema";
 export { apertureStrategyDiscoveries } from "./apertureStrategyDiscoverySchema";
+export { apertureDiscoverySelections } from "./apertureDiscoverySelectionSchema";
 export { apertureMissionDrafts, apertureMissionDraftRevisions } from "./apertureMissionDraftSchema";
 export { apertureCapitalEvents, apertureCapitalClaims } from "./apertureCapitalLedgerSchema";
+export { apertureExecutionEvidence } from "./apertureExecutionEvidenceSchema";
 export { capitalStackTemplates, capitalStacks, capitalStackLayers } from "./legacyCapitalStackSchema";

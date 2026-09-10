@@ -9,6 +9,7 @@ import { CURRENT_MANDATE, MIN_NARRATIVE_CHARS } from "./mandate";
 import type { getDb } from "../db";
 import { parsePersistedJson } from "../../shared/persistedJson";
 import { immutableReceiptBindingIssue } from "./decisionReceiptBinding";
+import type { CapitalEventInput } from "./capitalLedger";
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 export const acceptObjectiveMissionInput = z.object({ expectedVersion: z.number().int().positive().safe(), requestId: z.string().uuid() }).strict();
@@ -51,6 +52,17 @@ export function prepareObjectiveMission(raw: MissionDraftValues) {
     sourceBasis: strategy.intent === "deploy_excess_capital" ? "operator_declared" as const : "hypothetical_only" as const,
     availableCapitalCents: null, permittedRiskCents: null,
   };
+}
+
+/** Stable source identity from accepted operator inputs, never a cash claim.
+ * Non-declaration sources require their own reconciliation adapter. */
+export function declaredObjectiveCapitalEvent(accepted: ReturnType<typeof prepareObjectiveMission>): CapitalEventInput | null {
+  if (accepted.strategy.intent !== "deploy_excess_capital") return null;
+  const declarationId = accepted.strategy.declarationId;
+  if (!declarationId) invalid("The accepted capital declaration is missing.");
+  return { accountId: accepted.accountId, sourceId: `declared:${declarationId}`,
+    sourceKey: `declaration:${declarationId}`, capitalEventId: `declaration:${declarationId}`,
+    sourceKind: "operator_declared_excess", currency: "USD", amountCents: accepted.deployableCapitalCents };
 }
 
 /** Verify against the immutable source version, never today's mutable draft.

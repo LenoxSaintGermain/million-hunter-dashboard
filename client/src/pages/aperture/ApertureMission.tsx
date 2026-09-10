@@ -31,7 +31,8 @@ export default function ApertureMission() {
     {invalidReceipt ? <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)" }}>
       <h2 className="font-semibold">Mission link is incomplete</h2>
       <p className="mt-2 text-sm">Open the saved Mission from Today. This link has not started or replaced a Mission.</p>
-    </section> : newObjective ? <ObjectiveMissionFlow newObjective /> : <DecisionRunway
+    </section> : newObjective ? <ObjectiveMissionFlow newObjective onAccepted={({ decisionRunId, revisionId }) =>
+      navigate(`/aperture/decision/${decisionRunId}/revision/${revisionId}`, { replace: true })} /> : <DecisionRunway
       key={receiptTarget ? `receipt:${receiptTarget.decisionRunId}:${receiptTarget.revisionId}` : "mission"}
       receiptTarget={receiptTarget}
       onNewResearch={() => navigate("/aperture?setup=1&draft=1")}

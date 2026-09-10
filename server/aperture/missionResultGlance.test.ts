@@ -58,7 +58,9 @@ describe("completed Mission glance", () => {
     expect(text).not.toContain("Best plays—or sit out");
     expect(text).not.toContain("Mission synthesis");
     expect(text).toContain("No new trade");
-    expect(text).toContain("Existing positions are unchanged");
+    // Both substantive claims survive the shortened wording.
+    expect(text).toContain("No paper ticket created");
+    expect(text).toContain("existing positions unchanged");
     expect(text).toContain(result.noTrade!.reopenCondition);
     expect(validate).not.toHaveBeenCalled();
   });

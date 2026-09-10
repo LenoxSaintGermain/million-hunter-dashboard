@@ -1,10 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { immutableReceiptBindingIssue } from "./decisionReceiptBinding";
+import { immutableReceiptBindingIssue, revisionJsonForInsert } from "./decisionReceiptBinding";
 import { emptyMissionDraftValues } from "../../shared/apertureMissionDraft";
 
 const run = { ownerId: 1, canonicalThesisId: 11, capitalThesisId: 21, accountId: 31 };
 const contextSnapshot = { canonicalThesisId: 11, capitalThesisId: 21, accountId: 31 };
 const gateSnapshot = { mandateVersion: "capital-v1" };
+
+describe("copying immutable revision JSON", () => {
+  const fields = { holdingPeriods: ["swing"], contextSnapshot, gateSnapshot, rankingSnapshot: null };
+  it("preserves decoded driver values without changing the original", () => {
+    expect(revisionJsonForInsert(fields)).toEqual(fields);
+  });
+  it("decodes text-driver values once before insertion", () => {
+    const stored = Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, JSON.stringify(value)])) as typeof fields;
+    expect(revisionJsonForInsert(stored)).toEqual(fields);
+    expect(typeof stored.contextSnapshot).toBe("string");
+  });
+  it.each(["holdingPeriods", "contextSnapshot", "gateSnapshot", "rankingSnapshot"] as const)("rejects malformed or double-encoded %s", key => {
+    expect(() => revisionJsonForInsert({ ...fields, [key]: "{broken" })).toThrow();
+    expect(() => revisionJsonForInsert({ ...fields, [key]: JSON.stringify(JSON.stringify(fields[key])) })).toThrow();
+  });
+});
 
 describe("immutable Decision Runway receipt bindings", () => {
   it("accepts the exact owner, thesis, account, and mandate snapshot", () => {

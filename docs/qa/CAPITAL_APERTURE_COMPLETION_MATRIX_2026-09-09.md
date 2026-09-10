@@ -1,5 +1,416 @@
 # Capital Aperture — original-scope completion audit
 
+## September 10 — decision prominence increment (supersedes the release snapshot below)
+
+`capital-aperture-00099-buj` / release marker `918db8d-uat-6cbcc3fb` **now serves
+100% of production traffic**, promoted on explicit operator instruction after the
+desktop pass. `capital-aperture-00096-fuh` is retained for rollback.
+The revision fixes the three presentation problems observed on `00098-xuc`:
+repeated account chrome above the decision, a utilization percentage sitting
+beside "blocked" without reconciling them, and a restated no-trade consequence.
+
+Measured on Today at 1379 CSS px: header 2 paragraph blocks → 1, header height
+119px → 95px, primary decision action 673px → 652px, no horizontal overflow.
+The blocked-constraint explanation now renders while the rail is expanded, which
+is the exact state where it previously disappeared.
+
+`DATABASE_URL= pnpm test:unit`: 2,061 passed / 0 failed / 8 existing skips across
+175 files. Type check and client/server builds passed. Desktop regression checks
+confirmed the inline finding review (Save review still disabled), the inline gate
+review, and Mission opening to its saved result. No order, approval, review save,
+monitoring refresh or evidence answer was invoked.
+
+**Deployed narrow-viewport acceptance now passes at a measured 402 CSS px**
+(not 390 — Chrome floors the window width and this profile runs ~80% page zoom;
+the number is recorded as measured). The earlier failure was a stale window whose
+`window.outerWidth` reads 0; a fresh MCP window resizes normally. Today, the inline
+finding review (Save review still disabled), the inline gate review and Mission all
+render with no horizontal overflow. **One item is explicitly not closed:** the
+primary decision action sits at y=724 against a 707px viewport — 17px below the
+fold. The header repair cut 119px to 87px but the dominant consumers are 220px of
+page chrome and a 132px status notice, outside this increment. Physical-device and
+screen-reader acceptance remain separate and unproven. Every other row of this matrix
+— verified gains, allocation/proposal integration, sourced retrieval, market-open
+lifecycle and accessibility — remains open and is not narrowed by this increment.
+See `CAPITAL_APERTURE_REVIEW_HANDOFF_2026-09-10.md` for the full evidence.
+
+## September 10 — latest UI release status (supersedes earlier release snapshots)
+
+Revision `capital-aperture-00096-fuh` / `7b5095a` serves 100% production traffic
+(Cloud Run traffic rechecked September 10, approximately 05:06 ET).
+Public health returned JSON and the matching release marker. Fresh authenticated
+Chrome Today → exact DKNG finding passed; an older tab failed to navigate, with
+cause still unverified. Context loading now waits honestly rather than asserting
+a missing finding before dependent records arrive. No broker or review action
+was performed in that check.
+
+Evidence formatting source `f3eeb7f`, production-compatible branch `7b5095a`,
+passed 1,345 release unit tests (six existing skips) and isolated exact-finding
+navigation. Full account/order/check/explicit-review fixture hash stayed unchanged.
+Renderer screenshots show formatted paragraphs and emphasis, retained numbered
+sources, no embedded media, and unavailable unsafe links. Narrow-screen measured
+width was 433 CSS pixels at current zoom, not the requested 390; exact 390-pixel
+acceptance was subsequently verified on production at measured 390×844; physical
+device acceptance remains open. Cloud Build
+`d03597cd-a867-4775-b797-117b803a15e9` completed successfully and revision 96 was
+promoted. These later production results supersede the earlier renderer viewport
+qualification only for the sampled production handoff.
+See `CAPITAL_APERTURE_REVIEW_HANDOFF_2026-09-10.md` for the detailed evidence.
+
+These are UI acceptance increments only. The original Strategist/gains,
+allocation/proposal integration, revision, sourced retrieval, market-open
+lifecycle and accessibility requirements below remain authoritative and open.
+
+## September 10 — public discovery action through persisted no-trade result
+
+The isolated integration suite now exercises `selectDiscovery` through the real
+router, source-bound child creation, leased underwriting execution and persisted
+result readback. Only market analysis is a deterministic, explicitly illustrative
+no-setup fixture passed through the actual quantitative engine. The selected
+projection remains non-canonical and the original capital/loss inputs reach the
+engine unchanged. A second caller reads the completed result without writes;
+repeating the selection reuses the same selection and underwriting revision,
+without another analysis call. Canonical/account records, research, candidates,
+orders and allocation claims remain unchanged.
+
+Evidence: `/tmp/capital-isolated-integration.AuiVc3/summary.json`: 222 passed,
+zero failed, two external-URL skips; owned disposable DB/user cleanup confirmed.
+Typecheck passed. This is API/persistence journey coverage, not browser coverage,
+live market proof or positive-play/evidence/verified-gains acceptance. No new
+deployment or production migration occurred in this increment.
+
+### Positive source-bound research handoff — API/persistence verified
+
+The same real-router journey now also generates one explicitly illustrative
+conditional DATA play, records its selection, and starts the real research
+orchestrator. Only macro/provider research and underwriting market inputs are
+fixture replacements; each provider seam throws unless explicitly authorized
+by that test. The swarm receives exactly DATA. The orchestrator completes and
+persists one DATA candidate with the selected discovery's capital-source and
+allocation-verification requirements intact. No canonical thesis, account,
+order, evidence-review or allocation-claim row changes. Reading/replaying the
+underwriting result still produces no duplicate analysis.
+
+Latest receipt: `/tmp/capital-isolated-integration.HgziLr/summary.json`:
+223 passed, zero failed, two external-URL skips. Typecheck and diff check pass;
+owned disposable database/user cleanup confirmed. This is now positive API
+handoff coverage, but not a browser test, actual provider-quality validation,
+completed evidence answers or verified-gains allocation. No production release
+or schema migration is claimed.
+
+## September 10, 04:12–04:20 ET — connected exact-finding UAT
+
+A separate illustrative owner (144), manual paper account (52), run (27),
+candidate (20), recorded order (26) and two checks (1/2) were added to the exact
+loopback browser-UAT database. These are frozen UI records, not provider or broker
+execution evidence. The seed is idempotent and never changes existing fixture
+work. The explicit wrong-host test refused before opening a database connection.
+
+The current working backend failed on its expected-but-unapplied `context_kind`
+schema. No migration was applied to conceal this. The connected UI retest instead
+used production baseline 070d04c plus the five-file review/navigation fix. Its
+files matched release worktree `a42b16bd8ae474ea4af849c14b5200b3aaa69821`
+exactly (excluding dependencies/git/build output). This release branch is pushed.
+It does not contain the pending Strategist backend or migrations.
+
+At localhost:3112, Today’s primary action opened:
+`/aperture/run/27/execute?candidate=20&lifecycle=monitoring&order=26&finding=2&findingVersion=v1-758ed8f1`.
+Desktop click and 390×844 Enter activation both selected and focused the catalyst
+finding, expanded its evidence, retained the other check and kept Save review
+disabled. Example-domain evidence was correctly unverified; partial coverage was
+not an all-clear. No assessment or sourced check was requested.
+
+Before/after the mobile repeat, full account/order/check rows plus explicit
+review receipts had the same SHA-256:
+`139549688b93d6d5d840e69dea8dfccd87126734d53e50700fcdb96ad1310c26`.
+Counts remained one order, two checks and zero reviews. Seen is intentionally
+excluded; this is not a zero-write claim. Temporary viewport override was reset.
+Screenshots in the earlier `routing-2026-09-10` evidence directory:
+`exact-finding-desktop.png`, `exact-today-mobile.png`, `exact-finding-mobile.png`.
+
+The production-compatible package passed 1,341 unit tests, zero failed, six
+existing skips (`/tmp/aperture-ui-review-release-unit.json`). Current workspace
+type checking also passed. Cloud Build
+`050676f1-318a-4e0e-827d-1035bb6800b5` was started from the clean release worktree;
+at this checkpoint it was WORKING, with no traffic change. Production promotion
+and signed-in verification must be recorded separately. Full original scope,
+including the gains/claim/revision path, remains unfinished.
+
+## September 10, 04:06–04:10 ET — Today routing consistency (local only)
+
+Source checkpoint `7d38fbc994b0c43a9a0f50233c1c0f2d42ae0b48` pushed to
+origin/main. Not deployed; larger uncommitted work remains separate.
+
+Today now passes attention destinations to the existing Wouter router, as Play
+Desk already does, instead of requiring a full-page location assignment. A new
+test exercises DailyPlayList's actual briefing callback and verifies exact
+run/candidate/order/finding/version preservation, one navigation, no reload and
+no mutation. It failed before the change and passes afterward. The browser's
+suppression of the original production full-page assignment is not diagnosed;
+this is a routing-consistency fix, not a claim about extension internals.
+
+The existing isolated server on localhost:3110 rendered the change through Vite.
+Using its labeled illustrative account, Today → Resume mission setup opened the
+saved Review decision section with the existing $25,000 capital, $249 entered
+ceiling and $187.50 effective allowance intact. Desktop pointer activation and
+390×844 Enter activation both worked. The mobile primary action occupied roughly
+44 CSS pixels at y=513–557, within the first viewport. No inputs were edited or
+conditional review submitted; ordinary Seen state is not claimed unchanged.
+Temporary viewport override was reset. This fixture has no exact monitoring
+finding, so the affected Today → selected-finding browser retest remains open.
+
+Evidence directory:
+`/Users/lenoxparis/.codex/visualizations/2026/08/25/01a0392e-5a5e-73c2-9f5e-675f1dc136d9/routing-2026-09-10/`
+contains `today-desktop.png`, `today-mobile.png`, `mission-mobile.png`.
+The source test is not a substitute for that missing connected fixture.
+
+Verification: 1,959 unit tests pass, zero fail, eight existing explicit skips;
+type checking and whitespace validation pass. Unit receipt:
+`/tmp/aperture-today-routing-unit.json`. No production deployment, broker action,
+or full stakeholder-readiness claim. Existing gaps elsewhere in this matrix
+remain part of the objective.
+
+## September 10, 04:00–04:06 ET — signed-in regression and hydration fix
+
+The existing authenticated production Chrome session was available. Mission
+opened directly on its saved no-trade result with the plan compact and editable;
+suggestions no longer interrupted that completed-result path. This is a sampled
+desktop observation, not a fresh mobile or new-Mission acceptance pass.
+
+Play Desk's primary DKNG action navigated to run 360001, candidate 240003,
+order 2, finding 120001, version v1-951cb173, and focused that exact finding after
+hydration. No assessment, monitoring refresh, proposal or broker action was
+invoked. Ordinary visibility can record Seen; this is not a zero-write claim.
+
+Two gaps were observed:
+
+- **Open blocker:** Today's primary review button repeatedly remained on Today,
+  although workspace navigation and the Desk's equivalent action worked. The
+  root cause is not established. Do not claim a speculative routing fix or a
+  complete Today-to-review journey.
+- **Locally repaired, not deployed:** before the candidate/order queries settled,
+  Monitoring briefly reported an unmatched finding and an empty checks list.
+  A disabled dependent query was mistaken for a settled empty result. The parent
+  now passes loading/failure state; missing context waits explicitly, failures
+  provide a retry, and retained evidence stays visible without permitting new
+  checks on unconfirmed context. Actual settled identity mismatches still fail
+  closed. A regression rendered the original false-missing/empty messages before
+  the fix; 14 targeted monitoring tests and full type checking pass afterward.
+
+Full unit receipt: `/tmp/aperture-monitoring-hydration-unit.json`: 1,958 passed,
+zero failed, eight existing explicit skips. Client/server build passed with the
+existing large-chunk and Node deprecation warnings. No production
+deployment, schema change, physical-device check, screen-reader acceptance, or
+market-open lifecycle success occurred in this pass. Full scope remains open,
+including verified gains availability, allocation claims, revisions and connected
+desktop/mobile UAT. Current time is premarket, not the missed market-close target.
+
+## September 10 — closing-fill reconciliation (local only)
+
+Saved execution reads now reconcile symbol, closing side, cumulative quantity,
+remaining quantity, chronological sequence and explicit option multiplier against
+the selected order. Exact decimal arithmetic produces gross proceeds without
+per-fill cent rounding. Partial fills remain partial; empty, incomplete or
+conflicting execution records return no proceeds amount. This does not establish
+net proceeds, cost basis, settlement or available capital. The gains panel labels
+the subtotal before fees and never upgrades the source to verified gains.
+
+Twelve arithmetic/identity tests and the panel distinction test were added.
+Unit receipt `/tmp/aperture-gross-reconciliation-unit.json`: 1,955 passed,
+zero failed, eight explicit skips. Disposable DB receipt
+`/tmp/capital-isolated-integration.t3CU4r/summary.json`: 221 passed,
+zero failed, two external-URL skips. Current order schema has no explicit
+opening-lot attribution for a closing order; this must be sourced rather than
+inferred from matching symbols. Fee completeness, funds availability, reserve
+application and source-bound proposal claims remain required.
+
+Provider contract reviewed: https://docs.alpaca.markets/us/docs/account-activities.
+The fill contract is not independent proof of cost basis or spendable proceeds.
+
+## September 10 — source-order entry (local only)
+
+Objective setup now includes secondary, expandable gains-source selection.
+The server lists owned Alpaca Paper closing sell orders with exact account,
+run, candidate and order identity; keyset pagination preserves older sources.
+The picker requires an explicit Use this source confirmation. It changes the
+draft account/source/intent, retains capital, loss and other declarations, and
+requires saving/review before analysis. It does not invent an active thesis,
+ingest executions, verify gains or create an order. Failed/loading source reads
+cannot apply a choice; previous draft values remain intact.
+
+Isolated DB receipt `/tmp/capital-isolated-integration.Vu3Z6j/summary.json`:
+221 passed, zero failed, two external-URL skips. Includes owned-source lookup,
+opening-order exclusion and 52-source pagination without duplication; no live
+provider calls or production/browser-database mutations. The connected fixture
+was extended for the new read endpoint; no production endpoint is mocked by
+the application. Full reconciliation and rendered desktop/mobile UAT remain open.
+
+## September 10 — execution evidence in gains setup (local only)
+
+The account/risk section now presents saved executions for the exact selected
+source order. Opening the section reads saved evidence only. A deliberate
+paper-execution refresh is capability-gated, keeps the request identity after
+an uncertain response, and requires status reconciliation before retrying.
+Failed refreshes retain the prior count and timestamp. Pending means completion
+unconfirmed, not a claim that a worker is still running. The adjacent source
+order link offers inspection; no capital allocation or order action is invoked.
+
+Interrupted refresh recovery is now explicit: the operator can discard the exact
+pending attempt. Its failed/abandoned receipt remains auditable, a late provider
+reply cannot replace it, and a new explicit attempt is allowed. Discarding does
+not cancel network I/O or a broker order. Concurrent new request IDs are blocked
+while a pending attempt exists. Reads and repeated discard calls are idempotent;
+completed evidence cannot be discarded. The isolated regression first failed
+without this path, then passed with owner/identity/late-response tests.
+Receipt: `/tmp/capital-isolated-integration.4tIvKP/summary.json` — 219 passed,
+zero failed, two external-URL skips; owned disposable resources removed.
+
+The panel says **Gains not verified** and names cost basis, fees and available
+proceeds as missing reconciliation. It does not turn fills into spendable profit.
+Nine controller tests and 79 adjacent Mission tests passed. These are
+deterministic interaction tests, not rendered desktop/mobile or stakeholder UAT.
+The full source reconciliation, connected
+isolated fixtures and release remain unfinished. No production changes.
+
+## September 10 — persisted execution refresh (local follow-up)
+
+`aperture.strategy.refreshExecutionEvidence` now records an exact owned closing
+order refresh before provider work and finalizes that attempt once. Reusing a
+request observes its saved pending/complete/failed attempt instead of issuing
+another broker query. Provider reads run outside database transactions. The
+read-only `executionEvidence` query retains the last successful snapshot when
+a later attempt fails. Account/order identity, observation time, receipt shape
+and canonical hashes are checked; malformed or self-asserted gain proof is not
+persisted as successful evidence. Provider errors are sanitized.
+
+Migration `0069_aperture_execution_evidence.sql` adds evidence attempts only.
+It is not applied to production or the browser database. No existing order,
+account balance, capital claim, approval, or submission record is changed.
+The production refresh is guarded by the existing discovery feature gate;
+isolated UI refresh requires a dedicated fixture rather than live provider calls.
+
+The final disposable DB pass has 217 passing tests, 2 external-URL skips,
+including ownership mismatch, simultaneous retry, tamper rejection and failed
+refresh preservation. Actual 0069 migration SQL also passed against owned
+shadow tables, preserving existing rows and enforcing request uniqueness.
+Receipts: `/tmp/capital-isolated-integration.ba7n7Q/summary.json` and
+`/tmp/aperture-persisted-executions-unit.json`. Type-check and server build passed.
+
+Visible refresh/status controls are now connected locally (above). Still required: connected browser fixtures;
+cost-basis attribution, fee completeness, settlement/availability, reserves and
+proposal claims. A complete execution query alone remains insufficient for
+verified gains. No shareable stakeholder-ready release is claimed.
+
+## September 10 — individual execution reader (local follow-up)
+
+The Alpaca Paper adapter now exposes a deliberate, read-only execution query
+for an exact broker order and expected external paper account. It verifies the
+account before and after pagination, preserves decimal prices/quantities,
+rejects overlapping/wrong-order IDs and malformed/future evidence, and refuses
+to call bounded/truncated or failed pagination complete. An empty execution
+query is not a filled-order or proceeds claim. The transport uses only the
+paper account-activities GET endpoint; no live credentials were exercised.
+
+Provider contract verified against:
+[Account Activities](https://docs.alpaca.markets/us/docs/account-activities) and
+[Retrieve Account Activities](https://docs.alpaca.markets/us/reference/getaccountactivities-2).
+Execution coverage does not establish attributed cost basis, complete fees,
+settlement or available funds. Those flags remain explicitly false.
+
+Verification: the full unit receipt is
+`/tmp/aperture-execution-evidence-unit.json`; the new execution tests include
+the actual adapter's URL/query/method boundary with mocked HTTP. Type-check and
+server build passed. This is deterministic development evidence, not a live
+provider probe or completed browser UAT.
+
+Still required: durable versioned execution ingestion/correction lineage,
+attributed lots and fee completeness, availability reconciliation, event-bound
+reserve policy and proposal claim integration. The reader is not yet wired to
+a user-facing sync action or claimed as verified-gains ingestion. No automatic
+Today/status reads invoke it. No production migration, broker call or release.
+
+## September 10 — declared source registration (local follow-up)
+
+The deliberate discovery selection now atomically registers one capital event
+for its accepted excess-capital declaration and retains that event identity in
+the child receipt. It reuses the existing account-locked ledger and original
+declaration identity, not a new source per hypothesis/request. The event remains
+operator-declared; available cash is still unknown and no allocation claim,
+proposal, approval, or order is created. Gains and other non-declaration intents
+do not use this adapter. Registration happens on authorized selection, not on
+Mission/status reads or ordinary draft acceptance.
+
+Verification: 206 isolated database tests pass with 2 external-URL skips,
+including conflicting amount rejection and rollback after an injected final
+selection-write failure. Receipt:
+`/tmp/capital-isolated-integration.YEHcos/summary.json`. The disposable database
+and user were removed by their owning harness. Type-check passed. Full unit
+results are in `/tmp/aperture-declared-source-unit.json`.
+
+Still required: independently reconciled gains/available-funds ingestion,
+transactional proposal claims and lifecycle reconciliation, reviewed source
+revisions, and connected authenticated browser UAT. Source registration alone
+does not establish allocation eligibility. No production migration or deployment.
+
+## September 10 — selected discovery handoff (local, not released)
+
+This checkpoint supersedes the earlier statement that no selection handoff
+exists. It does **not** establish full end-to-end stakeholder readiness.
+
+Selection now records a source-bound tactical projection and child Decision Run,
+with a distinct `discovery` context and no canonical-thesis identity. The source
+Mission and active thesis remain unchanged. Source/owner/job/attempt checks,
+immutable JSON hashes and a transaction prevent substituted or duplicate
+selections. Re-entry opens the child's current saved task, not a new mission.
+
+The deliberate **Underwrite this lead** action continues into the existing
+leased Underwriter. Queries never start analysis. Expired or unsupported leads
+cannot advance; historical records remain inspectable. The research worker
+retains the selected symbol and carries source requirements, contradictions,
+invalidation and capital-source uncertainty into the candidate evidence fields.
+It does not recompile or promote the tactical projection into a canonical thesis.
+
+**Still blocked by design, pending implementation:** new opening paper actions
+for discovery contexts require capital-source/allocated-envelope proof and
+transactional claim integration. Selection is not allocation. Hypothetical
+gains must not become verified cash. Accepted source-Mission revision support
+also remains incomplete: a changed Underwriter objective cannot silently
+replace the source assumptions. These are required remaining features, not
+waivers or a revised definition of done.
+
+Development evidence now includes 1,898 unit tests (0 failed, 8 existing
+skips), type-checking, and 204 disposable-database tests (0 failed,
+2 external-URL skips). Evidence: `/tmp/aperture-discovery-resume-unit.json`
+and `/tmp/capital-isolated-integration.S4QMth/summary.json`. The extra
+current-child-revision resume case passes. Copying MariaDB text JSON into a
+new revision had double-encoded the context; the shared revision-copy boundary
+now decodes once and rejects malformed or already double-encoded fields. The
+router's conditional-provider receipt and resume fixture use that same boundary.
+Six focused regressions cover decoded/text driver values and all four JSON
+fields. The prior ledger test timeout did not recur; no timeout was increased.
+Both server and client builds passed; the existing client chunk-size warning
+remains. This is not a performance or browser-UAT acceptance claim.
+Actual 0065–0068 SQL was exercised on owned disposable shadow tables, including
+old-row preservation and selection uniqueness. Neither production nor the
+separate browser database was migrated. A changed job-token regression was
+caught and fixed before the successful database repeat.
+
+Chrome became accessible on this turn. A signed-in **read-only desktop** check
+of the existing production Today page confirmed PW active-thesis identity,
+separate NVDA portfolio constraint, stale/unresolved DKNG finding, other critical
+issues, accepted-but-unfilled orders, and on-demand monitoring language. A
+desktop screenshot was inspected. The extension tab read timed out; native
+Chrome accessibility worked. This is not testing the new local discovery flow,
+mobile layout, keyboard/enlarged-text behavior or real-provider correctness.
+No broker action, acknowledgement, source check, deployment or production
+traffic change was performed. The previous Mac-lock blocker is no longer the
+current browser-access condition.
+
+Next: complete reviewed source assumptions and capital-envelope handoff, add
+deterministic connected browser fixtures, run the selected-lead → Underwriter →
+exact evidence journey and approval/submission invariants, then complete
+responsive/authenticated release UAT. THI-266 and the full goal remain open.
+
 ## September 10 — connected objective UI checkpoint
 
 **Source only, default off, not deployed.** Mission now exposes deliberate
@@ -47,7 +458,7 @@ Checkpoint: September 9 evening. Production was last verified at `070d04c` / `ca
 | Persisted Start / Resume / Check in | Existing owner-scoped draft CAS/history, underwriting job and attention baseline tests; isolated multi-tab resume | Further independently authenticated device coverage; not a browser-only onboarding flag |
 | Uncertain / quiet / critical states | Shared attention arbitration and deterministic journey tests; no false all-clear from failed or partial reads; critical issues survive filters | Additional real provider-failure and assistive-technology sessions |
 | Evidence handoff / lifecycle | Existing selected-play and exact monitoring identity paths, independent review/approval/submission boundaries | Bounded market-open paper lifecycle repeat with fresh evidence; no forced trade if gates fail |
-| Mobile / keyboard | Local first-focus skip link reaches one named main; account rail retained; refresh focus preserved; ten opaque text/surface contrast pairs checked | Full keyboard-only setup-to-evidence, screen reader, enlarged text, reduced-motion and zoom coverage; these checks are not WCAG certification |
+| Mobile / keyboard | Local first-focus skip link reaches one named main; account rail retained; refresh focus preserved; ten opaque text/surface contrast pairs checked. Sept 10 revision 99: signed-in deployed pass at a measured 402 CSS px — Today, inline finding review, inline gate review and Mission, all with no horizontal overflow | **The primary decision action is still 17px below the fold at 402px**, and the account label still appears twice in view. Plus physical-device, screen reader, full keyboard-only setup-to-evidence, enlarged text, reduced-motion and zoom coverage; these checks are not WCAG certification |
 | Revision / no-trade history | Existing immutable decision and underwriting revisions, explicit before/after review | Continue checking disposition-specific copy; old orders and approvals must remain unchanged |
 
 ## Capital Strategist acceptance table

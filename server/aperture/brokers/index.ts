@@ -16,6 +16,7 @@ import { portfolioAccounts, positions as positionsTable } from "../../../drizzle
 import { eq } from "drizzle-orm";
 import { httpJson, num } from "../providers/types";
 import { parseOccOptionSymbol } from "../../../shared/paperInstrument";
+import { readOrderExecutions } from "./orderExecutions";
 import {
   assertPaperOnly, BrokerUnavailableError, dollarsToCents,
   type BrokerAccount, type BrokerAdapter, type BrokerPosition, type OptionChainItem, type OptionChainQuery, type OptionContractResult, type OptionMarketSnapshotResult, type OrderRequest, type OrderResult,
@@ -384,6 +385,22 @@ export const alpacaPaperBroker: BrokerAdapter = {
     if (res.status === 404) return null;
     if (!res.ok) throw new BrokerUnavailableError(`Alpaca Paper order reconciliation returned HTTP ${res.status}.`);
     return toOrderResult(await res.json());
+  },
+
+  async getOrderExecutions(input) {
+    if (!this.available()) throw new BrokerUnavailableError(this.unavailableReason() ?? "unavailable");
+    return readOrderExecutions(input, {
+      readAccount: () => this.getAccount(),
+      readPage: ({ orderId, pageSize, pageToken }) => {
+        const url = new URL(`${ALPACA_PAPER_BASE}/account/activities`);
+        url.searchParams.set("activity_types", "FILL");
+        url.searchParams.set("order_id", orderId);
+        url.searchParams.set("direction", "asc");
+        url.searchParams.set("page_size", String(pageSize));
+        if (pageToken) url.searchParams.set("page_token", pageToken);
+        return httpJson<unknown>(url.toString(), { headers: alpacaHeaders() });
+      },
+    });
   },
 
   async getOptionContract(symbol: string): Promise<OptionContractResult | null> {

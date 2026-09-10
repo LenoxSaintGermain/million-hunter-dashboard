@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, eq, or } from "drizzle-orm";
 import { z } from "zod";
-import { portfolioAccounts } from "../../drizzle/schema";
+import { brokerOrders, portfolioAccounts } from "../../drizzle/schema";
 import { apertureCapitalEvents as events, apertureCapitalClaims as claims, type ApertureCapitalEvent, type ApertureCapitalClaim } from "../../drizzle/apertureCapitalLedgerSchema";
 import { capitalLedgerReceiptSchema, type CapitalLedgerReceipt } from "../../shared/capitalStrategy";
 import type { getDb } from "../db";
@@ -9,6 +9,26 @@ import type { getDb } from "../db";
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 /** Caller owns commit/rollback. Never pass the root DB or start a nested transaction. */
 export type CapitalLedgerTransaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/** DB-only operations with stable identities. Drizzle finishes rollback before
+ * rejecting transaction(). Retry only known snapshot/deadlock conflicts, never
+ * connection loss or unknown commit outcomes. No broker/provider work here. */
+export async function withCapitalLedgerTransaction<T>(db: Db, operation: (tx: CapitalLedgerTransaction) => Promise<T>): Promise<T> {
+  if (typeof (db as any).rollback === "function") throw new Error("Capital transaction requires the root database");
+  for (let attempt = 0; ; attempt++) {
+    try { return await db.transaction(operation); }
+    catch (error) {
+      let cause: any = error, retryable = false;
+      const visited = new Set<unknown>();
+      while (cause && !visited.has(cause)) {
+        visited.add(cause);
+        if (["ER_CHECKREAD", "ER_LOCK_DEADLOCK"].includes(cause.code)) { retryable = true; break; }
+        cause = cause.cause;
+      }
+      if (!retryable || attempt >= 2) throw error;
+    }
+  }
+}
 type Code = "INVALID_INPUT" | "ACCOUNT_UNAVAILABLE" | "ACCOUNT_BINDING_CHANGED" | "EVENT_MISSING" | "SOURCE_CONFLICT" | "CLAIM_CONFLICT" | "SOURCE_PROOF_MISSING" | "CAPACITY_EXCEEDED" | "INVALID_TRANSITION" | "LEDGER_INTEGRITY";
 export class CapitalLedgerError extends Error {
   constructor(readonly code: Code) { super(`Capital ledger: ${code}`); this.name = "CapitalLedgerError"; }
@@ -27,6 +47,11 @@ const stateSchema = z.enum(["pending", "committed", "consumed", "released"]);
 const transitionSchema = targetSchema.extend({ allocationId: key, expectedState: stateSchema, nextState: stateSchema }).strict();
 export type CapitalEventInput = z.infer<typeof eventSchema>;
 export type CapitalClaimInput = z.infer<typeof claimSchema>;
+
+/** One immutable allocation identity per actual paper proposal, never per retry. */
+export function paperOrderAllocationId(orderId: number) {
+  return `paper-order:${parse(owner, orderId)}`;
+}
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value);
@@ -192,4 +217,71 @@ export async function readCapitalLedger(tx: CapitalLedgerTransaction, userId: nu
     observedCapitalEventIds: [event.capitalEventId] };
   const receiptId = createHash("sha256").update(JSON.stringify([userId, event.id, contents])).digest("hex");
   return { status: "complete", event, receipt: capitalLedgerReceiptSchema.parse({ receiptId, ...contents }) };
+}
+
+/** Reconcile an EXISTING order-bound claim. No order/source/claim creation and
+ * no broker calls. Caller owns the transaction: account -> event -> claims ->
+ * order lock order must also be used by the eventual order-transition caller.
+ * Partial terminal fills conservatively consume the whole earmark; releasing
+ * an unused remainder requires a separate execution-cost reconciliation. */
+export async function reconcilePaperOrderClaim(tx: CapitalLedgerTransaction, userId: number, orderId: number) {
+  parse(owner, userId); parse(owner, orderId);
+  if (typeof tx.rollback !== "function") fail("INVALID_INPUT");
+  const [initial] = await tx.select().from(brokerOrders).where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.userId, userId))).limit(1);
+  if (!initial) return fail("CLAIM_CONFLICT");
+  const account = await accountLock(tx, userId, initial.accountId);
+  const allocationId = paperOrderAllocationId(orderId);
+  const [binding] = await tx.select().from(claims).where(and(eq(claims.userId, userId), eq(claims.allocationId, allocationId))).limit(1);
+  if (!binding) return { status: "not_bound" as const };
+  if (binding.accountId !== account.id) return fail("CLAIM_CONFLICT");
+  const [source] = await tx.select().from(events).where(and(eq(events.id, binding.eventId), eq(events.userId, userId), eq(events.accountId, account.id))).limit(1);
+  if (!source) return fail("EVENT_MISSING");
+  const target = { accountId: account.id, capitalEventId: source.capitalEventId };
+  const event = await eventLock(tx, userId, target, account) ?? fail("EVENT_MISSING");
+  const rows = await claimRows(tx, event);
+  checkedUsage(event, rows);
+  let claim = rows.find(row => row.id === binding.id && row.allocationId === allocationId) ?? fail("CLAIM_CONFLICT");
+  const [order] = await tx.select().from(brokerOrders).where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.userId, userId))).for("update").limit(1);
+  if (!order || order.accountId !== account.id || order.intent !== "open" || order.side !== "buy") return fail("CLAIM_CONFLICT");
+  const terminal = order.status === "rejected" || order.status === "cancelled";
+  const qtyValid = order.filledQty != null && Number.isFinite(order.filledQty) && order.filledQty >= 0
+    && (order.qty == null || order.filledQty <= order.qty);
+  const hasFill = qtyValid && order.filledQty! > 0;
+  const dispatched = order.submittedAt != null || order.submitConfirmedAt != null
+    || order.clientOrderId != null || order.brokerOrderId != null || Boolean(order.dispatchError);
+  const untouched = !dispatched && order.filledAt == null && (order.filledQty == null || order.filledQty === 0);
+  const zeroConfirmed = terminal && (untouched || (qtyValid && order.filledQty === 0 && order.brokerOrderId && !order.dispatchError));
+  let next: ApertureCapitalClaim["state"] = claim.state;
+  let needsReconciliation = false;
+  if (claim.state === "consumed") return { status: "bound" as const, state: claim.state, changed: false,
+    needsReconciliation: !hasFill || !order.brokerOrderId || Boolean(order.dispatchError) || !(order.status === "filled" || terminal) };
+  if (claim.state === "released") {
+    if (!zeroConfirmed) return fail("LEDGER_INTEGRITY");
+    return { status: "bound" as const, state: claim.state, changed: false, needsReconciliation: false };
+  }
+  if (order.status === "submitted") { next = "committed"; needsReconciliation = Boolean(order.dispatchError) || !order.brokerOrderId; }
+  else if ((order.status === "filled" || terminal) && hasFill && order.brokerOrderId && !order.dispatchError) next = "consumed";
+  else if (zeroConfirmed) next = "released";
+  else if (["pending_approval", "approved"].includes(order.status) && untouched && claim.state === "pending") next = "pending";
+  else { next = dispatched ? "committed" : claim.state; needsReconciliation = true; }
+  const original = claim.state;
+  // Existing ledger permits pending -> committed -> consumed, not shortcuts.
+  if (next === "consumed" && claim.state === "pending") {
+    claim = (await transitionCapitalClaim(tx, userId, { ...target, allocationId, expectedState: "pending", nextState: "committed" })).claim;
+  }
+  if (next !== claim.state) claim = (await transitionCapitalClaim(tx, userId, { ...target, allocationId, expectedState: claim.state, nextState: next })).claim;
+  return { status: "bound" as const, state: claim.state, changed: original !== claim.state, needsReconciliation };
+}
+
+/** Actual lifecycle mutations use one transaction for order + existing claim.
+ * Acquire the allocation locks BEFORE the order write, then reconcile its new
+ * state before committing. Callbacks must be DB-only and safe after rollback. */
+export async function withPaperOrderClaimTransaction<T>(db: Db, userId: number, orderId: number,
+  operation: (tx: CapitalLedgerTransaction) => Promise<T>) {
+  return withCapitalLedgerTransaction(db, async tx => {
+    await reconcilePaperOrderClaim(tx, userId, orderId);
+    const result = await operation(tx);
+    await reconcilePaperOrderClaim(tx, userId, orderId);
+    return result;
+  });
 }

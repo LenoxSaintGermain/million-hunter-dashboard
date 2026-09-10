@@ -10,6 +10,15 @@ const render = (finding: string, citations = ["https://example.org/announcement"
   } }));
 
 describe("finding evidence rendering", () => {
+  it("opens the full recorded evidence in an inline review without another disclosure click", () => {
+    const html = renderToStaticMarkup(createElement(FindingEvidence, { expanded: true, evidence: {
+      checkedAt: Date.UTC(2026, 8, 9), finding: 'Illustrative unchanged source finding', citations: [],
+    } }));
+    expect(html).toContain('open=""');
+    expect(html).toContain('Illustrative unchanged source finding');
+    expect(html).toContain('not verified evidence');
+    expect(html).not.toContain('<button');
+  });
   it("renders recorded emphasis without changing the evidence or review boundary", () => {
     const html = render("A **reported catalyst** remains *unverified*.[1]");
     expect(html).toContain("<strong>reported catalyst</strong>");
