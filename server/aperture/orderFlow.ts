@@ -21,7 +21,7 @@
  * "what did we try to do and what stopped it" is exactly what the pilot needs to
  * answer, and a thrown error with no row answers nothing.
  */
-import { eq, and, inArray, gte } from "drizzle-orm";
+import { eq, and, inArray, gte, isNull } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   apertureDecisionRuns, apertureRuns, brokerOrders, positionSnapshots, portfolioAccounts, positions as positionsTable,
@@ -810,11 +810,14 @@ export async function rejectOrder(orderId: number, userId: number, reason?: stri
     throw new Error(`cannot reject an order in status ${order.status}`);
   }
   const now = Date.now();
-  await db.update(brokerOrders).set({
+  // A simultaneous approval/dispatch may win after the read above. Reject only
+  // the exact state the operator reviewed; never erase a dispatch lease or fill.
+  const [updated] = await db.update(brokerOrders).set({
     status: "rejected",
     rejectionReason: reason ?? "rejected by operator",
     updatedAt: now,
-  }).where(eq(brokerOrders.id, orderId));
+  }).where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.userId, userId), eq(brokerOrders.status, order.status)));
+  if (updated.affectedRows !== 1) throw new Error("Order changed before rejection could be recorded. Review its current status; no rejection was applied.");
 }
 
 // ── Submit ────────────────────────────────────────────────────────────────────
@@ -960,17 +963,29 @@ export async function mirrorFills(userId: number): Promise<number> {
 
       const newStatus = result.status === "filled" ? "filled" :
         result.status === "rejected" ? "rejected" : "submitted";
-      if (newStatus === order.status && (result.brokerOrderId || null) === order.brokerOrderId && !order.dispatchError) continue;
+      const brokerOrderId = result.brokerOrderId || order.brokerOrderId;
+      const filledQty = result.filledQty ?? order.filledQty;
+      const filledAvgPriceCents = result.filledAvgPriceCents ?? order.filledAvgPriceCents;
+      // Accepted/partially-filled both remain submitted in this lifecycle. Fill
+      // progress is material even when the status and broker identity match.
+      if (newStatus === order.status && brokerOrderId === order.brokerOrderId && !order.dispatchError
+        && filledQty === order.filledQty && filledAvgPriceCents === order.filledAvgPriceCents) continue;
       const now = Date.now();
-      await db.update(brokerOrders).set({
+      const [mirrored] = await db.update(brokerOrders).set({
         status: newStatus as any,
-        brokerOrderId: result.brokerOrderId || order.brokerOrderId,
+        brokerOrderId,
         dispatchError: null,
-        filledQty: result.filledQty ?? order.filledQty,
-        filledAvgPriceCents: result.filledAvgPriceCents ?? order.filledAvgPriceCents,
+        filledQty,
+        filledAvgPriceCents,
         filledAt: newStatus === "filled" ? now : order.filledAt,
         updatedAt: now,
-      }).where(eq(brokerOrders.id, order.id));
+      }).where(and(eq(brokerOrders.id, order.id), eq(brokerOrders.userId, userId),
+        eq(brokerOrders.status, order.status),
+        order.filledQty == null ? isNull(brokerOrders.filledQty) : eq(brokerOrders.filledQty, order.filledQty),
+        order.filledAvgPriceCents == null ? isNull(brokerOrders.filledAvgPriceCents) : eq(brokerOrders.filledAvgPriceCents, order.filledAvgPriceCents)));
+      // Another poll may have recorded a newer fill while this request was in
+      // flight. Never downgrade it or emit outcome/snapshot side effects twice.
+      if (mirrored.affectedRows !== 1) continue;
 
       if (newStatus === "filled" && result.filledQty && result.filledAvgPriceCents) {
         await writePositionSnapshot(order.accountId, order.runId, order.symbol, result.filledQty, result.filledAvgPriceCents);

@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import http from "node:http";
 import https from "node:https";
@@ -228,6 +228,62 @@ describe("capital ledger — actual disposable database transactions", () => {
     const receipt = (await read()).receipt!;
     expect(receipt.allocationClaims.find(row => row.allocationId === committed.claim.allocationId)?.state).toBe("consumed");
     expect(receipt.allocationClaims.filter(row => row.state !== "released").reduce((sum, row) => sum + row.amountCents, 0)).toBe(120_000);
+  });
+
+  it.each(["submitted", "filled"] as const)("stale operator rejection preserves a competing %s order in the real database", async status => {
+    const before = await unaffected();
+    const order = before.orders.find(row => row.userId === fixtures[0].userId)!;
+    const target = requireIsolatedIntegrationDatabase(process.env.DATABASE_URL, process.env.ISOLATED_INTEGRATION_DATABASE);
+    const mysql = await import("mysql2/promise");
+    const connection = await mysql.createConnection(target.toString());
+    const database = await import("../db");
+    let injected = false;
+    const proxied = new Proxy(db, { get(object, key) {
+      if (key === "update") return (table: Parameters<Db["update"]>[0]) => ({ set: (values: any) => ({ where: async (predicate: any) => {
+        if (table !== brokerOrders || injected) throw new Error("Unexpected rejection write");
+        injected = true;
+        // Separate connection commits after rejectOrder's SELECT and before its
+        // UPDATE. This is deterministic interleaving, not a broker submission.
+        await connection.execute("UPDATE broker_orders SET status = ? WHERE id = ? AND user_id = ?", [status, order.id, order.userId]);
+        return db.update(table).set(values).where(predicate);
+      } }) });
+      const member = Reflect.get(object, key);
+      return typeof member === "function" ? member.bind(object) : member;
+    }});
+    const read = vi.spyOn(database, "getDb").mockResolvedValue(proxied);
+    try {
+      const { rejectOrder } = await import("./orderFlow");
+      await expect(rejectOrder(order.id, order.userId, "Illustrative stale rejection")).rejects.toThrow(/changed/);
+      expect(injected).toBe(true);
+      baseline = { ...before, orders: before.orders.map(row => row.id === order.id ? { ...row, status } : row) };
+      expect(await unaffected()).toEqual(baseline);
+      expect(await ledgerRows()).toEqual({ events: [], claims: [] });
+    } finally { read.mockRestore(); await connection.end(); }
+  });
+
+  it.each([false, true])("persists partial fills without overwriting a competing poll (race=%s)", async race => {
+    const initial = await unaffected();
+    const order = initial.orders.find(row => row.userId === fixtures[0].userId)!;
+    await db.update(brokerOrders).set({ status: "submitted", brokerOrderId: "illustrative-partial-order",
+      filledQty: 0, filledAvgPriceCents: null }).where(eq(brokerOrders.id, order.id));
+    const before = await unaffected();
+    const brokers = await import("./brokers/index");
+    const getOrder = vi.fn(async () => {
+      if (race) await db.update(brokerOrders).set({ filledQty: 0.75, filledAvgPriceCents: 1000 }).where(eq(brokerOrders.id, order.id));
+      return { status: "pending", brokerOrderId: "illustrative-partial-order", filledQty: 0.5, filledAvgPriceCents: 1000 };
+    });
+    const broker = vi.spyOn(brokers, "brokerFor").mockReturnValue({ available: () => true, getOrder } as any);
+    try {
+      const { mirrorFills } = await import("./orderFlow");
+      expect(await mirrorFills(order.userId)).toBe(race ? 0 : 1);
+      baseline = { ...before, orders: before.orders.map(row => row.id === order.id
+        ? { ...row, filledQty: race ? 0.75 : 0.5, filledAvgPriceCents: 1000, updatedAt: NOW } : row) };
+      expect(await unaffected()).toEqual(baseline);
+      if (!race) expect(await mirrorFills(order.userId)).toBe(0);
+      expect(await unaffected()).toEqual(baseline);
+      expect(await ledgerRows()).toEqual({ events: [], claims: [] });
+      expect(getOrder).toHaveBeenCalledTimes(race ? 1 : 2);
+    } finally { broker.mockRestore(); }
   });
 
   it("rolls back an uncommitted claim when the caller fails after reading its receipt", async () => {
