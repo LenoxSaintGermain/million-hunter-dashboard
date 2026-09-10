@@ -106,3 +106,44 @@ score. The production repeat for this follow-up is recorded separately below.
 
 Follow-up verification: 1,305 unit tests passed, 0 failed, 6 skipped. TypeScript
 and production Vite build passed; the existing large-client-chunk warning remains.
+
+## Final production release and repeat
+
+- Release: `fba1b41918dd8c0ccff5dccf3a68375a322f3ae0` (branch
+  `codex/aperture-play-desk`, fast-forwarded to `origin/main`).
+- Build: `3b6ccbba-db15-4282-bce7-d871defe2e55`, SUCCESS.
+- Image digest: `sha256:a2bd16ee45e0f76fce1c6adf1391dcb9bf9b366d9c8232371727e0cc5b505c6a`.
+- Revision: `capital-aperture-00090-hal`, 100% production traffic. Previous
+  verified revision `capital-aperture-00088-xus` remains available for rollback.
+- Runtime configuration compared equal, excluding the image. No auth settings
+  changed. Staged and public routes returned HTTP 200 JSON health and the exact
+  full release marker.
+- Public entry: https://third-signal-capital-aperture.web.app/aperture
+
+Signed-in Chrome repeat at approximately 9:46–9:49 PM EDT:
+
+1. **Mobile Play Desk (390×844):** header height 44px; primary unresolved-finding
+   button at y=677.5–721.5, height 44px, within the initial viewport. No page-width
+   overflow. Paper mode, NVDA constraint consequence and stale-check warning
+   remain ahead of the action. Screenshot: `production-playdesk-mobile-final.png`.
+2. **Desktop Play Desk (1297×1196):** one prominent task, three visible compact
+   secondary critical rows, no page-width overflow. Screenshot:
+   `production-playdesk-desktop-final.png`.
+3. **Mission:** saved PW result opens directly on both sizes. One no-trade reason,
+   reopening condition and no-ticket/existing-position boundary, with editable
+   saved assumptions below; no suggestions intervene. Screenshots:
+   `production-mission-desktop-final.png`, `production-mission-mobile-final.png`.
+4. **Today:** exact DKNG concern still unresolved; named account and PW/NVDA
+   distinction preserved. No false all-clear on the settled stale state. Initial
+   cold navigation showed the loading shell before records arrived; this sample
+   is not an exhaustive network-timing test. Browser error log was empty.
+
+Browser viewport overrides were reset, All filter restored, and Chrome was left
+on Today. No proposal, review acknowledgment, approval, submission or exit was
+performed. Screenshots live under the task artifact directory:
+`/Users/lenoxparis/.codex/visualizations/2026/08/25/01a0392e-5a5e-73c2-9f5e-675f1dc136d9/stakeholder-uat-2026-09-09/`.
+
+This closes the four annotated presentation defects and exact-review refinement,
+not the remaining broader acceptance boundaries above. Next live UAT: use the
+existing exact paper workflow during an open market; do not relax risk or evidence
+gates to obtain a trade. No-trade remains a valid completed decision.
