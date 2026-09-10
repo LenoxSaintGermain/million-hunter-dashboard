@@ -7,8 +7,20 @@ operator walkthrough of the deployed briefing. Staged as
 `capital-aperture-00105-lal`, marker `1171ac2-uat-22995aa2`, digest
 `sha256:2fe44857236a138aec98da0c245292a0267b3b018c69fa2e02ac41f467b4bbbd`,
 Cloud Build `1a649928-c243-4cfa-a97f-598a821e72b9`, **zero traffic**.
-Production deliberately remains `capital-aperture-00102-vax` so an in-progress
-UAT is not disturbed; the operator compares and decides when to promote.
+**Promoted to 100% on operator instruction** after the tagged hostname proved
+unusable: `uat-hierarchy---capital-aperture-...` is not in the Firebase
+`authorizedDomains` list, so Google sign-in there fails and no comparison was
+possible. `capital-aperture-00102-vax` is retained for rollback.
+
+The authorized public host is **`third-signal-capital-aperture.web.app`** (Firebase
+Hosting rewriting to this Cloud Run service). Read-only readback of
+`authorizedDomains` confirms it is authorized and that the earlier temporary UAT
+hostname remains absent, as intended — an existing token still works on that
+hostname, but no new sign-in does. No authentication configuration was changed in
+this session. Verified signed-in on the public host after promotion: HTTP 200,
+marker `1171ac2-uat-22995aa2`, one primary card, zero full-card rows, three
+compact rows, In Motion ahead of the secondary sections, and the changed-since
+baseline line present.
 
 Four observed failures, each reproduced by a failing test first:
 
