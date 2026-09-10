@@ -119,6 +119,29 @@ beforeEach(() => {
 afterEach(() => { fixture.cleanups.forEach(cleanup => cleanup?.()); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("persisted Mission disposition context", () => {
+  it("reopens an accepted no-thesis objective without adopting the active thesis or starting a new action", async () => {
+    const values = { ...emptyMissionDraftValues(), accountId: 3, canonicalThesisId: null,
+      capital: "1200", maxLoss: "100", mission: "Illustrative: compare uses of my extra capital next month.",
+      strategyContext: { schemaVersion: 1, requestId: "00000000-0000-4000-8000-000000000011", intent: "deploy_excess_capital",
+        searchScope: "broader_permitted_universe", requestedSymbols: [], declarationId: "00000000-0000-4000-8000-000000000012", sourceOrder: null, profitReserve: "" } };
+    fixture.queries.draft.data = { id: 1, version: 5, updatedAt: now, completedAt: now,
+      values: { ...values, baseDecisionRunId: 77, baseDecisionRevisionId: 88 } };
+    fixture.queries.latest.data.latest = { authority: "authoritative", contextKind: "objective", decisionRunId: 77, decisionRevisionId: 88,
+      canonicalThesisId: null, capitalThesisId: null, accountId: 3, branch: "research", version: 1, createdAt: now,
+      missionText: values.mission, deployableCapitalCents: 120000, maxPlannedLossCents: 10000,
+      holdingPeriod: values.holdingPeriod, holdingPeriods: values.holdingPeriods,
+      objectiveContext: { requestId: values.strategyContext.requestId, sourceDraftId: 1, sourceDraftVersion: 4, values } };
+    const before = structuredClone(fixture.queries.latest.data);
+    const view = render();
+    expect(view.$("h1").text()).toBe("Capital objective saved");
+    expect(view.$.text()).toContain("Mission accepted.");
+    expect(view.$.text()).not.toContain("Illustrative PWR");
+    expect(view.$.text()).not.toContain("Underwrite my mission");
+    expect(view.$("button").text()).toBe("Return to Today");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(fixture.queries.latest.data).toEqual(before);
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+  });
   it("preserves an objective-led draft without auto-assigning a thesis or exposing the unrelated Mission action", async () => {
     const values = fixture.queries.draft.data.values;
     values.canonicalThesisId = null;

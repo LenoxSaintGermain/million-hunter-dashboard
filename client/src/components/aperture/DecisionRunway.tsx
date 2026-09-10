@@ -77,10 +77,15 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false });
   const { data: accounts } = accountQuery;
   const draftQuery = trpc.aperture.runway.draft.get.useQuery(undefined, { enabled: !receiptTarget, retry: false, refetchOnWindowFocus: false });
-  // This release can retain the newer request, but must not reinterpret it as
-  // a canonical-thesis Mission before the accepted-intent handoff is wired.
-  const preservedStrategyDraft = !receiptTarget && draftQuery.data?.completedAt == null
-    && draftQuery.data?.values.strategyContext ? draftQuery.data : null;
+  // Never reinterpret an objective receipt as the profile's active thesis.
+  // A newer unfinished draft still wins on Mission; an exact receipt link does not.
+  const objectiveReceipt = runway?.latest?.authority === "authoritative" && runway.latest.contextKind === "objective" ? runway.latest : null;
+  const hasUnfinishedDraft = draftQuery.data != null && draftQuery.data.completedAt == null;
+  const acceptedObjective = objectiveReceipt?.objectiveContext && (receiptTarget || !hasUnfinishedDraft) ? objectiveReceipt : null;
+  const preservedStrategyDraft = !receiptTarget && hasUnfinishedDraft && draftQuery.data?.values.strategyContext ? draftQuery.data
+    : acceptedObjective?.objectiveContext ? { id: acceptedObjective.objectiveContext.sourceDraftId,
+      version: acceptedObjective.objectiveContext.sourceDraftVersion, values: acceptedObjective.objectiveContext.values,
+      updatedAt: acceptedObjective.createdAt, completedAt: acceptedObjective.createdAt } : null;
   const saveDraftMutation = trpc.aperture.runway.draft.save.useMutation();
   const completeDraftMutation = trpc.aperture.runway.draft.complete.useMutation();
   const [selectedCanonicalId, setSelectedCanonicalId] = useState<number | null | undefined>(undefined);
@@ -88,15 +93,18 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const immutableReceipt = receiptTarget && runway?.latest?.authority === "authoritative" ? runway.latest : null;
   const currentDecisionRunId = runway?.latest?.authority === "authoritative" ? runway.latest.decisionRunId : null;
   const currentDecisionRevisionId = runway?.latest?.authority === "authoritative" ? runway.latest.decisionRevisionId : null;
-  const activeCanonicalId = immutableReceipt?.canonicalThesisId ?? (selectedCanonicalId !== undefined ? selectedCanonicalId : runway?.activeCanonicalThesisId ?? null);
+  const activeCanonicalId = preservedStrategyDraft ? preservedStrategyDraft.values.canonicalThesisId
+    : immutableReceipt?.canonicalThesisId ?? (selectedCanonicalId !== undefined ? selectedCanonicalId : runway?.activeCanonicalThesisId ?? null);
   const activeThesis = useMemo(() => (canonicalTheses ?? []).find((item) => item.id === activeCanonicalId) ?? null, [canonicalTheses, activeCanonicalId]);
   const projection = useMemo(() => immutableReceipt
     ? (capitalTheses ?? []).find((item) => item.id === immutableReceipt.capitalThesisId) ?? null
     : (capitalTheses ?? []).find((item) => item.sourceCompilationId === activeCanonicalId) ?? null, [capitalTheses, activeCanonicalId, immutableReceipt]);
-  const paperAccount = useMemo(() => immutableReceipt
+  const paperAccount = useMemo(() => preservedStrategyDraft
+    ? (accounts ?? []).find((item) => item.id === preservedStrategyDraft.values.accountId && item.isPaper) ?? null
+    : immutableReceipt
     ? (accounts ?? []).find((item) => item.id === immutableReceipt.accountId) ?? null
     : selectedAccountId !== undefined ? (accounts ?? []).find((item) => item.id === selectedAccountId && item.isPaper) ?? null
-    : (accounts ?? []).find((item) => item.isPaper && item.brokerId === "alpaca_paper") ?? (accounts ?? []).find((item) => item.isPaper) ?? null, [accounts, immutableReceipt, selectedAccountId]);
+    : (accounts ?? []).find((item) => item.isPaper && item.brokerId === "alpaca_paper") ?? (accounts ?? []).find((item) => item.isPaper) ?? null, [accounts, immutableReceipt, selectedAccountId, preservedStrategyDraft]);
   const cockpit = trpc.aperture.cockpit.useQuery(paperAccount ? { accountId: paperAccount.id } : undefined, { enabled: Boolean(paperAccount) });
 
   const [capital, setCapital] = useState("");
@@ -518,6 +526,12 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
       applyDraftValues(persisted.values);
       return;
     }
+    if (acceptedObjective?.objectiveContext) {
+      applyDraftValues(acceptedObjective.objectiveContext.values);
+      hydratedDecisionRevisionId.current = acceptedObjective.decisionRevisionId;
+      completedDraftRef.current = true;
+      return;
+    }
     const receipt = runway?.latest;
     if (receipt?.authority !== "authoritative") {
       const defaults = projection?.missionDefaults;
@@ -796,7 +810,9 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
       <div><p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{paperAccount?.label ?? "Paper account not selected"} · Paper</p><h1 className="mt-1 font-serif text-2xl">Capital objective saved</h1></div>
       {missionContextError && <div role="alert" className="rounded-lg border p-3 text-sm leading-6" style={{ borderColor: "var(--sh-red)" }}><p>Refresh failed. Showing saved version {preservedStrategyDraft.version}; current context is unverified.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void refreshMissionContext()}>Retry loading saved context</Button></div>}
       <p className="whitespace-pre-wrap break-words text-base leading-6">{preservedStrategyDraft.values.mission || "Your unfinished capital request is preserved."}</p>
-      <p role="status" className="text-sm leading-6">Objective-led discovery is not available in this workspace yet. Your saved request has not been converted into a thesis. No analysis or order was authorized by this draft.</p>
+      <p role="status" className="text-sm leading-6">{acceptedObjective
+        ? "Mission accepted. Discovery-to-research validation is not available in this release. No analysis, allocation or order has been created."
+        : "Objective-led discovery is not available in this workspace yet. Your saved request has not been converted into a thesis. No analysis or order was authorized by this draft."}</p>
       <details className="rounded-lg border px-3" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 content-center cursor-pointer text-sm font-medium">Saved inputs</summary><dl className="space-y-2 pb-3 text-sm">
         <div><dt className="font-medium">Declared capital</dt><dd>{preservedStrategyDraft.values.capital || "Not entered"} · Operator-declared, not verified cash</dd></div>
         <div><dt className="font-medium">Horizon</dt><dd>{horizonLabel(preservedStrategyDraft.values.holdingPeriod)}</dd></div>

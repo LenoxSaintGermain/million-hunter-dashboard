@@ -6,6 +6,7 @@ import {
   apertureRunwayStates,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { hasThesisDecisionBinding } from "./decisionReceiptBinding";
 
 export type DecisionBranch = "research" | "eligible" | "conditional" | "cash";
 export type PaperDecisionAction = "preflight" | "create_proposal" | "approve" | "submit";
@@ -20,6 +21,9 @@ export type DecisionAuthorizationSnapshot = {
   researchRunId: number | null;
   /** Effective absolute loss limit persisted on the authoritative mission revision. */
   maxPlannedLossCents: number | null;
+  /** Optional for legacy callers; production always supplies the head proof. */
+  contextKind?: "thesis" | "objective";
+  validBinding?: boolean;
 };
 
 export class DecisionRunwayBlockedError extends Error {
@@ -52,6 +56,10 @@ export function decisionActionBlock(
   // intent is resolved from the held position before this helper is reached;
   // unknown intent remains fail-closed below.
   if (!requiresCurrentDecisionBinding(intent)) return null;
+  if ((snapshot.contextKind !== undefined && snapshot.contextKind !== "thesis")
+    || (snapshot.validBinding !== undefined && snapshot.validBinding !== true)) {
+    return "Decision Runway binding mismatch: an objective or incomplete thesis binding cannot authorize opening paper actions. Validate an explicit research handoff first.";
+  }
   if (snapshot.source === "authoritative" && expected) {
     if (snapshot.researchRunId !== expected.runId || snapshot.accountId !== expected.accountId) {
       return "Decision Runway binding mismatch: the mission revision, research run, and paper account must match exactly.";
@@ -98,12 +106,26 @@ export async function authorizeDecisionAction(input: {
   }
 
   if (decisionRun) {
+    const bindingProof = {
+      contextKind: decisionRun.contextKind === undefined ? "thesis" as const : decisionRun.contextKind,
+      validBinding: hasThesisDecisionBinding(decisionRun),
+    };
+    // Objective acceptance is a planning receipt, never opening-order authority.
+    // Reject before reading a permissive branch, even if a research ID was
+    // incorrectly attached. A proven close retains the existing safety path.
+    if (requiresCurrentBinding && !bindingProof.validBinding) {
+      throw new DecisionRunwayBlockedError(
+        "Decision Runway binding mismatch: an objective or incomplete thesis binding cannot authorize opening paper actions.",
+        "DECISION_BINDING_MISMATCH",
+      );
+    }
     if (decisionRun.currentRevisionId == null) {
       if (requiresCurrentBinding) {
         throw new DecisionRunwayBlockedError("Decision Runway has no current mission revision.", "DECISION_BINDING_MISMATCH");
       }
       return {
         source: "authoritative",
+        ...bindingProof,
         decisionRunId: decisionRun.id,
         revisionId: null,
         effectiveBranch: "cash",
@@ -120,6 +142,7 @@ export async function authorizeDecisionAction(input: {
       if (!requiresCurrentBinding) {
         return {
           source: "authoritative",
+          ...bindingProof,
           decisionRunId: decisionRun.id,
           revisionId: null,
           effectiveBranch: "cash",
@@ -141,6 +164,7 @@ export async function authorizeDecisionAction(input: {
     }
     const snapshot: DecisionAuthorizationSnapshot = {
       source: "authoritative",
+      ...bindingProof,
       decisionRunId: decisionRun.id,
       revisionId: revision.id,
       effectiveBranch: revision.effectiveBranch,

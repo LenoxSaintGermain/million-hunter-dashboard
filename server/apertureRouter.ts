@@ -17,6 +17,7 @@ import { apertureUnderwritingJobs } from "../drizzle/apertureUnderwritingJobSche
 import { claimUnderwritingJob, readUnderwritingJob } from "./aperture/underwritingJobs";
 import { mayPublishUnderwriting, underwritingJobStatus } from "../shared/underwritingJob";
 import { missionDraftRouter, missionDraftStore } from "./aperture/missionDraftRouter";
+import { acceptObjectiveMission, acceptObjectiveMissionInput, readAcceptedObjectiveValues } from "./aperture/objectiveMission";
 import { parsePersistedJson } from "../shared/persistedJson";
 import { deskAttentionSourceIssues, deskMonitoringFindings } from "./aperture/deskAttentionPresentation";
 import { monitoringReviewRouter } from "./aperture/monitoringReviewReceipt";
@@ -110,7 +111,7 @@ import {
   outcomeReviewAt,
   rankMissionLibrary,
 } from "./aperture/decisionRunway";
-import { immutableReceiptBindingIssue } from "./aperture/decisionReceiptBinding";
+import { immutableReceiptBindingIssue, hasThesisDecisionBinding } from "./aperture/decisionReceiptBinding";
 import { resolveCapitalMissionDefaults } from "../shared/capitalMissionDefaults";
 import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
 import { detailsFromCanonicalRecord } from "../shared/capitalThesisStructure";
@@ -231,6 +232,8 @@ async function readImmutableDecisionReceipt(
     requestedOwnerId: userId,
     run: {
       ownerId: decisionRun.userId,
+      contextKind: decisionRun.contextKind,
+      clientRequestId: decisionRun.clientRequestId,
       canonicalThesisId: decisionRun.canonicalThesisId,
       capitalThesisId: decisionRun.capitalThesisId,
       accountId: decisionRun.accountId,
@@ -240,11 +243,17 @@ async function readImmutableDecisionReceipt(
   })) receiptBindingUnavailable();
 
   const [[canonical], [projection], [account]] = await Promise.all([
-    db.select({ id: thesisCompilations.id, name: thesisCompilations.name }).from(thesisCompilations).where(eq(thesisCompilations.id, decisionRun.canonicalThesisId)).limit(1),
-    db.select({ id: capitalTheses.id, name: capitalTheses.name, sourceCompilationId: capitalTheses.sourceCompilationId }).from(capitalTheses).where(and(eq(capitalTheses.id, decisionRun.capitalThesisId), eq(capitalTheses.userId, userId))).limit(1),
+    decisionRun.canonicalThesisId == null ? [] : db.select({ id: thesisCompilations.id, name: thesisCompilations.name }).from(thesisCompilations).where(eq(thesisCompilations.id, decisionRun.canonicalThesisId)).limit(1),
+    decisionRun.capitalThesisId == null ? [] : db.select({ id: capitalTheses.id, name: capitalTheses.name, sourceCompilationId: capitalTheses.sourceCompilationId }).from(capitalTheses).where(and(eq(capitalTheses.id, decisionRun.capitalThesisId), eq(capitalTheses.userId, userId))).limit(1),
     db.select({ id: portfolioAccounts.id, label: portfolioAccounts.label, isPaper: portfolioAccounts.isPaper }).from(portfolioAccounts).where(and(eq(portfolioAccounts.id, decisionRun.accountId), eq(portfolioAccounts.userId, userId))).limit(1),
   ]);
-  if (!canonical || !projection || projection.sourceCompilationId !== canonical.id || !account?.isPaper) receiptBindingUnavailable();
+  if (!account?.isPaper) receiptBindingUnavailable();
+  if (decisionRun.contextKind === "thesis" && (!canonical || !projection || projection.sourceCompilationId !== canonical.id)) receiptBindingUnavailable();
+  const objectiveValues = decisionRun.contextKind === "objective" ? await readAcceptedObjectiveValues(db, userId, decisionRun, revision) : null;
+  if (objectiveValues?.canonicalThesisId != null) {
+    const [selected] = await db.select({ id: thesisCompilations.id }).from(thesisCompilations).where(and(eq(thesisCompilations.id, objectiveValues.canonicalThesisId), eq(thesisCompilations.userId, userId))).limit(1);
+    if (!selected) receiptBindingUnavailable();
+  }
   const [cashOutcome] = revision.effectiveBranch === "cash"
     ? await db.select({
       status: aperturePendingOutcomes.status,
@@ -271,12 +280,17 @@ async function readImmutableDecisionReceipt(
     lifecycle: decisionRun.lifecycle,
     cashOutcome: cashOutcome?.status === "resolved" ? cashOutcome : null,
     authority: "authoritative" as const,
+    contextKind: decisionRun.contextKind,
+    objectiveContext: objectiveValues == null ? null : {
+      requestId: decisionRun.clientRequestId!, sourceDraftId: context.sourceDraftId as number,
+      sourceDraftVersion: context.sourceDraftVersion as number, values: objectiveValues,
+    },
     binding: {
       ownerId: decisionRun.userId,
-      canonicalThesisId: canonical.id,
-      canonicalThesisName: canonical.name ?? "Unnamed thesis",
-      capitalThesisId: projection.id,
-      capitalThesisName: projection.name ?? "Unnamed Capital thesis",
+      canonicalThesisId: canonical?.id ?? null,
+      canonicalThesisName: canonical?.name ?? (decisionRun.contextKind === "objective" ? "No canonical thesis assigned" : "Unnamed thesis"),
+      capitalThesisId: projection?.id ?? null,
+      capitalThesisName: projection?.name ?? (decisionRun.contextKind === "objective" ? "No tactical research context yet" : "Unnamed Capital thesis"),
       accountId: account.id,
       accountLabel: account.label,
       mandateVersion: gateSnapshot.mandateVersion as string,
@@ -482,9 +496,15 @@ function normalizeExplicitTarget(objective: CapitalObjective): CapitalObjective 
   };
 }
 
+function requireThesisMission<T extends typeof apertureDecisionRuns.$inferSelect>(decision: T): asserts decision is T & { contextKind: "thesis"; canonicalThesisId: number; capitalThesisId: number } {
+  if (decision.contextKind !== "thesis" || !hasThesisDecisionBinding(decision)) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This capital objective still needs a verified discovery-to-research handoff. No analysis job, research run, selection or paper order was created." });
+  }
+}
+
 type UnderwritingAuthority = {
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>;
-  decisionRun: typeof apertureDecisionRuns.$inferSelect;
+  decisionRun: typeof apertureDecisionRuns.$inferSelect & { contextKind: "thesis"; canonicalThesisId: number; capitalThesisId: number };
   decisionRevision: typeof apertureDecisionRevisions.$inferSelect;
   objective: CapitalObjective;
   cockpit: Awaited<ReturnType<typeof buildCockpit>>;
@@ -546,6 +566,7 @@ async function resolveUnderwritingAuthority(input: {
   if (!decisionRun || decisionRun.currentRevisionId !== input.decisionRevisionId || decisionRun.researchRunId != null) {
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current pre-research mission revision before underwriting it." });
   }
+  requireThesisMission(decisionRun);
   const [decisionRevision] = await db.select().from(apertureDecisionRevisions).where(and(
     eq(apertureDecisionRevisions.id, input.decisionRevisionId),
     eq(apertureDecisionRevisions.decisionRunId, decisionRun.id),
@@ -1537,6 +1558,7 @@ export const apertureRouter = router({
       if (!row || row.decision.currentRevisionId !== row.revision.decisionRevisionId) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current underwriting revision before choosing a play." });
       }
+      requireThesisMission(row.decision);
       const play = parsePersistedJson(row.revision.plays).find((item) => item.id === input.playId);
       if (!play || ["invalidated", "expired"].includes(play.status)) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This play is not available for research validation." });
@@ -1565,6 +1587,14 @@ export const apertureRouter = router({
   // Durable operator context only. A cash branch cannot be attached to a run
   // and is separately checked when a paper-order proposal is attempted.
   runway: router({
+    acceptObjectiveDraft: capitalOperatorProcedure.input(acceptObjectiveMissionInput).mutation(async ({ ctx, input }) => {
+      // Disabled until the complete objective/discovery/research journey and
+      // release review pass. Never expose a browser-controlled bypass.
+      if (process.env.CAPITAL_OBJECTIVE_MISSIONS_ENABLED !== "true") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Objective-led Mission acceptance is not enabled in this release. Your saved draft is unchanged." });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Mission storage is unavailable. No Mission was accepted; keep the saved draft and retry." });
+      return acceptObjectiveMission(db, ctx.user.id, input);
+    }),
     draft: missionDraftRouter,
     latest: capitalOperatorProcedure.input(z.object({
       decisionRunId: z.number().positive().optional(),
@@ -1614,7 +1644,7 @@ export const apertureRouter = router({
         revisionId: apertureDecisionRevisions.id,
         revisionVersion: apertureDecisionRevisions.version,
         branch: apertureDecisionRevisions.effectiveBranch,
-        thesisName: thesisCompilations.name,
+        thesisName: sql<string>`COALESCE(${thesisCompilations.name}, ${apertureDecisionRevisions.missionText})`,
         orderId: aperturePendingOutcomes.orderId,
         orderRunId: brokerOrders.runId,
         orderCandidateId: brokerOrders.candidateId,
@@ -1626,7 +1656,7 @@ export const apertureRouter = router({
           eq(aperturePendingOutcomes.revisionId, apertureDecisionRevisions.id),
           eq(aperturePendingOutcomes.decisionRunId, apertureDecisionRevisions.decisionRunId),
         ))
-        .innerJoin(thesisCompilations, eq(apertureDecisionRuns.canonicalThesisId, thesisCompilations.id))
+        .leftJoin(thesisCompilations, eq(apertureDecisionRuns.canonicalThesisId, thesisCompilations.id))
         .leftJoin(brokerOrders, and(
           eq(aperturePendingOutcomes.orderId, brokerOrders.id),
           eq(brokerOrders.userId, ctx.user.id),
@@ -1852,6 +1882,7 @@ export const apertureRouter = router({
         if (input.decisionRunId != null) {
           const [head] = await db!.select().from(apertureDecisionRuns).where(and(
             eq(apertureDecisionRuns.id, input.decisionRunId),
+            eq(apertureDecisionRuns.contextKind, "thesis"),
             eq(apertureDecisionRuns.userId, ctx.user.id),
             eq(apertureDecisionRuns.canonicalThesisId, input.canonicalThesisId),
             eq(apertureDecisionRuns.capitalThesisId, input.capitalThesisId),
@@ -1983,6 +2014,9 @@ export const apertureRouter = router({
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
         const isolatedUatResearchBlocked = isExactIsolatedUatRuntime();
+        const [researchMission] = await db!.select().from(apertureDecisionRuns).where(and(eq(apertureDecisionRuns.id, input.decisionRunId), eq(apertureDecisionRuns.userId, ctx.user.id))).limit(1);
+        if (!researchMission) throw new TRPCError({ code: "NOT_FOUND", message: "The selected Mission is unavailable to this operator." });
+        requireThesisMission(researchMission);
         const qualifiedPlayFixture = isolatedUatResearchBlocked
           && input.uatCase === "qualified-play"
           && ["uat_jim_9c18799", "uat_ch_capital_9c18799"].includes(ctx.user.openId);
@@ -1994,6 +2028,7 @@ export const apertureRouter = router({
             eq(apertureDecisionRuns.id, input.decisionRunId), eq(apertureDecisionRuns.userId, ctx.user.id),
           )).limit(1);
           if (!decisionRun || decisionRun.currentRevisionId !== input.revisionId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current operator-owned mission revision before compiling the illustrative UAT fixture." });
+          requireThesisMission(decisionRun);
           if (decisionRun.researchRunId != null) return { status: "started" as const, runId: decisionRun.researchRunId, decisionRunId: decisionRun.id, revisionId: input.revisionId, fixture: "qualified-play" as const };
           const [revision] = await db!.select().from(apertureDecisionRevisions).where(and(eq(apertureDecisionRevisions.id, input.revisionId), eq(apertureDecisionRevisions.decisionRunId, decisionRun.id))).limit(1);
           if (!revision || revision.effectiveBranch !== "research") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash and conditional branches cannot compile the illustrative fixture." });
@@ -2105,12 +2140,14 @@ export const apertureRouter = router({
           eq(apertureDecisionRuns.userId, ctx.user.id),
         )).limit(1);
         if (!decisionRun || decisionRun.currentRevisionId !== input.revisionId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Open the current mission revision before starting research." });
+        requireThesisMission(decisionRun);
         if (decisionRun.researchRunId != null) throw new TRPCError({ code: "CONFLICT", message: "This mission already has an exact research run." });
         const [revision] = await db!.select().from(apertureDecisionRevisions).where(and(
           eq(apertureDecisionRevisions.id, input.revisionId),
           eq(apertureDecisionRevisions.decisionRunId, decisionRun.id),
         )).limit(1);
         if (!revision || revision.effectiveBranch !== "research") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cash and conditional branches cannot start research." });
+        if (!revision.invalidationRule || revision.invalidationRule.trim().length < MIN_NARRATIVE_CHARS) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm a substantive invalidation condition before research. No provider or run was started." });
         const [underwritingSelection] = await db!.select({
           selectedPlayId: apertureUnderwritingRuns.selectedPlayId,
           revision: apertureUnderwritingRevisions,
@@ -2503,6 +2540,7 @@ export const apertureRouter = router({
         revisionId: apertureDecisionRevisions.id,
         researchRunId: apertureDecisionRuns.researchRunId,
         lifecycle: apertureDecisionRuns.lifecycle,
+        contextKind: apertureDecisionRuns.contextKind,
         missionText: apertureDecisionRevisions.missionText,
         deployableCapitalCents: apertureDecisionRevisions.deployableCapitalCents,
         maxPlannedLossCents: apertureDecisionRevisions.maxPlannedLossCents,
@@ -2513,8 +2551,8 @@ export const apertureRouter = router({
           eq(apertureDecisionRevisions.id, apertureDecisionRuns.currentRevisionId),
           eq(apertureDecisionRevisions.decisionRunId, apertureDecisionRuns.id),
         ))
-        .innerJoin(thesisCompilations, eq(thesisCompilations.id, apertureDecisionRuns.canonicalThesisId))
-        .where(and(eq(apertureDecisionRuns.userId, ctx.user.id), eq(thesisCompilations.userId, ctx.user.id)))
+        .leftJoin(thesisCompilations, eq(thesisCompilations.id, apertureDecisionRuns.canonicalThesisId))
+        .where(eq(apertureDecisionRuns.userId, ctx.user.id))
         .orderBy(desc(apertureDecisionRuns.updatedAt))
         .limit(1);
 
@@ -2576,6 +2614,7 @@ export const apertureRouter = router({
         decisionRunId: aperturePendingOutcomes.decisionRunId,
         revisionId: aperturePendingOutcomes.revisionId,
         gateLabel: apertureDecisionRevisions.namedGateLabel,
+        missionText: apertureDecisionRevisions.missionText,
         thesisName: thesisCompilations.name,
         orderRunId: brokerOrders.runId,
         orderCandidateId: brokerOrders.candidateId,
@@ -2583,7 +2622,7 @@ export const apertureRouter = router({
       }).from(aperturePendingOutcomes)
         .innerJoin(apertureDecisionRuns, eq(aperturePendingOutcomes.decisionRunId, apertureDecisionRuns.id))
         .innerJoin(apertureDecisionRevisions, eq(aperturePendingOutcomes.revisionId, apertureDecisionRevisions.id))
-        .innerJoin(thesisCompilations, eq(apertureDecisionRuns.canonicalThesisId, thesisCompilations.id))
+        .leftJoin(thesisCompilations, eq(apertureDecisionRuns.canonicalThesisId, thesisCompilations.id))
         .leftJoin(brokerOrders, and(eq(aperturePendingOutcomes.orderId, brokerOrders.id), eq(brokerOrders.userId, ctx.user.id)))
         .where(and(
           eq(aperturePendingOutcomes.userId, ctx.user.id),
@@ -2617,12 +2656,13 @@ export const apertureRouter = router({
           revisionId: latestMission.revisionId,
           lifecycle: latestMission.lifecycle,
           state: latestMission.missionText.trim().length >= MIN_NARRATIVE_CHARS && latestMission.deployableCapitalCents > 0 && latestMission.maxPlannedLossCents > 0 ? "complete" : "incomplete",
-          title: latestMission.thesisName ?? "Capital Mission",
+          title: latestMission.thesisName ?? latestMission.missionText,
           updatedAt: latestMission.updatedAt,
         } : null,
         underwriting: latestMission && latestMission.researchRunId == null ? {
           decisionRunId: latestMission.decisionRunId,
           revisionId: latestMission.revisionId,
+          unavailableReason: latestMission.contextKind === "objective" ? "The capital objective is saved. Discovery-to-research validation is not available in this release; no analysis has started." : null,
           state: jobState.state === "running" ? "running" : jobState.canRetry ? "failed" : latestUnderwriting?.decisionRevisionId === latestMission.revisionId ? "complete" : "not_started",
           error: jobState.canRetry ? jobState.message : null,
           selectedPlayId: latestUnderwriting?.selectedPlayId ?? null,
@@ -2668,7 +2708,7 @@ export const apertureRouter = router({
           kind: review.kind,
           dueAt: review.dueAt,
           updatedAt: review.updatedAt,
-          title: review.orderSymbol ? `${review.orderSymbol} review` : review.gateLabel ?? review.thesisName ?? "Decision review",
+          title: review.orderSymbol ? `${review.orderSymbol} review` : review.gateLabel ?? review.thesisName ?? review.missionText,
           href: review.orderRunId != null
             ? `/aperture/run/${review.orderRunId}/execute?candidate=${review.orderCandidateId ?? ""}`
             : `/aperture/decision/${review.decisionRunId}/revision/${review.revisionId}`,

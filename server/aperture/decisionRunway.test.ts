@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+const database = vi.hoisted(() => ({ getDb: vi.fn() }));
+vi.mock("../db", () => ({ getDb: database.getDb }));
 import {
   decisionReceiptPendingOutcome,
+  authorizeDecisionAction,
   decisionActionBlock,
   missingDecisionAuthorityBlock,
   outcomeReviewAt,
@@ -67,6 +70,61 @@ describe("Decision Runway authorization", () => {
     expect(requiresCurrentDecisionBinding("unknown")).toBe(true);
     expect(requiresCurrentDecisionBinding(null)).toBe(true);
     expect(requiresCurrentDecisionBinding("close")).toBe(false);
+  });
+});
+
+describe("objective context cannot authorize opening exposure", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it.each(["preflight", "create_proposal", "approve", "submit"] as const)("blocks %s irrespective of branch while preserving closes", action => {
+    for (const effectiveBranch of ["research", "eligible", "cash", "conditional"] as const) {
+      for (const binding of [{ contextKind: "objective" as const }, { contextKind: "thesis" as const, validBinding: false }]) {
+        const snapshot = { ...eligible, effectiveBranch, ...binding };
+        expect(decisionActionBlock(snapshot, action, "open")).toMatch(/binding|objective/i);
+        expect(decisionActionBlock(snapshot, action, "unknown")).toMatch(/binding|objective/i);
+        expect(decisionActionBlock(snapshot, action, "close")).toBeNull();
+      }
+    }
+  });
+
+  function mockStore(head: Record<string, unknown>, revision: Record<string, unknown> | null = { id: 12, decisionRunId: 9, effectiveBranch: "eligible", maxPlannedLossCents: 50_000 }) {
+    const limit = vi.fn().mockResolvedValueOnce([head]).mockResolvedValueOnce(revision ? [revision] : []);
+    const builder = { from: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), limit };
+    const db = { select: vi.fn(() => builder), insert: vi.fn(), update: vi.fn(), delete: vi.fn(), transaction: vi.fn() };
+    database.getDb.mockResolvedValue(db);
+    return db;
+  }
+  const head = { id: 9, userId: 1, contextKind: "thesis", canonicalThesisId: 11, capitalThesisId: 21, accountId: 4, researchRunId: 22, currentRevisionId: 12 };
+  const input = { action: "submit" as const, userId: 1, runId: 22, accountId: 4 };
+
+  it.each([
+    ["objective", { contextKind: "objective", canonicalThesisId: null, capitalThesisId: null }],
+    ["objective with grafted IDs", { contextKind: "objective" }],
+    ["missing canonical", { canonicalThesisId: null }],
+    ["missing projection", { capitalThesisId: null }],
+    ["zero canonical", { canonicalThesisId: 0 }],
+    ["invalid projection", { capitalThesisId: 1.5 }],
+    ["unknown context", { contextKind: "future" }],
+    ["null context", { contextKind: null }],
+    ["legacy omitted context with null IDs", { contextKind: undefined, canonicalThesisId: null, capitalThesisId: null }],
+  ])("rejects stored %s for OPEN/UNKNOWN, without writes", async (_label, patch) => {
+    for (const intent of ["open", "unknown", undefined] as const) {
+      const db = mockStore({ ...head, ...patch });
+      await expect(authorizeDecisionAction({ ...input, intent })).rejects.toMatchObject({ code: "DECISION_BINDING_MISMATCH" });
+      for (const op of [db.insert, db.update, db.delete, db.transaction]) expect(op).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each(["thesis", undefined])("accepts valid stored %s context with explicit binding proof in the returned snapshot", async contextKind => {
+    mockStore({ ...head, contextKind });
+    expect(await authorizeDecisionAction({ ...input, intent: "open" })).toMatchObject({ source: "authoritative", contextKind: "thesis", validBinding: true });
+  });
+
+  it.each(["missing current revision", "missing revision row", "present revision"])("preserves a proven close on an objective with %s", async scenario => {
+    const db = mockStore({ ...head, contextKind: "objective", canonicalThesisId: null, capitalThesisId: null,
+      currentRevisionId: scenario === "missing current revision" ? null : 12 }, scenario === "missing revision row" ? null : undefined);
+    expect(await authorizeDecisionAction({ ...input, intent: "close" })).toMatchObject({ source: "authoritative", contextKind: "objective", validBinding: false });
+    for (const op of [db.insert, db.update, db.delete, db.transaction]) expect(op).not.toHaveBeenCalled();
   });
 });
 

@@ -1,6 +1,6 @@
 # Capital Aperture — original-scope completion audit
 
-Checkpoint: September 9 evening. Production is `070d04c` / `capital-aperture-00092-yil` at 100% traffic; UI-only follow-up is deployed and public health/version checked. Its local desktop/mobile interaction checks passed; the signed-in post-deployment repeat is pending because the Mac is locked. Separate Strategist safeguards are pushed as `9657373`, not deployed. The market has closed. No market-open submission success is claimed.
+Checkpoint: September 9 evening. Production was last verified at `070d04c` / `capital-aperture-00092-yil` with 100% traffic; the UI-only follow-up was public health/version checked. Its local desktop/mobile interaction checks passed; the signed-in post-deployment repeat is pending because the Mac is locked. Separate Strategist safeguards and persistence work are not deployed. Later sections distinguish each local increment from this production checkpoint. The market has closed. No market-open submission success is claimed.
 
 ## Operator workflow
 
@@ -19,7 +19,7 @@ The following tests cover deterministic decisions or adapter boundaries. A green
 
 | Original scenario | Verified increment | Missing end-to-end work |
 | --- | --- | --- |
-| Excess capital, no saved thesis | Existing draft store now persists objective/search context with null canonical identity; exact authenticated resume/CAS/ownership tests pass | User-facing entry, accepted intent receipt, discovery and explicit selected-opportunity handoff |
+| Excess capital, no saved thesis | Existing draft store and default-off acceptance API preserve an objective with null thesis identity; authenticated exact receipt/resume, concurrency and ownership tests pass | User-facing entry, sourced discovery and explicit selected-opportunity handoff |
 | Realized-gain fixture | Helper computes only the selected $1,200 after basis and reserve | Authoritative executions, attributed lots, fees, reconciliation and availability ingestion; UI source selection |
 | Unrealized / unreconciled gains | Helper rejects deployment; new read adapter keeps unknown amounts null and never promotes position marks to gains | Persist proof and show exact source uncertainty in the user journey |
 | Duplicate event / concurrent proposal | New internal event/claim ledger proves unique event identity and serialized claims on separate DB connections; missing history stays unknown | Authoritative source ingestion and integration/revalidation inside the actual proposal transaction; service concurrency tests are not end-to-end proposal proof |
@@ -38,7 +38,7 @@ The following tests cover deterministic decisions or adapter boundaries. A green
 - `strategyDiscovery.ts` accepts strict structured output and an independently supplied provider provenance manifest. It preserves source cutoffs, originating signals, rejected hypotheses and null unsupported confidence. It invokes no provider, persists nothing, reserves no capital and creates no order. Schema/citation validity is not economic fact verification.
 - The existing Strategist comparison now requires an independent exact candidate/security/evidence-path/underwriting-result/play binding receipt. Model or browser assertions are not authorized receipt producers. Blank IDs, unreviewed securities, mismatched lineage and stale receipts refuse promotion. Invalid proceeds/basis retain null arithmetic instead of manufacturing profit. Receipt producers remain integration work.
 
-Final local regression: 1,475 unit tests passed, zero failed, six existing skips; 72 isolated integration tests passed, zero failed, two external-URL skips. Type checking and client/server builds passed. The integration harness removed only its disposable test database/user and left production and browser-fixture records untouched. Four persisted journey tests also passed earlier in this follow-up. These results do not supply missing end-to-end capabilities or qualified release review.
+Earlier boundary-adapter checkpoint: 1,475 unit tests passed, zero failed, six existing skips; 72 isolated integration tests passed, zero failed, two external-URL skips. Type checking and client/server builds passed. The integration harness removed only its disposable test database/user and left production and browser-fixture records untouched. Four persisted journey tests also passed earlier in this follow-up. Later results supersede these counts, not the remaining acceptance requirements.
 
 ## Release and evidence boundaries
 
@@ -50,7 +50,7 @@ Final local regression: 1,475 unit tests passed, zero failed, six existing skips
 
 ## Reconciled next implementation seam
 
-The existing draft store can preserve a null canonical thesis, but accepted Decision Runs and authoritative receipt reads currently require canonical and Capital-thesis bindings. An intent-led journey therefore needs an explicit discriminated context, not an invented thesis ID or a bypass of `runway.startResearch`.
+At the boundary-adapter checkpoint, accepted Decision Runs required canonical and Capital-thesis bindings. The acceptance increment below now supplies an explicit discriminated objective context. It does not invent a thesis ID or bypass `runway.startResearch`. The following was the reconciled implementation plan; discovery and selected-opportunity handoff remain unfinished.
 
 - Extend the existing persisted draft with backward-compatible intent/search-scope fields and keep version-conflict protection. Explicit null must not fall back to the user's active thesis.
 - Add accepted Mission context discrimination, nullable thesis bindings only in that branch, and owner/request uniqueness through a reviewed additive migration. Reuse immutable revision snapshots and leased underwriting jobs; do not create a second job authority.
@@ -123,10 +123,84 @@ not changed by that lane.
 
 ### Still required, not waived
 
-Accepted objective-led Mission discrimination and idempotent acceptance; durable
-provider/discovery jobs and cited/rejected hypotheses; verified capital-source
+The acceptance increment below supersedes the missing accepted-Mission item.
+Durable provider/discovery jobs and cited/rejected hypotheses; verified capital-source
 ingestion; exact opportunity selection into existing underwriting/research;
 proposal-transaction claim/revalidation; public release review; authenticated
 desktop/mobile end-to-end UAT. The ledger cannot deduplicate real-world money
 behind invented fresh source keys: its future producer must use the stable owned
 origin/declaration record. It supplies current snapshots, not historical replay.
+
+## September 9 late follow-up — accepted objective Mission
+
+**Local, default off, not deployed.** This closes the accepted-assumptions seam,
+not the full Strategist journey. `CAPITAL_OBJECTIVE_MISSIONS_ENABLED` must be
+explicitly true on the server; the browser cannot enable it. No acceptance CTA
+is exposed in this increment.
+
+- `runway.acceptObjectiveDraft` uses the existing Mission/revision store. An
+  objective head has null canonical and Capital-thesis IDs; an optional owned
+  saved thesis is only an explicit context anchor. No active thesis is invented,
+  selected or replaced, and no research projection is manufactured.
+- A transaction locks the owner's draft before reading its version. The exact
+  request UUID has one owner-scoped head, one immutable first revision, and one
+  atomic draft completion/history update. Identical retries return the original
+  receipt, including after a newer draft exists. Version/request conflicts and
+  history-write failures leave the attempted Mission unchanged.
+- Exact reads, retries and claimed draft baselines validate the original draft
+  history, fingerprint, account/request/anchor, calculations, pending-risk gate,
+  research-only disposition and zero proposed risk. Corrupt or cross-kind
+  receipts fail closed; they are never repaired by reading them. Legacy draft
+  completion cannot accept an objective receipt. Source/anchor changes cannot
+  silently reuse an old accepted baseline.
+- The entered amount and loss limit remain declarations, not permission or cash
+  verification. Available capital and permitted risk remain null. Even a filled
+  owned closing order establishes a reference only: gains remain hypothetical.
+  No allocation, underwriting job, provider call, evidence answer, approval or
+  broker order is created by acceptance or ordinary status reads.
+- Shared attention and exact receipt routes preserve the saved objective and
+  say analysis is unavailable. They do not replace it with the active thesis,
+  call the job complete, or suggest that underwriting can run through the old
+  thesis-only path. The existing research/underwriting authority rejects an
+  objective before job/provider work until the verified handoff is implemented.
+  The compatibility view is not the finished guided entry experience.
+- `drizzle/0066_aperture_objective_mission.sql` adds the context discriminator,
+  owner/request uniqueness and nullable thesis/invalidation fields. Existing
+  thesis receipts keep their identity and substantive invalidation requirement.
+  Neither this migration nor 0065 has been applied to production or the browser
+  fixture. The release must account for both even while the feature is off,
+  because ordinary ORM queries read the new columns. Fresh-schema integration
+  testing is not proof of the existing-database migration path.
+
+### Acceptance-increment verification
+
+| Lane | Result | Evidence |
+| --- | --- | --- |
+| Full unit lane | 1,590 passed, 0 failed, 8 explicit skips | `/tmp/aperture-objective-acceptance-verified-unit.json` |
+| Disposable DB integration | 120 passed, 0 failed, 2 external-URL skips | `/tmp/capital-isolated-integration.qnYc7D/summary.json` |
+| Persisted Mission journeys | All 6 passed; included in the 120, not additional | Same disposable integration run |
+| Type check and client/server builds | Passed | Required Node runtime; existing large-bundle warning remains |
+| Signed-in desktop/mobile | Not repeated in this increment | Mac remained locked; no new screenshots or user-tested usability claim |
+
+Two independent agents inspected authority boundaries and added authenticated
+database cases. Their review exposed legacy completion, insufficient retry
+validation, baseline drift and disposition inconsistency; each is now covered
+by a failing-closed regression. The final integration harness removed only its
+own database/user and reported no browser database mutations. The eight unit
+skips are the six DB journeys plus two opt-in external provider probes.
+
+All 21 changed non-document source/configuration files matched the final
+integration snapshot hashes. A silent local client-build attempt was stopped
+after it stalled; the repeat with the required runtime path completed. This is
+build verification, not a performance or browser usability pass.
+
+Still required: the intent-entry UI; accepted-assumption revision UI/API;
+durable provider-backed discovery and provenance/origin/cutoff receipts;
+promoted and rejected hypotheses; independently verified source ingestion;
+selected-opportunity lineage into existing underwriting/evidence; actual
+proposal-transaction claim revalidation; migration/release review; and the
+authenticated responsive, keyboard, enlarged-text and screen-reader journeys.
+The exact objective `validatePlay` mutation path has not yet been exercised by
+this new DB file; it remains guarded in source and needs explicit journey proof
+with the handoff implementation. None of these open items is waived by the
+acceptance service, green tests or an illustrative comparison.

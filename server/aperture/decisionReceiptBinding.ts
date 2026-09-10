@@ -1,9 +1,48 @@
+import { z } from "zod";
+import { missionDraftValuesSchema } from "../../shared/apertureMissionDraft";
+
 export type StoredDecisionBinding = {
   ownerId: number;
-  canonicalThesisId: number;
-  capitalThesisId: number;
+  /** Omitted only by legacy thesis receipts. Null/unknown is never a kind. */
+  contextKind?: "thesis" | "objective";
+  clientRequestId?: string | null;
+  canonicalThesisId: number | null;
+  capitalThesisId: number | null;
   accountId: number;
 };
+
+const positiveId = z.number().int().positive().safe();
+const requestId = z.string().uuid();
+const objectiveContextSchema = z.object({
+  contextKind: z.literal("objective"),
+  requestId,
+  canonicalThesisId: z.null(),
+  capitalThesisId: z.null(),
+  selectedCanonicalThesisId: positiveId.nullable(),
+  accountId: positiveId,
+  sourceDraftId: positiveId,
+  sourceDraftVersion: positiveId,
+  // Reuse the strict draft schema: prose or additional proof claims cannot
+  // stand in for the accepted structured inputs.
+  acceptedDraft: missionDraftValuesSchema,
+  sourceBasis: z.enum(["operator_declared", "hypothetical_only"]),
+  availableCapitalCents: z.null(),
+});
+const objectiveGateSchema = z.object({
+  mandateVersion: z.string().trim().min(1),
+  paperOnly: z.literal(true),
+  humanApprovalRequired: z.literal(true),
+  riskAuthorityState: z.literal("pending_verification"),
+  permittedRiskCents: z.null(),
+  sourceAvailabilityVerified: z.literal(false),
+});
+
+/** Narrow structural proof, not verification of thesis ownership or evidence. */
+export function hasThesisDecisionBinding(run: Pick<StoredDecisionBinding, "contextKind" | "canonicalThesisId" | "capitalThesisId">): boolean {
+  return (run.contextKind === undefined || run.contextKind === "thesis")
+    && positiveId.safeParse(run.canonicalThesisId).success
+    && positiveId.safeParse(run.capitalThesisId).success;
+}
 
 export function immutableReceiptBindingIssue(input: {
   requestedOwnerId: number;
@@ -11,14 +50,33 @@ export function immutableReceiptBindingIssue(input: {
   contextSnapshot: unknown;
   gateSnapshot: unknown;
 }) {
-  if (input.requestedOwnerId !== input.run.ownerId) return "owner";
-  if (!input.contextSnapshot || typeof input.contextSnapshot !== "object") return "context_snapshot";
-  if (!input.gateSnapshot || typeof input.gateSnapshot !== "object") return "gate_snapshot";
+  if (!positiveId.safeParse(input.run.ownerId).success || input.requestedOwnerId !== input.run.ownerId) return "owner";
+  if (!input.contextSnapshot || typeof input.contextSnapshot !== "object" || Array.isArray(input.contextSnapshot)) return "context_snapshot";
+  if (!input.gateSnapshot || typeof input.gateSnapshot !== "object" || Array.isArray(input.gateSnapshot)) return "gate_snapshot";
   const context = input.contextSnapshot as Record<string, unknown>;
   const gate = input.gateSnapshot as Record<string, unknown>;
-  if (context.canonicalThesisId !== input.run.canonicalThesisId) return "canonical_thesis";
-  if (context.capitalThesisId !== input.run.capitalThesisId) return "capital_thesis";
-  if (context.accountId !== input.run.accountId) return "account";
-  if (typeof gate.mandateVersion !== "string" || !gate.mandateVersion) return "mandate";
+  const kind = input.run.contextKind === undefined ? "thesis" : input.run.contextKind;
+  if (kind !== "thesis" && kind !== "objective") return "context_kind";
+  if (context.contextKind !== undefined && context.contextKind !== kind) return "context_kind";
+  if (kind === "objective" && context.contextKind !== "objective") return "context_kind";
+  if ((kind === "thesis" ? !positiveId.safeParse(input.run.canonicalThesisId).success : input.run.canonicalThesisId !== null)
+    || context.canonicalThesisId !== input.run.canonicalThesisId) return "canonical_thesis";
+  if ((kind === "thesis" ? !positiveId.safeParse(input.run.capitalThesisId).success : input.run.capitalThesisId !== null)
+    || context.capitalThesisId !== input.run.capitalThesisId) return "capital_thesis";
+  if (!positiveId.safeParse(input.run.accountId).success || context.accountId !== input.run.accountId) return "account";
+  if (typeof gate.mandateVersion !== "string" || !gate.mandateVersion.trim()) return "mandate";
+  if (kind === "objective") {
+    if (!requestId.safeParse(input.run.clientRequestId).success || context.requestId !== input.run.clientRequestId) return "request";
+    const parsed = objectiveContextSchema.safeParse(context);
+    if (!parsed.success) return "context_snapshot";
+    const accepted = parsed.data.acceptedDraft;
+    if (!accepted.strategyContext || accepted.baseDecisionRunId !== null || accepted.baseDecisionRevisionId !== null) return "accepted_draft";
+    if (accepted.strategyContext.requestId !== input.run.clientRequestId) return "request";
+    if (accepted.accountId !== input.run.accountId) return "account";
+    if (accepted.canonicalThesisId !== parsed.data.selectedCanonicalThesisId) return "canonical_thesis";
+    const sourceBasis = accepted.strategyContext.intent === "deploy_excess_capital" ? "operator_declared" : "hypothetical_only";
+    if (parsed.data.sourceBasis !== sourceBasis) return "source_basis";
+    if (!objectiveGateSchema.safeParse(gate).success) return "gate_snapshot";
+  }
   return null;
 }

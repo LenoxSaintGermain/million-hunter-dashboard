@@ -6,6 +6,7 @@ import { apertureCandidates, apertureRuns, brokerOrders, apertureDecisionRevisio
 import { missionDraftValuesSchema, type MissionDraftRecord, type MissionDraftValues } from "../../shared/apertureMissionDraft";
 import { capitalOperatorProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { readAcceptedObjectiveValues } from "./objectiveMission";
 
 const saveInput = z.object({ expectedVersion: z.number().int().nonnegative(), values: missionDraftValuesSchema, replaceStrategyContext: z.boolean().optional() }).strict();
 const completeInput = z.object({
@@ -17,7 +18,7 @@ type DraftWrite = Pick<MissionDraftRecord, "values" | "updatedAt" | "completedAt
 export interface MissionDraftStore {
   get(userId: number): Promise<MissionDraftRecord | null>;
   assertBindings(userId: number, values: MissionDraftValues): Promise<void>;
-  assertReceipt(userId: number, decisionRunId: number, decisionRevisionId: number): Promise<void>;
+  assertReceipt(userId: number, decisionRunId: number, decisionRevisionId: number, kind?: "thesis" | "objective"): Promise<void>;
   /** Atomically replace exactly the expected owner version and append history. */
   compareAndSwap(userId: number, expectedVersion: number, next: DraftWrite): Promise<MissionDraftRecord | null>;
 }
@@ -45,7 +46,7 @@ export function createMissionDraftService(store: MissionDraftStore, now = Date.n
       const input = completeInput.parse(raw);
       const current = await store.get(userId);
       if (current?.values.strategyContext) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This capital objective has not entered the accepted Mission workflow yet. Keep the draft; an unrelated Mission receipt cannot complete it." });
-      await store.assertReceipt(userId, input.decisionRunId, input.decisionRevisionId);
+      await store.assertReceipt(userId, input.decisionRunId, input.decisionRevisionId, "thesis");
       // Retrying an already-confirmed completion is harmless. A newer draft is not.
       if (current?.version === input.expectedVersion + 1 && current.completedAt != null
         && current.values.baseDecisionRunId === input.decisionRunId
@@ -86,11 +87,12 @@ export const missionDraftStore: MissionDraftStore = {
     const [row] = await db.select().from(apertureMissionDrafts).where(eq(apertureMissionDrafts.userId, userId)).limit(1);
     return row ? decodeMissionDraftRecord(row) : null;
   },
-  async assertReceipt(userId, decisionRunId, decisionRevisionId) {
+  async assertReceipt(userId, decisionRunId, decisionRevisionId, kind) {
     const db = await database();
     const [binding] = await db.select({ id: apertureDecisionRevisions.id }).from(apertureDecisionRuns)
       .innerJoin(apertureDecisionRevisions, eq(apertureDecisionRevisions.decisionRunId, apertureDecisionRuns.id))
-      .where(and(eq(apertureDecisionRuns.userId, userId), eq(apertureDecisionRuns.id, decisionRunId), eq(apertureDecisionRevisions.id, decisionRevisionId))).limit(1);
+      .where(and(eq(apertureDecisionRuns.userId, userId), eq(apertureDecisionRuns.id, decisionRunId), eq(apertureDecisionRevisions.id, decisionRevisionId),
+        kind == null ? undefined : eq(apertureDecisionRuns.contextKind, kind))).limit(1);
     if (!binding) throw new TRPCError({ code: "NOT_FOUND", message: "The saved Mission revision is not available to this operator. The draft remains unchanged." });
   },
   async assertBindings(userId, values) {
@@ -118,6 +120,19 @@ export const missionDraftStore: MissionDraftStore = {
     }
     if (values.baseDecisionRunId != null && values.baseDecisionRevisionId != null) {
       await missionDraftStore.assertReceipt(userId, values.baseDecisionRunId, values.baseDecisionRevisionId);
+      const [head] = await db.select().from(apertureDecisionRuns).where(and(eq(apertureDecisionRuns.id, values.baseDecisionRunId), eq(apertureDecisionRuns.userId, userId))).limit(1);
+      if (values.strategyContext) {
+        if (!head || head.contextKind !== "objective" || head.clientRequestId !== values.strategyContext.requestId
+          || head.accountId !== values.accountId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This draft does not match the exact accepted capital objective. No receipt was substituted." });
+        const [revision] = await db.select().from(apertureDecisionRevisions).where(and(eq(apertureDecisionRevisions.id, values.baseDecisionRevisionId), eq(apertureDecisionRevisions.decisionRunId, head.id))).limit(1);
+        if (!revision) throw new TRPCError({ code: "NOT_FOUND", message: "The objective baseline receipt is unavailable." });
+        const accepted = await readAcceptedObjectiveValues(db, userId, head, revision);
+        if (values.canonicalThesisId !== accepted.canonicalThesisId || JSON.stringify(values.strategyContext) !== JSON.stringify(accepted.strategyContext)) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The selected thesis or capital source differs from this accepted objective. A deliberate context revision is required; the saved baseline was not changed." });
+        }
+      } else if (head?.contextKind === "objective") {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Retain the accepted capital objective when revising this Mission." });
+      }
     }
   },
   async compareAndSwap(userId, expectedVersion, next) {

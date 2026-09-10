@@ -25,7 +25,11 @@ describe("Capital Aperture owner-isolation contracts", () => {
     const pending = router.slice(pendingStart, pendingEnd);
 
     expect(receipt).toContain("eq(thesisCompilations.id, decisionRun.canonicalThesisId)");
-    expect(receipt).not.toContain("eq(thesisCompilations.userId, userId)");
+    const sharedCanonicalQuery = receipt.split("const [[canonical]")[1]?.split("decisionRun.capitalThesisId")[0];
+    expect(sharedCanonicalQuery).not.toContain("eq(thesisCompilations.userId, userId)");
+    // Objective-led optional anchors are explicitly selected and owner-scoped;
+    // they do not change the legitimate shared canonical receipt rule above.
+    expect(receipt).toContain("eq(thesisCompilations.id, objectiveValues.canonicalThesisId)");
     expect(receipt).toContain("eq(capitalTheses.userId, userId)");
     expect(receipt).toContain("eq(portfolioAccounts.userId, userId)");
     expect(pending).toContain("eq(apertureDecisionRuns.userId, ctx.user.id)");

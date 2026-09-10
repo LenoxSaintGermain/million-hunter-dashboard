@@ -17,6 +17,7 @@ export default mergeConfig(baseConfig, defineConfig({
       "server/aperture/playOutcomeLedgerSchema.test.ts",
       "server/aperture/monitoringReviewReceipt.integration.test.ts",
       "server/aperture/capitalLedger.integration.test.ts",
+      "server/aperture/objectiveMission.integration.test.ts",
       "server/scan-pipeline.test.ts",
       "server/sprint11.test.ts",
       "server/sprint4.test.ts",

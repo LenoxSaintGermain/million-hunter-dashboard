@@ -81,7 +81,8 @@ describe("objective-led drafts use the existing durable Mission store", () => {
     expect(missionDraftValuesSchema.safeParse({ ...a, strategyContext: { ...context(), verifiedAvailableCents: 1_200_000 } }).success).toBe(false);
     expect(missionDraftValuesSchema.safeParse({ ...a, strategyContext: { ...context(), sourceOrder: { accountId: 7, runId: 1, candidateId: 2 } } }).success).toBe(false);
     expect(missionDraftValuesSchema.safeParse({ ...a, strategyContext: { ...context(), requestedSymbols: Array(101).fill("SPY") } }).success).toBe(false);
-    expect(missionDraftValuesSchema.safeParse({ ...a, baseDecisionRunId: 11, baseDecisionRevisionId: 12 }).success).toBe(false);
+    // Parsing identities is not authorization; the server verifies exact accepted lineage.
+    expect(missionDraftValuesSchema.safeParse({ ...a, baseDecisionRunId: 11, baseDecisionRevisionId: 12 }).success).toBe(true);
     expect(missionDraftValuesSchema.safeParse({ ...a, accountId: 8, strategyContext: { ...context(), sourceOrder: { accountId: 7, runId: 1, candidateId: 2, orderId: 3 } } }).success).toBe(false);
   });
 

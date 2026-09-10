@@ -1472,8 +1472,11 @@ export type ApertureRunwayState = typeof apertureRunwayStates.$inferSelect;
 export const apertureDecisionRuns = mysqlTable("aperture_decision_runs", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("user_id").notNull(),
-  canonicalThesisId: int("canonical_thesis_id").notNull(),
-  capitalThesisId: int("capital_thesis_id").notNull(),
+  contextKind: mysqlEnum("context_kind", ["thesis", "objective"]).default("thesis").notNull(),
+  /** Thesis-led runs retain both bindings; objective acceptance invents neither. */
+  canonicalThesisId: int("canonical_thesis_id"),
+  capitalThesisId: int("capital_thesis_id"),
+  clientRequestId: varchar("client_request_id", { length: 36 }),
   accountId: int("account_id").notNull(),
   researchRunId: int("research_run_id"),
   currentRevisionId: int("current_revision_id"),
@@ -1486,6 +1489,7 @@ export const apertureDecisionRuns = mysqlTable("aperture_decision_runs", {
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
 }, (table) => ({
   byOwnerUpdated: index("aperture_decision_runs_owner_updated_idx").on(table.userId, table.updatedAt),
+  byOwnerRequest: uniqueIndex("aperture_decision_runs_owner_request_uq").on(table.userId, table.clientRequestId),
   researchRunUnique: uniqueIndex("aperture_decision_runs_research_run_uq").on(table.researchRunId),
 }));
 export type ApertureDecisionRun = typeof apertureDecisionRuns.$inferSelect;
@@ -1511,7 +1515,7 @@ export const apertureDecisionRevisions = mysqlTable("aperture_decision_revisions
   maxPlannedLossCents: bigint("max_planned_loss_cents", { mode: "number" }).notNull(),
   holdingPeriod: mysqlEnum("holding_period", ["intraday", "overnight", "swing", "catalyst_window", "position"]).notNull(),
   holdingPeriods: json("holding_periods").$type<Array<"intraday" | "overnight" | "swing" | "catalyst_window" | "position">>(),
-  invalidationRule: text("invalidation_rule").notNull(),
+  invalidationRule: text("invalidation_rule"),
   operatorChoice: mysqlEnum("operator_choice", ["research", "conditional", "cash", "selected_play"]).default("research").notNull(),
   effectiveBranch: mysqlEnum("effective_branch", ["research", "eligible", "conditional", "cash"]).default("research").notNull(),
   selectedCandidateId: int("selected_candidate_id"),

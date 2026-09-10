@@ -63,9 +63,8 @@ export const missionDraftValuesSchema = z.object({
   if (!value.strategyContext) return;
   const source = value.strategyContext.sourceOrder;
   if (source && source.accountId !== value.accountId) ctx.addIssue({ code: "custom", path: ["accountId"], message: "The selected source order and paper account must match." });
-  // Accepted intent receipts require their own discriminator; never graft this
-  // unfinished request onto a canonical receipt while that integration is absent.
-  if (value.baseDecisionRunId != null) ctx.addIssue({ code: "custom", path: ["baseDecisionRunId"], message: "An objective-led draft cannot reuse an unrelated accepted Mission receipt." });
+  // Receipt IDs may be returned by atomic acceptance. Their ownership, kind and
+  // exact request lineage are checked by the server, never established by JSON.
 });
 
 export type MissionDraftValues = z.infer<typeof missionDraftValuesSchema>;

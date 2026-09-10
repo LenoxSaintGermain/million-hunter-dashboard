@@ -24,6 +24,19 @@ function base(overrides: Partial<ApertureAttentionInput> = {}): ApertureAttentio
 describe("Capital Aperture attention briefing", () => {
   const savedMission = { decisionRunId: 42, revisionId: 7, state: "complete" as const, title: "MRVL", updatedAt: now - 8_000 };
 
+  it("keeps an accepted objective visible without advertising unsupported analysis or inventing a thesis", () => {
+    const result = deriveApertureAttention(base({
+      mission: { ...savedMission, title: "Compare my excess capital" },
+      underwriting: { decisionRunId: 42, revisionId: 7, state: "not_started", updatedAt: now,
+        unavailableReason: "Discovery-to-research validation is not available in this release." },
+    }), null);
+    expect(result.entryState).toBe("resume");
+    expect(result.quiet).toBe(false);
+    expect(result.primary).toMatchObject({ title: "Compare my excess capital", actionLabel: "Review saved objective",
+      href: "/aperture/decision/42/revision/7" });
+    expect(result.primary?.consequence).toContain("No research, allocation or order");
+  });
+
   it.each(["loading", "empty", "stale", "partial", "failed"] as const)("never presents %s status as quiet or setup absence", (state) => {
     const result = deriveApertureAttention(base({ mission: savedMission, checks: { state, asOf: null, monitoring: "on_demand" } }), null);
     expect(result.quiet).toBe(false);

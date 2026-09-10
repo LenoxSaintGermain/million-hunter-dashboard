@@ -290,7 +290,40 @@ preserves this newer request behind a truthful unavailable-discovery notice;
 it does not prompt the operator to manufacture a thesis to proceed.
 
 This is compatibility protection, not the finished intent-entry experience.
-Accepted intent receipts, sourced discovery, selected-opportunity lineage and
-the existing Underwriter handoff remain required. Do not enable the public
-flow or claim complete UAT from these draft tests. Track verification and the
-separate capital-ledger increment in the completion matrix.
+The acceptance increment below supplies a persisted receipt; sourced discovery,
+selected-opportunity lineage and the existing Underwriter handoff remain
+required. Do not enable the public flow or claim complete UAT from draft tests.
+Track verification and the separate capital-ledger increment in the completion
+matrix.
+
+## Accepted objective receipt — local, default off
+
+An explicit acceptance saves the operator's capital question in the existing
+Mission/revision lifecycle. No canonical thesis is required for a broader search;
+an intentionally chosen saved thesis remains an optional context anchor, not a
+fabricated tactical thesis. Owner/request identity makes retries return the same
+receipt. The original draft version, raw inputs, named paper account, source
+reference and declared amounts remain recoverable after newer drafts exist.
+
+The next decision is still unavailable until discovery and its exact validation
+handoff exist. Shared attention says **Objective saved · analysis unavailable**,
+with **Review saved objective** leading to the exact immutable receipt. The
+compatibility view retains those inputs and explains that no analysis, allocation
+or order has been created. It does not fall back to the active canonical thesis,
+silently autosave a replacement, or offer the legacy thesis-only underwriting
+action. Reading the record is not acknowledgement or resolution.
+
+Acceptance does not assert available funds or an effective risk allowance.
+Entered capital/loss remain operator declarations; referenced closing orders
+remain hypothetical until proceeds and availability are verified. No tactical
+invalidation is invented at this stage. A subsequent real research context must
+have explicit evidence requirements and invalidation before entering the existing
+human-gated lifecycle.
+
+This is not a new homepage, completed wizard, discovery result or market-open
+UAT pass. The acceptance endpoint is server-enforced and default off; it has no
+new UI CTA. Migration 0066 and the prior ledger migration 0065 have not been
+applied to the browser fixture or production. Current authenticated DB tests
+prove persistence and no unintended mutations; the locked Mac prevented fresh
+desktop/mobile interaction evidence. The completion matrix records the exact
+tests and the remaining entry, revision, discovery and handoff work.

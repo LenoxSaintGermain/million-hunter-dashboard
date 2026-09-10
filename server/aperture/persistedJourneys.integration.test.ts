@@ -19,13 +19,19 @@ import { mayPublishUnderwriting } from "../../shared/underwritingJob";
 import { parsePersistedJson } from "../../shared/persistedJson";
 import { underwritePlayCandidates, type CapitalObjective, type MarketRegimeSnapshot } from "../../shared/playUnderwriting";
 import { apertureRouter } from "../apertureRouter";
+import { requireIsolatedIntegrationDatabase } from "../../scripts/isolated-integration-identity.mjs";
 
 // Never inherit .env implicitly. The harness supplies this exact isolated target.
 const raw = process.env.DATABASE_URL;
 const url = raw ? new URL(raw) : null;
-const local = url?.protocol === "mysql:" && url.hostname === "127.0.0.1" && url.port === "3307"
+const browserFixture = url?.protocol === "mysql:" && url.hostname === "127.0.0.1" && url.port === "3307"
   && url.pathname === "/capital_aperture_uat_9c18799" && !url.search && !url.hash
   && process.env.ISOLATED_UAT_MODE === "true";
+// Schema-changing work runs against the harness-owned disposable database,
+// never by upgrading or reseeding an operator's existing browser fixture.
+const disposable = process.env.ISOLATED_INTEGRATION_DATABASE
+  ? Boolean(requireIsolatedIntegrationDatabase(raw, process.env.ISOLATED_INTEGRATION_DATABASE)) : false;
+const local = browserFixture || disposable;
 if (raw && !local) throw new Error("Refusing persistence UAT outside the exact isolated localhost database.");
 
 const NOW = Date.UTC(2026, 8, 9, 14);

@@ -20,6 +20,8 @@ export type AttentionUnderwriting = {
   state: "not_started" | "queued" | "running" | "failed" | "complete";
   updatedAt: number;
   error?: string | null;
+  /** A saved request is not proof that its analysis capability is available. */
+  unavailableReason?: string | null;
   outcome?: "plays" | "no_trade" | null;
   resultSummary?: string | null;
   reopenCondition?: string | null;
@@ -464,7 +466,19 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     }));
   }
 
-  if (input.underwriting?.state === "not_started") {
+  if (input.underwriting?.unavailableReason) {
+    attention.push(item({
+      key: `underwriting:${input.underwriting.decisionRunId}`,
+      kind: "underwriting_underway", priority: 65,
+      stateLabel: "Objective saved · analysis unavailable",
+      title: input.mission?.title ?? "Saved capital objective",
+      reason: input.underwriting.unavailableReason,
+      consequence: "Review the saved request. No research, allocation or order has been created.",
+      actionLabel: "Review saved objective",
+      href: `/aperture/decision/${input.underwriting.decisionRunId}/revision/${input.underwriting.revisionId}`,
+      updatedAt: input.underwriting.updatedAt,
+    }));
+  } else if (input.underwriting?.state === "not_started") {
     attention.push(item({
       key: `underwriting:${input.underwriting.decisionRunId}`,
       kind: "underwriting_underway",

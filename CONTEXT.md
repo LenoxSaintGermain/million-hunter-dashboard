@@ -1,6 +1,7 @@
 # Capital Aperture domain language
 
-- **Capital Mission** — the operator's declared capital, target, loss boundary, horizons, instrument preference, and canonical thesis for one Decision Run.
+- **Capital Mission** — the operator's declared purpose, capital, target, loss boundary, horizons, and allowed instruments. It may be thesis-led, with a selected canonical thesis, or objective-led, with a capital question and an explicit search scope. Accepting a Mission records those assumptions; it does not qualify a play or authorize an allocation.
+- **Mission draft** — unfinished operator inputs that can be resumed without accepting their assumptions or starting analysis.
 - **Canonical thesis** — the durable investment constitution selected by the operator. It is not a tactical market prediction.
 - **Play Underwriter** — the upstream strategy layer that tests target feasibility, classifies the sourced market environment, proposes at most three conditional plays, and may return no trade.
 - **Tactical market thesis** — a time-bounded, sourced statement with confirmation, invalidation, and expiry. It does not replace the canonical thesis.
