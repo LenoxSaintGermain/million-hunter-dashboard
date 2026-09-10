@@ -5,6 +5,7 @@ import { fetchIntradayBars } from "./providers/marketData";
 import { calculatePaperPlayOutcome } from "../../shared/playOutcomeLedger";
 import { evaluateIntradayPaperOutcome } from "./playOutcomeEvaluator";
 import { closeMinutesFor, etClock, startOfEtDay } from "./marketSession";
+import { parsePersistedJson } from "../../shared/persistedJson";
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type LiveSlate = typeof aperturePlaySlates.$inferSelect;
@@ -42,7 +43,7 @@ export async function refreshLiveSlateOutcomes(db: Db, slate: LiveSlate, now = D
   const items = await db.select().from(aperturePlaySlateItems).where(eq(aperturePlaySlateItems.slateId, slate.id));
   let terminalCount = 0;
   for (const item of items) {
-    const snapshot = item.recommendationSnapshot as any;
+    const snapshot = parsePersistedJson(item.recommendationSnapshot) as any;
     const play = snapshot?.play;
     if (!play) continue;
     const tape = await fetchIntradayBars(item.symbol, { startMs: slate.capturedAt, timeoutMs: 5_000, maxPages: 3 });
@@ -70,7 +71,8 @@ export async function refreshLiveSlateOutcomes(db: Db, slate: LiveSlate, now = D
       observedAt: windowBars.length ? windowBars[windowBars.length - 1]!.t : null,
       unavailableReason: evaluation.unavailableReason ?? tape.unavailableReason,
     });
-    if (outcome.status !== "pending") terminalCount++;
+    // Unavailable tape is retryable, not a completed market observation.
+    if (outcome.status === "resolved" && outcome.basis === "verified") terminalCount++;
     await db.update(aperturePlaySlateItems).set({
       outcomeStatus: outcome.status,
       outcomeResult: outcome.result,

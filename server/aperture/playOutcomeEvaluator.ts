@@ -33,7 +33,9 @@ export function evaluateIntradayPaperOutcome(
       unavailableReason: "This captured play has no complete intraday entry, stop, and time-stop recipe to evaluate.",
     };
   }
-  const ordered = bars.filter((bar) => Number.isFinite(bar.t) && bar.v > 0).sort((a, b) => a.t - b.t);
+  const ordered = bars.filter((bar) => Number.isFinite(bar.t) && bar.t <= now && bar.v > 0
+    && [bar.o, bar.h, bar.l, bar.c].every(value => Number.isFinite(value) && value > 0))
+    .sort((a, b) => a.t - b.t);
   if (!ordered.length) {
     return {
       trigger: "not_observed",
@@ -49,6 +51,14 @@ export function evaluateIntradayPaperOutcome(
 
   for (const bar of ordered) {
     if (bar.t > recipe.timeStopAt) break;
+    if (lastThroughTimeStop && bar.t - lastThroughTimeStop.t > 60_000) {
+      return {
+        trigger: trigger === "met" ? "met" : "not_observed",
+        exit: "not_observed",
+        settlementPriceCents: null,
+        unavailableReason: "The source tape has a gap. Entry or stop behavior during the missing interval is not observed.",
+      };
+    }
     lastThroughTimeStop = bar;
     const entryHit = isLong ? cents(bar.h) >= recipe.entryPriceCents : cents(bar.l) <= recipe.entryPriceCents;
     const stopHit = isLong ? cents(bar.l) <= recipe.stopPriceCents : cents(bar.h) >= recipe.stopPriceCents;
@@ -72,26 +82,28 @@ export function evaluateIntradayPaperOutcome(
     }
   }
 
-  if (trigger !== "met") {
-    return { trigger: "not_met", exit: "not_observed", settlementPriceCents: null, unavailableReason: null };
-  }
-
   if (now < recipe.timeStopAt) {
     return {
-      trigger,
+      trigger: trigger === "met" ? "met" : "not_observed",
       exit: "not_observed",
       settlementPriceCents: null,
       unavailableReason: null,
     };
   }
 
-  if (!lastThroughTimeStop) {
+  // A minute bar represents its minute, not every later price through the
+  // scheduled stop. A truncated tape cannot settle or disprove a trigger.
+  if (!lastThroughTimeStop || lastThroughTimeStop.t + 60_000 < recipe.timeStopAt) {
     return {
-      trigger,
+      trigger: trigger === "met" ? "met" : "not_observed",
       exit: "not_observed",
       settlementPriceCents: null,
       unavailableReason: "No source bar is available through the captured time-stop window.",
     };
+  }
+
+  if (trigger !== "met") {
+    return { trigger: "not_met", exit: "not_observed", settlementPriceCents: null, unavailableReason: null };
   }
 
   return {

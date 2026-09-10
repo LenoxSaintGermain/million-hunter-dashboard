@@ -5,6 +5,20 @@ const recipe = { side: "long" as const, entryPriceCents: 10_000, stopPriceCents:
 const bar = (t: number, h: number, l: number, c: number) => ({ t, o: c, h, l, c, v: 1_000, vw: c });
 
 describe("evaluateIntradayPaperOutcome", () => {
+  it("does not infer an uninterrupted position across a missing minute", () => {
+    const timeStopAt = 180_000;
+    expect(evaluateIntradayPaperOutcome({ ...recipe, timeStopAt }, [bar(0, 100.2, 99.9, 100.1), bar(180_000, 100.7, 100.1, 100.6)], timeStopAt + 60_000))
+      .toMatchObject({ trigger: "met", exit: "not_observed", settlementPriceCents: null });
+  });
+  it("does not settle an entered play from a bar that stops short of the time window", () => {
+    const timeStopAt = 10 * 60_000;
+    expect(evaluateIntradayPaperOutcome({ ...recipe, timeStopAt }, [bar(60_000, 100.2, 99.9, 100.1)], timeStopAt + 60_000))
+      .toMatchObject({ trigger: "met", exit: "not_observed", settlementPriceCents: null });
+  });
+  it("does not call a missing trigger final while its observation window is open", () => {
+    expect(evaluateIntradayPaperOutcome(recipe, [bar(1000, 99.9, 99.1, 99.5)], 2000))
+      .toMatchObject({ trigger: "not_observed", exit: "not_observed", settlementPriceCents: null });
+  });
   it("does not enter a play when the recorded entry level was never observed", () => {
     expect(evaluateIntradayPaperOutcome(recipe, [bar(1_000, 99.9, 99.1, 99.5)], 4_000))
       .toEqual({ trigger: "not_met", exit: "not_observed", settlementPriceCents: null, unavailableReason: null });
