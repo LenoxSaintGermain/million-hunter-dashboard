@@ -148,7 +148,7 @@ not the remaining broader acceptance boundaries above. Next live UAT: use the
 existing exact paper workflow during an open market; do not relax risk or evidence
 gates to obtain a trade. No-trade remains a valid completed decision.
 
-## Local keyboard and readability follow-up — not yet deployed
+## Keyboard and readability follow-up — local interaction evidence
 
 Actual keyboard inspection required nineteen Tab presses to reach the saved
 Mission task. Aperture now has a first-focus `Skip to workspace` link and one
@@ -207,3 +207,51 @@ checks alone. Viewport reset/handoff is pending while the browser is inaccessibl
 The original [completion matrix](CAPITAL_APERTURE_COMPLETION_MATRIX_2026-09-09.md)
 now makes the unimplemented gains/intent/discovery/persistence path explicit.
 Safe parser and read-adapter increments are not advertised as completed E2E UAT.
+
+### Follow-up file manifest
+
+UI-only commit `070d04c`:
+
+- `client/src/components/EditorialTopNav.tsx`
+- `client/src/components/aperture/ApertureShell.tsx`
+- `client/src/components/aperture/DecisionRunway.tsx`
+- `client/src/index.css`
+- `client/src/pages/aperture/AperturePlayDesk.tsx`
+- `server/aperture/missionDispositionContext.test.ts`
+- `server/aperture/playDeskKeyboardRecovery.test.ts`
+- `server/aperture/workspaceContrast.test.ts`
+- `server/aperture/workspaceKeyboardAccess.test.ts`
+
+Separate non-deployed safeguard/audit commit `9657373`:
+
+- `shared/capitalStrategy.ts`
+- `server/aperture/capitalStrategist.ts` and `capitalStrategist.test.ts`
+- `server/aperture/realizedGainSource.ts` and `realizedGainSource.test.ts`
+- `server/aperture/strategyDiscovery.ts` and `strategyDiscovery.test.ts`
+- This refinement receipt, the guided UX walkthrough, and original-scope completion matrix.
+
+No schema migration. No model, risk-policy, execution, approval or submission change.
+
+## UI-only production release — 070d04c
+
+- Commit: `070d04ca4d2e0190a346fb4105187671ebdecdf5`.
+- Build: `e35c8d4b-ab4c-48b3-963a-11302fc61b68`, SUCCESS.
+- Revision: `capital-aperture-00092-yil`, read back at 100% traffic.
+- Image digest: `sha256:dd2a411a168bc61dabebc294b0e57ef967fb81c5844ef3d5317fe06060614e6e`.
+- Runtime specification compared equal excluding image. Rollback retained:
+  `capital-aperture-00090-hal`.
+- The zero-traffic tag returned JSON health and the exact full release marker
+  before promotion. The public Firebase domain repeated both at
+  `2026-09-10T02:43:45.071Z` (September 9, 10:43 PM EDT).
+- Exact archived UI release unit lane: 1,337 passed, 0 failed, 6 existing skips.
+  Report: `/tmp/aperture-ui-release-070d04c-unit.json`. The 1,475 working-tree
+  total above additionally includes the separate unexposed safeguards and local
+  tests; it is not represented as the release's own test count.
+- No auth-domain change, migration, approval, submission or broker operation.
+  Separate `9657373` is pushed to GitHub but excluded from the production image.
+
+Release receipts: `/tmp/capital-accessibility-release.ZRLq5i/`.
+Signed-in post-deployment UAT is **pending**, not passed: the Mac locked after
+the local interaction checks. Unlock it to resume the existing browser session,
+repeat Today → Mission → exact Play Desk task on desktop/mobile, and restore
+the temporary local viewport override. Market-open execution remains separate.

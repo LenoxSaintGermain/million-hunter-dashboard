@@ -1,6 +1,6 @@
 # Capital Aperture guided UX walkthrough
 
-**Production checkpoint:** 2026-09-09 release `fba1b41`, revision `capital-aperture-00090-hal`, 100% traffic. Later local changes are not implied deployed.
+**Production checkpoint:** 2026-09-09 release `070d04c`, revision `capital-aperture-00092-yil`, 100% traffic; public JSON health and exact release marker verified. The preceding `fba1b41` has signed-in production evidence; the latest UI follow-up has local desktop/mobile interaction checks, but its signed-in post-deployment repeat is pending because the Mac is locked. Separate Strategist commit `9657373` is pushed, not deployed.
 
 **Scope:** Mission underwriting and returning Today check-in
 

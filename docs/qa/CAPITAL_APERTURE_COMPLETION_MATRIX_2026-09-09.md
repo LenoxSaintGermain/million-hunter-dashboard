@@ -1,6 +1,6 @@
 # Capital Aperture — original-scope completion audit
 
-Checkpoint: September 9 evening. Production is `fba1b41` / `capital-aperture-00090-hal`; local follow-up work is separate. The market has closed. No market-open submission success is claimed.
+Checkpoint: September 9 evening. Production is `070d04c` / `capital-aperture-00092-yil` at 100% traffic; UI-only follow-up is deployed and public health/version checked. Its local desktop/mobile interaction checks passed; the signed-in post-deployment repeat is pending because the Mac is locked. Separate Strategist safeguards are pushed as `9657373`, not deployed. The market has closed. No market-open submission success is claimed.
 
 ## Operator workflow
 
