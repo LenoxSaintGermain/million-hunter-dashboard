@@ -11,6 +11,15 @@ function evidenceUrl(value: string | undefined): string | undefined {
   } catch { return undefined; }
 }
 
+/** Provenance stays one deliberate action away once it would dominate the card. */
+const INLINE_SOURCE_LIMIT = 3;
+
+function sourceLinks(citations: string[]) {
+  return citations.map((url, index) => evidenceUrl(url)
+    ? <a key={`${index}:${url}`} href={evidenceUrl(url)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center break-all underline underline-offset-4" style={{ color: "var(--sh-signal)" }}>Source {index + 1}</a>
+    : <span key={`${index}:${url}`} className="inline-flex min-h-11 items-center">Source {index + 1} · link unavailable</span>);
+}
+
 export function FindingEvidence({ evidence, label = "Evidence", expanded = false }: { evidence: NonNullable<ApertureAttentionItem["evidence"]>; label?: string; expanded?: boolean }) {
   const date = Number.isFinite(evidence.checkedAt) && Number.isFinite(new Date(evidence.checkedAt).getTime()) ? new Date(evidence.checkedAt).toLocaleString() : "Not recorded";
   return <details open={expanded || undefined} className="mt-2 border-t" style={{ borderColor: "var(--sh-border-1)" }}>
@@ -35,7 +44,9 @@ export function FindingEvidence({ evidence, label = "Evidence", expanded = false
           h6: ({ children }) => <p className="font-semibold">{children}</p>,
         }}
       >{evidence.finding}</Markdown></div>
-      {evidence.citations.length ? <div className="flex flex-wrap gap-2">{evidence.citations.map((url, index) => evidenceUrl(url) ? <a key={`${index}:${url}`} href={evidenceUrl(url)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center break-all underline underline-offset-4" style={{ color: "var(--sh-signal)" }}>Source {index + 1}</a> : <span key={`${index}:${url}`} className="inline-flex min-h-11 items-center">Source {index + 1} · link unavailable</span>)}</div> : <p>No source links recorded. This finding is not verified evidence.</p>}
+      {evidence.citations.length ? (evidence.citations.length > INLINE_SOURCE_LIMIT
+        ? <details className="rounded-lg border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-semibold">Sources · {evidence.citations.length}</summary><div className="flex flex-wrap gap-2 border-t px-3 py-2" style={{ borderColor: "var(--sh-border-1)" }}>{sourceLinks(evidence.citations)}</div></details>
+        : <div className="flex flex-wrap gap-2">{sourceLinks(evidence.citations)}</div>) : <p>No source links recorded. This finding is not verified evidence.</p>}
     </div>
   </details>;
 }

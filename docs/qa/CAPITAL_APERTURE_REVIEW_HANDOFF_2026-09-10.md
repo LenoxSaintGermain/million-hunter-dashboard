@@ -1,5 +1,56 @@
 # Today → exact finding: connected UAT
 
+## Today decision hierarchy — September 10, operator walkthrough punch list
+
+Built against `TSL-BUILD-2026-008A` §5 and its Today attention model, from an
+operator walkthrough of the deployed briefing. Staged as
+`capital-aperture-00105-lal`, marker `1171ac2-uat-22995aa2`, digest
+`sha256:2fe44857236a138aec98da0c245292a0267b3b018c69fa2e02ac41f467b4bbbd`,
+Cloud Build `1a649928-c243-4cfa-a97f-598a821e72b9`, **zero traffic**.
+Production deliberately remains `capital-aperture-00102-vax` so an in-progress
+UAT is not disturbed; the operator compares and decides when to promote.
+
+Four observed failures, each reproduced by a failing test first:
+
+- **Secondary attention competed with the primary decision.** `BriefRow` rendered
+  every attention row through the full card layout, so MGM and the two due
+  reviews appeared at the same visual weight as the focal DKNG card, each with
+  its own evidence block. Secondary rows now use the existing compact layout.
+  Measured on the deployed revision: one `primary` card, **zero** `card`-layout
+  rows (was three), three `compact` rows.
+- **Fifteen raw source anchors dominated the first viewport.** `FindingEvidence`
+  laid every citation out inline. Above three, they now sit behind a counted
+  "Sources · 15" disclosure, closed by default. Verified on the deployed
+  revision: the tray is present and collapsed, with **zero loose anchors** left
+  in the primary card. Provenance stays one deliberate action away, per §5.6 —
+  it is not hidden, and three or fewer links stay inline rather than being
+  buried.
+- **In Motion sat below every large card.** The section now renders directly
+  beneath the primary decision and its inline review, ahead of the secondary
+  attention sections. Confirmed by document order on the deployed revision.
+- **No changed-since baseline was visible.** The section only existed when
+  something had changed, so an operator could not tell "nothing changed" from
+  "not tracked". A baseline line now always renders and keeps the two states
+  distinct: a first baseline reads "Current status · 0 — this is the first
+  recorded baseline"; a later comparison reads "Changed since your last review ·
+  0 — nothing changed since your last review on <time>. Timestamp-only churn is
+  ignored." Observed live: the latter, dated Sep 10 7:02 PM.
+
+Seven tests in `todayDecisionHierarchy.test.ts`. `DATABASE_URL= pnpm test:unit`:
+2,074 passed, zero failed, eight existing skips across 177 files. `pnpm check`
+passed. The existing `attentionUatPresentation` and `todayAttentionBehavior`
+contracts still pass unchanged, so the compaction did not drop any state label,
+consequence or honest-failure copy.
+
+**Not addressed, and not claimed.** The Addendum's "at most three ranked
+alternatives" cap is not enforced — the count is still whatever the attention
+model returns. The redundant global-plus-sub navigation shell (~180px before any
+decision text) is untouched; that is a layout-wide change beyond this briefing.
+Active-thesis scoping ambiguity between the PW rail label and cross-thesis
+attention rows is unresolved. The ten-second comprehension target remains an
+unmeasured usability claim: these are structural and test results, not observed
+UAT. The narrow-viewport below-the-fold item from the earlier entry is unchanged.
+
 ## Expired liquidity facts blocked every paper ticket — September 10, 12:5x ET
 
 Walking the operator workflows end to end on the deployed build found a hard

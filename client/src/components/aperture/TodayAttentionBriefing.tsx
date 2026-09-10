@@ -16,7 +16,7 @@ function localTime(value: number | null) {
 
 function BriefRow({ item, fingerprint, changed, onOpen }: { item: ApertureAttentionItem | ApertureMotionItem; fingerprint?: string; changed?: boolean; onOpen: (href: string) => void }) {
   const attention = "actionLabel" in item;
-  if (attention) return <AttentionDecisionCard item={item} fingerprint={fingerprint} onOpen={onOpen} />;
+  if (attention) return <AttentionDecisionCard item={item} compact fingerprint={fingerprint} onOpen={onOpen} />;
   const parsed = parseOccOptionSymbol(item.symbol);
   const label = parsed ? paperInstrumentDisplayLabel({ symbol: item.symbol, instrumentType: parsed.instrumentType }) : item.symbol;
   return <article data-attention-key={item.key} data-attention-fingerprint={fingerprint} className="flex flex-col gap-3 border-t px-4 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)" }}>
@@ -159,15 +159,19 @@ export function TodayAttentionBriefing({
       {primary ? <AttentionDecisionCard item={primary} prominent fingerprint={fingerprints.get(primary.key)} busy={primary.kind === "status_unavailable" && loading} onOpen={() => openTask(primary)} /> : quiet ? <div data-quiet-status className="flex gap-3 p-4"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div><p className="font-semibold">No new action identified.</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.quietMessage}</p></div></div> : null}
       {primary && inlineReview(primary)}
 
+      {visibleMotion.length > 0 && <section className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2></div>{visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
       {(layout?.otherCritical.length ?? 0) > 0 && <section aria-label="Other critical issues" className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">Other critical issues · {layout!.otherCritical.length}</h2><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>All authorized plays, regardless of thesis or instrument filters.</p></div>{layout!.otherCritical.map(row)}</section>}
 
       <AttentionSourceRecovery issues={attention.sourceIssues ?? []} onOpen={onOpen} onRetry={onRetry} busy={read.busy} />
 
       {(layout?.otherAttention.length ?? 0) > 0 && <details open={tasksOpen} onToggle={event => setTasksOpen(event.currentTarget.open)} className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Other pending decisions · {layout!.otherAttention.length}</summary>{tasksOpen && layout!.otherAttention.map(row)}</details>}
 
-      {visibleChanged.length > 0 && <details className="border-t" style={{ borderColor: "var(--sh-border-1)" }} open={changesOpen} onToggle={event => setChangesOpen(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">{attention.changeHeading} · {visibleChanged.length}</summary>{changesOpen && <div className="border-t" style={{ borderColor: "var(--sh-border-1)" }}>{visibleChanged.map(row)}</div>}</details>}
+      {visibleChanged.length > 0
+        ? <details className="border-t" style={{ borderColor: "var(--sh-border-1)" }} open={changesOpen} onToggle={event => setChangesOpen(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">{attention.changeHeading} · {visibleChanged.length}</summary>{changesOpen && <div className="border-t" style={{ borderColor: "var(--sh-border-1)" }}>{visibleChanged.map(row)}</div>}</details>
+        : <div data-change-baseline className="border-t px-4 py-3 text-sm leading-5" style={{ borderColor: "var(--sh-border-1)" }}><span className="font-semibold">{attention.changeHeading} · 0</span><span style={{ color: "var(--sh-fg-muted)" }}>{attention.changeHeading === "Current status"
+          ? " — this is the first recorded baseline, so there is no earlier review to compare against."
+          : ` — nothing changed since your last review${attention.baseline?.capturedAt ? ` on ${localTime(attention.baseline.capturedAt)}` : ""}. Timestamp-only churn is ignored.`}</span></div>}
 
-      {visibleMotion.length > 0 && <section className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2></div>{visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
 
       {attention.nextCheckpoint && <footer aria-label="Next checkpoint" className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div className="flex gap-3"><Clock3 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><p className="text-sm font-semibold">{attention.nextCheckpoint.title}</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.nextCheckpoint.detail}{attention.nextCheckpoint.at ? ` · ${localTime(attention.nextCheckpoint.at)}` : ""}</p></div></div>{attention.nextCheckpoint.href && <Button variant="outline" size="sm" className="min-h-11" onClick={() => onOpen(attention.nextCheckpoint!.href!)}>Open checkpoint</Button>}</footer>}
       <div className="space-y-3 border-t px-4 py-3" style={{ borderColor: "var(--sh-border-1)" }}>
