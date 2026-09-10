@@ -1,5 +1,25 @@
 # Capital Aperture — original-scope completion audit
 
+## September 10 — paper ticket path unblocked (supersedes the entry below)
+
+`capital-aperture-00102-vax` / marker `0a7b191-uat-f9c83e1b` serves 100%.
+An end-to-end workflow walk found that **no paper ticket could be prepared on
+any candidate in any run older than about a day**: reference market facts carry
+a one-day TTL, `getFacts` filters expired rows, and nothing outside a full
+re-underwrite rewrites them, so the liquidity gate reported "no 30-day ADV fact"
+even though a healthy value (PWR $743M) was stored and merely aged out.
+The preflight now refreshes the exact exposure symbol on demand and still
+refuses on a failed, empty or unknown provider result. Verified on the deployed
+revision: the refused preflight now reads "Next guarded action: Acknowledge
+paper-only", and the stored fact is a genuinely re-fetched $722,942,208.
+`DATABASE_URL= pnpm test:unit`: 2,067 passed / 0 failed / 8 skips.
+
+Route sweep found no dead ends across Today, Play Desk, CandidateBoard, the
+evidence view, ticket preflight, Research, Portfolio, Theses and the objective
+Mission flow. Proposal, approval and submission remain separate human-confirmed
+steps and were deliberately not exercised — the operator's own paper run is
+still the acceptance event.
+
 ## September 10 — decision prominence increment (supersedes the release snapshot below)
 
 `capital-aperture-00099-buj` / release marker `918db8d-uat-6cbcc3fb` **now serves

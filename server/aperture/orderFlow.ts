@@ -30,6 +30,7 @@ import {
 import { brokerFor } from "./brokers/index";
 import type { OrderRequest } from "./brokers/types";
 import { getFacts, freshestPerKey, normSymbol } from "./facts";
+import { resolveLiquidityFact } from "./liquidityFactRefresh";
 import { marketSession, startOfEtDay, type SessionState } from "./marketSession";
 import {
   evaluateOrderGates,
@@ -663,8 +664,11 @@ async function loadOrderAccountState(args: {
         .reduce((s, p) => s + (p.marketValueCents ?? 0), 0)
     : positionValueCents;
 
-  const advRow = freshestPerKey(factRows.filter((f) => normSymbol(f.symbol) === exposureSymbol))
-    .find((f) => f.factKey === "adv_usd_30d" && f.basis !== "unknown" && f.valueNum != null);
+  // A one-day TTL had been silently disqualifying every ticket on a run older
+  // than a day: getFacts drops the expired row and the gate then reports "no
+  // 30-day ADV fact". Refresh the exact exposure symbol so the gate decides
+  // against current data. A failed provider still yields null and still refuses.
+  const advRow = await resolveLiquidityFact(exposureSymbol, factRows, now);
 
   const LIVE = LIVE_ORDER_STATUSES;
   const dayStart = startOfEtDay(now) ?? now - 86_400_000;

@@ -1,5 +1,72 @@
 # Today → exact finding: connected UAT
 
+## Expired liquidity facts blocked every paper ticket — September 10, 12:5x ET
+
+Walking the operator workflows end to end on the deployed build found a hard
+stop: **no paper ticket could be prepared, on any candidate, in any run older
+than about a day.** Fixed and released as `capital-aperture-00102-vax`, release
+marker `0a7b191-uat-f9c83e1b`, digest
+`sha256:5d347681cd4eaaee6a5edbe9700eb8d70d6fcbe80a5692f76267e5f7ea81e0e2`,
+Cloud Build `c2ff8a72-eaf2-497b-9fa6-567d8cecab46`, now serving 100%.
+`capital-aperture-00099-buj` is retained for rollback.
+
+**What was observed.** Play Desk showed CHOOSE 2 / APPROVE-SEND 0 / MONITOR 6.
+Both ready candidates refused preflight with "this paper play cannot be
+prepared — no 30-day ADV fact for PWR — an unknown liquidity is not a passing
+liquidity", and all nine alternatives in that run still had two evidence checks
+outstanding. APPROVE / SEND was therefore unreachable.
+
+**What it actually was — not missing data.** A read-only query against the
+`security_facts` table showed a good `adv_usd_30d` value stored for all ten
+symbols, PWR at $743,294,848, far above any floor. Every one had **expired**:
+seven on September 9, three on September 7. `providers/marketData.ts` writes
+these facts with `ttlMs: DAY`, `getFacts` filters on
+`expiresAt > now`, and `collectMarketFacts` is only ever called from the
+underwriter and the market-regime read. Nothing else rewrites them, so once a
+day passed the fact vanished from the read and `loadOrderAccountState` saw
+`advUsd: null`. The gate then reported "no 30-day ADV fact", which was
+misleading: a fact existed and was healthy, it had simply aged out with no
+operator path to refresh it short of a full re-underwrite that would create a
+new decision revision.
+
+**Fix.** `server/aperture/liquidityFactRefresh.ts` resolves the exposure
+symbol's liquidity fact for the preflight: it uses a stored unexpired fact
+untouched, and only when none is available makes a single market-provider pass
+and re-reads. `loadOrderAccountState` calls it in place of the raw fact scan.
+It cannot manufacture a pass — a throwing provider, an empty result, an
+unknown-basis fact, or a fact recorded against another symbol all still yield
+null and the gate still refuses. Because the refreshed fact persists with its
+own TTL, the provider is contacted at most once per symbol per day.
+
+Six tests in `liquidityFactRefresh.test.ts` cover exactly those cases and were
+written against the observed failure before the fix existed.
+
+**Verified on the deployed revision.** The same PWR preflight that refused now
+reads "Next guarded action: Acknowledge paper-only" with no liquidity blocker,
+and a repeat read-only query shows PWR carrying a **freshly fetched** fact —
+$722,942,208, a different value from the stored $743,294,848, expiring
+September 11 — proving a real provider round trip rather than a relaxed gate.
+The other nine symbols remain expired until their own preflight runs, which is
+the intended per-symbol behaviour, not an oversight.
+
+`DATABASE_URL= pnpm test:unit`: 2,067 passed, zero failed, eight existing skips
+across 176 files. `pnpm check` passed.
+
+Route sweep on the same revision, no errors and no dead ends: Today, Play Desk
+(pipeline counts and candidate comparison), CandidateBoard, the evidence view
+with its four answer options and source-record actions, the paper ticket
+preflight, Research journeys, Portfolio, Theses, and the objective Mission flow
+(question and scope, account and risk, review, "Underwrite my mission").
+
+**Still open.** Nothing here was submitted: proposal, approval and paper
+submission remain separate human-confirmed steps and were deliberately not
+exercised, so the operator's own end-to-end paper run is still the acceptance
+event. The nine alternative candidates in run #690001 each need their two
+evidence checks answered before they can reach a ticket. The narrow-viewport
+below-the-fold item from the previous entry is unchanged. Verified gains,
+allocation/proposal integration, physical-device and screen-reader acceptance
+all remain open.
+
 ## Decision prominence fixed and deployed — September 10, 11:2x ET
 
 Continued from the interrupted prior session. Its three named presentation
