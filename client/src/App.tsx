@@ -37,6 +37,7 @@ import InvestorScout from "./pages/investor/InvestorScout";
 import InvestorDNAProfile from "./pages/investor/InvestorDNAProfile";
 import { trpc } from "@/lib/trpc";
 import { useEffect } from "react";
+import { workspaceTitle } from "@shared/workspaceTitle";
 import { useAuth } from "./_core/hooks/useAuth";
 import LandingPage from "./pages/LandingPage";
 import PublicSearch from "./pages/PublicSearch";
@@ -201,6 +202,8 @@ function OnboardingGuard() {
 }
 
 function Router() {
+  const [location] = useLocation();
+  useEffect(() => { document.title = workspaceTitle(location); }, [location]);
   return (
     <>
       <OnboardingGuard />
