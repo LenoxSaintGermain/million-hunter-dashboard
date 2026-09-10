@@ -9,7 +9,7 @@ import baseConfig from "./vitest.config";
  */
 export default mergeConfig(baseConfig, defineConfig({
   test: {
-    include: ["shared/**/*.test.ts"],
+    include: ["shared/**/*.test.ts", "server/aperture/objectiveMissionWorkspace.test.tsx"],
     exclude: [
       "**/node_modules/**",
       "server/api-keys.test.ts",
@@ -18,6 +18,8 @@ export default mergeConfig(baseConfig, defineConfig({
       "server/aperture/monitoringReviewReceipt.integration.test.ts",
       "server/aperture/capitalLedger.integration.test.ts",
       "server/aperture/objectiveMission.integration.test.ts",
+      "server/aperture/objectiveMigration.integration.test.ts",
+      "server/aperture/strategyDiscoveryWorkflow.integration.test.ts",
       "server/scan-pipeline.test.ts",
       "server/sprint11.test.ts",
       "server/sprint4.test.ts",

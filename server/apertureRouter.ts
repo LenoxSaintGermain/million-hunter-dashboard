@@ -21,6 +21,7 @@ import { acceptObjectiveMission, acceptObjectiveMissionInput, readAcceptedObject
 import { parsePersistedJson } from "../shared/persistedJson";
 import { deskAttentionSourceIssues, deskMonitoringFindings } from "./aperture/deskAttentionPresentation";
 import { monitoringReviewRouter } from "./aperture/monitoringReviewReceipt";
+import { strategyDiscoveryRouter } from "./aperture/strategyDiscoveryRouter";
 import { readOptionalStatusSource } from "./aperture/optionalStatusSource";
 import { decodeHoldingPeriods } from "../shared/underwritingPersistence";
 import { getDb } from "./db";
@@ -768,6 +769,7 @@ async function executeUnderwriting(input: {
 // ── Router ────────────────────────────────────────────────────────────────────
 
 export const apertureRouter = router({
+  strategy: strategyDiscoveryRouter,
 
   // ── Thesis management ──────────────────────────────────────────────────────
 

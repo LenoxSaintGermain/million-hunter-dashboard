@@ -33,4 +33,13 @@ describe("persisted underwriting job journey", () => {
     expect(underwritingJobStatus(null, 1)).toMatchObject({ state: "not_started", canRetry: false });
     expect(underwritingJobStatus(job({ state: "failed", milestone: "failed" }), 1)).toMatchObject({ state: "failed", canRetry: true });
   });
+  it("uses actual discovery milestones without claiming a completed underwriting or allocation", () => {
+    const discovery = job({ workKind: "discovery" });
+    expect(underwritingJobStatus(discovery, 2000).message).toContain("Collecting cited research");
+    expect(underwritingJobStatus({ ...discovery, milestone: "recording_result" }, 2000).message).toContain("Recording hypotheses and exclusions");
+    const complete = underwritingJobStatus({ ...discovery, state: "complete", milestone: "complete" }, 2000);
+    expect(complete.message).toContain("Research leads are not allocations");
+    expect(complete.canRetry).toBe(false);
+    expect(complete.message).not.toContain("playbook");
+  });
 });

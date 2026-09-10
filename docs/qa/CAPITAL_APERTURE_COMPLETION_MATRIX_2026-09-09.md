@@ -204,3 +204,72 @@ The exact objective `validatePlay` mutation path has not yet been exercised by
 this new DB file; it remains guarded in source and needs explicit journey proof
 with the handoff implementation. None of these open items is waived by the
 acceptance service, green tests or an illustrative comparison.
+
+## September 10 — persisted discovery increment (not deployed)
+
+The existing accepted objective now has a server-gated path through bounded
+research/classification into an immutable discovery receipt. Both
+`CAPITAL_OBJECTIVE_MISSIONS_ENABLED` and `CAPITAL_STRATEGY_DISCOVERY_ENABLED`
+must be true; the isolated browser runtime refuses a default live provider.
+No route in this increment creates a canonical thesis, investment allocation,
+Underwriter result, research candidate, evidence answer, approval or broker order.
+
+- Reuses `aperture_underwriting_jobs`, its Mission lock, lease and attempt token.
+  Reload/read does not launch work; repeats reuse completion, concurrent starts
+  cannot duplicate provider work, and a failed job needs explicit identity-bound
+  retry, limited to three attempts. Correctable prerequisites run inside the
+  acceptance lock before completing the draft.
+- The source adapter uses existing cited research and model abstractions. Broad
+  no-thesis/no-symbol discovery permits proposed US security leads, not verified
+  listing. Narrower thesis scopes require explicitly named securities. Scope and
+  horizon cannot be expanded by model output; rejected out-of-horizon hypotheses
+  remain recorded rather than invalidating a separate valid research lead.
+- Stores bounded payload bytes, the server-built source manifest, current or
+  historical evaluation cutoff, conditional/rejected hypotheses and exclusions.
+  Missing lineage, dates, quality, permission and economics stay unknown. There
+  is no independent verification adapter yet; the current provider output can
+  support conditional research, not independently qualified allocation.
+- Readback verifies owner/revision/job/attempt/token/time and content integrity,
+  then re-runs the deterministic parser. Native JSON object-key reordering does
+  not break the saved content hash. Corruption, missing receipts and failed
+  classification fail closed. A second failure while recording status is
+  sanitized and remains unresolved; it is not an all-clear or duplicate-start CTA.
+- `ObjectiveMissionWorkspace` is a controlled three-section component, not yet
+  mounted in the Mission flow. Its 36 callback/render tests cover no-thesis
+  setup, saved-state acknowledgment, adjacent errors, declared capital, tighter
+  server-returned risk, stale/failed preview, and no implicit actions. They do
+  not establish actual browser, focus, keyboard, device or usability behavior.
+
+### Verification for this increment
+
+| Lane | Result | Evidence |
+| --- | --- | --- |
+| Full unit lane | 1,692 passed, 0 failed, 8 explicit skips | `/tmp/aperture-discovery-final-unit.json` |
+| Disposable database lane | 144 passed, 0 failed, 2 external-URL skips | `/tmp/capital-isolated-integration.PbkqvG/summary.json` |
+| New actual discovery persistence | 23 passed, included in 144 | Same isolated run; full unchanged collateral row comparisons |
+| Actual 0065/0066 migration SQL | 1 passed, included in 144 | Mechanically renamed owned shadow tables, original SQL hashes checked |
+| Existing persisted Mission journeys | All 6 passed, included in 144 | Same isolated run |
+| Full type check and client/server builds | Passed | Required Node runtime; existing bundle/deprecation warnings retained |
+| Live provider / signed-in responsive UAT | Not performed | No production/source accuracy or user-tested usability claim |
+
+The migration test preserved legacy receipt values, history, defaults and
+uniqueness through the actual old-to-new SQL. This is local MariaDB compatibility
+evidence, not a production TiDB migration claim. New migration 0067 adds discovery
+receipts; the disposable schema lane covers its ORM table and actual CRUD, not
+execution of that SQL file against a production database. Migrations 0065–0067
+remain unapplied to production and the separate browser fixture. The harness
+verified removal of its own disposable DB/user; no browser DB changes occurred.
+
+Review found and fixed invalid-input draft consumption, rejected-horizon
+overblocking, raw database failure exposure, strict-provider input mismatch and
+JSON content-hash instability. These are implementation checks, not proof that
+the complete user journey is ready.
+
+Remaining critical path: mount the guided entry and discovery-result disclosure,
+carry one selected lead and its immutable source path into the existing
+Underwriter/evidence task, persist explicit assumption revisions, connect actual
+capital-source ingestion and proposal-transaction claims, then run isolated
+desktop/mobile and authenticated release UAT. Shared attention still shows the
+compatibility state until its exact discovery-result handoff is wired. No live
+feature enablement, production build/promotion or market-open UAT occurred in
+this increment. THI-266 remains In Progress.

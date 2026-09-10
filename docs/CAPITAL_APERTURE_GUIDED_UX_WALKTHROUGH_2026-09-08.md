@@ -327,3 +327,57 @@ applied to the browser fixture or production. Current authenticated DB tests
 prove persistence and no unintended mutations; the locked Mac prevented fresh
 desktop/mobile interaction evidence. The completion matrix records the exact
 tests and the remaining entry, revision, discovery and handoff work.
+
+## September 10 — discovery receipt and guided-entry preparation
+
+This increment is local and default off, not a deployed or user-tested flow.
+It implements a research receipt for an accepted objective using the existing
+analysis-job identity. It does not complete the subsequent selected-lead handoff
+into Underwriter/evidence, independently verify source economics, or allocate
+capital. The existing compatibility screen remains in place until those seams
+are connected and tested together.
+
+The controlled `ObjectiveMissionWorkspace` prepares three sections: Question &
+scope, Account & risk, Review. Completed sections become editable summaries.
+Broad research does not require a canonical thesis or ticker; a narrower thesis
+scope needs the deliberately selected thesis and securities. Named Paper mode,
+declared amounts, actual save state, and any tighter returned constraint remain
+visible. Stale/failed/unknown preview states stay recorded-only and block the
+consequential action. The parent must bind/invalidate a preview when assumptions
+change; this display component is not another risk calculator or persistence
+authority. It is not mounted by the production Mission yet.
+
+The explicit `strategy.start` operation accepts saved inputs and runs bounded
+discovery. Correctable discovery prerequisites are checked while the draft is
+locked, before marking it complete. Server-only feature flags gate execution.
+`strategy.get` is read-only; it never launches or retries analysis. `strategy.run`
+reuses the exact accepted revision and existing job, with explicit same-job
+retry after failure and a three-attempt ceiling. Leaving a view does not imply
+worker cancellation or completion; an expired lease requires reconciliation.
+
+Each attempt preserves its bounded classifier payload, source manifest,
+conditional/rejected hypotheses, exclusions and issues. The receipt binds owner,
+Mission/revision, job/attempt/token, timestamps and original content bytes.
+Reads verify those bindings and recompute the classification; missing, corrupted
+or failed evidence is not an empty successful search. A failed result remains
+failed, including when failure-status persistence also becomes unavailable.
+
+The adapter makes at most one call to each existing research/classification
+abstraction per attempt. These are invocation limits, not claims that gateway
+internals perform no retries. Citations use server-built identities; absent
+publication, observation, origin and quality evidence stays unknown. Cached
+retrieval is not restamped fresh. Model hypotheses do not certify listing,
+commercial terms, economic uplift or catalyst permission. Historical evaluation
+retains its explicit cutoff and excludes subsequently available information.
+
+No ordinary status read changes Seen, review, evidence, allocations, approvals,
+submissions or broker orders. The pure parser's no-side-effects fields describe
+that parser only; the service separately reports whether this request started
+analysis. Real discovery may use the existing research cache. No live provider
+or authenticated browser result is inferred from injected-fixture tests.
+
+New migration `0067_aperture_strategy_discovery.sql` adds immutable discovery
+receipts. It and the prior 0065/0066 migrations remain unapplied to production and
+the browser fixture. Test results and remaining release/UAT scope belong in the
+completion matrix. No new homepage, broker status, risk authority or auto-trade
+path has been introduced.

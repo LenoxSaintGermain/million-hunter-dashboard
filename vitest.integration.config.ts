@@ -26,6 +26,8 @@ export default defineConfig({
       "server/aperture/monitoringReviewReceipt.integration.test.ts",
       "server/aperture/capitalLedger.integration.test.ts",
       "server/aperture/objectiveMission.integration.test.ts",
+      "server/aperture/objectiveMigration.integration.test.ts",
+      "server/aperture/strategyDiscoveryWorkflow.integration.test.ts",
       "server/aperture/persistedJourneys.integration.test.ts",
       "server/aperture/activeCapitalThesisSchema.test.ts",
       "server/aperture/playOutcomeLedgerSchema.test.ts",

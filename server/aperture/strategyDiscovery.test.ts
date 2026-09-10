@@ -117,6 +117,33 @@ describe("strict production discovery parsing boundary (not E2E)", () => {
     body.searchScope = "broader_permitted_universe"; body.hypotheses[0].causalPath.securityMapping.symbol = "OTHER";
     expect(parse(body).issues[0].code).toBe("unreviewed_or_unauthorized_security");
   });
+  it("permits no-ticker broad discovery without claiming verified listing or an allocation", () => {
+    const receipt = context(); receipt.permittedUniverse = []; receipt.universePolicy = "cited_us_security_leads";
+    const body = payload(); body.hypotheses[0].causalPath.securityMapping.status = "unverified";
+    const result = parse(body, receipt);
+    expect(result.status).not.toBe("unavailable");
+    expect(result.hypotheses[0].causalPath.securityMapping.status).toBe("unverified");
+    expect(result.investmentAlternatives).toEqual([]);
+    expect(result.confidence).toBeNull();
+  });
+  it("does not use broad research permission to certify a model-generated security mapping", () => {
+    const receipt = context(); receipt.permittedUniverse = []; receipt.universePolicy = "cited_us_security_leads";
+    expect(parse(payload(), receipt).issues).toContainEqual({ path: "hypotheses.0", code: "security_mapping_requires_independent_verification" });
+  });
+  it.each(["current_thesis", "related_opportunities"] as const)("cannot use broad no-ticker policy under %s scope", searchScope => {
+    const receipt = context(); Object.assign(receipt, { searchScope, permittedUniverse: [], universePolicy: "cited_us_security_leads" });
+    const body = payload(); body.searchScope = searchScope;
+    expect(parse(body, receipt).status).toBe("unavailable");
+  });
+  it("distinguishes a bounded search reviewing no symbols from missing symbol permission", () => {
+    const body = payload(); body.reviewedUniverse = []; body.hypotheses = [];
+    body.coverageGaps = ["No supported security lead in this bounded review"];
+    expect(parse(body).reviewedUniverse).toEqual([]);
+    const receipt = context(); receipt.permittedUniverse = [];
+    expect(parse(body, receipt).status).toBe("unavailable");
+    receipt.universePolicy = "cited_us_security_leads";
+    expect(parse(body, receipt).status).not.toBe("unavailable");
+  });
   it("rejects contradictory availability and future evaluation or retrieval receipts", () => {
     const receipt = context(); receipt.providerState = { status: "available", failures: ["Source fetch failed"] };
     expect(parse(payload(), receipt).coverageGaps).toContain("invalid_provider_manifest");

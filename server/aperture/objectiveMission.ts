@@ -86,7 +86,8 @@ export async function readAcceptedObjectiveValues(db: Pick<Db, "select">, userId
 
 /** Atomic acceptance in the existing Mission/revision store. Deliberately no jobs,
  * projections, allocations, research, providers, approvals or order operations. */
-export async function acceptObjectiveMission(db: Db, userId: number, raw: z.infer<typeof acceptObjectiveMissionInput>, now = Date.now()) {
+export async function acceptObjectiveMission(db: Db, userId: number, raw: z.infer<typeof acceptObjectiveMissionInput>, now = Date.now(),
+  validateBeforeCompletion?: (db: Pick<Db, "select">, values: MissionDraftValues) => Promise<void>) {
   const input = acceptObjectiveMissionInput.parse(raw);
   return db.transaction(async tx => {
     // Every draft writer updates this owner/version row. Lock before reading its
@@ -119,6 +120,9 @@ export async function acceptObjectiveMission(db: Db, userId: number, raw: z.infe
           eq(brokerOrders.id, source.orderId), eq(brokerOrders.runId, source.runId), eq(brokerOrders.candidateId, source.candidateId))).limit(1);
       if (!owned) invalid("The exact source order is unavailable in this account and play. No proceeds were verified.");
     }
+    // The caller's read-only analysis prerequisites run under the same draft
+    // lock. A correctable research input must not consume/complete the draft.
+    await validateBeforeCompletion?.(tx, accepted.values);
     const contextSnapshot = {
       contextKind: "objective", requestId: input.requestId, canonicalThesisId: null, capitalThesisId: null,
       selectedCanonicalThesisId: accepted.canonicalThesisId, accountId: account.id,

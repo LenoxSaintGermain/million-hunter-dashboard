@@ -13,12 +13,14 @@ export async function readUnderwritingJob(db: Db, userId: number, decisionRunId:
     eq(apertureUnderwritingJobs.userId, userId), eq(apertureUnderwritingJobs.decisionRunId, decisionRunId),
     eq(apertureUnderwritingJobs.decisionRevisionId, decisionRevisionId),
   )).orderBy(desc(apertureUnderwritingJobs.updatedAt), desc(apertureUnderwritingJobs.id)).limit(1);
-  return row ? { ...row, request: parsePersistedJson(row.request) } : null;
+  const request = row ? parsePersistedJson(row.request) : null;
+  return row ? { ...row, request, workKind: request?.discovery ? "discovery" as const : "underwriting" as const } : null;
 }
 
 export async function claimUnderwritingJob(db: Db, input: {
   userId: number; decisionRunId: number; decisionRevisionId: number; requestKey: string; retryJobId?: number;
   request: typeof apertureUnderwritingJobs.$inferInsert.request;
+  maxAttempts?: number;
 }) {
   return db.transaction(async (tx) => {
     // Serialize claims with the same authoritative mission lock used by publication.
@@ -37,6 +39,7 @@ export async function claimUnderwritingJob(db: Db, input: {
     const disposition = jobClaimDisposition(prior, now, input.retryJobId);
     if (disposition === "reuse") return { job: prior!, reused: true };
     if (disposition === "needs_explicit_retry") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The previous analysis did not finish. Inspect its saved progress and explicitly resume that job." });
+    if (prior && input.maxAttempts != null && prior.attempt >= input.maxAttempts) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This analysis reached its attempt limit. Review the Mission before authorizing more work." });
     const attemptToken = randomUUID();
     const update = { state: "running" as const, milestone: "market_evidence" as const, attemptToken, leaseUntil: now + UNDERWRITING_JOB_LEASE_MS, failure: null, updatedAt: now };
     if (prior) {

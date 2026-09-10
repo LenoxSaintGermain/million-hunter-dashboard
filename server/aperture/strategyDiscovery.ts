@@ -67,7 +67,7 @@ const pathSchema = z.object({
 export const strategyDiscoveryPayloadSchema = z.object({
   schemaVersion: z.literal(1),
   searchScope: z.enum(["current_thesis", "related_opportunities", "broader_permitted_universe"]),
-  reviewedUniverse: z.array(id).min(1).max(100), coverageGaps: texts,
+  reviewedUniverse: z.array(id).max(100), coverageGaps: texts,
   hypotheses: z.array(z.object({
     id, title: prose, use: z.enum(["new_play", "incremental_existing_thesis"]),
     horizon: z.enum(["intraday", "overnight", "swing", "catalyst_window", "position"]),
@@ -95,11 +95,20 @@ const sourceReceipt = z.object({
 export const strategyDiscoveryContextSchema = z.object({
   requestId: id, provider: id, asOf: time, receivedAt: time,
   searchScope: z.enum(["current_thesis", "related_opportunities", "broader_permitted_universe"]),
-  permittedUniverse: z.array(id).min(1).max(100),
+  // Authorization to research a cited symbol is not verified listing/tradability.
+  universePolicy: z.enum(["declared_symbols", "cited_us_security_leads"]).optional(),
+  permittedUniverse: z.array(id).max(100),
   citations: z.array(url).max(STRATEGY_DISCOVERY_LIMITS.sources),
   sources: z.array(sourceReceipt).max(STRATEGY_DISCOVERY_LIMITS.sources),
   providerState: state, classifierState: state,
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.universePolicy === "cited_us_security_leads" && value.searchScope !== "broader_permitted_universe") {
+    ctx.addIssue({ code: "custom", path: ["universePolicy"], message: "Broad symbol discovery requires explicit broad-search permission" });
+  }
+  if (value.universePolicy !== "cited_us_security_leads" && value.permittedUniverse.length === 0) {
+    ctx.addIssue({ code: "custom", path: ["permittedUniverse"], message: "An exact-symbol search requires an explicit universe" });
+  }
+});
 
 export type StrategyDiscoveryPayload = z.infer<typeof strategyDiscoveryPayloadSchema>;
 export type StrategyDiscoveryContext = z.infer<typeof strategyDiscoveryContextSchema>;
@@ -211,7 +220,9 @@ export function parseStrategyDiscovery(payload: unknown, contextInput: unknown):
   }
   if (body.searchScope !== context.searchScope) fail("searchScope", "unauthorized_search_scope");
   const permitted = new Set(context.permittedUniverse);
-  if (body.reviewedUniverse.some((symbol) => !permitted.has(symbol))) fail("reviewedUniverse", "outside_permitted_universe");
+  const authorizedSymbol = (symbol: string) => context.universePolicy === "cited_us_security_leads"
+    ? /^[A-Z]{1,5}(\.[A-Z])?$/.test(symbol) : permitted.has(symbol);
+  if (body.reviewedUniverse.some((symbol) => !authorizedSymbol(symbol))) fail("reviewedUniverse", "outside_permitted_universe");
   const identities = new Set<string>();
   for (const [index, item] of Array.from(body.hypotheses.entries())) {
     for (const identity of [`hypothesis:${item.id}`, `path:${item.causalPath.id}`]) {
@@ -220,7 +231,8 @@ export function parseStrategyDiscovery(payload: unknown, contextInput: unknown):
     }
     const path = item.causalPath;
     const symbol = path.securityMapping.symbol;
-    if (symbol && (!permitted.has(symbol) || !body.reviewedUniverse.includes(symbol))) fail(`hypotheses.${index}`, "unreviewed_or_unauthorized_security");
+    if (symbol && (!authorizedSymbol(symbol) || !body.reviewedUniverse.includes(symbol))) fail(`hypotheses.${index}`, "unreviewed_or_unauthorized_security");
+    if (context.universePolicy === "cited_us_security_leads" && path.securityMapping.status === "verified") fail(`hypotheses.${index}`, "security_mapping_requires_independent_verification");
     const assertionIds = assertions(path).map((item) => item.id);
     if (new Set(assertionIds).size !== assertionIds.length || new Set(path.hops.map((hop) => hop.id)).size !== path.hops.length) fail(`hypotheses.${index}`, "duplicate_path_identity");
     for (const sourceId of references(path)) {

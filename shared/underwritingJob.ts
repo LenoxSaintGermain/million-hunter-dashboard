@@ -8,6 +8,7 @@ export type UnderwritingJobRecord = {
   leaseUntil: number;
   failure: string | null;
   updatedAt: number;
+  workKind?: "underwriting" | "discovery";
 };
 
 // Read-only presentation: opening a page never retries or marks a job failed.
@@ -17,7 +18,8 @@ export function underwritingJobStatus(job: UnderwritingJobRecord | null, now: nu
   const state = interrupted ? "interrupted" as const : job.state;
   const message = interrupted ? "The analysis worker has not reported completion. Resume this analysis explicitly; no order was created."
     : state === "failed" ? job.failure ?? "Analysis failed. Your mission and previous result are preserved."
-    : state === "complete" ? "The research playbook is recorded. No ticket or order was created."
+    : state === "complete" ? job.workKind === "discovery" ? "The discovery receipt is recorded. Research leads are not allocations; no order was created." : "The research playbook is recorded. No ticket or order was created."
+    : job.workKind === "discovery" ? job.milestone === "recording_result" ? "Source review finished. Recording hypotheses and exclusions." : "Collecting cited research for the saved capital question."
     : job.milestone === "recording_result" ? "Market analysis finished. Recording the playbook."
     : "Checking provider-backed market evidence against the mission risk limits.";
   return { state, message, jobId: job.id, updatedAt: job.updatedAt, canRetry: state === "failed" || state === "interrupted" };
