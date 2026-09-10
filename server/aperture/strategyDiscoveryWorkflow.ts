@@ -20,6 +20,7 @@ type ReceiptDb = Pick<Db, "select">;
 const positiveId = z.number().int().positive().safe();
 export const discoveryIdentityInput = z.object({ decisionRunId: positiveId, decisionRevisionId: positiveId }).strict();
 export const discoveryRunInput = discoveryIdentityInput.extend({ retryJobId: positiveId.optional() }).strict();
+export const discoveryResumeInput = z.object({ requestId: z.string().uuid() }).strict();
 type Identity = z.infer<typeof discoveryIdentityInput>;
 export type DiscoveryProvider = (request: StrategyDiscoveryRequest) => Promise<{ payload: unknown; context: StrategyDiscoveryContext }>;
 // Native MySQL JSON may reorder object keys; hashes must not depend on that order.
@@ -113,16 +114,36 @@ export async function readObjectiveDiscovery(db: Db, userId: number, raw: Identi
     return receipt;
   });
   const successful = records.find(record => record.result.status !== "unavailable") ?? null;
-  const latest = records[0] ?? null;
+  const latest = records.length ? records[0] : null;
   if (job?.state === "complete" && (!latest || latest.attempt !== job.attempt || latest.result.status === "unavailable")) blocked("The completed discovery has no matching result. Reconcile this job; do not start a duplicate.");
   const jobStatus = underwritingJobStatus(job, Date.now());
   const attemptLimitReached = !!job && job.attempt >= DISCOVERY_MAX_ATTEMPTS && jobStatus.canRetry;
-  return { ...input, account: { id: mission.account.id, label: mission.account.label, isPaper: true as const, asOf: mission.account.lastSyncedAt },
+  const sourceContext = parsePersistedJson(mission.revision.contextSnapshot);
+  if (!sourceContext) blocked("The accepted Mission context is unavailable. Reconcile the original receipt.");
+  return { ...input, acceptedValues: mission.values, sourceDraftVersion: sourceContext.sourceDraftVersion as number,
+    account: { id: mission.account.id, label: mission.account.label, isPaper: true as const, asOf: mission.account.lastSyncedAt },
     job: { ...jobStatus, canRetry: jobStatus.canRetry && !attemptLimitReached,
       ...(attemptLimitReached ? { message: "Three attempts did not finish. Review the saved failure and authorize a new Mission revision before further discovery." } : {}) }, receipt: successful ?? latest,
     latestAttempt: latest, history: records.map(record => ({ id: record.id, attempt: record.attempt, createdAt: record.createdAt, status: record.result.status })),
     usingPreviousResult: successful != null && latest?.id !== successful.id,
     mutations: { analysisStarted: false as boolean, allocationCreated: false as const, orderCreated: false as const } };
+}
+
+/** Reconcile a disconnected acceptance by its original owner/request identity.
+ * A new draft on another device is not evidence that the previous request failed.
+ * This lookup never accepts a Mission, retries a job or changes review state. */
+export async function resumeObjectiveDiscovery(db: Db, userId: number, raw: z.infer<typeof discoveryResumeInput>) {
+  const input = discoveryResumeInput.parse(raw);
+  const [head] = await db.select().from(apertureDecisionRuns).where(and(
+    eq(apertureDecisionRuns.userId, userId), eq(apertureDecisionRuns.clientRequestId, input.requestId),
+  )).limit(1);
+  if (!head) return null;
+  if (head.contextKind !== "objective") blocked("This request belongs to another Mission kind. Reconcile the original request; do not replace it.");
+  const [revision] = await db.select().from(apertureDecisionRevisions).where(and(
+    eq(apertureDecisionRevisions.decisionRunId, head.id), eq(apertureDecisionRevisions.version, 1),
+  )).limit(1);
+  if (!revision) blocked("The accepted request has no original Mission revision. Reconcile its saved record before retrying.");
+  return readObjectiveDiscovery(db, userId, { decisionRunId: head.id, decisionRevisionId: revision.id });
 }
 
 /** One deliberate action, existing job/lease authority, immutable per-attempt output. */

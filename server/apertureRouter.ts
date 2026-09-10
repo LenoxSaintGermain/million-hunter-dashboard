@@ -22,6 +22,7 @@ import { parsePersistedJson } from "../shared/persistedJson";
 import { deskAttentionSourceIssues, deskMonitoringFindings } from "./aperture/deskAttentionPresentation";
 import { monitoringReviewRouter } from "./aperture/monitoringReviewReceipt";
 import { strategyDiscoveryRouter } from "./aperture/strategyDiscoveryRouter";
+import { objectiveDiscoveryEnabled, readObjectiveDiscovery } from "./aperture/strategyDiscoveryWorkflow";
 import { readOptionalStatusSource } from "./aperture/optionalStatusSource";
 import { decodeHoldingPeriods } from "../shared/underwritingPersistence";
 import { getDb } from "./db";
@@ -2639,6 +2640,10 @@ export const apertureRouter = router({
       const now = Date.now();
       const jobRecord = latestMission ? await readUnderwritingJob(db!, ctx.user.id, latestMission.decisionRunId, latestMission.revisionId) : null;
       const jobState = underwritingJobStatus(jobRecord, now);
+      const discoveryRead = latestMission?.contextKind === "objective" && jobRecord
+        ? await readOptionalStatusSource("Discovery receipt", () => readObjectiveDiscovery(db!, ctx.user.id, {
+          decisionRunId: latestMission.decisionRunId, decisionRevisionId: latestMission.revisionId,
+        })) : null;
       // Accepted but unfilled orders are status tasks, not missing post-entry research.
       const monitoredOrders = orders.filter(order => order.status === "filled");
       const monitoredCandidateIds = new Set(monitoredOrders.flatMap(order => order.candidateId == null ? [] : [order.candidateId]));
@@ -2648,7 +2653,7 @@ export const apertureRouter = router({
         monitoringUnavailable: Boolean(monitoringRead.unavailable), positionsUnavailable: Boolean(snapshotRead.unavailable), now });
       const monitoringIncomplete = sourceIssues.some(issue => issue.state === "missing");
       const unknownMonitoring = latestChecks.some((check) => monitoringReviewState(check, now).state === "unknown");
-      const unavailableSources = [monitoringRead.unavailable, snapshotRead.unavailable].filter(Boolean).join(" ");
+      const unavailableSources = [monitoringRead.unavailable, snapshotRead.unavailable, discoveryRead?.unavailable].filter(Boolean).join(" ");
       const draft = await missionDraftStore.get(ctx.user.id);
       const attention = deriveApertureAttention({
         now,
@@ -2664,8 +2669,13 @@ export const apertureRouter = router({
         underwriting: latestMission && latestMission.researchRunId == null ? {
           decisionRunId: latestMission.decisionRunId,
           revisionId: latestMission.revisionId,
-          unavailableReason: latestMission.contextKind === "objective" ? "The capital objective is saved. Discovery-to-research validation is not available in this release; no analysis has started." : null,
-          state: jobState.state === "running" ? "running" : jobState.canRetry ? "failed" : latestUnderwriting?.decisionRevisionId === latestMission.revisionId ? "complete" : "not_started",
+          workKind: latestMission.contextKind === "objective" ? "discovery" : "underwriting",
+          unavailableReason: latestMission.contextKind === "objective" && !jobRecord && !objectiveDiscoveryEnabled()
+            ? "The capital objective is saved. Discovery is not enabled in this release; no analysis has started." : null,
+          state: latestMission.contextKind === "objective"
+            ? discoveryRead?.unavailable ? "failed"
+              : jobState.state === "running" ? "running" : jobState.canRetry ? "failed" : jobState.state === "complete" ? "complete" : "not_started"
+            : jobState.state === "running" ? "running" : jobState.canRetry ? "failed" : latestUnderwriting?.decisionRevisionId === latestMission.revisionId ? "complete" : "not_started",
           error: jobState.canRetry ? jobState.message : null,
           selectedPlayId: latestUnderwriting?.selectedPlayId ?? null,
           updatedAt: jobState.updatedAt ?? latestUnderwriting?.updatedAt ?? latestMission.updatedAt,

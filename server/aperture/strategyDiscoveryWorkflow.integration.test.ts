@@ -303,6 +303,38 @@ describe("accepted objective discovery — actual isolated workflow persistence"
     expect(produce).toHaveBeenCalledTimes(1);
   });
 
+  it("reconciles an accepted request before any job without accepting or starting it again", async () => {
+    const before = await workRows();
+    const result = await workflow.resumeObjectiveDiscovery(db, owners[0].userId, { requestId: REQUEST_ID });
+    expect(result).toEqual(await read());
+    expect(result).toMatchObject({ ...owners[0].identity, sourceDraftVersion: 1,
+      acceptedValues: values(owners[0].accountId), job: { state: "not_started" },
+      mutations: { analysisStarted: false, allocationCreated: false, orderCreated: false } });
+    expect(await workRows()).toEqual(before);
+  });
+
+  it("reconciles the same request ID within each owner rather than returning another owner's result", async () => {
+    const produce = provider();
+    const result = await execute(produce);
+    const before = await workRows();
+    expect(await workflow.resumeObjectiveDiscovery(db, owners[0].userId, { requestId: REQUEST_ID })).toEqual(readOnly(result));
+    const other = await workflow.resumeObjectiveDiscovery(db, owners[1].userId, { requestId: REQUEST_ID });
+    expect(other).toMatchObject({ ...owners[1].identity, account: { id: owners[1].accountId }, job: { state: "not_started" }, receipt: null });
+    expect(await workflow.resumeObjectiveDiscovery(db, owners[0].userId, { requestId: NEXT_REQUEST_ID })).toBeNull();
+    expect(await workRows()).toEqual(before);
+    expect(produce).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a damaged original receipt during request reconciliation without rewriting it", async () => {
+    const [revision] = await db.select().from(apertureDecisionRevisions).where(eq(apertureDecisionRevisions.id, owners[0].identity.decisionRevisionId));
+    await db.update(apertureDecisionRevisions).set({ missionHash: "invalid-fixture-hash" }).where(eq(apertureDecisionRevisions.id, revision.id));
+    try {
+      await assertBlockedWithoutWrites(() => workflow.resumeObjectiveDiscovery(db, owners[0].userId, { requestId: REQUEST_ID }));
+    } finally {
+      await db.update(apertureDecisionRevisions).set({ missionHash: revision.missionHash }).where(eq(apertureDecisionRevisions.id, revision.id));
+    }
+  });
+
   it("survives database JSON key reordering without rewriting receipt hashes, results or jobs", async () => {
     const produce = provider();
     const original = await execute(produce);

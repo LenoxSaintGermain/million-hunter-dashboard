@@ -15,6 +15,7 @@ export type AttentionMission = {
 };
 
 export type AttentionUnderwriting = {
+  workKind?: "underwriting" | "discovery";
   decisionRunId: number;
   revisionId: number;
   state: "not_started" | "queued" | "running" | "failed" | "complete";
@@ -477,6 +478,26 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       actionLabel: "Review saved objective",
       href: `/aperture/decision/${input.underwriting.decisionRunId}/revision/${input.underwriting.revisionId}`,
       updatedAt: input.underwriting.updatedAt,
+    }));
+  } else if (input.underwriting?.workKind === "discovery") {
+    const discovery = input.underwriting;
+    const failed = discovery.state === "failed";
+    const complete = discovery.state === "complete";
+    const running = discovery.state === "running" || discovery.state === "queued";
+    attention.push(item({
+      key: `underwriting:${discovery.decisionRunId}${complete ? ":complete" : ""}`,
+      kind: failed ? "underwriting_failed" : complete ? "underwriting_complete" : "underwriting_underway",
+      priority: failed ? 74 : complete ? 72 : 65,
+      stateLabel: failed ? "Discovery needs attention" : complete ? "Research findings recorded" : running ? "Discovery underway" : "Objective ready",
+      title: failed ? "Reconcile the saved analysis" : complete ? "Review research findings" : running ? "Researching the saved capital question" : "Underwrite the saved objective",
+      reason: failed ? "The saved analysis or its evidence could not be confirmed."
+        : complete ? "Review the recorded hypotheses and exclusions; these are not qualified allocations."
+          : running ? "The recorded job has not finished. Leaving does not restart it."
+            : "Your question is saved. Analysis has not started.",
+      consequence: "No allocation or order is created by discovery. Existing positions are unchanged.",
+      actionLabel: failed ? "Review analysis status" : complete ? "Review research findings" : running ? "View discovery progress" : "Underwrite my mission",
+      href: `/aperture/decision/${discovery.decisionRunId}/revision/${discovery.revisionId}`,
+      updatedAt: discovery.updatedAt,
     }));
   } else if (input.underwriting?.state === "not_started") {
     attention.push(item({

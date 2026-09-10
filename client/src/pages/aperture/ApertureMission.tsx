@@ -1,17 +1,23 @@
 import { ArrowLeft } from "lucide-react";
-import { useLocation, useRoute } from "wouter";
+import { useLocation, useRoute, useSearch } from "wouter";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { DecisionRunway } from "@/components/aperture/DecisionRunway";
+import { ObjectiveMissionFlow } from "@/components/aperture/ObjectiveMissionFlow";
+import { trpc } from "@/lib/trpc";
 
 export default function ApertureMission() {
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const discovery = trpc.aperture.strategy.capabilities.useQuery(undefined, { retry: false });
   const [isReceiptRoute, receiptParams] = useRoute("/aperture/decision/:decisionRunId/revision/:revisionId");
   const receiptTarget = isReceiptRoute
-    && Number.isInteger(Number(receiptParams?.decisionRunId))
-    && Number.isInteger(Number(receiptParams?.revisionId))
+    && Number.isSafeInteger(Number(receiptParams?.decisionRunId)) && Number(receiptParams?.decisionRunId) > 0
+    && Number.isSafeInteger(Number(receiptParams?.revisionId)) && Number(receiptParams?.revisionId) > 0
     ? { decisionRunId: Number(receiptParams?.decisionRunId), revisionId: Number(receiptParams?.revisionId) }
     : null;
+  const newObjective = !receiptTarget && new URLSearchParams(search).get("objective") === "1";
+  const invalidReceipt = isReceiptRoute && !receiptTarget;
 
   return <DashboardLayout>
     <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -20,11 +26,16 @@ export default function ApertureMission() {
         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture · Mission</p>
         <h1 className="sr-only">{receiptTarget ? "Mission revision" : "Mission"}</h1>
       </div>
+      {!isReceiptRoute && !newObjective && discovery.data?.enabled && <Button variant="outline" className="min-h-11" onClick={() => navigate("/aperture/mission?objective=1")}>Explore a capital objective</Button>}
     </div>
-    <DecisionRunway
+    {invalidReceipt ? <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)" }}>
+      <h2 className="font-semibold">Mission link is incomplete</h2>
+      <p className="mt-2 text-sm">Open the saved Mission from Today. This link has not started or replaced a Mission.</p>
+    </section> : newObjective ? <ObjectiveMissionFlow newObjective /> : <DecisionRunway
+      key={receiptTarget ? `receipt:${receiptTarget.decisionRunId}:${receiptTarget.revisionId}` : "mission"}
       receiptTarget={receiptTarget}
       onNewResearch={() => navigate("/aperture?setup=1&draft=1")}
       onOpenResearchRun={(runId) => navigate(`/aperture/run/${runId}`)}
-    />
+    />}
   </DashboardLayout>;
 }

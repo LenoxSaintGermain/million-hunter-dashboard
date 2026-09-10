@@ -160,10 +160,10 @@ describe("discovery failure recording regression (mocked storage and provider)",
 });
 
 describe("discovery router storage-error sanitization (real in-process caller)", () => {
-  it.each(["start", "run", "get"] as const)("sanitizes a raw getDb rejection on %s before any workflow action", async (route) => {
+  it.each(["start", "run", "get", "resume"] as const)("sanitizes a raw getDb rejection on %s before any workflow action", async (route) => {
     vi.mocked(getDb).mockRejectedValue(new Error("MOCK_DB_DETAIL mysql://fixture-user:fixture-password@private-host"));
     const caller = strategyDiscoveryRouter.createCaller({ user: { id: 7, role: "capital_operator" } } as TrpcContext);
-    const operation = route === "start" ? caller.start({ requestId, expectedVersion: 1 }) : caller[route](identity);
+    const operation = route === "start" ? caller.start({ requestId, expectedVersion: 1 }) : route === "resume" ? caller.resume({ requestId }) : caller[route](identity);
     await expect(operation).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE",
       message: "Mission analysis storage is unavailable. Reconcile the saved Mission and job before retrying; no eligibility is asserted.", cause: undefined });
     expect(getDb).toHaveBeenCalledTimes(1);

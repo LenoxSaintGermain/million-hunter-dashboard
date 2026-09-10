@@ -1,5 +1,42 @@
 # Capital Aperture — original-scope completion audit
 
+## September 10 — connected objective UI checkpoint
+
+**Source only, default off, not deployed.** Mission now exposes deliberate
+objective entry when server capability is confirmed, resumes persisted drafts,
+and opens exact accepted discovery receipts. Original inputs survive conflicts
+and uncertain-start recovery; retries retain the original request/version/job.
+Completed research remains readable while availability is loading or disabled.
+An explicit refresh rechecks availability without starting research. Stale risk
+previews block authorization, including callbacks captured before expiry.
+
+Result summaries distinguish unverified research leads from trade plays, keep
+rejected hypotheses and source records accessible, and do not offer an
+unimplemented evidence handoff. Today/Desk share exact discovery-state links;
+failed receipt reads produce partial status rather than a false all-clear.
+No new homepage or broker/risk authority was introduced.
+
+| Final verification | Result | Receipt |
+| --- | --- | --- |
+| Full unit lane | 1,787 passed, 0 failed, 8 existing explicit skips | `/tmp/aperture-objective-connected-verified-unit.json` |
+| Disposable database lane | 147 passed, 0 failed, 2 external-URL skips | `/tmp/capital-isolated-integration.FaMMZW/summary.json` |
+| Existing-schema migration | Actual 0065/0066/0067 SQL applied to owned shadow tables; old receipts preserved | Included in the 147, not additional |
+| Type check; client/server builds | Passed; existing large-chunk warning remains | No performance claim |
+| Authenticated desktop/mobile | Not repeated; Mac locked | No new screenshots or user-tested usability claim |
+
+The migration-test parser initially split a semicolon inside a SQL comment;
+that test-only parsing error was fixed before the successful repeat. A failing
+availability-refresh regression was also reproduced and corrected. The final
+database harness removed only its disposable database/user and reported zero
+browser-database mutations. Production migrations and feature flags remain
+unchanged. The market-open UAT deadline was not met.
+
+**Still required:** source-bound selection into existing Underwriter/evidence;
+accepted-assumption revisions; verified gains ingestion and actual proposal
+claim revalidation; deterministic connected browser fixtures; signed-in
+responsive/keyboard/enlarged-text/screen-reader journeys and release review.
+The goal remains open. Green development checks do not waive this work.
+
 Checkpoint: September 9 evening. Production was last verified at `070d04c` / `capital-aperture-00092-yil` with 100% traffic; the UI-only follow-up was public health/version checked. Its local desktop/mobile interaction checks passed; the signed-in post-deployment repeat is pending because the Mac is locked. Separate Strategist safeguards and persistence work are not deployed. Later sections distinguish each local increment from this production checkpoint. The market has closed. No market-open submission success is claimed.
 
 ## Operator workflow

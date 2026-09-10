@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { capitalOperatorProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { acceptObjectiveMission, acceptObjectiveMissionInput } from "./objectiveMission";
-import { discoveryIdentityInput, discoveryRunInput, executeObjectiveDiscovery, objectiveDiscoveryEnabled, readObjectiveDiscovery, validateObjectiveDiscoveryDraft } from "./strategyDiscoveryWorkflow";
+import { discoveryIdentityInput, discoveryRunInput, discoveryResumeInput, executeObjectiveDiscovery, objectiveDiscoveryEnabled, readObjectiveDiscovery, resumeObjectiveDiscovery, validateObjectiveDiscoveryDraft } from "./strategyDiscoveryWorkflow";
 
 async function database() {
   const db = await getDb();
@@ -31,4 +31,5 @@ export const strategyDiscoveryRouter = router({
   })),
   run: capitalOperatorProcedure.input(discoveryRunInput).mutation(({ ctx, input }) => sanitized(async () => executeObjectiveDiscovery(await database(), ctx.user.id, input))),
   get: capitalOperatorProcedure.input(discoveryIdentityInput).query(({ ctx, input }) => sanitized(async () => readObjectiveDiscovery(await database(), ctx.user.id, input))),
+  resume: capitalOperatorProcedure.input(discoveryResumeInput).query(({ ctx, input }) => sanitized(async () => resumeObjectiveDiscovery(await database(), ctx.user.id, input))),
 });

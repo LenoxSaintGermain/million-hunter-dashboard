@@ -13,6 +13,12 @@ const fixture = vi.hoisted(() => ({
   effects: [] as Array<() => void>, cleanups: [] as any[], queries: {} as Record<string, any>,
   mutations: {} as Record<string, any>, invalidate: vi.fn(), success: vi.fn(), openResearch: vi.fn(),
   headings: {} as Record<string, any>, lookupHeading: vi.fn(),
+  objectiveFlow: vi.fn(),
+}));
+// This suite checks the parent handoff; the connected child has its own journey
+// tests, including failed refresh and draft/job reconciliation.
+vi.mock("../../client/src/components/aperture/ObjectiveMissionFlow", () => ({
+  ObjectiveMissionFlow: (props: any) => { fixture.objectiveFlow(props); return React.createElement("section", { "data-objective-flow": true }, props.initialDraft.values.mission); },
 }));
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof React>();
@@ -133,11 +139,12 @@ describe("persisted Mission disposition context", () => {
       objectiveContext: { requestId: values.strategyContext.requestId, sourceDraftId: 1, sourceDraftVersion: 4, values } };
     const before = structuredClone(fixture.queries.latest.data);
     const view = render();
-    expect(view.$("h1").text()).toBe("Capital objective saved");
-    expect(view.$.text()).toContain("Mission accepted.");
+    expect(view.$("[data-objective-flow]")).toHaveLength(1);
+    expect(fixture.objectiveFlow).toHaveBeenLastCalledWith(expect.objectContaining({
+      receiptTarget: { decisionRunId: 77, revisionId: 88 }, initialDraft: expect.objectContaining({ values, completedAt: now }),
+    }));
     expect(view.$.text()).not.toContain("Illustrative PWR");
     expect(view.$.text()).not.toContain("Underwrite my mission");
-    expect(view.$("button").text()).toBe("Return to Today");
     await vi.advanceTimersByTimeAsync(2000);
     expect(fixture.queries.latest.data).toEqual(before);
     for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
@@ -149,18 +156,16 @@ describe("persisted Mission disposition context", () => {
     values.strategyContext = { schemaVersion: 1, requestId: "00000000-0000-4000-8000-000000000011", intent: "deploy_excess_capital", searchScope: "broader_permitted_universe", requestedSymbols: [], declarationId: "00000000-0000-4000-8000-000000000012", sourceOrder: null, profitReserve: "" };
     const before = structuredClone(fixture.queries.draft.data);
     const view = render();
-    expect(view.$("h1").text()).toBe("Capital objective saved");
+    expect(view.$("[data-objective-flow]")).toHaveLength(1);
+    expect(fixture.objectiveFlow).toHaveBeenLastCalledWith({ initialDraft: before, receiptTarget: null });
     expect(view.$.text()).toContain(values.mission);
-    expect(view.$.text()).toContain("Illustrative Paper");
     expect(view.$.text()).not.toContain("Illustrative PWR");
-    expect(view.$.text()).toContain("not available in this workspace yet");
-    expect(view.$("button").text()).toBe("Return to Today");
     await vi.advanceTimersByTimeAsync(2000);
     expect(fixture.queries.draft.data).toEqual(before);
     for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
   });
 
-  it("retains the saved objective and exposes a cached-success to failed-refresh recovery without mutations", async () => {
+  it("retains the saved objective handoff after a parent refresh fails without mutations", async () => {
     const values = fixture.queries.draft.data.values;
     values.canonicalThesisId = null;
     values.strategyContext = { schemaVersion: 1, requestId: "00000000-0000-4000-8000-000000000011", intent: "deploy_excess_capital", searchScope: "broader_permitted_universe", requestedSymbols: [], declarationId: null, sourceOrder: null, profitReserve: "" };
@@ -169,11 +174,9 @@ describe("persisted Mission disposition context", () => {
     fixture.queries.draft.isError = true;
     fixture.queries.draft.error = new Error("Illustrative refresh failure");
     const view = render();
-    expect(view.$("h1").text()).toBe("Capital objective saved");
-    expect(view.$("[role=alert]").text()).toContain("Refresh failed");
+    expect(view.$("[data-objective-flow]")).toHaveLength(1);
+    expect(fixture.objectiveFlow).toHaveBeenLastCalledWith({ initialDraft: before, receiptTarget: null });
     expect(view.$.text()).toContain(values.mission);
-    await button(view.tree, "Retry loading saved context").props.onClick();
-    expect(fixture.invalidate).toHaveBeenCalled();
     expect(fixture.queries.draft.data).toEqual(before);
     for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
   });

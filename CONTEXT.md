@@ -18,3 +18,7 @@
 - **Capital envelope** — the named account, source event, availability state, returned principal, realized profit/loss, reserve, prior allocation claims, and amount eligible for consideration. An earmark is not a transfer, unrealized gains are hypothetical, and a target never increases allowed risk.
 - **Causal economic path** — an inspectable, maximum-three-hop chain from an observed development through the economic mechanism and security mapping to a possible expression. Every consequential link preserves sources, timestamps, assumptions, contradictions, unknowns, and invalidation.
 - **Discovery receipt** — the bounded research outcome for one accepted Mission: its reviewed scope, source provenance, conditional hypotheses, exclusions and unresolved questions. It is not a qualified allocation or an order.
+
+**Research lead**:
+A conditional opportunity hypothesis retained for further investigation, with its source basis, weaknesses and invalidation. It has not earned a capital allocation or become a quantitatively underwritten Trade Play Blueprint.
+_Avoid_: Approved play, qualified allocation, confirmed opportunity

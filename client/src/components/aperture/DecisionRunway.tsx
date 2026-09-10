@@ -15,6 +15,7 @@ import { ArgumentRail, BasisMark, StateMark, TypedStatusStrip, type WorkflowStat
 import { ContextHelp } from "./ContextHelp";
 import { PlayUnderwritingBrief } from "./PlayUnderwritingBrief";
 import { MissionResultWorkspace } from "./MissionResultWorkspace";
+import { ObjectiveMissionFlow } from "./ObjectiveMissionFlow";
 
 type Branch = "research" | "conditional" | "cash";
 type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
@@ -806,20 +807,9 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     return <section role="status" aria-live="polite" className="mx-auto max-w-3xl rounded-2xl border p-6 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>{receiptTarget ? "Loading immutable decision receipt…" : "Loading saved Mission and draft… No new analysis is starting."}</section>;
   }
   if (preservedStrategyDraft) {
-    return <section className="mx-auto max-w-3xl space-y-4 rounded-2xl border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-      <div><p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{paperAccount?.label ?? "Paper account not selected"} · Paper</p><h1 className="mt-1 font-serif text-2xl">Capital objective saved</h1></div>
-      {missionContextError && <div role="alert" className="rounded-lg border p-3 text-sm leading-6" style={{ borderColor: "var(--sh-red)" }}><p>Refresh failed. Showing saved version {preservedStrategyDraft.version}; current context is unverified.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void refreshMissionContext()}>Retry loading saved context</Button></div>}
-      <p className="whitespace-pre-wrap break-words text-base leading-6">{preservedStrategyDraft.values.mission || "Your unfinished capital request is preserved."}</p>
-      <p role="status" className="text-sm leading-6">{acceptedObjective
-        ? "Mission accepted. Discovery-to-research validation is not available in this release. No analysis, allocation or order has been created."
-        : "Objective-led discovery is not available in this workspace yet. Your saved request has not been converted into a thesis. No analysis or order was authorized by this draft."}</p>
-      <details className="rounded-lg border px-3" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 content-center cursor-pointer text-sm font-medium">Saved inputs</summary><dl className="space-y-2 pb-3 text-sm">
-        <div><dt className="font-medium">Declared capital</dt><dd>{preservedStrategyDraft.values.capital || "Not entered"} · Operator-declared, not verified cash</dd></div>
-        <div><dt className="font-medium">Horizon</dt><dd>{horizonLabel(preservedStrategyDraft.values.holdingPeriod)}</dd></div>
-        <div><dt className="font-medium">Saved version</dt><dd>{preservedStrategyDraft.version} · {new Date(preservedStrategyDraft.updatedAt).toLocaleString()}</dd></div>
-      </dl></details>
-      <Button className="min-h-11" onClick={() => window.location.assign(aperturePathForFixture("/aperture", readIsolatedUatIdentity()))}>Return to Today</Button>
-    </section>;
+    return <ObjectiveMissionFlow key={acceptedObjective ? `objective:${acceptedObjective.decisionRunId}:${acceptedObjective.decisionRevisionId}` : `objective-draft:${preservedStrategyDraft.id}`} initialDraft={preservedStrategyDraft} receiptTarget={acceptedObjective
+      ? { decisionRunId: acceptedObjective.decisionRunId, revisionId: acceptedObjective.decisionRevisionId }
+      : null} />;
   }
   if (receiptTarget && (receiptError || !immutableReceipt || !immutableReceipt.binding)) {
     const fixture = readIsolatedUatIdentity();

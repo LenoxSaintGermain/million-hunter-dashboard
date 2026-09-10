@@ -25,12 +25,14 @@ const SOURCES = {
   underwriting: ["0061_aperture_play_underwriting.sql", "aaedf5d92610fa2daedd0d71bd97643e1c0989e76eba69d4b9ad22d8ca5e5979"],
   ledger: ["0065_aperture_capital_ledger.sql", "d6566591dde81ca68665622f9aebc3ddec92ce1088cf0b41279ed70b01f4b03e"],
   objective: ["0066_aperture_objective_mission.sql", "2c44d798c0c049a4d478753f94fe7a0edd0d93b50e063e912dd7aed13f6c0a18"],
+  discovery: ["0067_aperture_strategy_discovery.sql", "9e2472d3e3cb7e232f2fe7efba3d66b440cf5073f6440f528879a9e1b806c075"],
 } as const;
 const TABLES = {
   runs: "aperture_decision_runs",
   revisions: "aperture_decision_revisions",
   events: "aperture_capital_events",
   claims: "aperture_capital_claims",
+  discoveries: "aperture_strategy_discoveries",
 } as const;
 type Table = keyof typeof TABLES;
 type Ddl = { sql: string; operation: "CREATE" | "ALTER"; table: string };
@@ -43,15 +45,16 @@ function statements(source: keyof typeof SOURCES): Ddl[] {
   const [file, hash] = SOURCES[source];
   const bytes = readFileSync(new URL(`../../drizzle/${file}`, import.meta.url));
   // Fail closed if reviewed migration bytes change; do not silently execute new
-  // targets, a backfill, or destructive SQL. Hashes identify HEAD 79dc804 sources.
+  // targets, a backfill, or destructive SQL. Hashes identify reviewed migration bytes.
   expect(createHash("sha256").update(bytes).digest("hex"), file).toBe(hash);
   return bytes.toString("utf8").split("--> statement-breakpoint")
-    .flatMap(chunk => chunk.split(/(?<=;)/))
-    .filter(sql => sql.replace(/--[^\r\n]*/g, "").trim())
+    // These hash-pinned migrations contain line comments, including semicolons.
+    // Remove only those comments before splitting executable statements.
+    .flatMap(chunk => chunk.replace(/--[^\r\n]*/g, "").split(/(?<=;)/))
+    .filter(sql => sql.trim())
     .map(sql => {
-      // Splitting removes only migration framing. The executable SQL, including
-      // comments, columns, defaults and index names, is not regenerated.
-      const head = sql.replace(/--[^\r\n]*/g, "").trim();
+      // Columns, defaults and index names remain the actual migration SQL.
+      const head = sql.trim();
       const match = /^(CREATE|ALTER) TABLE (?:IF NOT EXISTS )?`?([a-z_]+)`?\s/.exec(head);
       if (!match) throw new Error(`Unreviewed statement shape in ${file}`);
       return { sql, operation: match[1] as Ddl["operation"], table: match[2] };
@@ -69,7 +72,7 @@ function renameTables(sql: string, names: ReadonlyMap<string, string>): string {
   });
 }
 
-describe("0065/0066 existing receipt migration — owned disposable shadow tables", () => {
+describe("0065/0066/0067 existing receipt migration — owned disposable shadow tables", () => {
   it("retains legacy receipts and enforces objective and ledger identities using actual migration SQL", async () => {
     const target = requireIsolatedIntegrationDatabase(process.env.DATABASE_URL, process.env.ISOLATED_INTEGRATION_DATABASE);
     const suffix = randomUUID().replaceAll("-", "");
@@ -79,7 +82,7 @@ describe("0065/0066 existing receipt migration — owned disposable shadow table
     const allowed = new Set(Object.values(shadow));
     const owned: string[] = [];
     const quote = (name: string) => {
-      if (!allowed.has(name) || !/^objmig_[a-f0-9]{32}_(runs|revisions|events|claims)$/.test(name)) {
+      if (!allowed.has(name) || !/^objmig_[a-f0-9]{32}_(runs|revisions|events|claims|discoveries)$/.test(name)) {
         throw new Error("Refusing SQL outside this test's exact shadow tables");
       }
       return `\`${name}\``;
@@ -94,12 +97,14 @@ describe("0065/0066 existing receipt migration — owned disposable shadow table
     const underwriting = statements("underwriting").filter(s => s.table === TABLES.revisions);
     const ledger = statements("ledger");
     const objective = statements("objective");
+    const discovery = statements("discovery");
     const shape = (ddl: Ddl[]) => ddl.map(({ operation, table }) => [operation, table]);
     expect(shape(base)).toEqual([["CREATE", TABLES.runs], ["CREATE", TABLES.revisions]]);
     expect(shape(options)).toEqual([["ALTER", TABLES.revisions]]);
     expect(shape(underwriting)).toEqual([["ALTER", TABLES.revisions]]);
     expect(shape(ledger)).toEqual([["CREATE", TABLES.events], ["CREATE", TABLES.claims]]);
     expect(shape(objective)).toEqual([["ALTER", TABLES.runs], ["ALTER", TABLES.revisions]]);
+    expect(shape(discovery)).toEqual([["CREATE", TABLES.discoveries]]);
 
     const network = vi.fn(() => { throw new Error("Provider/broker calls forbidden in migration test"); });
     vi.stubGlobal("fetch", network);
@@ -120,7 +125,7 @@ describe("0065/0066 existing receipt migration — owned disposable shadow table
       };
       await identity();
       const existingShadows = () => rows(
-        "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?)",
+        "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?, ?)",
         Object.values(shadow),
       );
       // Never pre-drop/reuse a table, even in the approved database.
@@ -293,6 +298,28 @@ describe("0065/0066 existing receipt migration — owned disposable shadow table
         await insert("claims", { ...claim, allocation_id: "fixture:allocation-2" }); // Multiple allocations per event are legal.
         expect(await all("claims")).toHaveLength(3);
         expect(await all("events")).toHaveLength(3);
+
+        const beforeDiscovery = { runs: await all("runs"), revisions: await all("revisions"), events: await all("events"), claims: await all("claims") };
+        await apply(discovery);
+        expect(await all("discoveries")).toEqual([]);
+        expect(await indexes("discoveries")).toEqual({
+          PRIMARY: { unique: true, columns: ["id"] },
+          aperture_discovery_job_attempt_uq: { unique: true, columns: ["job_id", "attempt"] },
+          aperture_discovery_owner_revision_idx: { unique: false, columns: ["user_id", "decision_revision_id", "id"] },
+        });
+        const discoveryColumns = await columns("discoveries");
+        for (const column of ["request", "payload", "manifest", "result", "record_hash", "created_at"]) expect(discoveryColumns[column].Null).toBe("NO");
+        const discoveryFixture = { user_id: OWNER, decision_run_id: objectiveId, decision_revision_id: objectiveRevisionId,
+          job_id: 9001, attempt: 1, attempt_token: REQUEST, request: JSON.stringify({ fixture: true }),
+          payload: JSON.stringify({ raw: "Illustrative raw bytes.  \nNot a market claim." }), manifest: JSON.stringify({ fixture: true }),
+          result: JSON.stringify({ fixture: true }), record_hash: "d".repeat(64), created_at: NOW };
+        await insert("discoveries", discoveryFixture);
+        await duplicate(insert("discoveries", discoveryFixture));
+        await duplicate(insert("discoveries", { ...discoveryFixture, user_id: OTHER_OWNER }));
+        await insert("discoveries", { ...discoveryFixture, attempt: 2 });
+        await insert("discoveries", { ...discoveryFixture, job_id: 9002 });
+        expect(await all("discoveries")).toHaveLength(3);
+        expect({ runs: await all("runs"), revisions: await all("revisions"), events: await all("events"), claims: await all("claims") }).toEqual(beforeDiscovery);
 
         // Identity, history links, cents, timestamps, nullable values, exact text
         // and JSON survive both DDL and all rejected/successful new inserts.

@@ -381,3 +381,54 @@ receipts. It and the prior 0065/0066 migrations remain unapplied to production a
 the browser fixture. Test results and remaining release/UAT scope belong in the
 completion matrix. No new homepage, broker status, risk authority or auto-trade
 path has been introduced.
+
+## September 10 — connected objective entry and discovery readback
+
+This section supersedes the preceding **unmounted** UI description, not its
+release boundary. The local Mission now routes an unfinished objective to its
+guided workspace and an accepted objective to its exact discovery record.
+The optional capital-objective entry belongs inside Mission; it is advertised
+only when the server confirms capability. A direct receipt remains authoritative
+even if a conflicting new-objective query parameter is present. No active
+canonical thesis is substituted, and opening either route authorizes no work.
+
+The flow preserves raw inputs, shows persistence success only after confirmation,
+and checks a named Paper account plus the authoritative risk preview beside the
+entered limit. A failed refresh cannot convert the last result into an empty
+successful search. Changing assumptions invalidates the old preview. An
+unrelated unfinished draft is not silently replaced by the new entry.
+
+Discovery opens with research findings, not another permission-to-continue
+screen. Conditional hypotheses, their weaknesses and reopening conditions are
+distinct from qualified trade plays. Source detail and rejected hypotheses
+remain inspectable. Job states are actual persisted milestones; no fabricated
+percentage, market observation or automatic monitoring claim is added.
+
+`strategy.resume` reconciles an uncertain start using its original owner-scoped
+request ID. It returns the immutable accepted inputs and exact Mission revision,
+or absence; it never starts work. Absence alone does not permit a new identity:
+the same saved version/request must still pass acceptance's concurrency checks.
+This remains safe when another device subsequently changes the current draft.
+`strategy.get` likewise returns original inputs, never reconstructed inputs from
+the newest draft. The parent controller retains edits and requires review when
+stored versions conflict.
+
+Today and Play Desk use the existing shared attention helper to distinguish an
+objective awaiting analysis, discovery underway, failed/unreconciled discovery,
+and recorded findings. Their links open the exact Mission revision, not the
+thesis-only underwriting page. A completed job's receipt is checked before this
+status is exposed. A lookup failure becomes an attention item, not “no analysis”
+or an all-clear. Discovery does not acknowledge or resolve findings, allocate
+capital, or change any existing position.
+
+Remaining: selecting a discovery hypothesis into a verified, source-bound
+tactical research context and the existing Underwriter/evidence workflow;
+explicit accepted-assumption revisions; actual gains-envelope ingestion and
+transactional proposal claims. These cannot be replaced by enabling the legacy
+thesis-only action or manufacturing a canonical thesis. Discovery execution
+stays server-gated until the connected journey and release review pass.
+
+The Mac was locked during this check, preventing a new authenticated browser
+walkthrough. Renderer/callback tests and isolated storage tests are development
+evidence, not mobile, keyboard, focus, cross-device authentication or user-tested
+usability evidence. The current market-open UAT requirement is not fulfilled.

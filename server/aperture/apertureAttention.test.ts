@@ -45,6 +45,24 @@ describe("Capital Aperture attention briefing", () => {
     expect(result.scopeNote).not.toContain("Checks last completed");
   });
 
+  it.each([
+    ["not_started", "Underwrite my mission"],
+    ["running", "View discovery progress"],
+    ["failed", "Review analysis status"],
+    ["complete", "Review research findings"],
+  ] as const)("uses the exact objective route for %s discovery without treating hypotheses as qualified plays", (state, actionLabel) => {
+    const input = base({ mission: savedMission, underwriting: { workKind: "discovery", decisionRunId: 42,
+      revisionId: 7, state, updatedAt: now } });
+    const before = structuredClone(input);
+    const result = deriveApertureAttention(input, null);
+    expect(result.quiet).toBe(false);
+    expect(result.primary).toMatchObject({ actionLabel, href: "/aperture/decision/42/revision/7" });
+    expect(result.primary?.consequence).toContain("Existing positions are unchanged");
+    expect(result.primary?.reason).not.toContain("conditional playbook");
+    expect(result.primary?.reason).not.toContain("no analysis has started");
+    expect(input).toEqual(before);
+  });
+
   it("does not assert a verified quiet session without a successful status timestamp", () => {
     const result = deriveApertureAttention(base({ mission: savedMission, checks: { state: "complete", asOf: null, monitoring: "on_demand" } }), null);
     expect(result.quiet).toBe(false);
