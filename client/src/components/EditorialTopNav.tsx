@@ -327,7 +327,8 @@ function GlobalSearchPalette({ open, onClose }: { open: boolean; onClose: () => 
 }
 
 /* ── Main Component ─────────────────────────────────────────────────────────── */
-export default function EditorialTopNav({ children }: { children: React.ReactNode }) {
+export default function EditorialTopNav({ children, workspaceId }: { children: React.ReactNode; workspaceId?: string }) {
+  const PageContainer = workspaceId ? "div" : "main";
   const [location] = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
   const userRole = (user as any)?.role as string | undefined;
@@ -378,6 +379,16 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-[var(--bone)]">
+      {workspaceId && <a href={`#${workspaceId}`}
+        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[100] focus:flex focus:min-h-11 focus:items-center focus:rounded-md focus:border focus:px-4 focus:py-2 focus:text-base focus:font-semibold focus:outline focus:outline-2 focus:outline-offset-2"
+        style={{ background: "var(--sh-surface)", color: "var(--sh-text-primary)", borderColor: "var(--sh-border-1)" }}
+        onClick={(event) => {
+          const target = document.getElementById(workspaceId);
+          if (!target) return;
+          event.preventDefault();
+          target.focus({ preventScroll: true });
+          target.scrollIntoView({ behavior: "auto", block: "start" });
+        }}>Skip to workspace</a>}
       {/* ── Top Nav ─────────────────────────────────────────────────────────── */}
       <header
         className={cn(
@@ -745,9 +756,9 @@ export default function EditorialTopNav({ children }: { children: React.ReactNod
       <GlobalSearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       {/* ── Page Content ────────────────────────────────────────────────────── */}
-      <main style={{ paddingTop: "56px" }}>
+      <PageContainer style={{ paddingTop: "56px" }}>
         {children}
-      </main>
+      </PageContainer>
     </div>
   );
 }

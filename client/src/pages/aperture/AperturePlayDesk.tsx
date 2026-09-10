@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
@@ -104,6 +104,7 @@ export default function AperturePlayDesk() {
   const playList = trpc.aperture.play.list.useQuery(undefined, { retry: false });
   const outcomes = trpc.aperture.runway.pending.useQuery(undefined, { retry: false });
   const [primaryKey, setPrimaryKey] = useState<string | null>(null);
+  const refreshInFlight = useRef(false);
   const briefing = desk.data?.attention;
   const read = arbitrateTodayRead({ briefing: briefing ?? null, refreshing: desk.isFetching, failed: !!desk.error, primaryKey });
   const disclosure = read.layout;
@@ -147,12 +148,24 @@ export default function AperturePlayDesk() {
     setStageFilter(next);
   };
 
-  const refresh = () => Promise.all([desk.refetch(), runs.refetch(), playList.refetch(), outcomes.refetch()]);
+  const refresh = async () => {
+    // Keep the initiating control focusable while blocking repeated activation,
+    // including a second event before query state has repainted.
+    if (isRefreshing || refreshInFlight.current) return;
+    refreshInFlight.current = true;
+    try {
+      // One failed source must not unlock another refresh while others still run.
+      // Each query retains its own error and last successful records for recovery.
+      await Promise.allSettled([desk.refetch(), runs.refetch(), playList.refetch(), outcomes.refetch()]);
+    } finally {
+      refreshInFlight.current = false;
+    }
+  };
 
   return <DashboardLayout><div className="mx-auto max-w-6xl space-y-5 pb-12">
     <header data-desk-header className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="font-serif text-2xl sm:text-3xl" style={{ color: "var(--sh-text-primary)" }}>Play Desk</h1>
-      <Button variant="outline" size="sm" className="min-h-11" onClick={refresh} disabled={isRefreshing} aria-describedby="desk-refresh-scope"><RefreshCw className="mr-2 h-4 w-4" />{isRefreshing ? "Refreshing…" : "Refresh status"}</Button>
+      <Button type="button" variant="outline" size="sm" className="min-h-11 aria-disabled:opacity-50" onClick={refresh} aria-disabled={isRefreshing} aria-describedby="desk-refresh-scope"><RefreshCw className="mr-2 h-4 w-4" />{isRefreshing ? "Refreshing…" : "Refresh status"}</Button>
     </header>
 
     <div id="desk-refresh-scope" role="status" aria-live="polite" className="text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>
@@ -162,7 +175,7 @@ export default function AperturePlayDesk() {
     {unavailable.length > 0 && <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}>
       {unavailable.map(({ label, query }) => <div key={label} className="mb-3 last:mb-0"><p className="font-semibold">{label} status unavailable</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{query.data != null ? "Refresh failed. Last known records remain visible; they may be stale." : "This part of the desk could not be verified."}</p></div>)}
       <p className="text-sm">This is not an all-clear. Refresh status to retry; no order will be resubmitted.</p>
-      <Button variant="outline" className="mt-3 min-h-11" onClick={refresh} disabled={isRefreshing}>Retry status</Button>
+      <Button type="button" variant="outline" className="mt-3 min-h-11 aria-disabled:opacity-50" onClick={refresh} aria-disabled={isRefreshing} aria-describedby="desk-refresh-scope">Retry status</Button>
     </section>}
     {briefing && read.state !== "complete" && <section role="status" className="rounded-xl border px-4 py-3 text-sm leading-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}><p className="font-semibold">Recorded checks: {read.state}. Status is not an all-clear.</p>{!briefing.sourceIssues?.length && <p>Missing source not identified in this saved snapshot. Refresh status to identify the gap.</p>}</section>}
 
@@ -176,7 +189,7 @@ export default function AperturePlayDesk() {
       {!!disclosure?.otherAttention.length && <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer p-3 text-sm font-semibold">Other decisions ({disclosure.otherAttention.length})</summary><div className="space-y-2 p-3 pt-0">{disclosure.otherAttention.map((item) => <AttentionTask key={item.key} item={item} onOpen={navigate} />)}</div></details>}
     </section>
 
-    <AttentionSourceRecovery issues={briefing?.sourceIssues ?? []} onOpen={navigate} onRetry={refresh} busy={desk.isFetching} />
+    <AttentionSourceRecovery issues={briefing?.sourceIssues ?? []} onOpen={navigate} onRetry={refresh} busy={isRefreshing} />
 
     {selectedPlayId != null && <section id={`play-${selectedPlayId}`} tabIndex={-1} aria-label={`Selected play ${selectedPlayId}`} className="scroll-mt-24 rounded-xl border-2 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}>
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">Selected play · #{selectedPlayId}</h2><Button variant="outline" className="min-h-11" onClick={() => navigate(playDeskFilterHref(search, { play: null }))}>Return to filtered desk</Button></div>
@@ -186,7 +199,7 @@ export default function AperturePlayDesk() {
           const state = deskOrderPresentation(order.id, briefing);
           return <div key={order.id} className="mt-3 rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="text-sm font-semibold">Linked order #{order.id} · {state.label}</p><p className="mt-1 text-sm">{state.detail}</p><Button className="mt-2 min-h-11" variant="outline" onClick={() => state.href ? navigate(state.href) : refresh()}>{state.action}</Button></div>;
         })}
-      </> : <div role="status" className="mt-3 text-sm leading-6">{desk.isLoading ? "Loading this play's saved record…" : desk.error ? "The selected play could not be loaded. Retry status; this does not mean the play is closed." : "This play is not in the returned active records. It may be outside this account's active view; closure is not confirmed."}<div className="mt-2 flex flex-wrap gap-2"><Button className="min-h-11" variant="outline" onClick={refresh} disabled={isRefreshing}>Retry selected play</Button><Button className="min-h-11" variant="outline" onClick={() => navigate("/aperture/accounts")}>Inspect account records</Button></div></div>}
+      </> : <div role="status" className="mt-3 text-sm leading-6">{desk.isLoading ? "Loading this play's saved record…" : desk.error ? "The selected play could not be loaded. Retry status; this does not mean the play is closed." : "This play is not in the returned active records. It may be outside this account's active view; closure is not confirmed."}<div className="mt-2 flex flex-wrap gap-2"><Button type="button" className="min-h-11 aria-disabled:opacity-50" variant="outline" onClick={refresh} aria-disabled={isRefreshing} aria-describedby="desk-refresh-scope">Retry selected play</Button><Button className="min-h-11" variant="outline" onClick={() => navigate("/aperture/accounts")}>Inspect account records</Button></div></div>}
     </section>}
 
     <section className="grid grid-cols-3 overflow-hidden rounded-xl border" aria-label="Filter by workflow stage" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>

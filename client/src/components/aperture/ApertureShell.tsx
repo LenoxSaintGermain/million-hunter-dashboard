@@ -34,7 +34,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
   const nav = user?.defaultWorkspace === "capital_aperture_trader" ? TRADER_NAV : APERTURE_NAV;
 
   return (
-    <EditorialTopNav>
+    <EditorialTopNav workspaceId="aperture-workspace">
       <section className="border-b border-rule bg-paper">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-10 py-3 sm:py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -73,7 +73,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
           </nav>
         </div>
       </section>
-      <main className="aperture-editorial max-w-[1280px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-5 sm:py-8 lg:py-10">
+      <main id="aperture-workspace" tabIndex={-1} aria-label="Capital Aperture workspace" className="aperture-editorial scroll-mt-16 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 max-w-[1280px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-5 sm:py-8 lg:py-10">
         <CapitalCockpitRail runId={runId} compactOnly={location === "/aperture/plays" || location.startsWith("/aperture/run/")} />
         {children}
       </main>
