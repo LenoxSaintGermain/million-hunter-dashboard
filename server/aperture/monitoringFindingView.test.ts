@@ -27,6 +27,44 @@ beforeEach(() => {
 });
 
 describe("monitoring finding decision view", () => {
+  it("waits for the exact play context instead of reporting a missing finding during hydration", () => {
+    fixture.checks = [];
+    const html = renderToStaticMarkup(React.createElement(MonitoringPanel, {
+      runId: check.runId, selection, onOpenFinding: fixture.navigate,
+      contextState: "loading",
+    }));
+    expect(html).toContain("Loading selected play and order");
+    expect(html).not.toContain("could not be matched");
+    expect(html).not.toContain("No monitoring checks recorded");
+    expect(html).not.toContain("Review the order status first");
+    expect(fixture.mutate).not.toHaveBeenCalled();
+    expect(fixture.refetch).not.toHaveBeenCalled();
+  });
+  it("does not turn a failed context read into missing evidence or an empty queue", () => {
+    fixture.checks = [];
+    const html = renderToStaticMarkup(React.createElement(MonitoringPanel, {
+      runId: check.runId, selection, contextState: "failed", onOpenFinding: fixture.navigate,
+      onRetryContext: fixture.refetch,
+    }));
+    expect(html).toContain("Selected play or order could not refresh");
+    expect(html).toContain("Retry play and order");
+    expect(html).not.toContain("could not be matched");
+    expect(html).not.toContain("No monitoring checks recorded");
+    expect(fixture.mutate).not.toHaveBeenCalled();
+    expect(fixture.refetch).not.toHaveBeenCalled();
+  });
+  it("keeps last successful evidence visible on a context refresh failure without allowing new checks", () => {
+    const html = renderToStaticMarkup(React.createElement(MonitoringPanel, {
+      runId: check.runId, candidate: { id: check.candidateId, symbol: check.symbol },
+      order: order as any, selection, contextState: "failed", onOpenFinding: fixture.navigate,
+      onRetryContext: fixture.refetch,
+    }));
+    expect(html).toContain("No monitoring eligibility is confirmed");
+    expect(html).toContain('data-selected-monitoring-finding="1"');
+    expect(html).toContain("Illustrative catalyst concern");
+    expect(html).not.toContain("Refresh sourced checks");
+    expect(fixture.mutate).not.toHaveBeenCalled();
+  });
   it("leads with the selected stale finding and exact put while retaining other checks without mutations", () => {
     const html = render();
     expect(html.indexOf('data-selected-monitoring-finding="1"')).toBeLessThan(html.indexOf('id="monitoring-check-4"'));

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { ArrowRight, ChevronDown, CircleSlash2, FileSearch, GitCompareArrows, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +34,7 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
   onNewResearch: () => void;
   onOpenRun: (runId: number, candidateId: number, view?: string) => void;
 }) {
+  const [, navigate] = useLocation();
   const { data: playList, isLoading, isFetching: playsRefreshing, error: playsError, refetch: refetchPlays } = trpc.aperture.play.list.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const desk = trpc.aperture.desk.summary.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false });
@@ -135,7 +137,7 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
       loading={desk.isFetching}
       failed={statusErrors}
       failedSources={failedSources}
-      onOpen={(href) => window.location.assign(href)}
+      onOpen={navigate}
       onRetry={() => { void Promise.all([desk.refetch(), refetchPlays(), accountQuery.refetch(), thesisQuery.refetch(), ...(preferredAccountId != null ? [refetchCockpit()] : [])]); }}
       onNewMission={onNewMission}
     />
