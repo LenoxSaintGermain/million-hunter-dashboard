@@ -2,11 +2,14 @@
 import { spawn, execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 
-const server = process.argv[2] === "--server";
+const monitoringServer = process.argv[2] === "--monitoring-server";
+const monitoringSeed = process.argv[2] === "--monitoring-seed";
+const monitoringInspect = process.argv[2] === "--monitoring-inspect";
+const server = process.argv[2] === "--server" || monitoringServer;
 const test = process.argv[2] === "--test";
-const seed = process.argv[2] === "--seed";
+const seed = process.argv[2] === "--seed" || monitoringSeed || monitoringInspect;
 const shuffle = test && process.argv[3] === "--shuffle";
-if ((!server && !test && !seed) || process.argv.length > (shuffle ? 4 : 3)) throw new Error("Use --server, --seed, or --test [--shuffle].");
+if ((!server && !test && !seed) || process.argv.length > (shuffle ? 4 : 3)) throw new Error("Use --server, --seed, --monitoring-server, --monitoring-seed, --monitoring-inspect, or --test [--shuffle].");
 const container = JSON.parse(execFileSync("docker", ["inspect", "sh-ch-capital-uat-db", "--format", "{{json .}}"], { encoding: "utf8" }));
 const bindings = container.NetworkSettings?.Ports?.["3306/tcp"];
 if (!container.State?.Running || bindings?.length !== 1 || bindings[0].HostIp !== "127.0.0.1" || bindings[0].HostPort !== "3307") throw new Error("The isolated database must be running and bound only to 127.0.0.1:3307.");
@@ -25,14 +28,14 @@ Object.assign(env, {
   // Container-local credentials only. This root connection intentionally does
   // not satisfy the uat_app-qualified artificial play / order fixture gate.
   DATABASE_URL: `mysql://root:${encodeURIComponent(local.MARIADB_ROOT_PASSWORD)}@127.0.0.1:3307/capital_aperture_uat_9c18799`,
-  NODE_ENV: "development", ISOLATED_UAT_MODE: "true", LOCAL_PREVIEW_OPENID: "uat_guided_20260909",
-  JWT_SECRET: "isolated-uat-no-production-authority", PORT: "3110",
+  NODE_ENV: "development", ISOLATED_UAT_MODE: "true", LOCAL_PREVIEW_OPENID: monitoringServer ? "uat_monitoring_20260910" : "uat_guided_20260909",
+  JWT_SECRET: "isolated-uat-no-production-authority", PORT: monitoringServer ? "3112" : "3110",
   VITE_ANALYTICS_ENDPOINT: "", VITE_ANALYTICS_WEBSITE_ID: "",
 });
 const command = test ? "./node_modules/.bin/vitest" : "./node_modules/.bin/tsx";
 // --test never seeds or starts a server. Shuffling has a fixed replayable seed
 // and cannot broaden the test-file scope through arbitrary forwarded arguments.
-const args = server ? ["server/_core/index.ts"] : seed ? ["scripts/seed-guided-capital-uat.ts"] : ["run", "server/aperture/persistedJourneys.integration.test.ts", ...(shuffle ? ["--sequence.shuffle", "--sequence.seed=630001"] : [])];
+const args = server ? ["server/_core/index.ts"] : seed ? [monitoringSeed || monitoringInspect ? "scripts/seed-monitoring-capital-uat.ts" : "scripts/seed-guided-capital-uat.ts", ...(monitoringInspect ? ["--inspect"] : [])] : ["run", "server/aperture/persistedJourneys.integration.test.ts", ...(shuffle ? ["--sequence.shuffle", "--sequence.seed=630001"] : [])];
 const child = spawn(command, args, { env, stdio: "inherit" });
 process.on("SIGINT", () => child.kill("SIGINT"));
 process.on("SIGTERM", () => child.kill("SIGTERM"));
