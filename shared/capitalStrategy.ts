@@ -1,11 +1,10 @@
 import type { UnderwritingHoldingPeriod } from "./playUnderwriting";
 import { z } from "zod";
 
-export type StrategyIntent =
-  | "deploy_excess_capital"
-  | "redeploy_realized_gains"
-  | "explore_opportunity"
-  | "review_material_change";
+export const strategyIntentSchema = z.enum([
+  "deploy_excess_capital", "redeploy_realized_gains", "explore_opportunity", "review_material_change",
+]);
+export type StrategyIntent = z.infer<typeof strategyIntentSchema>;
 
 export type NamedCapitalAccount = {
   id: string;
@@ -294,7 +293,8 @@ export type CausalPathAssessment = {
   confidence: number | null;
 };
 
-export type CapitalSearchScope = "current_thesis" | "related_opportunities" | "broader_permitted_universe";
+export const capitalSearchScopeSchema = z.enum(["current_thesis", "related_opportunities", "broader_permitted_universe"]);
+export type CapitalSearchScope = z.infer<typeof capitalSearchScopeSchema>;
 export type CapitalUseKind = "new_play" | "incremental_existing_thesis";
 
 export type CapitalStrategyCandidate = {

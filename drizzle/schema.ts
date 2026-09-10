@@ -2053,4 +2053,5 @@ export type ApertureAlpha = typeof apertureAlpha.$inferSelect;
 export type InsertApertureAlpha = typeof apertureAlpha.$inferInsert;
 export { apertureUnderwritingJobs } from "./apertureUnderwritingJobSchema";
 export { apertureMissionDrafts, apertureMissionDraftRevisions } from "./apertureMissionDraftSchema";
+export { apertureCapitalEvents, apertureCapitalClaims } from "./apertureCapitalLedgerSchema";
 export { capitalStackTemplates, capitalStacks, capitalStackLayers } from "./legacyCapitalStackSchema";

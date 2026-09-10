@@ -2,12 +2,12 @@ import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { apertureMissionDrafts, apertureMissionDraftRevisions } from "../../drizzle/apertureMissionDraftSchema";
-import { apertureDecisionRevisions, apertureDecisionRuns, portfolioAccounts, thesisCompilations } from "../../drizzle/schema";
+import { apertureCandidates, apertureRuns, brokerOrders, apertureDecisionRevisions, apertureDecisionRuns, portfolioAccounts, thesisCompilations } from "../../drizzle/schema";
 import { missionDraftValuesSchema, type MissionDraftRecord, type MissionDraftValues } from "../../shared/apertureMissionDraft";
 import { capitalOperatorProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 
-const saveInput = z.object({ expectedVersion: z.number().int().nonnegative(), values: missionDraftValuesSchema });
+const saveInput = z.object({ expectedVersion: z.number().int().nonnegative(), values: missionDraftValuesSchema, replaceStrategyContext: z.boolean().optional() }).strict();
 const completeInput = z.object({
   expectedVersion: z.number().int().positive(),
   decisionRunId: z.number().int().positive(),
@@ -32,6 +32,10 @@ export function createMissionDraftService(store: MissionDraftStore, now = Date.n
     get: (userId: number) => store.get(userId),
     async save(userId: number, raw: z.infer<typeof saveInput>) {
       const input = saveInput.parse(raw);
+      const previous = await store.get(userId);
+      if (previous?.values.strategyContext && !input.values.strategyContext && !input.replaceStrategyContext) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This saved draft contains a capital objective. Reload a workspace that supports it, or explicitly choose to replace that context. Nothing was overwritten." });
+      }
       await store.assertBindings(userId, input.values);
       const result = await store.compareAndSwap(userId, input.expectedVersion, { values: input.values, updatedAt: now(), completedAt: null });
       if (!result) throw conflict();
@@ -39,8 +43,9 @@ export function createMissionDraftService(store: MissionDraftStore, now = Date.n
     },
     async complete(userId: number, raw: z.infer<typeof completeInput>) {
       const input = completeInput.parse(raw);
-      await store.assertReceipt(userId, input.decisionRunId, input.decisionRevisionId);
       const current = await store.get(userId);
+      if (current?.values.strategyContext) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This capital objective has not entered the accepted Mission workflow yet. Keep the draft; an unrelated Mission receipt cannot complete it." });
+      await store.assertReceipt(userId, input.decisionRunId, input.decisionRevisionId);
       // Retrying an already-confirmed completion is harmless. A newer draft is not.
       if (current?.version === input.expectedVersion + 1 && current.completedAt != null
         && current.values.baseDecisionRunId === input.decisionRunId
@@ -99,6 +104,17 @@ export const missionDraftStore: MissionDraftStore = {
       const [account] = await db.select({ id: portfolioAccounts.id }).from(portfolioAccounts)
         .where(and(eq(portfolioAccounts.id, values.accountId), eq(portfolioAccounts.userId, userId), eq(portfolioAccounts.isPaper, true))).limit(1);
       if (!account) throw new TRPCError({ code: "NOT_FOUND", message: "Select an available paper account before saving this account choice." });
+    }
+    const source = values.strategyContext?.sourceOrder;
+    if (source) {
+      const [owned] = await db.select({ id: brokerOrders.id }).from(brokerOrders)
+        .innerJoin(apertureRuns, eq(apertureRuns.id, brokerOrders.runId))
+        .innerJoin(apertureCandidates, and(eq(apertureCandidates.id, brokerOrders.candidateId), eq(apertureCandidates.runId, brokerOrders.runId)))
+        .where(and(eq(brokerOrders.userId, userId), eq(apertureRuns.userId, userId),
+          eq(brokerOrders.accountId, source.accountId), eq(brokerOrders.runId, source.runId),
+          eq(brokerOrders.candidateId, source.candidateId), eq(brokerOrders.id, source.orderId))).limit(1);
+      if (!owned) throw new TRPCError({ code: "NOT_FOUND", message: "The selected source order is not available in this account and play. Reopen that exact play; no source was guessed." });
+      // An owned reference is not proof of a closing fill, profit or availability.
     }
     if (values.baseDecisionRunId != null && values.baseDecisionRevisionId != null) {
       await missionDraftStore.assertReceipt(userId, values.baseDecisionRunId, values.baseDecisionRevisionId);

@@ -77,6 +77,10 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false });
   const { data: accounts } = accountQuery;
   const draftQuery = trpc.aperture.runway.draft.get.useQuery(undefined, { enabled: !receiptTarget, retry: false, refetchOnWindowFocus: false });
+  // This release can retain the newer request, but must not reinterpret it as
+  // a canonical-thesis Mission before the accepted-intent handoff is wired.
+  const preservedStrategyDraft = !receiptTarget && draftQuery.data?.completedAt == null
+    && draftQuery.data?.values.strategyContext ? draftQuery.data : null;
   const saveDraftMutation = trpc.aperture.runway.draft.save.useMutation();
   const completeDraftMutation = trpc.aperture.runway.draft.complete.useMutation();
   const [selectedCanonicalId, setSelectedCanonicalId] = useState<number | null | undefined>(undefined);
@@ -194,7 +198,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     deployableCapitalCents: Math.max(parseMoney(capital), 1),
     holdingPeriod,
     objective,
-  }, { enabled: libraryBindings.ready, retry: false });
+  }, { enabled: libraryBindings.ready && !preservedStrategyDraft, retry: false });
   const createThesis = trpc.thesis.createCapital.useMutation();
   const projectThesis = trpc.thesis.useInAperture.useMutation();
   const saveMission = trpc.aperture.runway.begin.useMutation();
@@ -219,7 +223,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const authoritativePreview = trpc.aperture.underwriter.preview.useQuery(
     { accountId: paperAccount?.id ?? 0, objective: previewObjective },
     {
-      enabled: Boolean(paperAccount?.id) && previewObjective.deployableCapitalCents > 0 && previewObjective.maxPlannedLossCents > 0,
+      enabled: !preservedStrategyDraft && Boolean(paperAccount?.id) && previewObjective.deployableCapitalCents > 0 && previewObjective.maxPlannedLossCents > 0,
       retry: false,
       refetchOnWindowFocus: false,
     },
@@ -786,6 +790,20 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   }
   if (missionContextLoading || (receiptTarget && (receiptLoading || (!receiptError && immutableReceipt?.binding && hydratedDecisionRevisionId.current !== receiptTarget.revisionId)))) {
     return <section role="status" aria-live="polite" className="mx-auto max-w-3xl rounded-2xl border p-6 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>{receiptTarget ? "Loading immutable decision receipt…" : "Loading saved Mission and draft… No new analysis is starting."}</section>;
+  }
+  if (preservedStrategyDraft) {
+    return <section className="mx-auto max-w-3xl space-y-4 rounded-2xl border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+      <div><p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{paperAccount?.label ?? "Paper account not selected"} · Paper</p><h1 className="mt-1 font-serif text-2xl">Capital objective saved</h1></div>
+      {missionContextError && <div role="alert" className="rounded-lg border p-3 text-sm leading-6" style={{ borderColor: "var(--sh-red)" }}><p>Refresh failed. Showing saved version {preservedStrategyDraft.version}; current context is unverified.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void refreshMissionContext()}>Retry loading saved context</Button></div>}
+      <p className="whitespace-pre-wrap break-words text-base leading-6">{preservedStrategyDraft.values.mission || "Your unfinished capital request is preserved."}</p>
+      <p role="status" className="text-sm leading-6">Objective-led discovery is not available in this workspace yet. Your saved request has not been converted into a thesis. No analysis or order was authorized by this draft.</p>
+      <details className="rounded-lg border px-3" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 content-center cursor-pointer text-sm font-medium">Saved inputs</summary><dl className="space-y-2 pb-3 text-sm">
+        <div><dt className="font-medium">Declared capital</dt><dd>{preservedStrategyDraft.values.capital || "Not entered"} · Operator-declared, not verified cash</dd></div>
+        <div><dt className="font-medium">Horizon</dt><dd>{horizonLabel(preservedStrategyDraft.values.holdingPeriod)}</dd></div>
+        <div><dt className="font-medium">Saved version</dt><dd>{preservedStrategyDraft.version} · {new Date(preservedStrategyDraft.updatedAt).toLocaleString()}</dd></div>
+      </dl></details>
+      <Button className="min-h-11" onClick={() => window.location.assign(aperturePathForFixture("/aperture", readIsolatedUatIdentity()))}>Return to Today</Button>
+    </section>;
   }
   if (receiptTarget && (receiptError || !immutableReceipt || !immutableReceipt.binding)) {
     const fixture = readIsolatedUatIdentity();

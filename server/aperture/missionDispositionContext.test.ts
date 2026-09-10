@@ -119,6 +119,42 @@ beforeEach(() => {
 afterEach(() => { fixture.cleanups.forEach(cleanup => cleanup?.()); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("persisted Mission disposition context", () => {
+  it("preserves an objective-led draft without auto-assigning a thesis or exposing the unrelated Mission action", async () => {
+    const values = fixture.queries.draft.data.values;
+    values.canonicalThesisId = null;
+    values.mission = "Illustrative: compare uses of my extra capital next month.";
+    values.strategyContext = { schemaVersion: 1, requestId: "00000000-0000-4000-8000-000000000011", intent: "deploy_excess_capital", searchScope: "broader_permitted_universe", requestedSymbols: [], declarationId: "00000000-0000-4000-8000-000000000012", sourceOrder: null, profitReserve: "" };
+    const before = structuredClone(fixture.queries.draft.data);
+    const view = render();
+    expect(view.$("h1").text()).toBe("Capital objective saved");
+    expect(view.$.text()).toContain(values.mission);
+    expect(view.$.text()).toContain("Illustrative Paper");
+    expect(view.$.text()).not.toContain("Illustrative PWR");
+    expect(view.$.text()).toContain("not available in this workspace yet");
+    expect(view.$("button").text()).toBe("Return to Today");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(fixture.queries.draft.data).toEqual(before);
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("retains the saved objective and exposes a cached-success to failed-refresh recovery without mutations", async () => {
+    const values = fixture.queries.draft.data.values;
+    values.canonicalThesisId = null;
+    values.strategyContext = { schemaVersion: 1, requestId: "00000000-0000-4000-8000-000000000011", intent: "deploy_excess_capital", searchScope: "broader_permitted_universe", requestedSymbols: [], declarationId: null, sourceOrder: null, profitReserve: "" };
+    const before = structuredClone(fixture.queries.draft.data);
+    render();
+    fixture.queries.draft.isError = true;
+    fixture.queries.draft.error = new Error("Illustrative refresh failure");
+    const view = render();
+    expect(view.$("h1").text()).toBe("Capital objective saved");
+    expect(view.$("[role=alert]").text()).toContain("Refresh failed");
+    expect(view.$.text()).toContain(values.mission);
+    await button(view.tree, "Retry loading saved context").props.onClick();
+    expect(fixture.invalidate).toHaveBeenCalled();
+    expect(fixture.queries.draft.data).toEqual(before);
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+  });
+
   it("focuses the review heading only after the explicit section callback and preserves autosave values", async () => {
     setDraft("conditional", 2);
     const saved = structuredClone(fixture.queries.draft.data.values);

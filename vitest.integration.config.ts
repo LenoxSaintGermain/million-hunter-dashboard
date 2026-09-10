@@ -24,6 +24,7 @@ export default defineConfig({
     fileParallelism: false,
     include: [
       "server/aperture/monitoringReviewReceipt.integration.test.ts",
+      "server/aperture/capitalLedger.integration.test.ts",
       "server/aperture/activeCapitalThesisSchema.test.ts",
       "server/aperture/playOutcomeLedgerSchema.test.ts",
       "server/scan-pipeline.test.ts",

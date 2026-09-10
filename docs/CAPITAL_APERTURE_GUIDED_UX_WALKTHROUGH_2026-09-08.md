@@ -274,3 +274,23 @@ Do not repeat the introductory workflow or gate disclaimer above attention when
 the named paper mode and the consequential workflow gates are already present.
 Keep stale/partial warnings and every critical action outside disclosures. Verify
 the resulting first-viewport action placement on the actual deployed page.
+
+## Objective-led persistence increment — local, not released
+
+The existing owner-scoped Mission draft now accepts structured objective/search
+context with no canonical thesis. Raw capital input, the operator's question,
+source-order identity and the current section stay in that same CAS/history
+record. Another authenticated caller resumes those exact values. Requested
+symbols and referenced orders are inputs, not verified securities or cash proof.
+
+Older clients cannot silently erase the objective on autosave. An unrelated
+canonical Mission receipt cannot complete it. Replacing the context must be an
+explicit save and retains the earlier draft revision. The current Mission view
+preserves this newer request behind a truthful unavailable-discovery notice;
+it does not prompt the operator to manufacture a thesis to proceed.
+
+This is compatibility protection, not the finished intent-entry experience.
+Accepted intent receipts, sourced discovery, selected-opportunity lineage and
+the existing Underwriter handoff remain required. Do not enable the public
+flow or claim complete UAT from these draft tests. Track verification and the
+separate capital-ledger increment in the completion matrix.

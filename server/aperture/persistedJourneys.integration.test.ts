@@ -179,6 +179,60 @@ describe.skipIf(!local)("real-database interrupted and returning operator journe
     expect(await db.select().from(apertureUnderwritingJobs).where(inArray(apertureUnderwritingJobs.userId, ownerIds))).toEqual([]);
   });
 
+  it("persists objective-led capital context across callers without a canonical thesis or an accepted Mission", async () => {
+    const [inserted] = await db.insert(portfolioAccounts).values({ userId: owners[0].id, label: "Illustrative declared-capital paper account", brokerId: "manual", isPaper: true, createdAt: NOW, updatedAt: NOW });
+    const accountId = Number(inserted.insertId);
+    const a = callerFor(owners[0]); const b = callerFor(owners[0]);
+    const values = { ...emptyMissionDraftValues(), accountId, mission: "Illustrative: compare uses of my extra $10,000 over the next month.", capital: "10,000.", maxLoss: "250", holdingPeriod: "swing" as const, holdingPeriods: ["swing" as const], activeSection: 2 as const,
+      strategyContext: { schemaVersion: 1 as const, requestId: "00000000-0000-4000-8000-000000000011", intent: "deploy_excess_capital" as const, searchScope: "broader_permitted_universe" as const, requestedSymbols: ["SPY", "IWM"], declarationId: "00000000-0000-4000-8000-000000000012", sourceOrder: null, profitReserve: "" },
+    };
+    const before = await db.select().from(users).where(inArray(users.id, ownerIds));
+    const saved = await a.runway.draft.save({ expectedVersion: 0, values });
+    expect((await b.runway.draft.get())?.values).toEqual(values);
+    expect(await callerFor(owners[1]).runway.draft.get()).toBeNull();
+    const { strategyContext: _oldClientCannotRepresent, ...oldClient } = values;
+    await expect(b.runway.draft.save({ expectedVersion: saved.version, values: oldClient })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    const results = await Promise.allSettled([a, b].map((caller, index) => caller.runway.draft.save({ expectedVersion: saved.version, values: { ...values, capital: index ? "25,000" : "10,000" } })));
+    expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    expect((results.find(result => result.status === "rejected") as PromiseRejectedResult).reason.code).toBe("CONFLICT");
+    const desk = await b.desk.summary();
+    expect(desk.attention.entryState).toBe("resume");
+    expect(desk.attention.primary?.href).toBe("/aperture/mission");
+    const history = await db.select().from(apertureMissionDraftRevisions).where(eq(apertureMissionDraftRevisions.userId, owners[0].id)).orderBy(apertureMissionDraftRevisions.version);
+    expect(history).toHaveLength(2);
+    expect(parsePersistedJson(history[0].values)).toEqual(values);
+    expect(await db.select().from(users).where(inArray(users.id, ownerIds))).toEqual(before);
+    expect(await db.select().from(thesisCompilations).where(inArray(thesisCompilations.userId, ownerIds))).toEqual([]);
+    expect(await db.select().from(capitalTheses).where(inArray(capitalTheses.userId, ownerIds))).toEqual([]);
+    expect(await db.select().from(apertureDecisionRuns).where(inArray(apertureDecisionRuns.userId, ownerIds))).toEqual([]);
+    expect(await db.select().from(apertureUnderwritingJobs).where(inArray(apertureUnderwritingJobs.userId, ownerIds))).toEqual([]);
+  });
+
+  it("binds a source-order draft to its exact owned account, run and candidate without treating it as gains", async () => {
+    const owned = await missionFixture(owners[0]);
+    const otherAccount = await missionFixture(owners[0]);
+    const foreign = await missionFixture(owners[1]);
+    const sources = [];
+    for (const mission of [owned, foreign]) {
+      const [run] = await db.insert(apertureRuns).values({ userId: mission.owner.id, thesisId: mission.capitalThesisId, accountId: mission.accountId, deployableCapitalCents: 100_000, status: "completed", holdingPeriod: "swing", createdAt: NOW });
+      const runId = Number(run.insertId);
+      const [candidate] = await db.insert(apertureCandidates).values({ runId, symbol: "SPY", role: "core", createdAt: NOW });
+      const candidateId = Number(candidate.insertId);
+      const [order] = await db.insert(brokerOrders).values({ userId: mission.owner.id, runId, candidateId, accountId: mission.accountId, symbol: "SPY", side: "buy", intent: "open", qty: 1, status: "pending_approval", reason: "Illustrative source-identity sentinel; no realized gain", createdAt: NOW, updatedAt: NOW });
+      sources.push({ accountId: mission.accountId, runId, candidateId, orderId: Number(order.insertId) });
+    }
+    expectedOrders = await ordersForOwners();
+    const values = { ...emptyMissionDraftValues(), accountId: owned.accountId, strategyContext: { schemaVersion: 1 as const, requestId: "00000000-0000-4000-8000-000000000011", intent: "redeploy_realized_gains" as const, searchScope: "related_opportunities" as const, requestedSymbols: [], declarationId: null, sourceOrder: sources[0], profitReserve: "600" } };
+    const caller = callerFor(owners[0]);
+    const saved = await caller.runway.draft.save({ expectedVersion: 0, values });
+    for (const sourceOrder of [sources[1], { ...sources[0], accountId: otherAccount.accountId }, { ...sources[0], candidateId: sources[1].candidateId }, { ...sources[0], runId: sources[1].runId }]) {
+      await expect(caller.runway.draft.save({ expectedVersion: saved.version, values: { ...values, accountId: sourceOrder.accountId, strategyContext: { ...values.strategyContext, sourceOrder } } })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    }
+    expect(await caller.runway.draft.get()).toEqual(saved);
+    expect(saved.values.strategyContext).not.toHaveProperty("verifiedAvailableCents");
+    expect(await db.select().from(apertureMissionDraftRevisions).where(eq(apertureMissionDraftRevisions.userId, owners[0].id))).toHaveLength(1);
+  });
+
   it("serializes simultaneous claims, fences the lost worker, and reuses a completed request after explicit retry", async () => {
     const mission = await missionFixture(owners[0]);
     const decisionRevisionId = await appendReceipt(mission, 1, null, ["swing"]);

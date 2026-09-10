@@ -19,10 +19,10 @@ The following tests cover deterministic decisions or adapter boundaries. A green
 
 | Original scenario | Verified increment | Missing end-to-end work |
 | --- | --- | --- |
-| Excess capital, no saved thesis | Intent and operator-declared envelope types need no fabricated thesis | Objective-led persisted entry, discovery and explicit selected-opportunity handoff |
+| Excess capital, no saved thesis | Existing draft store now persists objective/search context with null canonical identity; exact authenticated resume/CAS/ownership tests pass | User-facing entry, accepted intent receipt, discovery and explicit selected-opportunity handoff |
 | Realized-gain fixture | Helper computes only the selected $1,200 after basis and reserve | Authoritative executions, attributed lots, fees, reconciliation and availability ingestion; UI source selection |
 | Unrealized / unreconciled gains | Helper rejects deployment; new read adapter keeps unknown amounts null and never promotes position marks to gains | Persist proof and show exact source uncertainty in the user journey |
-| Duplicate event / concurrent proposal | Pure duplicate/claim checks now require an explicit complete ledger receipt bound to this source/account/event and decision time; missing history stays unknown | Authoritative receipt producer, unique event ledger and transactional reservation/revalidation at proposal; no concurrency guarantee from pure tests |
+| Duplicate event / concurrent proposal | New internal event/claim ledger proves unique event identity and serialized claims on separate DB connections; missing history stays unknown | Authoritative source ingestion and integration/revalidation inside the actual proposal transaction; service concurrency tests are not end-to-end proposal proof |
 | Fixed-fee supplier | Existing causal guard rejects invented usage-driven uplift | Provider adapter and reviewed economic claim lineage |
 | Technology, permission unverified | Conditional research result, not verified catalyst | Sourced retrieval and user-visible path |
 | Already launched capability | Historical baseline and cutoff tests | Persisted provider receipts and simulated-time replay |
@@ -58,3 +58,75 @@ The existing draft store can preserve a null canonical thesis, but accepted Deci
 - Persist sourced discovery receipts, rejected hypotheses, exact selection lineage, and the independently underwritten comparison. A selected research lead is not yet a qualified investment.
 - On deliberate validation, materialize a genuine tactical research context with evidence requirements/invalidation and `sourceCompilationId: null`, linked to the exact accepted Mission/underwriting/selection. Do not call `thesis.createCapital`, change the active canonical thesis, or treat this context as a legacy record awaiting canonical promotion.
 - Keep the new capability server-enforced and default off until schema, authorization, isolated journeys, and the specified release review are satisfied. This is the remaining implementation plan, not implemented behavior.
+
+## September 9 late follow-up — persisted objective and ledger foundation
+
+**Local implementation, not deployed.** The public release remains the UI-only
+checkpoint above. The Mac was still locked at the latest browser attempt; no
+new authenticated screenshots or market-open submission are claimed.
+
+### Implemented boundaries
+
+- `shared/apertureMissionDraft.ts` and `missionDraftRouter.ts` extend the existing
+  strict JSON draft, authenticated owner scope, CAS and immutable draft history.
+  Canonical identity remains null when absent. The existing mission/capital
+  fields retain the question and raw declared amount; no duplicate target or
+  verified-cash authority is introduced. Exact source order/account/run/candidate
+  references are authorized, but are never treated as realized gains.
+- An older client cannot erase the new context on autosave. Explicit replacement
+  preserves history. An unrelated accepted canonical receipt cannot complete an
+  objective-led draft. This does not yet implement accepted intent receipts.
+- `DecisionRunway.tsx` preserves unsupported objective drafts instead of asking
+  for a manufactured thesis. It shows that discovery is unavailable, retains
+  saved inputs and exposes cached-success-to-failed-refresh recovery. Independent
+  review found the initially hidden refresh error; its new failing test was
+  reproduced and then passed after the fix. This compatibility notice is not the
+  completed entry/discovery UI and has not been browser-validated.
+- `capitalLedger.ts` adds server-only transaction-scoped event registration,
+  claims, explicit claim transitions and complete exact-source ledger reads.
+  Owner/account locks and unique source/event/allocation identities serialize
+  retries and competing claims. Claims count pending, committed and consumed
+  amounts; only explicit release restores the declared envelope. Read failure
+  or a missing event never becomes checked-empty proof.
+- Only operator-declared excess capital can be earmarked in this increment.
+  Realized gains, returned principal and purported reconciled funds remain
+  **unknown**, even when an amount is supplied. A complete receipt attests claim
+  coverage, not source cash provenance. No broker order, approval, submission,
+  monitoring check or account balance is written by the service.
+- The proposed additive migration `drizzle/0065_aperture_capital_ledger.sql`
+  defines `aperture_capital_events` and `aperture_capital_claims`; no backfill or
+  alteration to existing order tables. The isolated lane generated these tables
+  from the exported schema. The migration has **not** been applied to production
+  or the browser fixture. No public ledger endpoint/ingestion producer is added.
+
+### Verified results
+
+| Lane | Result | Receipt |
+| --- | --- | --- |
+| Full local unit lane | 1,519 passed, 0 failed, 8 explicit skips | `/tmp/aperture-objective-ledger-final-unit.json` |
+| Actual persisted Mission journeys | 6 passed, shuffled seed 630001 | Exact isolated browser-fixture DB; disposable owners only |
+| Full disposable integration lane | 81 passed, 0 failed, 2 external-URL skips | `/tmp/capital-isolated-integration.K5zcSq/summary.json` |
+| Type check and client/server builds | Passed | Existing large-bundle warning remains; not a performance pass |
+
+The eight unit skips are the six persisted journeys executed separately plus
+the explicitly gated Alpaca/FRED provider probes. The ledger DB file is excluded
+from unit collection and refuses any target other than the scoped disposable
+integration database; it does not silently skip there. All code hashes matched
+the successful integration snapshot at final readback.
+
+The initial ledger DB run failed in fixture setup because its disposable user
+identifier exceeded the existing 64-character limit. The fixture was shortened,
+with an explicit length assertion; the application user schema was not widened.
+Only the successful repeat establishes the nine ledger DB tests. Both disposable
+databases/users were removed by the harness; production and browser records were
+not changed by that lane.
+
+### Still required, not waived
+
+Accepted objective-led Mission discrimination and idempotent acceptance; durable
+provider/discovery jobs and cited/rejected hypotheses; verified capital-source
+ingestion; exact opportunity selection into existing underwriting/research;
+proposal-transaction claim/revalidation; public release review; authenticated
+desktop/mobile end-to-end UAT. The ledger cannot deduplicate real-world money
+behind invented fresh source keys: its future producer must use the stable owned
+origin/declaration record. It supplies current snapshots, not historical replay.
