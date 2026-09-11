@@ -61,9 +61,11 @@ function AttentionTime({ value, kind }: { value: number | null | undefined; kind
 }
 
 /** Presentation only. The shared attention record remains the authority for priority and actions. */
-export function AttentionDecisionCard({ item, prominent = false, compact = false, fingerprint, onOpen, busy = false }: {
+export function AttentionDecisionCard({ item, prominent = false, compact = false, fingerprint, onOpen, busy = false, onDismiss }: {
   item: ApertureAttentionItem; prominent?: boolean; compact?: boolean; fingerprint?: string;
   onOpen: (href: string) => void; busy?: boolean;
+  /** Quiets this row on this device only. Resolves nothing. */
+  onDismiss?: () => void;
 }) {
   // The workspace banner states the operating invariant once. A consequence it
   // covers in full, matched as a whole sentence, moves behind the disclosure
@@ -99,7 +101,7 @@ export function AttentionDecisionCard({ item, prominent = false, compact = false
         {!routine && <p className="mt-1 break-words text-sm leading-5" style={{ color: "var(--sh-text-secondary)" }}>{item.consequence}</p>}
         {evidenceWarnings}
       </div>
-      <div className="min-w-0">{action}{busy && <p id={busyId} role="status" className="mt-2 text-sm leading-5">Refreshing this task. Its action will be available when status returns.</p>}</div>
+      <div className="min-w-0">{action}{onDismiss && <Button variant="ghost" size="sm" data-dismiss-attention className="mt-2 h-auto min-h-11 w-full whitespace-normal lg:w-auto" onClick={onDismiss} title="Hide on this device. Nothing is resolved; it returns if its state changes.">Dismiss</Button>}{busy && <p id={busyId} role="status" className="mt-2 text-sm leading-5">Refreshing this task. Its action will be available when status returns.</p>}</div>
       {(item.evidence || checkpointGuidance) && <div className="min-w-0 lg:col-span-2 lg:col-start-2">
         {item.evidence && <FindingEvidence evidence={item.evidence} />}
         {checkpointGuidance && <details className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">Review details</summary><p className="pb-3 text-sm leading-6">{checkpointGuidance}</p></details>}

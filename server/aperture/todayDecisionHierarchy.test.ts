@@ -46,7 +46,10 @@ function briefing(over: Partial<ApertureAttentionBriefing> = {}): ApertureAttent
     nextCheckpoint: null, changeHeading: "Changed since your last review",
     scopeNote: "All authorized plays.", monitoringNote: "Checks run on demand.",
     quiet: false, quietMessage: null,
-    baseline: { capturedAt: now - 86_400_000, items: [] }, baselineToken: "t",
+    baseline: { capturedAt: now - 86_400_000, items: [
+      { key: "DKNG", fingerprint: "fp-DKNG" }, { key: "MGM", fingerprint: "fp-MGM" }, { key: "TLT", fingerprint: "fp-TLT" },
+      ...Array.from({ length: 8 }, (_, i) => ({ key: `X${i}`, fingerprint: `fp-X${i}` })),
+    ] }, baselineToken: "t",
     ...over,
   } as ApertureAttentionBriefing;
 }
@@ -160,5 +163,21 @@ describe("Today offers the capital-to-work entry without setup", () => {
   it("offers it on a first visit, before any mission exists", () => {
     const $ = load(render(briefing({ entryState: "start" } as any)));
     expect($("[data-put-capital-to-work]")).toHaveLength(1);
+  });
+});
+
+/** Nothing could ever leave the desk; work accumulated until it was unreadable. */
+describe("a handled item can be quieted without resolving anything", () => {
+  beforeAll(() => vi.stubGlobal("React", React));
+  afterAll(() => vi.unstubAllGlobals());
+
+  it("offers a dismiss control on secondary rows", () => {
+    const $ = load(render());
+    expect($("[data-dismiss-attention]").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not offer it on the primary decision, which must be acted on", () => {
+    const $ = load(render());
+    expect($("[data-attention-layout='primary'] [data-dismiss-attention]")).toHaveLength(0);
   });
 });

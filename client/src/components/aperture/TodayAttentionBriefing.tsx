@@ -8,15 +8,16 @@ import { InlineGateReview, inlineGateTarget } from "./InlineGateReview";
 import { inlineMonitoringTarget } from "@shared/monitoringFinding";
 import { AttentionSourceRecovery } from "./AttentionSourceRecovery";
 import { paperInstrumentDisplayLabel, parseOccOptionSymbol } from "@shared/paperInstrument";
+import { partitionDismissed, recordDismissal, restoreDismissal, parseDismissals, DISMISSAL_STORAGE_KEY, type AttentionDismissal } from "@shared/attentionDismissal";
 import { arbitrateTodayRead, displayedAttentionBaseline, safeStatusError, type AttentionStatusSource, type ApertureAttentionBriefing, type ApertureAttentionItem, type ApertureMotionItem } from "@shared/apertureAttention";
 
 function localTime(value: number | null) {
   return value == null ? "Not scheduled" : new Date(value).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 }
 
-function BriefRow({ item, fingerprint, changed, onOpen }: { item: ApertureAttentionItem | ApertureMotionItem; fingerprint?: string; changed?: boolean; onOpen: (href: string) => void }) {
+function BriefRow({ item, fingerprint, changed, onOpen, onDismiss }: { item: ApertureAttentionItem | ApertureMotionItem; fingerprint?: string; changed?: boolean; onOpen: (href: string) => void; onDismiss?: () => void }) {
   const attention = "actionLabel" in item;
-  if (attention) return <AttentionDecisionCard item={item} compact fingerprint={fingerprint} onOpen={onOpen} />;
+  if (attention) return <AttentionDecisionCard item={item} compact fingerprint={fingerprint} onOpen={onOpen} onDismiss={onDismiss} />;
   const parsed = parseOccOptionSymbol(item.symbol);
   const label = parsed ? paperInstrumentDisplayLabel({ symbol: item.symbol, instrumentType: parsed.instrumentType }) : item.symbol;
   return <article data-attention-key={item.key} data-attention-fingerprint={fingerprint} className="flex flex-col gap-3 border-t px-4 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)" }}>
@@ -59,6 +60,15 @@ export function TodayAttentionBriefing({
   const [tasksOpen, setTasksOpen] = useState(false);
   const [allMotion, setAllMotion] = useState(false);
   const [allCritical, setAllCritical] = useState(false);
+  const [showDismissed, setShowDismissed] = useState(false);
+  // A view preference on this device. It resolves nothing and writes no record.
+  const [dismissals, setDismissals] = useState<AttentionDismissal[]>(() => {
+    try { return parseDismissals(window.localStorage.getItem(DISMISSAL_STORAGE_KEY)); } catch { return []; }
+  });
+  const persistDismissals = (next: AttentionDismissal[]) => {
+    setDismissals(next);
+    try { window.localStorage.setItem(DISMISSAL_STORAGE_KEY, JSON.stringify(next)); } catch { /* view preference only */ }
+  };
   const [primaryKey, setPrimaryKey] = useState<string | null>(null);
   const [inlineTask, setInlineTask] = useState<ApertureAttentionItem | null>(null);
   const [observed, setObserved] = useState<Map<string, string>>(() => new Map());
@@ -70,8 +80,11 @@ export function TodayAttentionBriefing({
   // §4 Screen A caps the briefing at three ranked alternatives. The remainder
   // is counted and one click away, never dropped.
   const criticalCap = 3;
-  const visibleCritical = allCritical ? layout?.otherCritical ?? [] : layout?.otherCritical.slice(0, criticalCap) ?? [];
   const fingerprints = useMemo(() => new Map(attention?.baseline.items.map(item => [item.key, item.fingerprint]) ?? []), [attention]);
+  const criticalSplit = partitionDismissed(layout?.otherCritical ?? [], fingerprints, dismissals);
+  const attentionSplit = partitionDismissed(layout?.otherAttention ?? [], fingerprints, dismissals);
+  const dismissedCount = criticalSplit.dismissed.length + attentionSplit.dismissed.length;
+  const visibleCritical = allCritical ? criticalSplit.visible : criticalSplit.visible.slice(0, criticalCap);
   const changedKeys = new Set(attention?.changeHeading === "Changed since your last review" ? attention.changed.map(item => item.key) : []);
   const quiet = read.quiet;
   useEffect(() => { setPrimaryKey(primary?.key ?? null); }, [primary?.key]);
@@ -137,7 +150,12 @@ export function TodayAttentionBriefing({
       <MonitoringFindingReview key={inlineTask.href} target={target} />
     </section>;
   };
-  const row = (item: ApertureAttentionItem | ApertureMotionItem) => <div key={item.key}><BriefRow item={item} fingerprint={fingerprints.get(item.key)} changed={changedKeys.has(item.key)} onOpen={() => "kind" in item ? openTask(item) : onOpen(item.href)} />{"kind" in item && inlineReview(item)}</div>;
+  const dismiss = (item: ApertureAttentionItem | ApertureMotionItem) => {
+    const fingerprint = fingerprints.get(item.key);
+    if (!fingerprint) return;
+    persistDismissals(recordDismissal(dismissals, { key: item.key, fingerprint, dismissedAt: Date.now() }));
+  };
+  const row = (item: ApertureAttentionItem | ApertureMotionItem) => <div key={item.key}><BriefRow item={item} fingerprint={fingerprints.get(item.key)} changed={changedKeys.has(item.key)} onOpen={() => "kind" in item ? openTask(item) : onOpen(item.href)} onDismiss={fingerprints.get(item.key) ? () => dismiss(item) : undefined} />{"kind" in item && inlineReview(item)}</div>;
   const notice = read.state === "loading" ? { title: "Loading the last recorded briefing…", detail: "Existing work is unchanged. Wait for saved status before choosing a next step." }
     : read.state === "refreshing" ? { title: "Refreshing recorded status.", detail: "The last successful briefing remains below; it is not a current all-clear. The refresh is already in progress." }
       : read.state === "failed" ? { title: "Current status could not be verified.", detail: `An empty result is not treated as an all-clear.${attention ? " Last successful records remain below." : ""} Retry status refresh to reconcile what is available.` }
@@ -165,11 +183,11 @@ export function TodayAttentionBriefing({
       {primary && inlineReview(primary)}
 
       {visibleMotion.length > 0 && <section className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2></div>{visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
-      {(layout?.otherCritical.length ?? 0) > 0 && <section aria-label="Other critical issues" className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">Other critical issues · {layout!.otherCritical.length}</h2><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>All authorized plays, regardless of thesis or instrument filters.</p></div>{visibleCritical.map(row)}{layout!.otherCritical.length > criticalCap && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllCritical(value => !value)}>{allCritical ? "Show fewer critical issues" : `Show ${layout!.otherCritical.length - criticalCap} more critical issues`}</Button>}</section>}
+      {(layout?.otherCritical.length ?? 0) > 0 && <section aria-label="Other critical issues" className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">Other critical issues · {criticalSplit.visible.length}</h2><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>All authorized plays, regardless of thesis or instrument filters.</p></div>{visibleCritical.map(row)}{criticalSplit.visible.length > criticalCap && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllCritical(value => !value)}>{allCritical ? "Show fewer critical issues" : `Show ${criticalSplit.visible.length - criticalCap} more critical issues`}</Button>}</section>}
 
       <AttentionSourceRecovery issues={attention.sourceIssues ?? []} onOpen={onOpen} onRetry={onRetry} busy={read.busy} />
 
-      {(layout?.otherAttention.length ?? 0) > 0 && <details open={tasksOpen} onToggle={event => setTasksOpen(event.currentTarget.open)} className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Other pending decisions · {layout!.otherAttention.length}</summary>{tasksOpen && layout!.otherAttention.map(row)}</details>}
+      {(layout?.otherAttention.length ?? 0) > 0 && <details open={tasksOpen} onToggle={event => setTasksOpen(event.currentTarget.open)} className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Other pending decisions · {attentionSplit.visible.length}</summary>{tasksOpen && attentionSplit.visible.map(row)}</details>}
 
       {visibleChanged.length > 0
         ? <details className="border-t" style={{ borderColor: "var(--sh-border-1)" }} open={changesOpen} onToggle={event => setChangesOpen(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">{attention.changeHeading} · {visibleChanged.length}</summary>{changesOpen && <div className="border-t" style={{ borderColor: "var(--sh-border-1)" }}>{visibleChanged.map(row)}</div>}</details>
@@ -179,6 +197,17 @@ export function TodayAttentionBriefing({
 
 
       {attention.nextCheckpoint && <footer aria-label="Next checkpoint" className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div className="flex gap-3"><Clock3 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><p className="text-sm font-semibold">{attention.nextCheckpoint.title}</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.nextCheckpoint.detail}{attention.nextCheckpoint.at ? ` · ${localTime(attention.nextCheckpoint.at)}` : ""}</p></div></div>{attention.nextCheckpoint.href && <Button variant="outline" size="sm" className="min-h-11" onClick={() => onOpen(attention.nextCheckpoint!.href!)}>Open checkpoint</Button>}</footer>}
+      {dismissedCount > 0 && <details open={showDismissed} onToggle={event => setShowDismissed(event.currentTarget.open)} className="border-t" style={{ borderColor: "var(--sh-border-1)" }}>
+        <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Dismissed on this device · {dismissedCount}</summary>
+        {showDismissed && <div className="border-t px-4 py-3" style={{ borderColor: "var(--sh-border-1)" }}>
+          <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Hidden here only, on this device. Nothing was resolved or acknowledged, and any of these returns on its own if its state changes.</p>
+          <ul className="mt-2 space-y-2">{[...criticalSplit.dismissed, ...attentionSplit.dismissed].map(item => <li key={item.key} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="min-w-0 break-words">{item.title}</span>
+            <Button variant="outline" size="sm" className="min-h-11" onClick={() => persistDismissals(restoreDismissal(dismissals, item.key))}>Bring back</Button>
+          </li>)}</ul>
+        </div>}
+      </details>}
+
       <div className="space-y-3 border-t px-4 py-3" style={{ borderColor: "var(--sh-border-1)" }}>
         <p className="text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.monitoringNote}</p>
         <details><summary className="min-h-11 cursor-pointer py-3 text-sm">Status details</summary><p className="pb-2 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.scopeNote}</p></details>
