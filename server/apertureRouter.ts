@@ -2838,7 +2838,33 @@ export const apertureRouter = router({
         },
       }, attentionBaseline?.snapshot ? parsePersistedJson(attentionBaseline.snapshot) : null);
 
+      // The execution account, for the deployable-capital figure on the desk.
+      // Read as an optional source: a balance the desk cannot verify is stated
+      // as unavailable, never silently rendered as zero buying power.
+      const deskAccountRead = await readOptionalStatusSource("Execution account", async () => {
+        const rows = await db!.select({
+          label: portfolioAccounts.label,
+          isPaper: portfolioAccounts.isPaper,
+          brokerId: portfolioAccounts.brokerId,
+          cashCents: portfolioAccounts.cashCents,
+          buyingPowerCents: portfolioAccounts.buyingPowerCents,
+          lastSyncedAt: portfolioAccounts.lastSyncedAt,
+          syncSource: portfolioAccounts.syncSource,
+        }).from(portfolioAccounts).where(eq(portfolioAccounts.userId, ctx.user.id));
+        return rows.find((row) => row.isPaper && row.brokerId === "alpaca_paper") ?? rows.find((row) => row.isPaper) ?? null;
+      });
+
       return {
+        account: deskAccountRead.value
+          ? {
+            label: deskAccountRead.value.label,
+            cashCents: deskAccountRead.value.cashCents,
+            buyingPowerCents: deskAccountRead.value.buyingPowerCents,
+            lastSyncedAt: deskAccountRead.value.lastSyncedAt,
+            syncSource: deskAccountRead.value.syncSource,
+          }
+          : null,
+        accountUnavailable: deskAccountRead.unavailable,
         orders: orders.map((order) => ({
           ...order,
           monitoring: order.candidateId == null ? [] : monitoringByCandidate.get(order.candidateId) ?? [],
@@ -3563,7 +3589,7 @@ export const apertureRouter = router({
           .where(and(eq(apertureRuns.userId, ctx.user.id), eq(apertureRuns.status, "completed")))
           .orderBy(desc(apertureRuns.createdAt))
           .limit(120);
-        if (!rows.length) return { best: null, alternatives: [], withheld: { unresolvedEvidence: 0, declined: 0, outOfHorizon: 0, duplicateSymbol: 0 } };
+        if (!rows.length) return { best: null, alternatives: [], withheld: { unresolvedEvidence: 0, declined: 0, outOfHorizon: 0, duplicateSymbol: 0 }, directionalMix: null };
         const reviewRows = await db!.select().from(apertureEvidenceReviews).where(and(
           eq(apertureEvidenceReviews.userId, ctx.user.id),
           inArray(apertureEvidenceReviews.candidateId, rows.map(({ candidate }) => candidate.id)),
@@ -3580,6 +3606,7 @@ export const apertureRouter = router({
           symbol: candidate.symbol,
           role: candidate.role,
           holdingPeriod: run.holdingPeriod ?? null,
+          playSide: candidate.playSide ?? null,
           rankScore: candidate.rankScore ?? null,
           compositeScore: candidate.compositeScore ?? null,
           checks: normalizeStringList(candidate.verifyFields),

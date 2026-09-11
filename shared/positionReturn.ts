@@ -94,7 +94,7 @@ export function computePositionReturn(mark: PositionMark | null | undefined, now
 
 export interface DeskReturnInput {
   status: string;
-  latestMark: PositionMark | null;
+  latestMark?: PositionMark | null;
   /** True when the marks read itself failed. Distinguishes "we could not look"
    *  from "the broker reports no position", which mean opposite things. */
   markSourceUnavailable?: boolean;
@@ -111,11 +111,15 @@ export function deskOrderReturn(order: DeskReturnInput, now: number): PositionRe
   if (order.status !== "filled") {
     return { measured: false, reason: "No fill is recorded, so there is nothing to mark." };
   }
-  return computePositionReturn(order.latestMark, now);
+  return computePositionReturn(order.latestMark ?? null, now);
 }
 
-const signedDollars = (cents: number) =>
+/** Signed money, e.g. `+$41.00` / `−$12.50`. The sign is carried by the prefix
+ *  so the figure reads correctly without colour. */
+export const formatSignedCents = (cents: number): string =>
   `${cents > 0 ? "+" : cents < 0 ? "−" : ""}$${(Math.abs(cents) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const signedDollars = formatSignedCents;
 
 /** Headline figure, e.g. `+$41.00`. Callers render the refusal reason instead
  *  when the return is not measured. */

@@ -97,3 +97,51 @@ describe("one name is one opportunity, however many runs researched it", () => {
     expect(r.withheld.duplicateSymbol).toBe(1);
   });
 });
+
+describe("directional mix", () => {
+  const ready = (over: Partial<ReadyPlayCandidate>): ReadyPlayCandidate => ({
+    runId: 1, candidateId: 1, symbol: "AAA", role: "core", holdingPeriod: null,
+    rankScore: 10, compositeScore: null, checks: ["liquidity"],
+    reviews: { liquidity: "confirmed" }, ...over,
+  });
+
+  it("says nothing when every offered play points the same way", () => {
+    const result = selectBestPlays([
+      ready({ candidateId: 1, symbol: "AAA", playSide: "long", rankScore: 9 }),
+      ready({ candidateId: 2, symbol: "BBB", playSide: "long", rankScore: 8 }),
+    ]);
+    expect(result.directionalMix).toBeNull();
+  });
+
+  it("flags opposing directions without claiming they offset", () => {
+    const result = selectBestPlays([
+      ready({ candidateId: 1, symbol: "AAA", playSide: "long", rankScore: 9 }),
+      ready({ candidateId: 2, symbol: "BBB", playSide: "short", rankScore: 8 }),
+    ]);
+    expect(result.directionalMix).not.toBeNull();
+    expect(result.directionalMix!.long).toBe(1);
+    expect(result.directionalMix!.short).toBe(1);
+    expect(result.directionalMix!.note).toContain("not measured");
+    expect(result.directionalMix!.note).toContain("not as a hedge");
+  });
+
+  it("counts a legacy candidate with no recorded direction rather than guessing one", () => {
+    const result = selectBestPlays([
+      ready({ candidateId: 1, symbol: "AAA", playSide: "long", rankScore: 9 }),
+      ready({ candidateId: 2, symbol: "BBB", playSide: "short", rankScore: 8 }),
+      ready({ candidateId: 3, symbol: "CCC", playSide: null, rankScore: 7 }),
+    ], { maxAlternatives: 2 });
+    expect(result.directionalMix!.unrecorded).toBe(1);
+    expect(result.directionalMix!.long).toBe(1);
+  });
+
+  it("only considers plays actually on offer, not ones ranked out", () => {
+    const result = selectBestPlays([
+      ready({ candidateId: 1, symbol: "AAA", playSide: "long", rankScore: 9 }),
+      ready({ candidateId: 2, symbol: "BBB", playSide: "long", rankScore: 8 }),
+      ready({ candidateId: 3, symbol: "CCC", playSide: "short", rankScore: 1 }),
+    ], { maxAlternatives: 1 });
+    expect(result.alternatives).toHaveLength(1);
+    expect(result.directionalMix).toBeNull();
+  });
+});

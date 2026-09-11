@@ -155,6 +155,9 @@ export default function ApertureDeploy() {
                   <Button variant="outline" size="sm" className="min-h-11" onClick={() => navigate(`/aperture/run/${alternative.runId}/execute?candidate=${alternative.candidateId}`)}>Review {alternative.symbol}</Button>
                 </li>)}</ul>
               : <p style={{ color: "var(--sh-fg-muted)" }}>No other candidate has every check resolved.</p>}
+            {ready.data?.directionalMix && <p data-directional-mix className="rounded-lg border p-3" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 40%, var(--sh-border-1))", color: "var(--sh-text-primary)" }}>
+              <strong>{ready.data.directionalMix.long} long · {ready.data.directionalMix.short} short.</strong>{" "}{ready.data.directionalMix.note}
+            </p>}
             {withheld && <p style={{ color: "var(--sh-fg-muted)" }}>Set aside: {withheld.unresolvedEvidence} awaiting evidence, {withheld.declined} declined on evidence, {withheld.outOfHorizon} outside this horizon, {withheld.duplicateSymbol} repeat{withheld.duplicateSymbol === 1 ? "" : "s"} of a name already offered.</p>}
           </div>
         </details>

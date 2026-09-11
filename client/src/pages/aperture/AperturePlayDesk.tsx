@@ -14,6 +14,7 @@ import { playDeskJourneyLane } from "@shared/playDeskState";
 import { isOptionInstrument, paperInstrumentDisplayLabel, parseOccOptionSymbol } from "@shared/paperInstrument";
 import { arbitrateTodayRead, canShowQuietBriefing, type ApertureAttentionBriefing, type ApertureAttentionItem } from "@shared/apertureAttention";
 import { deskOrderReturn, formatMarkProvenance, formatReturnAmount, formatReturnPercent } from "@shared/positionReturn";
+import { DeskGlanceLayer } from "@/components/aperture/DeskGlanceLayer";
 
 const money = (cents?: number | null) => cents == null
   ? "—"
@@ -179,6 +180,16 @@ export default function AperturePlayDesk() {
       <Button type="button" variant="outline" className="mt-3 min-h-11 aria-disabled:opacity-50" onClick={refresh} aria-disabled={isRefreshing} aria-describedby="desk-refresh-scope">Retry status</Button>
     </section>}
     {briefing && read.state !== "complete" && <section role="status" className="rounded-xl border px-4 py-3 text-sm leading-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}><p className="font-semibold">Recorded checks: {read.state}. Status is not an all-clear.</p>{!briefing.sourceIssues?.length && <p>Missing source not identified in this saved snapshot. Refresh status to identify the gap.</p>}</section>}
+
+    {desk.data && <DeskGlanceLayer
+      orders={desk.data.orders ?? []}
+      account={desk.data.account ?? null}
+      accountUnavailable={desk.data.accountUnavailable ?? null}
+      attentionCount={(disclosure?.primary ? 1 : 0) + (disclosure?.otherCritical.length ?? 0)}
+      primaryLabel={disclosure?.primary?.actionLabel ?? null}
+      onPrimary={() => disclosure?.primary?.href && navigate(disclosure.primary.href)}
+      onFindBestPlay={() => navigate("/aperture/deploy")}
+    />}
 
     <section id="desk-attention" aria-label="Attention across all plays" className="space-y-3">
       {disclosure?.primary && <AttentionTask item={disclosure.primary} prominent onOpen={navigate} />}

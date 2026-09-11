@@ -184,6 +184,49 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
     expect(html).not.toContain("Max loss");
   });
 
+  it("answers what is at stake, what it is worth and what is deployable before any row", () => {
+    const orders = [
+      order({ status: "filled", filledQty: 2, plannedRiskCents: 42_000,
+        latestMark: { qty: 2, avgCostCents: 258, lastPriceCents: 305, marketValueCents: 61_000, priceAsOf: Date.now() - 60_000, priceSource: "alpaca_paper" } }),
+      order({ id: 13, status: "submitted", filledQty: 0, plannedRiskCents: 9_600, latestMark: null }),
+    ];
+    fixture.queries.desk = query({
+      orders, activePlays: [], attention: attention({ orders: orders as any }),
+      account: { label: "Alpaca Paper", cashCents: 500_000, buyingPowerCents: 1_200_000, lastSyncedAt: Date.now() - 60_000, syncSource: "alpaca_paper" },
+    });
+    const html = render();
+    expect(html).toContain("data-desk-glance");
+    expect(html).toContain("$516");      // at stake: 42_000 + 9_600
+    expect(html).toContain("+$94.00");   // unrealized, the one markable position
+    expect(html).toContain("$12,000");   // deployable buying power
+    expect(html).toContain("1 of 1 open marked");
+    expect(html).toContain("Find my best play");
+  });
+
+  it("refuses a deployable figure the account cannot support instead of showing zero", () => {
+    const orders = [order({ status: "submitted", plannedRiskCents: 9_600 })];
+    fixture.queries.desk = query({
+      orders, activePlays: [], attention: attention({ orders: orders as any }),
+      account: { label: "Alpaca Paper", cashCents: null, buyingPowerCents: null, lastSyncedAt: null, syncSource: null },
+    });
+    const html = render();
+    expect(html).toContain("Not measured");
+    expect(html).toContain("never reported a synced balance");
+    expect(html).not.toContain(">$0<");
+  });
+
+  it("does not present a partial unrealized total as complete", () => {
+    const orders = [
+      order({ status: "filled", filledQty: 2,
+        latestMark: { qty: 2, avgCostCents: 258, lastPriceCents: 305, marketValueCents: 61_000, priceAsOf: Date.now() - 60_000, priceSource: "alpaca_paper" } }),
+      order({ id: 13, status: "filled", filledQty: 2, latestMark: null }),
+    ];
+    fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }), account: null });
+    const html = render();
+    expect(html).toContain("1 of 2 open positions could not be marked");
+    expect(html).toContain("No paper account is connected");
+  });
+
   it("marks a filled order from the broker position and states when and from where", () => {
     const orders = [order({
       status: "filled", filledQty: 2,

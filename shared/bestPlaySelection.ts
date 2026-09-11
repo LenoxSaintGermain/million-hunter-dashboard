@@ -12,6 +12,8 @@ export type ReadyPlayCandidate = {
   symbol: string;
   role: string;
   holdingPeriod: string | null;
+  /** Recorded direction. Null on legacy candidates written before it existed. */
+  playSide?: "long" | "short" | null;
   rankScore: number | null;
   compositeScore: number | null;
   /** Every decision-critical check recorded on this candidate. */
@@ -25,6 +27,13 @@ export type BestPlaySelection = {
   alternatives: ReadyPlayCandidate[];
   /** Counted, not hidden: why the rest are not on offer. */
   withheld: { unresolvedEvidence: number; declined: number; outOfHorizon: number; duplicateSymbol: number };
+  /**
+   * Set when the offered plays do not all point the same way. This is a
+   * statement about recorded direction, not a correlation finding: whether a
+   * long in one name and a short in another actually offset each other is not
+   * measured anywhere in this system, and is not claimed here.
+   */
+  directionalMix: { long: number; short: number; unrecorded: number; note: string } | null;
 };
 
 /** A resolution that clears a gate. Anything else leaves the play unavailable. */
@@ -77,5 +86,26 @@ export function selectBestPlays(
     return true;
   });
   withheld.duplicateSymbol = ready.length - distinct.length;
-  return { best: distinct[0] ?? null, alternatives: distinct.slice(1, 1 + maxAlternatives), withheld };
+
+  const best = distinct[0] ?? null;
+  const alternatives = distinct.slice(1, 1 + maxAlternatives);
+  const offered = best ? [best, ...alternatives] : [];
+  const long = offered.filter((candidate) => candidate.playSide === "long").length;
+  const short = offered.filter((candidate) => candidate.playSide === "short").length;
+  const unrecorded = offered.length - long - short;
+
+  // The brief this is measured against says "ORCL and PSQ cannot both activate".
+  // That judgement rests on knowing PSQ is an inverse Nasdaq expression, which
+  // nothing here records. So the honest output is the fact we do hold — these
+  // plays point opposite ways — and an explicit statement that the offsetting
+  // question is not answered. Inventing a correlation model to answer it would
+  // be a fabricated number in a sizing decision.
+  const directionalMix = long > 0 && short > 0
+    ? {
+      long, short, unrecorded,
+      note: "These plays point in opposite directions. Whether they offset each other is not measured: no correlation between different underlyings is recorded. Size them as separate decisions, not as a hedge.",
+    }
+    : null;
+
+  return { best, alternatives, withheld, directionalMix };
 }
