@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, CircleSlash2, ClipboardCheck,
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { buildProposalReadiness } from "@shared/proposalReadiness";
+import { PlayAndReturn } from "./PlayAndReturn";
 import { dollarsToCents } from "@shared/proposalTicketFields";
 import { buildOccOptionSymbol, isOptionInstrument, nextStandardMonthlyOptionExpiration, paperInstrumentLabel, type PaperInstrumentType } from "@shared/paperInstrument";
 import { Badge } from "@/components/ui/badge";
@@ -411,6 +412,26 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
         </div>}
         {hardResolutionNeeded && <div className="mt-3 grid gap-2 sm:grid-cols-2"><Button type="button" variant="outline" className="min-h-11" onClick={onReturnToDecisionBrief}>Choose another play</Button><Button type="button" className="min-h-11" disabled={preserveCash.isPending} onClick={() => preserveCash.mutate({ runId, candidateId: candidate.id, decision: "skipped", reason: preserveHardBlockCashReason })}>{preserveCash.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CircleSlash2 className="mr-1.5 h-3.5 w-3.5" />}Preserve cash · $0 risk</Button></div>}
       </section>
+
+      {/* TSL-BUILD-2026-009: the decision leads with PLAY and RETURN; the price
+          chart and mandate detail below are supporting evidence. */}
+      <PlayAndReturn
+        play={{
+          symbol: candidate.symbol,
+          expression: isOption ? (instrumentType === "long_call" ? "Long call" : "Long put") : "Shares",
+          horizon: constructedPlay?.holdingPeriod ? String(constructedPlay.holdingPeriod).replaceAll("_", " ") : "Horizon not recorded",
+          entryCondition: modeledEntryCents == null ? "Entry not measured" : `holds above ${(modeledEntryCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}`,
+          invalidation: modeledStopCents == null ? "Stop not measured" : `below ${(modeledStopCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}`,
+          target: modeledTargets[0]?.priceCents == null ? "Target not measured" : (modeledTargets[0].priceCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }),
+        }}
+        terms={{
+          quantity: isOption ? (Number.isInteger(optionQty) && optionQty > 0 ? optionQty : null) : constructedPlay?.qty ?? null,
+          entryCents: modeledEntryCents ?? null,
+          stopCents: modeledStopCents ?? null,
+          multiplier: isOption ? 100 : 1,
+          targets: modeledTargets,
+        }}
+      />
 
       <section aria-labelledby="price-risk-heading" className="space-y-3">
         <div className="flex items-center justify-between gap-3"><h3 id="price-risk-heading" className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Price &amp; risk</h3><span className="text-[10px] font-mono uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>{isOption ? "underlying plan" : "modeled play"}</span></div>
