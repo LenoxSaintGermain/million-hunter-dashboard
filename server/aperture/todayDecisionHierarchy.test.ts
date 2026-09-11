@@ -116,3 +116,32 @@ describe("Provenance stays one action away without dominating the view", () => {
     expect($.text()).toContain("not verified evidence");
   });
 });
+
+/**
+ * TSL-BUILD-2026-008A §4 Screen A caps the briefing at "at most three ranked
+ * ready/needs-review alternatives". The list was previously unbounded: three
+ * rows measured 576px on production, and nothing stopped ten.
+ */
+describe("secondary attention is bounded, and says what it is hiding", () => {
+  beforeAll(() => vi.stubGlobal("React", React));
+  afterAll(() => vi.unstubAllGlobals());
+
+  const many = (n: number) => Array.from({ length: n }, (_, i) => task(`X${i}`));
+
+  it("shows at most three secondary critical rows at once", () => {
+    const $ = load(render(briefing({ otherCritical: many(7) })));
+    expect($("[data-attention-layout='compact']").length).toBe(3);
+  });
+
+  it("counts the remainder rather than dropping it silently", () => {
+    const text = load(render(briefing({ otherCritical: many(7) }))).text();
+    expect(text).toContain("Other critical issues · 7");
+    expect(text).toMatch(/Show 4 more/);
+  });
+
+  it("leaves a list already within the cap alone", () => {
+    const text = load(render(briefing({ otherCritical: many(2) }))).text();
+    expect(load(render(briefing({ otherCritical: many(2) })))("[data-attention-layout='compact']").length).toBe(2);
+    expect(text).not.toMatch(/Show \d+ more critical/);
+  });
+});

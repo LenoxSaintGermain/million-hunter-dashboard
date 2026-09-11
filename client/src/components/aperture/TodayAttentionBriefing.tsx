@@ -58,6 +58,7 @@ export function TodayAttentionBriefing({
   const [changesOpen, setChangesOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [allMotion, setAllMotion] = useState(false);
+  const [allCritical, setAllCritical] = useState(false);
   const [primaryKey, setPrimaryKey] = useState<string | null>(null);
   const [inlineTask, setInlineTask] = useState<ApertureAttentionItem | null>(null);
   const [observed, setObserved] = useState<Map<string, string>>(() => new Map());
@@ -66,6 +67,10 @@ export function TodayAttentionBriefing({
   const primary = layout?.primary ?? null;
   const visibleChanged = layout?.changed ?? [];
   const visibleMotion = allMotion ? layout?.inMotion ?? [] : layout?.inMotion.slice(0, 4) ?? [];
+  // §4 Screen A caps the briefing at three ranked alternatives. The remainder
+  // is counted and one click away, never dropped.
+  const criticalCap = 3;
+  const visibleCritical = allCritical ? layout?.otherCritical ?? [] : layout?.otherCritical.slice(0, criticalCap) ?? [];
   const fingerprints = useMemo(() => new Map(attention?.baseline.items.map(item => [item.key, item.fingerprint]) ?? []), [attention]);
   const changedKeys = new Set(attention?.changeHeading === "Changed since your last review" ? attention.changed.map(item => item.key) : []);
   const quiet = read.quiet;
@@ -160,7 +165,7 @@ export function TodayAttentionBriefing({
       {primary && inlineReview(primary)}
 
       {visibleMotion.length > 0 && <section className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2></div>{visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
-      {(layout?.otherCritical.length ?? 0) > 0 && <section aria-label="Other critical issues" className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">Other critical issues · {layout!.otherCritical.length}</h2><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>All authorized plays, regardless of thesis or instrument filters.</p></div>{layout!.otherCritical.map(row)}</section>}
+      {(layout?.otherCritical.length ?? 0) > 0 && <section aria-label="Other critical issues" className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">Other critical issues · {layout!.otherCritical.length}</h2><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>All authorized plays, regardless of thesis or instrument filters.</p></div>{visibleCritical.map(row)}{layout!.otherCritical.length > criticalCap && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllCritical(value => !value)}>{allCritical ? "Show fewer critical issues" : `Show ${layout!.otherCritical.length - criticalCap} more critical issues`}</Button>}</section>}
 
       <AttentionSourceRecovery issues={attention.sourceIssues ?? []} onOpen={onOpen} onRetry={onRetry} busy={read.busy} />
 

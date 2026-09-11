@@ -170,3 +170,63 @@ before being restored to green. Nineteen page components pass it.
 
 `DATABASE_URL= pnpm test:unit`: 2,105 passed, zero failed, eight existing skips.
 `pnpm check` passed. Defects 1, 4 and 5 from the list above remain open.
+
+## Follow-up 2 — defect 5 fixed at source, defect 1 bounded
+
+Shipped as `capital-aperture-00114-vop` / `135c843-uat-ddff6b75`, serving 100%.
+
+**The SEC extraction bug was three compounding faults, diagnosed against the
+live filings rather than inferred.**
+
+1. `latestAnnual` selected on form and period end but never on period length.
+   A 10-K contains quarterly rows beside the annual one, so PRIM's revenue came
+   back as a 91-day figure: $1,857,700,000 against a true annual $7,574,900,000.
+   Its net income was a quarter too — $51,800,000 against $274,900,000.
+2. When a concept held no FY/10-K row, `pool = annual.length ? annual : units`
+   fell back to any datapoint. EME's first revenue concept holds exactly one
+   row, an 89-day 10-Q filed in **2018**, and that became the recorded annual
+   revenue of $1,900,388,000.
+3. First-concept-wins meant the correct EME figure — $16,986,422,000 in a
+   sibling concept with 39 annual rows — was never reached.
+
+The extractor now requires a 330-400 day period for flow concepts, treats
+balance-sheet concepts as instants that legitimately carry no start date,
+refuses rather than falling back to an arbitrary row, and selects the freshest
+qualifying concept instead of the first listed. Nine tests cover each fault with
+the real filing shapes. One existing test asserted the fallback behaviour and was
+deliberately superseded, with the reason recorded beside it.
+
+Stored facts were re-collected for all ten candidates. The corrections change the
+picture materially: **PRIM was never expensive.** It read 76.13x on the broken
+data and is 14.35x P/E and 0.52 P/S on the corrected figures — among the cheapest
+names in the run rather than the most expensive. EME's P/S moved from 17.53 to
+1.96. The three evidence answers that had been held at needs-follow-up for bad
+data are now recorded as confirmed, each note naming what the earlier figure was
+and why it was wrong. EME and PRIM are ticket-ready alongside PWR, ACM, VMI and
+MYRG.
+
+**Worth the operator's attention:** on corrected facts PWR is **P/E 90.02, P/S
+3.25** — by a wide margin the most expensive name in this run. Its two evidence
+checks were confirmed before this session and have been left as recorded; that
+determination belongs to whoever made it, but it was made when the peer figures
+around it were wrong.
+
+**Defect 1 is bounded, not eliminated.** Secondary critical rows are now capped
+at the three the Addendum specifies, with the remainder counted behind a "Show N
+more critical issues" control. This stops the section growing without limit; it
+does not shrink three rows below the measured 576px. That height is required
+content — state label, deadline and check timestamps, title, reason, consequence
+and an evidence disclosure — and `AttentionDecisionCard` deliberately refuses to
+shorten an arbitrary consequence, since only one exact routine explanation has a
+sanctioned short form. Reducing it further means deciding which honest disclosure
+an operator may lose, which is a product decision and not one to take silently.
+
+**Defect 4 is not addressed.** The 211px global-plus-sub navigation shell affects
+every Aperture route, not this briefing. A UAT is in progress on this build, and
+a smaller change earlier today reached production broken; a layout-wide change
+made without an observed pass is not worth that risk right now.
+
+`DATABASE_URL= pnpm test:unit`: 2,117 passed, zero failed, eight existing skips.
+`pnpm check` passed. Verified on production after promotion: the evidence screen
+renders, one fill click returns P/E 37.33 from the ledger, Today shows one
+primary card and three compact rows.

@@ -160,25 +160,29 @@ describe("EDGAR concept selection", () => {
     const concept = {
       units: {
         USD: [
-          { val: 100, end: "2023-12-31", fp: "FY", form: "10-K" },
-          { val: 200, end: "2024-12-31", fp: "FY", form: "10-K" },
-          { val: 50, end: "2025-03-31", fp: "Q1", form: "10-Q" },
+          { val: 100, start: "2023-01-01", end: "2023-12-31", fp: "FY", form: "10-K" },
+          { val: 200, start: "2024-01-01", end: "2024-12-31", fp: "FY", form: "10-K" },
+          { val: 50, start: "2025-01-01", end: "2025-03-31", fp: "Q1", form: "10-Q" },
         ],
       },
     };
-    const hit = __edgarInternals.latestAnnual(concept, "USD")!;
+    const hit = __edgarInternals.latestAnnual(concept, "USD", { instant: false })!;
     expect(hit.value).toBe(200);
     expect(hit.end).toBe("2024-12-31");
   });
 
-  it("falls back to any datapoint when no annual filing exists", () => {
-    const concept = { units: { USD: [{ val: 42, end: "2025-06-30", fp: "Q2", form: "10-Q" }] } };
-    expect(__edgarInternals.latestAnnual(concept, "USD")!.value).toBe(42);
+  // Superseded deliberately. This previously asserted a fallback to any
+  // datapoint, which is how a 2018 quarter became EME's recorded annual
+  // revenue and a 91-day figure became PRIM's. A missing fact is recoverable;
+  // a wrong one reaches a trade gate looking verified.
+  it("refuses a quarterly datapoint instead of passing it off as annual", () => {
+    const concept = { units: { USD: [{ val: 42, start: "2025-04-01", end: "2025-06-30", fp: "Q2", form: "10-Q" }] } };
+    expect(__edgarInternals.latestAnnual(concept, "USD", { instant: false })).toBeNull();
   });
 
   it("returns null for a missing concept instead of zero", () => {
-    expect(__edgarInternals.latestAnnual(undefined, "USD")).toBeNull();
-    expect(__edgarInternals.latestAnnual({ units: {} }, "USD")).toBeNull();
+    expect(__edgarInternals.latestAnnual(undefined, "USD", { instant: false })).toBeNull();
+    expect(__edgarInternals.latestAnnual({ units: {} }, "USD", { instant: false })).toBeNull();
   });
 });
 
