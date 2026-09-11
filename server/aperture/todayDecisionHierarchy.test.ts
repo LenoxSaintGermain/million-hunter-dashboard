@@ -145,3 +145,20 @@ describe("secondary attention is bounded, and says what it is hiding", () => {
     expect(text).not.toMatch(/Show \d+ more critical/);
   });
 });
+
+/** TSL-BUILD-2026-009 tap 1: one persistent action, no thesis or mission first. */
+describe("Today offers the capital-to-work entry without setup", () => {
+  beforeAll(() => vi.stubGlobal("React", React));
+  afterAll(() => vi.unstubAllGlobals());
+
+  it("renders the action and points it at the three-tap route", () => {
+    const $ = load(render());
+    expect($("[data-put-capital-to-work]")).toHaveLength(1);
+    expect($("[data-put-capital-to-work]").text()).toContain("Put capital to work");
+  });
+
+  it("offers it on a first visit, before any mission exists", () => {
+    const $ = load(render(briefing({ entryState: "start" } as any)));
+    expect($("[data-put-capital-to-work]")).toHaveLength(1);
+  });
+});

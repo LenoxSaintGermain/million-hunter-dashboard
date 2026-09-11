@@ -15,6 +15,7 @@ import { eq, ne, and, or, inArray, gte, lt, sql, asc, isNull } from "drizzle-orm
 import { createHash } from "node:crypto";
 import { apertureUnderwritingJobs } from "../drizzle/apertureUnderwritingJobSchema";
 import { buildEvidenceFactDraft } from "./aperture/evidenceFactDraft";
+import { selectBestPlays } from "../shared/bestPlaySelection";
 import { claimUnderwritingJob, readUnderwritingJob } from "./aperture/underwritingJobs";
 import { mayPublishUnderwriting, underwritingJobStatus } from "../shared/underwritingJob";
 import { missionDraftRouter, missionDraftStore } from "./aperture/missionDraftRouter";
@@ -3518,6 +3519,45 @@ export const apertureRouter = router({
           vwap: { value: hold.vwap, lastPrice: hold.lastPrice, feed: hold.feed, lagMs: hold.lagMs, needsOperatorConfirmation: hold.needsOperatorConfirmation },
           openingRange: { high: range.high, low: range.low, widthPct: range.widthPct, complete: range.complete, feed: range.feed, lagMs: range.lagMs, unavailableReason: range.unavailableReason },
         };
+      }),
+
+    /**
+     * Tap 2 of the three-tap journey: rank research the operator has already
+     * finished. Read-only — it starts no run, contacts no provider and cannot
+     * make a candidate eligible.
+     */
+    ready: capitalOperatorProcedure
+      .input(z.object({ horizon: z.string().optional(), maxAlternatives: z.number().int().min(0).max(2).optional() }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        const rows = await db!.select({ candidate: apertureCandidates, run: apertureRuns })
+          .from(apertureCandidates)
+          .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
+          .where(and(eq(apertureRuns.userId, ctx.user.id), eq(apertureRuns.status, "completed")))
+          .orderBy(desc(apertureRuns.createdAt))
+          .limit(120);
+        if (!rows.length) return { best: null, alternatives: [], withheld: { unresolvedEvidence: 0, declined: 0, outOfHorizon: 0, duplicateSymbol: 0 } };
+        const reviewRows = await db!.select().from(apertureEvidenceReviews).where(and(
+          eq(apertureEvidenceReviews.userId, ctx.user.id),
+          inArray(apertureEvidenceReviews.candidateId, rows.map(({ candidate }) => candidate.id)),
+        ));
+        const byCandidate = new Map<number, Record<string, string>>();
+        for (const review of reviewRows) {
+          const bucket = byCandidate.get(review.candidateId) ?? {};
+          bucket[review.checkLabel] = review.status;
+          byCandidate.set(review.candidateId, bucket);
+        }
+        return selectBestPlays(rows.map(({ candidate, run }) => ({
+          runId: candidate.runId,
+          candidateId: candidate.id,
+          symbol: candidate.symbol,
+          role: candidate.role,
+          holdingPeriod: run.holdingPeriod ?? null,
+          rankScore: candidate.rankScore ?? null,
+          compositeScore: candidate.compositeScore ?? null,
+          checks: normalizeStringList(candidate.verifyFields),
+          reviews: byCandidate.get(candidate.id) ?? {},
+        })), { horizon: input.horizon ?? null, maxAlternatives: input.maxAlternatives });
       }),
 
     construct: capitalOperatorProcedure

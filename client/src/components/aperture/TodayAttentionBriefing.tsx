@@ -183,7 +183,10 @@ export function TodayAttentionBriefing({
         <p className="text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.monitoringNote}</p>
         <details><summary className="min-h-11 cursor-pointer py-3 text-sm">Status details</summary><p className="pb-2 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.scopeNote}</p></details>
         {seenError && <div role="status" className="text-sm">Your displayed-status baseline was not saved. This does not acknowledge or resolve any finding.<Button variant="outline" className="mt-2 min-h-11 sm:ml-2" onClick={() => { setSeenError(false); setSeenRetry(value => value + 1); }}>Retry saving viewed status</Button></div>}
-        {attention.entryState !== "start" && <div className="flex justify-end"><Button variant="ghost" size="sm" className="min-h-11" onClick={onNewMission}>Review / revise mission</Button></div>}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button data-put-capital-to-work className="min-h-11" onClick={() => onOpen("/aperture/deploy")}>Put capital to work<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button>
+          {attention.entryState !== "start" && <Button variant="ghost" size="sm" className="min-h-11" onClick={onNewMission}>Review / revise mission</Button>}
+        </div>
       </div>
     </>}
   </section>;
