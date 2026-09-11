@@ -125,3 +125,48 @@ remain, and no proposal, approval or order was created.
 The three-alternative cap, the shell-chrome reduction and active-thesis scoping
 remain open from the previous pass. Nothing here measures comprehension; the
 ten-second check-in target is still unverified by observed UAT.
+
+## Follow-up — defects 2 and 3 fixed, with one regression and rollback
+
+Shipped as `capital-aperture-00111-gen` / `9dbe955-uat-442d1441`, serving 100%.
+
+**Account freshness (defect 2).** `buildProposalReadiness` now recognises
+`execution_account_freshness` and `portfolio_context_freshness` as refreshable
+and returns a `refresh_account` action instead of routing the operator to a
+different candidate. The ticket renders a "Refresh paper account" control wired
+to the existing `aperture.account.sync` mutation, targeting whichever account
+the failing gate names. Verified on production: the header changed from "This
+paper play cannot be prepared" to "Refresh the paper account to continue",
+clicking it returned "Paper account snapshot refreshed. No proposal or order was
+created", and the flow advanced to "Acknowledge paper-only". Genuinely
+unrecoverable blockers, such as a liquidity failure, still route to the decision
+brief; a blocker with no supplied gate key is treated as unrecoverable.
+
+**Fill from verified facts (defect 3).** `evidenceFactDraft.ts` drafts a price
+multiple from the ledger: market cap from last price and shares outstanding,
+divided by net income or revenue TTM, with every input and its source named in
+the criterion text. It refuses rather than assuming when any input is missing,
+ignores unknown-basis facts, and has no computation for criteria it does not
+recognise. It drafts evidence only — the conclusion ends by stating that whether
+the multiple supports the thesis is the operator's determination. It also carries
+the plausibility check the EME and PRIM facts justified: a market cap more than
+ten times recorded revenue is flagged as a likely misparsed filing rather than
+divided quietly. Verified on production: one click filled all five fields with
+P/E 37.29, its derivation and the SEC source link, and enabled the verdict
+buttons. The check went from five typed fields plus a click to two clicks.
+
+**Regression and rollback, recorded honestly.** The first attempt placed the
+fact-draft query hook below `if (!data) return` in CandidateBoard. That changes
+hook order between renders and crashed the evidence screen. It reached production
+before being caught, and traffic was rolled back to `00105-lal` within minutes.
+Neither guard in this repo could have caught it: there is no eslint, so no
+`react-hooks/rules-of-hooks`, and the unit lane renders each component once with
+`renderToStaticMarkup`, which never exercises a second render. The query is now
+an imperative `utils.fetch` taking its input at call time, declared above every
+return. `hookOrderContract.test.ts` reads each aperture page top to bottom and
+fails when a hook follows a top-level early return; it was confirmed to fail on
+the exact reintroduced defect, naming the file, both line numbers and the fix,
+before being restored to green. Nineteen page components pass it.
+
+`DATABASE_URL= pnpm test:unit`: 2,105 passed, zero failed, eight existing skips.
+`pnpm check` passed. Defects 1, 4 and 5 from the list above remain open.

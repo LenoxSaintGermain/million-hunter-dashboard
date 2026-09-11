@@ -14,6 +14,7 @@ import { z } from "zod";
 import { eq, ne, and, or, inArray, gte, lt, sql, asc, isNull } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { apertureUnderwritingJobs } from "../drizzle/apertureUnderwritingJobSchema";
+import { buildEvidenceFactDraft } from "./aperture/evidenceFactDraft";
 import { claimUnderwritingJob, readUnderwritingJob } from "./aperture/underwritingJobs";
 import { mayPublishUnderwriting, underwritingJobStatus } from "../shared/underwritingJob";
 import { missionDraftRouter, missionDraftStore } from "./aperture/missionDraftRouter";
@@ -3039,6 +3040,19 @@ export const apertureRouter = router({
       }),
 
     evidence: router({
+      /** Draft a source record from the verified fact ledger. Read-only: it
+       *  records nothing and never answers the gate. */
+      factDraft: capitalOperatorProcedure
+        .input(z.object({ runId: z.number(), candidateId: z.number(), checkLabel: z.string().min(2).max(255) }))
+        .query(async ({ input }) => {
+          const db = await getDb();
+          const [candidate] = await db!.select().from(apertureCandidates)
+            .where(and(eq(apertureCandidates.id, input.candidateId), eq(apertureCandidates.runId, input.runId)))
+            .limit(1);
+          if (!candidate) throw new TRPCError({ code: "NOT_FOUND", message: "Evidence item not found in this research brief" });
+          const facts = await getFacts(candidate.symbol);
+          return buildEvidenceFactDraft({ symbol: candidate.symbol, checkLabel: input.checkLabel, facts });
+        }),
       review: capitalOperatorProcedure
         .input(z.object({
           runId: z.number(),

@@ -23,10 +23,15 @@ import type { EvidenceReviewStatus } from "@shared/evidenceReview";
 
 type EvidenceAnswer = Exclude<EvidenceReviewStatus, "reviewed">;
 
-export function EvidenceQuestionReview({ symbol, checkLabel, draft, pending, now, onChange, onReview }: {
+export function EvidenceQuestionReview({ symbol, checkLabel, draft, pending, now, onChange, onReview, onFillFromFacts, fillPending = false, fillNotice = null }: {
   symbol: string; checkLabel: string; draft: EvidenceQuestionDraft; pending: boolean; now: number;
   onChange: (draft: EvidenceQuestionDraft) => void;
   onReview: (status: EvidenceAnswer, note: string) => void;
+  /** Draft this record from the verified fact ledger instead of retyping it.
+   *  Absent when the parent cannot supply facts; never answers the gate. */
+  onFillFromFacts?: () => void;
+  fillPending?: boolean;
+  fillNotice?: string | null;
 }) {
   const question = describeEvidenceQuestion(symbol, checkLabel);
   const readiness = evidenceQuestionReadiness(draft, now);
@@ -37,6 +42,8 @@ export function EvidenceQuestionReview({ symbol, checkLabel, draft, pending, now
   };
   return <section aria-label="Review evidence" className="space-y-3">
     <p className="text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Add the evidence for this question. General research is not proof of this check. These entries are operator-supplied, not independently verified.</p>
+    {onFillFromFacts && <div className="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" size="sm" className="min-h-11" disabled={fillPending} onClick={onFillFromFacts}>{fillPending ? "Reading the fact ledger…" : "Fill from verified facts"}</Button><span className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Drafts this record from recorded facts. It does not answer the question.</span></div>}
+    {fillNotice && <p role="status" className="rounded border px-2 py-1.5 text-xs leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", color: "var(--sh-text-primary)" }}>{fillNotice}</p>}
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="text-sm font-medium">Observed value or finding<input aria-label="Observed value or finding" value={draft.observation} onChange={(event) => onChange({ ...draft, observation: event.target.value })} className="mt-1 min-h-11 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /><span className="mt-1 block text-xs font-normal leading-5" style={{ color: "var(--sh-fg-muted)" }}>{question.observationHelp}</span></label>
       <label className="text-sm font-medium">Observation date<input type="date" aria-label="Observation date" value={draft.asOf} onChange={(event) => onChange({ ...draft, asOf: event.target.value })} className="mt-1 min-h-11 w-full min-w-0 rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /><span className="mt-1 block text-xs font-normal leading-5" style={{ color: "var(--sh-fg-muted)" }}>When the fact was measured—not when you opened this page.</span></label>
@@ -206,6 +213,12 @@ export default function CandidateBoard() {
     },
     onError: (error) => toast.error(error.message),
   });
+  const [factDraftNotice, setFactDraftNotice] = useState<string | null>(null);
+  const [factDraftPending, setFactDraftPending] = useState(false);
+  // Imperative on purpose: this component returns early before the evidence
+  // question exists, so a query hook keyed to it would change hook order
+  // between renders. utils.fetch takes its input at call time.
+  const trpcUtils = trpc.useUtils();
   const reviewEvidence = trpc.aperture.run.evidence.review.useMutation({
     onSuccess: () => { setReviewProgressMessage("Review recorded. The next guarded action is highlighted below; no paper order was created."); setReviewCompletedAt(Date.now()); toast.success("Human review recorded. This does not create a paper order."); refetch(); },
     onError: (error) => toast.error(error.message),
@@ -416,7 +429,27 @@ export default function CandidateBoard() {
             {focusCandidate && currentEvidenceQuestion && <Card className="border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><CardContent className="space-y-4 pt-5">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Current decision-critical question</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{describeEvidenceQuestion(focusCandidate.symbol, currentEvidenceQuestion).question}</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Requirement: {describeEvidenceQuestion(focusCandidate.symbol, currentEvidenceQuestion).requirement}. Confirmation clears this evidence gate only; ticket and risk checks remain.</p></div><Badge variant="outline" style={{ color: "var(--sh-signal)" }}>{unreviewedChecks.length} open</Badge></div>
               <div className="rounded-lg border p-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Research context · not a verified answer</p><p className="mt-1" style={{ color: "var(--sh-fg-muted)" }}>{sourceExcerpt ? `${sourceExcerpt}${sourceExcerpt.length >= 420 ? "…" : ""}` : "No fact-traced source record is available yet. Build it inline before resolving this question; no paper order is created."}</p>{sourceRecordMessage && <p role="status" className="mt-2 rounded border px-2 py-1.5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", color: "var(--sh-text-primary)" }}>{sourceRecordMessage}</p>}<div className="mt-2 flex flex-wrap gap-2"><Button type="button" variant="ghost" size="sm" onClick={() => setShowInlineRecord(true)}><FileText className="mr-1.5 h-3.5 w-3.5" />View source record</Button>{focusCandidate.memoStatus !== "ok" && <Button type="button" variant="outline" size="sm" disabled={generatingMemo === focusCandidate.id} onClick={() => { setSourceRecordMessage(""); setGeneratingMemo(focusCandidate.id); genMemo.mutate({ runId, candidateId: focusCandidate.id }); }}>{generatingMemo === focusCandidate.id ? "Building source…" : "Build source record"}</Button>}</div></div>
-              <EvidenceQuestionReview symbol={focusCandidate.symbol} checkLabel={currentEvidenceQuestion} draft={currentEvidenceDraft} pending={reviewEvidence.isPending} now={Date.now()} onChange={(draft) => setEvidenceDrafts((current) => ({ ...current, [evidenceDraftKey]: draft }))} onReview={(status, note) => reviewEvidence.mutate({ runId, candidateId: focusCandidate.id, checkLabel: currentEvidenceQuestion, status, note })} />
+              <EvidenceQuestionReview symbol={focusCandidate.symbol} checkLabel={currentEvidenceQuestion} draft={currentEvidenceDraft} pending={reviewEvidence.isPending} now={Date.now()} onChange={(draft) => setEvidenceDrafts((current) => ({ ...current, [evidenceDraftKey]: draft }))} onReview={(status, note) => reviewEvidence.mutate({ runId, candidateId: focusCandidate.id, checkLabel: currentEvidenceQuestion, status, note })} fillPending={factDraftPending} fillNotice={factDraftNotice} onFillFromFacts={async () => {
+                setFactDraftNotice(null);
+                setFactDraftPending(true);
+                let value: Awaited<ReturnType<typeof trpcUtils.aperture.run.evidence.factDraft.fetch>> | null = null;
+                try {
+                  value = await trpcUtils.aperture.run.evidence.factDraft.fetch({ runId, candidateId: focusCandidate.id, checkLabel: currentEvidenceQuestion });
+                } catch {
+                  value = null;
+                } finally {
+                  setFactDraftPending(false);
+                }
+                if (!value) { setFactDraftNotice("The fact ledger could not be read. Nothing was changed."); return; }
+                if (!value.available) { setFactDraftNotice(value.reason); return; }
+                setEvidenceDrafts((current) => ({ ...current, [evidenceDraftKey]: {
+                  observation: value.observedValue, asOf: value.observedAt, criterion: value.criterion,
+                  sourceUrl: value.sourceUrl ?? "", note: value.conclusion,
+                } }));
+                setFactDraftNotice(value.plausibilityWarning
+                  ? "Drafted from the fact ledger, but a recorded input looks wrong — read the conclusion before answering."
+                  : "Drafted from the fact ledger. Review it, then answer the question.");
+              }} />
             </CardContent></Card>}
             {focusCandidate && (() => {
               const checks = proposalChecks;

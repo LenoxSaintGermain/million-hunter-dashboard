@@ -23,7 +23,7 @@ vi.mock("@/lib/trpc", () => {
   return { trpc: {
     useUtils: () => ({}),
     thesis: { list: { useQuery: () => ({ data: [], isLoading: false }) }, createCapital: mutation, setActiveCapital: mutation, useInAperture: mutation },
-    aperture: { run: { get: { useQuery: () => ({ data: { run: { id: 690001, status: "completed" }, candidates: [fixture.candidate], evidenceReviews: [], macroFacts: [], thesisContext: null }, isLoading: false, refetch: fixture.refetch }) }, retry: mutation, followUp: mutation, evidence: { review: mutation } }, macro: { refresh: mutation }, generateMemo: mutation },
+    aperture: { run: { get: { useQuery: () => ({ data: { run: { id: 690001, status: "completed" }, candidates: [fixture.candidate], evidenceReviews: [], macroFacts: [], thesisContext: null }, isLoading: false, refetch: fixture.refetch }) }, retry: mutation, followUp: mutation, evidence: { review: mutation, factDraft: { useQuery: () => ({ data: undefined, isFetching: false, refetch: fixture.refetch }) } } }, macro: { refresh: mutation }, generateMemo: mutation },
   } };
 });
 

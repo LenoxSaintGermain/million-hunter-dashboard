@@ -310,6 +310,19 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   const preserveRiskCashReason = `${candidate?.symbol ?? "This play"} preserved as cash — the selected option ticket exceeded the current paper-account risk ceiling. No proposal or order was created.`;
   const preserveHardBlockCashReason = `${candidate?.symbol ?? "This play"} preserved as cash — ${hardPreflightResult?.detail ?? "the selected option ticket did not clear current paper-account guardrails"}. No proposal or order was created.`;
   const recipeAvailability = marketAvailabilityCopy(constructedPlay?.unavailableReasons[0], constructed.data?.marketContext);
+  // The freshness gate names an account, so resolve it here rather than sending
+  // the operator to Portfolio while a fifteen-minute window runs down.
+  const staleAccountId = hardPreflightResult?.key === "portfolio_context_freshness"
+    ? account?.id ?? null
+    : hardPreflightResult?.key === "execution_account_freshness" ? destinationAccount?.id ?? null : null;
+  const syncAccount = trpc.aperture.account.sync.useMutation({
+    onSuccess: async () => {
+      toast.success("Paper account snapshot refreshed. No proposal or order was created.");
+      if (preflightEnabled) await preflight.refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   const refreshRecipe = async () => {
     const result = await constructed.refetch();
     if (result.isError) {
@@ -329,6 +342,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
     preflightReady: currentPreflightData?.wouldPass,
     blocking: currentPreflightData?.blocking,
     hardBlocker: hardPreflightResult?.detail,
+    hardBlockerKey: hardPreflightResult?.key,
     paperAcknowledged: paperAcknowledgement === "PAPER",
   });
 
@@ -389,6 +403,11 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
           <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Checks run on demand. A waiting trigger is not an order queued for market open.</p>
           <div className="flex flex-wrap gap-2"><Button type="button" className="min-h-11" disabled={constructed.isFetching} onClick={() => void refreshRecipe()}>{constructed.isFetching ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}{constructed.isFetching ? "Refreshing market checks…" : "Refresh market checks"}</Button><Button type="button" variant="outline" className="min-h-11" onClick={onReturnToDecisionBrief}>Compare other plays</Button></div>
           {recipeAvailability.providerDetail && <details className="text-xs"><summary className="min-h-11 cursor-pointer content-center">Provider detail</summary>{recipeAvailability.providerDetail}</details>}
+        </div>}
+        {readiness.action === "refresh_account" && <div className="mt-3 flex flex-wrap gap-2">
+          <Button type="button" className="min-h-11" disabled={syncAccount.isPending || staleAccountId == null} onClick={() => { if (staleAccountId != null) syncAccount.mutate({ id: staleAccountId }); }}>{syncAccount.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}{syncAccount.isPending ? "Refreshing paper account…" : "Refresh paper account"}</Button>
+          <Button type="button" variant="outline" className="min-h-11" onClick={onReturnToDecisionBrief}>Choose another play</Button>
+          {staleAccountId == null && <p className="w-full text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>This account is not resolved on this screen. Sync it from Portfolio, then reopen this ticket.</p>}
         </div>}
         {hardResolutionNeeded && <div className="mt-3 grid gap-2 sm:grid-cols-2"><Button type="button" variant="outline" className="min-h-11" onClick={onReturnToDecisionBrief}>Choose another play</Button><Button type="button" className="min-h-11" disabled={preserveCash.isPending} onClick={() => preserveCash.mutate({ runId, candidateId: candidate.id, decision: "skipped", reason: preserveHardBlockCashReason })}>{preserveCash.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CircleSlash2 className="mr-1.5 h-3.5 w-3.5" />}Preserve cash · $0 risk</Button></div>}
       </section>

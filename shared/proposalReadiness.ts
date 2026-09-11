@@ -2,8 +2,12 @@ export type ProposalReadiness = {
   title: string;
   explanation: string;
   actionLabel: string;
-  action: "return_to_evidence" | "refresh_recipe" | "return_to_decision" | "complete_ticket" | "review_recipe" | "confirm_paper" | "create_proposal";
+  action: "return_to_evidence" | "refresh_recipe" | "return_to_decision" | "refresh_account" | "complete_ticket" | "review_recipe" | "confirm_paper" | "create_proposal";
 };
+
+/** Gates that a deliberate account sync can clear, unlike a liquidity or
+ *  mandate failure which needs a different play. */
+const REFRESHABLE_ACCOUNT_GATES = new Set(["execution_account_freshness", "portfolio_context_freshness"]);
 
 function readableList(items: string[]): string {
   if (items.length <= 1) return items[0] ?? "required ticket terms";
@@ -26,6 +30,9 @@ export function buildProposalReadiness(input: {
   preflightReady?: boolean;
   blocking?: string[];
   hardBlocker?: string | null;
+  /** The failing gate's key, so a refreshable freshness window is not presented
+   *  as a dead end. Absent means the blocker's recoverability is unknown. */
+  hardBlockerKey?: string | null;
   paperAcknowledged?: boolean;
 }): ProposalReadiness {
   if (!input.recipeReady) {
@@ -55,6 +62,16 @@ export function buildProposalReadiness(input: {
   }
   if (!input.preflightReady) {
     if (input.hardBlocker) {
+      // A synced-account window expires on a clock, not on the play's merits.
+      // Sending the operator to pick a different candidate cannot resolve it.
+      if (input.hardBlockerKey && REFRESHABLE_ACCOUNT_GATES.has(input.hardBlockerKey)) {
+        return {
+          title: "Refresh the paper account to continue",
+          explanation: `${input.hardBlocker} Refreshing reads the account snapshot only; it creates no proposal and submits no order.`,
+          actionLabel: "Refresh paper account",
+          action: "refresh_account",
+        };
+      }
       return {
         title: "This paper play cannot be prepared",
         explanation: `${input.hardBlocker} Choose another play below or preserve cash.`,
