@@ -115,9 +115,11 @@ export default function ApertureDeploy() {
 
         {construct.isFetching && <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Reading the recorded play…</p>}
         {play && play.readiness !== "constructed" && <p className="rounded-lg border p-3 text-sm leading-6" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 40%, var(--sh-border-1))", background: "var(--sh-surface)", color: "var(--sh-fg-muted)" }}>
-          <strong style={{ color: "var(--sh-text-primary)" }}>Levels are not derivable yet.</strong>{" "}
+          <strong style={{ color: "var(--sh-text-primary)" }}>{play.readiness === "expired" ? "This recipe\u2019s window has passed." : "Levels are not derivable yet."}</strong>{" "}
           {play.unavailableReasons?.[0] ?? "The constructor could not measure entry, stop or size from the recorded tape."}{" "}
-          The play stands; its entry and stop need an observed session before any figure can be stated.
+          {play.readiness === "expired"
+            ? "Its levels were measured and remain readable, but they cannot be entered as a new paper ticket now. The next regular session re-derives them."
+            : "The play stands; its entry and stop need an observed session before any figure can be stated."}
         </p>}
         {construct.isError && <p role="alert" className="text-sm" style={{ color: "var(--sh-red)" }}>This play's recorded terms could not be read. Nothing was changed.</p>}
 

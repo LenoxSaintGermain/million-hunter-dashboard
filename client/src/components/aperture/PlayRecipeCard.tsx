@@ -23,7 +23,7 @@ const readinessCopy = {
   needs_equity: { label: "No paper play — equity required", color: "var(--sh-signal)" },
   needs_range: { label: "No paper play — opening range required", color: "var(--sh-signal)" },
   budget_too_small: { label: "No paper play — budget cannot size one share", color: "var(--sh-signal)" },
-  expired: { label: "No paper play — catalyst window expired", color: "var(--sh-signal)" },
+  expired: { label: "No paper play — review window has passed", color: "var(--sh-signal)" },
 } as const;
 
 export function PlayRecipeCard({

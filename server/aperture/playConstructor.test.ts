@@ -331,6 +331,38 @@ describe("time stop", () => {
     expect(play.unavailableReasons.join(" ")).toContain("deadline has passed");
   });
 
+  it("expires an intraday recipe once its own 15:30 ET review point has passed", () => {
+    // Found live on 2026-09-11 at 15:38 ET: MGM came back readiness "constructed"
+    // with entry 41.22 / stop 40.33 / qty 12 and an empty unavailableReasons,
+    // eight minutes after its own review point. Expiry was only ever checked
+    // against the catalyst deadline, so an intraday play carrying none stayed
+    // actionable into the close.
+    const past = DAY_START + (15 * 60 + 31) * MIN;
+    const play = constructPlay(input({ catalystDeadlineAt: null, now: past }));
+    expect(play.timeStopAt).toBe(DAY_START + (15 * 60 + 30) * MIN);
+    expect(play.readiness).toBe("expired");
+    // The levels stay readable — this is an expiry, not a measurement failure.
+    expect(play.entry).not.toBeNull();
+    expect(play.stop).not.toBeNull();
+    expect(play.unavailableReasons.join(" ")).toContain("15:30 ET");
+  });
+
+  it("keeps an intraday recipe live right up to its review point", () => {
+    const justBefore = DAY_START + (15 * 60 + 29) * MIN;
+    const play = constructPlay(input({ catalystDeadlineAt: null, now: justBefore }));
+    expect(play.readiness).toBe("constructed");
+    expect(play.unavailableReasons).toEqual([]);
+  });
+
+  it("names the catalyst deadline, not the session review point, when the catalyst is what expired", () => {
+    const expired = DAY_START + 9 * 60 * MIN;
+    const play = constructPlay(input({ catalystDeadlineAt: expired, now: expired + MIN }));
+    expect(play.readiness).toBe("expired");
+    const reasons = play.unavailableReasons.join(" ");
+    expect(reasons).toContain("deadline has passed");
+    expect(reasons).not.toContain("15:30 ET");
+  });
+
   it("says so when no review time could be set", () => {
     const play = constructPlay(input({ holdingPeriod: "swing", catalystDeadlineAt: null }));
     expect(play.timeStopAt).toBeNull();

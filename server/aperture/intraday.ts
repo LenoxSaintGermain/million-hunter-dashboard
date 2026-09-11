@@ -9,6 +9,24 @@
  *   feed=iex   12,317 shares on the day   ~1 min behind   (real-time, 4.8% of tape)
  *   feed=sip  255,439 shares on the day   15 min behind   (consolidated, delayed)
  *
+ * RE-MEASURED 2026-09-11, SPY, 15:36 ET — the delay is gone:
+ *
+ *   feed=iex    4,606 shares on the last bar   ~1 min behind
+ *   feed=sip   81,589 shares on the last bar   ~1 min behind   (real-time)
+ *
+ * The account now carries real-time SIP, so the consolidated tape is both
+ * complete and current and `checkVwapHold` returns definitive answers instead
+ * of deferring to the operator's own terminal. This file needed no change for
+ * that — every figure already carried its measured `lagMs`, which is the whole
+ * point of the design. Do not reintroduce a hardcoded delay assumption; if the
+ * subscription is ever downgraded, the measured lag will say so on its own.
+ *
+ * One deliberate conservatism, stated so it is not mistaken for a bug: `lagMs`
+ * is measured from each bar's START, so a just-completed one-minute bar reads
+ * as ~1 minute old the instant it is available. That overstates staleness by up
+ * to one bar interval and is left that way on purpose — it errs toward asking
+ * the operator to confirm.
+ *
  * Both carry a per-bar `vw`, so VWAP is arithmetic, not a missing data type.
  * But the two feeds produce genuinely different numbers: a VWAP built from IEX
  * prints alone is not the VWAP any other participant is looking at, and a
@@ -19,9 +37,9 @@
  * So every figure here carries `feed`, `asOf` and `lagMs`, and a trigger
  * evaluated against a stale or partial tape is labelled `stale` or
  * `partial_tape` rather than answered yes/no as though it were live. The
- * operator confirms the trigger on their own real-time terminal until the
- * account is upgraded to real-time SIP; when it is, `feed` becomes "sip" with a
- * sub-minute lag and the labels resolve themselves. Nothing else changes.
+ * operator confirms the trigger on their own real-time terminal whenever the
+ * measured lag or the feed says the tape cannot settle it. As of 2026-09-11 the
+ * SIP feed is real-time, so that path is the exception rather than the rule.
  *
  * PURE. Bars come in, structure comes out. No network, no clock, no database —
  * the fetching lives in providers/marketData.ts.

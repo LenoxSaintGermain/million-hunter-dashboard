@@ -555,8 +555,22 @@ export function constructPlay(input: ConstructPlayInput): ConstructedPlay {
     unavailable.push("no catalyst deadline was given, so no review time could be set");
   }
 
-  if (input.catalystDeadlineAt != null && input.catalystDeadlineAt <= input.now) {
-    unavailable.push("the catalyst deadline has passed, so this historical recipe cannot be prepared as a new paper proposal");
+  // Expiry used to be checked against the catalyst deadline alone. An intraday
+  // play carrying no catalyst therefore stayed "constructed" past its own
+  // review point — observed live on 2026-09-11 at 15:38 ET, where MGM returned
+  // entry 41.22 / stop 40.33 / qty 12 with an empty unavailableReasons eight
+  // minutes after the 15:30 ET stop it had set for itself. A recipe whose own
+  // review time has gone cannot be entered as a new proposal; the levels stay
+  // readable because this is an expiry, not a failure to measure.
+  const expiry = input.catalystDeadlineAt != null && input.catalystDeadlineAt <= input.now
+    ? "the catalyst deadline has passed, so this historical recipe cannot be prepared as a new paper proposal"
+    : timeStopAt != null && timeStopAt <= input.now
+      ? input.holdingPeriod === "intraday"
+        ? "the 15:30 ET intraday review point has already passed, so this recipe cannot be entered as a new paper proposal today"
+        : "the recorded review time has already passed, so this recipe cannot be prepared as a new paper proposal"
+      : null;
+  if (expiry) {
+    unavailable.push(expiry);
     readiness = "expired";
   }
 
