@@ -140,9 +140,13 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
     const html = render();
     expect(html).toContain("Partially filled");
     expect(html).toContain("1 filled · 3 remaining");
-    expect(html).toContain(">Ordered</p>");
-    expect(html).toContain(">Filled</p>");
-    expect(html).toContain(">Remaining</p>");
+    // The 2x2 card grid became a decision table, so these read as one line
+    // rather than three labelled stat blocks. The substantive requirement is
+    // unchanged: ordered, filled and remaining stay separately stated, and a
+    // partial fill is never collapsed into a single "filled" number.
+    expect(html).toContain("4 ordered");
+    expect(html).toContain("1 filled");
+    expect(html).toContain("3 remaining");
     expect(deskOrderPresentation(12, shared).label).toBe(shared.inMotion[0].stateLabel);
     expect(html).not.toContain("Position open");
   });

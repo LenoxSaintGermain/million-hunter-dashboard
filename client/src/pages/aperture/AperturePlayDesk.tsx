@@ -244,21 +244,41 @@ export default function AperturePlayDesk() {
 
     {desk.data && showMonitor && (inMotionOrders.length > 0 || activePlays.length > 0 || stageFilter === "monitor") && <section id="play-desk-monitor" className="scroll-mt-5 space-y-3">
       <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>In motion</p><h2 className="mt-1 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>Your plays</h2><p className="mt-1 text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>Queued orders and open positions are labeled separately.</p></div>
-      <div className="grid gap-3 md:grid-cols-2">{visibleOrders.map((order) => {
-        const state = deskOrderPresentation(order.id, briefing);
-        const quantities = deskOrderQuantities(order);
-        const humanReview = deskHumanReview(order, pendingOutcomes);
-        return <article key={`order-${order.id}`} id={`order-${order.id}`} className="min-w-0 rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-          <Badge variant="outline">{instrumentLabel(order.instrumentType)}</Badge><h3 className="mt-2 break-words font-serif text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{paperInstrumentDisplayLabel(order)}</h3>
-          <p className="mt-2 text-sm font-semibold" style={{ color: "var(--sh-signal)" }}>{state.label}</p><p className="mt-1 text-sm leading-6">{state.detail}</p>
-          {isOptionInstrument(order.instrumentType) && <p className="mt-1 break-all font-mono text-xs" style={{ color: "var(--sh-fg-muted)" }}>Raw contract · {order.symbol}</p>}
-          <div className="mt-4 grid grid-cols-3 gap-3 border-y py-3" style={{ borderColor: "var(--sh-border-1)" }}><SmallValue label="Ordered" value={quantities.ordered} /><SmallValue label="Filled" value={quantities.filled} /><SmallValue label="Remaining" value={quantities.remaining} /></div>
-          <div className="mt-3 grid grid-cols-2 gap-3"><SmallValue label={isOptionInstrument(order.instrumentType) ? "Premium at risk" : "Planned loss at modeled stop"} value={money(order.plannedRiskCents)} /><SmallValue label="Human review" value={humanReview ? new Date(humanReview.dueAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : outcomes.error || outcomes.data == null ? "Review status unavailable" : "No checkpoint recorded"} /></div>
-          {order.timeStopAt != null && <p className="mt-2 text-sm">Modeled time stop: {new Date(order.timeStopAt).toLocaleString()}. Not an automatic exit.</p>}
-          {!isOptionInstrument(order.instrumentType) && <p className="mt-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}>Stop execution may differ from the modeled price.</p>}
-          <p className="mt-3 text-sm">{order.accountLabel}</p>{order.thesisName && <p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>{order.thesisName}</p>}<Button className="mt-3 min-h-11 w-full whitespace-normal sm:w-auto" size="sm" variant="outline" onClick={() => state.href ? navigate(state.href) : refresh()}>{state.action}<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>
-        </article>;
-      })}{visibleActivePlays.map((play) => <article key={`play-${play.id}`} className="min-w-0 rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><ActivePlayDetails play={play} state={briefing?.inMotion.find((item) => item.key === `play:${play.id}`)?.stateLabel} compact /><Button size="sm" variant="outline" className="mt-3 min-h-11" onClick={() => navigate(playDeskFilterHref(search, { play: play.id }))}>Review this play<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button></article>)}</div>
+      {/* A dense decision table. The 2x2 card grid put five labelled stats and
+          three sentences on every play; a scan should answer state, risk and
+          next action in one line. Full receipts stay one click away. */}
+      <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <table className="w-full min-w-[44rem] border-collapse text-sm">
+          <thead><tr className="border-b text-left text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
+            <th scope="col" className="px-3 py-2">Play</th>
+            <th scope="col" className="px-3 py-2">State</th>
+            <th scope="col" className="px-3 py-2 text-right">Return</th>
+            <th scope="col" className="px-3 py-2 text-right">Risk / filled</th>
+            <th scope="col" className="px-3 py-2 text-right">Action</th>
+          </tr></thead>
+          <tbody>
+            {visibleOrders.map((order) => {
+              const state = deskOrderPresentation(order.id, briefing);
+              const quantities = deskOrderQuantities(order);
+              return <tr key={`order-${order.id}`} id={`order-${order.id}`} data-play-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
+                <th scope="row" className="px-3 py-2.5 text-left font-semibold" style={{ color: "var(--sh-text-primary)" }}>{paperInstrumentDisplayLabel(order)}</th>
+                <td className="px-3 py-2.5"><span className="whitespace-nowrap text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>{state.label}</span><span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{state.detail}</span></td>
+                <td className="px-3 py-2.5 text-right tabular-nums" title="Mark-to-market is not wired into this view; open the play for its recorded fills." style={{ color: "var(--sh-fg-muted)" }}>—</td>
+                <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: "var(--sh-text-primary)" }}>{money(order.plannedRiskCents)}<span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{isOptionInstrument(order.instrumentType) ? "Premium at risk" : "Planned loss at modeled stop"} · {quantities.ordered} ordered · {quantities.filled} filled · {quantities.remaining} remaining{!isOptionInstrument(order.instrumentType) ? " · Stop execution may differ from the modeled price." : ""}<span className="block">Human review: {(() => { const humanReview = deskHumanReview(order, pendingOutcomes); return humanReview ? new Date(humanReview.dueAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : outcomes.error || outcomes.data == null ? "Review status unavailable" : "No checkpoint recorded"; })()}</span></span></td>
+                <td className="px-3 py-2.5 text-right"><Button size="sm" variant="outline" className="min-h-11 whitespace-nowrap" onClick={() => navigate(playDeskFilterHref(search, { stage: "monitor" }))}>Open</Button></td>
+              </tr>;
+            })}
+            {visibleActivePlays.map((play) => <tr key={`play-${play.id}`} data-play-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
+              <th scope="row" className="px-3 py-2.5 text-left font-semibold" style={{ color: "var(--sh-text-primary)" }}>{readableSymbol(play.symbol)}</th>
+              <td className="px-3 py-2.5"><span className="whitespace-nowrap text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>{briefing?.inMotion.find((item) => item.key === `play:${play.id}`)?.stateLabel ?? "Open position"}</span></td>
+              <td className="px-3 py-2.5 text-right" style={{ color: "var(--sh-fg-muted)" }}>—</td>
+              <td className="px-3 py-2.5 text-right" style={{ color: "var(--sh-fg-muted)" }}>—</td>
+              <td className="px-3 py-2.5 text-right"><Button size="sm" variant="outline" className="min-h-11 whitespace-nowrap" onClick={() => navigate(playDeskFilterHref(search, { play: play.id }))}>Open</Button></td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Return is not shown here: mark-to-market is not wired into this view. Open a play for its recorded fills and modeled terms. A share stop is a modeled scenario; stop execution may differ from the modeled price and the loss can be greater.</p>
       {visibleOrders.length === 0 && visibleActivePlays.length === 0 && <p className="rounded-xl border px-4 py-6 text-center text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>No matching plays in the returned records.{selectedPlay && " The selected play remains open above."} Critical issues remain above all filters.</p>}
     </section>}
 
