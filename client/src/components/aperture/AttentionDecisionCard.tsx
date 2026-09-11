@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ApertureAttentionItem } from "@shared/apertureAttention";
+import { coveredByInvariant } from "@shared/operatingInvariant";
 import Markdown from "react-markdown";
 
 function evidenceUrl(value: string | undefined): string | undefined {
@@ -64,10 +65,12 @@ export function AttentionDecisionCard({ item, prominent = false, compact = false
   item: ApertureAttentionItem; prominent?: boolean; compact?: boolean; fingerprint?: string;
   onOpen: (href: string) => void; busy?: boolean;
 }) {
-  // Only this exact, routine explanation has a shorter equivalent. Unknown/new
-  // consequences always remain visible; never classify warnings from keywords.
-  const checkpointGuidance = compact && !prominent && item.consequence === "This is a human checkpoint, not proof that an automatic check or exit occurred."
-    ? item.consequence : null;
+  // The workspace banner states the operating invariant once. A consequence it
+  // covers in full, matched as a whole sentence, moves behind the disclosure
+  // rather than repeating on every row. Unknown or newly written consequences
+  // always stay visible; warnings are never classified by keyword.
+  const routine = coveredByInvariant(item.consequence);
+  const checkpointGuidance = routine ? item.consequence : null;
   const titleId = `attention-title-${item.key}`;
   const busyId = `attention-busy-${item.key}`;
   const evidenceWarnings = item.evidence && <>
@@ -93,7 +96,7 @@ export function AttentionDecisionCard({ item, prominent = false, compact = false
       <div className="min-w-0">
         <h3 id={titleId} className="break-words text-base font-semibold leading-6">{item.title}</h3>
         <p className="mt-1 break-words text-sm leading-5">{item.reason}</p>
-        <p className="mt-1 break-words text-sm leading-5" style={{ color: "var(--sh-text-secondary)" }}>{checkpointGuidance ? "Human review; no automatic check or exit." : item.consequence}</p>
+        {!routine && <p className="mt-1 break-words text-sm leading-5" style={{ color: "var(--sh-text-secondary)" }}>{item.consequence}</p>}
         {evidenceWarnings}
       </div>
       <div className="min-w-0">{action}{busy && <p id={busyId} role="status" className="mt-2 text-sm leading-5">Refreshing this task. Its action will be available when status returns.</p>}</div>
@@ -110,7 +113,7 @@ export function AttentionDecisionCard({ item, prominent = false, compact = false
     <p className="mt-2 text-sm leading-5">{item.reason}</p>
     {action}
     {busy && <p id={busyId} role="status" className="mt-2 text-sm leading-5">Refreshing this task. Its action will be available when status returns.</p>}
-    <p className="mt-2 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{item.consequence}</p>
+    {!routine && <p className="mt-2 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{item.consequence}</p>}
     {evidenceWarnings}
     {item.evidence && <FindingEvidence evidence={item.evidence} />}
   </article>;

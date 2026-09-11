@@ -18,6 +18,8 @@ export type ObjectiveMissionFlowProps = {
   initialDraft?: MissionDraftRecord | null;
   receiptTarget?: { decisionRunId: number; revisionId: number } | null;
   newObjective?: boolean;
+  /** Amount already stated in the three-tap entry, in cents. */
+  seedCapitalCents?: number | null;
   /** Replace the new-draft address only after the exact accepted identity is verified. */
   onAccepted?: (target: { decisionRunId: number; revisionId: number }) => void;
 };
@@ -39,8 +41,13 @@ const freshRisk = (data: RiskResponse) => freshAt(data.asOf) && freshAt(data.acc
 
 /** Called only for an explicit New objective entry/action, never to repair a
  * missing identity, refresh a draft, or retry an uncertain acceptance. */
-function newValues(): MissionDraftValues {
-  return { ...emptyMissionDraftValues(), strategyContext: {
+function newValues(seedCapitalCents?: number | null): MissionDraftValues {
+  const base = emptyMissionDraftValues();
+  // The three-tap entry already asked how much to put to work; do not ask twice.
+  if (seedCapitalCents != null && Number.isFinite(seedCapitalCents) && seedCapitalCents > 0) {
+    base.capital = String(Math.round(seedCapitalCents / 100));
+  }
+  return { ...base, strategyContext: {
     schemaVersion: 1, requestId: crypto.randomUUID(), declarationId: crypto.randomUUID(),
     intent: "deploy_excess_capital", searchScope: "broader_permitted_universe",
     requestedSymbols: [], sourceOrder: null, profitReserve: "",
@@ -139,7 +146,7 @@ function DraftComparison({ local, remote, accounts, theses }: { local: MissionDr
   </div>;
 }
 
-export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective = false, onAccepted }: ObjectiveMissionFlowProps) {
+export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective = false, seedCapitalCents = null, onAccepted }: ObjectiveMissionFlowProps) {
   const utils = trpc.useUtils();
   const draftQuery = trpc.aperture.runway.draft.get.useQuery(undefined, readOptions);
   // These endpoints are owner-scoped. Do not infer ownership from a label.
@@ -149,7 +156,7 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
   const saveMutation = trpc.aperture.runway.draft.save.useMutation({ retry: false });
   const startMutation = trpc.aperture.strategy.start.useMutation({ retry: false });
   const runMutation = trpc.aperture.strategy.run.useMutation({ retry: false });
-  const [values, setValues] = useState<MissionDraftValues>(() => newObjective ? newValues() : initialDraft?.values ?? emptyMissionDraftValues());
+  const [values, setValues] = useState<MissionDraftValues>(() => newObjective ? newValues(seedCapitalCents) : initialDraft?.values ?? emptyMissionDraftValues());
   const [saved, setSaved] = useState<MissionDraftRecord | null>(initialDraft ?? null);
   const [initialized, setInitialized] = useState(!!initialDraft || newObjective);
   const [draftTarget, setTarget] = useState<Identity | null>(() => newObjective ? null : draftIdentity(initialDraft));

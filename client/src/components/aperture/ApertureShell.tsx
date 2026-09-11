@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { BookOpen, FileText, Landmark, LayoutDashboard, ListTodo, Route, Wallet } from "lucide-react";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { cn } from "@/lib/utils";
+import { OPERATING_INVARIANT } from "@shared/operatingInvariant";
 import { CapitalCockpitRail } from "@/components/aperture/CapitalCockpitRail";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolatedUatIdentity";
@@ -47,6 +48,8 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
             <span className="inline-flex shrink-0 items-center gap-1.5 border border-amber/30 bg-amber/5 px-2 py-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-amber" />
               <span className="font-eyebrow text-eyebrow text-amber uppercase tracking-widest whitespace-nowrap">Paper only</span>
+            </span>
+            <span data-operating-invariant className="hidden shrink-0 text-[11px] leading-4 lg:inline" style={{ color: "var(--sh-fg-muted)" }}>{OPERATING_INVARIANT}
             </span>
           </div>
           <nav className="flex min-w-max gap-5" aria-label="Capital Aperture workspace menu">

@@ -83,6 +83,16 @@ export default function ApertureDeploy() {
         {!amountValid && amount.length > 0 && <p className="mt-2 text-xs" style={{ color: "var(--sh-red)" }}>Enter an amount greater than zero.</p>}
       </div>
 
+      {amountValid && <div className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <h2 className="text-sm font-semibold">Nothing here fits?</h2>
+        <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
+          Research a new opportunity for this amount. Unlike the recommendation above, this starts a fresh run against live sources — it takes a few minutes and is not instant. No order is created.
+        </p>
+        <Button variant="outline" className="mt-3 min-h-11" onClick={() => navigate(`/aperture/mission?objective=1&capital=${Math.round(amountCents / 100)}`)}>
+          Research something new with {money(amountCents)}<ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>}
+
       {asked && ready.isError && <p role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)" }}>Completed research could not be read. Nothing was started or changed.</p>}
 
       {asked && !ready.isFetching && !ready.isError && best == null && <section aria-label="No play available" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>

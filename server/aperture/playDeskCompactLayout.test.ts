@@ -1,3 +1,4 @@
+import { OPERATING_INVARIANT } from "../../shared/operatingInvariant";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { load } from "cheerio";
@@ -176,11 +177,19 @@ describe("Play Desk compact attention — illustrative records, no API calls", (
     expect(fixture.navigate).not.toHaveBeenCalled();
   });
 
-  it("moves only the repeated checkpoint explanation into Evidence, retaining the no-automation warning", () => {
+  // Superseded deliberately. The row used to repeat the no-automation warning,
+  // which put the same sentence in the viewport three or four times and pushed
+  // the decision down. The claim is not dropped: OPERATING_INVARIANT states it
+  // once for the whole workspace, and the full sentence stays on the row behind
+  // its disclosure. Only exactly-known routine copy defers this way - see
+  // shared/operatingInvariant.test.ts.
+  it("defers the repeated no-automation warning to the workspace banner, keeping it on the row behind Evidence", () => {
     const $ = render();
     const row = $('[data-attention-key="review:17"]');
-    expect(visibleText($.html(row))).toContain("Human review; no automatic check or exit.");
+    expect(visibleText($.html(row))).not.toContain("Human review; no automatic check or exit.");
     expect(row.find("details").text()).toContain("This is a human checkpoint, not proof that an automatic check or exit occurred.");
+    // The claim itself must still be made somewhere the operator sees it.
+    expect(OPERATING_INVARIANT).toMatch(/automatically/i);
   });
 
   it("opening the exact row only calls navigation; a busy row cannot dispatch an action", () => {

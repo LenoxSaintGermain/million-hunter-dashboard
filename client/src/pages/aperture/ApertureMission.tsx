@@ -17,6 +17,9 @@ export default function ApertureMission() {
     ? { decisionRunId: Number(receiptParams?.decisionRunId), revisionId: Number(receiptParams?.revisionId) }
     : null;
   const newObjective = !receiptTarget && new URLSearchParams(search).get("objective") === "1";
+  // Carried from the three-tap entry so the operator is not asked the amount twice.
+  const seedCapital = Number(new URLSearchParams(search).get("capital"));
+  const seedCapitalCents = Number.isFinite(seedCapital) && seedCapital > 0 ? Math.round(seedCapital * 100) : null;
   const invalidReceipt = isReceiptRoute && !receiptTarget;
 
   return <DashboardLayout>
@@ -31,7 +34,7 @@ export default function ApertureMission() {
     {invalidReceipt ? <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)" }}>
       <h2 className="font-semibold">Mission link is incomplete</h2>
       <p className="mt-2 text-sm">Open the saved Mission from Today. This link has not started or replaced a Mission.</p>
-    </section> : newObjective ? <ObjectiveMissionFlow newObjective onAccepted={({ decisionRunId, revisionId }) =>
+    </section> : newObjective ? <ObjectiveMissionFlow newObjective seedCapitalCents={seedCapitalCents} onAccepted={({ decisionRunId, revisionId }) =>
       navigate(`/aperture/decision/${decisionRunId}/revision/${revisionId}`, { replace: true })} /> : <DecisionRunway
       key={receiptTarget ? `receipt:${receiptTarget.decisionRunId}:${receiptTarget.revisionId}` : "mission"}
       receiptTarget={receiptTarget}
