@@ -2615,6 +2615,29 @@ export const apertureRouter = router({
         if (!snapshotByOrderKey.has(key)) snapshotByOrderKey.set(key, snapshot);
       }
 
+      // Current mark-to-market. `positionSnapshots` records zero P&L at fill and
+      // is never revalued, so it cannot answer "what is this worth now". The
+      // `positions` table is replaced wholesale by the broker sync and is the
+      // only row that carries a current price with its timestamp and source.
+      const markRead = await readOptionalStatusSource("Broker position marks", async () => accountIds.length
+        ? await db!.select({
+            accountId: positions.accountId,
+            symbol: positions.symbol,
+            qty: positions.qty,
+            avgCostCents: positions.avgCostCents,
+            lastPriceCents: positions.lastPriceCents,
+            marketValueCents: positions.marketValueCents,
+            priceAsOf: positions.priceAsOf,
+            priceSource: positions.priceSource,
+          }).from(positions).where(inArray(positions.accountId, accountIds)).limit(500)
+        : []);
+      const markRows = markRead.value ?? [];
+      const markByOrderKey = new Map<string, typeof markRows[number]>();
+      for (const row of markRows) {
+        const key = `${row.accountId}:${normSymbol(row.symbol)}`;
+        if (!markByOrderKey.has(key)) markByOrderKey.set(key, row);
+      }
+
       const [latestMission] = await db!.select({
         decisionRunId: apertureDecisionRuns.id,
         revisionId: apertureDecisionRevisions.id,
@@ -2731,7 +2754,7 @@ export const apertureRouter = router({
         monitoringUnavailable: Boolean(monitoringRead.unavailable), positionsUnavailable: Boolean(snapshotRead.unavailable), now });
       const monitoringIncomplete = sourceIssues.some(issue => issue.state === "missing");
       const unknownMonitoring = latestChecks.some((check) => monitoringReviewState(check, now).state === "unknown");
-      const unavailableSources = [monitoringRead.unavailable, snapshotRead.unavailable, discoveryRead?.unavailable].filter(Boolean).join(" ");
+      const unavailableSources = [monitoringRead.unavailable, snapshotRead.unavailable, markRead.unavailable, discoveryRead?.unavailable].filter(Boolean).join(" ");
       const draft = await missionDraftStore.get(ctx.user.id);
       const attention = deriveApertureAttention({
         now,
@@ -2820,6 +2843,10 @@ export const apertureRouter = router({
           ...order,
           monitoring: order.candidateId == null ? [] : monitoringByCandidate.get(order.candidateId) ?? [],
           latestSnapshot: snapshotByOrderKey.get(`${order.accountId}:${order.runId}:${normSymbol(order.symbol)}`) ?? null,
+          latestMark: markByOrderKey.get(`${order.accountId}:${normSymbol(order.symbol)}`) ?? null,
+          /** Set when the marks read failed outright, so the desk can say the
+           *  figure is unavailable rather than imply the position is closed. */
+          markSourceUnavailable: Boolean(markRead.unavailable),
         })),
         activePlays,
         executionTarget: latestUnderwriting?.objective.targetProfitCents != null && latestUnderwriting.objective.targetPeriod === "week"

@@ -13,6 +13,7 @@ import { buildResearchJourneys } from "@shared/runWorkspace";
 import { playDeskJourneyLane } from "@shared/playDeskState";
 import { isOptionInstrument, paperInstrumentDisplayLabel, parseOccOptionSymbol } from "@shared/paperInstrument";
 import { arbitrateTodayRead, canShowQuietBriefing, type ApertureAttentionBriefing, type ApertureAttentionItem } from "@shared/apertureAttention";
+import { deskOrderReturn, formatMarkProvenance, formatReturnAmount, formatReturnPercent } from "@shared/positionReturn";
 
 const money = (cents?: number | null) => cents == null
   ? "—"
@@ -263,7 +264,14 @@ export default function AperturePlayDesk() {
               return <tr key={`order-${order.id}`} id={`order-${order.id}`} data-play-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
                 <th scope="row" className="px-3 py-2.5 text-left font-semibold" style={{ color: "var(--sh-text-primary)" }}>{paperInstrumentDisplayLabel(order)}</th>
                 <td className="px-3 py-2.5"><span className="whitespace-nowrap text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>{state.label}</span><span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{state.detail}</span></td>
-                <td className="px-3 py-2.5 text-right tabular-nums" title="Mark-to-market is not wired into this view; open the play for its recorded fills." style={{ color: "var(--sh-fg-muted)" }}>—</td>
+                <td data-play-return className="px-3 py-2.5 text-right tabular-nums align-top">{(() => {
+                  const result = deskOrderReturn(order, Date.now());
+                  if (!result.measured) return <><span className="text-xs font-semibold" style={{ color: "var(--sh-fg-muted)" }}>Not measured</span><span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{result.reason}</span></>;
+                  // The sign is carried by the +/− prefix, never by colour alone.
+                  const tone = result.pnlCents > 0 ? "var(--sh-emerald)" : result.pnlCents < 0 ? "var(--sh-red)" : "var(--sh-text-primary)";
+                  const percent = formatReturnPercent(result);
+                  return <><span className="font-semibold" style={{ color: tone }}>{formatReturnAmount(result)}</span>{percent && <span className="block text-[11px] leading-4" style={{ color: tone }}>{percent}</span>}<span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{formatMarkProvenance(result)}</span></>;
+                })()}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: "var(--sh-text-primary)" }}>{money(order.plannedRiskCents)}<span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{isOptionInstrument(order.instrumentType) ? "Premium at risk" : "Planned loss at modeled stop"} · {quantities.ordered} ordered · {quantities.filled} filled · {quantities.remaining} remaining{!isOptionInstrument(order.instrumentType) ? " · Stop execution may differ from the modeled price." : ""}<span className="block">Human review: {(() => { const humanReview = deskHumanReview(order, pendingOutcomes); return humanReview ? new Date(humanReview.dueAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : outcomes.error || outcomes.data == null ? "Review status unavailable" : "No checkpoint recorded"; })()}</span></span></td>
                 <td className="px-3 py-2.5 text-right"><Button size="sm" variant="outline" className="min-h-11 whitespace-nowrap" onClick={() => navigate(playDeskFilterHref(search, { stage: "monitor" }))}>Open</Button></td>
               </tr>;
@@ -278,7 +286,7 @@ export default function AperturePlayDesk() {
           </tbody>
         </table>
       </div>
-      <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Return is not shown here: mark-to-market is not wired into this view. Open a play for its recorded fills and modeled terms. A share stop is a modeled scenario; stop execution may differ from the modeled price and the loss can be greater.</p>
+      <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Return is unrealized, marked from the broker’s last reported price for the exact contract; the mark time and source are shown on every figure and nothing is estimated between syncs. Sync the account to take a current mark. A share stop is a modeled scenario; stop execution may differ from the modeled price and the loss can be greater.</p>
       {visibleOrders.length === 0 && visibleActivePlays.length === 0 && <p className="rounded-xl border px-4 py-6 text-center text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>No matching plays in the returned records.{selectedPlay && " The selected play remains open above."} Critical issues remain above all filters.</p>}
     </section>}
 

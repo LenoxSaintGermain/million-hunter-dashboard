@@ -184,6 +184,63 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
     expect(html).not.toContain("Max loss");
   });
 
+  it("marks a filled order from the broker position and states when and from where", () => {
+    const orders = [order({
+      status: "filled", filledQty: 2,
+      latestMark: { qty: 2, avgCostCents: 258, lastPriceCents: 305, marketValueCents: 61_000, priceAsOf: Date.now() - 60_000, priceSource: "alpaca_paper" },
+    })];
+    fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }) });
+    const html = render();
+    // $610.00 market value against a $516.00 basis. The multiplier is derived
+    // from the broker's own market value, never assumed to be 100.
+    expect(html).toContain("+$94.00");
+    expect(html).toContain("+18.2%");
+    expect(html).toContain("alpaca_paper");
+    expect(html).toContain(">Mark ");
+    expect(html).not.toContain("Stale mark");
+    expect(html).not.toContain("mark-to-market is not wired");
+  });
+
+  it("says a stale mark is stale instead of presenting it as current", () => {
+    const orders = [order({
+      status: "filled", filledQty: 2,
+      latestMark: { qty: 2, avgCostCents: 258, lastPriceCents: 305, marketValueCents: 61_000, priceAsOf: Date.now() - 60 * 60_000, priceSource: "alpaca_paper" },
+    })];
+    fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }) });
+    const html = render();
+    expect(html).toContain("+$94.00");
+    expect(html).toContain("Stale mark");
+  });
+
+  it("does not report a return for an order with no recorded fill", () => {
+    const orders = [order({ status: "submitted", filledQty: 0, latestMark: null })];
+    fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }) });
+    const html = render();
+    expect(html).toContain("Not measured");
+    expect(html).toContain("No fill is recorded, so there is nothing to mark.");
+  });
+
+  it("separates an unreadable marks source from a position the broker does not report", () => {
+    const unreadable = [order({ status: "filled", filledQty: 2, latestMark: null, markSourceUnavailable: true })];
+    fixture.queries.desk = query({ orders: unreadable, activePlays: [], attention: attention({ orders: unreadable as any }) });
+    expect(render()).toContain("Broker position marks are unavailable");
+
+    const absent = [order({ status: "filled", filledQty: 2, latestMark: null })];
+    fixture.queries.desk = query({ orders: absent, activePlays: [], attention: attention({ orders: absent as any }) });
+    expect(render()).toContain("No open position is recorded at the broker for this play.");
+  });
+
+  it("refuses to mark a price the broker reported without a timestamp or source", () => {
+    const orders = [order({
+      status: "filled", filledQty: 2,
+      latestMark: { qty: 2, avgCostCents: 258, lastPriceCents: 305, marketValueCents: 61_000, priceAsOf: null, priceSource: null },
+    })];
+    fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }) });
+    const html = render();
+    expect(html).toContain("Not measured");
+    expect(html).toContain("not a fact");
+  });
+
   it("routes a filled order to the shared monitoring task, not a new ticket", () => {
     const orders = [order({ status: "filled", filledQty: 4 })];
     const shared = attention({ orders: orders as any });
