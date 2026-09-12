@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useLocation, useRoute, useSearch } from "wouter";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,11 @@ export default function ApertureMission() {
         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture · Mission</p>
         <h1 className="sr-only">{receiptTarget ? "Mission revision" : "Mission"}</h1>
       </div>
-      {!isReceiptRoute && !newObjective && discovery.data?.enabled && <Button variant="outline" className="min-h-11" onClick={() => navigate("/aperture/mission?objective=1")}>Explore a capital objective</Button>}
+      {/* "Explore a capital objective" named the concept, not the action, and sat
+          as a ghost-weight outline button among four others — the operator could
+          not find the sentence entry at all and asked whether it had been
+          removed. The label now says what you do, and the control is primary. */}
+      {!isReceiptRoute && !newObjective && discovery.data?.enabled && <Button data-start-from-sentence className="min-h-11" onClick={() => navigate("/aperture/mission?objective=1")}>Start from a sentence<ArrowRight className="ml-2 h-4 w-4" /></Button>}
     </div>
     {invalidReceipt ? <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)" }}>
       <h2 className="font-semibold">Mission link is incomplete</h2>

@@ -33,16 +33,18 @@ describe("Mission objective entry routing (isolated rendering, not browser UAT)"
     const tree = ApertureMission(); const $ = load(renderToStaticMarkup(tree));
     expect(fixture.runway).toHaveBeenCalledWith(expect.objectContaining({ receiptTarget: null }));
     expect(fixture.flow).not.toHaveBeenCalled(); expect(fixture.navigate).not.toHaveBeenCalled();
-    expect($.text()).toContain("Explore a capital objective");
-    const action = elements(tree).find(node => node.props.children === "Explore a capital objective")!;
+    expect($.text()).toContain("Start from a sentence");
+    const action = elements(tree).find(node => node.props["data-start-from-sentence"])!;
     expect(action.props.className).toContain("min-h-11");
+    // Primary weight: it was one outline button among four and went unfound.
+    expect(action.props.variant).toBeUndefined();
     action.props.onClick(); expect(fixture.navigate).toHaveBeenCalledOnce();
     expect(fixture.navigate).toHaveBeenCalledWith("/aperture/mission?objective=1");
   });
   it.each([{ isLoading: true }, { error: new Error("Unavailable") }, { data: { enabled: false } }])(
     "does not advertise objective execution without a confirmed capability", (capability) => {
       fixture.capability = capability; const $ = load(renderToStaticMarkup(ApertureMission()));
-      expect($.text()).not.toContain("Explore a capital objective");
+      expect($.text()).not.toContain("Start from a sentence");
       expect(fixture.flow).not.toHaveBeenCalled(); expect(fixture.navigate).not.toHaveBeenCalled();
     });
   it("opens the objective controller only for the deliberate objective route", () => {

@@ -69,3 +69,41 @@ describe("the workspace bar's standing disclosure stays out of the menu row", ()
     expect(source).toContain("Navigation is not the thing");
   });
 });
+
+describe("the cockpit rail fits its own cells", () => {
+  const source = read("client/src/components/aperture/CapitalCockpitRail.tsx");
+
+  it("gives the portfolio-constraint cell more than an even share", () => {
+    // Measured 2026-09-12 on every Aperture route: four even 299px columns,
+    // but that cell carries a state mark, a subject, a meter, a ratio, a help
+    // control and a Detail button — 330px of content. The 31px it could not fit
+    // overflowed the whole rail section, on Today, Mission and Research alike.
+    expect(source).toContain("xl:grid-cols-[1fr_1fr_1fr_1.4fr]");
+    expect(source).not.toContain("xl:grid-cols-4");
+  });
+
+  it("keeps the account cell's fact on the surface and its explanation behind the help", () => {
+    // The long form needed ~490px in a 299px cell and was clipped by 168px, with
+    // the same explanation already one control away.
+    expect(source).not.toContain("ceilings are measured against ${syncedLabel");
+    expect(source).toContain("const staleText = syncedLabel(data.account.stalenessMs);");
+    expect(source).toContain("measured against the equity value recorded at this sync");
+  });
+});
+
+describe("the sentence entry says what it does", () => {
+  const source = read("client/src/pages/aperture/ApertureMission.tsx");
+
+  it("names the action rather than the concept", () => {
+    // The old label named the concept, not the action, and was the one the
+    // operator could not find. It survives only in the comment recording why.
+    expect(source).toContain(">Start from a sentence<");
+    expect(source).not.toContain(">Explore a capital objective<");
+  });
+
+  it("is a primary control, not one outline button among four", () => {
+    const line = source.split("\n").find((l) => l.includes("data-start-from-sentence")) ?? "";
+    expect(line).not.toContain('variant="outline"');
+    expect(line).toContain("objective=1");
+  });
+});
