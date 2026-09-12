@@ -1,5 +1,5 @@
 import { monitoringFindingPresentation, type MonitoringInstrumentContext } from "./monitoringState";
-import { monitoringFindingHref } from "./monitoringFinding";
+import { monitoringFindingHref, monitoringFindingVersion, resolvedFindingVersions } from "./monitoringFinding";
 import { paperInstrumentDisplayLabel, parseOccOptionSymbol } from "./paperInstrument";
 
 export type ApertureEntryState = "start" | "resume" | "check_in";
@@ -582,7 +582,11 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     const key = `finding:${finding.orderId}:${finding.kind}:${hashCanonical(finding.finding.trim().replace(/\s+/g, " "))}`;
     if (!findings.has(key) || findings.get(key)!.checkedAt < finding.checkedAt) findings.set(key, finding);
   }
+  // A finding a human has explicitly resolved leaves the surface. The binding is
+  // to that exact version, so this can never hide evidence nobody has read.
+  const resolvedVersions = resolvedFindingVersions(prior?.monitoringReviews);
   for (const [key, finding] of Array.from(findings.entries())) {
+    if (resolvedVersions.has(`${finding.id}:${monitoringFindingVersion({ ...finding, flagged: true, citations: finding.citations })}`)) continue;
     const order = input.orders.find(order => order.id === finding.orderId);
     const presentation = monitoringFindingPresentation({
       check: { ...finding, flagged: true, citations: finding.citations },

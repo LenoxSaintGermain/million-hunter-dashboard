@@ -52,7 +52,16 @@ export function selectMonitoringFinding<T extends VersionedMonitoringFinding>(ch
   return { state: "selected", check, historical: checks.some(item => item.checkType === check.checkType && (item.checkedAt > check.checkedAt || item.checkedAt === check.checkedAt && item.id > check.id)) };
 }
 
-export type MonitoringReviewDecision = "reviewed_unresolved" | "needs_fresh_evidence";
+/**
+ * What a human decided about one recorded finding.
+ *
+ * `resolved` was missing until 2026-09-12. Both other decisions keep the concern
+ * open, `resolved` was typed as the literal `false`, and the server hardcoded it,
+ * so no review could ever close anything and the desk only ever grew. An
+ * operator reported being unable to clear a single finding; they were right, and
+ * it was not a defect in the form but an absent verb.
+ */
+export type MonitoringReviewDecision = "reviewed_unresolved" | "needs_fresh_evidence" | "resolved";
 export type MonitoringReviewReceipt = MonitoringFindingSelection & {
   requestId: string;
   userId: number;
@@ -61,5 +70,34 @@ export type MonitoringReviewReceipt = MonitoringFindingSelection & {
   reviewedAt: number;
   decision: MonitoringReviewDecision;
   note: string;
-  resolved: false;
+  /** True only for the `resolved` decision. Derived, never sent by the client. */
+  resolved: boolean;
 };
+
+/**
+ * Resolution is bound to the exact finding version it was recorded against.
+ *
+ * This is the whole safety property: closing what you have read cannot silence
+ * what you have not. A later check that flags again produces a different
+ * `monitoringFindingVersion`, so it surfaces as a new finding no matter how many
+ * times its predecessor was resolved.
+ */
+export function resolvedFindingVersions(receipts: readonly MonitoringReviewReceipt[] | undefined): Set<string> {
+  const resolved = new Set<string>();
+  const reopened = new Set<string>();
+  // Receipts are append-only, so the last decision on a version is the standing
+  // one: resolving and then recording a fresh concern must reopen it.
+  for (const receipt of receipts ?? []) {
+    const key = `${receipt.findingId}:${receipt.findingVersion}`;
+    if (receipt.resolved && receipt.decision === "resolved") { resolved.add(key); reopened.delete(key); }
+    else { reopened.add(key); resolved.delete(key); }
+  }
+  return resolved;
+}
+
+export function isFindingResolved(
+  finding: { id: number } & VersionedMonitoringFinding,
+  receipts: readonly MonitoringReviewReceipt[] | undefined,
+): boolean {
+  return resolvedFindingVersions(receipts).has(`${finding.id}:${monitoringFindingVersion(finding)}`);
+}

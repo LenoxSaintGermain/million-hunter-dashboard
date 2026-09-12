@@ -3,6 +3,7 @@ import {
   deriveApertureAttention,
   type ApertureAttentionInput,
 } from "../../shared/apertureAttention";
+import { monitoringFindingVersion } from "../../shared/monitoringFinding";
 
 const now = Date.UTC(2026, 8, 8, 14, 42);
 
@@ -220,6 +221,40 @@ describe("Capital Aperture attention briefing", () => {
 
     expect(second.changeHeading).toBe("Changed since your last review");
     expect(second.changed).toHaveLength(0);
+  });
+
+  it("takes a closed finding off the list, and brings a later one back", () => {
+    const finding = { id: 15, orderId: 9, runId: 88, candidateId: 3, symbol: "WBD", kind: "invalidation" as const,
+      finding: "New evidence challenges the catalyst.", checkedAt: now - 100 };
+    const input = base({ monitoringFindings: [finding] });
+    const open = deriveApertureAttention(input, null);
+    expect(open.primary).toMatchObject({ kind: "invalidation_evidence", symbol: "WBD" });
+
+    const closed = deriveApertureAttention(input, {
+      capturedAt: now - 1, items: [],
+      monitoringReviews: [{
+        requestId: "a1b2", userId: 1, runId: 88, candidateId: 3, orderId: 9, findingId: 15,
+        findingVersion: monitoringFindingVersion({ ...finding, flagged: true, citations: undefined as any }),
+        reviewedAt: now, decision: "resolved", note: "Dealt with; catalyst confirmed.", resolved: true,
+      }],
+    });
+    expect([closed.primary, ...closed.otherCritical, ...closed.otherAttention]
+      .filter(Boolean).some((item) => item!.kind === "invalidation_evidence")).toBe(false);
+
+    // A later check on the same finding carries a different version, so closing
+    // the one that was read cannot suppress the one that was not.
+    const later = deriveApertureAttention(base({
+      monitoringFindings: [{ ...finding, checkedAt: now, finding: "A further concern was recorded." }],
+    }), {
+      capturedAt: now - 1, items: [],
+      monitoringReviews: [{
+        requestId: "a1b2", userId: 1, runId: 88, candidateId: 3, orderId: 9, findingId: 15,
+        findingVersion: monitoringFindingVersion({ ...finding, flagged: true, citations: undefined as any }),
+        reviewedAt: now, decision: "resolved", note: "Dealt with; catalyst confirmed.", resolved: true,
+      }],
+    });
+    expect([later.primary, ...later.otherCritical, ...later.otherAttention]
+      .filter(Boolean).some((item) => item!.kind === "invalidation_evidence")).toBe(true);
   });
 
   it("keeps invalidation evidence visible regardless of page filters", () => {

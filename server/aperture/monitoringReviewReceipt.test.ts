@@ -54,6 +54,24 @@ describe("explicit monitoring review receipts", () => {
     await expect(f.caller().record({ ...input, note: "A different review message." })).rejects.toMatchObject({ code: "CONFLICT" });
     expect(f.write).toHaveBeenCalledTimes(1);
   });
+  it("records a close and derives `resolved` from the decision, never from the client", async () => {
+    const f = fixture();
+    const closed = await f.caller().record({ ...input, decision: "resolved", note: "Dealt with; the catalyst was confirmed." });
+    expect(closed.receipt).toMatchObject({ decision: "resolved", resolved: true });
+    // A client cannot assert resolution under a decision that does not close.
+    const open = await f.caller().record({ ...input, requestId: "00000000-0000-4000-8000-000000000003",
+      decision: "reviewed_unresolved", note: "Read it; still open for now.", resolved: true } as any);
+    expect(open.receipt.resolved).toBe(false);
+    // Closing records a receipt and nothing else: no source check is mutated.
+    expect(check.flagged).toBe(true);
+  });
+
+  it("still requires a written reason to close", async () => {
+    const f = fixture();
+    await expect(f.caller().record({ ...input, decision: "resolved", note: "ok" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(f.write).not.toHaveBeenCalled();
+  });
+
   it("preserves receipts through a concurrent Seen merge and rejects client-injected acknowledgments", async () => {
     const f = fixture(); const saved = await f.caller().record(input);
     const seen = { capturedAt: 20, items: [{ key: "visible", fingerprint: "v2" }], monitoringReviews: [{ ...saved.receipt, userId: 99 }] };
@@ -63,7 +81,10 @@ describe("explicit monitoring review receipts", () => {
   it("enforces operator access and a deliberate review decision", async () => {
     const f = fixture();
     await expect(f.caller(7, "investor").record(input)).rejects.toMatchObject({ code: "FORBIDDEN" });
-    await expect(f.caller().record({ ...input, decision: "resolved" as any })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    // Superseded deliberately. This line asserted that "resolved" was rejected —
+    // it was the test that locked in the missing verb. Closing a finding is now
+    // a real decision; an unknown one is still refused.
+    await expect(f.caller().record({ ...input, decision: "acknowledged" as any })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(f.caller().record({ ...input, note: "" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(f.write).not.toHaveBeenCalled();
   });

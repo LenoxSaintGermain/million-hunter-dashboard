@@ -9,7 +9,7 @@ import { capitalOperatorProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 
 const targetSchema = z.object({ runId: z.number().int().positive(), candidateId: z.number().int().positive(), orderId: z.number().int().positive(), findingId: z.number().int().positive(), findingVersion: z.string().regex(/^v1-[a-f0-9]{8}$/) });
-const reviewSchema = targetSchema.extend({ requestId: z.string().uuid(), decision: z.enum(["reviewed_unresolved", "needs_fresh_evidence"]), note: z.string().trim().min(10).max(1000) });
+const reviewSchema = targetSchema.extend({ requestId: z.string().uuid(), decision: z.enum(["reviewed_unresolved", "needs_fresh_evidence", "resolved"]), note: z.string().trim().min(10).max(1000) });
 type Target = z.infer<typeof targetSchema>;
 
 export interface MonitoringReviewRepository {
@@ -28,7 +28,9 @@ async function verifyTarget(repo: MonitoringReviewRepository, userId: number, ta
 }
 
 /** Receipt ledger is a separate JSON field beside Seen, never a gate or order authority.
- * No schema migration, source-check mutation, implicit acknowledgement, or resolution. */
+ * No schema migration, source-check mutation, or implicit acknowledgement.
+ * Explicit resolution is recorded here and is version-bound: it closes the exact
+ * finding version a human read, and cannot suppress a later one. */
 export function createMonitoringReviewRouter(repo: MonitoringReviewRepository) {
   return router({
     list: capitalOperatorProcedure.input(targetSchema).query(async ({ ctx, input }) => {
@@ -48,7 +50,10 @@ export function createMonitoringReviewRouter(repo: MonitoringReviewRepository) {
       const identical = reviews.find(receipt => sameTarget(receipt, ctx.user.id, input) && receipt.decision === input.decision && receipt.note === input.note);
       if (identical) return { receipt: identical, duplicate: true };
       const now = Date.now();
-      const receipt: MonitoringReviewReceipt = { ...input, userId: ctx.user.id, reviewedAt: now, resolved: false };
+            // Derived from the decision, never accepted from the client. Resolution
+      // closes the exact version reviewed; a later check that flags again has a
+      // different version and surfaces regardless.
+      const receipt: MonitoringReviewReceipt = { ...input, userId: ctx.user.id, reviewedAt: now, resolved: input.decision === "resolved" };
       const snapshot: ApertureAttentionBaseline = { ...(prior ?? { capturedAt: 0, items: [] }), monitoringReviews: [...reviews, receipt] };
       await locked.writeBaseline(ctx.user.id, snapshot, now);
       return { receipt, duplicate: false };
