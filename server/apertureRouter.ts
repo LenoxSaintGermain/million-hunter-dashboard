@@ -2511,6 +2511,11 @@ export const apertureRouter = router({
         holdingPeriod: brokerOrders.holdingPeriod,
         status: brokerOrders.status,
         brokerOrderId: brokerOrders.brokerOrderId,
+        // The two receipts an operator needs to reconcile a ticket against the
+        // broker by hand: the idempotency key written before dispatch, and the
+        // price the fill actually came back at.
+        clientOrderId: brokerOrders.clientOrderId,
+        filledAvgPriceCents: brokerOrders.filledAvgPriceCents,
         dispatchError: brokerOrders.dispatchError,
         timeStopAt: brokerOrders.timeStopAt,
         createdAt: brokerOrders.createdAt,

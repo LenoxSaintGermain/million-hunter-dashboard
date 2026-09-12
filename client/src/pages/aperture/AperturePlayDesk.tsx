@@ -15,6 +15,7 @@ import { isOptionInstrument, paperInstrumentDisplayLabel, parseOccOptionSymbol }
 import { arbitrateTodayRead, canShowQuietBriefing, type ApertureAttentionBriefing, type ApertureAttentionItem } from "@shared/apertureAttention";
 import { deskOrderReturn, formatMarkProvenance, formatReturnAmount, formatReturnPercent } from "@shared/positionReturn";
 import { DeskGlanceLayer } from "@/components/aperture/DeskGlanceLayer";
+import { PlayInspectionDrawer, type InspectableOrder } from "@/components/aperture/PlayInspectionDrawer";
 
 const money = (cents?: number | null) => cents == null
   ? "—"
@@ -52,14 +53,16 @@ export function readPlayDeskLocation(search: string) {
   const instrument = params.get("instrument");
   const stage = params.get("stage");
   const play = params.get("play");
+  const inspect = params.get("inspect");
   return {
     playFilter: (["shares", "calls", "puts"].includes(instrument ?? "") ? instrument : "all") as PlayFilter,
     stageFilter: (["choose", "approve", "monitor"].includes(stage ?? "") ? stage : "all") as StageFilter,
     selectedPlayId: play && /^[1-9]\d*$/.test(play) && Number.isSafeInteger(Number(play)) ? Number(play) : null,
+    inspectOrderId: inspect && /^[1-9]\d*$/.test(inspect) && Number.isSafeInteger(Number(inspect)) ? Number(inspect) : null,
   };
 }
 
-export function playDeskFilterHref(search: string, changes: { instrument?: PlayFilter; stage?: StageFilter; play?: number | null }) {
+export function playDeskFilterHref(search: string, changes: { instrument?: PlayFilter; stage?: StageFilter; play?: number | null; inspect?: number | null }) {
   const params = new URLSearchParams(search);
   for (const [key, value] of Object.entries(changes)) {
     if (value == null || value === "all") params.delete(key);
@@ -98,7 +101,7 @@ export default function AperturePlayDesk() {
   const [, navigate] = useLocation();
   const search = useSearch();
   const filters = readPlayDeskLocation(search);
-  const { playFilter, stageFilter, selectedPlayId } = filters;
+  const { playFilter, stageFilter, selectedPlayId, inspectOrderId } = filters;
   const setPlayFilter = (instrument: PlayFilter) => navigate(playDeskFilterHref(search, { instrument }));
   const setStageFilter = (stage: StageFilter) => navigate(playDeskFilterHref(search, { stage }));
   const desk = trpc.aperture.desk.summary.useQuery(undefined, { retry: false });
@@ -273,7 +276,14 @@ export default function AperturePlayDesk() {
               const state = deskOrderPresentation(order.id, briefing);
               const quantities = deskOrderQuantities(order);
               return <tr key={`order-${order.id}`} id={`order-${order.id}`} data-play-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
-                <th scope="row" className="px-3 py-2.5 text-left font-semibold" style={{ color: "var(--sh-text-primary)" }}>{paperInstrumentDisplayLabel(order)}</th>
+                <th scope="row" className="px-3 py-2.5 text-left font-semibold" style={{ color: "var(--sh-text-primary)" }}><button
+                  type="button"
+                  data-inspect-order={order.id}
+                  aria-haspopup="dialog"
+                  aria-expanded={inspectOrderId === order.id}
+                  className="min-h-11 text-left font-semibold underline decoration-dotted underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => navigate(playDeskFilterHref(search, { inspect: order.id }))}
+                >{paperInstrumentDisplayLabel(order)}<span className="sr-only"> — inspect receipts and thesis context</span></button></th>
                 <td className="px-3 py-2.5"><span className="whitespace-nowrap text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>{state.label}</span><span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{state.detail}</span></td>
                 <td data-play-return className="px-3 py-2.5 text-right tabular-nums align-top">{(() => {
                   const result = deskOrderReturn(order, Date.now());
@@ -284,7 +294,7 @@ export default function AperturePlayDesk() {
                   return <><span className="font-semibold" style={{ color: tone }}>{formatReturnAmount(result)}</span>{percent && <span className="block text-[11px] leading-4" style={{ color: tone }}>{percent}</span>}<span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{formatMarkProvenance(result)}</span></>;
                 })()}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: "var(--sh-text-primary)" }}>{money(order.plannedRiskCents)}<span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{isOptionInstrument(order.instrumentType) ? "Premium at risk" : "Planned loss at modeled stop"} · {quantities.ordered} ordered · {quantities.filled} filled · {quantities.remaining} remaining{!isOptionInstrument(order.instrumentType) ? " · Stop execution may differ from the modeled price." : ""}<span className="block">Human review: {(() => { const humanReview = deskHumanReview(order, pendingOutcomes); return humanReview ? new Date(humanReview.dueAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : outcomes.error || outcomes.data == null ? "Review status unavailable" : "No checkpoint recorded"; })()}</span></span></td>
-                <td className="px-3 py-2.5 text-right"><Button size="sm" variant="outline" className="min-h-11 whitespace-nowrap" onClick={() => navigate(playDeskFilterHref(search, { stage: "monitor" }))}>Open</Button></td>
+                <td className="px-3 py-2.5 text-right"><Button size="sm" variant="outline" className="min-h-11 whitespace-nowrap" onClick={() => state.href ? navigate(state.href) : navigate(playDeskFilterHref(search, { inspect: order.id }))}>{state.href ? "Open" : "Inspect"}</Button></td>
               </tr>;
             })}
             {visibleActivePlays.map((play) => <tr key={`play-${play.id}`} data-play-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
@@ -307,6 +317,22 @@ export default function AperturePlayDesk() {
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}><span>Show research backlog</span><Badge variant="outline">{researchBacklog.length}</Badge></summary>
       <div className="divide-y border-t" style={{ borderColor: "var(--sh-border-1)" }}>{researchBacklog.map((journey) => <DeskItem key={journey.rootId} eyebrow={journey.state === "paper_stage_declined" ? "Cash / no paper stage" : journey.latest.candidateStates?.expired ? "Expired setup" : "Research follow-up"} title={journey.thesisName} meta={`Run #${journey.latest.id} · ${journey.latest.candidateStates?.label ?? `${journey.evidenceCandidates} research candidate${journey.evidenceCandidates === 1 ? "" : "s"}`}`} action={journey.state === "paper_stage_declined" ? "View receipt" : journey.latest.candidateStates?.expired ? "Review expiry" : "Open research"} onAction={() => navigate(`/aperture/run/${journey.latest.id}?view=evidence`)} />)}</div>
     </details>}
+    {(() => {
+      // Inspection is read-only and URL-bound, so Back closes it and a reload
+      // reopens the same ticket. An `inspect` id that is not in the returned
+      // records leaves the drawer shut rather than opening an empty panel.
+      const inspected = (desk.data?.orders ?? []).find((order) => order.id === inspectOrderId) ?? null;
+      const humanReview = inspected ? deskHumanReview(inspected, pendingOutcomes) : null;
+      return <PlayInspectionDrawer
+        order={inspected as InspectableOrder | null}
+        stateLabel={inspected ? deskOrderPresentation(inspected.id, briefing).label : ""}
+        humanReviewAt={humanReview?.dueAt ?? null}
+        reviewsUnavailable={Boolean(outcomes.error) || outcomes.data == null}
+        onClose={() => navigate(playDeskFilterHref(search, { inspect: null }))}
+        onOpenFull={(order) => navigate(deskOrderPresentation(order.id, briefing).href
+          ?? `/aperture/run/${order.runId}/execute?candidate=${order.candidateId ?? ""}`)}
+      />;
+    })()}
   </div></DashboardLayout>;
 }
 

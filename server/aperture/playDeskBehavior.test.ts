@@ -1,6 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { load as loadHtml } from "cheerio";
 import { deriveApertureAttention, type ApertureAttentionInput } from "../../shared/apertureAttention";
 
 const fixture = vi.hoisted(() => ({ search: "", queries: {} as Record<string, any>, navigate: vi.fn(), refetch: vi.fn() }));
@@ -227,6 +228,46 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
     expect(html).toContain("No paper account is connected");
   });
 
+  it("puts inspection one click from the scan, announced as a dialog", () => {
+    const orders = [order({ status: "filled", filledQty: 4 })];
+    fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }) });
+    const html = render();
+    const $ = loadHtml(html);
+    const trigger = $('[data-inspect-order="12"]');
+    expect(trigger).toHaveLength(1);
+    expect(trigger.attr("aria-haspopup")).toBe("dialog");
+    expect(trigger.attr("aria-expanded")).toBe("false");
+    expect(trigger.attr("class")).toContain("min-h-11");
+    // The affordance is the instrument label itself, so the scan and the way in
+    // are the same target rather than a separate column of buttons.
+    expect(trigger.text()).toContain("MGM · $40 Call");
+    expect(trigger.text()).toContain("inspect receipts and thesis context");
+  });
+
+  it("binds the open drawer to the URL so Back closes it and a reload reopens it", () => {
+    const orders = [order({ status: "filled", filledQty: 4 })];
+    fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }) });
+    fixture.search = "inspect=12";
+    expect(readPlayDeskLocation("?inspect=12").inspectOrderId).toBe(12);
+    expect(loadHtml(render())('[data-inspect-order="12"]').attr("aria-expanded")).toBe("true");
+    expect(playDeskFilterHref("?inspect=12", { inspect: null })).toBe("/aperture/plays");
+  });
+
+  it("ignores an inspect id that is not a positive integer", () => {
+    for (const value of ["0", "-3", "abc", "1.5", "9007199254740993"]) {
+      expect(readPlayDeskLocation(`?inspect=${value}`).inspectOrderId).toBeNull();
+    }
+  });
+
+  it("leaves the drawer shut for an inspect id that is not in the returned records", () => {
+    const orders = [order({ status: "filled", filledQty: 4 })];
+    fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }) });
+    fixture.search = "inspect=999";
+    const html = render();
+    expect(html).not.toContain("data-inspection-body");
+    expect(html).toContain("data-play-row");
+  });
+
   it("marks a filled order from the broker position and states when and from where", () => {
     const orders = [order({
       status: "filled", filledQty: 2,
@@ -309,11 +350,15 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
   it("keeps URL filter and identity state intact through detail and back", () => {
     const original = "instrument=puts&stage=monitor&thesis=690001&account=3";
     const selected = playDeskFilterHref(original, { play: 77 });
-    expect(readPlayDeskLocation(selected.split("?")[1])).toEqual({ playFilter: "puts", stageFilter: "monitor", selectedPlayId: 77 });
+    expect(readPlayDeskLocation(selected.split("?")[1])).toEqual({ playFilter: "puts", stageFilter: "monitor", selectedPlayId: 77, inspectOrderId: null });
     const restored = playDeskFilterHref(selected.split("?")[1], { play: null });
     expect(restored).toBe(`/aperture/plays?${original}`);
     expect(playDeskFilterHref(original, { stage: "all" })).toBe("/aperture/plays?instrument=puts&thesis=690001&account=3");
-    expect(readPlayDeskLocation("play=1e3&instrument=bad&stage=bad")).toEqual({ playFilter: "all", stageFilter: "all", selectedPlayId: null });
+    expect(readPlayDeskLocation("play=1e3&instrument=bad&stage=bad")).toEqual({ playFilter: "all", stageFilter: "all", selectedPlayId: null, inspectOrderId: null });
+    // Opening and closing the drawer must not disturb the rest of the URL.
+    const inspecting = playDeskFilterHref(original, { inspect: 12 });
+    expect(readPlayDeskLocation(inspecting.split("?")[1]).inspectOrderId).toBe(12);
+    expect(playDeskFilterHref(inspecting.split("?")[1], { inspect: null })).toBe(`/aperture/plays?${original}`);
   });
 
   it("identifies out-of-filter reviews from their order instrument instead of underlying ticker", () => {
