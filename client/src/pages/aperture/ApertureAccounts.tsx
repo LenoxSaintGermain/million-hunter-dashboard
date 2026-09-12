@@ -38,8 +38,8 @@ export default function ApertureAccounts() {
   const [csvText, setCsvText] = useState("");
   const [syncFeedback, setSyncFeedback] = useState<{ accountId: number; message: string; tone: "success" | "error" } | null>(null);
 
-  const { data: accounts, refetch } = trpc.aperture.account.list.useQuery();
-  const { data: brokers } = trpc.aperture.brokers.useQuery();
+  const { data: accounts, refetch, isLoading, isError } = trpc.aperture.account.list.useQuery();
+  const { data: brokers, isError: brokersFailed, refetch: retryBrokers } = trpc.aperture.brokers.useQuery();
 
   const createAccount = trpc.aperture.account.create.useMutation({
     onSuccess: () => {
@@ -113,30 +113,24 @@ export default function ApertureAccounts() {
         </div>
 
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/aperture")}>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Back to Today" onClick={() => navigate("/aperture")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>Paper readiness</h1>
+            <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>Portfolio</h1>
             <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>
-              See how research becomes a human-approved paper action. No live capital and no autonomous order.
+              Balances, holdings, and account updates.
             </p>
           </div>
-          <Button className="ml-auto" size="sm" onClick={() => setShowCreate(!showCreate)}>
+          <Button className="ml-auto min-h-11" size="sm" onClick={() => setShowCreate(!showCreate)}>
             <Plus className="h-3.5 w-3.5 mr-1" /> New Account
           </Button>
         </div>
 
-        <section className="border border-rule bg-paper p-4" aria-label="Research to paper action flow">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div><p className="font-eyebrow text-eyebrow text-amber">How this works</p><p className="mt-1 text-sm text-ink">Research informs a proposed paper action; a human controls every approval and submission.</p></div>
-            <button onClick={() => navigate("/aperture/runs")} className="inline-flex shrink-0 items-center gap-1 text-xs text-amber hover:underline">Open research journeys <ArrowRight className="h-3 w-3" /></button>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2 border-t border-rule pt-4 sm:grid-cols-4">
-            {["1 · Sync context", "2 · Review decisive checks", "3 · Approve paper order", "4 · Track fill & follow-up"].map((step, index) => <div key={step} className="min-w-0"><p className="font-eyebrow text-eyebrow text-muted-foreground">{step}</p><p className="mt-1 text-xs leading-5 text-ink/70">{["Refresh a connected Alpaca Paper account now, or opt in to bounded freshness checks; manual accounts use CSV.", "Only decision-critical evidence gates order review.", "Approval and submission are separate human actions.", "Filled paper orders enter monitoring and outcome analysis."][index]}</p></div>)}
-          </div>
-        </section>
+        {isLoading && <p role="status">Loading accounts…</p>}
+        {isError && <div role="alert" className="rounded-lg border border-clay p-4 text-sm"><p>Account refresh failed. {accounts ? "Showing the last loaded balances; they may be out of date." : "Balances and holdings are unavailable."}</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => refetch()}>Retry accounts</Button></div>}
+        {brokersFailed && <div role="alert" className="rounded-lg border border-clay p-4 text-sm"><p>Broker connection status is unavailable. Account balances alone do not confirm connectivity.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => retryBrokers()}>Retry connections</Button></div>}
 
         {/* Create form */}
         {showCreate && (
@@ -183,7 +177,7 @@ export default function ApertureAccounts() {
         )}
 
         {/* Account list */}
-        {accounts?.length === 0 && !showCreate && (
+        {!isError && !isLoading && accounts?.length === 0 && !showCreate && (
           <Card>
             <CardContent className="pt-8 pb-8 text-center">
               <Wallet className="h-8 w-8 mx-auto mb-3 opacity-30" />
@@ -201,12 +195,12 @@ export default function ApertureAccounts() {
         {accounts?.map((account) => (
           <Card key={account.id}>
             <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <CardTitle className="text-base flex flex-wrap items-center gap-2 break-words">
                     {account.label}
                     <Badge variant="outline" className="text-xs">
-                      {account.brokerId}
+                      {brokers?.find((broker) => broker.id === account.brokerId)?.label ?? (account.brokerId === "alpaca_paper" ? "Alpaca Paper" : account.brokerId === "manual" ? "Manual import" : "Robinhood context")}
                     </Badge>
                     {account.isPaper && (
                       <Badge className="text-xs" style={{ background: "oklch(0.45 0.15 145)", color: "#fff" }}>paper</Badge>
@@ -215,19 +209,20 @@ export default function ApertureAccounts() {
                   <p className="text-xs mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>
                     Cash: {fmt(account.cashCents)} · Buying power: {fmt(account.buyingPowerCents)} · Equity: {fmt(account.equityValueCents)}
                   </p>
-                  <p className="text-[11px] mt-1" style={{ color: "var(--sh-fg-muted)" }}>
-                    {account.externalAccountId ? `Bound paper destination · ${account.externalAccountId}` : account.brokerId === "manual" ? "Portfolio context only · not an order destination" : "Paper destination not bound yet"}
+                  <p className="text-xs mt-1 break-words" style={{ color: "var(--sh-fg-muted)" }}>
+                    {account.externalAccountId ? `Paper account · ${account.externalAccountId}` : account.brokerId === "manual" ? "Research only · cannot send orders" : "Paper account not linked yet"}
                     {account.lastSyncedAt ? ` · refreshed ${new Date(account.lastSyncedAt).toLocaleString()}` : " · never refreshed"}
                   </p>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
+                  className="min-h-11 shrink-0"
                   onClick={() => syncAccount.mutate({ id: account.id })}
                   disabled={syncAccount.isPending || account.brokerId === "manual"}
                 >
                   <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                  {account.brokerId === "manual" ? "Imported context" : "Sync"}
+                  {account.brokerId === "manual" ? "Use CSV below" : syncAccount.isPending && syncAccount.variables?.id === account.id ? "Refreshing…" : "Refresh balances"}
                 </Button>
               </div>
               {syncFeedback?.accountId === account.id && (
@@ -241,17 +236,17 @@ export default function ApertureAccounts() {
               {account.brokerId === "manual" ? (
                 <div className="flex items-center gap-2 text-xs">
                   <XCircle className="h-3.5 w-3.5" style={{ color: "var(--sh-fg-muted)" }} />
-                  <span style={{ color: "var(--sh-fg-muted)" }}><strong>Manual context:</strong> these holdings came from an import. They inform research, but nothing syncs automatically and no broker order can be sent from this account.</span>
+                  <span style={{ color: "var(--sh-fg-muted)" }}>Imported holdings · update by CSV. No automatic refresh or broker orders.</span>
                 </div>
               ) : brokers?.find((b) => b.id === account.brokerId) && (
                 <div className="flex items-center gap-2 text-xs">
                   {brokers.find((b) => b.id === account.brokerId)!.available ? (
                     <><CheckCircle2 className="h-3.5 w-3.5" style={{ color: "oklch(0.55 0.15 145)" }} />
-                    <span style={{ color: "oklch(0.55 0.15 145)" }}><strong>Connected:</strong> sync now, or enable a bounded freshness schedule below. Research still requires human evidence review, order approval, and a separate paper submission.</span></>
+                    <span style={{ color: "oklch(0.55 0.15 145)" }}>Connected · refreshing balances does not place or change orders.</span></>
                   ) : (
                     <><XCircle className="h-3.5 w-3.5" style={{ color: "var(--sh-fg-muted)" }} />
                     <span style={{ color: "var(--sh-fg-muted)" }}>
-                      <strong>Manual context:</strong> {brokers.find((b) => b.id === account.brokerId)!.unavailableReason ?? "positions are not connected; import a CSV to use them in research."}
+                      <strong>Not connected:</strong> {brokers.find((b) => b.id === account.brokerId)!.unavailableReason ?? "Import a CSV for research, or configure the broker connection."}
                     </span></>
                   )}
                 </div>
@@ -270,17 +265,19 @@ export default function ApertureAccounts() {
                 <div className="rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Paper-account freshness</p>
-                      <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>When enabled, this account is read every 15 minutes during active US market sessions. It updates the research denominator only; it cannot create, approve, or submit an order.</p>
+                      <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Automatic balance updates · {account.syncScheduleEnabled ? "On" : "Off"}</p>
+                      <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Every 15 minutes during active US market sessions when enabled. Balances only—not play monitoring or orders.</p>
+                      {!brokers?.find((b) => b.id === account.brokerId)?.available && <p className="mt-1 text-xs">Connect the broker before changing automatic updates.</p>}
                       {account.syncScheduleLastResult && <p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Last check: {account.syncScheduleLastResult}</p>}
                     </div>
                     <Button
                       variant={account.syncScheduleEnabled ? "outline" : "default"}
                       size="sm"
+                      className="min-h-11 shrink-0"
                       onClick={() => configureSyncSchedule.mutate({ id: account.id, enabled: !account.syncScheduleEnabled })}
                       disabled={configureSyncSchedule.isPending || !brokers?.find((b) => b.id === account.brokerId)?.available}
                     >
-                      {account.syncScheduleEnabled ? "Pause freshness" : "Enable freshness"}
+                      {account.syncScheduleEnabled ? "Pause updates" : "Enable updates"}
                     </Button>
                   </div>
                 </div>
@@ -290,9 +287,9 @@ export default function ApertureAccounts() {
 
               {/* CSV import */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <Label className="text-xs font-medium">Import Positions (CSV)</Label>
-                  <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Broker export or symbol,qty,avg_cost,market_value</span>
+                  {csvAccountId === account.id && <span className="text-xs break-all" style={{ color: "var(--sh-fg-muted)" }}>Broker export or symbol,qty,avg_cost,market_value</span>}
                 </div>
                 {csvAccountId === account.id ? (
                   <div className="space-y-2">
@@ -333,9 +330,13 @@ export default function ApertureAccounts() {
         ))}
 
         {/* Broker status panel */}
+        <details className="rounded-lg border border-rule p-4">
+          <summary className="min-h-11 cursor-pointer content-center text-sm font-medium">Connections and order safeguards</summary>
+          <p className="mb-3 text-sm">Research → evidence review → paper ticket. Approval and submission are separate human actions.</p>
+          <Button variant="outline" className="mb-3 min-h-11" onClick={() => navigate("/aperture/runs")}>Open research <ArrowRight className="ml-2 h-4 w-4" /></Button>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Available Broker Rails</CardTitle>
+            <CardTitle className="text-sm">Broker connections</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {brokers?.map((b) => (
@@ -350,13 +351,13 @@ export default function ApertureAccounts() {
                   <Badge variant="outline" className="text-xs" style={{ color: b.available ? "oklch(0.55 0.15 145)" : "var(--sh-fg-muted)" }}>
                     {b.available ? "connected" : "not configured"}
                   </Badge>
-                  {b.capabilities?.serverSideExecution && <Badge variant="outline" className="text-xs">server-side</Badge>}
                   {b.capabilities?.paperTrading && <Badge variant="outline" className="text-xs" style={{ color: "oklch(0.55 0.15 145)" }}>paper</Badge>}
                 </div>
               </div>
             ))}
           </CardContent>
         </Card>
+        </details>
       </div>
     </DashboardLayout>
   );

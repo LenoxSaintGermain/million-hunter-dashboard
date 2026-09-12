@@ -21,8 +21,8 @@ const money = (value: number | null | undefined) => value == null
 
 export function AccountContextPanel({ accountId }: { accountId: number }) {
   const utils = trpc.useUtils();
-  const { data: positions } = trpc.aperture.account.getPositions.useQuery({ accountId });
-  const { data: plays } = trpc.aperture.account.listActivePlays.useQuery({ accountId });
+  const { data: positions, isError: positionsFailed, refetch: retryPositions } = trpc.aperture.account.getPositions.useQuery({ accountId });
+  const { data: plays, isError: playsFailed, refetch: retryPlays } = trpc.aperture.account.listActivePlays.useQuery({ accountId });
   const [open, setOpen] = useState(false);
   const [symbol, setSymbol] = useState("");
   const [instrumentType, setInstrumentType] = useState<PaperInstrumentType>("shares");
@@ -82,14 +82,16 @@ export function AccountContextPanel({ accountId }: { accountId: number }) {
   return <section className="space-y-3 rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Current portfolio context</p>
-        <p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{positions?.length ?? 0} held ticker{positions?.length === 1 ? "" : "s"} · {plays?.filter((play) => play.status !== "closed").length ?? 0} play{plays?.filter((play) => play.status !== "closed").length === 1 ? "" : "s"} in progress</p>
+        <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Holdings and recorded plays</p>
+        <p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{positions ? `${positions.length} held ticker${positions.length === 1 ? "" : "s"}` : positionsFailed ? "Holdings unavailable" : "Loading holdings…"} · {plays ? `${plays.filter((play) => play.status !== "closed").length} recorded plays in progress` : playsFailed ? "Plays unavailable" : "Loading plays…"}</p>
       </div>
-      <Button variant="outline" size="sm" onClick={() => setOpen((value) => !value)}>
+      <Button variant="outline" size="sm" className="min-h-11" onClick={() => setOpen((value) => !value)}>
         {open ? <ChevronUp className="mr-1 h-3.5 w-3.5" /> : <Plus className="mr-1 h-3.5 w-3.5" />}
-        {open ? "Close" : "Mirror a play"}
+        {open ? "Close form" : "Record existing play"}
       </Button>
     </div>
+
+    {(positionsFailed || playsFailed) && <div role="alert" className="text-sm"><p>{positionsFailed ? "Holdings could not be refreshed. " : ""}{playsFailed ? "Recorded plays could not be refreshed. " : ""}Any saved values shown may be out of date.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => { if (positionsFailed) void retryPositions(); if (playsFailed) void retryPlays(); }}>Retry portfolio data</Button></div>}
 
     {!!positions?.length && <div className="flex flex-wrap gap-1.5" aria-label="Imported holdings">
       {positions.slice(0, 12).map((position) => <Badge key={position.id} variant="outline" className="font-mono text-[11px]">{position.symbol} · {position.qty}</Badge>)}

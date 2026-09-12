@@ -9,7 +9,7 @@ import baseConfig from "./vitest.config";
  */
 export default mergeConfig(baseConfig, defineConfig({
   test: {
-    include: ["shared/**/*.test.ts", "server/aperture/objectiveMissionWorkspace.test.tsx", "server/aperture/objectiveMissionFlow.test.tsx", "server/aperture/objectiveDiscoveryResult.test.tsx", "server/aperture/objectiveMissionEntry.test.tsx", "server/aperture/discoveryLeadAction.test.tsx", "server/aperture/sourceExecutionEvidence.test.tsx", "server/aperture/gainsSourcePicker.test.tsx", "server/aperture/apertureShellChrome.test.tsx", "server/aperture/playAndReturn.test.tsx", "server/aperture/playInspectionDrawer.test.tsx", "server/aperture/researchJourneyList.test.tsx", "server/aperture/candidateComparison.test.tsx"],
+    include: ["shared/**/*.test.ts", "server/aperture/objectiveMissionWorkspace.test.tsx", "server/aperture/objectiveMissionFlow.test.tsx", "server/aperture/objectiveDiscoveryResult.test.tsx", "server/aperture/objectiveMissionEntry.test.tsx", "server/aperture/discoveryLeadAction.test.tsx", "server/aperture/sourceExecutionEvidence.test.tsx", "server/aperture/gainsSourcePicker.test.tsx", "server/aperture/apertureShellChrome.test.tsx", "server/aperture/playAndReturn.test.tsx", "server/aperture/playInspectionDrawer.test.tsx", "server/aperture/researchJourneyList.test.tsx", "server/aperture/candidateComparison.test.tsx", "server/aperture/portfolioClarity.test.tsx"],
     exclude: [
       "**/node_modules/**",
       "server/api-keys.test.ts",

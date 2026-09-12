@@ -1,5 +1,23 @@
 # Capital Aperture guided UX walkthrough
 
+## September 12: Portfolio clarity follow-up
+
+Portfolio now leads with account balances, connection status and last refresh.
+The repeated research-to-order tutorial and broker catalog are secondary under
+"Connections and order safeguards". Account-specific restrictions remain visible.
+Automatic balance updates explicitly state their schedule and distinguish balances
+from play monitoring or orders. Plain labels replace "freshness", "broker rails"
+and "mirror a play". Account headings and actions wrap at narrow widths.
+
+Loading, failed, cached and measured-empty responses are distinct for accounts,
+holdings and recorded plays. Failed refreshes preserve useful loaded values with
+an uncertainty warning and retry. Page reads never create or change orders.
+
+Deterministic render tests cover six state/disclosure cases and assert no mutations.
+Offline unit suite: 2,301 passed, 8 existing skips. Type check passed. These checks
+are not evidence of user-tested comprehension, physical-device usability or
+market-open execution. Live release verification is recorded separately in THI-266.
+
 ## September 12: candidate comparison (local follow-up to Claude)
 
 Candidate review now opens a scan list with every returned candidate, its role,
