@@ -13,6 +13,7 @@ import { CapitalBrief } from "@/components/aperture/CapitalBrief";
 import { ResearchLedger } from "@/components/aperture/ResearchLedger";
 import { DecisionFocusCard } from "@/components/aperture/DecisionFocusCard";
 import { PlayRecipeCard } from "@/components/aperture/PlayRecipeCard";
+import { CandidateComparison, CandidateInspection, candidateInspectionHref } from "@/components/aperture/CandidateComparison";
 import { SetAsideHistory } from "@/components/aperture/SetAsideHistory";
 import { DecisionStepLock, decisionAuthorityAllowsDownstream } from "@/components/aperture/DecisionStepLock";
 import { decisionPriority, describeCandidateRecommendation, rankResearchCandidates } from "@shared/decisionFocus";
@@ -160,10 +161,21 @@ export default function CandidateBoard() {
   const [location, navigate] = useLocation();
   const search = useSearch();
   const runId = Number(params?.id);
-  const [view, setView] = useState<"play" | "brief" | "evidence" | "ledger">(() => {
+  const [view, setViewState] = useState<"play" | "brief" | "evidence" | "ledger">(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
     return requested === "brief" || requested === "evidence" || requested === "ledger" ? requested : "play";
   });
+  const setView = (next: "play" | "brief" | "evidence" | "ledger") => {
+    setViewState(next);
+    const params = new URLSearchParams(search);
+    params.set("view", next);
+    if (next === "play") params.set("inspect", "0");
+    navigate(`/aperture/run/${runId}?${params}`);
+  };
+  useEffect(() => {
+    const requested = new URLSearchParams(search).get("view");
+    setViewState(requested === "brief" || requested === "evidence" || requested === "ledger" ? requested : "play");
+  }, [search]);
   const [activeRole, setActiveRole] = useState<Role | "all">("all");
   const [showSupporting, setShowSupporting] = useState(false);
   const [showInlineRecord, setShowInlineRecord] = useState(false);
@@ -173,6 +185,7 @@ export default function CandidateBoard() {
   const [reviewCompletedAt, setReviewCompletedAt] = useState<number | null>(null);
   const [sourceRecordMessage, setSourceRecordMessage] = useState("");
   const nextActionRef = useRef<HTMLDivElement>(null);
+  const inspectionTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [generatingMemo, setGeneratingMemo] = useState<number | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null);
   const { data, isLoading, refetch } = trpc.aperture.run.get.useQuery(
@@ -280,12 +293,15 @@ export default function CandidateBoard() {
   const candidateSequence = leadCandidate
     ? [leadCandidate, ...researchRankedCandidates.filter((candidate) => candidate.id !== leadCandidate.id)]
     : [];
-  const focusCandidate = candidateSequence.find((candidate) => candidate.id === selectedCandidateId) ?? leadCandidate;
-  const focusIndex = focusCandidate ? candidateSequence.findIndex((candidate) => candidate.id === focusCandidate.id) : -1;
-  const selectCandidate = (delta: number) => {
-    if (!candidateSequence.length || focusIndex < 0) return;
-    const next = (focusIndex + delta + candidateSequence.length) % candidateSequence.length;
-    setSelectedCandidateId(candidateSequence[next]!.id);
+  const focusCandidate = candidateSequence.find((candidate) => candidate.id === requestedCandidateId)
+    ?? candidateSequence.find((candidate) => candidate.id === selectedCandidateId) ?? leadCandidate;
+  const inspectionOpen = view === "play" && requestedCandidateId != null
+    && candidateSequence.some((candidate) => candidate.id === requestedCandidateId)
+    && new URLSearchParams(search).get("inspect") !== "0";
+  const inspectCandidate = (id: number, trigger: HTMLButtonElement) => {
+    inspectionTriggerRef.current = trigger;
+    setSelectedCandidateId(id);
+    navigate(candidateInspectionHref(runId, search, id));
   };
   const paperPositions = data.paperContext?.positions ?? [];
   const focusChecks = Array.isArray(focusCandidate?.verifyFields) ? focusCandidate.verifyFields as string[] : [];
@@ -327,7 +343,7 @@ export default function CandidateBoard() {
             <Button variant="ghost" size="icon" className="mt-0.5 h-8 w-8 shrink-0" onClick={() => navigate("/aperture")}><ArrowLeft className="h-4 w-4" /></Button>
             <div className="min-w-0">
               <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-fg-muted)" }}>Capital Aperture · run #{runId}</p>
-              <h1 className="mt-1 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>Start with the play. Work backward to the evidence.</h1>
+              <h1 className="mt-1 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>Choose a candidate to review</h1>
               <p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>{run.candidateCount ?? candidates.length} evidence candidates · {run.status} {run.droppedNote ? `· ${researchContextLabel(run.droppedNote)}` : ""}</p>
             </div>
           </div>
@@ -351,11 +367,11 @@ export default function CandidateBoard() {
 
         {view === "play" ? (
           <div className="space-y-5">
-            {focusCandidate && <section className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Candidate review · {focusIndex + 1} of {candidateSequence.length}</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{focusCandidate.id === leadCandidate?.id ? <><strong style={{ color: "var(--sh-text-primary)" }}>{focusCandidate.symbol} leads this brief.</strong> {brief?.priorityCandidate?.leadReason ?? "It is the current lead candidate in the brief's deterministic decision order."}</> : <><strong style={{ color: "var(--sh-text-primary)" }}>{focusCandidate.symbol} is candidate {focusIndex + 1}.</strong> {leadCandidate?.symbol} remains the brief lead; this candidate is available for deliberate comparison, not hidden supporting research.</>}</p></div><div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" disabled={candidateSequence.length < 2} onClick={() => selectCandidate(-1)}>Previous</Button><Button size="sm" variant="outline" disabled={candidateSequence.length < 2} onClick={() => selectCandidate(1)}>Next</Button></div></div>
-              {candidateSequence.length > 1 && <div className="mt-3 flex flex-wrap gap-1"><span className="mr-1 self-center text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>Lead + alternatives</span>{candidateSequence.slice(0, 3).map((candidate, index) => <button key={candidate.id} onClick={() => setSelectedCandidateId(candidate.id)} className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: candidate.id === focusCandidate.id ? "var(--sh-signal)" : "var(--sh-border-1)", background: candidate.id === focusCandidate.id ? "color-mix(in srgb, var(--sh-signal) 10%, var(--sh-surface))" : "transparent", color: candidate.id === focusCandidate.id ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>{index + 1}. {candidate.symbol}{candidate.id === leadCandidate?.id ? " · lead" : ""}</button>)}{candidateSequence.length > 3 && <button type="button" className="rounded-full border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} onClick={() => { setView("evidence"); setShowSupporting(true); }}>View all ({candidateSequence.length})</button>}</div>}
-            </section>}
-            {focusCandidate ? <PlayRecipeCard
+            <CandidateComparison candidates={candidateSequence} reviews={data.evidenceReviews ?? []} leadId={leadCandidate?.id} inspectedId={inspectionOpen ? requestedCandidateId : null} onInspect={inspectCandidate} />
+            {requestedCandidateId != null && !candidateSequence.some((candidate) => candidate.id === requestedCandidateId) && <p role="status" className="text-sm">The linked candidate is unavailable in this run. Choose a candidate from the list.</p>}
+            {!candidateSequence.length && <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>No candidates are available yet.</p>}
+            <CandidateInspection open={inspectionOpen} symbol={focusCandidate?.symbol ?? "Candidate"} onClose={() => navigate(candidateInspectionHref(runId, search, null), { replace: true })} onRestoreFocus={() => inspectionTriggerRef.current?.focus({ preventScroll: true })}>
+            {inspectionOpen && focusCandidate && <PlayRecipeCard
               candidate={focusCandidate}
               run={run}
               reviewedChecks={reviewedChecks}
@@ -365,8 +381,9 @@ export default function CandidateBoard() {
               onReviewEvidence={openEvidence}
               onPrepareProposal={() => navigate(`/aperture/run/${runId}/execute?candidate=${focusCandidate.id}`)}
               onOpenResearch={() => setView("ledger")}
-            /> : <section className="rounded-xl border p-5 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>No paper play is available until research returns a candidate.</section>}
-            {focusCandidate && <DecisionFocusCard candidate={focusCandidate} positions={paperPositions} reviewedChecks={reviewedChecks} onOpenMemo={focusCandidate.memoStatus === "ok" ? () => navigate(`/aperture/memos/${focusCandidate.id}`) : undefined} onReviewEvidence={openEvidence} onComparePostures={() => navigate(`/aperture/run/${runId}/strategies`)} onViewPaperAccount={() => navigate("/aperture/accounts")} onPrepareProposal={() => navigate(`/aperture/run/${runId}/execute?candidate=${focusCandidate.id}`)} />}
+            />}
+            {inspectionOpen && focusCandidate && <details><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">Portfolio fit and research rationale</summary><DecisionFocusCard candidate={focusCandidate} positions={paperPositions} reviewedChecks={reviewedChecks} onOpenMemo={focusCandidate.memoStatus === "ok" ? () => navigate(`/aperture/memos/${focusCandidate.id}`) : undefined} onReviewEvidence={openEvidence} onComparePostures={() => navigate(`/aperture/run/${runId}/strategies`)} onViewPaperAccount={() => navigate("/aperture/accounts")} onPrepareProposal={() => navigate(`/aperture/run/${runId}/execute?candidate=${focusCandidate.id}`)} /></details>}
+            </CandidateInspection>
           </div>
         ) : view === "brief" ? (
           <div className="space-y-5">

@@ -1,5 +1,29 @@
 # Capital Aperture guided UX walkthrough
 
+## September 12: candidate comparison (local follow-up to Claude)
+
+Candidate review now opens a scan list with every returned candidate, its role,
+saved evidence status and next unresolved check. Research ordering still uses
+the existing shared ranking. Inspect opens the selected candidate's existing
+plan in a drawer; supporting portfolio rationale is expandable. The list does
+not construct every candidate's plan or record a review. A declined answer stays
+visible on its row. Ticket pricing, risk and approval checks remain downstream.
+
+The selected candidate and view are carried in the URL. Closing inspection keeps
+the candidate identity and restores keyboard focus to its row. Unknown candidate
+links show an explicit unavailable message. Plan query failures show a retry,
+instead of remaining indefinitely in loading state.
+
+Local verification: deterministic twelve-candidate fixture, desktop and a real
+390-CSS-pixel iframe viewport. Directly opened candidate 12, closed with Escape,
+verified focus restoration, and activated the mobile fixture's candidate-12
+evidence action. This fixture uses production list/drawer components with an
+illustrative detail body; it does not verify broker or live-provider behavior.
+Workspace render tests separately verify exact deep-link identity, declined and
+legacy-review states, and no mutation when inspecting. Full live UAT, enlarged
+text and physical-device testing remain unverified. No new production release
+is claimed by this entry.
+
 ## September 10: review on Today (local follow-up)
 
 The next local increment also opens a gate’s exact saved blocker, condition,

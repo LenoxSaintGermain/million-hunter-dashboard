@@ -47,16 +47,21 @@ export function PlayRecipeCard({
   onOpenResearch: () => void;
   proposalBlockedReason?: string | null;
 }) {
-  const { data, isLoading } = trpc.aperture.play.construct.useQuery(
+  const { data, isLoading, isError, refetch } = trpc.aperture.play.construct.useQuery(
     { runId: run.id, candidateId: candidate.id },
     { staleTime: 30_000 },
   );
 
+  if (isError) return <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-signal)" }}>
+    <p className="font-semibold">This candidate’s plan could not be loaded.</p>
+    <p className="mt-1 text-sm">Current pricing and risk are unavailable. Retry before preparing a ticket.</p>
+    <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={() => refetch()}>Retry plan</Button>
+  </section>;
   if (isLoading || !data) {
     return <section className="rounded-xl border p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
       <div className="flex items-center gap-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}>
         <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
-        Constructing a modeled recipe from the available tape, mandate, and paper account context…
+        Checking available prices and account risk limits…
       </div>
     </section>;
   }

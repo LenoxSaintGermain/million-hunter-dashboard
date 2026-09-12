@@ -22,6 +22,7 @@ vi.mock("@/lib/trpc", () => ({ trpc: { aperture: {
 
 import ApertureRuns, { actionFor, readResearchInspect, researchHref } from "../../client/src/pages/aperture/ApertureRuns";
 import { ResearchJourneyBody } from "../../client/src/components/aperture/ResearchJourneyDrawer";
+import type { ResearchJourney } from "../../shared/runWorkspace";
 
 const now = Date.UTC(2026, 8, 12, 14, 0);
 
@@ -74,7 +75,7 @@ describe("inspection carries what the row dropped", () => {
     runs: [run(1), run(2)], latest: run(2), symbolsReviewed: 12, evidenceCandidates: 6,
     remainingDeferred: 4, state: "more_research_available" as const, nextLabel: "Review",
   };
-  const body = (over: Partial<typeof journey> = {}) => load(renderToStaticMarkup(React.createElement(ResearchJourneyBody, {
+  const body = (over: Partial<ResearchJourney> = {}) => load(renderToStaticMarkup(React.createElement(ResearchJourneyBody, {
     journey: { ...journey, ...over }, stateLabel: "More evidence available",
     action: actionFor({ ...journey, ...over }), onOpenChapter: vi.fn(),
   })));
