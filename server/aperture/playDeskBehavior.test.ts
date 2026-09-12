@@ -14,7 +14,7 @@ vi.mock("@/lib/trpc", () => ({ trpc: { aperture: {
   play: { list: { useQuery: () => fixture.queries.plays } },
   runway: { pending: { useQuery: () => fixture.queries.outcomes } },
 } } }));
-import AperturePlayDesk, { deskAttentionOutsideFilters, deskOrderPresentation, deskOrderQuantities, playDeskFilterHref, readPlayDeskLocation } from "../../client/src/pages/aperture/AperturePlayDesk";
+import AperturePlayDesk, { DESK_ROW_LIMIT, deskAttentionOutsideFilters, deskOrderPresentation, deskOrderQuantities, playDeskFilterHref, readPlayDeskLocation } from "../../client/src/pages/aperture/AperturePlayDesk";
 
 const now = 1_800_000_000_000;
 const query = (data: unknown, error: Error | null = null) => ({ data, error, isLoading: false, isFetching: false, dataUpdatedAt: now, refetch: fixture.refetch });
@@ -226,6 +226,42 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
     const html = render();
     expect(html).toContain("1 of 2 open positions could not be marked");
     expect(html).toContain("No paper account is connected");
+  });
+
+  it("caps the table for scanning and says exactly how many rows are collapsed", () => {
+    const orders = Array.from({ length: 7 }, (_, i) => order({ id: 20 + i, status: "submitted" }));
+    fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }) });
+    const $ = loadHtml(render());
+    expect($("[data-play-row]")).toHaveLength(DESK_ROW_LIMIT);
+    const toggle = $("[data-show-all-rows]");
+    expect(toggle).toHaveLength(1);
+    expect(toggle.attr("aria-expanded")).toBe("false");
+    expect(toggle.text()).toBe("Show all 7 plays · 2 not shown");
+    expect($.text()).toContain("2 rows are collapsed for scanning");
+    expect($.text()).toContain("every critical issue stays above the table");
+  });
+
+  it("does not offer a toggle when nothing is hidden", () => {
+    const orders = Array.from({ length: DESK_ROW_LIMIT }, (_, i) => order({ id: 20 + i, status: "submitted" }));
+    fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }) });
+    const $ = loadHtml(render());
+    expect($("[data-play-row]")).toHaveLength(DESK_ROW_LIMIT);
+    expect($("[data-show-all-rows]")).toHaveLength(0);
+    expect($.text()).not.toContain("collapsed for scanning");
+  });
+
+  it("counts active plays against the same cap rather than appending past it", () => {
+    // Orders and open positions share one table, so the cap has to span both or
+    // the "first 5" promise is false.
+    const orders = Array.from({ length: 3 }, (_, i) => order({ id: 20 + i, status: "submitted" }));
+    const activePlays = Array.from({ length: 4 }, (_, i) => ({
+      id: 40 + i, symbol: "MGM", instrumentType: "long_call", accountLabel: "Alpaca Paper — UAT",
+      state: "open_position", detail: null, href: "/aperture/plays", updatedAt: now, reviewAt: null, asOf: now,
+    }));
+    fixture.queries.desk = query({ orders, activePlays, attention: attention({ orders: orders as any }) });
+    const $ = loadHtml(render());
+    expect($("[data-play-row]")).toHaveLength(DESK_ROW_LIMIT);
+    expect($("[data-show-all-rows]").text()).toBe("Show all 7 plays · 2 not shown");
   });
 
   it("puts inspection one click from the scan, announced as a dialog", () => {

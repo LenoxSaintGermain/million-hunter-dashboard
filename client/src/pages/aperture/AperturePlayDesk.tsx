@@ -44,6 +44,9 @@ const pendingOutcomeRoute = (item: {
   ? `/aperture/run/${item.orderRunId}/execute?candidate=${item.orderCandidateId}&lifecycle=monitoring`
   : `/aperture/decision/${item.decisionRunId}/revision/${item.revisionId}`;
 
+/** Rows shown before the table asks to be expanded. */
+export const DESK_ROW_LIMIT = 5;
+
 type PlayFilter = "all" | "shares" | "calls" | "puts";
 type StageFilter = "all" | "choose" | "approve" | "monitor";
 
@@ -109,6 +112,7 @@ export default function AperturePlayDesk() {
   const playList = trpc.aperture.play.list.useQuery(undefined, { retry: false });
   const outcomes = trpc.aperture.runway.pending.useQuery(undefined, { retry: false });
   const [primaryKey, setPrimaryKey] = useState<string | null>(null);
+  const [showAllRows, setShowAllRows] = useState(false);
   const refreshInFlight = useRef(false);
   const briefing = desk.data?.attention;
   const read = arbitrateTodayRead({ briefing: briefing ?? null, refreshing: desk.isFetching, failed: !!desk.error, primaryKey });
@@ -139,6 +143,16 @@ export default function AperturePlayDesk() {
   const visibleOrderActions = orderActions.filter((order) => playFilter === "all" || instrumentFilter(order.instrumentType) === playFilter);
   const visibleOrders = inMotionOrders.filter((order) => playFilter === "all" || instrumentFilter(order.instrumentType) === playFilter);
   const visibleActivePlays = activePlays.filter((play) => playFilter === "all" || instrumentFilter(play.instrumentType) === playFilter);
+  // Collapsing rows hides rows, never decisions: every critical item is rendered
+  // in the attention section above the table and is explicitly visible across
+  // all filters, so a play below the cut cannot take its action with it.
+  const rowCount = visibleOrders.length + visibleActivePlays.length;
+  const collapsed = !showAllRows && rowCount > DESK_ROW_LIMIT;
+  const shownOrders = collapsed ? visibleOrders.slice(0, DESK_ROW_LIMIT) : visibleOrders;
+  const shownActivePlays = collapsed
+    ? visibleActivePlays.slice(0, Math.max(0, DESK_ROW_LIMIT - shownOrders.length))
+    : visibleActivePlays;
+  const hiddenRowCount = rowCount - shownOrders.length - shownActivePlays.length;
   const visiblePendingOutcomes = pendingOutcomes.filter((item) => playFilter === "all" || symbolFilter(item.orderSymbol) === playFilter);
   const showChoose = stageFilter === "all" || stageFilter === "choose";
   const showApprove = stageFilter === "all" || stageFilter === "approve";
@@ -272,7 +286,7 @@ export default function AperturePlayDesk() {
             <th scope="col" className="px-3 py-2 text-right">Action</th>
           </tr></thead>
           <tbody>
-            {visibleOrders.map((order) => {
+            {shownOrders.map((order) => {
               const state = deskOrderPresentation(order.id, briefing);
               const quantities = deskOrderQuantities(order);
               return <tr key={`order-${order.id}`} id={`order-${order.id}`} data-play-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
@@ -297,7 +311,7 @@ export default function AperturePlayDesk() {
                 <td className="px-3 py-2.5 text-right"><Button size="sm" variant="outline" className="min-h-11 whitespace-nowrap" onClick={() => state.href ? navigate(state.href) : navigate(playDeskFilterHref(search, { inspect: order.id }))}>{state.href ? "Open" : "Inspect"}</Button></td>
               </tr>;
             })}
-            {visibleActivePlays.map((play) => <tr key={`play-${play.id}`} data-play-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
+            {shownActivePlays.map((play) => <tr key={`play-${play.id}`} data-play-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
               <th scope="row" className="px-3 py-2.5 text-left font-semibold" style={{ color: "var(--sh-text-primary)" }}>{readableSymbol(play.symbol)}</th>
               <td className="px-3 py-2.5"><span className="whitespace-nowrap text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>{briefing?.inMotion.find((item) => item.key === `play:${play.id}`)?.stateLabel ?? "Open position"}</span></td>
               <td className="px-3 py-2.5 text-right" style={{ color: "var(--sh-fg-muted)" }}>—</td>
@@ -307,6 +321,18 @@ export default function AperturePlayDesk() {
           </tbody>
         </table>
       </div>
+      {rowCount > DESK_ROW_LIMIT && <button
+        type="button"
+        data-show-all-rows
+        aria-expanded={!collapsed}
+        aria-controls="play-desk-monitor"
+        className="min-h-11 w-full rounded-xl border text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}
+        onClick={() => setShowAllRows(!showAllRows)}
+      >{collapsed
+        ? `Show all ${rowCount} plays · ${hiddenRowCount} not shown`
+        : `Show fewer · first ${DESK_ROW_LIMIT} of ${rowCount}`}</button>}
+      {collapsed && <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{hiddenRowCount} row{hiddenRowCount === 1 ? " is" : "s are"} collapsed for scanning. Nothing that needs a decision is hidden by this: every critical issue stays above the table, across all filters.</p>}
       <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Return is unrealized, marked from the broker’s last reported price for the exact contract; the mark time and source are shown on every figure and nothing is estimated between syncs. Sync the account to take a current mark. A share stop is a modeled scenario; stop execution may differ from the modeled price and the loss can be greater.</p>
       {visibleOrders.length === 0 && visibleActivePlays.length === 0 && <p className="rounded-xl border px-4 py-6 text-center text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>No matching plays in the returned records.{selectedPlay && " The selected play remains open above."} Critical issues remain above all filters.</p>}
     </section>}
