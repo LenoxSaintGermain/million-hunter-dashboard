@@ -1,12 +1,23 @@
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, CircleAlert, Clock3, FlaskConical, Layers3, PlayCircle } from "lucide-react";
+import { AlertTriangle, ArrowRight, Clock3 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { buildResearchJourneys, type ResearchJourney } from "@shared/runWorkspace";
 import { formatDistanceToNow } from "date-fns";
+import { ResearchJourneyDrawer, type JourneyAction } from "@/components/aperture/ResearchJourneyDrawer";
+
+/**
+ * Research, as a scannable list.
+ *
+ * Measured 2026-09-12: this page was 8.3 screens and 1,830 words — 32.7 words
+ * per interactive control, the densest surface in the product — because every
+ * journey rendered three explanatory cards, each with a full sentence, stacked
+ * down the page. The sentences are worth keeping. Repeating them on every row
+ * is what made the page unreadable, so they moved behind the same slide-over
+ * the Play Desk uses. One row answers state, coverage and next action; the
+ * receipts are one click away and do not cost you your place in the list.
+ */
 
 const toneFor = (state: ResearchJourney["state"]) => state === "ready_to_review"
   ? "oklch(0.52 0.15 145)"
@@ -20,7 +31,7 @@ const labelFor = (state: ResearchJourney["state"]) => ({
   more_research_available: "More evidence available",
 })[state];
 
-const actionFor = (journey: ResearchJourney) => {
+export const actionFor = (journey: ResearchJourney): JourneyAction => {
   if (journey.state === "paper_stage_declined") return {
     label: "Review preserve-cash receipt",
     detail: "A required evidence answer was not confirmed. Review the durable decision; this revision cannot prepare a proposal or create an order.",
@@ -48,41 +59,98 @@ const actionFor = (journey: ResearchJourney) => {
   };
 };
 
+/** URL is the reading context, matching the Play Desk: Back closes the drawer. */
+export function readResearchInspect(search: string): number | null {
+  const value = new URLSearchParams(search).get("inspect");
+  return value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : null;
+}
+
+export function researchHref(search: string, inspect: number | null) {
+  const params = new URLSearchParams(search);
+  if (inspect == null) params.delete("inspect"); else params.set("inspect", String(inspect));
+  return `/aperture/runs${params.size ? `?${params}` : ""}`;
+}
+
 export default function ApertureRuns() {
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const inspectId = readResearchInspect(search);
   const { data: runs, isLoading, refetch } = trpc.aperture.run.list.useQuery();
   const { data: pendingOutcomes } = trpc.aperture.runway.pending.useQuery();
   const journeys = buildResearchJourneys((runs ?? []) as any[]);
+  const inspected = journeys.find((journey) => journey.rootId === inspectId) ?? null;
 
-  return <DashboardLayout><div className="mx-auto max-w-6xl space-y-6 pb-12">
+  return <DashboardLayout><div className="mx-auto max-w-6xl space-y-5 pb-12">
     <div className="flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}><AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} />Internal research tool — not investment advice. Research journeys never create or submit an order.</div>
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture · Research journeys</p><h1 className="mt-1 font-serif text-3xl" style={{ color: "var(--sh-text-primary)" }}>One question. One connected research trail.</h1><p className="mt-2 max-w-2xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>A follow-up batch belongs to the same decision. Start with the journey that has a clear next human action—not a raw list of brief IDs.</p></div>
-      <Button onClick={() => navigate("/aperture?setup=1&draft=1")}>Start a research brief <ArrowRight className="ml-2 h-4 w-4" /></Button>
-    </header>
-    {(pendingOutcomes?.length ?? 0) > 0 && <section className="overflow-hidden rounded-xl border" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "var(--sh-surface)" }}><div className="flex items-center gap-2 border-b px-5 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><CalendarClock className="h-4 w-4" style={{ color: "var(--sh-signal)" }} /><div><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Pending decisions and outcomes</p><p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Durable gates and outcome reviews. These are not research journeys.</p></div></div><div className="divide-y" style={{ borderColor: "var(--sh-border-1)" }}>{(pendingOutcomes ?? []).map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" style={{ color: "var(--sh-signal)", borderColor: "var(--sh-signal)" }}>{item.kind === "gate_review" ? "Named gate" : "Outcome review"}</Badge><span className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>Owner scoped · revision v{item.revisionVersion}</span></div><p className="mt-2 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{item.gateLabel ?? item.thesisName ?? "Decision review"}</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{item.thesisName ?? "Assigned thesis"} · due <time dateTime={new Date(item.dueAt).toISOString()}>{new Date(item.dueAt).toLocaleString()}</time> · {item.reviewBasis}</p></div><Button variant="outline" size="sm" className="min-h-11" onClick={() => navigate(`/aperture/decision/${item.decisionRunId}/revision/${item.revisionId}`)}>Open decision <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button></div>)}</div></section>}
-    {isLoading && <p className="py-12 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Loading your research journeys…</p>}
-    <div className="grid gap-4">
-      {journeys.map((journey) => {
-        const action = actionFor(journey);
-        return <Card key={journey.rootId} className="overflow-hidden" style={{ borderColor: journey.state === "ready_to_review" ? "color-mix(in srgb, oklch(0.52 0.15 145) 35%, var(--sh-border-1))" : "var(--sh-border-1)" }}><CardContent className="p-0">
-        <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between" style={{ background: "var(--sh-surface-2)" }}>
-          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" style={{ color: toneFor(journey.state), borderColor: toneFor(journey.state) }}>{labelFor(journey.state)}</Badge><span className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>Updated {formatDistanceToNow(Number(journey.latest.createdAt))} ago</span></div><h2 className="mt-2 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>{journey.thesisName}</h2><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{journey.runs.length} research chapter{journey.runs.length === 1 ? "" : "s"} · {journey.symbolsReviewed} symbols reviewed · {journey.evidenceCandidates} evidence candidates</p></div>
-          <Button size="sm" onClick={() => navigate(action.route)}>{journey.state === "in_progress" ? <PlayCircle className="mr-1.5 h-3.5 w-3.5" /> : <ArrowRight className="mr-1.5 h-3.5 w-3.5" />}{action.label}</Button>
-        </div>
-        <div className="grid gap-3 p-5 sm:grid-cols-3">
-          <Metric icon={<Layers3 className="h-4 w-4" />} label="Research coverage" value={`${journey.symbolsReviewed} symbols`} detail={journey.remainingDeferred ? `${journey.remainingDeferred} still available for research` : "Full discovered universe reviewed"} />
-          <Metric icon={<FlaskConical className="h-4 w-4" />} label="Current decision state" value={labelFor(journey.state)} detail={journey.state === "paper_stage_declined" ? "The current revision is closed to paper-proposal preparation." : journey.remainingDeferred ? "You can research more without clearing every check." : "Move into the priority evidence review."} />
-          <Metric icon={<CheckCircle2 className="h-4 w-4" />} label="What to do now" value={action.label} detail={action.detail} />
-        </div>
-        <div className="flex flex-wrap gap-2 border-t px-5 py-3" style={{ borderColor: "var(--sh-border-1)" }}>{journey.runs.map((run, index) => <button key={run.id} onClick={() => navigate(`/aperture/run/${run.id}`)} className="rounded-full border px-2.5 py-1 text-[11px] transition-colors hover:bg-muted" style={{ borderColor: run.id === journey.latest.id ? "var(--sh-signal)" : "var(--sh-border-1)", color: run.id === journey.latest.id ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Chapter {index + 1} · {run.candidateCount ?? 0} candidates</button>)}</div>
-      </CardContent></Card>})}
-      {!isLoading && !journeys.length && <Card><CardContent className="py-12 text-center"><Clock3 className="mx-auto h-6 w-6" style={{ color: "var(--sh-signal)" }} /><p className="mt-3 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>No research journeys yet</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Build a paper research brief to start one connected trail.</p></CardContent></Card>}
-    </div>
-    <Button variant="ghost" size="sm" onClick={() => refetch()}>Refresh journeys</Button>
-  </div></DashboardLayout>;
-}
 
-function Metric({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: string; detail: string }) {
-  return <div className="rounded-xl border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><div className="flex items-center gap-2 text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>{icon}{label}</div><p className="mt-2 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{value}</p><p className="mt-1 text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{detail}</p></div>;
+    <header data-research-header className="flex flex-wrap items-center justify-between gap-3">
+      <h1 className="font-serif text-2xl sm:text-3xl" style={{ color: "var(--sh-text-primary)" }}>Research</h1>
+      <Button className="min-h-11" onClick={() => navigate("/aperture?setup=1&draft=1")}>Start a research brief<ArrowRight className="ml-2 h-4 w-4" /></Button>
+    </header>
+
+    {isLoading && <p role="status" className="py-12 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Loading your research journeys…</p>}
+
+    {!isLoading && journeys.length > 0 && <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+      <table className="w-full min-w-[40rem] border-collapse text-sm">
+        <thead><tr className="border-b text-left text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
+          <th scope="col" className="px-3 py-2">Question</th>
+          <th scope="col" className="px-3 py-2">State</th>
+          <th scope="col" className="px-3 py-2 text-right">Coverage</th>
+          <th scope="col" className="px-3 py-2 text-right">Next</th>
+        </tr></thead>
+        <tbody>
+          {journeys.map((journey) => {
+            const action = actionFor(journey);
+            return <tr key={journey.rootId} data-journey-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
+              <th scope="row" className="px-3 py-2.5 text-left font-semibold" style={{ color: "var(--sh-text-primary)" }}><button
+                type="button"
+                data-inspect-journey={journey.rootId}
+                aria-haspopup="dialog"
+                aria-expanded={inspectId === journey.rootId}
+                className="min-h-11 text-left font-semibold underline decoration-dotted underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => navigate(researchHref(search, journey.rootId))}
+              >{journey.thesisName}<span className="sr-only"> — inspect coverage, chapters and next step</span></button>
+                <span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>Updated {formatDistanceToNow(Number(journey.latest.createdAt))} ago · {journey.runs.length} chapter{journey.runs.length === 1 ? "" : "s"}</span>
+              </th>
+              <td className="px-3 py-2.5"><span className="whitespace-nowrap text-xs font-semibold" style={{ color: toneFor(journey.state) }}>{labelFor(journey.state)}</span></td>
+              <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: "var(--sh-text-primary)" }}>{journey.symbolsReviewed} symbols<span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{journey.evidenceCandidates} candidates{journey.remainingDeferred ? ` · ${journey.remainingDeferred} deferred` : ""}</span></td>
+              <td className="px-3 py-2.5 text-right"><Button size="sm" variant="outline" className="min-h-11 whitespace-nowrap" onClick={() => navigate(action.route)}>{action.label}</Button></td>
+            </tr>;
+          })}
+        </tbody>
+      </table>
+    </div>}
+
+    {!isLoading && !journeys.length && <div className="rounded-xl border py-12 text-center" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+      <Clock3 className="mx-auto h-6 w-6" style={{ color: "var(--sh-signal)" }} />
+      <p className="mt-3 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>No research journeys yet</p>
+      <p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Build a paper research brief to start one connected trail.</p>
+    </div>}
+
+    {(pendingOutcomes?.length ?? 0) > 0 && <details data-pending-decisions className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>
+        <span>Scheduled decisions and outcome reviews</span>
+        <span className="tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>{pendingOutcomes!.length}</span>
+      </summary>
+      <p className="px-4 pb-2 text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>Durable gates and outcome reviews. These are not research journeys, and a recorded checkpoint is not proof that a check ran.</p>
+      <ul className="divide-y border-t" style={{ borderColor: "var(--sh-border-1)" }}>{(pendingOutcomes ?? []).map((item) => <li key={item.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{item.gateLabel ?? item.thesisName ?? "Decision review"}</p>
+          <p className="mt-0.5 text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{item.kind === "gate_review" ? "Named gate" : "Outcome review"} · due <time dateTime={new Date(item.dueAt).toISOString()}>{new Date(item.dueAt).toLocaleString()}</time></p>
+        </div>
+        <Button variant="outline" size="sm" className="min-h-11 shrink-0" onClick={() => navigate(`/aperture/decision/${item.decisionRunId}/revision/${item.revisionId}`)}>Open decision</Button>
+      </li>)}</ul>
+    </details>}
+
+    <Button variant="ghost" size="sm" className="min-h-11" onClick={() => refetch()}>Refresh journeys</Button>
+
+    <ResearchJourneyDrawer
+      journey={inspected}
+      stateLabel={inspected ? labelFor(inspected.state) : ""}
+      action={inspected ? actionFor(inspected) : { label: "", detail: "", route: "" }}
+      onClose={() => navigate(researchHref(search, null))}
+      onOpenChapter={(runId) => navigate(`/aperture/run/${runId}`)}
+      onTakeAction={() => inspected && navigate(actionFor(inspected).route)}
+    />
+  </div></DashboardLayout>;
 }
