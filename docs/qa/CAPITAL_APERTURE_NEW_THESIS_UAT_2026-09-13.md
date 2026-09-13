@@ -1,6 +1,14 @@
 # New canonical thesis → Mission UAT — 2026-09-13
 
-## Verdict
+## Current verdict
+
+**PASS: new thesis → exact Mission → bounded no-trade result → reload/return.**
+Production `capital-aperture-00152-rew` serves source `64f5160` at 100% traffic.
+Full qualified research and execution remain unexercised. The final connected
+repeat and mutation audit are at the end of this report; earlier failures are
+retained below as historical evidence.
+
+## Initial verdict — before repairs
 
 **FAIL at the new-thesis handoff.** This is a different entry path from the earlier objective-led diesel discovery recovery. Do not reuse that earlier pass as coverage for new canonical thesis creation.
 
@@ -145,3 +153,66 @@ identity rejection, running-to-complete result refresh, and zero page-read
 mutations. Tests are database-isolated, not a production execution test.
 
 The subsequent release and live reload repeat are recorded below when observed.
+
+## Final connected repeat — PASS for new thesis through no-trade result
+
+Source `64f5160454a0db29a247741aa882678cb9a56c54`, build
+`46d74664-b346-4930-8405-b6d7140da460`, production revision
+`capital-aperture-00152-rew`, **100% traffic**. Frozen 766-file source hash:
+`f2c85bb0b45b25ce6349b16c4e2e0e2d6f04774b120b116c1cd904d452f4deee`.
+Image digest `sha256:98f685ef37d129d28adfd00cb7a070ff56d3817f7bd0aed3219957b74e9e2f4e`.
+Six tagged release checks passed at **23:00:57.875Z**; six production checks passed
+at **23:01:29.789Z**. No schema, authorization-domain or broker-policy changes.
+
+### Annotated operator walkthrough
+
+1. **Recover existing work:** the previously broken canonical 810001/projection
+   480001 handoff automatically opened `/aperture/decision/810001/revision/1140001`.
+   Its completed no-trade result survived reload. No second action was clicked.
+2. **Fresh entry:** opened `/thesis?new=1`. Blank composer and disabled save were
+   verified. Entered the diesel surge as an explicitly unverified hypothesis,
+   evidence requirements, invalidation, descriptive research scope, shares and
+   2–10 sessions. Left ticker symbols blank.
+3. **Save and use:** one click created canonical **840001**, projection **510001**,
+   named **UAT — Diesel Price Shock · Reload verification · 2026-09-13**. Mission
+   carried that exact source and its shares/swing scope. Account/capital/loss
+   required explicit selection instead of inheriting unrelated amounts.
+4. **Confirm inputs:** selected **Alpaca Paper — AI Thesis**, $2,000 capital,
+   $200 loss ceiling, no profit target. Reload restored those saved inputs and
+   the Account & risk section. Effective risk remained $0 with its reason beside it.
+5. **Authorize once:** on the narrow viewport, reviewed the summary and clicked
+   **Underwrite my mission** once. The actual route transition completed and the
+   analysis finished after it: Decision **840001**, revision **1170001**, saved at
+   **7:03:43 PM ET**. Address became the exact saved decision/revision, not setup.
+6. **Understand outcome:** **No new trade** explained exhausted measured capacity,
+   a reassessment condition, stale/incomplete evidence, and that no ticket or
+   position change occurred. It did not manufacture a diesel price or candidate.
+7. **Return:** full reload on mobile kept the same result. Restored desktop,
+   visited Today, then Mission: the same completed result appeared. Reopened its
+   exact durable address for the final handoff.
+
+### Mutation and coverage receipt
+
+SELECT-only audit at **23:05:59.358Z**: each of the two deliberate test missions
+has exactly one completed underwriting job, attempt 1. Earlier Decision 810001
+has job/result 60001; final Decision 840001 has job/result 90001. Neither has a
+research run. Completed draft 1/version 16 points to 840001/1170001. These are two
+deliberate, separately named test runs, not duplicate work caused by reload.
+All seven broker rows retain baseline SHA256
+`94170ffca5732dc8dbd1fd7fe8448449e583df557145444a5fcf826566151fee`.
+
+Final screenshots in the evidence directory: `final-thesis-review-mobile.png`,
+`final-thesis-result-mobile.png`, `final-thesis-result-desktop.png`. Observed narrow
+viewport 354×767 CSS, document width 351; desktop 1099×1196 CSS, document width
+1099. No page-level horizontal overflow measured. Screenshot export showed a
+scale/canvas mismatch (extra blank canvas in full-page export); use DOM/interaction
+evidence for viewport dimensions, not exported pixel geometry. A supplemental
+native capture timed out; it did not change the application result.
+
+**Limits:** live reload of an in-flight long-running job was not observed because
+this bounded no-trade result completed quickly; running-to-complete resume is
+covered by deterministic behavioral tests. No second authenticated physical
+device, enlarged-text, screen-reader or measured-comprehension test is claimed.
+Long repeated thesis detail remains a density follow-up. This pass closes the
+reported creation, scope, handoff and completed-reload defects; it does not claim
+qualified evidence-to-proposal or order execution, which remain unexercised.
