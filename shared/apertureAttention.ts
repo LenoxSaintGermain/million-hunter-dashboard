@@ -713,7 +713,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
   const noTrade = input.underwriting?.state === "complete" && input.underwriting.outcome === "no_trade" ? input.underwriting : null;
   const noTradeCondition = noTrade?.reopenCondition?.trim();
   const nextCheckpoint = nextReview && (!nextPlay || nextReview.dueAt <= (nextPlay.reviewAt ?? Infinity))
-    ? { title: attentionReviewTitle(nextReview.title), detail: "Recorded human review time", at: nextReview.dueAt, href: nextReview.href }
+    ? { title: attentionReviewTitle(nextReview.title), detail: "Next review · checks run on demand", at: nextReview.dueAt, href: nextReview.href }
     : nextPlay
       ? { title: `${nextPlay.symbol} review`, detail: nextPlay.detail, at: nextPlay.reviewAt ?? null, href: nextPlay.href }
       : noTrade && noTradeCondition

@@ -698,3 +698,74 @@ The public bundle also contains the new presets, replacement confirmation and
 shortened stale-state guidance. This is release verification, not an additional
 authenticated interaction or market-open UAT pass. The bounded interaction
 results and unverified items above remain the acceptance record.
+
+### September 13 — operational Today snapshot (not deployed)
+
+The day-trader review called for faster access to positions and working orders.
+This bounded increment exposes existing records; it does not represent Capital
+Aperture as a streaming scalping terminal.
+
+**Reading order.** Today retains the primary unresolved decision first. A compact
+broker snapshot follows, then recorded positions/orders before secondary reviews.
+The snapshot shows unrealized return, broker buying power (cash fallback) and
+recorded order-plan risk. It uses the existing `buildDeskGlance` and position-mark
+math. Named-account totals require an account ID and exclude other accounts;
+critical attention and individual order rows remain cross-account. Totals cover
+order-linked positions, not every holding at the broker. Missing marks, excluded
+partial fills, stale marks and incomplete risk sums are labeled beside values.
+Buying power is explicitly not mission allocation or permission to exceed risk
+limits. Share risk remains planned loss at modeled stops, never guaranteed loss.
+
+**Order rows.** The same lifecycle items and exact navigation destinations are
+retained. Rows add the existing order type, limit, time-in-force, recorded filled
+and remaining quantities, and sourced basis/mark/unrealized return when measurable.
+Desktop uses aligned columns; narrow screens place terms and return side by side.
+Missing records cannot be substituted with another order in the same symbol.
+View status is read/navigation only: there is no cancel, replace, approval or
+submission shortcut. Next checkpoint now says “Next review · checks run on demand.”
+
+**Boundaries.** The existing desk read returns account identity and three additional
+stored order fields. No new provider, query, polling, persistence table, migration,
+order status, risk authority or mutation was added. Snapshot failures retain cached
+values with a failed-refresh label; no-data, loading and unavailable states are
+distinct. Seen still uses existing exact-version viewport observation; opening
+Today does not acknowledge or resolve findings. Review presets remain unchanged.
+
+**Annotated isolated walkthrough.** `scripts/review-presets-visual-uat.mjs` now
+includes illustrative positions, a partial fill and snapshot-state controls. It
+runs entirely in memory, with no database, provider or broker connection.
+
+1. Desktop: primary concern remains first; the three-value strip explicitly says
+   “Broker snapshots · not streaming.” The order grid exposes order terms and
+   return without another page. Full-fill and partial-fill rows stay distinct.
+2. Select View status on the partial fill: the fixture records the exact run,
+   candidate, lifecycle and order=5 destination. Review attempts, saved reviews
+   and broker orders remain zero.
+3. Select failed: last values remain and both the failed-status warning and
+   last-saved-snapshot label appear. Retry returns to the complete fixture.
+4. Select refreshing: saved values remain; the status action is aria-disabled.
+   Select partial: stale mark time remains beside the partial return total.
+5. Narrow viewport: order terms and marks reflow without horizontal overflow.
+   Keyboard Space opens Snapshot details; Tab reaches a visibly focused View
+   status control. Important controls measured approximately 44 CSS pixels.
+
+Requested viewports were 1280x900 and 390x844; browser scaling produced observed
+widths of 1422 and 433 CSS pixels (document widths 1418 and 429). These are bounded
+responsive checks, not proof of exact 390px rendering, physical-device acceptance,
+WCAG compliance or a measured ten-second comprehension result. Screenshots:
+
+- Desktop: `/Users/lenoxparis/.codex/visualizations/2026/08/25/01a0392e-5a5e-73c2-9f5e-675f1dc136d9/today-execution-2026-09-13/desktop-briefing.png`
+- Narrow order rows: `/Users/lenoxparis/.codex/visualizations/2026/08/25/01a0392e-5a5e-73c2-9f5e-675f1dc136d9/today-execution-2026-09-13/mobile-orders.png`
+
+Fifteen new deterministic tests cover account scope, failure retention, missing
+marks, partial fills, stale/partial totals, cash fallback, planned-stop labels,
+exact order matching, current Today wiring and absence of render-time mutations.
+Full local unit suite: 2,322 passed, eight existing skips. Typecheck and build pass;
+existing large-bundle warnings remain. Tests use an explicitly empty DATABASE_URL.
+
+Deferred/unverified: streaming prices, bid/ask depth, RVOL, day P&L, portfolio
+Greeks, partial-fill position-return attribution, time working at the broker,
+distance-to-stop, trading hotkeys, cancel/replace, enlarged-text/screen-reader
+acceptance and authenticated market-open end-to-end execution. No current
+eligibility or positive expectancy is inferred from this fixture. No production
+review, position, approval, submission or account setting was changed.

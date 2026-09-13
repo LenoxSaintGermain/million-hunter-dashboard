@@ -131,6 +131,8 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
 
   return <section className="space-y-5">
     <TodayAttentionBriefing
+      execution={desk.data}
+      executionFailed={!!desk.error}
       attention={desk.data?.attention ?? null}
       accountLabel={accountLabel}
       modeLabel={preferredAccount && !preferredAccount.isPaper ? "Execution unavailable" : "Paper"}

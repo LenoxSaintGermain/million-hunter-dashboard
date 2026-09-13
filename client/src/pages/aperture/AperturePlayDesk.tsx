@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { deskOrderQuantities } from "@shared/deskOrderQuantities";
 import { useLocation, useSearch } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
@@ -362,16 +363,7 @@ export default function AperturePlayDesk() {
   </div></DashboardLayout>;
 }
 
-export function deskOrderQuantities(order: { qty: number | null; filledQty: number | null }) {
-  const measured = (value: number | null) => value != null && Number.isFinite(value) && value >= 0 ? value : null;
-  const ordered = measured(order.qty);
-  const filled = measured(order.filledQty);
-  return {
-    ordered: ordered == null ? "Not measured" : String(ordered),
-    filled: filled == null ? "Not measured" : String(filled),
-    remaining: ordered == null || filled == null || filled > ordered ? "Not measured" : String(ordered - filled),
-  };
-}
+export { deskOrderQuantities } from "@shared/deskOrderQuantities";
 
 function AttentionTask({ item, prominent = false, compact = false, onOpen }: { item: ApertureAttentionItem; prominent?: boolean; compact?: boolean; onOpen: (href: string) => void }) {
   return <AttentionDecisionCard item={item} prominent={prominent} compact={compact} onOpen={onOpen} />;

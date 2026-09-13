@@ -2504,6 +2504,9 @@ export const apertureRouter = router({
         optionStrikePriceCents: brokerOrders.optionStrikePriceCents,
         side: brokerOrders.side,
         intent: brokerOrders.intent,
+        orderType: brokerOrders.orderType,
+        limitPriceCents: brokerOrders.limitPriceCents,
+        timeInForce: brokerOrders.timeInForce,
         qty: brokerOrders.qty,
         filledQty: brokerOrders.filledQty,
         notionalCents: brokerOrders.notionalCents,
@@ -2848,6 +2851,7 @@ export const apertureRouter = router({
       // as unavailable, never silently rendered as zero buying power.
       const deskAccountRead = await readOptionalStatusSource("Execution account", async () => {
         const rows = await db!.select({
+          id: portfolioAccounts.id,
           label: portfolioAccounts.label,
           isPaper: portfolioAccounts.isPaper,
           brokerId: portfolioAccounts.brokerId,
@@ -2862,6 +2866,7 @@ export const apertureRouter = router({
       return {
         account: deskAccountRead.value
           ? {
+            id: deskAccountRead.value.id,
             label: deskAccountRead.value.label,
             cashCents: deskAccountRead.value.cashCents,
             buyingPowerCents: deskAccountRead.value.buyingPowerCents,

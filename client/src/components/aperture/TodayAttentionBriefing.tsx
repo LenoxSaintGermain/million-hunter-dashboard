@@ -7,6 +7,7 @@ import { MonitoringFindingReview } from "./MonitoringFindingReview";
 import { InlineGateReview, inlineGateTarget } from "./InlineGateReview";
 import { inlineMonitoringTarget } from "@shared/monitoringFinding";
 import { AttentionSourceRecovery } from "./AttentionSourceRecovery";
+import { TodayExecutionSnapshot, TodayOrderRows, type TodayExecutionData } from "./TodayExecutionSnapshot";
 import { paperInstrumentDisplayLabel, parseOccOptionSymbol } from "@shared/paperInstrument";
 import { partitionDismissed, recordDismissal, restoreDismissal, parseDismissals, DISMISSAL_STORAGE_KEY, type AttentionDismissal } from "@shared/attentionDismissal";
 import { arbitrateTodayRead, displayedAttentionBaseline, safeStatusError, type AttentionStatusSource, type ApertureAttentionBriefing, type ApertureAttentionItem, type ApertureMotionItem } from "@shared/apertureAttention";
@@ -36,6 +37,8 @@ export function TodayAttentionBriefing({
   loading,
   failed,
   failedSources,
+  execution,
+  executionFailed,
   onOpen,
   onRetry,
   onNewMission,
@@ -46,6 +49,8 @@ export function TodayAttentionBriefing({
   loading: boolean;
   failed: string | null;
   failedSources?: AttentionStatusSource[];
+  execution?: TodayExecutionData;
+  executionFailed?: boolean;
   onOpen: (href: string) => void;
   onRetry: () => void;
   onNewMission: () => void;
@@ -179,8 +184,10 @@ export function TodayAttentionBriefing({
     {attention && <>
       {primary ? <AttentionDecisionCard item={primary} prominent fingerprint={fingerprints.get(primary.key)} busy={primary.kind === "status_unavailable" && loading} onOpen={() => openTask(primary)} reviewOpen={inlineTask?.key === primary.key} /> : quiet ? <div data-quiet-status className="flex gap-3 p-4"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div><p className="font-semibold">No new action identified.</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.quietMessage}</p></div></div> : null}
       {primary && inlineReview(primary)}
-
-      {visibleMotion.length > 0 && <section className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2></div>{visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
+    </>}
+    {(execution !== undefined || executionFailed !== undefined) && <TodayExecutionSnapshot data={execution} failed={!!executionFailed} loading={loading} />}
+    {attention && <>
+      {visibleMotion.length > 0 && <section className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2></div>{execution ? <TodayOrderRows items={visibleMotion} data={execution} fingerprints={fingerprints} changedKeys={changedKeys} onOpen={onOpen} /> : visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
       {(layout?.otherCritical.length ?? 0) > 0 && <section aria-label="Other critical issues" className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">Other critical issues · {criticalSplit.visible.length}</h2><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>All authorized plays, regardless of thesis or instrument filters.</p></div>{visibleCritical.map(row)}{criticalSplit.visible.length > criticalCap && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllCritical(value => !value)}>{allCritical ? "Show fewer critical issues" : `Show ${criticalSplit.visible.length - criticalCap} more critical issues`}</Button>}</section>}
 
       <AttentionSourceRecovery issues={attention.sourceIssues ?? []} onOpen={onOpen} onRetry={onRetry} busy={read.busy} />
