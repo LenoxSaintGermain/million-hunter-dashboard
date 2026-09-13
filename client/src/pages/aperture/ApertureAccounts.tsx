@@ -6,6 +6,7 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { invalidateAccountRefreshReads } from "@/lib/accountRefreshInvalidation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ function fmt(cents: number | null | undefined): string {
 
 export default function ApertureAccounts() {
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
   const [showCreate, setShowCreate] = useState(false);
   const [label, setLabel] = useState("");
   const [brokerId, setBrokerId] = useState<"alpaca_paper" | "manual" | "robinhood_mcp">("alpaca_paper");
@@ -52,11 +54,11 @@ export default function ApertureAccounts() {
   });
 
   const syncAccount = trpc.aperture.account.sync.useMutation({
-    onSuccess: (_, variables) => {
+    onSuccess: async (_, variables) => {
       const message = "Paper account snapshot refreshed. No order was created or changed.";
       setSyncFeedback({ accountId: variables.id, message, tone: "success" });
       toast.success("Account synced");
-      refetch();
+      await invalidateAccountRefreshReads(utils.aperture, variables.id);
     },
     onError: (e, variables) => {
       setSyncFeedback({ accountId: variables.id, message: e.message, tone: "error" });

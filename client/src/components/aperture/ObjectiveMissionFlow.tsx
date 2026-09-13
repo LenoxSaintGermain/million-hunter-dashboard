@@ -156,9 +156,11 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
   const saveMutation = trpc.aperture.runway.draft.save.useMutation({ retry: false });
   const startMutation = trpc.aperture.strategy.start.useMutation({ retry: false });
   const runMutation = trpc.aperture.strategy.run.useMutation({ retry: false });
-  const [values, setValues] = useState<MissionDraftValues>(() => newObjective ? newValues(seedCapitalCents) : initialDraft?.values ?? emptyMissionDraftValues());
-  const [saved, setSaved] = useState<MissionDraftRecord | null>(initialDraft ?? null);
-  const [initialized, setInitialized] = useState(!!initialDraft || newObjective);
+  // objective=1 selects this editor, including on Back/reload. Resolve its
+  // durable draft before minting identities or exposing an editable new form.
+  const [values, setValues] = useState<MissionDraftValues>(() => newObjective ? emptyMissionDraftValues() : initialDraft?.values ?? emptyMissionDraftValues());
+  const [saved, setSaved] = useState<MissionDraftRecord | null>(newObjective ? null : initialDraft ?? null);
+  const [initialized, setInitialized] = useState(!!initialDraft && !newObjective);
   const [draftTarget, setTarget] = useState<Identity | null>(() => newObjective ? null : draftIdentity(initialDraft));
   // An explicit route always wins over draft hydration, including the very
   // first render after a prop change (before effects can run).
@@ -194,6 +196,8 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
   const bindingRef = useRef(binding); bindingRef.current = binding;
   const riskCurrent = !!risk && risk.binding === binding && !riskFailure && !riskPending && !accountQuery.error
     && freshAt(account?.lastSyncedAt) && freshRisk(risk.data);
+  const accountRefreshRequired = !!account && (!freshAt(account.lastSyncedAt)
+    || (!!risk && risk.binding === binding && !freshAt(risk.data.account.lastSyncedAt)));
   const riskPreview = risk ? previewView(risk.data, riskFailure ? "failed" : riskPending ? "loading" : riskCurrent ? "ready" : "stale") : null;
   useEffect(() => {
     if (!risk || !freshRisk(risk.data) || !freshAt(account?.lastSyncedAt)) return;
@@ -217,8 +221,12 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
     const local = current.current;
     if (!initialized) {
       setInitialized(true); setSaved(remote);
-      if (remote?.values.strategyContext) { setValues(remote.values); setTarget(draftIdentity(remote)); }
-      else if (remote?.completedAt == null && remote != null) setConflict({ remote, compared: false });
+      if (remote?.values.strategyContext && (!newObjective || remote.completedAt == null)) {
+        setValues(remote.values); setTarget(draftIdentity(remote));
+      } else {
+        if (newObjective) setValues(newValues(seedCapitalCents));
+        if (remote?.completedAt == null && remote != null) setConflict({ remote, compared: false });
+      }
       return;
     }
     if (remote && local.saved && remote.version <= local.saved.version) {
@@ -232,14 +240,12 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
     if (remote?.completedAt == null || !local.saved || remote?.version !== local.saved.version) setConflict({ remote, compared: false });
   }
   useEffect(() => {
-    if (draftQuery.isLoading || draftQuery.error || draftQuery.data === undefined || seenDraft.current === draftQuery.data) return;
+    // A warm cache may still contain null/an older head while Back refetches.
+    // It is not evidence that the operator needs a new objective.
+    if (draftQuery.isLoading || (!initialized && draftQuery.isFetching) || draftQuery.error || draftQuery.data === undefined || seenDraft.current === draftQuery.data) return;
     seenDraft.current = draftQuery.data;
-    // The first read still detects an unfinished draft when an initial record
-    // was supplied alongside an explicit New objective entry.
-    if (newObjective && draftQuery.data?.completedAt == null && draftQuery.data != null
-      && !sameValues(values, draftQuery.data.values)) setConflict({ remote: draftQuery.data, compared: false });
-    else observeDraft(draftQuery.data);
-  }, [draftQuery.data, draftQuery.isLoading, draftQuery.error]);
+    observeDraft(draftQuery.data);
+  }, [draftQuery.data, draftQuery.isLoading, draftQuery.isFetching, draftQuery.error]);
   useEffect(() => {
     setFailure(null);
   }, [receiptTarget?.decisionRunId, receiptTarget?.revisionId]);
@@ -257,6 +263,7 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
     : conflict ? "Compare the saved draft before adopting or replacing it."
       : contextFailure ? message(contextFailure) : capabilityBlock
         || (uncertain ? "Reconcile the original start before another action." : null)
+        || (accountRefreshRequired ? `The account snapshot for ${account!.label} is stale or unavailable. Open Accounts and choose Refresh balances, then return and inspect the effective constraint.` : null)
         || (!riskCurrent ? "Inspect the effective constraint for these assumptions before underwriting." : null);
 
   async function refreshDraft() {
@@ -453,9 +460,9 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
           ? <SourceExecutionEvidence key={JSON.stringify(values.strategyContext.sourceOrder)} source={values.strategyContext.sourceOrder}
             refreshEnabled={!capabilities.error && !capabilities.isFetching && capabilities.data?.executionRefreshEnabled === true} /> : null}
         accounts={accounts} canonicalTheses={canonicalTheses} saveState={saveState} loading={loading}
-        failure={failure || (contextFailure ? message(contextFailure) : null)} busy={busy || saving}
+        failure={failure || (contextFailure ? message(contextFailure) : null)} busy={busy}
         blockedReason={startBlock} onSave={() => save()} onUnderwrite={() => saveAndStart()} saveBeforeUnderwriting
-        riskPreview={riskPreview} onInspectRisk={inspectRisk} />
+        riskPreview={riskPreview} accountRefreshRequired={accountRefreshRequired} onInspectRisk={inspectRisk} />
       {(riskFailure || riskPending) && <p role={riskFailure ? "alert" : "status"} className="text-sm" style={{ color: "var(--sh-signal)" }}>{riskFailure || "Reading the effective constraint from the server…"}</p>}
       <Button type="button" variant="ghost" className="min-h-11" onClick={refreshDraft} disabled={refreshing || busy || saving}>Refresh saved draft</Button>
       {!values.strategyContext && !loading && <Button type="button" variant="outline" className="min-h-11" onClick={() => {

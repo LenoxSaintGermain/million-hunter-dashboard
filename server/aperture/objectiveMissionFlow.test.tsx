@@ -140,6 +140,114 @@ beforeEach(() => {
 afterEach(() => { fixture.cleanups.forEach(cleanup => cleanup?.()); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("connected Objective Mission", () => {
+  it("points stale-account recovery to the named account in Accounts instead of another risk inspection", async () => {
+    fixture.queries.accounts.data[0].lastSyncedAt = now - STALE_ACCOUNT_MS - 1;
+    const view = harness(); view.render();
+    await view.workspace().onInspectRisk();
+    expect(view.workspace().blockedReason).toContain("Refresh balances");
+    const { $ } = view.render();
+    expect($('a[href="/aperture/accounts"]').text()).toContain("Illustrative Paper");
+    expect(view.workspace().values).toEqual(values());
+    expect(view.workspace().riskPreview?.status).toBe("stale");
+    await view.workspace().onUnderwrite();
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+    // A later Accounts response does not itself authorize anything. A fresh
+    // constraint must still be explicitly read against the updated snapshot.
+    fixture.queries.accounts.data[0].lastSyncedAt = now;
+    expect(view.workspace().riskPreview?.status).toBe("stale");
+    expect(view.workspace().blockedReason).toContain("Inspect the effective constraint");
+    await view.workspace().onUnderwrite();
+    expect(fixture.mutations.start.mutateAsync).not.toHaveBeenCalled();
+    await view.workspace().onInspectRisk();
+    expect(view.workspace().riskPreview?.status).toBe("ready");
+    expect(view.render().$('a[href="/aperture/accounts"]')).toHaveLength(0);
+  });
+
+  it.each([null, record(values(), 5)])("waits for the fresh draft read on Back instead of initializing from cached %j", cached => {
+    fixture.queries.draft = { ...query(cached), isFetching: true };
+    const view = harness({ newObjective: true }); view.render();
+    expect(view.workspace().loading).toBe(true);
+    expect(view.workspace().values.strategyContext).toBeUndefined();
+    const diesel = record({ ...values(), capital: "2000", maxLoss: "200" }, 6);
+    fixture.queries.draft = query(diesel);
+    view.render();
+    expect(view.workspace().values).toEqual(diesel.values);
+    expect(view.workspace().saveState).toBe("saved");
+    expect(view.render().$('section[aria-label="Draft recovery"]')).toHaveLength(0);
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it.each([null, { ...record(), completedAt: now }])("creates a seeded new objective only after a resolved empty/completed head", head => {
+    fixture.queries.draft = query(head);
+    const view = harness({ newObjective: true, seedCapitalCents: 200000 }); view.render();
+    const original = view.workspace().values;
+    expect(original).toMatchObject({ capital: "2000", maxLoss: "", mission: "", baseDecisionRunId: null, baseDecisionRevisionId: null });
+    expect(original.strategyContext?.requestId).toBeTruthy();
+    expect(original.strategyContext?.requestId).not.toBe(requestId);
+    view.render();
+    expect(view.workspace().values).toEqual(original);
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("keeps objective-route edits when the same saved head is refetched, but flags a newer remote edit", () => {
+    const saved = record(values(), 6);
+    fixture.queries.draft.data = saved;
+    const view = harness({ newObjective: true }); view.render();
+    view.change({ capital: "2000", maxLoss: "200" });
+    fixture.queries.draft.data = structuredClone(saved);
+    expect(view.render().$('section[aria-label="Draft recovery"]')).toHaveLength(0);
+    expect(view.workspace().saveState).toBe("unsaved");
+    expect(view.workspace().values.capital).toBe("2000");
+    fixture.queries.draft.data = record({ ...values(), capital: "3000" }, 7);
+    expect(view.render().$('section[aria-label="Draft recovery"]')).toHaveLength(1);
+    expect(view.workspace().values.capital).toBe("2000");
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it.each([1, 2, 3] as const)("labels a draft-only save in section %s as saving, never underwriting", async activeSection => {
+    fixture.queries.draft.data = record({ ...values(), activeSection });
+    const view = harness(); view.render(); view.change({ capital: "2000", maxLoss: "200" });
+    const write = deferred<MissionDraftRecord>();
+    fixture.mutations.save.mutateAsync.mockReturnValueOnce(write.promise);
+    const saving = view.workspace().onSave();
+    const { $ } = view.render();
+    expect(view.workspace().saveState).toBe("saving");
+    expect($('section[aria-label="Objective Mission setup"]').attr("aria-busy")).toBe("true");
+    expect($.text()).not.toMatch(/Underwriting…|Underwriting is in progress\./);
+    expect($('[role="status"]').text()).toContain("Saving your draft. Wait for confirmation.");
+    expect($("button").filter((_, button) => /Underwrite my mission|Saving draft/.test($(button).text())).is(":not([disabled])")).toBe(false);
+    await view.workspace().onUnderwrite();
+    expect(fixture.mutations.start.mutateAsync).not.toHaveBeenCalled();
+    expect(fixture.mutations.run.mutateAsync).not.toHaveBeenCalled();
+    write.resolve(record(view.workspace().values, 5)); await saving;
+    expect(view.workspace().saveState).toBe("saved");
+  });
+
+  it.each([1, 2, 3])("restores the saved diesel draft after Accounts refresh and Back to objective=1 without a false conflict (pass %s)", async () => {
+    const diesel = { ...values(), mission: "Illustrative: research diesel supply constraints.", capital: "2000", maxLoss: "200" };
+    fixture.queries.draft.data = record(diesel, 5);
+    const before = harness(); before.render();
+    await before.workspace().onSave();
+    const saved = record(diesel, 6);
+    expect(before.workspace().saveState).toBe("saved");
+    // Leaving Mission discards component state; Accounts refresh changes only
+    // the account snapshot. Back remounts the same objective=1 entry URL.
+    fixture.cleanups.forEach(cleanup => cleanup?.());
+    fixture.slots = []; fixture.deps = []; fixture.effects = []; fixture.cleanups = [];
+    fixture.queries.accounts.data = fixture.queries.accounts.data.map((account: any) => ({ ...account, updatedAt: now + 1 }));
+    fixture.queries.draft.data = saved;
+    const returned = harness({ newObjective: true });
+    const { $ } = returned.render();
+    expect(returned.workspace().values).toEqual(diesel);
+    expect(returned.workspace().saveState).toBe("saved");
+    expect($('section[aria-label="Draft recovery"]')).toHaveLength(0);
+    expect(returned.workspace().riskPreview).toBeNull();
+    await returned.workspace().onUnderwrite();
+    expect(fixture.mutations.save.mutateAsync).toHaveBeenCalledOnce();
+    expect(fixture.mutations.start.mutateAsync).not.toHaveBeenCalled();
+    expect(fixture.mutations.run.mutateAsync).not.toHaveBeenCalled();
+  });
+
   it("saves reviewed changes before underwriting with one click and deduplicates repeated clicks", async () => {
     const view = harness(); view.render();
     view.change({ mission: "Illustrative changed question: compare uses of declared capital." });

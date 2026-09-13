@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GEMINI_BALANCED } from "../../shared/models";
 import { invokeLLM, type InvokeResult } from "../_core/llm";
 import { runResearch } from "../deepResearch";
+import { classifyStrategyDiscovery } from "./strategyDiscoveryClassifier";
 import {
   parseStrategyDiscovery, STRATEGY_DISCOVERY_LIMITS, strategyDiscoveryContextSchema,
   strategyDiscoveryPayloadSchema, type StrategyDiscoveryPayload,
@@ -13,6 +14,7 @@ import {
 // No provider module initialization, network, credentials, or database access.
 vi.mock("../deepResearch", () => ({ runResearch: vi.fn() }));
 vi.mock("../_core/llm", () => ({ invokeLLM: vi.fn() }));
+vi.mock("./strategyDiscoveryClassifier", () => ({ classifyStrategyDiscovery: vi.fn() }));
 vi.mock("../db", () => { throw new Error("Discovery unit tests must not load the database"); });
 
 // Illustrative, frozen receipts only. No example.test URLs are ever requested.
@@ -114,9 +116,10 @@ describe("bounded objective discovery provider (mocked, not live UAT)", () => {
 
   it("wires the default existing abstractions without invoking their real implementations", async () => {
     vi.mocked(runResearch).mockResolvedValue(receipt() as Awaited<ReturnType<typeof runResearch>>);
-    vi.mocked(invokeLLM).mockImplementation(async (request) => response(JSON.stringify(bodyFor(request))));
+    vi.mocked(classifyStrategyDiscovery).mockImplementation(async (request) => response(JSON.stringify(bodyFor(request))));
     const result = await discoverObjectiveMission(input());
-    expect(runResearch).toHaveBeenCalledTimes(1); expect(invokeLLM).toHaveBeenCalledTimes(1);
+    expect(runResearch).toHaveBeenCalledTimes(1); expect(classifyStrategyDiscovery).toHaveBeenCalledTimes(1);
+    expect(invokeLLM).not.toHaveBeenCalled();
     expect(parse(result).status).toBe("incomplete");
   });
 

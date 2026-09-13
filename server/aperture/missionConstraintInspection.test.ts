@@ -99,9 +99,13 @@ describe("UAT-06 effective constraint inspection", () => {
   });
 
   it("labels a stale account snapshot without claiming that a status refresh syncs the broker", () => {
-    const { $ } = render({ inspection: { ...inspection, accountAsOf: asOf - 86_400_000 } });
+    const { $, refresh } = render({ inspection: { ...inspection, accountAsOf: asOf - 86_400_000 } });
     expect($("details").text()).toContain("Account snapshot was stale at calculation time");
     expect($("details").text()).toContain("reads saved account data");
+    const recovery = $('details a[href="/aperture/accounts"]');
+    expect(recovery.text()).toContain("Illustrative Alpaca Paper");
+    expect(recovery.parent().text()).toContain("Refresh balances");
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it.each([

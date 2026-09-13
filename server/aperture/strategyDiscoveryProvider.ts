@@ -34,8 +34,8 @@ export type StrategyDiscoveryProviderDeps = {
 // runResearch owns its existing research cache, NOT discovery persistence.
 const defaults: StrategyDiscoveryProviderDeps = {
   research: async (options) => (await import("../deepResearch")).runResearch(options),
-  // invokeLLM already selects the validated GEMINI_BALANCED registry constant.
-  classify: async (options) => (await import("../_core/llm")).invokeLLM(options),
+  // The production deployment configures direct Gemini, not the legacy Forge gateway.
+  classify: async (options) => (await import("./strategyDiscoveryClassifier")).classifyStrategyDiscovery(options),
   now: () => Date.now(),
 };
 

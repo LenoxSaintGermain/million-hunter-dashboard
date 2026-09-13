@@ -16,6 +16,7 @@ import { ContextHelp } from "./ContextHelp";
 import { PlayUnderwritingBrief } from "./PlayUnderwritingBrief";
 import { MissionResultWorkspace } from "./MissionResultWorkspace";
 import { ObjectiveMissionFlow } from "./ObjectiveMissionFlow";
+import { MissionAccountRefreshLink } from "./MissionAccountRefreshLink";
 
 type Branch = "research" | "conditional" | "cash";
 type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
@@ -1051,6 +1052,7 @@ export function MissionRiskInspection({ context, enteredLossCents, policyVersion
       <p className="font-semibold">{context.accountLabel} · Paper{context.accountId != null ? ` · Account #${context.accountId}` : ""}</p>
       <p style={{ color: "var(--sh-fg-muted)" }}>Account snapshot as of <RiskTimestamp at={context.accountAsOf} />. {context.calculationBasis} as of <RiskTimestamp at={context.calculationAsOf} />.</p>
       {context.accountAsOf != null && context.calculationAsOf != null && context.calculationAsOf - context.accountAsOf > STALE_ACCOUNT_MS && <p style={{ color: "var(--sh-signal)" }}>Account snapshot was stale at calculation time. Refreshing constraints reads saved account data; sync the paper account before relying on current capacity.</p>}
+      {context.accountId != null && (context.accountAsOf == null || (context.calculationAsOf ?? Date.now()) - context.accountAsOf > STALE_ACCOUNT_MS) && <MissionAccountRefreshLink accountLabel={context.accountLabel} />}
       <p><strong>Effective normal-play risk: {formatCents(feasibility?.riskBudgetCents)}.</strong> {binding.length ? `Binding: ${binding.join(" and ")}.` : "The binding limit is not fully measured here."}</p>
       <p>The smallest applicable measured limit controls. Policy {policyVersion ?? "not available"}; declared mission capital {formatCents(capitalCents)} is not total account equity.</p>
       <dl className="divide-y" style={{ borderColor: "var(--sh-border-1)" }}>{limits.map(line => <div key={line.label} className="py-2">

@@ -5,6 +5,7 @@ import { replacePrimaryMissionHorizon, type MissionDraftValues, type MissionSect
 import type { TargetFeasibility } from "@shared/playUnderwriting";
 import { ContextHelp } from "./ContextHelp";
 import { StateMark } from "./DecisionVisualLanguage";
+import { MissionAccountRefreshLink } from "./MissionAccountRefreshLink";
 
 export type { MissionDraftValues } from "@shared/apertureMissionDraft";
 export type ObjectiveMissionAccount = { id: number; label: string; lastSyncedAt?: number | null };
@@ -40,6 +41,8 @@ export type ObjectiveMissionWorkspaceProps = {
   /** Controller guarantees an exact successful save before starting analysis. */
   saveBeforeUnderwriting?: boolean;
   riskPreview?: ObjectiveMissionRiskPreview | null;
+  /** The controller has found stale/unavailable account data; this view never syncs it. */
+  accountRefreshRequired?: boolean;
   onInspectRisk: () => void;
   sourceEvidence?: React.ReactNode;
   sourcePicker?: React.ReactNode;
@@ -152,9 +155,10 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
   const previewCurrent = matchingPreview?.status === "ready" && matchingPreview.asOf != null && Number.isFinite(matchingPreview.asOf);
   const previewWarning = matchingPreview && !previewCurrent
     ? `Constraint ${matchingPreview.status === "loading" ? "refreshing" : matchingPreview.status === "failed" ? "refresh failed" : matchingPreview.status === "stale" ? "is stale" : "freshness is unconfirmed"}. Recorded values only; current eligibility is not confirmed.` : null;
-  const actionBlock = unavailable || (loading || saveState === "loading" ? "Loading the draft and account choices." : null)
+  const activityMessage = (loading || saveState === "loading" ? "Loading the draft and account choices." : null)
     || (busy ? "Underwriting is in progress." : null)
-    || (saveState === "saving" ? "Saving your draft. Wait for confirmation." : null)
+    || (saveState === "saving" ? "Saving your draft. Wait for confirmation." : null);
+  const actionBlock = unavailable || activityMessage
     || failureText || blockedReason || previewWarning || issues[0]?.message
     || (saveState !== "saved" && !props.saveBeforeUnderwriting ? "Save this draft before underwriting." : null);
   const effectiveSaveState = failureText ? "failed" : loading ? "loading" : saveState;
@@ -187,7 +191,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
     {failureText && <p role="alert" className="text-sm" style={{ color: "var(--sh-red)" }}>{failureText}</p>}
     {unavailable && <p role="alert" className="text-sm" style={{ color: "var(--sh-signal)" }}>{unavailable}</p>}
     {values.activeSection !== 3 && previewWarning && <p role="alert" className="text-sm" style={{ color: "var(--sh-signal)" }}>{previewWarning}</p>}
-    {values.activeSection !== 3 && (blockedReason || locked) && <p role="status" className="text-sm" style={{ color: "var(--sh-signal)" }}>{blockedReason || (busy ? "Underwriting is in progress." : loading || saveState === "loading" ? "Loading the draft and account choices." : "Saving your draft. Wait for confirmation.")}</p>}
+    {values.activeSection !== 3 && (blockedReason || locked) && <p role="status" className="text-sm" style={{ color: "var(--sh-signal)" }}>{activityMessage || blockedReason}</p>}
     <section aria-labelledby={`${prefix}-heading-1`} className="rounded-xl border p-4" style={surface}>
       {sectionHeader(1, "Question & scope")}
       <div id={`${prefix}-section-1`} hidden={values.activeSection !== 1} className="mt-4 space-y-4">
@@ -308,10 +312,11 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
             </details>}
           </> : <p className="text-sm" style={muted}>No matching server preview yet. No permitted risk is inferred from your declarations.</p>}
           <Button type="button" variant="outline" className="min-h-11" onClick={onInspectRisk}>Inspect effective constraint</Button>
+          {props.accountRefreshRequired && selectedAccount && <MissionAccountRefreshLink accountLabel={selectedAccount.label} />}
         </div>
         {issues.length > 0 && <Button type="button" variant="outline" className="min-h-11" disabled={locked} onClick={() => { setAttempted([1, 2]); change({ activeSection: issues[0].section }); }}>Review missing values</Button>}
         <div className="flex flex-wrap gap-2">
-          <Button type="button" className="min-h-11" disabled={!!actionBlock} aria-describedby={`${prefix}-effect ${prefix}-blocked`} onClick={() => { if (!actionBlock) onUnderwrite(); }}>{busy ? "Underwriting…" : "Underwrite my mission"}</Button>
+          <Button type="button" className="min-h-11" disabled={!!actionBlock} aria-describedby={`${prefix}-effect ${prefix}-blocked`} onClick={() => { if (!actionBlock) onUnderwrite(); }}>{busy ? "Underwriting…" : saveState === "saving" ? "Saving draft…" : "Underwrite my mission"}</Button>
         </div>
         <p id={`${prefix}-effect`} className="text-sm" style={muted}>{props.saveBeforeUnderwriting && saveState !== "saved" ? "Saves these assumptions and builds research. No order is created or submitted." : "Builds research. No order is created or submitted."}</p>
         <p id={`${prefix}-blocked`} role="status" className="text-sm" style={{ color: actionBlock ? "var(--sh-signal)" : "var(--sh-fg-muted)" }}>{actionBlock ?? "Ready for your explicit request."}</p>
