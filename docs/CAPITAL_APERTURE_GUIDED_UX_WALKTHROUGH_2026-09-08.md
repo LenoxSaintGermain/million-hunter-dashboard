@@ -636,3 +636,42 @@ September 10 review-handoff receipt for exact test evidence.
 Implementation checkpoint: inline exact-finding review and clearer stale copy
 are local. Browser interaction acceptance, inline gate evaluation and connected
 option/broker outcome calculation remain open; no production release claim.
+
+## September 13: review presets and one inline review
+
+The review form offers two short, editable reasons after the operator chooses
+an assessment. Presets are draft language, not generated findings or evidence.
+They neither select an assessment nor save a review. Existing typed text requires
+an explicit Replace note / Keep my note choice before replacement. Switching
+assessments clears an unedited preset but preserves custom text for review.
+
+Today retains one finding heading, implication and action. Opening the review
+changes that action to Close review and shows the exact evidence and form below;
+it no longer repeats the heading, explanation or evidence disclosure. Critical
+warnings remain on the original card. The stale-state explanation is shorter
+and still distinguishes a status reload from running new checks.
+
+Bounded verification, September 13 (local, illustrative fixture):
+
+- 2,307 unit tests passed, eight existing skips; typecheck and build passed.
+- Real components exercised in Chrome with in-memory review storage, no API or
+  broker connection. Opening and choosing presets produced zero review writes.
+- Typed note retained pending replacement; Keep my note preserved it; Replace
+  note populated an editable draft. Custom text survived assessment changes.
+- Unedited preset cleared on assessment change. Save remained disabled until
+  an assessment and adequate note were present.
+- Simulated unconfirmed save: two attempts reused one request and produced one
+  receipt. A new finding version did not inherit that receipt. No order created.
+- Keyboard Space activated a preset. Narrow-screen review and replacement UI
+  were inspected: no horizontal overflow at the observed 429 CSS-pixel width,
+  with approximately 44 CSS-pixel preset controls. Requested viewport was
+  390x844; browser scaling resulted in the measured width above. Override reset.
+- Desktop and narrow screenshots were emitted in the task. This is bounded
+  component UAT, not full accessibility certification or user-tested usability.
+
+Run the repeatable isolated harness with `DATABASE_URL= node
+scripts/review-presets-visual-uat.mjs` and open `/__review-uat` on port 3116.
+Saved production reviews were not changed. This delta is not yet deployed.
+Cross-device unsaved-review drafts, screen-reader/enlarged-text acceptance and
+market-open full lifecycle UAT remain unverified; closing the inline form still
+discards its unsaved draft under the existing behavior.

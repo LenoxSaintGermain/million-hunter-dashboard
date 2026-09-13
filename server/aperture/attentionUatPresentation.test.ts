@@ -43,7 +43,8 @@ describe("Authenticated UAT attention regressions — illustrative records, zero
     const html = today(attention);
     expect(html).not.toContain("Refresh status before relying on current eligibility");
     expect(html).toContain("Some play evidence is out of date.");
-    expect(html).toContain("Fresh checks are needed before relying on them; refreshing status only reloads saved records.");
+    expect(html).toContain("Refresh the affected play’s checks before deciding");
+    expect(html).toContain("Refresh status only reloads saved records");
     expect(fixture.refetch).not.toHaveBeenCalled();
   });
 

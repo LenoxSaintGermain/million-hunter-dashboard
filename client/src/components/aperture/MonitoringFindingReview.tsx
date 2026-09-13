@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { type MonitoringFindingSelection, type MonitoringReviewDecision, type MonitoringReviewReceipt } from "@shared/monitoringFinding";
+import { isPresetReviewNote, monitoringReviewPresets } from "@shared/monitoringReviewPresets";
 
 type Target = MonitoringFindingSelection & { runId: number; candidateId: number };
 
@@ -10,6 +11,8 @@ export function MonitoringFindingReview({ target }: { target: Target }) {
   const receipts = trpc.aperture.monitor.reviews.list.useQuery(target, { refetchOnWindowFocus: false });
   const [decision, setDecision] = useState<MonitoringReviewDecision | "">("");
   const [note, setNote] = useState("");
+  const [pendingPreset, setPendingPreset] = useState<string | null>(null);
+  const [draftNotice, setDraftNotice] = useState("");
   const [saved, setSaved] = useState<MonitoringReviewReceipt | null>(null);
   const [editing, setEditing] = useState(false);
   const request = useRef<(Target & { requestId: string; decision: MonitoringReviewDecision; note: string }) | null>(null);
@@ -18,8 +21,16 @@ export function MonitoringFindingReview({ target }: { target: Target }) {
   });
   const latest = saved ?? receipts.data?.receipts.at(-1) ?? null;
   const uncertain = record.isError && request.current != null;
+  const chooseDecision = (value: MonitoringReviewDecision) => {
+    setDecision(value); setPendingPreset(null);
+    if (isPresetReviewNote(note)) { setNote(""); setDraftNotice(""); }
+    else setDraftNotice(note ? "Your note is unchanged. Check it matches this assessment." : "");
+  };
+  const applyPreset = (value: string) => {
+    setNote(value); setPendingPreset(null); setDraftNotice("Draft added. Edit if needed, then save your review.");
+  };
   const submit = () => {
-    if (record.isPending) return;
+    if (record.isPending || pendingPreset) return;
     if (!request.current) {
       if (!decision || note.trim().length < 10 || !receipts.data || receipts.isError) return;
       request.current = { ...target, decision, note: note.trim(), requestId: crypto.randomUUID() };
@@ -28,14 +39,14 @@ export function MonitoringFindingReview({ target }: { target: Target }) {
   };
   return <section className="mt-3 rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }} aria-label="Record finding review">
     <h3 className="text-base font-semibold">Your review</h3>
-    <p className="mt-1 text-sm leading-5">Records your assessment of this version. It never changes, exits, or hedges an order.</p>
+    <p className="mt-1 text-sm leading-5">Saves your assessment of this finding only—not an order change or exit.</p>
     {receipts.isLoading && <p className="mt-2 text-sm" role="status">Loading saved review…</p>}
     {receipts.isError && <div className="mt-2 text-sm" role="alert"><p>Saved reviews could not load. No new review has been confirmed.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void receipts.refetch()}>Reload saved review</Button></div>}
     {latest && !editing ? <div className="mt-3 space-y-2">
       <p role="status" className="text-sm font-semibold">Review saved · {latest.decision === "needs_fresh_evidence" ? "Needs fresh evidence" : latest.decision === "resolved" ? "Closed" : "Concern kept open"}</p>
       <p className="text-sm">{latest.note}</p>
       <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{new Date(latest.reviewedAt).toLocaleString()} · No check was scheduled or order changed.{latest.decision === "resolved" ? " This version has left your attention list. A later check that flags again will return." : ""}</p>
-      <Button variant="outline" className="min-h-11" onClick={() => { request.current = null; setDecision(""); setNote(""); record.reset(); setEditing(true); }}>Record another review</Button>
+      <Button variant="outline" className="min-h-11" onClick={() => { request.current = null; setDecision(""); setNote(""); setPendingPreset(null); setDraftNotice(""); record.reset(); setEditing(true); }}>Record another review</Button>
     </div> : <div className="mt-3 space-y-3">
       <fieldset disabled={record.isPending || uncertain || !receipts.data || receipts.isError} className="space-y-2">
         <legend className="mb-2 text-sm font-semibold">What is your assessment?</legend>
@@ -43,12 +54,25 @@ export function MonitoringFindingReview({ target }: { target: Target }) {
           ["resolved", "Closed — I have dealt with this", "Removes it from your attention list. A later check that flags again comes back."],
           ["reviewed_unresolved", "Still open — I have read it", "Stays on your list. Use this when you have looked but nothing is settled."],
           ["needs_fresh_evidence", "Need fresh evidence", "Stays on your list. Use this when the recorded evidence is too old to judge."],
-        ] as const).map(([value, label, detail]) => <label key={value} data-review-option={value} className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border px-3 py-2 text-sm" style={{ borderColor: decision === value ? "var(--sh-signal)" : "var(--sh-border-1)" }}><input className="mt-1" type="radio" name={`review-${target.orderId}-${target.findingId}`} checked={decision === value} onChange={() => setDecision(value)} /><span className="min-w-0"><span className="block font-semibold">{label}</span><span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{detail}</span></span></label>)}
+        ] as const).map(([value, label, detail]) => <label key={value} data-review-option={value} className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border px-3 py-2 text-sm" style={{ borderColor: decision === value ? "var(--sh-signal)" : "var(--sh-border-1)" }}><input className="mt-1" type="radio" name={`review-${target.orderId}-${target.findingId}`} checked={decision === value} onChange={() => chooseDecision(value)} /><span className="min-w-0"><span className="block font-semibold">{label}</span><span className="block text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{detail}</span></span></label>)}
+        {decision && <div className="space-y-2 pt-2" role="group" aria-label="Suggested review notes">
+          <p className="text-sm">Start with a reason, or write your own.</p>
+          <div className="flex flex-wrap gap-2">{monitoringReviewPresets[decision].map(preset => <Button key={preset.label} type="button" variant="outline" className="min-h-11 h-auto whitespace-normal" aria-pressed={note === preset.note} onClick={() => {
+            if (note.trim() && note !== preset.note) setPendingPreset(preset.note);
+            else applyPreset(preset.note);
+          }}>{preset.label}</Button>)}</div>
+          {pendingPreset && <div className="rounded-md border p-3 text-sm" role="group" aria-label="Replace draft note">
+            <p className="font-semibold">Replace your current note?</p><p className="mt-1">{pendingPreset}</p>
+            <div className="mt-2 flex flex-wrap gap-2"><Button type="button" variant="outline" className="min-h-11" onClick={() => applyPreset(pendingPreset)}>Replace note</Button><Button type="button" variant="ghost" className="min-h-11" onClick={() => setPendingPreset(null)}>Keep my note</Button></div>
+          </div>}
+        </div>}
         <label className="block text-sm font-semibold" htmlFor={`review-note-${target.findingId}`}>{decision === "resolved" ? "Why you are closing it" : "Reason or next check"}</label>
-        <textarea id={`review-note-${target.findingId}`} rows={2} maxLength={1000} value={note} onChange={event => setNote(event.target.value)} className="w-full rounded-md border p-3 text-base" style={{ background: "var(--sh-surface)" }} placeholder={decision === "resolved" ? "Why is this closed?" : "What still needs to be verified for this play?"} />
+        <textarea id={`review-note-${target.findingId}`} rows={2} maxLength={1000} value={note} onChange={event => { setNote(event.target.value); setPendingPreset(null); setDraftNotice(""); }} className="w-full rounded-md border p-3 text-base" style={{ background: "var(--sh-surface)" }} placeholder={decision === "resolved" ? "Why is this closed?" : "What still needs to be verified for this play?"} />
+        {draftNotice && <p role="status" className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{draftNotice}</p>}
       </fieldset>
       {record.isError && <div role="alert" className="text-sm"><p>Saving was not confirmed. Check the saved receipt or retry this same request; do not assume the finding was reviewed.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void receipts.refetch()}>Check saved receipt</Button></div>}
-      <Button className="min-h-11 w-full sm:w-auto" disabled={record.isPending || (!uncertain && (!decision || note.trim().length < 10 || !receipts.data || receipts.isError))} onClick={submit}>{record.isPending ? "Saving review…" : uncertain ? "Retry same review" : "Save review"}</Button>
+      <Button className="min-h-11 w-full sm:w-auto" disabled={record.isPending || !!pendingPreset || (!uncertain && (!decision || note.trim().length < 10 || !receipts.data || receipts.isError))} onClick={submit}>{record.isPending ? "Saving review…" : uncertain ? "Retry same review" : "Save review"}</Button>
+      {pendingPreset && <p className="text-sm">Choose which note to keep before saving.</p>}
       {!decision || note.trim().length < 10 ? <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Choose an assessment and add a reason (at least 10 characters).</p> : null}
     </div>}
     {(receipts.data?.receipts.length ?? 0) > 1 && <details className="mt-3 border-t"><summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">Earlier reviews of this version</summary><ul className="space-y-2 text-sm">{receipts.data!.receipts.slice(0, -1).map(receipt => <li key={receipt.requestId}>{new Date(receipt.reviewedAt).toLocaleString()} · {receipt.note}</li>)}</ul></details>}

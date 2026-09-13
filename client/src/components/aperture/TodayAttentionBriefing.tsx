@@ -15,9 +15,9 @@ function localTime(value: number | null) {
   return value == null ? "Not scheduled" : new Date(value).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 }
 
-function BriefRow({ item, fingerprint, changed, onOpen, onDismiss }: { item: ApertureAttentionItem | ApertureMotionItem; fingerprint?: string; changed?: boolean; onOpen: (href: string) => void; onDismiss?: () => void }) {
+function BriefRow({ item, fingerprint, changed, onOpen, onDismiss, reviewOpen }: { item: ApertureAttentionItem | ApertureMotionItem; fingerprint?: string; changed?: boolean; onOpen: (href: string) => void; onDismiss?: () => void; reviewOpen?: boolean }) {
   const attention = "actionLabel" in item;
-  if (attention) return <AttentionDecisionCard item={item} compact fingerprint={fingerprint} onOpen={onOpen} onDismiss={onDismiss} />;
+  if (attention) return <AttentionDecisionCard item={item} compact fingerprint={fingerprint} onOpen={onOpen} onDismiss={onDismiss} reviewOpen={reviewOpen} />;
   const parsed = parseOccOptionSymbol(item.symbol);
   const label = parsed ? paperInstrumentDisplayLabel({ symbol: item.symbol, instrumentType: parsed.instrumentType }) : item.symbol;
   return <article data-attention-key={item.key} data-attention-fingerprint={fingerprint} className="flex flex-col gap-3 border-t px-4 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)" }}>
@@ -130,7 +130,8 @@ export function TodayAttentionBriefing({
   }, [displayedBaseline, markSeen, seenError, seenRetry, read.canRecordSeen]);
 
   const openTask = (item: ApertureAttentionItem) => {
-    if (item.kind === "status_unavailable") onRetry();
+    if (inlineTask?.key === item.key) setInlineTask(null);
+    else if (item.kind === "status_unavailable") onRetry();
     else if ((item.evidence && inlineMonitoringTarget(item.href)) || inlineGateTarget(item)) setInlineTask(item);
     else onOpen(item.href);
   };
@@ -138,14 +139,11 @@ export function TodayAttentionBriefing({
     if (!inlineTask || inlineTask.key !== item.key) return null;
     const gateTarget = inlineGateTarget(inlineTask);
     if (gateTarget) return <section aria-label="Review gate here" className="border-t p-4" style={{ borderColor: "var(--sh-border-1)" }}>
-      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-base font-semibold">{inlineTask.title}</h3><Button variant="ghost" className="min-h-11" onClick={() => setInlineTask(null)}>Close review</Button></div>
       <InlineGateReview key={inlineTask.href} target={gateTarget} onRevise={() => onOpen(inlineTask.href)} />
     </section>;
     const target = inlineMonitoringTarget(inlineTask.href);
     if (!target || !inlineTask.evidence) return null;
     return <section aria-label="Review finding here" className="border-t p-4" style={{ borderColor: "var(--sh-border-1)" }}>
-      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-base font-semibold">{inlineTask.title}</h3><Button variant="ghost" className="min-h-11" onClick={() => setInlineTask(null)}>Close review</Button></div>
-      <p className="text-sm leading-5">{inlineTask.reason}</p>
       <FindingEvidence evidence={inlineTask.evidence} expanded />
       <MonitoringFindingReview key={inlineTask.href} target={target} />
     </section>;
@@ -155,12 +153,12 @@ export function TodayAttentionBriefing({
     if (!fingerprint) return;
     persistDismissals(recordDismissal(dismissals, { key: item.key, fingerprint, dismissedAt: Date.now() }));
   };
-  const row = (item: ApertureAttentionItem | ApertureMotionItem) => <div key={item.key}><BriefRow item={item} fingerprint={fingerprints.get(item.key)} changed={changedKeys.has(item.key)} onOpen={() => "kind" in item ? openTask(item) : onOpen(item.href)} onDismiss={fingerprints.get(item.key) ? () => dismiss(item) : undefined} />{"kind" in item && inlineReview(item)}</div>;
+  const row = (item: ApertureAttentionItem | ApertureMotionItem) => <div key={item.key}><BriefRow item={item} fingerprint={fingerprints.get(item.key)} changed={changedKeys.has(item.key)} onOpen={() => "kind" in item ? openTask(item) : onOpen(item.href)} onDismiss={fingerprints.get(item.key) ? () => dismiss(item) : undefined} reviewOpen={inlineTask?.key === item.key} />{"kind" in item && inlineReview(item)}</div>;
   const notice = read.state === "loading" ? { title: "Loading the last recorded briefing…", detail: "Existing work is unchanged. Wait for saved status before choosing a next step." }
     : read.state === "refreshing" ? { title: "Refreshing recorded status.", detail: "The last successful briefing remains below; it is not a current all-clear. The refresh is already in progress." }
       : read.state === "failed" ? { title: "Current status could not be verified.", detail: `An empty result is not treated as an all-clear.${attention ? " Last successful records remain below." : ""} Retry status refresh to reconcile what is available.` }
         : read.state === "partial" ? { title: "Status is partially available.", detail: attention?.sourceIssues?.length ? `${Array.from(new Set(attention.sourceIssues.map(issue => issue.source === "monitoring" ? "Monitoring" : issue.label))).join(" · ")} needs verification. Recovery below.` : "Missing source not identified in this saved snapshot. Refresh status to identify the gap." }
-          : read.state === "stale" ? { title: "Some play evidence is out of date.", detail: "The findings below remain unresolved. Fresh checks are needed before relying on them; refreshing status only reloads saved records." }
+          : read.state === "stale" ? { title: "Some play evidence is out of date.", detail: "Refresh the affected play’s checks before deciding. Refresh status only reloads saved records." }
             : read.state === "empty" ? { title: "No verified briefing is available.", detail: "Refresh status to retrieve recorded work. This does not mean no work exists." } : null;
   const failedDetail = failed && read.state !== "refreshing" && read.state !== "loading"
     ? (failedSources?.length ? failedSources : ["status" as const]).map(safeStatusError).join(" ") : null;
@@ -179,7 +177,7 @@ export function TodayAttentionBriefing({
     </div>}
 
     {attention && <>
-      {primary ? <AttentionDecisionCard item={primary} prominent fingerprint={fingerprints.get(primary.key)} busy={primary.kind === "status_unavailable" && loading} onOpen={() => openTask(primary)} /> : quiet ? <div data-quiet-status className="flex gap-3 p-4"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div><p className="font-semibold">No new action identified.</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.quietMessage}</p></div></div> : null}
+      {primary ? <AttentionDecisionCard item={primary} prominent fingerprint={fingerprints.get(primary.key)} busy={primary.kind === "status_unavailable" && loading} onOpen={() => openTask(primary)} reviewOpen={inlineTask?.key === primary.key} /> : quiet ? <div data-quiet-status className="flex gap-3 p-4"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div><p className="font-semibold">No new action identified.</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.quietMessage}</p></div></div> : null}
       {primary && inlineReview(primary)}
 
       {visibleMotion.length > 0 && <section className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2></div>{visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
