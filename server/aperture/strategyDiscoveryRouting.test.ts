@@ -21,7 +21,7 @@ describe("objective discovery production provider routing", () => {
     provider.generateContent.mockReset().mockResolvedValue({
       text: JSON.stringify({ schemaVersion: 1, searchScope: "broader_permitted_universe",
         reviewedUniverse: [], coverageGaps: ["Illustrative evidence does not establish a setup."], hypotheses: [] }),
-      candidates: [{ finishReason: "STOP" }],
+      candidates: [{ finishReason: "STOP", content: { parts: [{ text: "Illustrative structured response" }] } }],
     });
   });
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
@@ -45,6 +45,17 @@ describe("objective discovery production provider routing", () => {
 
   it.each(["MAX_TOKENS", "SAFETY", undefined])("rejects noncomplete provider output (%s)", async (finishReason) => {
     provider.generateContent.mockResolvedValue({ text: '{}', candidates: [{ finishReason }] });
+    const result = await discoverObjectiveMission({ requestId: "illustrative-diesel-routing",
+      mission: "Illustrative evidence only", searchScope: "broader_permitted_universe", permittedUniverse: [],
+      universePolicy: "cited_us_security_leads", holdingPeriods: ["intraday"], instrumentPreference: "shares" });
+    expect(result.context.classifierState.failures).toContain("invalid_classifier_response");
+    expect(result.payload).toBeNull();
+  });
+
+  it("rejects a text response accompanied by a function call rather than dropping it", async () => {
+    provider.generateContent.mockResolvedValue({ text: JSON.stringify({ schemaVersion: 1,
+      searchScope: "broader_permitted_universe", reviewedUniverse: [], coverageGaps: [], hypotheses: [] }),
+      candidates: [{ finishReason: "STOP", content: { parts: [{ text: "{}" }, { functionCall: { name: "unrequested", args: {} } }] } }] });
     const result = await discoverObjectiveMission({ requestId: "illustrative-diesel-routing",
       mission: "Illustrative evidence only", searchScope: "broader_permitted_universe", permittedUniverse: [],
       universePolicy: "cited_us_security_leads", holdingPeriods: ["intraday"], instrumentPreference: "shares" });

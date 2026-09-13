@@ -42,7 +42,10 @@ export async function classifyStrategyDiscovery(request: InvokeParams): Promise<
     },
   });
   // Never turn truncation, a safety refusal, or an absent candidate into success.
-  const complete = response.candidates?.length === 1 && response.candidates[0].finishReason === "STOP";
+  const parts = response.candidates?.[0]?.content?.parts;
+  const textOnly = !!parts?.length && parts.every(part => typeof part.text === "string"
+    && Object.keys(part).every(key => ["text", "thought", "thoughtSignature"].includes(key)));
+  const complete = response.candidates?.length === 1 && response.candidates[0].finishReason === "STOP" && textOnly;
   return {
     id: response.responseId ?? "discovery-classification",
     created: Date.now(), model: GEMINI_BALANCED,
