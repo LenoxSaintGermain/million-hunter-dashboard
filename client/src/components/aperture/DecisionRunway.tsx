@@ -28,6 +28,7 @@ type Props = {
   onOpenResearchRun: (runId: number) => void;
   receiptTarget?: { decisionRunId: number; revisionId: number } | null;
   missionHandoff?: CanonicalMissionHandoff | null;
+  onMissionRecorded?: (receipt: { decisionRunId: number; revisionId: number }) => void;
 };
 
 function parseMoney(value: string) {
@@ -68,14 +69,24 @@ function branchState(branch: Branch | string | null | undefined): WorkflowState 
   return "researchable";
 }
 
-export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget = null, missionHandoff = null }: Props) {
+export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget = null, missionHandoff = null, onMissionRecorded }: Props) {
   const utils = trpc.useUtils();
   const handoff = receiptTarget ? null : missionHandoff;
   const [handoffReceipt, setHandoffReceipt] = useState<{ decisionRunId: number; revisionId: number } | null>(null);
-  const { data: savedRunwayResponse, error: receiptError, isLoading: receiptLoading } = trpc.aperture.runway.latest.useQuery(receiptTarget ?? handoffReceipt ?? undefined, { retry: false });
+  const draftQuery = trpc.aperture.runway.draft.get.useQuery(undefined, { enabled: !receiptTarget, retry: false, refetchOnWindowFocus: false });
+  // Older handoff URLs predate durable receipt navigation. Only the completed,
+  // owner-scoped draft supplies a recovery candidate, never the latest receipt.
+  const completedValues = handoff && draftQuery.data?.completedAt != null
+    && draftQuery.data.values.canonicalThesisId === handoff.canonicalThesisId
+    && !draftQuery.data.values.strategyContext ? draftQuery.data.values : null;
+  const completedHandoffReceipt = completedValues?.baseDecisionRunId && completedValues.baseDecisionRevisionId
+    ? { decisionRunId: completedValues.baseDecisionRunId, revisionId: completedValues.baseDecisionRevisionId } : null;
+  const exactHandoffReceipt = handoffReceipt ?? completedHandoffReceipt;
+  const { data: savedRunwayResponse, error: receiptError, isLoading: receiptLoading } = trpc.aperture.runway.latest.useQuery(receiptTarget ?? exactHandoffReceipt ?? undefined, { retry: false });
   // A new-thesis handoff is not a request to revise whichever receipt was last.
-  const handoffReceiptMatches = handoffReceipt && savedRunwayResponse?.latest?.authority === "authoritative"
-    && savedRunwayResponse.latest.decisionRunId === handoffReceipt.decisionRunId && savedRunwayResponse.latest.decisionRevisionId === handoffReceipt.revisionId;
+  const handoffReceiptMatches = exactHandoffReceipt && savedRunwayResponse?.latest?.authority === "authoritative"
+    && savedRunwayResponse.latest.decisionRunId === exactHandoffReceipt.decisionRunId && savedRunwayResponse.latest.decisionRevisionId === exactHandoffReceipt.revisionId
+    && savedRunwayResponse.latest.canonicalThesisId === handoff?.canonicalThesisId && savedRunwayResponse.latest.capitalThesisId === handoff?.capitalThesisId;
   const runwayResponse = handoff && !handoffReceiptMatches && savedRunwayResponse ? { ...savedRunwayResponse, latest: null } : savedRunwayResponse;
   const receiptStructureInvalid = runwayResponse?.latest?.authority === "authoritative" && !validReceiptHorizonShape(runwayResponse.latest);
   const runway = receiptStructureInvalid ? undefined : runwayResponse;
@@ -86,7 +97,6 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const { data: capitalTheses } = capitalQuery;
   const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false });
   const { data: accounts } = accountQuery;
-  const draftQuery = trpc.aperture.runway.draft.get.useQuery(undefined, { enabled: !receiptTarget, retry: false, refetchOnWindowFocus: false });
   const handoffSource = handoff ? canonicalTheses?.find(item => item.id === handoff.canonicalThesisId
     && (item.access !== "shared" || item.sharePermission === "use")) : null;
   const handoffProjection = handoff ? capitalTheses?.find(item => item.id === handoff.capitalThesisId && item.sourceCompilationId === handoff.canonicalThesisId) : null;
@@ -94,6 +104,11 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     || canonicalQuery.isFetching || capitalQuery.isFetching || draftQuery.isFetching);
   const handoffError = handoff && !handoffReadsLoading && (!handoffSource || !handoffProjection)
     ? "The requested thesis and projection could not be verified together in your saved library. No saved Mission or draft has been replaced." : null;
+  useEffect(() => {
+    if (completedHandoffReceipt && !handoffReceipt && !handoffReadsLoading && !handoffError
+      && !receiptError && !receiptStructureInvalid && handoffReceiptMatches) onMissionRecorded?.(completedHandoffReceipt);
+  }, [completedHandoffReceipt?.decisionRunId, completedHandoffReceipt?.revisionId, handoffReceipt, handoffReadsLoading,
+    handoffError, receiptError, receiptStructureInvalid, handoffReceiptMatches, onMissionRecorded]);
   // Never reinterpret an objective receipt as the profile's active thesis.
   // A newer unfinished draft still wins on Mission; an exact receipt link does not.
   const objectiveReceipt = runway?.latest?.authority === "authoritative" && runway.latest.contextKind === "objective" ? runway.latest : null;
@@ -231,11 +246,28 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     { decisionRunId: currentDecisionRunId ?? 0 },
     { enabled: currentDecisionRunId != null, retry: false },
   );
+  const jobVisibilityWindow = useRef({ key: "", until: 0 });
+  useEffect(() => {
+    const key = `${currentDecisionRunId}:${currentDecisionRevisionId}`;
+    if (jobVisibilityWindow.current.key !== key) jobVisibilityWindow.current = { key, until: Date.now() + 30_000 };
+  }, [currentDecisionRunId, currentDecisionRevisionId]);
   const underwritingJob = trpc.aperture.underwriter.status.useQuery(
     { decisionRunId: currentDecisionRunId ?? 0, decisionRevisionId: currentDecisionRevisionId ?? 0 },
     { enabled: currentDecisionRunId != null && currentDecisionRevisionId != null, retry: false,
-      refetchInterval: (query) => query.state.data?.state === "running" ? 3000 : false },
+      refetchInterval: (query) => query.state.data?.state === "running"
+        || (receiptTarget && query.state.data?.state === "not_started" && Date.now() < jobVisibilityWindow.current.until) ? 3000 : false },
   );
+  const refreshedCompletion = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentDecisionRunId == null || currentDecisionRevisionId == null || underwritingJob.data?.state !== "complete") return;
+    const key = `${currentDecisionRunId}:${currentDecisionRevisionId}:${underwritingJob.data.updatedAt}`;
+    if (refreshedCompletion.current === key) return;
+    refreshedCompletion.current = key;
+    // A reloaded page has no original mutation promise to publish its result.
+    // Refresh this saved result once per completed job, never rerun analysis.
+    void utils.aperture.underwriter.get.invalidate({ decisionRunId: currentDecisionRunId }).catch(() => undefined);
+  }, [currentDecisionRunId, currentDecisionRevisionId, underwritingJob.data?.state, underwritingJob.data?.updatedAt, utils]);
+  const unchangedResearchReceipt = !!receiptTarget && runway?.latest?.branch === "research" && !underwritingDirty && !revisingReceipt;
   const underwritingTaskPath = currentDecisionRunId != null && currentDecisionRevisionId != null
     ? aperturePathForFixture(`/aperture/decision/${currentDecisionRunId}/revision/${currentDecisionRevisionId}/underwrite`, readIsolatedUatIdentity()) : null;
   const jobNeedsReconciliation = currentDecisionRunId != null && (underwritingJob.data?.state === "running" || underwritingJob.data?.state === "failed" || underwritingJob.data?.state === "interrupted");
@@ -315,6 +347,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   };
 
   const commitOnce = async () => {
+    if (unchangedResearchReceipt) return toast.info("This Mission is already recorded. Review its saved underwriting task; do not create it again.");
     if (missionContextLoading || missionContextError || draftError || draftConflict) return toast.error("Restore or save the Mission draft before starting analysis.");
     if (horizonMismatch) return toast.info("Resolve the primary/underwriting horizon mismatch in Review & underwrite before starting a new analysis.");
     if (needsRevisionReview) return toast.info("Review the changed Mission assumptions before applying this revision.");
@@ -396,6 +429,16 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
       // was used. Another device's intervening edit remains intact.
       completedDraftRef.current = true;
       if (handoff) setHandoffReceipt({ decisionRunId: receipt.decisionRunId, revisionId: receipt.revisionId });
+      // Dispatch the already-authorized job before route replacement unmounts
+      // this form. Attach a rejection handler immediately while draft retirement
+      // finishes; neither navigation nor retirement may initiate a second run.
+      const launchUnderwriting = () => runUnderwriting.mutateAsync({
+        decisionRunId: receipt.decisionRunId, decisionRevisionId: receipt.revisionId,
+        requestedPlayCount: 3, uatCase: uatCase ?? undefined,
+      });
+      const launchedUnderwriting = handoff && branch === "research"
+        ? launchUnderwriting().then(() => ({ ok: true as const }), error => ({ ok: false as const, error })) : null;
+      if (handoff) onMissionRecorded?.({ decisionRunId: receipt.decisionRunId, revisionId: receipt.revisionId });
       setBaseMission({ decisionRunId: receipt.decisionRunId, decisionRevisionId: receipt.revisionId });
       hydratedDecisionRevisionId.current = receipt.revisionId;
       if (confirmedDraft) {
@@ -417,12 +460,10 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
           description: "No research run, paper ticket, approval, submission, or broker order has been created.",
         });
         try {
-          await runUnderwriting.mutateAsync({
-            decisionRunId: receipt.decisionRunId,
-            decisionRevisionId: receipt.revisionId,
-            requestedPlayCount: 3,
-            uatCase: uatCase ?? undefined,
-          });
+          if (launchedUnderwriting) {
+            const outcome = await launchedUnderwriting;
+            if (!outcome.ok) throw outcome.error;
+          } else await launchUnderwriting();
           await Promise.all([
             utils.aperture.underwriter.get.invalidate({ decisionRunId: receipt.decisionRunId }),
             utils.aperture.desk.summary.invalidate(),
@@ -532,7 +573,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     // One hydration decision. Late receipt/projection queries must never replace
     // a resumed draft or edits the operator has already made in this view.
     const receiptAlreadyLoaded = receiptTarget != null && hydratedDecisionRevisionId.current === receiptTarget.revisionId;
-    if ((receiptTarget ? receiptAlreadyLoaded : draftInitialized) || handoffReadsLoading || handoffError || receiptLoading || (!receiptTarget && draftQuery.isLoading)
+    if ((receiptTarget ? receiptAlreadyLoaded : draftInitialized) || completedHandoffReceipt || handoffReadsLoading || handoffError || receiptLoading || (!receiptTarget && draftQuery.isLoading)
       || canonicalQuery.isLoading || capitalQuery.isLoading || accountQuery.isLoading
       || receiptStructureInvalid || receiptError || (!receiptTarget && draftQuery.isError) || canonicalQuery.isError || capitalQuery.isError || accountQuery.isError) return;
     if (receiptTarget && (runway?.latest?.authority !== "authoritative" || runway.latest.decisionRevisionId !== receiptTarget.revisionId)) return;
@@ -611,7 +652,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     setMissionDirty(true); // Immutable receipt text must never be regenerated from parameter defaults.
     setUnderwritingDirty(false);
     setRevisingReceipt(false);
-  }, [receiptTarget, draftInitialized, receiptLoading, receiptError, draftQuery.data, draftQuery.isLoading, draftQuery.isError, canonicalQuery.isLoading, canonicalQuery.isError, capitalQuery.isLoading, capitalQuery.isError, accountQuery.isLoading, accountQuery.isError, runway?.latest, projection, handoffReadsLoading, handoffError]);
+  }, [receiptTarget, draftInitialized, receiptLoading, receiptError, draftQuery.data, draftQuery.isLoading, draftQuery.isError, canonicalQuery.isLoading, canonicalQuery.isError, capitalQuery.isLoading, capitalQuery.isError, accountQuery.isLoading, accountQuery.isError, runway?.latest, projection, handoffReadsLoading, handoffError, completedHandoffReceipt?.decisionRunId, completedHandoffReceipt?.revisionId]);
   const plannedRiskCeiling = cockpit.data?.headroom.lines.find((line) => line.key === "planned_risk_per_play")?.ceilingCents ?? null;
   const concentrationLine = cockpit.data?.headroom.lines.find((line) => /single name/i.test(line.label)) ?? null;
   const receiptActive = !receiptTarget && !revisingReceipt && currentBindingMatches && (latestBranch === "cash" || latestBranch === "conditional");
@@ -772,6 +813,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const feasibilityHasExplicitTarget = feasibilityForDisplay?.targetProfitCents != null && feasibilityForDisplay.targetPeriod != null;
   const primaryActionBlocker = missionContextError
     ? "Saved context is unavailable. Refresh saved context; your visible edits will not be replaced."
+    : unchangedResearchReceipt ? "This Mission is already recorded. Open the saved underwriting task to check progress; no new analysis will start here."
     : draftError ? "Resolve the draft save issue above before continuing."
     : draftConflict ? "Review the other device's draft before continuing."
     : horizonMismatch ? "Primary and underwriting horizons disagree. Inspect both in Review & underwrite and explicitly choose the intended scope."
@@ -856,6 +898,13 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
       </details>
     </section>;
   }
+  if (completedHandoffReceipt && !handoffReceipt) {
+    const recovering = handoffReadsLoading || receiptLoading || (handoffReceiptMatches && !missionContextError);
+    return <section role={recovering ? "status" : "alert"} className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-border-1)" }}>
+      <h2 className="font-semibold">{recovering ? "Opening saved Mission receipt…" : "Saved Mission needs verification"}</h2>
+      <p>This draft already recorded a Mission. No new Mission or analysis will start. {recovering ? "Checking the exact saved revision." : "The saved revision could not be verified against this thesis and projection. Open the saved Mission from Today; do not create it again."}</p>
+    </section>;
+  }
   if (missionContextLoading || (receiptTarget && (receiptLoading || (!receiptError && immutableReceipt?.binding && hydratedDecisionRevisionId.current !== receiptTarget.revisionId)))) {
     return <section role="status" aria-live="polite" className="mx-auto max-w-3xl rounded-2xl border p-6 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>{receiptTarget ? "Loading immutable decision receipt…" : "Loading saved Mission and draft… No new analysis is starting."}</section>;
   }
@@ -887,7 +936,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     {!receiptTarget && <div className="flex flex-wrap items-center justify-between gap-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}><p><strong style={{ color: "var(--sh-text-primary)" }}>{paperAccount?.label ?? "Select paper account"}</strong> · Paper</p><p role="status" aria-live="polite">{draftError ? "Draft not saved" : draftState === "saving" ? "Saving draft…" : draftState === "saved" ? `Saved · ${new Date(savedDraft!.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : draftTouched ? "Changes not yet saved" : handoff ? "New Mission draft · not saved" : savedDraft?.completedAt != null ? "From your saved Mission" : "Draft saves as you edit"}</p></div>}
     {missionContextError && draftInitialized && <div role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)" }}><p>Saved context could not be refreshed. Your last loaded values remain visible; underwriting is withheld.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void refreshMissionContext()}>Refresh saved context</Button></div>}
     {draftError && <section role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-semibold">{draftConflict ? (handoff ? "Choose which Mission draft to continue" : "Another device changed this draft") : "Draft save needs attention"}</h2><p className="mt-2 leading-6">{draftError}</p>{draftConflict ? <><p className="mt-2">Your edits are still here. Compare before choosing which version to keep.</p>{remoteDraft ? <><DraftDifference local={draftValues} remote={remoteDraft.values} /><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" className="min-h-11" onClick={useRemoteDraft}>Use saved draft</Button><Button className="min-h-11" onClick={() => void saveReviewedLocalDraft()}>Save these edits as a new revision</Button></div></> : <Button variant="outline" className="mt-3 min-h-11" onClick={() => void utils.aperture.runway.draft.get.fetch().then(setRemoteDraft).catch(() => toast.error("The saved draft could not be loaded. Your edits remain here."))}>Load saved draft for comparison</Button>}</> : !completedDraftRef.current ? <Button variant="outline" className="mt-3 min-h-11" onClick={() => void retryDraft()}>Retry saving draft</Button> : <Button variant="outline" className="mt-3 min-h-11" onClick={() => window.location.reload()}>Reload saved Mission</Button>}</section>}
-    {(jobNeedsReconciliation || runUnderwriting.error || underwritingStructureInvalid) && underwritingTaskPath && <section role="status" aria-live="polite" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}><h2 className="font-semibold">Saved underwriting task</h2><p className="mt-2 leading-6">{underwritingStructureInvalid ? "The saved result has malformed horizon data. Reload its corrected record; do not restart the completed job." : underwritingJob.data?.message ?? "The analysis response was interrupted. Check actual progress before retrying."}</p><Button className="mt-3 min-h-11" onClick={() => window.location.assign(underwritingTaskPath)}>{underwritingJob.data?.state === "running" ? "View underwriting progress" : "Review underwriting task"}</Button><p className="mt-2">Leaving this view does not cancel the task. No paper ticket has been requested.</p></section>}
+    {(unchangedResearchReceipt || jobNeedsReconciliation || runUnderwriting.error || underwritingStructureInvalid) && underwritingTaskPath && <section role="status" aria-live="polite" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}><h2 className="font-semibold">Saved underwriting task</h2><p className="mt-2 leading-6">{underwritingStructureInvalid ? "The saved result has malformed horizon data. Reload its corrected record; do not restart the completed job." : underwritingJob.data?.message ?? "Checking the saved analysis. No new analysis will start."}</p><Button className="mt-3 min-h-11" onClick={() => window.location.assign(underwritingTaskPath)}>{underwritingJob.data?.state === "running" ? "View underwriting progress" : "Review underwriting task"}</Button><p className="mt-2">Leaving this view does not cancel the task. No paper ticket has been requested.</p></section>}
     <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm">Saved context & provenance</summary><div className="grid gap-px overflow-hidden rounded-b-xl border-t md:grid-cols-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
       {[
         ["Assigned thesis · from saved thesis", activeThesis?.name ?? "Not assigned"],

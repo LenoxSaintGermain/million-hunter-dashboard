@@ -17,7 +17,7 @@ describe("guided underwriting and returning check-in UX contracts", () => {
     const runway = read("client/src/components/aperture/DecisionRunway.tsx");
     const mission = read("client/src/pages/aperture/ApertureMission.tsx");
     const saveIndex = runway.indexOf("await saveMission.mutateAsync");
-    const underwriteIndex = runway.indexOf("await runUnderwriting.mutateAsync", saveIndex);
+    const underwriteIndex = runway.indexOf("runUnderwriting.mutateAsync", saveIndex);
 
     expect(saveIndex).toBeGreaterThan(-1);
     expect(underwriteIndex).toBeGreaterThan(saveIndex);

@@ -45,6 +45,7 @@ export default function ApertureMission() {
       key={receiptTarget ? `receipt:${receiptTarget.decisionRunId}:${receiptTarget.revisionId}` : handoff ? `canonical:${handoff.canonicalThesisId}:${handoff.capitalThesisId}` : "mission"}
       receiptTarget={receiptTarget}
       missionHandoff={handoff}
+      onMissionRecorded={({ decisionRunId, revisionId }) => navigate(`/aperture/decision/${decisionRunId}/revision/${revisionId}`, { replace: true })}
       onNewResearch={() => navigate("/aperture?setup=1&draft=1")}
       onOpenResearchRun={(runId) => navigate(`/aperture/run/${runId}`)}
     />}

@@ -1,5 +1,21 @@
 # Capital Aperture guided UX walkthrough
 
+## September 13: canonical Mission resume invariant
+
+New-thesis entry carries the exact canonical source and Capital projection.
+After the operator records a Mission, its address must become the exact saved
+decision/revision, not retain a new-setup intent. The already-authorized analysis
+is launched once; returning to that address reads its job and result, never
+creates a second Mission. An older handoff address may recover through its
+owner-scoped completed draft only after all source, projection and receipt
+identities agree. A mismatch remains blocked with a recovery explanation.
+
+Live new-thesis testing exposed the completed-reload defect after the initial
+handoff fix. The [new-thesis UAT receipt](qa/CAPITAL_APERTURE_NEW_THESIS_UAT_2026-09-13.md)
+records both failures and subsequent validation rather than treating a unit-test
+pass as end-to-end acceptance. No-trade is a valid result when measured capacity
+is exhausted; it is not evidence that research or execution was completed.
+
 ## September 12: Portfolio clarity follow-up
 
 Portfolio now leads with account balances, connection status and last refresh.

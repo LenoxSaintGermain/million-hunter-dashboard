@@ -2,7 +2,7 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { load } from "cheerio";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { calculateTargetFeasibility } from "../../shared/playUnderwriting";
+import { calculateTargetFeasibility, underwritePlayCandidates, type MarketRegimeSnapshot } from "../../shared/playUnderwriting";
 import { emptyMissionDraftValues } from "../../shared/apertureMissionDraft";
 import { DecisionRunway } from "../../client/src/components/aperture/DecisionRunway";
 import ApertureMission from "../../client/src/pages/aperture/ApertureMission";
@@ -16,9 +16,10 @@ const fixture = vi.hoisted(() => ({
   headings: {} as Record<string, any>, lookupHeading: vi.fn(),
   objectiveFlow: vi.fn(),
   search: "",
+  receiptParams: null as null | { decisionRunId: string; revisionId: string }, queryCalls: vi.fn(), queryOptions: {} as Record<string, any>,
 }));
 vi.mock("wouter", () => ({ useLocation: () => ["/aperture/mission", fixture.openResearch],
-  useSearch: () => fixture.search, useRoute: () => [false, null] }));
+  useSearch: () => fixture.search, useRoute: () => [!!fixture.receiptParams, fixture.receiptParams] }));
 vi.mock("@/components/DashboardLayout", () => ({ default: ({ children }: any) => React.createElement("main", null, children) }));
 // This suite checks the parent handoff; the connected child has its own journey
 // tests, including failed refresh and draft/job reconciliation.
@@ -54,7 +55,7 @@ vi.mock("react", async (importOriginal) => {
 vi.mock("sonner", () => ({ toast: { success: fixture.success, error: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
 vi.mock("@/lib/trpc", () => {
   const endpoint = (name: string): any => ({
-    useQuery: () => fixture.queries[name], useMutation: () => fixture.mutations[name],
+    useQuery: (input: any, options: any) => { fixture.queryCalls(name, input); fixture.queryOptions[name] = options; return fixture.queries[name]; }, useMutation: () => fixture.mutations[name],
     invalidate: fixture.invalidate, setData: vi.fn(), fetch: vi.fn().mockResolvedValue(null),
   });
   const thesis = { list: endpoint("canonical"), activeCapital: endpoint("active"), createCapital: endpoint("create"), useInAperture: endpoint("project") };
@@ -88,7 +89,11 @@ function render(fromPage = false) {
     const tree = DecisionRunway(props);
     fixture.active = false;
     if (!fixture.effects.length) return { tree, $: load(renderToStaticMarkup(tree)) };
+    const before = [...fixture.slots];
     fixture.effects.splice(0).forEach(effect => effect());
+    // Effects alone do not rerender React. Only changed state does; fresh
+    // parent callback/route objects must not manufacture infinite hydration.
+    if (before.every((value, index) => Object.is(value, fixture.slots[index]))) return { tree, $: load(renderToStaticMarkup(tree)) };
   }
   throw new Error("Mission hydration did not settle");
 }
@@ -110,6 +115,7 @@ beforeEach(() => {
   vi.stubGlobal("document", { getElementById: fixture.lookupHeading });
   fixture.active = false; fixture.slots = []; fixture.deps = []; fixture.effects = []; fixture.cleanups = [];
   fixture.search = "";
+  fixture.receiptParams = null;
   fixture.queries = {
     capabilities: query({ enabled: true }),
     latest: query({ activeCanonicalThesisId: 720001, latest: null }), pending: query([]),
@@ -146,6 +152,102 @@ function canonicalHandoff() {
 }
 
 describe("persisted Mission disposition context", () => {
+  it("durably replaces the canonical handoff immediately after begin, with the authorized job already launched", async () => {
+    canonicalHandoff(); setDraft("research");
+    fixture.queries.draft.data.values.canonicalThesisId = 780001;
+    let finishDraft!: (value: any) => void, finishJob!: (value: any) => void;
+    fixture.mutations.completeDraft.mutateAsync.mockImplementation(() => new Promise(resolve => { finishDraft = resolve; }));
+    fixture.mutations.run.mutateAsync.mockImplementation(() => new Promise(resolve => { finishJob = resolve; }));
+    const view = render(true);
+    const submit = elements(view.tree).find(element => element.props.id === "mission-primary-action")!;
+    expect(submit.props.disabled).toBe(false);
+    const action = submit.props.onClick();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fixture.openResearch).toHaveBeenCalledWith("/aperture/decision/77/revision/88", { replace: true });
+    expect(fixture.mutations.run.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(fixture.mutations.run.mutateAsync).toHaveBeenCalledWith({ decisionRunId: 77, decisionRevisionId: 88, requestedPlayCount: 3, uatCase: undefined });
+    expect(fixture.mutations.run.mutateAsync.mock.invocationCallOrder[0]).toBeLessThan(fixture.openResearch.mock.invocationCallOrder[0]);
+    finishDraft({ ...fixture.queries.draft.data, completedAt: now }); finishJob({}); await action;
+    expect(fixture.mutations.begin.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(fixture.mutations.run.mutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["running", "complete"])("recovers the old handoff URL through its completed draft's exact receipt while the job is %s", state => {
+    canonicalHandoff();
+    fixture.queries.draft.data.completedAt = now;
+    Object.assign(fixture.queries.draft.data.values, { canonicalThesisId: 780001, baseDecisionRunId: 810001, baseDecisionRevisionId: 1140001 });
+    // The first query still contains the unrelated, older discovery receipt.
+    let view = render(true);
+    expect(fixture.queryCalls).toHaveBeenCalledWith("latest", { decisionRunId: 810001, revisionId: 1140001 });
+    expect(fixture.openResearch).not.toHaveBeenCalled();
+    expect(view.$("#mission-primary-action")).toHaveLength(0);
+    fixture.queries.latest.data.latest = { ...fixture.queries.latest.data.latest, contextKind: "thesis", discoveryContext: undefined,
+      decisionRunId: 810001, decisionRevisionId: 1140001, canonicalThesisId: 780001, capitalThesisId: 450001,
+      missionText: "Illustrative saved completed diesel Mission", instrumentPreference: "shares", holdingPeriod: "swing", holdingPeriods: ["swing"] };
+    render(true);
+    expect(fixture.openResearch).toHaveBeenCalledWith("/aperture/decision/810001/revision/1140001", { replace: true });
+    // A fresh page mount from that durable URL reads the same saved job only.
+    fixture.cleanups.forEach(cleanup => cleanup?.()); fixture.cleanups = []; fixture.slots = []; fixture.deps = []; fixture.effects = [];
+    fixture.receiptParams = { decisionRunId: "810001", revisionId: "1140001" }; fixture.search = "";
+    fixture.queries.job = query({ state, message: "Illustrative saved job", decisionRunId: 810001, decisionRevisionId: 1140001 });
+    view = render(true);
+    expect(view.$.text()).toContain("Illustrative saved completed diesel Mission");
+    if (state === "running") expect(view.$.text()).toContain("Saved underwriting task");
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it.each(["canonicalThesisId", "capitalThesisId", "decisionRunId", "decisionRevisionId"])("rejects completed handoff recovery with mismatched %s", key => {
+    canonicalHandoff(); fixture.queries.draft.data.completedAt = now;
+    Object.assign(fixture.queries.draft.data.values, { canonicalThesisId: 780001, baseDecisionRunId: 810001, baseDecisionRevisionId: 1140001 });
+    Object.assign(fixture.queries.latest.data.latest, { canonicalThesisId: 780001, capitalThesisId: 450001, decisionRunId: 810001, decisionRevisionId: 1140001, [key]: 999 });
+    const view = render(true);
+    expect(fixture.openResearch).not.toHaveBeenCalled();
+    expect(view.$("#mission-primary-action")).toHaveLength(0);
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("refreshes the exact saved result once when a reloaded job transitions from running to complete", () => {
+    canonicalHandoff();
+    fixture.receiptParams = { decisionRunId: "810001", revisionId: "1140001" };
+    Object.assign(fixture.queries.latest.data.latest, { contextKind: "thesis", discoveryContext: undefined,
+      decisionRunId: 810001, decisionRevisionId: 1140001, canonicalThesisId: 780001, capitalThesisId: 450001,
+      missionText: "Illustrative saved completed diesel Mission", instrumentPreference: "shares", holdingPeriod: "swing", holdingPeriods: ["swing"],
+      deployableCapitalCents: objective.deployableCapitalCents, maxPlannedLossCents: objective.maxPlannedLossCents,
+      targetProfitCents: objective.targetProfitCents, targetPeriod: objective.targetPeriod });
+    fixture.queries.job = query({ state: "running", updatedAt: now });
+    render(true);
+    expect(fixture.queryOptions.job.refetchInterval({ state: { data: { state: "running" } } })).toBe(3000);
+    expect(fixture.invalidate).not.toHaveBeenCalled();
+    fixture.queries.job.data = { state: "complete", updatedAt: now + 1 };
+    render(true);
+    expect(fixture.invalidate).toHaveBeenCalledTimes(1);
+    expect(fixture.invalidate).toHaveBeenCalledWith({ decisionRunId: 810001 });
+    const metric = { direction: "unknown", value: null, asOf: null, freshness: "unknown", source: "Illustrative fixture" };
+    const market = { asOf: now, marketSession: "closed", indexTrend: { spy: metric, qqq: metric, iwm: metric }, keyThemes: [], catalysts: [], regime: "unknown", confidence: 0 } as MarketRegimeSnapshot;
+    fixture.queries.underwriting = query({ ...underwritePlayCandidates({ now, market, candidates: [], objective, risk }), decisionRunId: 810001, decisionRevisionId: 1140001, selectedPlayId: null });
+    const view = render(true); render(true);
+    expect(view.$('[aria-label="Completed mission"]')).toHaveLength(1);
+    expect(view.$.text()).toContain("No new trade");
+    expect(fixture.invalidate).toHaveBeenCalledTimes(1);
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("does not enable duplicate begin while the launched job is not yet visible after receipt navigation", async () => {
+    canonicalHandoff(); fixture.receiptParams = { decisionRunId: "810001", revisionId: "1140001" };
+    Object.assign(fixture.queries.latest.data.latest, { contextKind: "thesis", discoveryContext: undefined, decisionRunId: 810001, decisionRevisionId: 1140001,
+      canonicalThesisId: 780001, capitalThesisId: 450001, missionText: "Illustrative recorded diesel mission awaiting worker visibility." });
+    fixture.queries.job = query({ state: "not_started" });
+    const view = render(true);
+    const submit = elements(view.tree).find(element => element.props.id === "mission-primary-action")!;
+    expect(submit.props.disabled).toBe(true);
+    await submit.props.onClick();
+    expect(fixture.mutations.begin.mutateAsync).not.toHaveBeenCalled();
+    expect(fixture.mutations.run.mutateAsync).not.toHaveBeenCalled();
+    expect(fixture.queryOptions.job.refetchInterval({ state: { data: { state: "not_started" } } })).toBe(3000);
+    vi.setSystemTime(now + 30_001);
+    expect(fixture.queryOptions.job.refetchInterval({ state: { data: { state: "not_started" } } })).toBe(false);
+    expect(fixture.queryOptions.job.refetchInterval({ state: { data: { state: "running" } } })).toBe(3000);
+  });
   it.each(["missing source", "missing projection", "mismatched projection", "view-only source"])("fails closed for a handoff with %s", async condition => {
     canonicalHandoff();
     if (condition === "missing source") fixture.queries.canonical.data.pop();
