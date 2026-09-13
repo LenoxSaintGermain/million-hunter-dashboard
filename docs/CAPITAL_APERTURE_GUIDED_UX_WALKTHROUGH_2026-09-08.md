@@ -769,3 +769,24 @@ distance-to-stop, trading hotkeys, cancel/replace, enlarged-text/screen-reader
 acceptance and authenticated market-open end-to-end execution. No current
 eligibility or positive expectancy is inferred from this fixture. No production
 review, position, approval, submission or account setting was changed.
+
+## Diesel Mission recovery — authenticated production retest, 2026-09-13
+
+Release `a8aec3b` / `capital-aperture-00148-zif` repairs the real discovery provider
+route, strict response handling, objective-draft restoration, accurate saving
+copy, stale-account recovery links and account/cockpit cache invalidation.
+The diagnosing-bugs workflow reproduced routing, schema-complexity and non-text
+response failures before each fix; authoritative evidence validation is unchanged.
+
+The operator-authorized $2,000 / $200 diesel Mission now reaches two explicitly
+unverified leads plus one recorded rejection. Selecting one lead opens its exact
+saved child analysis. That analysis correctly concludes no new trade at $0
+measured portfolio headroom. Reopening, reloading and returning from Portfolio
+preserve the selected task without duplicate analysis. Seven existing broker-order
+records are unchanged. Narrow/desktop screenshots and exact receipts are in
+[the recovery report](qa/CAPITAL_APERTURE_DIESEL_RECOVERY_2026-09-13.md).
+
+The research-to-underwriter technical path passed this bounded retest; evidence
+remains incomplete. Global active-thesis labeling and long accepted-prompt density
+remain UX follow-ups. This is not a market-open ticket/approval/submission pass,
+physical-device acceptance or a user-tested speed-to-decision claim.
