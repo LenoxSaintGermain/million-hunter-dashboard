@@ -6,7 +6,7 @@ import { CapitalThesisWorkspace, thesisDraftValidation } from "../../client/src/
 // providers, or a database. It does not claim DOM focus/accessibility coverage.
 const fixture = vi.hoisted(() => ({
   states: [] as any[], cursor: 0, effectCursor: 0, deps: [] as any[], effects: [] as Array<() => void>,
-  theses: [] as any[], create: vi.fn(), activate: vi.fn(), project: vi.fn(), navigate: vi.fn(), invalidate: vi.fn(),
+  search: "", theses: [] as any[], create: vi.fn(), activate: vi.fn(), project: vi.fn(), navigate: vi.fn(), invalidate: vi.fn(),
 }));
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof React>();
@@ -23,10 +23,10 @@ vi.mock("react", async (importOriginal) => {
     },
   };
 });
-vi.mock("wouter", () => ({ useLocation: () => ["/thesis", fixture.navigate] }));
+vi.mock("wouter", () => ({ useLocation: () => ["/thesis", fixture.navigate], useSearch: () => fixture.search }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
 vi.mock("@/lib/trpc", () => ({ trpc: {
-  useUtils: () => ({ thesis: { list: { invalidate: fixture.invalidate } } }),
+  useUtils: () => ({ thesis: { list: { invalidate: fixture.invalidate }, activeCapital: { invalidate: fixture.invalidate } }, aperture: { thesis: { list: { invalidate: fixture.invalidate } }, runway: { latest: { invalidate: fixture.invalidate } } } }),
   thesis: { list: { useQuery: () => ({ data: fixture.theses, isLoading: false }) },
     createCapital: { useMutation: () => ({ mutateAsync: fixture.create, isPending: false }) },
     setActiveCapital: { useMutation: () => ({ mutateAsync: fixture.activate, isPending: false }) },
@@ -53,8 +53,40 @@ const saved = { id: 720001, name: "Saved illustrative belief", thesisText: "Oper
 describe("new thesis defaults and preserved drafts", () => {
   beforeEach(() => {
     vi.stubGlobal("React", React);
-    fixture.states = []; fixture.cursor = 0; fixture.effectCursor = 0; fixture.deps = []; fixture.effects = []; fixture.theses = [];
+    fixture.states = []; fixture.cursor = 0; fixture.effectCursor = 0; fixture.deps = []; fixture.effects = []; fixture.theses = []; fixture.search = "";
     vi.clearAllMocks(); fixture.create.mockResolvedValue({ compilationId: 1, persistedName: "Draft", nameMatchesRequest: true });
+    fixture.project.mockResolvedValue({ sourceCompilationId: 1, apertureThesisId: 42, compilerStatus: "ready", missingFields: [], incompatibilities: [] });
+  });
+  it("opens the new composer directly even when another thesis is active", () => {
+    fixture.search = "new=1"; fixture.theses = [saved];
+    const tree = render();
+    expect(input(tree, "Thesis statement")?.props.value).toBe("");
+    expect(input(tree, "Thesis name")?.props.value).toBe("");
+    expect(fixture.create).not.toHaveBeenCalled();
+    expect(fixture.activate).not.toHaveBeenCalled();
+  });
+  it("hands the saved source and projection to Mission rather than resuming Today", async () => {
+    let tree = render();
+    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); tree = render();
+    button(tree, "Save and use in Capital Mission").props.onClick();
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    expect(fixture.navigate).toHaveBeenCalledWith("/aperture/mission?canonicalThesisId=1&capitalThesisId=42&newMission=1");
+  });
+  it("does not hand off an unrelated projection", async () => {
+    fixture.project.mockResolvedValue({ sourceCompilationId: 999, apertureThesisId: 42, compilerStatus: "ready", missingFields: [], incompatibilities: [] });
+    let tree = render();
+    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); tree = render();
+    button(tree, "Save and use in Capital Mission").props.onClick();
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    expect(fixture.navigate).not.toHaveBeenCalled();
+  });
+  it("blocks missing research scope even when provider compilation completed", async () => {
+    fixture.project.mockResolvedValue({ sourceCompilationId: 1, apertureThesisId: 42, compilerStatus: "compiled", missingFields: ["Recover the research universe in a new thesis version"], incompatibilities: [] });
+    let tree = render();
+    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); tree = render();
+    button(tree, "Save and use in Capital Mission").props.onClick();
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    expect(fixture.navigate).not.toHaveBeenCalled();
   });
   it("cannot save an empty or whitespace-only statement even when invoking the disabled handler", async () => {
     let tree = render();
@@ -113,5 +145,23 @@ describe("new thesis defaults and preserved drafts", () => {
     expect(thesisDraftValidation("x".repeat(20), "x".repeat(4001), "")).toContain("4,000");
     expect(thesisDraftValidation("x".repeat(20), "x".repeat(20), "n".repeat(121))).toContain("120");
     expect(thesisDraftValidation("x".repeat(20), "x".repeat(4000), "n".repeat(120))).toBeNull();
+  });
+  it("keeps descriptive research scope separate from declared tickers", async () => {
+    let tree = render();
+    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } });
+    button(tree, "Add thesis detail").props.onClick(); tree = render();
+    const scope = "Liquid U.S.-listed refiners and diesel-sensitive transport businesses; verify mappings first.";
+    input(tree, "Research scope (optional)").props.onChange({ target: { value: scope } }); tree = render();
+    button(tree, "Save without starting a run").props.onClick(); await Promise.resolve();
+    expect(fixture.create).toHaveBeenCalledWith(expect.objectContaining({ details: expect.objectContaining({ researchUniverse: scope, symbols: "" }) }));
+  });
+  it("asks for correction rather than saving prose as ticker declarations", async () => {
+    let tree = render();
+    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } });
+    button(tree, "Add thesis detail").props.onClick(); tree = render();
+    input(tree, "Ticker symbols (optional)").props.onChange({ target: { value: "Liquid U.S.-listed refiners and diesel-sensitive transport businesses" } }); tree = render();
+    button(tree, "Save without starting a run").props.onClick(); await Promise.resolve();
+    expect(fixture.create).not.toHaveBeenCalled();
+    expect(text(tree)).toContain("Put company descriptions in Research scope instead");
   });
 });

@@ -93,27 +93,30 @@ export function normalizeThesisRecord(value: unknown): { value: Record<string, u
 }
 
 /** The only Capital thesis shape that may reach React consumers. */
-export function normalizeCapitalThesisRead<T extends { confidenceNotes?: unknown; graph?: unknown }>(row: T): Omit<T, "confidenceNotes" | "graph"> & {
+export function normalizeCapitalThesisRead<T extends { confidenceNotes?: unknown; graph?: unknown; rawText?: unknown }>(row: T): Omit<T, "confidenceNotes" | "graph"> & {
   confidenceNotes: string[];
   graph: T["graph"];
   readDiagnostics: CanonicalThesisReadDiagnostics;
 } {
   const confidence = normalizeThesisStringList(row.confidenceNotes);
   const graph = normalizeThesisRecord(row.graph);
+  const scope = graph.value ? repairCapitalThesisResearchScope(graph.value, row.rawText) : null;
   return {
     ...row,
     confidenceNotes: confidence.value,
-    graph: graph.value as T["graph"],
+    graph: (graph.value && scope ? { ...graph.value, researchSymbols: scope.researchSymbols, researchUniverse: scope.researchUniverse,
+      researchUniverseNeedsReview: scope.symbolsWithheld && !scope.researchUniverse } : graph.value) as T["graph"],
     readDiagnostics: {
       confidenceNotes: confidence.diagnostic,
       graph: graph.diagnostic,
-      collections: {},
+      collections: scope?.symbolsWithheld ? { researchSymbols: unknownDiagnostic(classify(graph.value?.researchSymbols)) } : {},
     } satisfies CanonicalThesisReadDiagnostics,
   };
 }
 
 /** The canonical compilation list shares the same collection discipline. */
 export function normalizeCanonicalThesisRead(input: {
+  thesisText?: unknown;
   confidenceNotes: unknown;
   compiledFilters: unknown;
   scoringWeights: unknown;
@@ -125,9 +128,14 @@ export function normalizeCanonicalThesisRead(input: {
   const scoringWeights = normalizeThesisArray(input.scoringWeights);
   const evidenceRequirements = normalizeThesisStringList(input.evidenceRequirements);
   const autoDisqualifiers = normalizeThesisStringList(input.autoDisqualifiers);
+  const filters = compiledFilters.value ?? {};
+  const scope = repairCapitalThesisResearchScope(filters, input.thesisText);
+  const hasCapitalScope = "researchSymbols" in filters || "researchUniverse" in filters
+    || scope.researchUniverse !== "" || scope.researchSymbols.length > 0;
   return {
     confidenceNotes: confidence.value,
-    compiledFilters: compiledFilters.value ?? {},
+    compiledFilters: hasCapitalScope ? { ...filters, researchSymbols: scope.researchSymbols, researchUniverse: scope.researchUniverse,
+      researchUniverseNeedsReview: scope.symbolsWithheld && !scope.researchUniverse } : filters,
     scoringWeights: scoringWeights.value,
     evidenceRequirements: evidenceRequirements.value,
     autoDisqualifiers: autoDisqualifiers.value,
@@ -139,7 +147,9 @@ export function normalizeCanonicalThesisRead(input: {
         scoringWeights: scoringWeights.diagnostic,
         evidenceRequirements: evidenceRequirements.diagnostic,
         autoDisqualifiers: autoDisqualifiers.diagnostic,
+        ...(scope.symbolsWithheld ? { researchSymbols: unknownDiagnostic(classify(filters.researchSymbols)) } : {}),
       },
     } satisfies CanonicalThesisReadDiagnostics,
   };
 }
+import { repairCapitalThesisResearchScope } from "./capitalThesisStructure";

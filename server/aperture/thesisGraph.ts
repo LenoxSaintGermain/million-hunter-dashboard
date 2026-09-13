@@ -42,6 +42,9 @@ export interface ThesisGraph {
   exposureTree: ExposureTreeNode[];
   /** Explicit symbols declared by the operator. Never inferred by fallback. */
   researchSymbols: string[];
+  /** Operator-authored discovery scope, not a ticker or proof of security identity. */
+  researchUniverse?: string;
+  researchUniverseNeedsReview?: boolean;
   evidenceRequirements: string[];
   invalidationConditions: string[];
   instrumentPreference: "shares" | "options" | "either" | null;
@@ -297,6 +300,8 @@ export function applyCanonicalDeclarations(
     avoid: declared.avoids ? [declared.avoids] : graph.avoid,
     horizons: declared.horizon ? [declared.horizon] : graph.horizons,
     researchSymbols: declared.researchSymbols,
+    researchUniverse: declared.researchUniverse,
+    researchUniverseNeedsReview: declared.researchUniverseNeedsReview ?? false,
     evidenceRequirements: declared.evidence ? [declared.evidence] : graph.evidenceRequirements,
     invalidationConditions: declared.invalidation ? [declared.invalidation] : graph.invalidationConditions,
     instrumentPreference: declared.instrumentPreference ?? graph.instrumentPreference,

@@ -1,7 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { normalizeCapitalThesisRead, normalizeThesisStringList } from "./thesisReadContract";
+import { normalizeCapitalThesisRead, normalizeCanonicalThesisRead, normalizeThesisStringList } from "./thesisReadContract";
 
 describe("canonical thesis read contract", () => {
+  it("withholds the old diesel prose-symbol list on canonical and projection reads without mutation", () => {
+    const description = "Liquid U.S.-listed refiners and diesel-sensitive transport businesses; verify company-to-ticker mapping before inclusion.";
+    const researchSymbols = ["LIQUID", "REFINERS", "AND", "TRANSPORT", "BUSINESSES", "VERIFY", "MAPPING", "BEFORE", "INCLUSION."];
+    const rawText = `Illustrative refiner thesis.\nSymbols or research universe: ${description}`;
+    const canonical = { thesisText: rawText, compiledFilters: { researchSymbols }, scoringWeights: [], evidenceRequirements: [], autoDisqualifiers: [], confidenceNotes: [] };
+    const projection = { rawText, graph: { researchSymbols, beliefs: ["Illustrative"] }, confidenceNotes: [] };
+    const original = JSON.stringify({ canonical, projection });
+    expect(normalizeCanonicalThesisRead(canonical).compiledFilters).toMatchObject({ researchSymbols: [], researchUniverse: description });
+    expect(normalizeCapitalThesisRead(projection).graph).toMatchObject({ researchSymbols: [], researchUniverse: description });
+    expect(JSON.stringify({ canonical, projection })).toBe(original);
+  });
+  it("keeps unrecoverable scope explicitly unresolved across repeated projection reads", () => {
+    const row = { graph: { researchSymbols: ["LIQUID", "REFINERS", "AND", "INCLUSION."], exposureTree: [{ label: "Provider-suggested sector" }] }, rawText: "A saved belief without the original universe field." };
+    const repaired = normalizeCapitalThesisRead(row);
+    expect(repaired.graph).toMatchObject({ researchSymbols: [], researchUniverse: "", researchUniverseNeedsReview: true });
+    expect(normalizeCapitalThesisRead(repaired).graph).toEqual(repaired.graph);
+  });
   it.each([
     ["proper array", ["verified note"], ["verified note"], "canonical"],
     ["JSON array string", '["verified note"]', ["verified note"], "normalized"],

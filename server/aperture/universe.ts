@@ -18,6 +18,8 @@
 import { runResearch } from "../deepResearch";
 import { looseJsonParse } from "../gemini";
 import { normSymbol } from "./facts";
+import { createHash } from "node:crypto";
+import { normalizeResearchSymbols } from "../../shared/capitalThesisStructure";
 
 export interface DiscoveredSymbol {
   symbol: string;
@@ -69,6 +71,8 @@ export function thesisSummary(beliefs: string[], seek: string[]): string {
 }
 
 export interface DiscoverOpts {
+  /** Explicit descriptive scope. It enters cited discovery, never ticker parsing. */
+  researchUniverse?: string;
   /** Max nodes to query — each is one Sonar call. */
   maxNodes?: number;
   /** Max symbols kept overall. */
@@ -83,9 +87,7 @@ export interface DiscoverOpts {
  * it with exposure-tree alternatives; those belong in optional follow-up work.
  */
 export function operatorDeclaredUniverse(symbols: string[] | null | undefined): UniverseResult | null {
-  const normalized = Array.from(new Set((symbols ?? [])
-    .map((symbol) => normSymbol(symbol))
-    .filter((symbol) => looksLikeTicker(symbol))));
+  const normalized = normalizeResearchSymbols(symbols ?? undefined);
   if (normalized.length === 0) return null;
 
   return {
@@ -103,9 +105,11 @@ export function operatorDeclaredUniverse(symbols: string[] | null | undefined): 
   };
 }
 
-async function defaultResearch(node: string, prompt: string) {
+async function defaultResearch(node: string, prompt: string, descriptiveScope = false) {
   const r = await runResearch({
-    subjectKey: `aperture:universe:${node.toLowerCase().replace(/\s+/g, "-").slice(0, 120)}`,
+    subjectKey: descriptiveScope
+      ? `aperture:universe:scope:${createHash("sha256").update(prompt).digest("hex")}`
+      : `aperture:universe:${node.toLowerCase().replace(/\s+/g, "-").slice(0, 120)}`,
     subjectType: "industry",
     query: prompt,
     model: "sonar-pro",
@@ -128,10 +132,11 @@ export async function discoverUniverse(
 ): Promise<UniverseResult> {
   const maxNodes = opts.maxNodes ?? 12;
   const maxSymbols = opts.maxSymbols ?? 150;
-  const research = opts.research ?? defaultResearch;
+  const scope = opts.researchUniverse?.trim();
+  const research = opts.research ?? ((node, prompt) => defaultResearch(node, prompt, Boolean(scope)));
 
   // Deepest first — specific nodes surface the non-obvious names.
-  const ordered = nodes.slice().sort((a, b) => b.depth - a.depth);
+  const ordered = scope ? [{ label: scope, depth: 0 }] : nodes.slice().sort((a, b) => b.depth - a.depth);
   const queried = ordered.slice(0, maxNodes);
   const skippedNodes = ordered.length - queried.length;
 

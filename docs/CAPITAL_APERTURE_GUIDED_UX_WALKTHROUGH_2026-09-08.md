@@ -790,3 +790,27 @@ The research-to-underwriter technical path passed this bounded retest; evidence
 remains incomplete. Global active-thesis labeling and long accepted-prompt density
 remain UX follow-ups. This is not a market-open ticket/approval/submission pass,
 physical-device acceptance or a user-tested speed-to-decision claim.
+
+## New-thesis entry and identity handoff — September 13 repair
+
+An explicit **New thesis** action opens `/thesis?new=1` with an empty composer;
+ordinary `/thesis` remains saved-thesis review. Saving alone does not activate a
+Mission. **Save and use in Capital Mission** passes both the canonical source and
+its linked projection to Mission. The receiving view verifies their relationship
+and use access before displaying actionable setup. A numerically identical old
+discovery ID is not the same entity and cannot take over that handoff.
+
+For a new handoff, thesis text, holding horizon and instrument declarations come
+from that exact source. Account and allocated money are not copied from a prior
+Mission or account total. A same-thesis unfinished draft resumes; a different
+unfinished draft is compared before replacement. Page loads do not create a
+Mission, underwriting job, ticket or order.
+
+**Research scope** accepts descriptive intent. **Ticker symbols** accepts only an
+explicit list, not a sentence converted into uppercase words. Legacy malformed
+lists are withheld without rewriting historical source records. Descriptive scope
+is a discovery input, never verification of a security or its economic mechanism.
+
+Acceptance evidence and live status belong in
+[the new-thesis UAT report](qa/CAPITAL_APERTURE_NEW_THESIS_UAT_2026-09-13.md).
+Implementation and deterministic tests alone do not establish live journey success.

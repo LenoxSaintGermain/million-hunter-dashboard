@@ -247,6 +247,7 @@ describe("Decision Run projection recovery", () => {
       invalidation: "Preserve cash when any named gate is absent",
       risk: "$3,000 notional and $30 maximum planned loss",
       researchSymbols: ["IWM"],
+      researchUniverse: "",
       instrumentPreference: "shares",
     });
     expect(merged.researchSymbols).toEqual(["IWM"]);

@@ -22,6 +22,19 @@ const graph = (overrides: Partial<ThesisGraph> = {}): ThesisGraph => ({
 });
 
 describe("Capital thesis research readiness", () => {
+  it("allows descriptive scope into discovery without claiming any declared ticker", () => {
+    expect(evaluateThesisResearchReadiness(graph({ researchSymbols: [], researchUniverse: "Liquid U.S.-listed refiners; verify issuer-to-ticker mapping." }), {
+      holdingPeriod: "position", instrumentPreference: "options", invalidationRule: "Verify before inclusion.",
+    })).toMatchObject({ ready: true, declaredSymbols: [], missing: [] });
+  });
+
+  it("does not count the old prose-symbol fragments as a searchable ticker universe", () => {
+    const result = evaluateThesisResearchReadiness(graph({ researchSymbols: ["LIQUID", "REFINERS", "AND", "INCLUSION."] }), {
+      holdingPeriod: "position", instrumentPreference: "options", invalidationRule: "Verify before inclusion.",
+    });
+    expect(result).toMatchObject({ ready: false, declaredSymbols: [] });
+    expect(result.missing).toContain("search universe");
+  });
   it("blocks a manual draft with no searchable universe before a run can be created", () => {
     const result = evaluateThesisResearchReadiness(graph({ researchSymbols: [], exposureTree: [] }), {
       holdingPeriod: "position",

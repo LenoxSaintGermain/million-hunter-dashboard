@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { calculateTargetFeasibility } from "../../shared/playUnderwriting";
 import { emptyMissionDraftValues } from "../../shared/apertureMissionDraft";
 import { DecisionRunway } from "../../client/src/components/aperture/DecisionRunway";
+import ApertureMission from "../../client/src/pages/aperture/ApertureMission";
 
 // Exercise the real Mission's hydration and callbacks, then render its actual
 // children. Hook state is deterministic; this is not browser/focus coverage.
@@ -14,7 +15,11 @@ const fixture = vi.hoisted(() => ({
   mutations: {} as Record<string, any>, invalidate: vi.fn(), success: vi.fn(), openResearch: vi.fn(),
   headings: {} as Record<string, any>, lookupHeading: vi.fn(),
   objectiveFlow: vi.fn(),
+  search: "",
 }));
+vi.mock("wouter", () => ({ useLocation: () => ["/aperture/mission", fixture.openResearch],
+  useSearch: () => fixture.search, useRoute: () => [false, null] }));
+vi.mock("@/components/DashboardLayout", () => ({ default: ({ children }: any) => React.createElement("main", null, children) }));
 // This suite checks the parent handoff; the connected child has its own journey
 // tests, including failed refresh and draft/job reconciliation.
 vi.mock("../../client/src/components/aperture/ObjectiveMissionFlow", () => ({
@@ -54,6 +59,7 @@ vi.mock("@/lib/trpc", () => {
   });
   const thesis = { list: endpoint("canonical"), activeCapital: endpoint("active"), createCapital: endpoint("create"), useInAperture: endpoint("project") };
   const aperture = {
+    strategy: { capabilities: endpoint("capabilities") },
     thesis: { list: endpoint("capitalTheses") }, account: { list: endpoint("accounts") }, cockpit: endpoint("cockpit"),
     desk: { summary: endpoint("desk") },
     runway: { latest: endpoint("latest"), pending: endpoint("pending"), library: endpoint("library"), begin: endpoint("begin"),
@@ -74,10 +80,12 @@ function elements(node: React.ReactNode): React.ReactElement<any>[] {
 function text(node: React.ReactNode): string {
   return React.Children.toArray(node).map(child => React.isValidElement<{ children?: React.ReactNode }>(child) ? text(child.props.children) : String(child)).join("");
 }
-function render() {
+function render(fromPage = false) {
   for (let attempt = 0; attempt < 20; attempt++) {
     fixture.active = true; fixture.cursor = 0; fixture.effectCursor = 0;
-    const tree = DecisionRunway({ onNewResearch: fixture.openResearch, onOpenResearchRun: fixture.openResearch });
+    const props = fromPage ? elements(ApertureMission()).find(element => element.type === DecisionRunway)!.props
+      : { onNewResearch: fixture.openResearch, onOpenResearchRun: fixture.openResearch };
+    const tree = DecisionRunway(props);
     fixture.active = false;
     if (!fixture.effects.length) return { tree, $: load(renderToStaticMarkup(tree)) };
     fixture.effects.splice(0).forEach(effect => effect());
@@ -96,12 +104,14 @@ function visibleText($: ReturnType<typeof load>) {
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(now); vi.clearAllMocks();
   vi.stubGlobal("React", React);
-  vi.stubGlobal("window", { location: { search: "" }, setTimeout, clearTimeout, addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  vi.stubGlobal("window", { location: { search: "", assign: vi.fn() }, setTimeout, clearTimeout, addEventListener: vi.fn(), removeEventListener: vi.fn() });
   fixture.headings = Object.fromEntries(["thesis", "risk", "review"].map(section => [`mission-section-${section}`, { focus: vi.fn(), scrollIntoView: vi.fn(), closest: vi.fn().mockReturnValue(null) }]));
   fixture.lookupHeading.mockImplementation(id => fixture.headings[id] ?? null);
   vi.stubGlobal("document", { getElementById: fixture.lookupHeading });
   fixture.active = false; fixture.slots = []; fixture.deps = []; fixture.effects = []; fixture.cleanups = [];
+  fixture.search = "";
   fixture.queries = {
+    capabilities: query({ enabled: true }),
     latest: query({ activeCanonicalThesisId: 720001, latest: null }), pending: query([]),
     canonical: query([{ id: 720001, name: "Illustrative PWR", version: 1 }]),
     capitalTheses: query([{ id: 33, sourceCompilationId: 720001 }]),
@@ -124,7 +134,97 @@ beforeEach(() => {
 });
 afterEach(() => { fixture.cleanups.forEach(cleanup => cleanup?.()); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
+function canonicalHandoff() {
+  fixture.search = "canonicalThesisId=780001&capitalThesisId=450001&newMission=1";
+  fixture.queries.canonical.data.push({ id: 780001, name: "Illustrative diesel thesis", thesisText: "Illustrative saved diesel source for several sessions.",
+    access: "owner", version: 1, compiledFilters: { holdingPeriod: "swing", instrumentPreference: "shares" } });
+  fixture.queries.capitalTheses.data.push({ id: 450001, sourceCompilationId: 780001, missionDefaults: { holdingPeriod: "swing", instrumentPreference: "shares" } });
+  fixture.queries.latest.data.latest = { authority: "authoritative", contextKind: "discovery", decisionRunId: 780001, decisionRevisionId: 1110001,
+    canonicalThesisId: null, capitalThesisId: 123, accountId: 3, branch: "research", version: 1, createdAt: now,
+    missionText: "Older discovery", deployableCapitalCents: 200000, maxPlannedLossCents: 20000, instrumentPreference: "options",
+    holdingPeriod: "intraday", holdingPeriods: ["intraday"], binding: { accountLabel: "Illustrative Paper", capitalThesisName: "Old discovery thesis" }, discoveryContext: {} };
+}
+
 describe("persisted Mission disposition context", () => {
+  it.each(["missing source", "missing projection", "mismatched projection", "view-only source"])("fails closed for a handoff with %s", async condition => {
+    canonicalHandoff();
+    if (condition === "missing source") fixture.queries.canonical.data.pop();
+    if (condition === "missing projection") fixture.queries.capitalTheses.data.pop();
+    if (condition === "mismatched projection") fixture.queries.capitalTheses.data.at(-1).sourceCompilationId = 720001;
+    if (condition === "view-only source") Object.assign(fixture.queries.canonical.data.at(-1), { access: "shared", sharePermission: "view" });
+    const view = render(true);
+    expect(view.$('[role="alert"]').text()).toContain("could not be verified");
+    expect(view.$("#mission-primary-action")).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(2000);
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("resumes an unfinished same-thesis draft without replacing its declarations or starting analysis", async () => {
+    canonicalHandoff();
+    fixture.queries.draft.data.values.canonicalThesisId = 780001;
+    const before = structuredClone(fixture.queries.draft.data);
+    const view = render(true);
+    expect(view.$("#assigned-thesis").text()).toContain("Illustrative diesel thesis");
+    expect(view.$('input[aria-label="Capital"]').val()).toBe("25000");
+    expect(view.$('input[aria-label="Max planned loss"]').val()).toBe("250");
+    expect(view.$.text()).toContain(before.values.mission);
+    expect(view.$('[role="alert"]').text()).not.toContain("unfinished Mission");
+    await vi.advanceTimersByTimeAsync(2000);
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+    expect(fixture.queries.draft.data).toEqual(before);
+  });
+
+  it.each([false, true])("compares an unrelated unfinished draft before replacement (objective=%s)", async objective => {
+    canonicalHandoff();
+    if (objective) fixture.queries.draft.data.values.strategyContext = { schemaVersion: 1, requestId: "00000000-0000-4000-8000-000000000011", intent: "deploy_excess_capital", searchScope: "broader_permitted_universe", requestedSymbols: [], declarationId: null, sourceOrder: null, profitReserve: "" };
+    const before = structuredClone(fixture.queries.draft.data);
+    const view = render(true);
+    expect(view.$('[role="alert"]').text()).toContain("unfinished Mission");
+    expect(view.$('[role="alert"] dl').text()).toContain(before.values.mission);
+    expect(view.$('[role="alert"] dl').text()).toContain("Illustrative saved diesel source");
+    expect(view.$("#mission-primary-action").attr("disabled")).toBeDefined();
+    await vi.advanceTimersByTimeAsync(2000);
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+    button(view.tree, "Use saved draft").props.onClick();
+    expect(window.location.assign).toHaveBeenCalledWith("/aperture/mission");
+    expect(fixture.queries.draft.data).toEqual(before);
+    button(view.tree, "Save these edits as a new revision").props.onClick();
+    await Promise.resolve(); await Promise.resolve(); render(true);
+    expect(fixture.mutations.saveDraft.mutateAsync).toHaveBeenCalledWith({ expectedVersion: 4,
+      values: expect.objectContaining({ canonicalThesisId: 780001, capital: "", maxLoss: "", accountId: null, baseDecisionRunId: null, baseDecisionRevisionId: null, instrument: "shares", holdingPeriod: "swing" }),
+      ...(objective ? { replaceStrategyContext: true } : {}),
+    });
+    for (const name of ["begin", "run", "startResearch", "completeDraft"]) expect(fixture.mutations[name].mutateAsync).not.toHaveBeenCalled();
+    expect(fixture.queries.draft.data).toEqual(before);
+  });
+
+  it("carries an explicit canonical handoff from the Mission page ahead of the latest discovery receipt", async () => {
+    fixture.search = "canonicalThesisId=780001&capitalThesisId=450001&newMission=1";
+    const source = "Illustrative saved diesel source: constrained supply may support refiners over several sessions.";
+    fixture.queries.canonical.data.push({ id: 780001, name: "Illustrative diesel thesis", thesisText: source, version: 1,
+      compiledFilters: { holdingPeriod: "swing", instrumentPreference: "shares" } });
+    fixture.queries.capitalTheses.data.push({ id: 450001, sourceCompilationId: 780001,
+      missionDefaults: { holdingPeriod: "swing", instrumentPreference: "shares", deployableCapitalCents: null, maxPlannedLossCents: null } });
+    fixture.queries.draft.data.completedAt = now;
+    fixture.queries.latest.data.latest = { authority: "authoritative", contextKind: "discovery", decisionRunId: 780001, decisionRevisionId: 1110001,
+      canonicalThesisId: null, capitalThesisId: 123, accountId: 3, branch: "research", version: 1, createdAt: now,
+      missionText: "Older discovery", deployableCapitalCents: 200000, maxPlannedLossCents: 20000, instrumentPreference: "options",
+      holdingPeriod: "intraday", holdingPeriods: ["intraday"], binding: { accountLabel: "Illustrative Paper", capitalThesisName: "Old discovery thesis" },
+      discoveryContext: {} };
+    const before = structuredClone({ draft: fixture.queries.draft.data, receipt: fixture.queries.latest.data.latest });
+    const view = render(true);
+    expect(view.$('[aria-label="Selected research context"]')).toHaveLength(0);
+    expect(view.$("#assigned-thesis").text()).toContain("Illustrative diesel thesis");
+    expect(view.$.text()).toContain(source);
+    expect(view.$('select[aria-label="Holding horizon"]').val()).toBe("swing");
+    expect(view.$('select[aria-label="Instrument preference"]').val()).toBe("shares");
+    expect(view.$('input[aria-label="Capital"]').val()).toBe("");
+    expect(view.$('input[aria-label="Max planned loss"]').val()).toBe("");
+    await vi.advanceTimersByTimeAsync(2000);
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+    expect({ draft: fixture.queries.draft.data, receipt: fixture.queries.latest.data.latest }).toEqual(before);
+  });
+
   it("reopens an accepted no-thesis objective without adopting the active thesis or starting a new action", async () => {
     const values = { ...emptyMissionDraftValues(), accountId: 3, canonicalThesisId: null,
       capital: "1200", maxLoss: "100", mission: "Illustrative: compare uses of my extra capital next month.",

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { ArrowRight, ChevronDown, FileCheck2, Loader2, Pencil, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,13 @@ import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolate
 import { isCapitalThesisEligible } from "@shared/capitalThesisEligibility";
 import { canonicalThesisLabel } from "@shared/canonicalThesisLabel";
 import type { ThesisSaveReceipt } from "@shared/thesisSaveReceipt";
+import { normalizeResearchSymbols } from "@shared/capitalThesisStructure";
 
 type Purpose = "capital" | "acquisition" | "property";
 type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
 type Instrument = "shares" | "options" | "either";
 
-const EMPTY_DETAIL = { belief: "", evidence: "", seeks: "", avoids: "", horizon: "", holdingPeriod: "position" as HoldingPeriod, invalidation: "", risk: "", symbols: "", instrument: "either" as Instrument };
+const EMPTY_DETAIL = { belief: "", evidence: "", seeks: "", avoids: "", horizon: "", holdingPeriod: "position" as HoldingPeriod, invalidation: "", risk: "", symbols: "", researchUniverse: "", instrument: "either" as Instrument };
 
 const PURPOSES: Array<{ id: Purpose; label: string }> = [
   { id: "capital", label: "Capital" },
@@ -36,11 +37,12 @@ function route(path: string) {
 
 export function CapitalThesisWorkspace() {
   const [, navigate] = useLocation();
+  const search = useSearch();
   const utils = trpc.useUtils();
   const { data: theses, isLoading, error } = trpc.thesis.list.useQuery();
   const [purpose, setPurpose] = useState<Purpose>("capital");
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(() => new URLSearchParams(search).get("new") === "1");
   const [editing, setEditing] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -83,6 +85,7 @@ export function CapitalThesisWorkspace() {
         invalidation: selected.autoDisqualifiers?.[0] ?? "",
         risk: typed.risk ?? "",
         symbols: Array.isArray(filters.researchSymbols) ? filters.researchSymbols.join(", ") : "",
+        researchUniverse: typeof filters.researchUniverse === "string" ? filters.researchUniverse : "",
         instrument: filters.instrumentPreference ?? "either",
       });
     }
@@ -104,10 +107,14 @@ export function CapitalThesisWorkspace() {
     const rows = [
       ["Belief", detail.belief], ["Evidence basis", detail.evidence], ["Seeks", detail.seeks], ["Avoids", detail.avoids],
       ["Horizon", detail.horizon], ["Invalidation", detail.invalidation], ["Risk boundary", detail.risk],
+      ["Research universe", detail.researchUniverse],
     ].filter(([, value]) => value.trim()).map(([label, value]) => `${label}: ${value.trim()}`);
     return rows.length ? `${draftText.trim()}\n\nThesis detail\n${rows.join("\n")}` : draftText.trim();
   };
-  const validationError = thesisDraftValidation(draftText, detailedThesisText(), draftName);
+  const validationError = thesisDraftValidation(draftText, detailedThesisText(), draftName)
+    ?? (detail.symbols.trim() && !normalizeResearchSymbols(detail.symbols).length
+      ? "Enter ticker symbols only, separated by commas. Put company descriptions in Research scope instead."
+      : null);
   const createInline = async (openMission = false) => {
     if (validationError || createCapital.isPending || activate.isPending || project.isPending) return;
     setSaveError(null);
@@ -124,7 +131,11 @@ export function CapitalThesisWorkspace() {
     try {
       await activate.mutateAsync({ compilationId });
       const projection = await project.mutateAsync({ compilationId });
-      if (projection.compilerStatus === "needs_structure") {
+      if (projection.sourceCompilationId !== compilationId || !Number.isSafeInteger(projection.apertureThesisId) || projection.apertureThesisId <= 0) {
+        setMissionError("The saved thesis could not be matched to its Mission context. Retry this thesis; no mission was opened.");
+        return;
+      }
+      if (projection.compilerStatus === "needs_structure" || projection.missingFields.length > 0) {
         const missing = projection.missingFields.join(", ");
         setMissionError(`Add the missing thesis structure before research: ${missing}. Your thesis is saved; no empty run was created.`);
         setEditing(true);
@@ -145,7 +156,7 @@ export function CapitalThesisWorkspace() {
         utils.aperture.thesis.list.invalidate(),
         utils.aperture.runway.latest.invalidate(),
       ]);
-      navigate(route("/aperture"));
+      navigate(route(`/aperture/mission?canonicalThesisId=${compilationId}&capitalThesisId=${projection.apertureThesisId}&newMission=1`));
     } catch (error) {
       setMissionError(error instanceof Error ? error.message : "This thesis could not be bound to a Capital Mission. Review its type and try again.");
     }
@@ -162,7 +173,7 @@ export function CapitalThesisWorkspace() {
     <p id="thesis-guidance" className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{THESIS_GUIDANCE} Guidance is not saved as your belief.</p>
     <button type="button" onClick={() => setShowDetails((current) => !current)} aria-expanded={showDetails} className="inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}><ChevronDown className={showDetails ? "h-3.5 w-3.5 rotate-180" : "h-3.5 w-3.5"} />Add thesis detail</button>
     {showDetails && <div className="grid gap-2 sm:grid-cols-2">
-      {[["belief", "Belief"], ["evidence", "Evidence basis"], ["seeks", "Seeks"], ["avoids", "Avoids"], ["horizon", "Horizon"], ["invalidation", "Invalidation"], ["risk", "Risk boundary"], ["symbols", "Symbols or research universe"]].map(([key, label]) => <label key={key} className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{label}<input value={detail[key as keyof typeof detail]} onChange={(event) => setDetail((current) => ({ ...current, [key]: event.target.value }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} /></label>)}
+      {[["belief", "Belief"], ["evidence", "Evidence basis"], ["seeks", "Seeks"], ["avoids", "Avoids"], ["horizon", "Horizon"], ["invalidation", "Invalidation"], ["risk", "Risk boundary"], ["researchUniverse", "Research scope (optional)"], ["symbols", "Ticker symbols (optional)"]].map(([key, label]) => <label key={key} className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{label}<input aria-label={label} value={detail[key as keyof typeof detail]} onChange={(event) => setDetail((current) => ({ ...current, [key]: event.target.value }))} className="mt-1 min-h-11 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} />{key === "researchUniverse" && <span className="mt-1 block">Describe companies or sectors to investigate. This is not a verified ticker list.</span>}{key === "symbols" && <span className="mt-1 block">Known tickers, separated by commas. Leave blank for discovery.</span>}</label>)}
       <label className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Holding horizon<select value={detail.holdingPeriod} onChange={(event) => setDetail((current) => ({ ...current, holdingPeriod: event.target.value as HoldingPeriod }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><option value="intraday">Today</option><option value="overnight">Next close</option><option value="swing">2–10 sessions</option><option value="catalyst_window">Named catalyst window</option><option value="position">Multi-week / position</option></select></label>
       <label className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Instrument<select value={detail.instrument} onChange={(event) => setDetail((current) => ({ ...current, instrument: event.target.value as Instrument }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><option value="shares">Shares only</option><option value="options">Defined-risk options</option><option value="either">Either; keep explicit at mission setup</option></select></label>
     </div>}
@@ -211,6 +222,7 @@ export function CapitalThesisWorkspace() {
             {editing ? renderComposer(true) : <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm leading-6" style={{ color: "var(--sh-text-primary)" }}>{selected.thesisText}</p>}
           </section>
 
+          {(selected as any).readDiagnostics?.collections?.researchSymbols?.status === "unknown" && <p role="status" className="rounded-md border p-3 text-sm" style={{ borderColor: "var(--sh-signal)", color: "var(--sh-text-primary)" }}>The saved ticker list could not be validated and will not be used. Your thesis text is unchanged; research must establish company-to-ticker mappings.</p>}
           <section className="grid gap-3 lg:grid-cols-[1.15fr_.85fr]">
             <div className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div className="flex items-center gap-2"><FileCheck2 className="h-4 w-4" style={{ color: "var(--sh-signal)" }} /><p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Compiled thesis receipt</p></div><p className="mt-3 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{selected.thesisText}</p><dl className="mt-3 grid gap-2 text-xs"><div><dt style={{ color: "var(--sh-fg-muted)" }}>Primary evidence requirement</dt><dd style={{ color: "var(--sh-text-primary)" }}>{selected.evidenceRequirements?.[0] ?? "Unknown — collect before paper research."}</dd></div><div><dt style={{ color: "var(--sh-fg-muted)" }}>Invalidation</dt><dd style={{ color: "var(--sh-text-primary)" }}>{selected.autoDisqualifiers?.[0] ?? "Unknown — state before any paper proposal."}</dd></div><div><dt style={{ color: "var(--sh-fg-muted)" }}>Horizon</dt><dd style={{ color: "var(--sh-text-primary)" }}>{typeof (selected.compiledFilters as any)?.holdingPeriod === "string" ? (selected.compiledFilters as any).holdingPeriod : "Unknown — operator has not specified a horizon."}</dd></div></dl></div>
             <div className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" style={{ color: "var(--sh-signal)" }} /><p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Allowed next action</p></div><p className="mt-3 text-sm leading-6" style={{ color: "var(--sh-text-primary)" }}>Open one paper-only Capital Mission with this canonical thesis bound. Research and paper approval remain separate human gates.</p><p className="mt-3 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Paper research · no orders</p></div>

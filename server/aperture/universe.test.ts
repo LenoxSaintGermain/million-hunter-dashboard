@@ -37,6 +37,9 @@ describe("thesisSummary", () => {
 });
 
 describe("operatorDeclaredUniverse", () => {
+  it("never salvages AND from an invalid legacy prose-symbol array", () => {
+    expect(operatorDeclaredUniverse(["LIQUID", "REFINERS", "AND", "INCLUSION."])).toBeNull();
+  });
   it("keeps the exact declared symbols as the first research brief", () => {
     const result = operatorDeclaredUniverse(["iwm", "IWM"]);
     expect(result?.discovered).toEqual([expect.objectContaining({
@@ -53,6 +56,17 @@ describe("operatorDeclaredUniverse", () => {
 });
 
 describe("discoverUniverse", () => {
+  it("researches the full descriptive scope without turning its words into securities", async () => {
+    const researchUniverse = "Liquid U.S.-listed refiners and diesel-sensitive transport businesses; verify company-to-ticker mapping before inclusion.";
+    const asked: string[] = [];
+    const result = await discoverUniverse([], "Illustrative diesel hypothesis", new Set(), {
+      researchUniverse,
+      research: async (node, prompt) => { asked.push(node); expect(prompt).toContain(researchUniverse); return { content: "[]", citations: ["https://example.test/diesel"] }; },
+    });
+    expect(asked).toEqual([researchUniverse]);
+    expect(result.discovered).toEqual([]);
+    expect(result.nodesQueried).toEqual([researchUniverse]);
+  });
   it("queries the deepest nodes first — that is where the non-obvious names are", async () => {
     const asked: string[] = [];
     await discoverUniverse(NODES, "x", new Set(), {

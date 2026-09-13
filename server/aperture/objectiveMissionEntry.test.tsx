@@ -29,6 +29,33 @@ function elements(node: React.ReactNode): React.ReactElement<any>[] {
 }
 
 describe("Mission objective entry routing (isolated rendering, not browser UAT)", () => {
+  it("passes the explicit canonical/projection handoff to the real Mission entry contract", () => {
+    fixture.search = "canonicalThesisId=780001&capitalThesisId=450001&newMission=1&objective=1";
+    renderToStaticMarkup(ApertureMission());
+    expect(fixture.runway).toHaveBeenCalledWith(expect.objectContaining({ missionHandoff: { canonicalThesisId: 780001, capitalThesisId: 450001 }, receiptTarget: null }));
+    expect(fixture.flow).not.toHaveBeenCalled();
+    expect(fixture.navigate).not.toHaveBeenCalled();
+  });
+  it.each([
+    "canonicalThesisId=1&newMission=1", "capitalThesisId=2&newMission=1",
+    "canonicalThesisId=1&capitalThesisId=2", "canonicalThesisId=1&capitalThesisId=2&newMission=0",
+    "canonicalThesisId=0&capitalThesisId=2&newMission=1", "canonicalThesisId=1e2&capitalThesisId=2&newMission=1",
+    "canonicalThesisId=1&capitalThesisId=9007199254740992&newMission=1",
+    "canonicalThesisId=1&canonicalThesisId=2&capitalThesisId=3&newMission=1",
+  ])("rejects malformed handoff %s rather than resuming unrelated saved context", search => {
+    fixture.search = search;
+    const $ = load(renderToStaticMarkup(ApertureMission()));
+    expect($('[role="alert"]').text()).toContain("Mission link is incomplete");
+    expect(fixture.runway).not.toHaveBeenCalled(); expect(fixture.flow).not.toHaveBeenCalled();
+  });
+  it("keeps the exact receipt route ahead of canonical handoff parameters", () => {
+    fixture.search = "canonicalThesisId=780001&capitalThesisId=450001&newMission=1";
+    fixture.receipt = true; fixture.params = { decisionRunId: "77", revisionId: "88" };
+    renderToStaticMarkup(ApertureMission());
+    expect(fixture.runway).toHaveBeenCalledWith(expect.objectContaining({ missionHandoff: null, receiptTarget: { decisionRunId: 77, revisionId: 88 } }));
+    expect(fixture.flow).not.toHaveBeenCalled();
+  });
+
   it("retains saved Mission routing until the operator explicitly opens an objective", () => {
     const tree = ApertureMission(); const $ = load(renderToStaticMarkup(tree));
     expect(fixture.runway).toHaveBeenCalledWith(expect.objectContaining({ receiptTarget: null }));

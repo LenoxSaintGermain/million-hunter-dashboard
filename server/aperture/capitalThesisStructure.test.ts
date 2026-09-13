@@ -1,9 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { buildCapitalThesisCompilationFields, detailsFromCanonicalRecord, extractDeclaredResearchSymbols, normalizeCapitalThesisDetails } from "../../shared/capitalThesisStructure";
+import { buildCapitalThesisCompilationFields, detailsFromCanonicalRecord, extractDeclaredResearchSymbols, normalizeCapitalThesisDetails, normalizeResearchSymbols } from "../../shared/capitalThesisStructure";
 import { manualThesisProjection } from "../../shared/manualThesisProjection";
 import { operatorDeclaredProjectionIfReady } from "./operatorDeclaredProjection";
 
 describe("Capital thesis structured authoring", () => {
+  it("does not manufacture research tickers from a descriptive universe", () => {
+    const description = "Liquid U.S.-listed refiners and diesel-sensitive transport businesses; verify company-to-ticker mapping before inclusion.";
+    expect(normalizeResearchSymbols(description)).toEqual([]);
+    expect(normalizeCapitalThesisDetails({ symbols: description }).researchSymbols).toEqual([]);
+  });
+
+  it("round-trips a descriptive universe separately from explicit ticker declarations", () => {
+    const researchUniverse = "Liquid U.S.-listed refiners; verify company-to-ticker mapping before inclusion.";
+    const details = normalizeCapitalThesisDetails({ researchUniverse, symbols: "VLO, PSX" });
+    const fields = buildCapitalThesisCompilationFields(details);
+    expect(details).toMatchObject({ researchUniverse, researchSymbols: ["VLO", "PSX"] });
+    expect(fields.compiledFilters).toMatchObject({ researchUniverse, researchSymbols: ["VLO", "PSX"] });
+    expect(detailsFromCanonicalRecord(fields)).toMatchObject({ researchUniverse, researchSymbols: ["VLO", "PSX"] });
+    expect(manualThesisProjection("Illustrative refiner thesis.", null, details)).toMatchObject({ researchUniverse, researchSymbols: ["VLO", "PSX"] });
+    expect(normalizeCapitalThesisDetails({}).researchUniverse).toBe("");
+  });
+
+  it("repairs a legacy mixed-field receipt from its raw declaration without recovering prose tokens", () => {
+    const description = "Liquid U.S.-listed refiners and diesel-sensitive transport businesses; verify company-to-ticker mapping before inclusion.";
+    const source = {
+      thesisText: `Illustrative refiner thesis.\nSymbols or research universe: ${description}`,
+      compiledFilters: { researchSymbols: ["LIQUID", "REFINERS", "AND", "TRANSPORT", "BUSINESSES", "VERIFY", "MAPPING", "BEFORE", "INCLUSION."] },
+    };
+    const before = JSON.stringify(source);
+    expect(detailsFromCanonicalRecord(source)).toMatchObject({ researchUniverse: description, researchSymbols: [] });
+    expect(JSON.stringify(source)).toBe(before);
+  });
+
   it("persists typed fields and carries them through an honest compiler fallback", () => {
     const details = normalizeCapitalThesisDetails({
       belief: "NFL demand may support licensed sportsbook engagement.",

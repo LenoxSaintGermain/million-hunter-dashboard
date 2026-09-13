@@ -1,5 +1,6 @@
 import type { CapitalMissionHoldingPeriod, CapitalMissionInstrument } from "../../shared/capitalMissionDefaults";
 import type { ThesisGraph } from "./thesisGraph";
+import { repairCapitalThesisResearchScope } from "../../shared/capitalThesisStructure";
 
 export type ThesisResearchReadiness = {
   ready: boolean;
@@ -16,10 +17,15 @@ export function evaluateThesisResearchReadiness(
     invalidationRule: string | null;
   },
 ): ThesisResearchReadiness {
-  const declaredSymbols = graph.researchSymbols ?? [];
+  const scope = repairCapitalThesisResearchScope(graph);
+  const declaredSymbols = scope.researchSymbols;
   const missing: string[] = [];
   const incompatibilities: string[] = [];
-  if (declaredSymbols.length === 0 && graph.exposureTree.length === 0) missing.push("search universe");
+  if (!scope.researchUniverse && ((scope.symbolsWithheld || graph.researchUniverseNeedsReview)
+    || (declaredSymbols.length === 0 && graph.exposureTree.length === 0))) missing.push("search universe");
+  if (!scope.researchUniverse && (scope.symbolsWithheld || graph.researchUniverseNeedsReview)) {
+    missing.push("Recover the research universe in a new thesis version; the saved ticker text is invalid and no intact description is available.");
+  }
   if ((graph.evidenceRequirements ?? []).length === 0 && graph.seek.length === 0) missing.push("evidence requirement");
   if (!(run.invalidationRule?.trim() || (graph.invalidationConditions ?? []).length)) missing.push("invalidation condition");
   if (!(run.holdingPeriod || graph.horizons.length)) missing.push("holding horizon");

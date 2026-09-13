@@ -31,7 +31,7 @@ export default function ApertureTheses() {
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3"><Button variant="ghost" size="icon" aria-label="Back to Capital decision center" onClick={() => navigate("/aperture")}><ArrowLeft className="h-4 w-4" /></Button><div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Capital Operator · saved contexts</p><h1 className="mt-1 font-serif text-3xl" style={{ color: "var(--sh-text-primary)" }}>Saved theses</h1><p className="mt-2 max-w-2xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Choose the thesis that should frame today’s paper research. These records are scoped to your operator account; no other owner’s thesis is shown or changed here.</p></div></div>
-        <Button onClick={() => navigate("/thesis")}><Sparkles className="mr-2 h-4 w-4" />New canonical thesis</Button>
+        <Button onClick={() => navigate("/thesis?new=1")}><Sparkles className="mr-2 h-4 w-4" />New canonical thesis</Button>
       </div>
 
       <div className="grid gap-px overflow-hidden rounded-xl border sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>

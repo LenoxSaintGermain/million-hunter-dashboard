@@ -4922,7 +4922,7 @@ async function executeRun(
     // ── 3. Universe discovery ──────────────────────────────────────────────
     const summary = thesisSummary(graph.beliefs ?? [], graph.seek ?? []);
     const universe = operatorDeclaredUniverse(graph.researchSymbols)
-      ?? await discoverUniverse(nodeRows, summary, known);
+      ?? await discoverUniverse(nodeRows, summary, known, { researchUniverse: graph.researchUniverse });
     const offset = Math.max(0, input.researchOffset ?? 0);
     const researchPlan = buildBriefResearchPlan(universe.discovered.slice(offset), input.holdingPeriod);
     const researchDroppedNote = [

@@ -19,7 +19,7 @@ import { GEMINI_FAST } from "../shared/models";
 import { normalizeCanonicalThesisRead } from "../shared/thesisReadContract";
 import { isCapitalThesisEligible } from "../shared/capitalThesisEligibility";
 import { manualThesisProjection } from "../shared/manualThesisProjection";
-import { detailsFromCanonicalRecord, normalizeCapitalThesisDetails, buildCapitalThesisCompilationFields } from "../shared/capitalThesisStructure";
+import { detailsFromCanonicalRecord, normalizeCapitalThesisDetails, buildCapitalThesisCompilationFields, normalizeResearchSymbols } from "../shared/capitalThesisStructure";
 import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
 import { operatorDeclaredProjectionIfReady } from "./aperture/operatorDeclaredProjection";
 import { buildThesisSaveReceipt, DEFAULT_CAPITAL_THESIS_NAME } from "../shared/thesisSaveReceipt";
@@ -33,7 +33,11 @@ const capitalThesisDetailsSchema = z.object({
   holdingPeriod: z.enum(["intraday", "overnight", "swing", "catalyst_window", "position"]).nullable().optional(),
   invalidation: z.string().max(2000).optional(),
   risk: z.string().max(1000).optional(),
-  symbols: z.union([z.string().max(500), z.array(z.string().max(16)).max(50)]).optional(),
+  symbols: z.union([z.string().max(500), z.array(z.string().max(16)).max(50)]).refine(
+    (value) => (typeof value === "string" ? !value.trim() : value.length === 0) || normalizeResearchSymbols(value).length > 0,
+    "Enter explicit ticker symbols only; put descriptive scope in Research universe.",
+  ).optional(),
+  researchUniverse: z.string().max(2000).optional(),
   instrument: z.enum(["shares", "options", "either"]).nullable().optional(),
 }).optional();
 
@@ -374,6 +378,7 @@ export const thesisRouter = router({
     const rawRows = rows[0] as any[];
     return rawRows.map((row: any) => {
       const normalized = normalizeCanonicalThesisRead({
+        thesisText: row.thesis_text,
         confidenceNotes: row.confidence_notes,
         compiledFilters: row.compiled_filters,
         scoringWeights: row.scoring_weights,
@@ -652,6 +657,10 @@ export const thesisRouter = router({
         graph = illustrativeUatGraph(source.thesisText, source.name);
       } else if (operatorProjection) {
         graph = operatorProjection.graph;
+        providerCompiled = false;
+      } else if (declared.researchUniverseNeedsReview) {
+        // A compiler must not invent a replacement for the lost operator scope.
+        graph = manualThesisProjection(source.thesisText, source.name, declared);
         providerCompiled = false;
       } else {
         try {

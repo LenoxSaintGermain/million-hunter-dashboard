@@ -17,6 +17,7 @@ import { PlayUnderwritingBrief } from "./PlayUnderwritingBrief";
 import { MissionResultWorkspace } from "./MissionResultWorkspace";
 import { ObjectiveMissionFlow } from "./ObjectiveMissionFlow";
 import { MissionAccountRefreshLink } from "./MissionAccountRefreshLink";
+import { canonicalMissionHandoffValues, type CanonicalMissionHandoff } from "@/lib/canonicalMissionHandoff";
 
 type Branch = "research" | "conditional" | "cash";
 type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
@@ -26,6 +27,7 @@ type Props = {
   onNewResearch: () => void;
   onOpenResearchRun: (runId: number) => void;
   receiptTarget?: { decisionRunId: number; revisionId: number } | null;
+  missionHandoff?: CanonicalMissionHandoff | null;
 };
 
 function parseMoney(value: string) {
@@ -66,9 +68,15 @@ function branchState(branch: Branch | string | null | undefined): WorkflowState 
   return "researchable";
 }
 
-export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget = null }: Props) {
+export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget = null, missionHandoff = null }: Props) {
   const utils = trpc.useUtils();
-  const { data: runwayResponse, error: receiptError, isLoading: receiptLoading } = trpc.aperture.runway.latest.useQuery(receiptTarget ?? undefined, { retry: false });
+  const handoff = receiptTarget ? null : missionHandoff;
+  const [handoffReceipt, setHandoffReceipt] = useState<{ decisionRunId: number; revisionId: number } | null>(null);
+  const { data: savedRunwayResponse, error: receiptError, isLoading: receiptLoading } = trpc.aperture.runway.latest.useQuery(receiptTarget ?? handoffReceipt ?? undefined, { retry: false });
+  // A new-thesis handoff is not a request to revise whichever receipt was last.
+  const handoffReceiptMatches = handoffReceipt && savedRunwayResponse?.latest?.authority === "authoritative"
+    && savedRunwayResponse.latest.decisionRunId === handoffReceipt.decisionRunId && savedRunwayResponse.latest.decisionRevisionId === handoffReceipt.revisionId;
+  const runwayResponse = handoff && !handoffReceiptMatches && savedRunwayResponse ? { ...savedRunwayResponse, latest: null } : savedRunwayResponse;
   const receiptStructureInvalid = runwayResponse?.latest?.authority === "authoritative" && !validReceiptHorizonShape(runwayResponse.latest);
   const runway = receiptStructureInvalid ? undefined : runwayResponse;
   const { data: pendingOutcomes } = trpc.aperture.runway.pending.useQuery();
@@ -79,28 +87,35 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false });
   const { data: accounts } = accountQuery;
   const draftQuery = trpc.aperture.runway.draft.get.useQuery(undefined, { enabled: !receiptTarget, retry: false, refetchOnWindowFocus: false });
+  const handoffSource = handoff ? canonicalTheses?.find(item => item.id === handoff.canonicalThesisId
+    && (item.access !== "shared" || item.sharePermission === "use")) : null;
+  const handoffProjection = handoff ? capitalTheses?.find(item => item.id === handoff.capitalThesisId && item.sourceCompilationId === handoff.canonicalThesisId) : null;
+  const handoffReadsLoading = !!handoff && (canonicalQuery.isLoading || capitalQuery.isLoading || draftQuery.isLoading
+    || canonicalQuery.isFetching || capitalQuery.isFetching || draftQuery.isFetching);
+  const handoffError = handoff && !handoffReadsLoading && (!handoffSource || !handoffProjection)
+    ? "The requested thesis and projection could not be verified together in your saved library. No saved Mission or draft has been replaced." : null;
   // Never reinterpret an objective receipt as the profile's active thesis.
   // A newer unfinished draft still wins on Mission; an exact receipt link does not.
   const objectiveReceipt = runway?.latest?.authority === "authoritative" && runway.latest.contextKind === "objective" ? runway.latest : null;
   const hasUnfinishedDraft = draftQuery.data != null && draftQuery.data.completedAt == null;
   const acceptedObjective = objectiveReceipt?.objectiveContext && (receiptTarget || !hasUnfinishedDraft) ? objectiveReceipt : null;
-  const preservedStrategyDraft = !receiptTarget && hasUnfinishedDraft && draftQuery.data?.values.strategyContext ? draftQuery.data
+  const preservedStrategyDraft = !handoff && !receiptTarget && hasUnfinishedDraft && draftQuery.data?.values.strategyContext ? draftQuery.data
     : acceptedObjective?.objectiveContext ? { id: acceptedObjective.objectiveContext.sourceDraftId,
       version: acceptedObjective.objectiveContext.sourceDraftVersion, values: acceptedObjective.objectiveContext.values,
       updatedAt: acceptedObjective.createdAt, completedAt: acceptedObjective.createdAt } : null;
   const saveDraftMutation = trpc.aperture.runway.draft.save.useMutation();
   const completeDraftMutation = trpc.aperture.runway.draft.complete.useMutation();
   const [selectedCanonicalId, setSelectedCanonicalId] = useState<number | null | undefined>(undefined);
-  const [selectedAccountId, setSelectedAccountId] = useState<number | null | undefined>(undefined);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null | undefined>(handoff ? null : undefined);
   const immutableReceipt = receiptTarget && runway?.latest?.authority === "authoritative" ? runway.latest : null;
   const currentDecisionRunId = runway?.latest?.authority === "authoritative" ? runway.latest.decisionRunId : null;
   const currentDecisionRevisionId = runway?.latest?.authority === "authoritative" ? runway.latest.decisionRevisionId : null;
-  const activeCanonicalId = preservedStrategyDraft ? preservedStrategyDraft.values.canonicalThesisId
+  const activeCanonicalId = handoff ? handoff.canonicalThesisId : preservedStrategyDraft ? preservedStrategyDraft.values.canonicalThesisId
     : immutableReceipt?.canonicalThesisId ?? (selectedCanonicalId !== undefined ? selectedCanonicalId : runway?.activeCanonicalThesisId ?? null);
   const activeThesis = useMemo(() => (canonicalTheses ?? []).find((item) => item.id === activeCanonicalId) ?? null, [canonicalTheses, activeCanonicalId]);
-  const projection = useMemo(() => immutableReceipt
+  const projection = useMemo(() => handoff ? handoffProjection ?? null : immutableReceipt
     ? (capitalTheses ?? []).find((item) => item.id === immutableReceipt.capitalThesisId) ?? null
-    : (capitalTheses ?? []).find((item) => item.sourceCompilationId === activeCanonicalId) ?? null, [capitalTheses, activeCanonicalId, immutableReceipt]);
+    : (capitalTheses ?? []).find((item) => item.sourceCompilationId === activeCanonicalId) ?? null, [capitalTheses, activeCanonicalId, immutableReceipt, handoff, handoffProjection]);
   const paperAccount = useMemo(() => preservedStrategyDraft
     ? (accounts ?? []).find((item) => item.id === preservedStrategyDraft.values.accountId && item.isPaper) ?? null
     : immutableReceipt
@@ -223,9 +238,9 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   );
   const underwritingTaskPath = currentDecisionRunId != null && currentDecisionRevisionId != null
     ? aperturePathForFixture(`/aperture/decision/${currentDecisionRunId}/revision/${currentDecisionRevisionId}/underwrite`, readIsolatedUatIdentity()) : null;
-  const jobNeedsReconciliation = underwritingJob.data?.state === "running" || underwritingJob.data?.state === "failed" || underwritingJob.data?.state === "interrupted";
-  const missionContextError = receiptStructureInvalid ? new Error("Saved Mission horizons are malformed. Reload the corrected receipt; no new analysis can start.") : receiptError || draftQuery.error || canonicalQuery.error || capitalQuery.error || accountQuery.error;
-  const missionContextLoading = !receiptTarget && (!draftInitialized || receiptLoading || draftQuery.isLoading || canonicalQuery.isLoading || capitalQuery.isLoading || accountQuery.isLoading);
+  const jobNeedsReconciliation = currentDecisionRunId != null && (underwritingJob.data?.state === "running" || underwritingJob.data?.state === "failed" || underwritingJob.data?.state === "interrupted");
+  const missionContextError = handoffError || (receiptStructureInvalid ? new Error("Saved Mission horizons are malformed. Reload the corrected receipt; no new analysis can start.") : receiptError || draftQuery.error || canonicalQuery.error || capitalQuery.error || accountQuery.error);
+  const missionContextLoading = !receiptTarget && (handoffReadsLoading || !draftInitialized || receiptLoading || draftQuery.isLoading || canonicalQuery.isLoading || capitalQuery.isLoading || accountQuery.isLoading);
   const refreshMissionContext = () => Promise.all([
     utils.aperture.runway.latest.invalidate(), utils.aperture.runway.draft.get.invalidate(),
     utils.thesis.list.invalidate(), utils.aperture.thesis.list.invalidate(), utils.aperture.account.list.invalidate(),
@@ -243,7 +258,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const startResearch = trpc.aperture.runway.startResearch.useMutation();
   const resolveCashOutcome = trpc.aperture.runway.resolveCashOutcome.useMutation();
   const persistedUnderwritingLoading = currentDecisionRunId != null && currentUnderwriting.isLoading && runUnderwriting.data == null;
-  const rawUnderwritingResult = runUnderwriting.data ?? currentUnderwriting.data ?? null;
+  const rawUnderwritingResult = runUnderwriting.data ?? (currentDecisionRunId != null ? currentUnderwriting.data : null) ?? null;
   const underwritingStructureInvalid = rawUnderwritingResult != null && !validMissionHorizonCollection(rawUnderwritingResult.objective?.holdingPeriods);
   const persistedUnderwritingUnavailable = underwritingStructureInvalid || (currentDecisionRunId != null && currentUnderwriting.isError && currentUnderwriting.data == null && runUnderwriting.data == null);
   const busy = committing || createThesis.isPending || projectThesis.isPending || saveMission.isPending || runUnderwriting.isPending || validatePlay.isPending || startResearch.isPending || resolveCashOutcome.isPending;
@@ -303,7 +318,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     if (missionContextLoading || missionContextError || draftError || draftConflict) return toast.error("Restore or save the Mission draft before starting analysis.");
     if (horizonMismatch) return toast.info("Resolve the primary/underwriting horizon mismatch in Review & underwrite before starting a new analysis.");
     if (needsRevisionReview) return toast.info("Review the changed Mission assumptions before applying this revision.");
-    if (jobNeedsReconciliation || underwritingJob.isLoading || underwritingJob.isError) return toast.info("Review the saved underwriting task before starting new analysis.");
+    if (jobNeedsReconciliation || (currentDecisionRunId != null && (underwritingJob.isLoading || underwritingJob.isError))) return toast.info("Review the saved underwriting task before starting new analysis.");
     if (!activeCanonicalId || !paperAccount) return toast.error("Assign a thesis and paper account first.");
     if (branch === "research" && (persistedUnderwritingLoading || persistedUnderwritingUnavailable)) {
       toast.info("Checking saved underwriting state.", { description: "New analysis remains unavailable until the saved result is reconciled." });
@@ -380,6 +395,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
       // A successful explicit Mission action retires only the exact draft that
       // was used. Another device's intervening edit remains intact.
       completedDraftRef.current = true;
+      if (handoff) setHandoffReceipt({ decisionRunId: receipt.decisionRunId, revisionId: receipt.revisionId });
       setBaseMission({ decisionRunId: receipt.decisionRunId, decisionRevisionId: receipt.revisionId });
       hydratedDecisionRevisionId.current = receipt.revisionId;
       if (confirmedDraft) {
@@ -516,7 +532,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     // One hydration decision. Late receipt/projection queries must never replace
     // a resumed draft or edits the operator has already made in this view.
     const receiptAlreadyLoaded = receiptTarget != null && hydratedDecisionRevisionId.current === receiptTarget.revisionId;
-    if ((receiptTarget ? receiptAlreadyLoaded : draftInitialized) || receiptLoading || (!receiptTarget && draftQuery.isLoading)
+    if ((receiptTarget ? receiptAlreadyLoaded : draftInitialized) || handoffReadsLoading || handoffError || receiptLoading || (!receiptTarget && draftQuery.isLoading)
       || canonicalQuery.isLoading || capitalQuery.isLoading || accountQuery.isLoading
       || receiptStructureInvalid || receiptError || (!receiptTarget && draftQuery.isError) || canonicalQuery.isError || capitalQuery.isError || accountQuery.isError) return;
     if (receiptTarget && (runway?.latest?.authority !== "authoritative" || runway.latest.decisionRevisionId !== receiptTarget.revisionId)) return;
@@ -524,6 +540,19 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     savedDraftRef.current = persisted;
     setSavedDraft(persisted);
     setDraftInitialized(true);
+    if (handoff && handoffSource && handoffProjection) {
+      if (persisted?.completedAt == null && persisted?.values.canonicalThesisId === handoff.canonicalThesisId && !persisted.values.strategyContext) {
+        applyDraftValues(persisted.values);
+      } else {
+        try { applyDraftValues(canonicalMissionHandoffValues(handoffSource, handoffProjection)); }
+        catch { setDraftError("Saved thesis declarations are malformed. Review the source before starting this Mission."); draftFailureRef.current = "Saved thesis declarations are malformed."; return; }
+        if (persisted && persisted.completedAt == null) {
+          const message = "An unfinished Mission is already saved. Compare it with the requested thesis before choosing which draft to continue.";
+          setRemoteDraft(persisted); setDraftConflict(true); setDraftError(message); draftFailureRef.current = message;
+        }
+      }
+      return;
+    }
     if (persisted && persisted.completedAt == null) {
       applyDraftValues(persisted.values);
       return;
@@ -582,7 +611,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     setMissionDirty(true); // Immutable receipt text must never be regenerated from parameter defaults.
     setUnderwritingDirty(false);
     setRevisingReceipt(false);
-  }, [receiptTarget, draftInitialized, receiptLoading, receiptError, draftQuery.data, draftQuery.isLoading, draftQuery.isError, canonicalQuery.isLoading, canonicalQuery.isError, capitalQuery.isLoading, capitalQuery.isError, accountQuery.isLoading, accountQuery.isError, runway?.latest, projection]);
+  }, [receiptTarget, draftInitialized, receiptLoading, receiptError, draftQuery.data, draftQuery.isLoading, draftQuery.isError, canonicalQuery.isLoading, canonicalQuery.isError, capitalQuery.isLoading, capitalQuery.isError, accountQuery.isLoading, accountQuery.isError, runway?.latest, projection, handoffReadsLoading, handoffError]);
   const plannedRiskCeiling = cockpit.data?.headroom.lines.find((line) => line.key === "planned_risk_per_play")?.ceilingCents ?? null;
   const concentrationLine = cockpit.data?.headroom.lines.find((line) => /single name/i.test(line.label)) ?? null;
   const receiptActive = !receiptTarget && !revisingReceipt && currentBindingMatches && (latestBranch === "cash" || latestBranch === "conditional");
@@ -622,13 +651,14 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const draftState = missionDraftSaveState({ initialized: draftInitialized, values: draftValues, saved: savedDraft, saving: saveDraftMutation.isPending, error: draftError });
   const flushDraft = async (): Promise<MissionDraftRecord | null> => {
     if (receiptTarget) return null;
-    if (!draftInitialized || draftFailureRef.current) throw new Error(draftFailureRef.current ?? "Wait for the saved Mission draft to load.");
+    if (!draftInitialized || missionContextError || handoffReadsLoading || draftFailureRef.current) throw new Error(draftFailureRef.current ?? "Wait for the saved Mission draft to load.");
     while (draftWriteRef.current) await draftWriteRef.current;
     if (draftFailureRef.current) throw new Error(draftFailureRef.current);
     const values = latestDraftValues.current;
     const previous = savedDraftRef.current;
     if (previous && previous.completedAt == null && missionDraftFingerprint(previous.values) === missionDraftFingerprint(values)) return previous;
-    const request = saveDraftMutation.mutateAsync({ expectedVersion: previous?.version ?? 0, values });
+    const request = saveDraftMutation.mutateAsync({ expectedVersion: previous?.version ?? 0, values,
+      ...(handoff && previous?.values.strategyContext ? { replaceStrategyContext: true } : {}) });
     draftWriteRef.current = request;
     try {
       const saved = await request;
@@ -670,6 +700,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   };
   const useRemoteDraft = () => {
     if (!remoteDraft) return;
+    if (handoff) { window.location.assign(aperturePathForFixture("/aperture/mission", readIsolatedUatIdentity())); return; }
     applyDraftValues(remoteDraft.values);
     savedDraftRef.current = remoteDraft;
     setSavedDraft(remoteDraft);
@@ -802,6 +833,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   };
 
   if (!receiptTarget && !draftInitialized && missionContextError) {
+    if (handoffError) return <section role="alert" className="mx-auto max-w-3xl rounded-2xl border p-5" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-serif text-2xl">Thesis handoff unavailable</h2><p className="mt-2 text-sm leading-6">{handoffError}</p><Button className="mt-4 min-h-11" onClick={() => void refreshMissionContext()}>Retry loading saved context</Button></section>;
     return <section role="alert" className="mx-auto max-w-3xl rounded-2xl border p-5" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-serif text-2xl">Saved Mission context unavailable</h2><p className="mt-2 text-sm leading-6">The saved draft, receipt, thesis, or account could not be loaded. This is not an empty Mission. No new analysis has started.</p><Button className="mt-4 min-h-11" onClick={() => void refreshMissionContext()}>Retry loading saved context</Button></section>;
   }
   const discoveryReceipt = runway?.latest?.authority === "authoritative" && runway.latest.contextKind === "discovery"
@@ -850,10 +882,11 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   }
 
   return <section className="mx-auto max-w-5xl space-y-5 pb-24" onChangeCapture={markDraftEdited} onClickCapture={(event) => { if (event.target instanceof Element && event.target.closest("[data-draft-edit]")) markDraftEdited(); }}>
+    {handoff && !handoffReceipt && <section aria-label="Canonical Mission handoff" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-border-1)" }}><p className="font-semibold">{draftState === "saved" ? "Resumed thesis draft" : "New Mission assumptions — review before saving"}</p><p>Saved source #{handoff.canonicalThesisId} · projection #{handoff.capitalThesisId}. Previous Mission receipts remain unchanged. No analysis has started from this handoff.</p></section>}
     {underwritingComplete && editingCompletedMission && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-sm" style={{ borderColor: "var(--sh-border-1)" }}><p>Editing the saved plan. Changes require review before new analysis.</p><Button variant="outline" className="min-h-11" onClick={() => setEditingCompletedMission(false)}>Back to result</Button></div>}
-    {!receiptTarget && <div className="flex flex-wrap items-center justify-between gap-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}><p><strong style={{ color: "var(--sh-text-primary)" }}>{paperAccount?.label ?? "Select paper account"}</strong> · Paper</p><p role="status" aria-live="polite">{draftError ? "Draft not saved" : draftState === "saving" ? "Saving draft…" : draftState === "saved" ? `Saved · ${new Date(savedDraft!.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : draftTouched ? "Changes not yet saved" : savedDraft?.completedAt != null ? "From your saved Mission" : "Draft saves as you edit"}</p></div>}
+    {!receiptTarget && <div className="flex flex-wrap items-center justify-between gap-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}><p><strong style={{ color: "var(--sh-text-primary)" }}>{paperAccount?.label ?? "Select paper account"}</strong> · Paper</p><p role="status" aria-live="polite">{draftError ? "Draft not saved" : draftState === "saving" ? "Saving draft…" : draftState === "saved" ? `Saved · ${new Date(savedDraft!.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : draftTouched ? "Changes not yet saved" : handoff ? "New Mission draft · not saved" : savedDraft?.completedAt != null ? "From your saved Mission" : "Draft saves as you edit"}</p></div>}
     {missionContextError && draftInitialized && <div role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)" }}><p>Saved context could not be refreshed. Your last loaded values remain visible; underwriting is withheld.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void refreshMissionContext()}>Refresh saved context</Button></div>}
-    {draftError && <section role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-semibold">{draftConflict ? "Another device changed this draft" : "Draft save needs attention"}</h2><p className="mt-2 leading-6">{draftError}</p>{draftConflict ? <><p className="mt-2">Your edits are still here. Compare before choosing which version to keep.</p>{remoteDraft ? <><DraftDifference local={draftValues} remote={remoteDraft.values} /><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" className="min-h-11" onClick={useRemoteDraft}>Use saved draft</Button><Button className="min-h-11" onClick={() => void saveReviewedLocalDraft()}>Save these edits as a new revision</Button></div></> : <Button variant="outline" className="mt-3 min-h-11" onClick={() => void utils.aperture.runway.draft.get.fetch().then(setRemoteDraft).catch(() => toast.error("The saved draft could not be loaded. Your edits remain here."))}>Load saved draft for comparison</Button>}</> : !completedDraftRef.current ? <Button variant="outline" className="mt-3 min-h-11" onClick={() => void retryDraft()}>Retry saving draft</Button> : <Button variant="outline" className="mt-3 min-h-11" onClick={() => window.location.reload()}>Reload saved Mission</Button>}</section>}
+    {draftError && <section role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-semibold">{draftConflict ? (handoff ? "Choose which Mission draft to continue" : "Another device changed this draft") : "Draft save needs attention"}</h2><p className="mt-2 leading-6">{draftError}</p>{draftConflict ? <><p className="mt-2">Your edits are still here. Compare before choosing which version to keep.</p>{remoteDraft ? <><DraftDifference local={draftValues} remote={remoteDraft.values} /><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" className="min-h-11" onClick={useRemoteDraft}>Use saved draft</Button><Button className="min-h-11" onClick={() => void saveReviewedLocalDraft()}>Save these edits as a new revision</Button></div></> : <Button variant="outline" className="mt-3 min-h-11" onClick={() => void utils.aperture.runway.draft.get.fetch().then(setRemoteDraft).catch(() => toast.error("The saved draft could not be loaded. Your edits remain here."))}>Load saved draft for comparison</Button>}</> : !completedDraftRef.current ? <Button variant="outline" className="mt-3 min-h-11" onClick={() => void retryDraft()}>Retry saving draft</Button> : <Button variant="outline" className="mt-3 min-h-11" onClick={() => window.location.reload()}>Reload saved Mission</Button>}</section>}
     {(jobNeedsReconciliation || runUnderwriting.error || underwritingStructureInvalid) && underwritingTaskPath && <section role="status" aria-live="polite" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}><h2 className="font-semibold">Saved underwriting task</h2><p className="mt-2 leading-6">{underwritingStructureInvalid ? "The saved result has malformed horizon data. Reload its corrected record; do not restart the completed job." : underwritingJob.data?.message ?? "The analysis response was interrupted. Check actual progress before retrying."}</p><Button className="mt-3 min-h-11" onClick={() => window.location.assign(underwritingTaskPath)}>{underwritingJob.data?.state === "running" ? "View underwriting progress" : "Review underwriting task"}</Button><p className="mt-2">Leaving this view does not cancel the task. No paper ticket has been requested.</p></section>}
     <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm">Saved context & provenance</summary><div className="grid gap-px overflow-hidden rounded-b-xl border-t md:grid-cols-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
       {[
@@ -889,7 +922,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
         ].map((section) => <li key={section.number}><button type="button" aria-current={visibleMissionSection === section.number ? "step" : undefined} className="flex min-h-14 w-full items-start gap-2 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" style={{ background: visibleMissionSection === section.number ? "color-mix(in srgb, var(--sh-signal) 8%, var(--sh-surface-2))" : "var(--sh-surface-2)", color: visibleMissionSection === section.number ? "var(--sh-signal)" : "var(--sh-text-primary)" }} onClick={() => setExpandedMissionSection(section.number as 1 | 2 | 3)}><span className="font-mono text-xs tabular-nums">{section.number}</span><span className="min-w-0"><span className="block text-[0.62rem] font-semibold uppercase tracking-[0.08em]">{section.label}{section.number < activeMissionSection ? <span className="sr-only"> complete</span> : null}</span><span className="mt-1 hidden text-xs sm:block font-normal normal-case tracking-normal" style={{ color: "var(--sh-fg-muted)" }}>{section.summary}</span></span></button></li>)}</ol></nav>
         {receiptActive ? <DecisionReceipt branch={latestBranch as "cash" | "conditional"} reason={latestReason} blocker={latestBlocker} reopen={latestReopen} gateLabel={latestGate} reviewAt={latestReviewAt} revision={latestRevision} recordedAt={latestRecordedAt} binding={immutableReceipt?.binding} pendingCashOutcome={currentCashOutcome} recordedCashOutcome={authoritativeLatest?.cashOutcome} onRecordCashOutcome={recordCashOutcome} resolvingCashOutcome={resolveCashOutcome.isPending} onGateReview={reviseReceipt} onRevise={reviseReceipt} /> : <><div className="space-y-5 p-5 sm:p-7">
           <div hidden={visibleMissionSection !== 1} className="space-y-5"><section aria-labelledby="mission-section-thesis" className="space-y-3"><div className="flex items-center justify-between"><div><p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>1 · Thesis & horizon</p><h2 id="mission-section-thesis" tabIndex={-1} className="mt-1 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4" style={{ scrollMarginTop: "calc(var(--header-height, 4rem) + 1rem)" }}>What do you believe, and for how long?</h2></div><span className="text-xs" style={{ color: "var(--sh-emerald)" }}>Saved thesis</span></div><div id="assigned-thesis" className="rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 32%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" }}>
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div className="flex gap-3"><BookOpen className="mt-0.5 h-5 w-5" style={{ color: "var(--sh-signal)" }} /><div><p className="text-[0.62rem] font-semibold uppercase tracking-[0.13em]" style={{ color: "var(--sh-fg-muted)" }}>Assigned thesis loaded</p><p className="mt-1 text-sm font-semibold">{canonicalThesisLabel(activeThesis)}</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Run-specific edits create a new receipt. The saved thesis remains unchanged.</p></div></div><select aria-label="Switch assigned thesis" className="min-h-11 rounded-md border bg-transparent px-2 text-xs" style={{ borderColor: "var(--sh-border-1)" }} value={activeCanonicalId ?? ""} onChange={(event) => { setSelectedCanonicalId(Number(event.target.value)); setMissionDirty(false); setUnderwritingDirty(true); }}><option value="" disabled>Switch thesis</option>{(canonicalTheses ?? []).map((item) => <option key={item.id} value={item.id}>{canonicalThesisLabel(item)}</option>)}</select></div>
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div className="flex gap-3"><BookOpen className="mt-0.5 h-5 w-5" style={{ color: "var(--sh-signal)" }} /><div><p className="text-[0.62rem] font-semibold uppercase tracking-[0.13em]" style={{ color: "var(--sh-fg-muted)" }}>Assigned thesis loaded</p><p className="mt-1 text-sm font-semibold">{canonicalThesisLabel(activeThesis)}</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Run-specific edits create a new receipt. The saved thesis remains unchanged.</p></div></div><select disabled={Boolean(handoff)} aria-label="Switch assigned thesis" className="min-h-11 rounded-md border bg-transparent px-2 text-xs" style={{ borderColor: "var(--sh-border-1)" }} value={activeCanonicalId ?? ""} onChange={(event) => { setSelectedCanonicalId(Number(event.target.value)); setMissionDirty(false); setUnderwritingDirty(true); }}><option value="" disabled>Switch thesis</option>{(canonicalTheses ?? []).map((item) => <option key={item.id} value={item.id}>{canonicalThesisLabel(item)}</option>)}</select></div>
           </div>
 
           <div><div className="flex items-start justify-between gap-3"><p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Capital Mission</p><Button data-draft-edit variant="ghost" size="sm" className="min-h-11" onClick={() => setEditing((value) => !value)}><Pencil className="mr-2 h-3.5 w-3.5" />{editing ? "Done" : "Edit mission"}</Button></div>

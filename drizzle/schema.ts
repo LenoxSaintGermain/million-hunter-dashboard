@@ -723,6 +723,8 @@ export const thesisCompilations = mysqlTable("thesis_compilations", {
     holdingPeriod?: "intraday" | "overnight" | "swing" | "catalyst_window" | "position" | null;
     instrumentPreference?: "shares" | "options" | "either" | null;
     researchSymbols?: string[];
+    researchUniverse?: string;
+    researchUniverseNeedsReview?: boolean;
     capitalTradeDetails?: { belief?: string; seeks?: string; avoids?: string; horizon?: string; risk?: string };
   }>().default({}),
   scoringWeights: json("scoring_weights").$type<Array<{
@@ -1101,6 +1103,8 @@ export const capitalTheses = mysqlTable("capital_theses", {
     behavior?: { researches?: number; shortlists?: number; executes?: number };
     exposureTree?: Array<{ label: string; children?: any[] }>;
     researchSymbols?: string[];
+    researchUniverse?: string;
+    researchUniverseNeedsReview?: boolean;
     evidenceRequirements?: string[];
     invalidationConditions?: string[];
     instrumentPreference?: "shares" | "options" | "either" | null;
