@@ -675,3 +675,26 @@ Saved production reviews were not changed. This delta is not yet deployed.
 Cross-device unsaved-review drafts, screen-reader/enlarged-text acceptance and
 market-open full lifecycle UAT remain unverified; closing the inline form still
 discards its unsaved draft under the existing behavior.
+
+### September 13 production deployment receipt
+
+The local-only status above is superseded for this increment by the operator's
+explicit deployment instruction.
+
+- Source: `7e00cb2a06c8dcbd264d0ab0ccd6109a68137ff2` (clean checkout).
+- Cloud Build: `cc7dd3b5-aa11-46a3-ab53-81630519dd0f`, SUCCESS.
+- Runtime source snapshot: `da7e74583e39f8f64b23e8313b5eb5b209b4dc9ca0aa9c0122699fb61480a8f6`.
+- Image digest: `sha256:b46bebc16643c1b2e4d8385e2b9fdbc771d5d018e8e08e044a5055802c41531f`.
+- Revision: `capital-aperture-00146-xaf`, 100% production traffic.
+- Rollback retained: `capital-aperture-00144-gab`.
+- Public URL: https://third-signal-capital-aperture.web.app/aperture
+- Runtime specification comparison: unchanged except container image.
+- No migration, authentication configuration change, review save or broker action.
+
+Tagged zero-traffic checks passed before promotion. All six public read-only
+checks passed at 2026-09-13 17:11:31 UTC: app shell, same-origin bundle, exact
+source SHA, Today copy, JSON API health and denied unauthenticated account access.
+The public bundle also contains the new presets, replacement confirmation and
+shortened stale-state guidance. This is release verification, not an additional
+authenticated interaction or market-open UAT pass. The bounded interaction
+results and unverified items above remain the acceptance record.
