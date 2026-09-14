@@ -979,8 +979,15 @@ describe("discovery selection — isolated persisted adversarial handoff", () =>
     await blocked(() => caller.runway.startResearch({ decisionRunId: input.decisionRunId, revisionId: input.decisionRevisionId, uatCase: "qualified-play" }));
   });
 
-  it.each([false, true])("public selection persists underwriting and resumes without new work (positive=%s)", async positive => {
-    const input = await source(), before = await snapshot();
+  it.each([
+    { positive: false, fullCapital: false },
+    { positive: true, fullCapital: false },
+    { positive: true, fullCapital: true },
+  ])("public selection persists underwriting and resumes without new work ($positive, full capital=$fullCapital)", async ({ positive, fullCapital }) => {
+    const input = await source();
+    if (fullCapital) await db.update(portfolioAccounts).set({ equityValueCents: 800_025, cashCents: 800_025 })
+      .where(eq(portfolioAccounts.id, owners[0].accountId));
+    const before = await snapshot();
     expectedUnderwriterCalls = 1;
     forbidden.underwriter.mockImplementationOnce(async (args: any) => {
       expect(args.projection.sourceCompilationId).toBeNull();
@@ -995,6 +1002,7 @@ describe("discovery selection — isolated persisted adversarial handoff", () =>
         candidates: positive ? [{ symbol: "DATA", title: "Illustrative conditional research play", direction: "conditional",
           evidence: ["Illustrative contract mechanism; adoption still unverified."], sourceUrls: ["https://example.test/contract"],
           confirmationDescription: "Verify actual incremental adoption.", invalidationDescription: "Consideration is fixed.",
+          ...(fullCapital ? { lastPrice: 100, lastPriceAsOf: NOW } : {}),
           liquidityScore: 50, portfolioFitScore: 75 }] : [], risk: { normalPlayRiskPct: 0.75, highConvictionRiskPct: 1.25,
           maxAggregateOpenRiskPct: 3, weeklyLossLimitPct: 4, eventRiskAllocationPct: 1.5,
           perPlayHeadroomCents: 75_000, aggregateOpenRiskBeforeCents: 0, weeklyLossUsedCents: 0 },
@@ -1028,16 +1036,31 @@ describe("discovery selection — isolated persisted adversarial handoff", () =>
         underwritingRevisionId: selected.result.underwritingRevisionId, playId: play.id });
       expect(validation.createdResearchRun).toBe(false);
       expect(validation.createdBrokerOrder).toBe(false);
+      if (fullCapital) {
+        // A smaller selected play is not a bypass: account headroom still wins.
+        await db.update(portfolioAccounts).set({ equityValueCents: 100_000 }).where(eq(portfolioAccounts.id, owners[0].accountId));
+        await blocked(() => caller().runway.startResearch({ decisionRunId: validation.decisionRunId, revisionId: validation.decisionRevisionId }));
+        expect(forbidden.swarm).not.toHaveBeenCalled();
+        await db.update(portfolioAccounts).set({ equityValueCents: 800_025 }).where(eq(portfolioAccounts.id, owners[0].accountId));
+      }
       forbidden.macro.mockImplementationOnce(async () => ({ facts: [], ranProviders: [], errors: [] }));
       forbidden.swarm.mockImplementationOnce(async () => undefined);
       const request = { decisionRunId: validation.decisionRunId, revisionId: validation.decisionRevisionId };
       const attempts = await Promise.allSettled([caller().runway.startResearch(request), caller().runway.startResearch(request)]);
       const first = attempts.find(attempt => attempt.status === "fulfilled");
-      if (!first || first.status !== "fulfilled") throw new Error("No research dispatch completed");
+      if (!first || first.status !== "fulfilled") throw new Error(`No research dispatch completed: ${attempts.map(a => a.status === "rejected" ? String(a.reason) : "fulfilled").join("; ")}`);
       const started = first.value;
       expect(started.status).toBe("started");
       if (started.status !== "started") throw new Error("Expected exact research handoff");
       researchFixtureRunId = started.runId;
+      if (fullCapital) {
+        const [research] = await db.select().from(apertureRuns).where(eq(apertureRuns.id, started.runId));
+        const [mission] = await db.select().from(apertureDecisionRevisions).where(eq(apertureDecisionRevisions.id, selected.decisionRevisionId));
+        expect(mission.deployableCapitalCents).toBe(800_025);
+        expect(research.deployableCapitalCents).toBe(play.sizing.proposedNotionalCents);
+        expect(research.deployableCapitalCents).toBeGreaterThan(0);
+        expect(research.deployableCapitalCents).toBeLessThanOrEqual(Math.floor(800_025 * 0.4));
+      }
       expect(attempts.every(attempt => attempt.status === "fulfilled")).toBe(true);
       expect(attempts.map(attempt => attempt.status === "fulfilled" && attempt.value.status === "started" ? attempt.value.runId : null)).toEqual([started.runId, started.runId]);
       const recovered = await caller().runway.startResearch(request);

@@ -2255,10 +2255,21 @@ export const apertureRouter = router({
             message: "Catalyst-window research requires a declared review or look-back time. Return to Capital Mission and set it before starting research.",
           });
         }
+        // The mission is the operator's capital envelope, not an instruction to
+        // deploy it all into this one selected play. Keep that envelope immutable;
+        // research carries the blueprint's proposed notional and still passes the
+        // unchanged per-run mandate. An unmeasured structure keeps the conservative
+        // legacy envelope check until research can establish its size.
+        const proposedNotionalCents = selectedBlueprint.sizing.proposedNotionalCents;
+        if (!Number.isSafeInteger(proposedNotionalCents) || proposedNotionalCents < 0
+          || proposedNotionalCents > revision.deployableCapitalCents) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The selected play's proposed capital is invalid or exceeds this Mission. Re-underwrite before research; no run was created." });
+        }
+        const researchCapitalCents = proposedNotionalCents > 0 ? proposedNotionalCents : revision.deployableCapitalCents;
         const runInput = {
           thesisId: thesis.id,
           accountId: account.id,
-          deployableCapitalCents: revision.deployableCapitalCents,
+          deployableCapitalCents: researchCapitalCents,
           intendedTrades: [{
             symbol: selectedBlueprint.underlyingSymbol,
             dollarsCents: selectedBlueprint.sizing.proposedNotionalCents,
@@ -2302,7 +2313,7 @@ export const apertureRouter = router({
             userId: ctx.user.id,
             thesisId: thesis.id,
             accountId: account.id,
-            deployableCapitalCents: revision.deployableCapitalCents,
+            deployableCapitalCents: researchCapitalCents,
             intendedTrades: runInput.intendedTrades,
             holdingPeriod: revision.holdingPeriod,
             instrumentPreference: revision.instrumentPreference,
