@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PriceRiskVisual } from "@/components/aperture/PriceRiskVisual";
 import { marketAvailabilityCopy } from "@shared/marketAvailability";
+import { recipeHorizonRecovery } from "@shared/intradayRecipeGuard";
 
 type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
 
@@ -114,7 +115,10 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   const destinationAccount = executionAccounts.find((item) => item.id === destinationAccountId) ?? null;
   const isOption = isOptionInstrument(instrumentType);
   const utils = trpc.useUtils();
-  const constructed = trpc.aperture.play.construct.useQuery({ runId, candidateId: candidate?.id ?? 0 }, { enabled: !!candidate?.id, staleTime: 30_000 });
+  const sourceHorizonRecovery = recipeHorizonRecovery({ holdingPeriod: run?.holdingPeriod, playSide: candidate?.playSide });
+  const constructed = trpc.aperture.play.construct.useQuery({ runId, candidateId: candidate?.id ?? 0 }, { enabled: !!candidate?.id && !sourceHorizonRecovery, staleTime: 30_000 });
+  const recipeRecovery = sourceHorizonRecovery
+    ?? (constructed.data && "recovery" in constructed.data ? constructed.data.recovery : null);
   const create = trpc.aperture.order.create.useMutation({
     onSuccess: async (result) => {
       await utils.aperture.order.list.invalidate({ runId });
@@ -133,7 +137,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
     },
     onError: (error) => toast.error(error.message),
   });
-  const constructedPlay = constructed.data?.play;
+  const constructedPlay = recipeRecovery ? null : constructed.data?.play;
   const optionChain = trpc.aperture.order.optionChain.useQuery({
     accountId: destinationAccount?.id ?? 0,
     underlyingSymbol: candidate?.symbol ?? "",
@@ -141,7 +145,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
     type: instrumentType === "long_put" ? "put" : "call",
     targetPriceCents: constructedPlay?.entry?.priceCents ?? undefined,
   }, {
-    enabled: Boolean(isOption && destinationAccount?.id && candidate?.symbol && /^\d{4}-\d{2}-\d{2}$/.test(optionExpirationDate)),
+    enabled: Boolean(!recipeRecovery && isOption && destinationAccount?.id && candidate?.symbol && /^\d{4}-\d{2}-\d{2}$/.test(optionExpirationDate)),
     staleTime: 30_000,
     retry: false,
   });
@@ -255,14 +259,14 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   // field is hidden until a preflight that cannot pass without it.
   const preflightTicket = useMemo(() => ({ ...ticket, paperAcknowledgement: "PAPER" }), [ticket]);
   const preflightTicketFingerprint = useMemo(() => JSON.stringify(preflightTicket), [preflightTicket]);
-  const preflightEnabled = Boolean(account && destinationAccount && candidate && (isOption ? optionTermsReady : recipeCanPrepare));
+  const preflightEnabled = Boolean(!recipeRecovery && account && destinationAccount && candidate && (isOption ? optionTermsReady : recipeCanPrepare));
 
   useEffect(() => {
     if (!preflightEnabled) { setPreflightInput(null); return; }
     const timer = window.setTimeout(() => setPreflightInput({ ticket: preflightTicket, fingerprint: preflightTicketFingerprint }), 400);
     return () => window.clearTimeout(timer);
   }, [preflightEnabled, preflightTicket, preflightTicketFingerprint]);
-  const preflight = trpc.aperture.order.preflight.useQuery(preflightInput?.ticket ?? preflightTicket, { enabled: preflightInput != null, staleTime: 0, retry: false });
+  const preflight = trpc.aperture.order.preflight.useQuery(preflightInput?.ticket ?? preflightTicket, { enabled: !recipeRecovery && preflightInput != null, staleTime: 0, retry: false });
   const preflightMatchesTicket = preflightInput?.fingerprint === preflightTicketFingerprint;
   const currentPreflightData = preflightMatchesTicket ? preflight.data : undefined;
   const hardPreflightResult = (currentPreflightData?.evaluation.results ?? []).find((result) => !result.passed && HARD_PREFLIGHT_GATE_KEYS.has(result.key));
@@ -325,12 +329,17 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   });
 
   const refreshRecipe = async () => {
+    if (recipeRecovery) return;
     const result = await constructed.refetch();
     if (result.isError) {
       toast.error("Market checks could not refresh. Existing answers are saved; no ticket was created.");
       return;
     }
-    toast.info(result.data?.play.readiness === "constructed"
+    if (result.data && "recovery" in result.data && result.data.recovery) {
+      toast.info(result.data.recovery.reason);
+      return;
+    }
+    toast.info(result.data?.play?.readiness === "constructed"
       ? "Market checks refreshed. Review the measured ticket and current guardrails before creating a proposal."
       : "Market checks refreshed; this setup still needs verified inputs. Review the reason above.");
   };
@@ -348,6 +357,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   });
 
   const submitProposal = () => {
+    if (recipeRecovery) return toast.error(recipeRecovery.reason);
     const deadlineAt = new Date(deadline).getTime();
     const noTradeConditions = noTradeText.split("\n").map((condition) => condition.trim()).filter(Boolean);
     if (!account) return toast.error("Choose the portfolio context this research was tested against.");
@@ -363,6 +373,17 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   };
 
   if (!candidate) return null;
+  // Keep all hooks above this return. Unsupported source horizons must never
+  // become a market-refresh loop, an assumed direction, or an options bypass.
+  if (recipeRecovery) return <Card id="paper-proposal" className="scroll-mt-6 border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
+    <CardContent className="space-y-3 pt-4">
+      <p className="text-sm font-semibold" style={{ color: "var(--sh-signal)" }}>Research only · no paper recipe</p>
+      <h2 className="font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}><span translate="no">{candidate.symbol}</span> · {recipeRecovery.horizonLabel}</h2>
+      <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{recipeRecovery.side ? `Recorded direction: ${recipeRecovery.side}` : "Direction not recorded — no direction assumed."}</p>
+      <p className="text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{recipeRecovery.reason} {recipeRecovery.nextStep}</p>
+      <Button type="button" variant="outline" className="min-h-11" onClick={onReturnToBrief}>View research</Button>
+    </CardContent>
+  </Card>;
   const suggestedRange = candidate.suggestedSizeHighCents != null ? `${money(candidate.suggestedSizeLowCents)}–${money(candidate.suggestedSizeHighCents)}` : money(candidate.suggestedSizeLowCents);
   const preflightGaps = currentPreflightData?.blocking ?? [];
   const takeReadinessAction = () => {

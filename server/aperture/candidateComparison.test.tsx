@@ -19,7 +19,7 @@ vi.mock("@/components/ui/sheet", () => ({
 vi.mock("@/lib/trpc", () => {
   const mutation = { useMutation: () => ({ mutate: state.mutate, isPending: false }) };
   return { trpc: { useUtils: () => ({}), aperture: {
-    run: { get: { useQuery: () => ({ data: state.data, isLoading: false, refetch: vi.fn() }) }, retry: mutation, followUp: mutation, evidence: { review: mutation } },
+    run: { get: { useQuery: () => ({ data: state.data, isLoading: false, refetch: vi.fn() }) }, retry: mutation, followUp: mutation, evidence: { review: mutation, refreshFinancialFacts: mutation } },
     macro: { refresh: mutation }, generateMemo: mutation,
   } } };
 });
@@ -33,6 +33,20 @@ function render(reviews: any[] = []) {
 }
 
 describe("candidate comparison", () => {
+  it("shows a whole-share affordability blocker before opening the candidate drawer", () => {
+    const $ = load(renderToStaticMarkup(<CandidateComparison candidates={[{
+      ...candidates[0], symbol: "VLO", affordability: {
+        state: "above_limit", referencePriceCents: 39964, ceilingCents: 10000,
+        asOf: Date.parse("2026-09-14T14:52:00Z"), sourceName: "Illustrative recorded quote",
+        accountAsOf: Date.parse("2026-09-14T14:50:00Z"),
+      },
+    }]} reviews={[]} inspectedId={null} onInspect={vi.fn()} />));
+    expect($.text()).toContain("Above share budget");
+    expect($.text()).toContain("$399.64");
+    expect($.text()).toContain("$100.00");
+    expect($.text()).toContain("Research only");
+    expect($("button[aria-label='Inspect VLO']")).toHaveLength(1);
+  });
   it("exposes all twelve choices without sequential navigation", () => {
     const $ = render();
     expect($("[data-candidate-row]")).toHaveLength(12);

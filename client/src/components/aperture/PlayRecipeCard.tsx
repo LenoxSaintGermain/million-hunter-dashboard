@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { PriceRiskVisual } from "@/components/aperture/PriceRiskVisual";
 import { marketAvailabilityCopy } from "@shared/marketAvailability";
+import { recipeHorizonRecovery } from "@shared/intradayRecipeGuard";
 
 function money(cents: number | null | undefined) {
   return cents == null ? "Not measured" : `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -49,15 +50,28 @@ export function PlayRecipeCard({
 }) {
   const { data, isLoading, isError, refetch } = trpc.aperture.play.construct.useQuery(
     { runId: run.id, candidateId: candidate.id },
-    { staleTime: 30_000 },
+    { staleTime: 30_000, enabled: run.holdingPeriod === "intraday" },
   );
+
+  // Fail closed even with a cached pre-fix recipe or before a query resolves.
+  // A server recovery also wins if the client's saved run horizon is stale.
+  const recovery = recipeHorizonRecovery({ holdingPeriod: run.holdingPeriod, playSide: candidate.playSide })
+    ?? (data && "recovery" in data ? data.recovery : null);
+  if (recovery) return <section className="rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
+    <p className="text-sm font-semibold" style={{ color: "var(--sh-signal)" }}>Research only · no paper recipe</p>
+    <h3 className="mt-1 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}><span translate="no">{candidate.symbol}</span> · {recovery.horizonLabel}</h3>
+    <p className="mt-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}>{recovery.side ? `Recorded direction: ${recovery.side}` : "Direction not recorded — no direction assumed."}</p>
+    <p className="mt-3 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{recovery.reason}</p>
+    <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{recovery.nextStep}</p>
+    <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={onOpenResearch}>View research</Button>
+  </section>;
 
   if (isError) return <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-signal)" }}>
     <p className="font-semibold">This candidate’s plan could not be loaded.</p>
     <p className="mt-1 text-sm">Current pricing and risk are unavailable. Retry before preparing a ticket.</p>
     <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={() => refetch()}>Retry plan</Button>
   </section>;
-  if (isLoading || !data) {
+  if (isLoading || !data || !data.play) {
     return <section className="rounded-xl border p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
       <div className="flex items-center gap-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}>
         <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />

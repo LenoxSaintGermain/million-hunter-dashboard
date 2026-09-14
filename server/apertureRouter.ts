@@ -68,7 +68,9 @@ import { sumMeasuredOpenRiskCents } from "../shared/measuredOpenRisk";
 import { applyCanonicalDeclarations, compileThesis, flattenExposureTree, resolveRunGraph, validateGraphForPersistence, type ThesisGraph } from "./aperture/thesisGraph";
 import { discoverUniverse, operatorDeclaredUniverse, thesisSummary } from "./aperture/universe";
 import { collectSecurityFacts, collectMacroFacts, describeAvailability, availabilityMap, MACRO_SYMBOL } from "./aperture/providers/index";
-import { getFacts, freshestPerKey } from "./aperture/facts";
+import { getFacts, freshestPerKey, recordFacts } from "./aperture/facts";
+import { edgarProvider } from "./aperture/providers/edgar";
+import { candidateAffordability } from "./aperture/candidateAffordability";
 import { runResearchSwarm } from "./aperture/researchSwarm";
 import { scoreThesisFit, assignRole } from "./aperture/score";
 import { buildStrategies } from "./aperture/strategies";
@@ -91,7 +93,7 @@ import { ensureThesisReady } from "./aperture/thesisReadiness";
 import { buildBriefResearchPlan, isRunStale, nextFollowUpOffset } from "./aperture/runRecovery";
 import { getEvidenceReviewReadiness } from "../shared/evidenceReview";
 import { normalizeJsonRecord, normalizeStringList } from "../shared/stringList";
-import { missingIntradayRecipeMessage } from "../shared/intradayRecipeGuard";
+import { missingIntradayRecipeMessage, recipeHorizonRecovery } from "../shared/intradayRecipeGuard";
 import { fetchIntradayBars } from "./aperture/providers/marketData";
 import { checkVwapHold, openingRange, sessionVwap } from "./aperture/intraday";
 import { REGULAR_OPEN, etClock, marketSession, nextRegularSessionOpen, startOfEtDay } from "./aperture/marketSession";
@@ -3075,6 +3077,21 @@ export const apertureRouter = router({
           ? await db!.select({ symbol: positions.symbol, marketValueCents: positions.marketValueCents, priceAsOf: positions.priceAsOf })
             .from(positions).where(eq(positions.accountId, paperAccount.id))
           : [];
+        // A read-only, batched hint from saved facts. Failure leaves the research
+        // record available and affordability explicitly unknown; no provider job.
+        const affordabilityNow = Date.now();
+        const candidateFacts = await getFacts(candidates.map((candidate) => candidate.symbol), affordabilityNow).catch(() => []);
+        const candidatesWithBudget = candidates.map((candidate) => ({
+          ...candidate,
+          affordability: candidateAffordability({
+            equityCents: paperAccount?.equityValueCents ?? null,
+            capitalCents: run.deployableCapitalCents,
+            instrumentPreference: run.instrumentPreference,
+            accountAsOf: paperAccount?.lastSyncedAt ?? null,
+            now: affordabilityNow,
+            price: candidateFacts.find((fact) => fact.symbol === normSymbol(candidate.symbol) && fact.factKey === "last_price"),
+          }),
+        }));
         const coverageNodeIds = coverage.map((item) => item.nodeId);
         const coverageNodes = coverageNodeIds.length
           ? await db!.select().from(exposureNodes).where(inArray(exposureNodes.id, coverageNodeIds))
@@ -3099,7 +3116,7 @@ export const apertureRouter = router({
           run,
           decisionAuthority: decisionAuthority ?? null,
           stale: isRunStale(run),
-          candidates,
+          candidates: candidatesWithBudget,
           strategies,
           coverage,
           coverageDetail,
@@ -3120,12 +3137,34 @@ export const apertureRouter = router({
       }),
 
     evidence: router({
+      /** Deliberate provider refresh, distinct from ordinary record reads. */
+      refreshFinancialFacts: capitalOperatorProcedure
+        .input(z.object({ runId: z.number(), candidateId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const db = await getDb();
+          const [row] = await db!.select({ candidate: apertureCandidates }).from(apertureCandidates)
+            .innerJoin(apertureRuns, eq(apertureRuns.id, apertureCandidates.runId))
+            .where(and(eq(apertureCandidates.id, input.candidateId), eq(apertureCandidates.runId, input.runId), eq(apertureRuns.userId, ctx.user.id))).limit(1);
+          if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Evidence item not found in your research history" });
+          const now = Date.now();
+          const facts = await edgarProvider.fetchSecurityFacts!(row.candidate.symbol, { now, timeoutMs: 8_000 });
+          // A provider outage must not replace useful saved facts with unknowns.
+          // Always append a missing revenue key when OTHER numeric coverage was
+          // returned, so a superseded annual cannot survive a newer partial filing.
+          if (!facts.some(fact => fact.basis !== "unknown" && fact.valueNum != null)) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "SEC financial facts are unavailable. Existing research and reviews are unchanged; retry when the source is available." });
+          }
+          await recordFacts(row.candidate.symbol, facts, now);
+          return { symbol: row.candidate.symbol, refreshedAt: now, revenueAvailable: facts.some(fact => fact.factKey === "revenue_ttm" && fact.basis !== "unknown"), reviewChanged: false as const, orderCreated: false as const };
+        }),
       /** Draft a source record from the verified fact ledger. Read-only: it
        *  records nothing and never answers the gate. */
       factDraft: capitalOperatorProcedure
         .input(z.object({ runId: z.number(), candidateId: z.number(), checkLabel: z.string().min(2).max(255) }))
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
           const db = await getDb();
+          const [ownedRun] = await db!.select({ id: apertureRuns.id }).from(apertureRuns).where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id))).limit(1);
+          if (!ownedRun) throw new TRPCError({ code: "NOT_FOUND", message: "Evidence item not found in your research history" });
           const [candidate] = await db!.select().from(apertureCandidates)
             .where(and(eq(apertureCandidates.id, input.candidateId), eq(apertureCandidates.runId, input.runId)))
             .limit(1);
@@ -3143,6 +3182,8 @@ export const apertureRouter = router({
         }))
         .mutation(async ({ ctx, input }) => {
           const db = await getDb();
+          const [ownedRun] = await db!.select({ id: apertureRuns.id }).from(apertureRuns).where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id))).limit(1);
+          if (!ownedRun) throw new TRPCError({ code: "NOT_FOUND", message: "Evidence item not found in your research history" });
           const [candidate] = await db!.select().from(apertureCandidates)
             .where(and(eq(apertureCandidates.id, input.candidateId), eq(apertureCandidates.runId, input.runId)))
             .limit(1);
@@ -3653,6 +3694,21 @@ export const apertureRouter = router({
             eq(apertureRuns.userId, ctx.user.id),
           )).limit(1);
         if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Play not found in your research history" });
+
+        // Check the persisted, owner-scoped horizon before fixtures, accounts,
+        // market data, or any default direction can produce an intraday recipe.
+        const recovery = recipeHorizonRecovery({ holdingPeriod: row.run.holdingPeriod, playSide: row.candidate.playSide });
+        if (recovery) return {
+          play: null,
+          recovery,
+          marketContext: {
+            session: "unknown" as const,
+            nextRegularSessionOpenAt: null,
+            referencePriceCents: null,
+            referenceAsOf: null,
+          },
+          disclosure: "Research only. No recipe, proposal, approval, or order was created; the original research horizon is preserved.",
+        };
 
         const illustrativeFixtureRecipe = isExactIsolatedUatRuntime()
           && ctx.user.openId === "uat_jim_9c18799"

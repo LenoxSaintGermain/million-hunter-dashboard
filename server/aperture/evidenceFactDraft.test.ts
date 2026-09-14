@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildEvidenceFactDraft } from "./evidenceFactDraft";
 import type { SecurityFact } from "../../drizzle/schema";
+import { evidenceQuestionReadiness } from "../../shared/evidenceQuestion";
 
 const at = Date.UTC(2026, 8, 10, 12);
 const f = (factKey: string, valueNum: number, over: Partial<SecurityFact> = {}): SecurityFact => ({
@@ -17,6 +18,22 @@ const full = [
 ];
 
 describe("a price-multiple check drafts itself from verified facts", () => {
+  it("retains the source bridge when the denominator is a modeled TTM", () => {
+    const assumption = "FY 100 + current YTD 60 - prior YTD 50 = TTM 110; matching fiscal periods.";
+    const d = buildEvidenceFactDraft({ symbol: "MYRG", checkLabel: "C: Price / sales", facts: full.map(row => row.factKey === "revenue_ttm" ? { ...row, basis: "modeled", assumption } : row) as SecurityFact[] });
+    if (!d.available) throw new Error("expected a draft");
+    expect(d.calculationBasis).toContain(assumption);
+    expect(d.conclusion).toContain("modeled");
+  });
+  it("fits an SEC-derived revenue draft into the actual evidence form without losing assumptions", () => {
+    const facts = full.map(row => row.factKey === "revenue_ttm" ? { ...row, basis: "modeled", assumption: "FY + current YTD - prior YTD; matching periods and same accounting concept", sourceName: "SEC EDGAR 10-Q derived TTM through 2026-06-30 (VALERO ENERGY CORP/TX; RevenueFromContractWithCustomerIncludingAssessedTax)", sourceUrl: "https://www.sec.gov/Archives/edgar/data/1035002/000103500226000071/0001035002-26-000071-index.html" } : row) as SecurityFact[];
+    const d = buildEvidenceFactDraft({ symbol: "VLO", checkLabel: "C: Price / sales", facts });
+    if (!d.available) throw new Error("expected a draft");
+    const form = evidenceQuestionReadiness({ observation: d.observedValue, asOf: d.observedAt, criterion: d.criterion, sourceUrl: d.sourceUrl!, note: d.conclusion }, at);
+    expect(form.note.length).toBeLessThanOrEqual(1000);
+    expect(form.canResolve).toBe(true);
+    expect(d.calculationBasis).toContain("FY + current YTD");
+  });
   it("computes P/E and shows the whole derivation", () => {
     const d = buildEvidenceFactDraft({ symbol: "MYRG", checkLabel: "C: Price / earnings", facts: full });
     if (!d.available) throw new Error("expected a draft");

@@ -13,7 +13,7 @@ import { CapitalBrief } from "@/components/aperture/CapitalBrief";
 import { ResearchLedger } from "@/components/aperture/ResearchLedger";
 import { DecisionFocusCard } from "@/components/aperture/DecisionFocusCard";
 import { PlayRecipeCard } from "@/components/aperture/PlayRecipeCard";
-import { CandidateComparison, CandidateInspection, candidateInspectionHref } from "@/components/aperture/CandidateComparison";
+import { CandidateComparison, CandidateInspection, CandidateBudgetHint, candidateInspectionHref } from "@/components/aperture/CandidateComparison";
 import { SetAsideHistory } from "@/components/aperture/SetAsideHistory";
 import { DecisionStepLock, decisionAuthorityAllowsDownstream } from "@/components/aperture/DecisionStepLock";
 import { decisionPriority, describeCandidateRecommendation, rankResearchCandidates } from "@shared/decisionFocus";
@@ -228,6 +228,14 @@ export default function CandidateBoard() {
   });
   const [factDraftNotice, setFactDraftNotice] = useState<string | null>(null);
   const [factDraftPending, setFactDraftPending] = useState(false);
+  const [factDraftBases, setFactDraftBases] = useState<Record<string, string | null>>({});
+  const refreshFinancialFacts = trpc.aperture.run.evidence.refreshFinancialFacts.useMutation({
+    onSuccess: (result) => {
+      setFactDraftNotice(result.revenueAvailable ? `SEC financial facts refreshed for ${result.symbol}. Fill the draft again to use them; your review is unchanged.` : `SEC facts refreshed for ${result.symbol}, but a compatible revenue period is still unavailable. Your review is unchanged.`);
+      refetch();
+    },
+    onError: (error) => setFactDraftNotice(error.message),
+  });
   // Imperative on purpose: this component returns early before the evidence
   // question exists, so a query hook keyed to it would change hook order
   // between renders. utils.fetch takes its input at call time.
@@ -365,6 +373,14 @@ export default function CandidateBoard() {
           onRetry={() => retryRun.mutate({ id: runId })}
         />
 
+        {view === "evidence" && focusCandidate && <>
+          <CandidateBudgetHint value={focusCandidate.affordability} />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" className="min-h-11" disabled={refreshFinancialFacts.isPending || factDraftPending} onClick={() => refreshFinancialFacts.mutate({ runId, candidateId: focusCandidate.id })}>{refreshFinancialFacts.isPending ? "Refreshing SEC facts…" : `Refresh ${focusCandidate.symbol} financial facts`}</Button>
+            <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Reads SEC filings. Does not change your answers or create an order.</p>
+          </div>
+          {factDraftBases[evidenceDraftKey] && <details><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">Source periods and calculation</summary><p className="whitespace-pre-wrap break-words text-sm [overflow-wrap:anywhere]">{factDraftBases[evidenceDraftKey]}</p></details>}
+        </>}
         {view === "play" ? (
           <div className="space-y-5">
             <CandidateComparison candidates={candidateSequence} reviews={data.evidenceReviews ?? []} leadId={leadCandidate?.id} inspectedId={inspectionOpen ? requestedCandidateId : null} onInspect={inspectCandidate} />
@@ -459,6 +475,7 @@ export default function CandidateBoard() {
                 }
                 if (!value) { setFactDraftNotice("The fact ledger could not be read. Nothing was changed."); return; }
                 if (!value.available) { setFactDraftNotice(value.reason); return; }
+                setFactDraftBases(current => ({ ...current, [evidenceDraftKey]: value.calculationBasis }));
                 setEvidenceDrafts((current) => ({ ...current, [evidenceDraftKey]: {
                   observation: value.observedValue, asOf: value.observedAt, criterion: value.criterion,
                   sourceUrl: value.sourceUrl ?? "", note: value.conclusion,

@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { PlayAndReturn } from "@/components/aperture/PlayAndReturn";
 import { trpc } from "@/lib/trpc";
+import { recipeHorizonRecovery } from "@shared/intradayRecipeGuard";
 
 /**
  * TSL-BUILD-2026-009, taps 1-3. Tap 1 arrives here from Today. Tap 2 asks for
@@ -17,7 +18,7 @@ import { trpc } from "@/lib/trpc";
 
 const PREF_KEY = "aperture.deploy.preferences";
 const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
-const HORIZONS = [{ id: "", label: "Any" }, { id: "intraday", label: "Today" }, { id: "swing", label: "This week" }, { id: "position", label: "2–6 weeks" }] as const;
+const HORIZONS = [{ id: "", label: "Any" }, { id: "intraday", label: "Today" }, { id: "swing", label: "This week" }, { id: "position", label: "Long term" }] as const;
 
 function readPreferences(): { amount: string; horizon: string } {
   try {
@@ -38,11 +39,14 @@ export default function ApertureDeploy() {
   const amountValid = Number.isFinite(amountCents) && amountCents > 0;
   const ready = trpc.aperture.play.ready.useQuery({ horizon: horizon || undefined }, { enabled: false, retry: false });
   const best = ready.data?.best ?? null;
+  const sourceHorizonRecovery = best ? recipeHorizonRecovery(best) : null;
   const construct = trpc.aperture.play.construct.useQuery(
     { runId: best?.runId ?? 0, candidateId: best?.candidateId ?? 0 },
-    { enabled: asked && best != null, retry: false },
+    { enabled: asked && best != null && !sourceHorizonRecovery, retry: false },
   );
-  const play = construct.data?.play;
+  const recipeRecovery = sourceHorizonRecovery
+    ?? (construct.data && "recovery" in construct.data ? construct.data.recovery : null);
+  const play = recipeRecovery ? null : construct.data?.play;
 
   const findPlay = async () => {
     try { window.localStorage.setItem(PREF_KEY, JSON.stringify({ amount, horizon })); } catch { /* preference only */ }
@@ -104,16 +108,23 @@ export default function ApertureDeploy() {
         <Button variant="outline" className="mt-3 min-h-11" onClick={() => navigate("/aperture/plays")}>Open Play Desk</Button>
       </section>}
 
-      {asked && best && <section aria-label="Best play right now" className="space-y-3">
+      {asked && best && <section aria-label={recipeRecovery ? "Research candidate" : "Best play right now"} className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Best play right now</h2>
+          <h2 className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>{recipeRecovery ? "Research candidate" : "Best play right now"}</h2>
           {amountValid && deployedCents != null && <p className="text-sm tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>
             Recommended deployment: <strong style={{ color: "var(--sh-text-primary)" }}>{money(deployedCents)}</strong> of your {money(amountCents)}
             {deployedCents > amountCents ? " — this exceeds the amount you entered." : ""}
           </p>}
         </div>
 
-        {construct.isFetching && <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Reading the recorded play…</p>}
+        {recipeRecovery && <div className="space-y-3 rounded-xl border p-4" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}>
+          <p className="text-sm font-semibold" style={{ color: "var(--sh-signal)" }}>Research only · no paper recipe</p>
+          <h3 className="font-serif text-2xl"><span translate="no">{best.symbol}</span> · {recipeRecovery.horizonLabel}</h3>
+          <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{recipeRecovery.side ? `Recorded direction: ${recipeRecovery.side}` : "Direction not recorded — no direction assumed."}</p>
+          <p className="text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{recipeRecovery.reason} {recipeRecovery.nextStep}</p>
+          <Button type="button" variant="outline" className="min-h-11" onClick={() => navigate(`/aperture/run/${best.runId}?candidate=${best.candidateId}&view=evidence`)}>View research</Button>
+        </div>}
+        {!recipeRecovery && construct.isFetching && <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Reading the recorded play…</p>}
         {play && play.readiness !== "constructed" && <p className="rounded-lg border p-3 text-sm leading-6" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 40%, var(--sh-border-1))", background: "var(--sh-surface)", color: "var(--sh-fg-muted)" }}>
           <strong style={{ color: "var(--sh-text-primary)" }}>{play.readiness === "expired" ? "This recipe\u2019s window has passed." : "Levels are not derivable yet."}</strong>{" "}
           {play.unavailableReasons?.[0] ?? "The constructor could not measure entry, stop or size from the recorded tape."}{" "}
@@ -121,7 +132,7 @@ export default function ApertureDeploy() {
             ? "Its levels were measured and remain readable, but they cannot be entered as a new paper ticket now. The next regular session re-derives them."
             : "The play stands; its entry and stop need an observed session before any figure can be stated."}
         </p>}
-        {construct.isError && <p role="alert" className="text-sm" style={{ color: "var(--sh-red)" }}>This play's recorded terms could not be read. Nothing was changed.</p>}
+        {!recipeRecovery && construct.isError && <p role="alert" className="text-sm" style={{ color: "var(--sh-red)" }}>This play's recorded terms could not be read. Nothing was changed.</p>}
 
         {play && <>
           <PlayAndReturn

@@ -1,3 +1,26 @@
+/** The current recipe builder derives levels only for an explicit intraday horizon. */
+export function recipeHorizonRecovery(input: {
+  holdingPeriod?: string | null;
+  playSide?: string | null;
+}) {
+  if (input.holdingPeriod === "intraday") return null;
+  const holdingPeriod = input.holdingPeriod ?? null;
+  const labels: Record<string, string> = {
+    overnight: "Overnight",
+    swing: "Swing",
+    catalyst_window: "Catalyst window",
+    position: "Long term · position",
+  };
+  return {
+    status: "research_only" as const,
+    holdingPeriod,
+    horizonLabel: holdingPeriod ? labels[holdingPeriod] ?? `Unrecognized horizon: ${holdingPeriod}` : "Horizon not recorded",
+    side: input.playSide === "long" || input.playSide === "short" ? input.playSide : null,
+    reason: "No supported price-and-risk recipe is available for this research horizon. The original horizon has not been changed; no executable recipe has been prepared.",
+    nextStep: "Return to the original research to review its evidence and invalidation. A horizon-appropriate, source-backed risk plan is required before preparing a paper proposal.",
+  };
+}
+
 /**
  * A missing source-derived level is a research gap, never a zero-valued level.
  * Keep this message shared so preflight and final proposal creation explain the

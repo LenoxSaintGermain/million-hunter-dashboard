@@ -4,8 +4,28 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import type { DecisionCandidate } from "@shared/decisionFocus";
 import { getEvidenceReviewReadiness, type EvidenceReviewRecord } from "@shared/evidenceReview";
 import { describeEvidenceQuestion } from "@shared/evidenceQuestion";
+import type { CandidateAffordability } from "@shared/candidateAffordability";
 
-type Candidate = DecisionCandidate & { id: number };
+type Candidate = DecisionCandidate & { id: number; affordability?: CandidateAffordability };
+const dollars = (cents: number) => (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+
+export function CandidateBudgetHint({ value }: { value?: CandidateAffordability }) {
+  if (!value) return null;
+  const blocked = value.state === "above_limit";
+  const measured = blocked || value.state === "within_reference";
+  return <div className="mt-1 text-sm" data-candidate-budget={value.state}>
+    <p style={{ color: blocked ? "var(--sh-red)" : "var(--sh-fg-muted)" }}>
+      {blocked ? "Above share budget · Research only" : value.state === "options_required" ? "Options need a fresh contract quote" : measured ? "Share price within reference budget · not qualified" : "Share affordability not measured"}
+    </p>
+    {measured && value.referencePriceCents != null && value.ceilingCents != null && <p className="tabular-nums">{dollars(value.referencePriceCents)} / share · {dollars(value.ceilingCents)} ceiling</p>}
+    <details className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>
+      <summary className="min-h-11 cursor-pointer py-3">{blocked ? "Why this limit · next step" : "Price and budget basis"}</summary>
+      {measured && value.asOf != null && <p>{value.sourceName} · price recorded {new Date(value.asOf).toLocaleString("en-US")}. Not an executable quote.</p>}
+      <p>{value.accountAsOf ? `Account snapshot ${new Date(value.accountAsOf).toLocaleString("en-US")}. ` : "Account snapshot not measured. "}The lower of the single-order policy limit and this research budget is shown. Other risk limits may be tighter.</p>
+      <p>{blocked ? "Continue research or compare another candidate. Refresh account and price evidence before reassessment; no limit or instrument is changed automatically." : "Confirm fresh price, account capacity and all evidence at paper review. This comparison does not authorize a ticket."}</p>
+    </details>
+  </div>;
+}
 const roles: Record<string, string> = {
   core: "Thesis match", complementary: "Portfolio balance",
   remainder: "Other idea", alternative_expression: "Alternative strategy",
@@ -48,7 +68,7 @@ export function CandidateComparison({ candidates, reviews, leadId, inspectedId, 
           <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{roles[candidate.role] ?? "Research candidate"}</p>
         </div>
         <p className="col-start-1 text-sm sm:col-start-auto" style={{ color: readiness.paperStageDeclined ? "var(--sh-red)" : "var(--sh-text-primary)" }}>{status}</p>
-        <p className="col-start-1 break-words text-sm sm:col-start-auto" style={{ color: "var(--sh-fg-muted)" }}>{next ? describeEvidenceQuestion(candidate.symbol, next).requirement : "Confirm current price, contract, and risk"}</p>
+        <div className="col-start-1 min-w-0 break-words text-sm sm:col-start-auto" style={{ color: "var(--sh-fg-muted)" }}><p>{next ? describeEvidenceQuestion(candidate.symbol, next).requirement : "Confirm current price, contract, and risk"}</p><CandidateBudgetHint value={candidate.affordability} /></div>
         <Button type="button" variant="outline" className="col-start-2 row-start-1 min-h-11 sm:col-start-auto sm:row-start-auto" aria-label={`Inspect ${candidate.symbol}`} aria-haspopup="dialog" aria-expanded={inspectedId === candidate.id} onClick={(event) => onInspect(candidate.id, event.currentTarget)}>Inspect</Button>
       </li>;
     })}</ul>

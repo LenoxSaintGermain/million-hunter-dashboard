@@ -21,6 +21,7 @@ export type EvidenceDraft = {
   conclusion: string;
   /** Set when the inputs disagree with each other badly enough to distrust. */
   plausibilityWarning: string | null;
+  calculationBasis: string | null;
 };
 export type EvidenceDraftUnavailable = { available: false; reason: string };
 
@@ -78,6 +79,7 @@ export function buildEvidenceFactDraft(args: {
 
   return {
     available: true,
+    calculationBasis: [price, shares, denom].filter(f => f.basis === "modeled").map(f => `${f.factKey}: ${f.assumption ?? "Calculation assumptions were not recorded; do not confirm from this value."}`).join("\n") || null,
     criterionKey,
     observedValue: `${label} ${ratio.toFixed(2)}`,
     observedAt: isoDay(price.asOf ?? price.fetchedAt ?? args.now ?? Date.now()),

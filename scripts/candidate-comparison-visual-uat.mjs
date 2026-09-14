@@ -11,7 +11,7 @@ const entry = `import React, {useState,useRef} from 'react';
 import {createRoot} from 'react-dom/client';
 import {CandidateComparison,CandidateInspection} from '/src/components/aperture/CandidateComparison.tsx';
 import '/src/index.css';
-const candidates=Array.from({length:12},(_,i)=>({id:i+1,symbol:'FIX'+(i+1),role:i===0?'core':'complementary',compositeScore:70,confidenceScore:0.7,verifyFields:['C: Price / earnings']}));
+const candidates=Array.from({length:3},(_,i)=>({id:i+1,symbol:'FIX'+(i+1),role:i===0?'core':'complementary',compositeScore:70,confidenceScore:0.7,verifyFields:['C: Price / earnings'],affordability:{state:i===0?'above_limit':i===1?'within_reference':'unknown',referencePriceCents:i===0?39964:i===1?5000:null,ceilingCents:10000,asOf:i===2?null:Date.parse('2026-09-14T14:52:00Z'),sourceName:'Illustrative quote',accountAsOf:Date.parse('2026-09-14T14:50:00Z')}}));
 function App(){const [id,setId]=useState(null);const trigger=useRef(null);const [task,setTask]=useState(null);
 return <main className='aperture-editorial mx-auto max-w-6xl p-4'>
 <p className='mb-4 text-sm'>Illustrative interaction fixture · no API, account, or order actions</p>

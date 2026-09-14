@@ -8,7 +8,7 @@ import {
   users, brokerOrders, thesisCompilations, capitalTheses, portfolioAccounts,
   apertureDecisionRuns, apertureDecisionRevisions, apertureAttentionBaselines,
   apertureUnderwritingRuns, apertureUnderwritingRevisions, apertureRuns,
-  apertureCandidates, apertureEvidenceReviews, aperturePendingOutcomes,
+  apertureCandidates, apertureEvidenceReviews, aperturePendingOutcomes, securityFacts,
 } from "../../drizzle/schema";
 import { apertureMissionDrafts, apertureMissionDraftRevisions } from "../../drizzle/apertureMissionDraftSchema";
 import { apertureUnderwritingJobs } from "../../drizzle/apertureUnderwritingJobSchema";
@@ -19,6 +19,7 @@ import { mayPublishUnderwriting } from "../../shared/underwritingJob";
 import { parsePersistedJson } from "../../shared/persistedJson";
 import { underwritePlayCandidates, type CapitalObjective, type MarketRegimeSnapshot } from "../../shared/playUnderwriting";
 import { apertureRouter } from "../apertureRouter";
+import { edgarProvider } from "./providers/edgar";
 import { requireIsolatedIntegrationDatabase } from "../../scripts/isolated-integration-identity.mjs";
 
 // Never inherit .env implicitly. The harness supplies this exact isolated target.
@@ -246,6 +247,44 @@ describe.skipIf(!local)("real-database interrupted and returning operator journe
     expect(await db.select().from(capitalTheses).where(inArray(capitalTheses.userId, ownerIds))).toEqual([]);
     expect(await db.select().from(apertureDecisionRuns).where(inArray(apertureDecisionRuns.userId, ownerIds))).toEqual([]);
     expect(await db.select().from(apertureUnderwritingJobs).where(inArray(apertureUnderwritingJobs.userId, ownerIds))).toEqual([]);
+  });
+
+  it("reads early candidate affordability without provider requests or changing reviews and orders", async () => {
+    const mission = await missionFixture(owners[0]);
+    await db.update(portfolioAccounts).set({ equityValueCents: 200_000 }).where(eq(portfolioAccounts.id, mission.accountId));
+    const [run] = await db.insert(apertureRuns).values({ userId: owners[0].id, thesisId: mission.capitalThesisId, accountId: mission.accountId, deployableCapitalCents: 40_000, instrumentPreference: "shares", status: "completed", holdingPeriod: "position", createdAt: NOW });
+    const runId = Number(run.insertId);
+    const symbol = `FIX${owners[0].id}`;
+    const [candidate] = await db.insert(apertureCandidates).values({ runId, symbol, role: "core", verifyFields: ["C: Price / sales"], createdAt: NOW });
+    const [fact] = await db.insert(securityFacts).values({ symbol, factKey: "last_price", valueNum: 399.64, unit: "usd", basis: "verified", providerId: "illustrative_fixture", sourceName: "Illustrative price", asOf: NOW - 60_000, fetchedAt: NOW, expiresAt: NOW + 60_000 });
+    try {
+      const before = await db.select().from(apertureEvidenceReviews).where(eq(apertureEvidenceReviews.runId, runId));
+      const caller = callerFor(owners[0]);
+      const result = await caller.run.get({ id: runId });
+      expect(result.candidates[0].id).toBe(Number(candidate.insertId));
+      expect(result.candidates[0].affordability).toMatchObject({ state: "above_limit", ceilingCents: 10_000, referencePriceCents: 39_964 });
+      expect(await caller.run.get({ id: runId })).toEqual(result);
+      expect(await db.select().from(apertureEvidenceReviews).where(eq(apertureEvidenceReviews.runId, runId))).toEqual(before);
+      await expect(callerFor(owners[1]).run.get({ id: runId })).rejects.toMatchObject({ code: "NOT_FOUND" });
+      const evidenceInput = { runId, candidateId: Number(candidate.insertId) };
+      await expect(callerFor(owners[1]).run.evidence.factDraft({ ...evidenceInput, checkLabel: "C: Price / sales" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+      await expect(callerFor(owners[1]).run.evidence.review({ ...evidenceInput, checkLabel: "C: Price / sales", status: "confirmed" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+      await expect(callerFor(owners[1]).run.evidence.refreshFinancialFacts(evidenceInput)).rejects.toMatchObject({ code: "NOT_FOUND" });
+      const provider = vi.spyOn(edgarProvider, "fetchSecurityFacts").mockResolvedValue([{ factKey: "revenue_ttm", valueNum: 110, basis: "modeled", assumption: "Illustrative FY100 + YTD60 - YTD50", providerId: "edgar", sourceName: "Illustrative source", asOf: NOW, ttlMs: 1000 }]);
+      try {
+        const refreshed = await caller.run.evidence.refreshFinancialFacts(evidenceInput);
+        expect(refreshed).toMatchObject({ revenueAvailable: true, reviewChanged: false, orderCreated: false });
+        expect(provider).toHaveBeenCalledWith(symbol, { now: NOW, timeoutMs: 8_000 });
+        expect(await db.select().from(apertureEvidenceReviews).where(eq(apertureEvidenceReviews.runId, runId))).toEqual(before);
+        expect(await db.select().from(securityFacts).where(eq(securityFacts.symbol, symbol))).toHaveLength(2);
+        provider.mockResolvedValue([{ factKey: "revenue_ttm", basis: "unknown", providerId: "edgar" }]);
+        await expect(caller.run.evidence.refreshFinancialFacts(evidenceInput)).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+        expect(await db.select().from(securityFacts).where(eq(securityFacts.symbol, symbol))).toHaveLength(2);
+      } finally { provider.mockRestore(); }
+      expect(networkAttempt).not.toHaveBeenCalled();
+    } finally {
+      await db.delete(securityFacts).where(eq(securityFacts.symbol, symbol));
+    }
   });
 
   it("binds a source-order draft to its exact owned account, run and candidate without treating it as gains", async () => {
