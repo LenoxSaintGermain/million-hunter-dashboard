@@ -8,9 +8,15 @@ const fixture = vi.hoisted(() => ({ search: "", receipt: false, params: {} as an
   capability: {} as any, navigate: vi.fn(), flow: vi.fn(), runway: vi.fn() }));
 vi.mock("wouter", () => ({ useLocation: () => ["/aperture/mission", fixture.navigate],
   useSearch: () => fixture.search, useRoute: () => [fixture.receipt, fixture.params] }));
-vi.mock("@/lib/trpc", () => ({ trpc: { aperture: { strategy: {
-  capabilities: { useQuery: () => fixture.capability },
-} } } }));
+vi.mock("@/lib/trpc", () => ({ trpc: { aperture: {
+  strategy: { capabilities: { useQuery: () => fixture.capability } },
+  // The mission record carries a close-out control; this route test is about
+  // routing, so the closure surface is stubbed as still loading.
+  runway: {
+    closePreview: { useQuery: () => ({ isLoading: true, isError: false, data: undefined, refetch: vi.fn() }) },
+    close: { useMutation: () => ({ mutate: vi.fn(), isPending: false, isError: false, reset: vi.fn() }) },
+  },
+} } }));
 vi.mock("@/components/DashboardLayout", () => ({ default: ({ children }: any) => <main>{children}</main> }));
 vi.mock("@/components/aperture/DecisionRunway", () => ({ DecisionRunway: (props: any) => {
   fixture.runway(props); return <section>Saved Mission routing</section>;

@@ -1,4 +1,5 @@
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import { MissionCloseOut } from "@/components/aperture/MissionCloseOut";
 import { useLocation, useRoute, useSearch } from "wouter";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,8 @@ export default function ApertureMission() {
           removed. The label now says what you do, and the control is primary. */}
       {!isReceiptRoute && !newObjective && discovery.data?.enabled && <Button data-start-from-sentence className="min-h-11" onClick={() => navigate("/aperture/mission?objective=1")}>Start from a sentence<ArrowRight className="ml-2 h-4 w-4" /></Button>}
     </div>
+    {/* The way to be done with a mission, on the mission's own record. */}
+    {receiptTarget && !newObjective && <div className="mb-5"><MissionCloseOut decisionRunId={receiptTarget.decisionRunId} onClosed={() => navigate("/aperture")} /></div>}
     {invalidReceipt || handoff === "invalid" ? <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)" }}>
       <h2 className="font-semibold">Mission link is incomplete</h2>
       <p className="mt-2 text-sm">Open the saved Mission from Today. This link has not started or replaced a Mission.</p>

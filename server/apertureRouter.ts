@@ -83,6 +83,7 @@ import { normSymbol } from "./aperture/facts";
 import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills, preflightOrder, OrderGateError, LIVE_ORDER_STATUSES } from "./aperture/orderFlow";
 import { evaluateRunPreset, singleOrderCeilingCents } from "./aperture/gates";
 import { buildSingleOrderCeilingPreview, describeSingleOrderCeiling } from "../shared/singleOrderCeiling";
+import { assessMissionClosure } from "../shared/missionClosure";
 import { buildCockpit } from "./aperture/cockpit";
 import { CURRENT_MANDATE, HOLDING_PERIOD_KEYS, MIN_NARRATIVE_CHARS, PAPER_ACKNOWLEDGEMENT } from "./aperture/mandate";
 import { runMonitoringChecks, getMonitoringChecks, getFlaggedChecks } from "./aperture/monitor";
@@ -1843,6 +1844,81 @@ export const apertureRouter = router({
           hasVerifiedCatalyst: false,
         });
       }),
+    /**
+     * Close out a mission. A recorded decision, never a delete: research,
+     * evidence, orders and receipts all stay readable afterwards. It refuses
+     * while a ticket is live, because "done with this" must never quietly mean
+     * an approved or submitted order was abandoned, and it says plainly that a
+     * filled position survives the closure.
+     */
+    close: capitalOperatorProcedure
+      .input(z.object({
+        decisionRunId: z.number().int().positive(),
+        reason: z.string().trim().min(10).max(1_000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const now = Date.now();
+        return db!.transaction(async (tx) => {
+          const [head] = await tx.select().from(apertureDecisionRuns).where(and(
+            eq(apertureDecisionRuns.id, input.decisionRunId),
+            eq(apertureDecisionRuns.userId, ctx.user.id),
+          )).for("update").limit(1);
+          if (!head) throw new TRPCError({ code: "NOT_FOUND", message: "That mission is not available to this operator." });
+          if (head.lifecycle === "closed") return { alreadyClosed: true, cancelledReviewIds: [] as number[], assessment: null };
+
+          const orders = await tx.select({ id: brokerOrders.id, symbol: brokerOrders.symbol, status: brokerOrders.status })
+            .from(brokerOrders).where(and(
+              eq(brokerOrders.userId, ctx.user.id),
+              eq(brokerOrders.decisionRunId, head.id),
+            ));
+          const reviews = await tx.select({ id: aperturePendingOutcomes.id, status: aperturePendingOutcomes.status })
+            .from(aperturePendingOutcomes).where(and(
+              eq(aperturePendingOutcomes.userId, ctx.user.id),
+              eq(aperturePendingOutcomes.decisionRunId, head.id),
+            ));
+          const assessment = assessMissionClosure({ orders, reviews });
+          if (!assessment.canClose) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: assessment.blockers[0]?.message ?? "This mission cannot be closed yet." });
+          }
+
+          const update = await tx.update(apertureDecisionRuns).set({
+            lifecycle: "closed",
+            lockVersion: head.lockVersion + 1,
+            updatedAt: now,
+          }).where(and(
+            eq(apertureDecisionRuns.id, head.id),
+            eq(apertureDecisionRuns.lockVersion, head.lockVersion),
+          ));
+          if (!update[0].affectedRows) throw new TRPCError({ code: "CONFLICT", message: "The mission changed while it was being closed. Reopen it and try again." });
+
+          if (assessment.reviewsToCancel.length) {
+            await tx.update(aperturePendingOutcomes).set({ status: "cancelled", updatedAt: now }).where(and(
+              eq(aperturePendingOutcomes.userId, ctx.user.id),
+              inArray(aperturePendingOutcomes.id, assessment.reviewsToCancel),
+            ));
+          }
+          return { alreadyClosed: false, cancelledReviewIds: assessment.reviewsToCancel, assessment };
+        });
+      }),
+
+    /** What closing would do, before anyone commits to it. Read-only. */
+    closePreview: capitalOperatorProcedure
+      .input(z.object({ decisionRunId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [head] = await db!.select().from(apertureDecisionRuns).where(and(
+          eq(apertureDecisionRuns.id, input.decisionRunId),
+          eq(apertureDecisionRuns.userId, ctx.user.id),
+        )).limit(1);
+        if (!head) throw new TRPCError({ code: "NOT_FOUND", message: "That mission is not available to this operator." });
+        const orders = await db!.select({ id: brokerOrders.id, symbol: brokerOrders.symbol, status: brokerOrders.status })
+          .from(brokerOrders).where(and(eq(brokerOrders.userId, ctx.user.id), eq(brokerOrders.decisionRunId, head.id)));
+        const reviews = await db!.select({ id: aperturePendingOutcomes.id, status: aperturePendingOutcomes.status })
+          .from(aperturePendingOutcomes).where(and(eq(aperturePendingOutcomes.userId, ctx.user.id), eq(aperturePendingOutcomes.decisionRunId, head.id)));
+        return { lifecycle: head.lifecycle, ...assessMissionClosure({ orders, reviews }) };
+      }),
+
     begin: capitalOperatorProcedure
       .input(z.object({
         missionText: z.string().trim().min(MIN_NARRATIVE_CHARS).max(12_000),
