@@ -81,7 +81,8 @@ import { belongsInMemoLibrary } from "./aperture/memoLibrary";
 import { brokerFor, listBrokers } from "./aperture/brokers/index";
 import { normSymbol } from "./aperture/facts";
 import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills, preflightOrder, OrderGateError, LIVE_ORDER_STATUSES } from "./aperture/orderFlow";
-import { evaluateRunPreset } from "./aperture/gates";
+import { evaluateRunPreset, singleOrderCeilingCents } from "./aperture/gates";
+import { buildSingleOrderCeilingPreview, describeSingleOrderCeiling } from "../shared/singleOrderCeiling";
 import { buildCockpit } from "./aperture/cockpit";
 import { CURRENT_MANDATE, HOLDING_PERIOD_KEYS, MIN_NARRATIVE_CHARS, PAPER_ACKNOWLEDGEMENT } from "./aperture/mandate";
 import { runMonitoringChecks, getMonitoringChecks, getFlaggedChecks } from "./aperture/monitor";
@@ -1490,6 +1491,23 @@ export const apertureRouter = router({
         objective,
         risk,
         feasibility,
+        // What the declared figure implies for one order, stated while the
+        // operator is still declaring it. Computed here because the objective
+        // flow deliberately keeps sizing math off the client.
+        singleOrderCeilingText: describeSingleOrderCeiling(buildSingleOrderCeilingPreview({
+          policyCeilingCents: cockpit.account.equityValueCents != null
+            ? singleOrderCeilingCents(cockpit.account.equityValueCents) : null,
+          policyPctOfEquity: cockpit.mandate.maxOrderNotionalPctOfEquity,
+          equityCents: cockpit.account.equityValueCents,
+          declaredCapitalCents: objective.deployableCapitalCents,
+        })),
+        singleOrderCeiling: buildSingleOrderCeilingPreview({
+          policyCeilingCents: cockpit.account.equityValueCents != null
+            ? singleOrderCeilingCents(cockpit.account.equityValueCents) : null,
+          policyPctOfEquity: cockpit.mandate.maxOrderNotionalPctOfEquity,
+          equityCents: cockpit.account.equityValueCents,
+          declaredCapitalCents: objective.deployableCapitalCents,
+        }),
         portfolioRisk: {
           beforeCents: aggregateOpenRiskCents,
           remainingHeadroomCents,

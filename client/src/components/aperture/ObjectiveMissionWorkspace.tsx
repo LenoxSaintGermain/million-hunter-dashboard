@@ -20,6 +20,9 @@ export type ObjectiveMissionRiskPreview = {
   asOf: number | null;
   constraintExplanation: string;
   measuredLimits?: ReadonlyArray<{ label: string; valueCents: number | null; context: string }>;
+  /** Server-written. What the declared capital implies for one order. */
+  singleOrderCeilingText?: string | null;
+  singleOrderCeilingCents?: number | null;
   /** Only an explicit ready status confirms freshness for the current inputs. */
   status?: "ready" | "loading" | "failed" | "stale";
 };
@@ -300,6 +303,14 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
           {matchingPreview ? <>
             {previewWarning && <p role="alert" className="text-sm" style={{ color: "var(--sh-signal)" }}>{previewWarning}</p>}
             <p className="text-sm">{matchingPreview.constraintExplanation || "The server has not supplied a constraint explanation."}</p>
+            {/* On the surface, not inside "Measured limit context". A fresh
+                operator declared $2,000, researched a refiner universe, and
+                learned only at the evidence stage that the ceiling was $100. */}
+            {matchingPreview.singleOrderCeilingText && <div data-single-order-ceiling className="rounded-lg border p-3" style={{ borderColor: matchingPreview.singleOrderCeilingCents != null ? "var(--sh-signal)" : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+              <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={muted}>What this buys per order</p>
+              {matchingPreview.singleOrderCeilingCents != null && <p className="mt-1 font-serif text-2xl tabular-nums" style={{ color: "var(--sh-text-primary)" }}>{money(matchingPreview.singleOrderCeilingCents)}</p>}
+              <p className="mt-1 text-sm leading-6">{matchingPreview.singleOrderCeilingText}</p>
+            </div>}
             <p className="text-xs" style={muted}>Server preview as of {timestamp(matchingPreview.asOf)}. This is not order approval.</p>
             {matchingPreview.feasibility.targetProfitCents != null && <div className="border-t pt-2" style={{ borderColor: "var(--sh-border-1)" }}>
               <StateMark state={matchingPreview.feasibility.classification === "extreme" ? "blocked" : "conditional"} label={`${previewCurrent ? "Target feasibility" : "Recorded target feasibility"}: ${matchingPreview.feasibility.classification.replaceAll("_", " ")}`} />

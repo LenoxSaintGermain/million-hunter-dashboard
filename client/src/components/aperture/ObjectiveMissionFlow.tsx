@@ -83,6 +83,8 @@ const constraintText: Record<RiskResponse["portfolioRisk"]["bindingConstraint"],
 function previewView(data: RiskResponse, status: ObjectiveMissionRiskPreview["status"]): ObjectiveMissionRiskPreview {
   return { accountId: data.account.id, asOf: data.asOf, status, feasibility: data.feasibility,
     constraintExplanation: constraintText[data.portfolioRisk.bindingConstraint],
+    singleOrderCeilingText: data.singleOrderCeilingText ?? null,
+    singleOrderCeilingCents: data.singleOrderCeiling?.ceilingCents ?? null,
     measuredLimits: [
       { label: "Portfolio open risk", valueCents: data.portfolioRisk.beforeCents, context: "Server-measured open risk for this Paper account." },
       { label: "Remaining portfolio headroom", valueCents: data.portfolioRisk.remainingHeadroomCents, context: "Server-returned headroom, not an allocation." },

@@ -489,3 +489,48 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
     expect(Array.from(css.matchAll(/--sh-text-primary\s*:/g))).toHaveLength(2);
   });
 });
+
+/**
+ * A fresh operator declared $2,000, researched a refiner universe, and only
+ * learned at the evidence stage that the 5% single-name limit capped a single
+ * order at $100 — below every candidate they had just researched. The figure was
+ * always derivable; it was stated too late to act on. It now appears while the
+ * capital is still being declared.
+ */
+describe("what the declared capital buys per order", () => {
+  const ceiling = (over: Partial<ObjectiveMissionRiskPreview>) =>
+    harness(completeValues(), { saveState: "saved", riskPreview: { ...serverPreview, ...over } }).render();
+
+  it("states the ceiling on the surface, not inside the collapsed limit context", () => {
+    const { $ } = ceiling({
+      singleOrderCeilingText: "This caps a single order at $100.00. A name priced above that cannot be taken as a whole share. Account policy is the binding limit here. 5% of $2,000.00 equity = $100.00 per order.",
+      singleOrderCeilingCents: 10_000,
+    });
+    const panel = $("[data-single-order-ceiling]");
+    expect(panel).toHaveLength(1);
+    // Being late is the whole defect, so it must not sit behind a disclosure.
+    expect(panel.parents("details")).toHaveLength(0);
+    expect(panel.text()).toContain("$100.00");
+    expect(panel.text()).toContain("cannot be taken as a whole share");
+  });
+
+  it("renders nothing rather than an empty panel when the server stated no ceiling", () => {
+    const { $ } = ceiling({ singleOrderCeilingText: null, singleOrderCeilingCents: null });
+    expect($("[data-single-order-ceiling]")).toHaveLength(0);
+  });
+
+  it("shows a refusal without a figure when capital has not been declared", () => {
+    const { $ } = ceiling({
+      singleOrderCeilingText: "No capital has been declared yet, so no single-order ceiling can be stated.",
+      singleOrderCeilingCents: null,
+    });
+    expect($("[data-single-order-ceiling]").text()).toContain("No capital has been declared");
+    expect($("[data-single-order-ceiling]").text()).not.toContain("$");
+  });
+
+  it("survives a preview that predates the field instead of crashing the flow", () => {
+    const { $ } = harness(completeValues(), { saveState: "saved", riskPreview: serverPreview }).render();
+    expect($("[data-single-order-ceiling]")).toHaveLength(0);
+    expect($.text()).toContain("Effective constraint");
+  });
+});
