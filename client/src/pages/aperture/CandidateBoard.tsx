@@ -18,7 +18,7 @@ import { SetAsideHistory } from "@/components/aperture/SetAsideHistory";
 import { DecisionStepLock, decisionAuthorityAllowsDownstream } from "@/components/aperture/DecisionStepLock";
 import { decisionPriority, describeCandidateRecommendation, rankResearchCandidates } from "@shared/decisionFocus";
 import { buildDecisionPath } from "@shared/decisionPath";
-import { runAffordabilitySummary } from "@shared/candidateAffordability";
+import { orderByActionability, runAffordabilitySummary } from "@shared/candidateAffordability";
 import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
 import { describeEvidenceQuestion, EMPTY_EVIDENCE_QUESTION, evidenceQuestionReadiness, type EvidenceQuestionDraft } from "@shared/evidenceQuestion";
 import type { EvidenceReviewStatus } from "@shared/evidenceReview";
@@ -301,9 +301,15 @@ export default function CandidateBoard() {
   const researchRankedCandidates = rankResearchCandidates(candidates);
   const leadCandidate = candidates.find((candidate) => candidate.id === brief?.priorityCandidate?.id)
     ?? researchRankedCandidates[0];
-  const candidateSequence = leadCandidate
-    ? [leadCandidate, ...researchRankedCandidates.filter((candidate) => candidate.id !== leadCandidate.id)]
+  // The lead is a research verdict and the UI names it as one, so it keeps its
+  // place. The alternatives beside it are ordered so names the account can
+  // actually take come first — affordability is a fact about the account, not a
+  // claim that the research is better. Research order survives inside each group.
+  const alternatives = leadCandidate
+    ? researchRankedCandidates.filter((candidate) => candidate.id !== leadCandidate.id)
     : [];
+  const actionability = orderByActionability(alternatives);
+  const candidateSequence = leadCandidate ? [leadCandidate, ...actionability.ordered] : [];
   const focusCandidate = candidateSequence.find((candidate) => candidate.id === requestedCandidateId)
     ?? candidateSequence.find((candidate) => candidate.id === selectedCandidateId) ?? leadCandidate;
   const inspectionOpen = view === "play" && requestedCandidateId != null
@@ -372,7 +378,7 @@ export default function CandidateBoard() {
             change the answer. This stays silent unless every candidate is
             measured AND blocked, so a single affordable name keeps it quiet. */}
         {(() => {
-          const summary = runAffordabilitySummary(candidates as any[]);
+          const summary = runAffordabilitySummary(candidates as any[], run.instrumentPreference);
           if (!summary) return null;
           return <section data-run-affordability role="status" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}>
             <p className="text-sm font-semibold" style={{ color: "var(--sh-red)" }}>
@@ -387,6 +393,12 @@ export default function CandidateBoard() {
             <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
               The research is still worth reading and nothing here is changed for you. To act on a name, revise the mission to declare more capital or research lower-priced names.
             </p>
+            {/* A whole-share price is not the only expression this system can
+                compare, and the instrument preference is the operator's own
+                input. State that it was shares-only; recommend nothing. */}
+            {summary.sharesOnly && <p data-shares-only className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
+              This research compared whole shares only, because that is the instrument preference recorded on the mission. A defined-risk option is quoted per contract, not per share, so it is measured against the same ceiling differently. Changing the preference is a mission revision, not something done here.
+            </p>}
             <Button variant="outline" className="mt-3 min-h-11" onClick={() => navigate("/aperture/mission")}>Revise the mission<ArrowRight className="ml-2 h-4 w-4" /></Button>
           </section>;
         })()}
@@ -411,6 +423,9 @@ export default function CandidateBoard() {
         </>}
         {view === "play" ? (
           <div className="space-y-5">
+            {actionability.reordered && <p data-actionable-first role="status" className="text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
+              Alternatives are listed with the {actionability.actionable === 1 ? "name" : "names"} your account can take first. That is a fact about your ceiling, not a judgement that the research is stronger — the lead below is unchanged and the research-fit order holds inside each group.
+            </p>}
             <CandidateComparison candidates={candidateSequence} reviews={data.evidenceReviews ?? []} leadId={leadCandidate?.id} inspectedId={inspectionOpen ? requestedCandidateId : null} onInspect={inspectCandidate} />
             {requestedCandidateId != null && !candidateSequence.some((candidate) => candidate.id === requestedCandidateId) && <p role="status" className="text-sm">The linked candidate is unavailable in this run. Choose a candidate from the list.</p>}
             {!candidateSequence.length && <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>No candidates are available yet.</p>}

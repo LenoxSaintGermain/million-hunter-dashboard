@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { candidateAffordability } from "./candidateAffordability";
-import { runAffordabilitySummary } from "../../shared/candidateAffordability";
+import { orderByActionability, runAffordabilitySummary } from "../../shared/candidateAffordability";
 import { CURRENT_MANDATE } from "./mandate";
 import { singleOrderCeilingCents } from "./gates";
 
@@ -93,7 +93,7 @@ describe("a run with no affordable candidate says so once", () => {
 
   it("names the cheapest way in when every candidate is above the ceiling", () => {
     const summary = runAffordabilitySummary([blocked(799_280), blocked(528_140), blocked(999_000)]);
-    expect(summary).toEqual({ blocked: 3, cheapestRequiredEquityCents: 528_140, ceilingCents: 10_000 });
+    expect(summary).toEqual({ blocked: 3, cheapestRequiredEquityCents: 528_140, ceilingCents: 10_000, sharesOnly: false });
   });
 
   it("stays quiet when even one candidate is affordable", () => {
@@ -112,5 +112,70 @@ describe("a run with no affordable candidate says so once", () => {
   it("reports the block without a figure rather than inventing one", () => {
     const summary = runAffordabilitySummary([blocked(null)]);
     expect(summary).toMatchObject({ blocked: 1, cheapestRequiredEquityCents: null });
+  });
+});
+
+describe("actionable names first, without calling them better research", () => {
+  const at = (state: "within_reference" | "above_limit" | "unknown" | "options_required", symbol: string) => ({
+    symbol,
+    affordability: {
+      state, referencePriceCents: 39_964, ceilingCents: 10_000, asOf: now,
+      sourceName: "Illustrative quote", accountAsOf: now,
+      requiredEquityCents: null, requiredCapitalCents: null,
+    },
+  });
+
+  it("lifts affordable names above blocked ones", () => {
+    const result = orderByActionability([at("above_limit", "PSX"), at("within_reference", "F"), at("above_limit", "VLO")]);
+    expect(result.ordered.map((c) => c.symbol)).toEqual(["F", "PSX", "VLO"]);
+    expect(result).toMatchObject({ actionable: 1, blocked: 2, unmeasured: 0, reordered: true });
+  });
+
+  it("preserves the incoming research order inside each group", () => {
+    // Research-fit order is a judgement about evidence and must survive intact.
+    const result = orderByActionability([
+      at("within_reference", "F"), at("above_limit", "PSX"),
+      at("within_reference", "T"), at("above_limit", "VLO"),
+    ]);
+    expect(result.ordered.map((c) => c.symbol)).toEqual(["F", "T", "PSX", "VLO"]);
+  });
+
+  it("keeps an unmeasured name above a proven-blocked one, never below", () => {
+    // Unknown is not proven unaffordable, so it must not be buried with the blocked.
+    const result = orderByActionability([at("above_limit", "PSX"), at("unknown", "MPC"), at("options_required", "XOM")]);
+    expect(result.ordered.map((c) => c.symbol)).toEqual(["MPC", "XOM", "PSX"]);
+    expect(result.unmeasured).toBe(2);
+  });
+
+  it("reports no reordering when the order already holds", () => {
+    const result = orderByActionability([at("within_reference", "F"), at("above_limit", "PSX")]);
+    expect(result.reordered).toBe(false);
+  });
+
+  it("leaves a run with no affordability data exactly as it came", () => {
+    const input = [{ symbol: "PSX" }, { symbol: "VLO" }];
+    const result = orderByActionability(input);
+    expect(result.ordered.map((c) => c.symbol)).toEqual(["PSX", "VLO"]);
+    expect(result).toMatchObject({ actionable: 0, blocked: 0, unmeasured: 2, reordered: false });
+  });
+});
+
+describe("what the run actually compared", () => {
+  const blockedCandidate = {
+    affordability: {
+      state: "above_limit" as const, referencePriceCents: 39_964, ceilingCents: 10_000,
+      asOf: now, sourceName: "Illustrative quote", accountAsOf: now,
+      requiredEquityCents: 799_280, requiredCapitalCents: null,
+    },
+  };
+
+  it("flags a whole-share-only run, because the instrument preference is the operator's to change", () => {
+    expect(runAffordabilitySummary([blockedCandidate], "shares")?.sharesOnly).toBe(true);
+  });
+
+  it("does not flag it when options were already in scope", () => {
+    for (const preference of ["options", "either", null, undefined]) {
+      expect(runAffordabilitySummary([blockedCandidate], preference)?.sharesOnly).toBe(false);
+    }
   });
 });

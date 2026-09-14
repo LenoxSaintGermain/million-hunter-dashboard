@@ -28,7 +28,14 @@ export interface CandidateAffordability {
  */
 export function runAffordabilitySummary(
   candidates: ReadonlyArray<{ affordability?: CandidateAffordability | null }>,
-): { blocked: number; cheapestRequiredEquityCents: number | null; ceilingCents: number | null } | null {
+  /** What this research actually compared. Only "shares" is a whole-share price. */
+  instrumentPreference?: string | null,
+): {
+  blocked: number; cheapestRequiredEquityCents: number | null; ceilingCents: number | null;
+  /** True when the run compared whole shares only, so the instrument preference
+   *  is an input the operator controls that this banner has not accounted for. */
+  sharesOnly: boolean;
+} | null {
   const states = candidates.map((candidate) => candidate.affordability);
   if (!states.length || states.some((value) => value == null)) return null;
   const measured = states as CandidateAffordability[];
@@ -40,5 +47,40 @@ export function runAffordabilitySummary(
     blocked: measured.length,
     cheapestRequiredEquityCents: required.length ? Math.min(...required) : null,
     ceilingCents: measured[0]!.ceilingCents,
+    sharesOnly: instrumentPreference === "shares",
+  };
+}
+
+/**
+ * Actionable names first, without pretending they are better research.
+ *
+ * The research-fit order is a judgement about evidence; affordability is a fact
+ * about the account. Reordering silently would let a weaker candidate read as
+ * the brief lead, so this returns the grouping explicitly and preserves the
+ * incoming research order within each group. Callers must label it.
+ */
+export function orderByActionability<T extends { affordability?: CandidateAffordability | null }>(
+  candidates: readonly T[],
+): { ordered: T[]; actionable: number; blocked: number; unmeasured: number; reordered: boolean } {
+  const rank = (candidate: T) => {
+    const state = candidate.affordability?.state;
+    if (state === "within_reference") return 0;
+    if (state === "above_limit") return 2;
+    return 1; // unknown or options_required: not proven either way, so mid.
+  };
+  const ordered = candidates
+    .map((candidate, index) => ({ candidate, index, rank: rank(candidate) }))
+    .sort((left, right) => left.rank - right.rank || left.index - right.index)
+    .map((entry) => entry.candidate);
+  const counts = { actionable: 0, blocked: 0, unmeasured: 0 };
+  for (const candidate of candidates) {
+    const state = candidate.affordability?.state;
+    if (state === "within_reference") counts.actionable += 1;
+    else if (state === "above_limit") counts.blocked += 1;
+    else counts.unmeasured += 1;
+  }
+  return {
+    ordered, ...counts,
+    reordered: ordered.some((candidate, index) => candidate !== candidates[index]),
   };
 }
