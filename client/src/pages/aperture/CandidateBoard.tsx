@@ -54,7 +54,12 @@ export function EvidenceQuestionReview({ symbol, checkLabel, draft, pending, now
     </div>
     <label className="block text-sm font-medium">Conclusion or uncertainty<Textarea aria-label="Conclusion or uncertainty" value={draft.note} onChange={(event) => onChange({ ...draft, note: event.target.value })} placeholder="Why does this evidence meet—or fail—the criterion?" className="mt-1 min-h-20 text-sm" /></label>
     <p id="evidence-answer-readiness" role="status" className="text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{tooLong ? "Shorten the evidence and note to 1,000 characters total before recording an answer." : readiness.canResolve ? "Evidence attached. Confirm only if it supports the criterion; otherwise decline or request more evidence. A review is not an order." : `${readiness.issues.join(" · ")}. Add the missing evidence before clearing this gate, or choose Need more evidence to keep it open.`}</p>
-    <div className="flex flex-wrap gap-2">
+    {/* Measured on production 2026-09-14: 654px — over half a screen — between
+        the question and its verdicts, with the whole source-record form in
+        between. The form is how you answer, so the verdicts still belong after
+        it; they just cannot require a half-screen scroll to reach. Sticky
+        matches the "Next guarded action" bar in PaperProposalForm. */}
+    <div data-evidence-verdicts className="sticky bottom-3 z-10 flex flex-wrap gap-2 rounded-lg border p-2 shadow-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
       <Button type="button" size="sm" className="h-auto min-h-11 max-w-full whitespace-normal py-2" aria-describedby="evidence-answer-readiness" disabled={pending || !readiness.canResolve} onClick={() => answer("confirmed")}>Confirmed · clear this gate</Button>
       <Button type="button" variant="outline" size="sm" className="h-auto min-h-11 max-w-full whitespace-normal py-2" disabled={pending || tooLong} onClick={() => answer("not_confirmed")}>Not confirmed · decline paper stage</Button>
       <Button type="button" variant="outline" size="sm" className="h-auto min-h-11 max-w-full whitespace-normal py-2" aria-describedby="evidence-answer-readiness" disabled={pending || !readiness.canResolve} onClick={() => answer("not_applicable")}>Not applicable</Button>

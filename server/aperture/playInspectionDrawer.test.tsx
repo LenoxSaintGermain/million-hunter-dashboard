@@ -10,7 +10,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { load } from "cheerio";
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
-import { PlayInspectionBody, type InspectableOrder } from "../../client/src/components/aperture/PlayInspectionDrawer";
+import { PlayInspectionBody, isStoppableTicket, type InspectableOrder } from "../../client/src/components/aperture/PlayInspectionDrawer";
 
 const NOW = Date.UTC(2026, 8, 11, 19, 40);
 
@@ -147,5 +147,47 @@ describe("return and disclosure", () => {
 
   it("states that inspecting changes nothing", () => {
     expect(render().text()).toContain("acknowledges no finding, resolves no review, and moves no order");
+  });
+});
+
+/**
+ * "How do I clear or cancel something" had no answer on this desk. The only
+ * stop was "Do not approve", buried on the execute page and never named as
+ * cancelling. It is stated here, beside the ticket it stops — and it must be
+ * honest about the states where nothing can be stopped.
+ */
+describe("stopping a ticket", () => {
+  it("says yes, and names the control, while the ticket is still pre-dispatch", () => {
+    for (const status of ["pending_approval", "approved"]) {
+      const text = render({ order: order({ status }) }).text();
+      expect(text).toContain("Yes — it has not been sent to the broker.");
+      expect(text).toContain("Do not approve");
+      expect(text).toContain("records a written reason and leaves the research intact");
+    }
+  });
+
+  it("does not offer to cancel a filled position", () => {
+    const text = render({ order: order({ status: "filled" }) }).text();
+    expect(text).toContain("a filled position is closed by an exit order, not by cancelling");
+    expect(text).not.toContain("Yes — it has not been sent");
+  });
+
+  it("sends a submitted ticket to reconciliation rather than implying a cancel", () => {
+    const text = render({ order: order({ status: "submitted" }) }).text();
+    expect(text).toContain("The broker already accepted or queued it");
+    expect(text).toContain("reconcile");
+  });
+
+  it("calls an already-terminal ticket terminal", () => {
+    for (const status of ["rejected", "cancelled"]) {
+      expect(render({ order: order({ status }) }).text()).toContain("already terminal");
+    }
+  });
+});
+
+describe("isStoppableTicket", () => {
+  it("is true only before the broker has seen it", () => {
+    expect(["pending_approval", "approved"].every(isStoppableTicket)).toBe(true);
+    expect(["submitted", "filled", "rejected", "cancelled"].some(isStoppableTicket)).toBe(false);
   });
 });

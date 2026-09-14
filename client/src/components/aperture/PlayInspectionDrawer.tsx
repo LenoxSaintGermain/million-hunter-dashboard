@@ -83,6 +83,11 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
  * asserted on directly — a Radix portal does not survive static rendering, and
  * a panel whose claims are only checked by reading the source is not checked.
  */
+/** Before dispatch, a human decision can still stop this. After it, cannot. */
+export function isStoppableTicket(status: string): boolean {
+  return status === "pending_approval" || status === "approved";
+}
+
 export function PlayInspectionBody({ order, stateLabel, humanReviewAt, reviewsUnavailable, now }: {
   order: InspectableOrder;
   stateLabel: string;
@@ -178,6 +183,24 @@ export function PlayInspectionBody({ order, stateLabel, humanReviewAt, reviewsUn
         : <p className="text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>No sourced monitoring check is recorded against this ticket. That is an absence of evidence, not an all-clear.</p>}
     </Group>
 
+    {/* "How do I clear or cancel something" had no answer on this desk. The
+        only stop was "Do not approve", buried on the execute page and never
+        called cancelling. It is named here, beside the ticket it stops. */}
+    <Group title="Stopping this">
+      <Fact
+        label="Can this still be stopped?"
+        value={isStoppableTicket(order.status) ? "Yes — it has not been sent to the broker." : null}
+        absent={order.status === "filled"
+          ? "No. This ticket filled; a filled position is closed by an exit order, not by cancelling."
+          : order.status === "submitted"
+            ? "Not from here. The broker already accepted or queued it; reconcile the order at the broker before creating another ticket."
+            : `No. This ticket is ${order.status.replaceAll("_", " ")} and is already terminal.`}
+      />
+      {isStoppableTicket(order.status) && <p className="text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>
+        Stopping it records a written reason and leaves the research intact. It is called <strong>Do not approve</strong> on the full record, which is where the decision is made.
+      </p>}
+    </Group>
+
     <p className="text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>
       Inspecting a play changes nothing: it acknowledges no finding, resolves no review, and moves no order.
     </p>
@@ -216,6 +239,12 @@ export function PlayInspectionDrawer({ order, stateLabel, humanReviewAt, reviews
           <Button className="mt-5 min-h-12 w-full" onClick={() => onOpenFull(order)}>
             Open full record<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4 shrink-0" />
           </Button>
+          {isStoppableTicket(order.status) && <Button
+            data-stop-ticket
+            variant="outline"
+            className="mt-2 h-auto min-h-12 w-full whitespace-normal"
+            onClick={() => onOpenFull(order)}
+          >Do not approve — stop this ticket<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4 shrink-0" /></Button>}
         </div>
       </>}
     </SheetContent>
