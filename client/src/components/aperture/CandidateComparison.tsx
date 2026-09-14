@@ -18,11 +18,13 @@ export function CandidateBudgetHint({ value }: { value?: CandidateAffordability 
       {blocked ? "Above share budget · Research only" : value.state === "options_required" ? "Options need a fresh contract quote" : measured ? "Share price within reference budget · not qualified" : "Share affordability not measured"}
     </p>
     {measured && value.referencePriceCents != null && value.ceilingCents != null && <p className="tabular-nums">{dollars(value.referencePriceCents)} / share · {dollars(value.ceilingCents)} ceiling</p>}
+    {blocked && value.requiredEquityCents != null && <p data-required-capital className="tabular-nums" style={{ color: "var(--sh-text-primary)" }}>One share needs about {dollars(value.requiredEquityCents)} of declared capital at this policy, or a lower-priced name.</p>}
+    {blocked && value.requiredCapitalCents != null && <p data-required-capital className="tabular-nums" style={{ color: "var(--sh-text-primary)" }}>One share needs at least {dollars(value.requiredCapitalCents)} of research budget on this mission, or a lower-priced name.</p>}
     <details className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>
       <summary className="min-h-11 cursor-pointer py-3">{blocked ? "Why this limit · next step" : "Price and budget basis"}</summary>
       {measured && value.asOf != null && <p>{value.sourceName} · price recorded {new Date(value.asOf).toLocaleString("en-US")}. Not an executable quote.</p>}
       <p>{value.accountAsOf ? `Account snapshot ${new Date(value.accountAsOf).toLocaleString("en-US")}. ` : "Account snapshot not measured. "}The lower of the single-order policy limit and this research budget is shown. Other risk limits may be tighter.</p>
-      <p>{blocked ? "Continue research or compare another candidate. Refresh account and price evidence before reassessment; no limit or instrument is changed automatically." : "Confirm fresh price, account capacity and all evidence at paper review. This comparison does not authorize a ticket."}</p>
+      <p>{blocked ? "Nothing is raised for you. Revise the mission to declare more capital, research a lower-priced name, or continue this research without a paper ticket. Refresh account and price evidence before reassessment." : "Confirm fresh price, account capacity and all evidence at paper review. This comparison does not authorize a ticket."}</p>
     </details>
   </div>;
 }

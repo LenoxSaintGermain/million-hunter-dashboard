@@ -44,3 +44,38 @@ describe("saved candidate affordability", () => {
     expect(candidateAffordability({ ...input, price: { ...input.price, valueNum: 50 } }).state).toBe("within_reference");
   });
 });
+
+describe("what would admit one share", () => {
+  it("names the declared capital that the 5% policy would need for this price", () => {
+    // The fresh-operator dead end: $2,000 declared gives a $100 ceiling, and
+    // every candidate in their own thesis was priced far above it. The app said
+    // only "compare another candidate", which led nowhere.
+    const result = candidateAffordability(input);
+    expect(result.state).toBe("above_limit");
+    expect(result.requiredEquityCents).toBe(Math.ceil(39_964 * (100 / CURRENT_MANDATE.maxOrderNotionalPctOfEquity)));
+    expect(result.requiredEquityCents).toBe(799_280); // $7,992.80 for a $399.64 share
+    expect(result.requiredCapitalCents).toBeNull();
+  });
+
+  it("names the research budget instead when that is the binding input", () => {
+    // Policy would allow $10,000; the mission only declared $200.
+    const result = candidateAffordability({ ...input, equityCents: 20_000_000, capitalCents: 20_000 });
+    expect(result.state).toBe("above_limit");
+    expect(result.requiredCapitalCents).toBe(39_964);
+    expect(result.requiredEquityCents).toBeNull();
+  });
+
+  it("says nothing about raising anything when the price already fits", () => {
+    const result = candidateAffordability({ ...input, equityCents: 2_000_000, capitalCents: 1_000_000 });
+    expect(result.state).toBe("within_reference");
+    expect(result.requiredEquityCents).toBeNull();
+    expect(result.requiredCapitalCents).toBeNull();
+  });
+
+  it("stays silent when the price itself was never measured", () => {
+    const result = candidateAffordability({ ...input, price: null });
+    expect(result.state).toBe("unknown");
+    expect(result.requiredEquityCents).toBeNull();
+    expect(result.requiredCapitalCents).toBeNull();
+  });
+});

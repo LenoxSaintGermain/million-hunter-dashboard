@@ -39,9 +39,12 @@ describe("candidate comparison", () => {
         state: "above_limit", referencePriceCents: 39964, ceilingCents: 10000,
         asOf: Date.parse("2026-09-14T14:52:00Z"), sourceName: "Illustrative recorded quote",
         accountAsOf: Date.parse("2026-09-14T14:50:00Z"),
+        requiredEquityCents: 799_280, requiredCapitalCents: null,
       },
     }]} reviews={[]} inspectedId={null} onInspect={vi.fn()} />));
     expect($.text()).toContain("Above share budget");
+    // A dead end is a dead end unless it names the way out.
+    expect($.text()).toContain("$7,992.80");
     expect($.text()).toContain("$399.64");
     expect($.text()).toContain("$100.00");
     expect($.text()).toContain("Research only");
