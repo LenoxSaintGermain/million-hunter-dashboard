@@ -161,3 +161,15 @@ Browser left at `https://third-signal-capital-aperture.web.app/aperture/run/7500
 - `server/aperture/missionDispositionContext.test.ts`
 - `server/aperture/discoverySelection.integration.test.ts`
 - This QA report.
+
+## Next phase — evidence review and paper-stage refusal (September 14, ~10:52–10:56 ET)
+
+- Resumed the same authenticated run 750001. At entry, P/E already showed answer recorded and only P/S was unanswered; this phase did not change the existing P/E answer.
+- Fill from verified facts explicitly refused the P/S draft: no revenue TTM fact recorded for VLO. It did not invent a denominator.
+- Independently consulted [Valero's FY2025 10-K](https://www.sec.gov/Archives/edgar/data/1035002/000162828026011499/vlo-20251231.htm) and [Q2 2026 company release](https://investorvalero.com/news/news-details/2026/Valero-Energy-Reports-Second-Quarter-2026-Results/default.aspx). Consolidated revenue calculation, USD millions: 122,687 + 76,857 - 60,147 = 139,397 for the twelve months to June 30, 2026. These sources predate the UAT decision; no later publication was used.
+- Entered a research-only evidence draft with both sources and the revenue period. An indicative 0.85x P/S used the earlier app-recorded $119.081bn market-cap snapshot, expressly not a refreshed quote or independent confirmation of current shares outstanding. The text requests a consistent current numerator and a valuation comparison before confirmation; it does not claim a low ratio validates the diesel-margin thesis.
+- The initial draft hit the 1,000-character aggregate limit with an explicit recovery message and disabled answer actions. Shortened it without removing source or uncertainty; controls recovered. Submitted Need more evidence, not Confirmed. No error appeared and P/S remained open. Exact persisted note bytes were not independently read back, so this is an observed UI interaction rather than a database receipt assertion.
+- Your play → Inspect VLO resolved candidate **600003** and exposed a genuine policy refusal: **$100 single-order ceiling cannot buy one share at 399.64**. Evidence/assumptions showed a recorded SIP minute-bar basis at 14:52Z, two minutes behind when displayed, and an unmet VWAP hold condition. These are observed app data, not independently verified executable quotes.
+- The long-term candidate still exposes an intraday opening-range recipe and an assumed long direction; flag the horizon/recipe fit for product review. Do not loosen account limits or fabricate fractional-share support to force this test into a ticket.
+- No confirmation, proposal, approval, submission, broker connection, order change, risk-policy change, new Mission or new research job was requested in this phase. Source ingestion coverage and early visibility of the $100 order cap are the next implementation gaps; the existing paper gate correctly refused advancement.
+- No application code or production deployment in this phase. No new automated-test or mobile/accessibility pass claimed.
