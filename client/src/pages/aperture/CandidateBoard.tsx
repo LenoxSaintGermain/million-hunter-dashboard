@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, ArrowLeft, CheckCircle2, CircleAlert, ClipboardCheck, FileText, Loader2, RefreshCw, SearchCheck, TrendingUp, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, CircleAlert, ClipboardCheck, FileText, Loader2, RefreshCw, SearchCheck, TrendingUp, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { CapitalBrief } from "@/components/aperture/CapitalBrief";
@@ -18,6 +18,7 @@ import { SetAsideHistory } from "@/components/aperture/SetAsideHistory";
 import { DecisionStepLock, decisionAuthorityAllowsDownstream } from "@/components/aperture/DecisionStepLock";
 import { decisionPriority, describeCandidateRecommendation, rankResearchCandidates } from "@shared/decisionFocus";
 import { buildDecisionPath } from "@shared/decisionPath";
+import { runAffordabilitySummary } from "@shared/candidateAffordability";
 import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
 import { describeEvidenceQuestion, EMPTY_EVIDENCE_QUESTION, evidenceQuestionReadiness, type EvidenceQuestionDraft } from "@shared/evidenceQuestion";
 import type { EvidenceReviewStatus } from "@shared/evidenceReview";
@@ -155,6 +156,8 @@ function RunProgress({ run, candidateCount, stale, retrying, onRefresh, onStartF
     </section>
   );
 }
+
+const dollars = (cents: number) => (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 export default function CandidateBoard() {
   const [, params] = useRoute("/aperture/run/:id");
@@ -362,6 +365,31 @@ export default function CandidateBoard() {
             <button onClick={() => setView("ledger")} className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium" style={{ background: view === "ledger" ? "var(--sh-surface)" : "transparent", color: view === "ledger" ? "var(--sh-text-primary)" : "var(--sh-fg-muted)" }}>Research</button>
           </div>
         </header>
+
+        {/* One statement instead of N dead ends. A fresh $2,000 account met a
+            $100 ceiling and every candidate in its own thesis was priced above
+            it — discovered one candidate at a time, with no figure that would
+            change the answer. This stays silent unless every candidate is
+            measured AND blocked, so a single affordable name keeps it quiet. */}
+        {(() => {
+          const summary = runAffordabilitySummary(candidates as any[]);
+          if (!summary) return null;
+          return <section data-run-affordability role="status" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}>
+            <p className="text-sm font-semibold" style={{ color: "var(--sh-red)" }}>
+              No candidate in this research fits your declared capital.
+            </p>
+            <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-text-primary)" }}>
+              All {summary.blocked} {summary.blocked === 1 ? "candidate is" : "candidates are"} priced above the {summary.ceilingCents != null ? dollars(summary.ceilingCents) : "current"} single-order ceiling.
+              {summary.cheapestRequiredEquityCents != null
+                ? ` The cheapest would need about ${dollars(summary.cheapestRequiredEquityCents)} of declared capital at this policy.`
+                : ""}
+            </p>
+            <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
+              The research is still worth reading and nothing here is changed for you. To act on a name, revise the mission to declare more capital or research lower-priced names.
+            </p>
+            <Button variant="outline" className="mt-3 min-h-11" onClick={() => navigate("/aperture/mission")}>Revise the mission<ArrowRight className="ml-2 h-4 w-4" /></Button>
+          </section>;
+        })()}
 
         <RunProgress
           run={run}

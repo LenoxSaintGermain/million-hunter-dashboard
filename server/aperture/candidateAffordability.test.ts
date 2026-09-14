@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { candidateAffordability } from "./candidateAffordability";
+import { runAffordabilitySummary } from "../../shared/candidateAffordability";
 import { CURRENT_MANDATE } from "./mandate";
 import { singleOrderCeilingCents } from "./gates";
 
@@ -77,5 +78,39 @@ describe("what would admit one share", () => {
     expect(result.state).toBe("unknown");
     expect(result.requiredEquityCents).toBeNull();
     expect(result.requiredCapitalCents).toBeNull();
+  });
+});
+
+describe("a run with no affordable candidate says so once", () => {
+  const blocked = (requiredEquityCents: number | null) => ({
+    affordability: {
+      state: "above_limit" as const, referencePriceCents: 39_964, ceilingCents: 10_000,
+      asOf: now, sourceName: "Illustrative quote", accountAsOf: now,
+      requiredEquityCents, requiredCapitalCents: null,
+    },
+  });
+  const fits = { affordability: { ...blocked(null).affordability, state: "within_reference" as const } };
+
+  it("names the cheapest way in when every candidate is above the ceiling", () => {
+    const summary = runAffordabilitySummary([blocked(799_280), blocked(528_140), blocked(999_000)]);
+    expect(summary).toEqual({ blocked: 3, cheapestRequiredEquityCents: 528_140, ceilingCents: 10_000 });
+  });
+
+  it("stays quiet when even one candidate is affordable", () => {
+    expect(runAffordabilitySummary([blocked(799_280), fits])).toBeNull();
+  });
+
+  it("stays quiet when any price was never measured, so it cannot prove a dead end", () => {
+    expect(runAffordabilitySummary([blocked(799_280), { affordability: null }])).toBeNull();
+    expect(runAffordabilitySummary([blocked(799_280), {}])).toBeNull();
+  });
+
+  it("stays quiet on an empty run", () => {
+    expect(runAffordabilitySummary([])).toBeNull();
+  });
+
+  it("reports the block without a figure rather than inventing one", () => {
+    const summary = runAffordabilitySummary([blocked(null)]);
+    expect(summary).toMatchObject({ blocked: 1, cheapestRequiredEquityCents: null });
   });
 });
