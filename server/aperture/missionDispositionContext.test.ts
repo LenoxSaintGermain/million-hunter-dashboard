@@ -152,6 +152,26 @@ function canonicalHandoff() {
 }
 
 describe("persisted Mission disposition context", () => {
+  it("replaces a resumed generic Mission URL with its receipt after launching analysis exactly once", async () => {
+    setDraft("research");
+    let finishDraft!: (value: any) => void, finishJob!: (value: any) => void;
+    fixture.mutations.completeDraft.mutateAsync.mockImplementation(() => new Promise(resolve => { finishDraft = resolve; }));
+    fixture.mutations.run.mutateAsync.mockImplementation(() => new Promise(resolve => { finishJob = resolve; }));
+    const view = render(true);
+    const submit = elements(view.tree).find(element => element.props.id === "mission-primary-action")!;
+    expect(submit.props.disabled).toBe(false);
+    const action = submit.props.onClick();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fixture.mutations.run.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(fixture.openResearch).toHaveBeenCalledWith("/aperture/decision/77/revision/88", { replace: true });
+    finishDraft({ ...fixture.queries.draft.data, completedAt: now }); finishJob({});
+    await action;
+    expect(fixture.mutations.begin.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(fixture.mutations.run.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(fixture.mutations.startResearch.mutateAsync).not.toHaveBeenCalled();
+    expect(fixture.mutations.validate.mutateAsync).not.toHaveBeenCalled();
+  });
+
   it("durably replaces the canonical handoff immediately after begin, with the authorized job already launched", async () => {
     canonicalHandoff(); setDraft("research");
     fixture.queries.draft.data.values.canonicalThesisId = 780001;

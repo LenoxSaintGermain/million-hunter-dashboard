@@ -1874,7 +1874,11 @@ export const apertureRouter = router({
         const systemLossCeiling = account.equityValueCents == null
           ? input.maxPlannedLossCents
           : Math.floor(account.equityValueCents * CURRENT_MANDATE.maxPlannedRiskPctPerPlay / 100);
-        const maxPlannedLossCents = Math.min(input.maxPlannedLossCents, systemLossCeiling);
+        // A Mission records the operator's assumption, not the result of applying
+        // account policy. Keep the tighter snapshot separately; underwriting and
+        // ticket gates still recompute the authoritative risk envelope.
+        const maxPlannedLossCents = input.maxPlannedLossCents;
+        const effectiveMaxPlannedLossCents = Math.min(maxPlannedLossCents, systemLossCeiling);
         const missionHash = createHash("sha256").update(JSON.stringify({
           missionText: input.missionText,
           canonicalThesisId: input.canonicalThesisId,
@@ -1925,7 +1929,8 @@ export const apertureRouter = router({
             mandateVersion: CURRENT_MANDATE.version,
             paperOnly: true,
             humanApprovalRequired: true,
-            maxPlannedLossCents,
+            maxPlannedLossCents: effectiveMaxPlannedLossCents,
+            declaredMaxPlannedLossCents: maxPlannedLossCents,
           },
           createdByUserId: ctx.user.id,
           createdAt: now,

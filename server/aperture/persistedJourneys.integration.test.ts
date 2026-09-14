@@ -162,6 +162,40 @@ describe.skipIf(!local)("real-database interrupted and returning operator journe
     return { headId, revisionId };
   }
 
+  it("preserves a $200 declared loss ceiling across receipt reads and revisions while effective risk stays $15", async () => {
+    const mission = await missionFixture(owners[0]);
+    await db.update(portfolioAccounts).set({ equityValueCents: 200_000, cashCents: 200_000 })
+      .where(eq(portfolioAccounts.id, mission.accountId));
+    const caller = callerFor(owners[0]);
+    const input = {
+      canonicalThesisId: mission.canonicalThesisId, capitalThesisId: mission.capitalThesisId,
+      accountId: mission.accountId, missionText: "Illustrative diesel research: verify the mechanism before considering shares.",
+      deployableCapitalCents: 200_000, maxPlannedLossCents: 20_000,
+      holdingPeriod: "position" as const, holdingPeriods: ["position" as const], instrumentPreference: "shares" as const,
+      invalidationRule: "Reject if cited evidence does not support sustained refining margins.",
+    };
+    const receipt = await caller.runway.begin(input);
+    expect(receipt.maxPlannedLossCents).toBe(20_000);
+    const [saved] = await db.select().from(apertureDecisionRevisions).where(eq(apertureDecisionRevisions.id, receipt.revisionId));
+    expect(saved.maxPlannedLossCents).toBe(20_000);
+    expect(parsePersistedJson(saved.gateSnapshot)).toMatchObject({ maxPlannedLossCents: 1_500 });
+    const read = await callerFor(owners[0]).runway.latest({ decisionRunId: receipt.decisionRunId, revisionId: receipt.revisionId });
+    expect(read.latest).toMatchObject({ maxPlannedLossCents: 20_000 });
+    const preview = await caller.underwriter.preview({ accountId: mission.accountId, objective: {
+      ...objective, deployableCapitalCents: 200_000, maxPlannedLossCents: saved.maxPlannedLossCents,
+      holdingPeriods: ["position"], targetProfitCents: null, targetPeriod: null,
+    } });
+    expect(preview.objective.maxPlannedLossCents).toBe(20_000);
+    expect(preview.feasibility.riskBudgetCents).toBe(1_500);
+    const revised = await caller.runway.begin({ ...input, decisionRunId: receipt.decisionRunId, maxPlannedLossCents: 18_000 });
+    const [next] = await db.select().from(apertureDecisionRevisions).where(eq(apertureDecisionRevisions.id, revised.revisionId));
+    expect(next).toMatchObject({ maxPlannedLossCents: 18_000, previousRevisionId: saved.id, version: 2 });
+    expect(next.missionHash).not.toBe(saved.missionHash);
+    expect((await db.select().from(apertureDecisionRevisions).where(eq(apertureDecisionRevisions.id, saved.id)))[0]).toEqual(saved);
+    expect(await db.select().from(apertureUnderwritingJobs).where(inArray(apertureUnderwritingJobs.userId, ownerIds))).toEqual([]);
+    expect(await db.select().from(apertureRuns).where(inArray(apertureRuns.userId, ownerIds))).toEqual([]);
+  });
+
   it("resumes incomplete inputs through another authenticated caller and CAS never clobbers the winning draft", async () => {
     const deviceA = callerFor(owners[0]);
     const values = { ...emptyMissionDraftValues(), newTitle: "Illustrative MRVL thesis", newBelief: "Still typing ", capital: "2,000.", maxLoss: "", activeSection: 2 as const };

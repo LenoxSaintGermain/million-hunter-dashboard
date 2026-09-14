@@ -436,9 +436,9 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
         decisionRunId: receipt.decisionRunId, decisionRevisionId: receipt.revisionId,
         requestedPlayCount: 3, uatCase: uatCase ?? undefined,
       });
-      const launchedUnderwriting = handoff && branch === "research"
+      const launchedUnderwriting = (handoff || onMissionRecorded) && branch === "research"
         ? launchUnderwriting().then(() => ({ ok: true as const }), error => ({ ok: false as const, error })) : null;
-      if (handoff) onMissionRecorded?.({ decisionRunId: receipt.decisionRunId, revisionId: receipt.revisionId });
+      onMissionRecorded?.({ decisionRunId: receipt.decisionRunId, revisionId: receipt.revisionId });
       setBaseMission({ decisionRunId: receipt.decisionRunId, decisionRevisionId: receipt.revisionId });
       hydratedDecisionRevisionId.current = receipt.revisionId;
       if (confirmedDraft) {
