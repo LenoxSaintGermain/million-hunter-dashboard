@@ -153,3 +153,27 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - Typecheck `pnpm check`: 0 errors. Production bundle: built in 22.64s.
 - Rollback revision: `capital-aperture-00178-tob`.
 
+## 2026-09-15 Production Fix: React Hook Rule Ordering & Firebase Authorized Domain
+
+- Deployed source: `594d957` (`594d957640fdba95a7071db1dbf6cbf0c8fbe2a0`).
+- Release marker: `594d957-uat-b5fb8237`.
+- Cloud Build: `56182ead-4deb-42f6-9b13-803d28d89b45` — `SUCCESS`.
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:594d957-uat-b5fb8237`.
+- Image digest: `sha256:92297e37be0af5b8e8599c0f5ba2435dfcf6d72548ab384e4ed312cda371294b`.
+- Ready revision: `capital-aperture-00182-dek`, serving 100% of Cloud Run traffic.
+- Traffic tag: `uat-b5fb8237` (`https://uat-b5fb8237---capital-aperture-oxiyp4dcpq-uc.a.run.app`).
+- Public production URL: `https://third-signal-capital-aperture.web.app` / `https://capital-aperture-oxiyp4dcpq-uc.a.run.app`.
+- Root causes diagnosed and resolved:
+  1. **Firebase: Error (auth/unauthorized-domain)**:
+     - Root cause: Cloud Run direct URL `capital-aperture-oxiyp4dcpq-uc.a.run.app` was absent from the Firebase Auth / Identity Platform `authorizedDomains` whitelist.
+     - Fix: Patched Identity Platform v2 config for project `third-signal-v2` to include `capital-aperture-oxiyp4dcpq-uc.a.run.app`, `capital-aperture-325422432428.us-central1.run.app`, and `localhost`.
+  2. **Minified React error #310 ("Rendered more hooks than during the previous render")**:
+     - Root cause: In `CapitalCockpitRail.tsx`, 7 hooks (`deskQuery`, `syncMutation`, `useState`, `utils`, `activeThesisQuery`, `thesesListQuery`, `activateThesis`) were invoked after early conditional returns (`if (isLoading || !data) return ...`). When loading completed, hook count changed across renders and crashed React. In `DashboardLayout.tsx`, `useEffect` was declared after `if (location.startsWith("/aperture")) return ...`.
+     - Fix: Reordered all hooks to the top of components before any conditional returns. Verified via TS AST scanner that 0 hook rule violations exist across the codebase.
+- Validation:
+  - `system.health` returned `204 No Content` / `200 OK`.
+  - Deployed bundle `index-CB-dnq0t.js` verified with release tag `594d957-uat-b5fb8237`.
+  - Vitest test suites: 116/116 unit tests passed. Typecheck: 0 errors.
+- Rollback revision: `capital-aperture-00106-qx2`.
+
+
