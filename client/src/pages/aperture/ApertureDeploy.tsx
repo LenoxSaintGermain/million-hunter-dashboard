@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Zap, Layers, Sparkles } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { PlayAndReturn } from "@/components/aperture/PlayAndReturn";
 import { trpc } from "@/lib/trpc";
 import { recipeHorizonRecovery } from "@shared/intradayRecipeGuard";
+import { ManualOrderTicketModal } from "@/components/aperture/ManualOrderTicketModal";
+import { QuickHitCard } from "@/components/aperture/QuickHitCard";
+import { SymphonyRuleBuilder } from "@/components/aperture/SymphonyRuleBuilder";
 
 /**
  * TSL-BUILD-2026-009, taps 1-3. Tap 1 arrives here from Today. Tap 2 asks for
@@ -31,9 +34,17 @@ function readPreferences(): { amount: string; horizon: string } {
 export default function ApertureDeploy() {
   const [, navigate] = useLocation();
   const saved = readPreferences();
+  const [deployMode, setDeployMode] = useState<"standard" | "quick_hits">("standard");
+  const [quickHitBudget, setQuickHitBudget] = useState<number>(50);
   const [amount, setAmount] = useState(saved.amount);
   const [horizon, setHorizon] = useState(saved.horizon);
   const [asked, setAsked] = useState(false);
+  const [ticketModalOpen, setTicketModalOpen] = useState(false);
+
+  const quickHitQuery = trpc.aperture.quickHit?.catalog?.useQuery;
+  const quickHitCatalog = quickHitQuery
+    ? quickHitQuery({ budgetUsd: quickHitBudget }, { enabled: deployMode === "quick_hits" })
+    : { data: [], isLoading: false };
 
   const amountCents = Math.round(Number(amount.replace(/[^0-9.]/g, "")) * 100);
   const amountValid = Number.isFinite(amountCents) && amountCents > 0;
@@ -58,7 +69,106 @@ export default function ApertureDeploy() {
   const deployedCents = play?.notionalCents ?? null;
 
   return <DashboardLayout>
-    <section className="mx-auto max-w-3xl space-y-5 pb-16">
+    <section className={`mx-auto ${deployMode === "quick_hits" ? "max-w-5xl" : "max-w-3xl"} space-y-6 pb-16`}>
+      {/* Strategy Mode Switcher: Quick Hits vs Standard Thesis */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--sh-border-1)] pb-4">
+        <button
+          type="button"
+          onClick={() => setDeployMode("quick_hits")}
+          className={`min-h-10 px-4 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+            deployMode === "quick_hits"
+              ? "bg-[var(--sh-primary)] text-[var(--sh-primary-fg)] shadow-xs"
+              : "bg-[var(--sh-surface-2)] text-[var(--sh-fg-2)] border border-[var(--sh-border-1)] hover:bg-[var(--sh-surface-3)]"
+          }`}
+        >
+          <Zap className="w-3.5 h-3.5 text-[var(--sh-amber)]" />
+          <span>Quick Hits & Symphony Lite ($25–$100)</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setDeployMode("standard")}
+          className={`min-h-10 px-4 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+            deployMode === "standard"
+              ? "bg-[var(--sh-primary)] text-[var(--sh-primary-fg)] shadow-xs"
+              : "bg-[var(--sh-surface-2)] text-[var(--sh-fg-2)] border border-[var(--sh-border-1)] hover:bg-[var(--sh-surface-3)]"
+          }`}
+        >
+          <span>Institutional Thesis Deploy (Options / Equities)</span>
+        </button>
+      </div>
+
+      {deployMode === "quick_hits" ? (
+        <div className="space-y-8 animate-in fade-in duration-150">
+          <header>
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>
+              Event-Driven Quick Hits
+            </p>
+            <h1 className="mt-1 font-serif text-3xl leading-tight">
+              Event Momentum & Micro-Cap Cockpit
+            </h1>
+            <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
+              Disciplined short-term plays inspired by Composer rule-blocks. Automated brackets with mandatory limit orders — no manual audit friction.
+            </p>
+          </header>
+
+          {/* Symphony Modular Rule Engine */}
+          <SymphonyRuleBuilder />
+
+          {/* Curated Opportunities Feed */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="font-mono text-sm font-bold text-[var(--sh-text-primary)] uppercase tracking-wider">
+                  Curated Catalyst Plays
+                </h2>
+                <p className="text-xs text-[var(--sh-fg-muted)] mt-0.5">
+                  SEC 8-K filings, clinical catalysts, and breakout volume. Spread capped &le; 2.0%, ADV &gt; 500k shares.
+                </p>
+              </div>
+
+              {/* Global Quick Budget Toggle */}
+              <div className="flex items-center gap-2 text-xs font-mono">
+                <span className="text-[var(--sh-fg-muted)]">Default Budget:</span>
+                {[25, 50, 100].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setQuickHitBudget(amt)}
+                    className={`px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                      quickHitBudget === amt
+                        ? "bg-[var(--sh-primary)] text-[var(--sh-primary-fg)] font-bold shadow-xs"
+                        : "bg-[var(--sh-surface-2)] text-[var(--sh-fg-2)] border border-[var(--sh-border-1)] hover:bg-[var(--sh-surface-3)]"
+                    }`}
+                  >
+                    ${amt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {quickHitCatalog.isLoading ? (
+              <div className="p-12 text-center text-xs font-mono text-[var(--sh-fg-muted)] border rounded-xl" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+                <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-[var(--sh-signal)]" />
+                Loading curated catalyst plays...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(quickHitCatalog.data ?? []).map((play) => (
+                  <QuickHitCard
+                    key={play.id}
+                    play={play}
+                    defaultBudget={quickHitBudget}
+                    onAuthorized={() => {
+                      // Navigate or show indicator
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
       <header>
         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture</p>
         <h1 className="mt-1 font-serif text-3xl leading-tight">How much do you want to put to work?</h1>
@@ -122,7 +232,16 @@ export default function ApertureDeploy() {
           <h3 className="font-serif text-2xl"><span translate="no">{best.symbol}</span> · {recipeRecovery.horizonLabel}</h3>
           <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{recipeRecovery.side ? `Recorded direction: ${recipeRecovery.side}` : "Direction not recorded — no direction assumed."}</p>
           <p className="text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{recipeRecovery.reason} {recipeRecovery.nextStep}</p>
-          <Button type="button" variant="outline" className="min-h-11" onClick={() => navigate(`/aperture/run/${best.runId}?candidate=${best.candidateId}&view=evidence`)}>View research</Button>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              type="button"
+              className="min-h-11 font-semibold"
+              onClick={() => setTicketModalOpen(true)}
+            >
+              Stage Ad-Hoc Paper Ticket for {best.symbol}
+            </Button>
+            <Button type="button" variant="outline" className="min-h-11" onClick={() => navigate(`/aperture/run/${best.runId}?candidate=${best.candidateId}&view=evidence`)}>View research</Button>
+          </div>
         </div>}
         {!recipeRecovery && construct.isFetching && <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Reading the recorded play…</p>}
         {play && play.readiness !== "constructed" && <p className="rounded-lg border p-3 text-sm leading-6" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 40%, var(--sh-border-1))", background: "var(--sh-surface)", color: "var(--sh-fg-muted)" }}>
@@ -173,6 +292,20 @@ export default function ApertureDeploy() {
           </div>
         </details>
       </section>}
+      </>
+      )}
     </section>
+    <ManualOrderTicketModal
+      open={ticketModalOpen}
+      onOpenChange={setTicketModalOpen}
+      initialValues={best ? {
+        symbol: best.symbol,
+        direction: recipeRecovery?.side === "short" ? "short" : "long",
+        runId: best.runId,
+        candidateId: best.candidateId,
+        suggestedAmountCents: amountCents,
+        holdingPeriod: horizon === "intraday" ? "intraday" : horizon === "position" ? "position" : "swing",
+      } : undefined}
+    />
   </DashboardLayout>;
 }

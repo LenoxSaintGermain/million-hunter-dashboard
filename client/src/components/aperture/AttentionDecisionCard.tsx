@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ApertureAttentionItem } from "@shared/apertureAttention";
 import { coveredByInvariant } from "@shared/operatingInvariant";
@@ -10,6 +10,27 @@ function evidenceUrl(value: string | undefined): string | undefined {
     const url = new URL(value);
     return (url.protocol === "https:" || url.protocol === "http:") && !url.username && !url.password ? value : undefined;
   } catch { return undefined; }
+}
+
+export function getCitationDomain(urlStr: string): string {
+  try {
+    const url = new URL(urlStr);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    if (host.includes("sec.gov")) return "SEC EDGAR 10-Q";
+    if (host.includes("bloomberg.com")) return "Bloomberg";
+    if (host.includes("reuters.com")) return "Reuters";
+    if (host.includes("wsj.com")) return "WSJ";
+    if (host.includes("cnbc.com")) return "CNBC";
+    if (host.includes("ft.com")) return "Financial Times";
+    if (host.includes("yahoo.com")) return "Yahoo Finance";
+    if (host.includes("seekingalpha.com")) return "Seeking Alpha";
+    if (host.includes("prnewswire.com")) return "PR Newswire";
+    if (host.includes("globenewswire.com")) return "GlobeNewswire";
+    const parts = host.split(".");
+    return parts[0]?.toUpperCase() || host;
+  } catch {
+    return "Source";
+  }
 }
 
 /** Provenance stays one deliberate action away once it would dominate the card. */
@@ -37,9 +58,35 @@ function parseCatalystSummary(text: string | undefined) {
 }
 
 function sourceLinks(citations: string[]) {
-  return citations.map((url, index) => evidenceUrl(url)
-    ? <a key={`${index}:${url}`} href={evidenceUrl(url)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center break-all underline underline-offset-4" style={{ color: "var(--sh-signal)" }}>Source {index + 1}</a>
-    : <span key={`${index}:${url}`} className="inline-flex min-h-11 items-center">Source {index + 1} · link unavailable</span>);
+  return citations.map((url, index) => {
+    const valid = evidenceUrl(url);
+    const domain = valid ? getCitationDomain(valid) : "Link";
+    return valid ? (
+      <a
+        key={`${index}:${url}`}
+        href={valid}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex min-h-8 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium hover:underline"
+        style={{
+          borderColor: "var(--sh-border-1)",
+          background: "var(--sh-surface-2)",
+          color: "var(--sh-signal)",
+        }}
+      >
+        <span>Source {index + 1} · {domain}</span>
+        <ExternalLink className="h-3 w-3 opacity-60" />
+      </a>
+    ) : (
+      <span
+        key={`${index}:${url}`}
+        className="inline-flex min-h-8 items-center rounded-md border px-2 py-1 text-xs"
+        style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}
+      >
+        Source {index + 1} · link unavailable
+      </span>
+    );
+  });
 }
 
 export function FindingEvidence({ evidence, label = "Evidence", expanded = false }: { evidence: NonNullable<ApertureAttentionItem["evidence"]>; label?: string; expanded?: boolean }) {
@@ -84,9 +131,13 @@ export function FindingEvidence({ evidence, label = "Evidence", expanded = false
           h6: ({ children }) => <p className="font-semibold">{children}</p>,
         }}
       >{evidence.finding}</Markdown></div>
-      {evidence.citations.length ? (evidence.citations.length > INLINE_SOURCE_LIMIT
-        ? <details className="rounded-lg border" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-semibold">Sources · {evidence.citations.length}</summary><div className="flex flex-wrap gap-2 border-t px-3 py-2" style={{ borderColor: "var(--sh-border-1)" }}>{sourceLinks(evidence.citations)}</div></details>
-        : <div className="flex flex-wrap gap-2">{sourceLinks(evidence.citations)}</div>) : <p>No source links recorded. This finding is not verified evidence.</p>}
+      {evidence.citations.length ? (() => {
+        const domainList = Array.from(new Set(evidence.citations.map(getCitationDomain))).filter(Boolean);
+        const domainSummary = domainList.length > 0 ? ` · ${domainList.slice(0, 3).join(", ")}${domainList.length > 3 ? "..." : ""}` : "";
+        return evidence.citations.length > INLINE_SOURCE_LIMIT
+          ? <details className="rounded-lg border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-semibold">Sources ({evidence.citations.length}){domainSummary}</summary><div className="flex flex-wrap gap-2 border-t p-3" style={{ borderColor: "var(--sh-border-1)" }}>{sourceLinks(evidence.citations)}</div></details>
+          : <div className="flex flex-wrap gap-2">{sourceLinks(evidence.citations)}</div>;
+      })() : <p>No source links recorded. This finding is not verified evidence.</p>}
     </div>
   </details>;
 }

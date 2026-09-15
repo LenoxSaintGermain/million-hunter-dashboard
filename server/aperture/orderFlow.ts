@@ -262,6 +262,7 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
       contractMultiplier: input.contractMultiplier,
       side: input.side,
       orderType,
+      limitPriceCents: input.limitPriceCents ?? null,
       timeInForce,
       intent: input.intent ?? null,
       holdingPeriod: input.holdingPeriod ?? "",

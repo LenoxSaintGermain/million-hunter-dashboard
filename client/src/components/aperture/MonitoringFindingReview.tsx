@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { ShieldCheck, Layers, DollarSign } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { type MonitoringFindingSelection, type MonitoringReviewDecision, type MonitoringReviewReceipt } from "@shared/monitoringFinding";
@@ -7,7 +8,15 @@ import { isPresetReviewNote, monitoringReviewPresets } from "@shared/monitoringR
 type Target = MonitoringFindingSelection & { runId: number; candidateId: number };
 
 /** This form owns only a review receipt. Rendering and opening evidence never save. */
-export function MonitoringFindingReview({ target }: { target: Target }) {
+export function MonitoringFindingReview({
+  target,
+  onHedge,
+  onExit,
+}: {
+  target: Target;
+  onHedge?: () => void;
+  onExit?: () => void;
+}) {
   const receipts = trpc.aperture.monitor.reviews.list.useQuery(target, { refetchOnWindowFocus: false });
   const [decision, setDecision] = useState<MonitoringReviewDecision | "">("");
   const [note, setNote] = useState("");
@@ -38,10 +47,70 @@ export function MonitoringFindingReview({ target }: { target: Target }) {
     record.mutate(request.current);
   };
   return <section className="mt-3 rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }} aria-label="Record finding review">
-    <h3 className="text-base font-semibold">Your review</h3>
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+      <h3 className="text-base font-semibold">Your review</h3>
+      <span className="text-xs px-2 py-0.5 rounded font-mono" style={{ background: "var(--sh-surface-3)", color: "var(--sh-fg-muted)" }}>
+        Paper Fill Recorded · Discretionary Exit
+      </span>
+    </div>
     <p className="mt-1 text-sm leading-5">Saves your assessment of this finding only—not an order change or exit.</p>
     {receipts.isLoading && <p className="mt-2 text-sm" role="status">Loading saved review…</p>}
     {receipts.isError && <div className="mt-2 text-sm" role="alert"><p>Saved reviews could not load. No new review has been confirmed.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void receipts.refetch()}>Reload saved review</Button></div>}
+
+    {/* Operational Cockpit Actions */}
+    <div className="mt-3 rounded-lg border p-3 space-y-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+      <p className="text-[11px] font-bold tracking-tight uppercase" style={{ color: "var(--sh-fg-muted)" }}>Operational Decisions</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {/* Action 1: Hold / Maintain */}
+        <Button
+          type="button"
+          variant="outline"
+          className="h-auto py-2 px-3 flex flex-col items-start gap-0.5 text-left border-emerald-500/30 hover:bg-emerald-500/10 hover:border-emerald-500"
+          disabled={record.isPending || !receipts.data || receipts.isError}
+          onClick={() => {
+            const holdNote = "Hold / Maintain: Position monitored, thesis and risk intact.";
+            request.current = { ...target, decision: "reviewed_unresolved", note: holdNote, requestId: crypto.randomUUID() };
+            setDecision("reviewed_unresolved");
+            setNote(holdNote);
+            record.mutate(request.current);
+          }}
+        >
+          <div className="flex items-center gap-1.5 font-semibold text-xs text-emerald-500">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            <span>Hold / Maintain</span>
+          </div>
+          <span className="text-[10px] text-muted-foreground leading-tight">Acknowledge & keep active</span>
+        </Button>
+
+        {/* Action 2: Hedge / Adjust */}
+        <Button
+          type="button"
+          variant="outline"
+          className="h-auto py-2 px-3 flex flex-col items-start gap-0.5 text-left border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-500"
+          onClick={onHedge}
+        >
+          <div className="flex items-center gap-1.5 font-semibold text-xs text-amber-500">
+            <Layers className="h-3.5 w-3.5" />
+            <span>Hedge / Adjust</span>
+          </div>
+          <span className="text-[10px] text-muted-foreground leading-tight">Spread or delta hedge</span>
+        </Button>
+
+        {/* Action 3: Take Profit / Cut Loss */}
+        <Button
+          type="button"
+          variant="outline"
+          className="h-auto py-2 px-3 flex flex-col items-start gap-0.5 text-left border-primary/30 hover:bg-primary/10 hover:border-primary"
+          onClick={onExit}
+        >
+          <div className="flex items-center gap-1.5 font-semibold text-xs text-primary">
+            <DollarSign className="h-3.5 w-3.5" />
+            <span>Take Profit / Exit</span>
+          </div>
+          <span className="text-[10px] text-muted-foreground leading-tight">Route instant paper exit</span>
+        </Button>
+      </div>
+    </div>
     {latest && !editing ? <div className="mt-3 space-y-2">
       <p role="status" className="text-sm font-semibold">Review saved · {latest.decision === "needs_fresh_evidence" ? "Needs fresh evidence" : latest.decision === "resolved" ? "Closed" : "Concern kept open"}</p>
       <p className="text-sm">{latest.note}</p>

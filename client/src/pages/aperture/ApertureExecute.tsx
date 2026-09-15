@@ -33,6 +33,10 @@ import { MonitoringFindingCard } from "@/components/aperture/MonitoringFindingCa
 import { MonitoringFindingReview, revealMonitoringFinding } from "@/components/aperture/MonitoringFindingReview";
 import { monitoringFindingHref, monitoringFindingVersion, parseMonitoringFindingSelection, selectMonitoringFinding, type MonitoringFindingRoute } from "@shared/monitoringFinding";
 import { PaperProposalForm } from "@/components/aperture/PaperProposalForm";
+import { ManualOrderTicketModal } from "@/components/aperture/ManualOrderTicketModal";
+import { PositionSummaryBar } from "@/components/aperture/PositionSummaryBar";
+import { TacticalFlankRadar } from "@/components/aperture/TacticalFlankRadar";
+import { PositionExitModal, type ExitTarget } from "@/components/aperture/PositionExitModal";
 import { DecisionStepLock, decisionAuthorityAllowsDownstream } from "@/components/aperture/DecisionStepLock";
 import { format, formatDistanceToNow } from "date-fns";
 import { normalizeStringList } from "@shared/stringList";
@@ -102,6 +106,7 @@ function OrderQueue({ runId, focusCandidateId, ticketBuilderActive = false }: { 
   const [confirmationText, setConfirmationText] = useState("");
   const [rejection, setRejection] = useState<Order | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [manualModalOpen, setManualModalOpen] = useState(false);
   const { data: orders, refetch } = trpc.aperture.order.list.useQuery({ runId });
   const approve = trpc.aperture.order.approve.useMutation({
     onSuccess: () => { toast.success("Order approved"); refetch(); },
@@ -178,11 +183,20 @@ function OrderQueue({ runId, focusCandidateId, ticketBuilderActive = false }: { 
       </div>
 
       {scopedOrders.length === 0 && (
-        <p className="text-sm text-center py-8" style={{ color: "var(--sh-fg-muted)" }}>
-           {ticketBuilderActive
-             ? "No paper proposal yet. Follow the guarded action above; proposal, approval, and paper submission remain separate steps."
-             : "No paper orders yet. A reviewed research decision must be translated into an order before it can enter this queue."}
-        </p>
+        <div className="text-center py-8 space-y-3">
+          <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>
+             {ticketBuilderActive
+               ? "No paper proposal yet. Follow the guarded action above; proposal, approval, and paper submission remain separate steps."
+               : "No paper orders yet. A reviewed research decision must be translated into an order before it can enter this queue."}
+          </p>
+          <Button
+            type="button"
+            className="min-h-11 font-semibold"
+            onClick={() => setManualModalOpen(true)}
+          >
+            + Stage Discretionary Paper Ticket
+          </Button>
+        </div>
       )}
 
       <div className="space-y-2">
@@ -294,11 +308,14 @@ function OrderQueue({ runId, focusCandidateId, ticketBuilderActive = false }: { 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ManualOrderTicketModal
+        open={manualModalOpen}
+        onOpenChange={setManualModalOpen}
+        initialValues={{ runId, candidateId: focusCandidateId }}
+      />
     </div>
   );
 }
-
-// ── Check whether thesis still holds ─────────────────────────────────────────
 
 export function MonitoringPanel({ runId, candidate, thesisSummary, order, selection, onOpenFinding, contextState = "ready", onRetryContext }: {
   runId: number; candidate?: { id: number; symbol: string }; thesisSummary?: string | null;
@@ -311,6 +328,9 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
   const selectedElement = useRef<HTMLDivElement>(null);
   const focusedVersion = useRef<string | null>(null);
   const interrupted = useRef(false);
+  const [exitModalOpen, setExitModalOpen] = useState(false);
+  const [hedgeModalOpen, setHedgeModalOpen] = useState(false);
+
   const selectionKey = selection && !("invalid" in selection) ? `${selection.orderId}:${selection.findingId}:${selection.findingVersion}` : null;
   useEffect(() => {
     interrupted.current = false;
@@ -322,6 +342,15 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
     { runId, candidateId: candidate?.id ?? -1 }, { enabled: candidate != null },
   );
   const checks = query.data;
+
+  // Safe position lookup for mark & PnL
+  const positionsQuery = (trpc.aperture as any)?.position?.list?.useQuery
+    ? (trpc.aperture as any).position.list.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: undefined };
+  const currentPosition = positionsQuery.data?.find?.(
+    (p: any) => p.symbol === order?.symbol || (order?.underlyingSymbol && p.symbol.startsWith(order.underlyingSymbol))
+  );
+
   const runCheck = trpc.aperture.monitor.run.useMutation({
     onSuccess: (results) => {
       const reviewCount = results.filter((result) => monitoringReviewState(result).needsReview).length;
@@ -351,10 +380,55 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
   if (contextState === "loading") return <p role="status">Loading selected play and order… No checks are being run.</p>;
   const contextError = contextState === "failed" ? <div role="alert" className="rounded-lg border p-4"><p>Selected play or order could not refresh. No monitoring eligibility is confirmed.</p>{onRetryContext && <Button variant="outline" className="mt-2 min-h-11" onClick={onRetryContext}>Retry play and order</Button>}</div> : null;
   if (contextError && (!candidate || !order)) return contextError;
+
+  const exitTarget: ExitTarget | null = order ? {
+    symbol: order.symbol,
+    underlyingSymbol: order.underlyingSymbol,
+    instrumentType: (order.instrumentType as any) ?? "long_call",
+    optionExpirationDate: order.optionExpirationDate,
+    optionStrikePriceCents: order.optionStrikePriceCents,
+    contractMultiplier: order.contractMultiplier ?? 100,
+    qty: order.qty ?? 1,
+    side: "long",
+    accountId: order.accountId ?? 1,
+    runId,
+    candidateId: candidate?.id,
+    lastPriceCents: currentPosition?.lastPriceCents ?? (order as any).filledAvgPriceCents ?? (order as any).limitPriceCents,
+    marketValueCents: currentPosition?.marketValueCents,
+  } : null;
+
   return <div className="space-y-4">
     {contextError}
+
+    {/* Above-the-fold Active Position Management Cockpit */}
+    {order && (
+      <PositionSummaryBar
+        order={order}
+        position={currentPosition}
+        thesisSummary={thesisSummary}
+        onOpenExit={() => setExitModalOpen(true)}
+        onOpenHedge={() => setHedgeModalOpen(true)}
+      />
+    )}
+
+    {/* Tactical Flank Radar (Consolidated 4-Matrix Check) */}
+    <TacticalFlankRadar
+      checks={checks ?? []}
+      order={order}
+      candidate={candidate}
+      runId={runId}
+      onOpenFinding={onOpenFinding}
+      onRefreshAll={canCheck ? runScopedChecks : undefined}
+      refreshing={runCheck.isPending}
+    />
+
     <section className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
-      <h2 className="text-base font-semibold">Thesis checks · {order ? orderInstrumentLabel(order) : candidate?.symbol ?? "Select a play"}</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <h2 className="text-base font-semibold">Thesis checks · {order ? orderInstrumentLabel(order) : candidate?.symbol ?? "Select a play"}</h2>
+        <span className="font-mono text-xs px-2.5 py-1 rounded border border-primary/20 bg-primary/5 text-primary font-medium w-fit">
+          Paper Fill Recorded · Discretionary Exit
+        </span>
+      </div>
       <p className="mt-2 text-sm leading-5">Check this play’s catalyst and invalidation. Checks run on demand; reading a finding does not acknowledge or resolve it.</p>
       <Button variant="outline" className="mt-3 min-h-11" disabled={!canCheck || runCheck.isPending} onClick={runScopedChecks}>{runCheck.isPending ? <Loader2 aria-hidden="true" className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw aria-hidden="true" className="mr-1.5 h-4 w-4" />}{runCheck.isPending ? "Checking this play…" : "Run sourced checks"}</Button>
       <p className="mt-2 text-sm" role="status">{!canCheck ? "New monitoring checks require a verified open fill. Review the order status first." : runCheck.isPending ? "New checks are running for this play only." : "Creates new monitoring evidence for this play only. Does not submit, hedge, or exit an order."}</p>
@@ -365,16 +439,42 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
     {showSelected && <div ref={selectedElement} tabIndex={-1} data-selected-monitoring-finding={selectedCheck.id} className="scroll-mt-28 rounded-xl outline-offset-4" aria-label="Selected monitoring finding">
       <p className="mb-2 text-sm font-semibold">{selected.historical ? "Selected historical finding" : "Selected finding"} · {monitoringFindingPresentation({ check: selectedCheck, instrument: order }).stateLabel}</p>
       {selected.historical && <p className="mb-2 text-sm">A newer check exists below. This is the exact version you opened, not a current market claim.</p>}
-      <MonitoringFindingCard check={selectedCheck} instrument={order} rationale={order?.reason ?? thesisSummary} onRefresh={canCheck ? runScopedChecks : undefined} refreshing={runCheck.isPending} />
-      <MonitoringFindingReview key={selectionKey} target={{ runId, candidateId: candidate!.id, orderId: order!.id, findingId: selectedCheck.id, findingVersion: monitoringFindingVersion(selectedCheck) }} />
+      <MonitoringFindingCard check={selectedCheck} instrument={order} rationale={order?.reason ?? thesisSummary} onRefresh={canCheck ? runScopedChecks : undefined} refreshing={runCheck.isPending} hideImplication={true} />
+      <MonitoringFindingReview key={selectionKey} target={{ runId, candidateId: candidate!.id, orderId: order!.id, findingId: selectedCheck.id, findingVersion: monitoringFindingVersion(selectedCheck) }} onHedge={() => setHedgeModalOpen(true)} onExit={() => setExitModalOpen(true)} />
     </div>}
     {reviewItems.length > 0 && <p role="status" className="text-sm font-medium">{reviewItems.length} check{reviewItems.length === 1 ? " needs" : "s need"} review. Open the evidence beside each finding.</p>}
     <div className="space-y-3">{currentChecks.filter(check => !showSelected || check.id !== selectedCheck.id).map((check) => <div key={check.id}>
-      <MonitoringFindingCard check={check} instrument={order} rationale={order?.reason ?? thesisSummary} onRefresh={canCheck ? runScopedChecks : undefined} refreshing={runCheck.isPending} />
+      <MonitoringFindingCard check={check} instrument={order} rationale={order?.reason ?? thesisSummary} onRefresh={canCheck ? runScopedChecks : undefined} refreshing={runCheck.isPending} hideImplication={true} />
       {order && candidate && <Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding(monitoringFindingHref({ ...check, runId, candidateId: candidate.id, orderId: order.id }))}>Review this finding</Button>}
     </div>)}</div>
-    {previousChecks.length > 0 && <details className="rounded-lg border p-3"><summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">Previous checks · {previousChecks.length}</summary><p className="mb-3 text-sm">Historical versions, not additional current review tasks. No finding is acknowledged or erased.</p><div className="space-y-3">{previousChecks.filter(check => !showSelected || check.id !== selectedCheck.id).map(check => <div key={check.id}><MonitoringFindingCard check={check} instrument={order} rationale={order?.reason ?? thesisSummary} />{order && candidate && <Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding(monitoringFindingHref({ ...check, runId, candidateId: candidate.id, orderId: order.id }))}>Review this recorded version</Button>}</div>)}</div></details>}
+    {previousChecks.length > 0 && <details className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><summary className="min-h-11 cursor-pointer font-semibold flex items-center justify-between text-sm"><span>Version History ({previousChecks.length}) · Previous checks · {previousChecks.length}</span><span className="text-xs font-normal" style={{ color: "var(--sh-fg-muted)" }}>Archived checks · Click to expand</span></summary><p className="my-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Historical versions, not additional current review tasks. No finding is acknowledged or erased.</p><div className="space-y-3 pt-2">{previousChecks.filter(check => !showSelected || check.id !== selectedCheck.id).map(check => <div key={check.id}><MonitoringFindingCard check={check} instrument={order} rationale={order?.reason ?? thesisSummary} hideImplication={true} />{order && candidate && <Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding(monitoringFindingHref({ ...check, runId, candidateId: candidate.id, orderId: order.id }))}>Review this recorded version</Button>}</div>)}</div></details>}
     {!query.isLoading && !query.isError && checks?.length === 0 && <p className="text-sm">No monitoring checks recorded for this play. No conclusion about its current thesis is available.</p>}
+
+    {exitModalOpen && (
+      <PositionExitModal
+        open={exitModalOpen}
+        onOpenChange={setExitModalOpen}
+        target={exitTarget}
+        onSuccess={() => {
+          setExitModalOpen(false);
+          toast.success("Paper exit order submitted");
+          void query.refetch();
+        }}
+      />
+    )}
+
+    {hedgeModalOpen && (
+      <ManualOrderTicketModal
+        open={hedgeModalOpen}
+        onOpenChange={setHedgeModalOpen}
+        initialValues={{
+          symbol: order?.underlyingSymbol ?? order?.symbol ?? "MGM",
+          direction: "short",
+          runId,
+          candidateId: candidate?.id,
+        }}
+      />
+    )}
   </div>;
 }
 

@@ -61,6 +61,7 @@ export function DecisionFocusCard({ candidate, positions, reviewedChecks, onOpen
           {path.stage === "read_memo" && onOpenMemo && <Button size="sm" onClick={onOpenMemo}>Read decision record <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>}
           {path.stage === "resolve_checks" && onReviewEvidence && <Button size="sm" onClick={onReviewEvidence}>Open decisive checks</Button>}
           {path.stage === "prepare_paper_review" && onViewPaperAccount && <Button size="sm" onClick={onViewPaperAccount}>Review paper readiness</Button>}
+          {onPrepareProposal && <Button size="sm" variant="outline" className="min-h-11 font-semibold" onClick={onPrepareProposal}>Stage Play on Desk</Button>}
           {onReviewEvidence && path.stage !== "resolve_checks" && <button className="text-xs underline-offset-4 hover:underline" style={{ color: "var(--sh-fg-muted)" }} onClick={onReviewEvidence}>Evidence</button>}
           {onComparePostures && <button className="text-xs underline-offset-4 hover:underline" style={{ color: "var(--sh-fg-muted)" }} onClick={onComparePostures}>Postures</button>}
         </div>

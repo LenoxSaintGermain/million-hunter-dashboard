@@ -89,6 +89,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   const [recipePrefilled, setRecipePrefilled] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [destinationAccountId, setDestinationAccountId] = useState<number | null>(null);
+  const [draftManualTicket, setDraftManualTicket] = useState(false);
   const [instrumentType, setInstrumentType] = useState<PaperInstrumentType>(() => run?.instrumentPreference === "options" ? (candidate?.playSide === "short" ? "long_put" : "long_call") : "shares");
   const [optionExpirationDate, setOptionExpirationDate] = useState(() => nextStandardMonthlyOptionExpiration());
   const [optionStrikeDollars, setOptionStrikeDollars] = useState("");
@@ -259,14 +260,14 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   // field is hidden until a preflight that cannot pass without it.
   const preflightTicket = useMemo(() => ({ ...ticket, paperAcknowledgement: "PAPER" }), [ticket]);
   const preflightTicketFingerprint = useMemo(() => JSON.stringify(preflightTicket), [preflightTicket]);
-  const preflightEnabled = Boolean(!recipeRecovery && account && destinationAccount && candidate && (isOption ? optionTermsReady : recipeCanPrepare));
+  const preflightEnabled = Boolean((!recipeRecovery || draftManualTicket) && account && destinationAccount && candidate && (isOption ? optionTermsReady : (recipeCanPrepare || draftManualTicket)));
 
   useEffect(() => {
     if (!preflightEnabled) { setPreflightInput(null); return; }
     const timer = window.setTimeout(() => setPreflightInput({ ticket: preflightTicket, fingerprint: preflightTicketFingerprint }), 400);
     return () => window.clearTimeout(timer);
   }, [preflightEnabled, preflightTicket, preflightTicketFingerprint]);
-  const preflight = trpc.aperture.order.preflight.useQuery(preflightInput?.ticket ?? preflightTicket, { enabled: !recipeRecovery && preflightInput != null, staleTime: 0, retry: false });
+  const preflight = trpc.aperture.order.preflight.useQuery(preflightInput?.ticket ?? preflightTicket, { enabled: (!recipeRecovery || draftManualTicket) && preflightInput != null, staleTime: 0, retry: false });
   const preflightMatchesTicket = preflightInput?.fingerprint === preflightTicketFingerprint;
   const currentPreflightData = preflightMatchesTicket ? preflight.data : undefined;
   const hardPreflightResult = (currentPreflightData?.evaluation.results ?? []).find((result) => !result.passed && HARD_PREFLIGHT_GATE_KEYS.has(result.key));
@@ -339,12 +340,12 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
       toast.info(result.data.recovery.reason);
       return;
     }
-    toast.info(result.data?.play?.readiness === "constructed"
-      ? "Market checks refreshed. Review the measured ticket and current guardrails before creating a proposal."
+    toast.success(result.data && "play" in result.data && result.data.play?.readiness === "constructed"
+      ? "Market checks refreshed; entry and stop are ready."
       : "Market checks refreshed; this setup still needs verified inputs. Review the reason above.");
   };
   const readiness = buildProposalReadiness({
-    recipeReady: isOption ? true : recipeCanPrepare,
+    recipeReady: isOption ? true : (recipeCanPrepare || draftManualTicket),
     evidenceReviewComplete,
     unavailableReason: constructed.isError ? "Market data request failed. Retry to verify this setup." : recipeAvailability.summary,
     ticketReady: isOption ? optionTermsReady : true,
@@ -357,16 +358,16 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   });
 
   const submitProposal = () => {
-    if (recipeRecovery) return toast.error(recipeRecovery.reason);
+    if (recipeRecovery && !draftManualTicket) return toast.error(recipeRecovery.reason);
     const deadlineAt = new Date(deadline).getTime();
     const noTradeConditions = noTradeText.split("\n").map((condition) => condition.trim()).filter(Boolean);
     if (!account) return toast.error("Choose the portfolio context this research was tested against.");
     if (!destinationAccount) return toast.error("Connect, sync, and bind a paper execution destination before preparing a proposal.");
     if (isOption && !optionTermsReady) return toast.error("Choose an expiration, strike, whole contracts, and limit premium for the exact option contract.");
-    if (!isOption && !recipeCanPrepare) return toast.error(readiness.explanation);
+    if (!isOption && !recipeCanPrepare && !draftManualTicket) return toast.error(readiness.explanation);
     if (!Number.isFinite(deadlineAt)) return toast.error("Choose a valid catalyst deadline.");
     if (paperAcknowledgement !== "PAPER") return toast.error("Type PAPER to record your paper-only acknowledgement.");
-    if (!isOption && isIntraday && (!intradaySizing || entryPriceCents == null || stopPriceCents == null || slippageCents == null || !noTradeConditions.length)) return toast.error("Review the modeled intraday plan before preparing a proposal.");
+    if (!isOption && isIntraday && !draftManualTicket && (!intradaySizing || entryPriceCents == null || stopPriceCents == null || slippageCents == null || !noTradeConditions.length)) return toast.error("Review the modeled intraday plan before preparing a proposal.");
     if (preflightBusy) return toast.error("Checking paper-order guardrails. Please wait.");
     if (!currentPreflightData?.wouldPass) return toast.error(readiness.explanation);
     create.mutate({ ...ticket, accountId: destinationAccount.id, portfolioContextAccountId: account.id, candidateId: candidate.id, catalystDeadlineAt: deadlineAt, paperAcknowledgement: "PAPER" } as any);
@@ -375,13 +376,18 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   if (!candidate) return null;
   // Keep all hooks above this return. Unsupported source horizons must never
   // become a market-refresh loop, an assumed direction, or an options bypass.
-  if (recipeRecovery) return <Card id="paper-proposal" className="scroll-mt-6 border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
+  if (recipeRecovery && !draftManualTicket) return <Card id="paper-proposal" className="scroll-mt-6 border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
     <CardContent className="space-y-3 pt-4">
       <p className="text-sm font-semibold" style={{ color: "var(--sh-signal)" }}>Research only · no paper recipe</p>
       <h2 className="font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}><span translate="no">{candidate.symbol}</span> · {recipeRecovery.horizonLabel}</h2>
       <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{recipeRecovery.side ? `Recorded direction: ${recipeRecovery.side}` : "Direction not recorded — no direction assumed."}</p>
       <p className="text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{recipeRecovery.reason} {recipeRecovery.nextStep}</p>
-      <Button type="button" variant="outline" className="min-h-11" onClick={onReturnToBrief}>View research</Button>
+      <div className="flex flex-wrap gap-2 pt-2">
+        <Button type="button" className="min-h-11 font-semibold" onClick={() => setDraftManualTicket(true)}>
+          Draft Discretionary Paper Ticket
+        </Button>
+        <Button type="button" variant="outline" className="min-h-11" onClick={onReturnToBrief}>View research</Button>
+      </div>
     </CardContent>
   </Card>;
   const suggestedRange = candidate.suggestedSizeHighCents != null ? `${money(candidate.suggestedSizeLowCents)}–${money(candidate.suggestedSizeHighCents)}` : money(candidate.suggestedSizeLowCents);
@@ -415,7 +421,13 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
     : null;
 
   return <Card id="paper-proposal" className="scroll-mt-6 border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
-    <CardContent className="space-y-4 pt-4">
+    <CardContent className="space-y-4 pt-6">
+      {recipeRecovery && draftManualTicket && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-xs" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 10%, var(--sh-surface))" }}>
+          <span><strong>Discretionary Paper Mode:</strong> Bypassing automated price recipe with manual terms for <strong>{candidate.symbol}</strong>. Single-order ceiling, margin, and liquidity guardrails remain enforced.</span>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setDraftManualTicket(false)}>Reset to research view</Button>
+        </div>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper ticket</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol} · review the play</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Check price and risk, finish the exact ticket, then create a paper proposal.</p></div><Badge variant="outline" style={{ color: "var(--sh-signal)" }}>{isOption ? instrumentType === "long_call" ? "Long call" : "Long put" : "Shares"}</Badge>
       </div>

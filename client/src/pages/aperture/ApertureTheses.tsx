@@ -22,24 +22,26 @@ export default function ApertureTheses() {
   const { data: theses, isLoading, error, refetch } = trpc.aperture.thesis.list.useQuery();
   const { data: activeContext } = trpc.thesis.activeCapital.useQuery();
   const activate = trpc.aperture.thesis.activate.useMutation({
-    onSuccess: () => {
-      utils.aperture.thesis.list.invalidate();
-      utils.thesis.activeCapital.invalidate();
-      toast.success("Active Capital context updated");
+    onSuccess: async (data) => {
+      await Promise.all([
+        utils.aperture.invalidate(),
+        utils.thesis.invalidate(),
+      ]);
+      toast.success(`Active Capital thesis switched to "${data.name ?? "selected thesis"}". Play Desk, Mission, and Research are now synchronized.`);
     },
     onError: (error) => toast.error(error.message),
   });
 
-  const activeId = activeContext?.thesis?.id;
+  const activeCompilationId = activeContext?.thesis?.id;
 
   const filteredTheses = useMemo(() => {
     if (!theses) return [];
     if (filter === "all") return theses;
-    if (filter === "active") return theses.filter((t) => t.id === activeId || t.isPrimary || t.status === "active");
+    if (filter === "active") return theses.filter((t) => (activeCompilationId != null && t.sourceCompilationId === activeCompilationId) || t.isPrimary || t.status === "active");
     if (filter === "review") return theses.filter((t) => t.status === "review" || t.status === "compiling");
     if (filter === "archived") return theses.filter((t) => t.status === "archived");
     return theses;
-  }, [theses, filter, activeId]);
+  }, [theses, filter, activeCompilationId]);
 
   return (
     <DashboardLayout>
@@ -98,7 +100,7 @@ export default function ApertureTheses() {
             className="h-7 px-3 text-xs"
             onClick={() => setFilter("active")}
           >
-            Active Focus ({theses?.filter(t => t.id === activeId || t.isPrimary || t.status === "active").length ?? 0})
+            Active Focus ({theses?.filter(t => (activeCompilationId != null && t.sourceCompilationId === activeCompilationId) || t.isPrimary || t.status === "active").length ?? 0})
           </Button>
           <Button
             type="button"
@@ -155,7 +157,7 @@ export default function ApertureTheses() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {filteredTheses.map((thesis) => {
-              const isActive = thesis.id === activeId || thesis.isPrimary;
+              const isActive = (activeCompilationId != null && thesis.sourceCompilationId === activeCompilationId) || thesis.isPrimary;
               const recovered = thesis.confidenceNotes?.some((note: string) => note.startsWith("Recovered verbatim"));
               return (
                 <Card

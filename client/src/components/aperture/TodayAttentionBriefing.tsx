@@ -193,7 +193,20 @@ export function TodayAttentionBriefing({
     {(execution !== undefined || executionFailed !== undefined) && <TodayExecutionSnapshot data={execution} failed={!!executionFailed} loading={loading} />}
     {attention && <>
       {visibleMotion.length > 0 && <section className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2></div>{execution ? <TodayOrderRows items={visibleMotion} data={execution} fingerprints={fingerprints} changedKeys={changedKeys} onOpen={onOpen} /> : visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
-      {(layout?.otherCritical.length ?? 0) > 0 && <section aria-label="Other critical issues" className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">Other critical issues · {criticalSplit.visible.length}</h2><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>All authorized plays, regardless of thesis or instrument filters.</p></div>{visibleCritical.map(row)}{criticalSplit.visible.length > criticalCap && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllCritical(value => !value)}>{allCritical ? "Show fewer critical issues" : `Show ${criticalSplit.visible.length - criticalCap} more critical issues`}</Button>}</section>}
+      {(layout?.otherCritical.length ?? 0) > 0 && <section aria-label="Other critical issues" className="border-t" style={{ borderColor: "var(--sh-border-1)" }}>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-[var(--sh-red)] animate-pulse" />
+            <h2 className="text-sm font-semibold">Other critical issues · {criticalSplit.visible.length}</h2>
+          </div>
+          <div className="flex items-center gap-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
+            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[var(--sh-emerald)]" />Tactical Radar · Ambient Feeds Armed</span>
+          </div>
+        </div>
+        <p className="mt-1 px-4 text-xs" style={{ color: "var(--sh-fg-muted)" }}>All authorized plays, regardless of thesis or instrument filters.</p>
+        {visibleCritical.map(row)}
+        {criticalSplit.visible.length > criticalCap && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllCritical(value => !value)}>{allCritical ? "Show fewer critical issues" : `Show ${criticalSplit.visible.length - criticalCap} more critical issues`}</Button>}
+      </section>}
 
       <AttentionSourceRecovery issues={attention.sourceIssues ?? []} onOpen={onOpen} onRetry={onRetry} busy={read.busy} />
 

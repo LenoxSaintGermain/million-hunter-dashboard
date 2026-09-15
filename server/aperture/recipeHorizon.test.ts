@@ -27,6 +27,7 @@ vi.mock("@/lib/trpc", () => ({ trpc: {
     play: { construct: { useQuery: seam.query }, decide: { useMutation: () => ({}) }, ready: { useQuery: seam.ready } },
     account: { list: { useQuery: () => ({ data: [] }) }, sync: { useMutation: () => ({}) } },
     order: { create: { useMutation: () => ({}) }, optionChain: { useQuery: seam.optionChain }, preflight: { useQuery: seam.preflight } },
+    quickHit: { catalog: { useQuery: () => ({ data: [], isLoading: false }) }, backtest: { useMutation: () => ({}) }, authorize: { useMutation: () => ({}) } },
   },
 } }));
 import { apertureRouter } from "../apertureRouter";

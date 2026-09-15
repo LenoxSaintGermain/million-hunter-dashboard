@@ -18,6 +18,7 @@ import { deskOrderReturn, formatMarkProvenance, formatReturnAmount, formatReturn
 import { DeskGlanceLayer } from "@/components/aperture/DeskGlanceLayer";
 import { PlayInspectionDrawer, type InspectableOrder } from "@/components/aperture/PlayInspectionDrawer";
 import { PositionExitModal, type ExitTarget } from "@/components/aperture/PositionExitModal";
+import { ManualOrderTicketModal } from "@/components/aperture/ManualOrderTicketModal";
 
 const money = (cents?: number | null) => cents == null
   ? "—"
@@ -117,6 +118,7 @@ export default function AperturePlayDesk() {
   const [showAllRows, setShowAllRows] = useState(false);
   const [exitTarget, setExitTarget] = useState<ExitTarget | null>(null);
   const [exitModalOpen, setExitModalOpen] = useState(false);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
   const refreshInFlight = useRef(false);
 
   const openExitForOrder = (order: any) => {
@@ -235,7 +237,15 @@ export default function AperturePlayDesk() {
         <p>{isRefreshing ? "Loading status; existing records stay visible." : desk.dataUpdatedAt ? <>Records loaded <time dateTime={new Date(desk.dataUpdatedAt).toISOString()}>{new Date(desk.dataUpdatedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time>.</> : "Status has not loaded yet."}</p>
         <p>Refresh reads records only; no new checks.</p>
       </div>
-      <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => navigate("/aperture/mission")}><Sparkles className="mr-2 h-4 w-4" />New research run</Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" className="min-h-11 font-semibold" onClick={() => setManualModalOpen(true)}>
+          <Sparkles className="mr-2 h-4 w-4" />
+          + Draft Paper Ticket
+        </Button>
+        <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => navigate("/aperture/mission")}>
+          New research run
+        </Button>
+      </div>
     </div>
     {unavailable.length > 0 && <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}>
       {unavailable.map(({ label, query }) => <div key={label} className="mb-3 last:mb-0"><p className="font-semibold">{label} status unavailable</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{query.data != null ? "Refresh failed. Last known records remain visible; they may be stale." : "This part of the desk could not be verified."}</p></div>)}
@@ -257,7 +267,16 @@ export default function AperturePlayDesk() {
     <section id="desk-attention" aria-label="Attention across all plays" className="space-y-3">
       {disclosure?.primary && <AttentionTask item={disclosure.primary} prominent onOpen={navigate} />}
       {!!disclosure?.otherCritical.length && <section id="desk-critical" aria-labelledby="desk-critical-heading" className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-        <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b px-4 py-3" style={{ borderColor: "var(--sh-border-1)" }}><h2 id="desk-critical-heading" className="text-base font-semibold">Also needs you · {disclosure.otherCritical.length}</h2><p className="text-sm" style={{ color: "var(--sh-text-secondary)" }}>Visible across all filters</p></header>
+        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b px-4 py-3" style={{ borderColor: "var(--sh-border-1)" }}>
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-[var(--sh-red)] animate-pulse" />
+            <h2 id="desk-critical-heading" className="text-base font-semibold">Tactical Radar · Watch My Six ({disclosure.otherCritical.length})</h2>
+          </div>
+          <div className="flex items-center gap-3 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
+            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[var(--sh-emerald)]" />Perplexity Sonar-Pro Armed</span>
+            <span>Visible across all filters</span>
+          </div>
+        </header>
         <div>{disclosure.otherCritical.map((item) => <AttentionTask key={item.key} item={item} compact onOpen={navigate} />)}</div>
       </section>}
       {outsideFilters.length > 0 && <p role="status" className="text-sm leading-6" style={{ color: "var(--sh-text-primary)" }}>{outsideFilters.length} critical issue{outsideFilters.length === 1 ? "" : "s"} outside these filters. Their review actions remain above. <button type="button" className="min-h-11 font-semibold underline underline-offset-4" onClick={() => navigate(playDeskFilterHref(search, { instrument: "all", stage: "all" }))}>Show all plays and stages</button></p>}
@@ -353,6 +372,11 @@ export default function AperturePlayDesk() {
                     {dte != null && (
                       <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-mono font-medium" style={{ background: dte <= 7 ? "color-mix(in srgb, var(--sh-red) 15%, transparent)" : "var(--sh-surface-2)", color: dte <= 7 ? "var(--sh-red)" : "var(--sh-fg-muted)" }}>
                         {dte}d DTE
+                      </span>
+                    )}
+                    {order.reason?.startsWith("[QUICK_HIT]") && (
+                      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold" style={{ background: "var(--sh-purple-20)", color: "var(--sh-purple)", border: "1px solid var(--sh-purple)" }}>
+                        ⚡ QUICK HIT
                       </span>
                     )}
                   </div>
@@ -470,6 +494,12 @@ export default function AperturePlayDesk() {
             open={exitModalOpen}
             onOpenChange={setExitModalOpen}
             target={exitTarget}
+          />
+        )}
+        {manualModalOpen && (
+          <ManualOrderTicketModal
+            open={manualModalOpen}
+            onOpenChange={setManualModalOpen}
           />
         )}
       </>;

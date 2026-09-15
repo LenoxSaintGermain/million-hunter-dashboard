@@ -129,6 +129,11 @@ export const ORDER_GATE_INTENT_APPLICABILITY: Record<string, GateIntentApplicabi
   cluster_concentration: "open_only",
   run_gross_deployed: "open_only",
   daily_new_notional: "open_only",
+
+  // Low-budget / Micro-cap / Spread safeguards (Open only)
+  penny_stock_limit_only: "open_only",
+  max_spread_cap: "open_only",
+  micro_cap_min_volume: "open_only",
 };
 
 const pctOf = (cents: number, equityCents: number): number => (cents / equityCents) * 100;
@@ -364,6 +369,10 @@ export interface OrderGateInput {
    */
   gatedNotionalCents: number | null;
   notionalBasis: NotionalBasis;
+  /** Explicit limit price in cents for limit orders. */
+  limitPriceCents?: number | null;
+  /** Strategy play type: standard or quick_hit. */
+  playType?: "standard" | "quick_hit" | null;
 }
 
 export interface OrderAccountState {
@@ -397,6 +406,10 @@ export interface OrderAccountState {
   plannedRiskTodayCents: number;
   /** Planned loss already committed by live orders in this symbol's cluster. */
   clusterPlannedRiskCents: number;
+  /** Bid-ask spread percentage ((ask - bid) / mid * 100). Null when quote unavailable. */
+  spreadPct?: number | null;
+  /** Current daily volume in shares. Null when unavailable. */
+  dailyVolumeShares?: number | null;
 }
 
 export interface EvaluateOrderArgs {
@@ -480,6 +493,19 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
       g.add("long_option_sell_only", input.side === "sell", input.side === "sell" ? "closing long option exits with sell to close" : "Closing a long option position must be a sell order.");
     }
     g.add("option_limit_day_only", input.orderType === "limit" && input.timeInForce === "day", input.orderType === "limit" && input.timeInForce === "day" ? "option order is limit + day" : "Long-option paper orders must use a limit price and day time-in-force.");
+  } else {
+    // Sub-$5 Penny/Micro-cap protection: mandate hard limit orders to prevent slippage traps
+    const estimatedUnitPriceCents = input.limitPriceCents ?? input.entryPriceCents ?? (input.gatedNotionalCents && input.qty ? Math.round(input.gatedNotionalCents / input.qty) : null);
+    if (estimatedUnitPriceCents != null && estimatedUnitPriceCents < 500) {
+      const isLimit = input.orderType === "limit";
+      g.add(
+        "penny_stock_limit_only",
+        isLimit,
+        isLimit
+          ? `Sub-$5.00 equity ($${(estimatedUnitPriceCents / 100).toFixed(2)}) specifies a limit price, protecting against spread slippage.`
+          : `Sub-$5.00 equities ($${(estimatedUnitPriceCents / 100).toFixed(2)}) mandate hard limit orders only — market orders risk severe slippage traps on micro-caps.`
+      );
+    }
   }
 
   const ack = (input.paperAcknowledgement ?? "").trim().toUpperCase();
@@ -878,6 +904,35 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
         mandate.maxOrderPctOfAdv,
       );
     }
+  }
+
+  // ── Spread cap & Micro-cap volume safeguards ────────────────────────────────
+  if (account.spreadPct != null) {
+    const spreadOk = account.spreadPct <= 3.0;
+    g.add(
+      "max_spread_cap",
+      spreadOk,
+      spreadOk
+        ? `Bid-ask spread (${account.spreadPct.toFixed(2)}%) clears the 3.0% maximum liquidity ceiling`
+        : `Bid-ask spread (${account.spreadPct.toFixed(2)}%) exceeds the 3.0% maximum liquidity ceiling — wide spread introduces excessive execution drag`,
+      account.spreadPct,
+      3.0,
+    );
+  }
+
+  const unitPrice = input.limitPriceCents ?? input.entryPriceCents ?? (input.gatedNotionalCents && input.qty ? Math.round(input.gatedNotionalCents / input.qty) : null);
+  if (account.dailyVolumeShares != null && !isOption && unitPrice != null && unitPrice < 500) {
+    const minVol = 500_000;
+    const volOk = account.dailyVolumeShares >= minVol;
+    g.add(
+      "micro_cap_min_volume",
+      volOk,
+      volOk
+        ? `Daily volume (${account.dailyVolumeShares.toLocaleString()} shares) clears the 500,000 micro-cap liquidity floor`
+        : `Daily volume (${account.dailyVolumeShares.toLocaleString()} shares) is below the 500,000 micro-cap liquidity floor — illiquid float risks entrapment`,
+      account.dailyVolumeShares,
+      minVol,
+    );
   }
 
   return g.finish(mandate.version, now);

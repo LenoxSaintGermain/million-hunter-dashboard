@@ -15,6 +15,9 @@
 import { deskOrderReturn, type PositionMark } from "./positionReturn";
 
 export interface GlanceOrder {
+  id?: number;
+  symbol?: string;
+  underlyingSymbol?: string | null;
   status: string;
   instrumentType: string;
   plannedRiskCents: number | null;

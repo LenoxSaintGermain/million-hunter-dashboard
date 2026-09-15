@@ -63,7 +63,7 @@ export function PlayRecipeCard({
     <p className="mt-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}>{recovery.side ? `Recorded direction: ${recovery.side}` : "Direction not recorded — no direction assumed."}</p>
     <p className="mt-3 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{recovery.reason}</p>
     <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{recovery.nextStep}</p>
-    <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={onOpenResearch}>View research</Button>
+    <Button type="button" className="mt-3 min-h-11" onClick={onOpenResearch}>View research</Button>
   </section>;
 
   if (isError) return <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-signal)" }}>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Clock3, Info, Landmark, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { formatMandatePercentPoints } from "@shared/cockpitPresentation";
 import { buildCockpitRailSummary, type CockpitHeadroomLine } from "@shared/cockpitRailSummary";
@@ -147,6 +148,28 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
     : "0.0";
   const unrealizedCents = deskQuery.data?.account?.unrealizedPnlCents ?? null;
 
+  const utils = typeof (trpc as any).useUtils === "function" ? (trpc as any).useUtils() : null;
+  const activeThesisQuery = (trpc as any).thesis?.activeCapital?.useQuery
+    ? (trpc as any).thesis.activeCapital.useQuery()
+    : { data: null };
+  const thesesListQuery = (trpc as any).aperture?.thesis?.list?.useQuery
+    ? (trpc as any).aperture.thesis.list.useQuery()
+    : { data: [] };
+  const activateThesis = (trpc as any).aperture?.thesis?.activate?.useMutation
+    ? (trpc as any).aperture.thesis.activate.useMutation({
+        onSuccess: async (data: any) => {
+          if (utils) {
+            await Promise.all([
+              utils.aperture?.invalidate?.(),
+              utils.thesis?.invalidate?.(),
+            ]);
+          }
+          toast.success(`Active focus switched to "${data?.name ?? "selected thesis"}"`);
+        },
+        onError: (err: any) => toast.error(`Failed to switch thesis: ${err.message}`),
+      })
+    : null;
+
   return <section className="mb-5 overflow-hidden rounded-xl border shadow-sm" style={{ borderColor: summary.severity === "critical" ? severityColor : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
     {/* Executive Cockpit Ticker Tape (Desktop) */}
     <div className="hidden sm:block">
@@ -169,6 +192,35 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
               <RefreshCw className={`h-2.5 w-2.5 ${syncing ? "animate-spin" : ""}`} />
             </button>
           </div>
+          {/* Rapid Inline Thesis Switcher */}
+          {thesesListQuery.data && thesesListQuery.data.length > 0 && (
+            <>
+              <div className="h-3.5 w-px" style={{ background: "var(--sh-border-1)" }} />
+              <div className="flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+                <span className="text-[10px] uppercase font-bold tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Thesis:</span>
+                <select
+                  aria-label="Active Capital Thesis"
+                  className="bg-transparent font-semibold cursor-pointer text-[11px] focus:outline-none"
+                  style={{ color: "var(--sh-text-primary)", maxWidth: 170 }}
+                  value={activeThesisQuery.data?.thesis?.id ?? ""}
+                  onChange={(e) => {
+                    const selectedId = Number(e.target.value);
+                    if (!selectedId) return;
+                    const candidate = thesesListQuery.data?.find((t: any) => (t.sourceCompilationId ?? t.id) === selectedId);
+                    if (candidate && activateThesis?.mutate) {
+                      activateThesis.mutate({ compilationId: selectedId });
+                    }
+                  }}
+                >
+                  {thesesListQuery.data.map((t: any) => (
+                    <option key={t.id} value={t.sourceCompilationId ?? t.id} style={{ background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Live Capital & Risk Metrics Glance */}
