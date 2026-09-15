@@ -127,3 +127,29 @@ Complete the Google account chooser once and confirm the verified owner lands in
 - Public `/aperture/plays` returned HTTP 200, same-origin `system.health` returned `ok: true`, and the served bundle contained the exact source release marker.
 - No schema migration, provider configuration change, proposal creation, paper approval, paper submission, or broker order occurred in this release.
 - Rollback revision: `capital-aperture-00049-52g`.
+
+## 2026-09-15 Quick Hits & Composer-Style Symphony Lite Release
+
+- Deployed source: `8d10c0b399d26ed679b83f0ec9795ff03eba4640`.
+- Release marker: `8d10c0b-uat-e7e37b8c`.
+- Cloud Build: `411ba627-0182-43ea-828a-af7d2c21c396` — `SUCCESS`.
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:8d10c0b-uat-e7e37b8c`.
+- Image digest: `sha256:d4c87987c95a1a490e0d28eecd8278694bd84dfe44b00c80d6539ae445435701`.
+- Ready revision: `capital-aperture-00106-qx2`, serving 100% of Cloud Run traffic.
+- Traffic tag: `uat-e7e37b8c` (`https://uat-e7e37b8c---capital-aperture-oxiyp4dcpq-uc.a.run.app`).
+- Public production URL: `https://third-signal-capital-aperture.web.app` / `https://capital-aperture-oxiyp4dcpq-uc.a.run.app`.
+- Release features:
+  - Event-Driven "Quick Hits" & Low-Budget / Micro-Cap Play Mode inspired by Composer by SoFi.
+  - Modular "Symphony" recipe rule blocks: Trigger (Event/Catalyst) -> Filter (Universe/Float) -> Action (Budget & Brackets).
+  - Pre-flight backtesting engine simulating historical catalyst distributions with win rate %, max drawdown %, profit factor, and expected return per dollar.
+  - Budget-modeled sizing ($25, $50, $100) auto-snapped to whole shares for Alpaca limit ticket execution on sub-$5 penny stocks.
+  - Hard liquidity and risk gates: `penny_stock_limit_only`, `max_spread_cap` (<=3.0%), and `micro_cap_min_volume` (>=500k shares/day).
+  - 1-click `[⚡ Authorize Play]` killing compliance and audit friction; `⚡ QUICK HIT` badge indicator on Play Desk with trailing bracket monitoring.
+- Validation:
+  - `system.health` returned `ok: true` on Cloud Run and Firebase origins.
+  - Served client bundle `index-J64cxSaq.js` verified with release tag `8d10c0b-uat-e7e37b8c` and `Quick Hits & Symphony Lite` assets present.
+  - `aperture.quickHit.catalog` API route verified on live Cloud Run container.
+  - Vitest test suites: 12/12 quickHit tests, 104/104 risk gate tests, 30/30 recipe horizon tests passed.
+  - Typecheck `pnpm check`: 0 errors. Production bundle: built in 22.64s.
+- Rollback revision: `capital-aperture-00178-tob`.
+
