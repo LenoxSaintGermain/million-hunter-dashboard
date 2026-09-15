@@ -196,9 +196,16 @@ export function PlayInspectionBody({ order, stateLabel, humanReviewAt, reviewsUn
             ? "Not from here. The broker already accepted or queued it; reconcile the order at the broker before creating another ticket."
             : `No. This ticket is ${order.status.replaceAll("_", " ")} and is already terminal.`}
       />
-      {isStoppableTicket(order.status) && <p className="text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>
-        Stopping it records a written reason and leaves the research intact. It is called <strong>Do not approve</strong> on the full record, which is where the decision is made.
-      </p>}
+      {isStoppableTicket(order.status) && (
+        <p className="text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>
+          Stopping it records a written reason and leaves the research intact. It is called <strong>Do not approve</strong> on the full record, which is where the decision is made.
+        </p>
+      )}
+      {order.status === "filled" && (
+        <p className="text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>
+          A filled paper position is closed by submitting a closing paper order, reducing exposure and returning capital to your paper balance.
+        </p>
+      )}
     </Group>
 
     <p className="text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>
@@ -208,13 +215,14 @@ export function PlayInspectionBody({ order, stateLabel, humanReviewAt, reviewsUn
 }
 
 /** Read-only inspection of one ticket. Every action stays on the full record. */
-export function PlayInspectionDrawer({ order, stateLabel, humanReviewAt, reviewsUnavailable, onClose, onOpenFull }: {
+export function PlayInspectionDrawer({ order, stateLabel, humanReviewAt, reviewsUnavailable, onClose, onOpenFull, onExit }: {
   order: InspectableOrder | null;
   stateLabel: string;
   humanReviewAt: number | null;
   reviewsUnavailable: boolean;
   onClose: () => void;
   onOpenFull: (order: InspectableOrder) => void;
+  onExit?: (order: InspectableOrder) => void;
 }) {
   return <Sheet open={order != null} onOpenChange={(open) => { if (!open) onClose(); }}>
     <SheetContent
@@ -239,6 +247,20 @@ export function PlayInspectionDrawer({ order, stateLabel, humanReviewAt, reviews
           <Button className="mt-5 min-h-12 w-full" onClick={() => onOpenFull(order)}>
             Open full record<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4 shrink-0" />
           </Button>
+          {order.status === "filled" && onExit && (
+            <Button
+              data-exit-position
+              variant="destructive"
+              className="mt-2 min-h-12 w-full whitespace-normal"
+              onClick={() => {
+                onClose();
+                onExit(order);
+              }}
+            >
+              Exit or reduce position
+              <ArrowRight aria-hidden="true" className="ml-2 h-4 w-4 shrink-0" />
+            </Button>
+          )}
           {isStoppableTicket(order.status) && <Button
             data-stop-ticket
             variant="outline"

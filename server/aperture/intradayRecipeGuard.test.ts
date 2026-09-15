@@ -11,4 +11,14 @@ describe("intraday paper-recipe guard", () => {
     expect(missingIntradayRecipeMessage({ holdingPeriod: "intraday", entryPriceCents: 12_000, stopPriceCents: 11_800, slippageCents: 0, timeStopAt: 1, noTradeConditions: ["Do not chase"] })).toBeNull();
     expect(missingIntradayRecipeMessage({ holdingPeriod: "swing", entryPriceCents: 0, stopPriceCents: 0 })).toBeNull();
   });
+
+  it("never blocks a closing order even if intraday levels are missing", () => {
+    expect(missingIntradayRecipeMessage({
+      intent: "close",
+      holdingPeriod: "intraday",
+      entryPriceCents: 0,
+      stopPriceCents: 0,
+      slippageCents: 0,
+    })).toBeNull();
+  });
 });

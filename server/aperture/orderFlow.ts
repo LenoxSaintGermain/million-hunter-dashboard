@@ -453,15 +453,17 @@ async function lockCandidateProposalScope(tx: any, input: Pick<CreateOrderInput,
   if (!scope) throw new Error("research run not found");
 }
 
-async function findExistingActiveCandidateOrder(tx: any, input: Pick<CreateOrderInput, "runId" | "candidateId" | "userId">) {
+async function findExistingActiveCandidateOrder(tx: any, input: Pick<CreateOrderInput, "runId" | "candidateId" | "userId" | "intent">) {
   if (input.candidateId == null) return null;
+  const targetIntent = input.intent ?? "open";
   const [existingOrder] = await tx.select({ id: brokerOrders.id })
     .from(brokerOrders)
     .where(and(
       eq(brokerOrders.runId, input.runId),
       eq(brokerOrders.candidateId, input.candidateId),
       eq(brokerOrders.userId, input.userId),
-      inArray(brokerOrders.status, [...LIVE_ORDER_STATUSES]),
+      eq(brokerOrders.intent, targetIntent),
+      inArray(brokerOrders.status, targetIntent === "close" ? ["pending_approval", "approved", "submitted"] : [...LIVE_ORDER_STATUSES]),
     ))
     .limit(1);
   return existingOrder ?? null;

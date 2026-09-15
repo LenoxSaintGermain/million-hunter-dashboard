@@ -27,6 +27,7 @@ export function recipeHorizonRecovery(input: {
  * same boundary in operator language.
  */
 export function missingIntradayRecipeMessage(input: {
+  intent?: string | null;
   holdingPeriod?: string | null;
   entryPriceCents?: number | null;
   stopPriceCents?: number | null;
@@ -34,6 +35,7 @@ export function missingIntradayRecipeMessage(input: {
   timeStopAt?: number | null;
   noTradeConditions?: string[] | null;
 }): string | null {
+  if (input.intent === "close") return null;
   if (input.holdingPeriod !== "intraday") return null;
   const missing: string[] = [];
   if (!(typeof input.entryPriceCents === "number" && input.entryPriceCents > 0)) missing.push("entry");

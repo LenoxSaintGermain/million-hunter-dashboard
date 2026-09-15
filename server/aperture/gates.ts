@@ -84,6 +84,53 @@ class GateCollector {
   }
 }
 
+export type GateIntentApplicability = "universal" | "open_only" | "close_only";
+
+export const ORDER_GATE_INTENT_APPLICABILITY: Record<string, GateIntentApplicability> = {
+  // Integrity & Session (Universal)
+  order_intent: "universal",
+  paper_account: "universal",
+  instrument_identity: "universal",
+  option_limit_day_only: "universal",
+  paper_acknowledgement: "universal",
+  reason: "universal",
+  holding_period: "universal",
+  market_session_known: "universal",
+  market_open: "universal",
+  extended_hours_limit_only: "universal",
+  intraday_requires_regular_session: "universal",
+  notional_resolvable: "universal",
+  equity_known: "universal",
+  liquidity_adv_floor: "universal",
+  liquidity_participation: "universal",
+
+  // Directional constraints
+  long_option_buy_only: "open_only",
+  long_option_sell_only: "close_only",
+
+  // Thesis & Recipe constraints (Open only)
+  invalidation_condition: "open_only",
+  catalyst_deadline: "open_only",
+  option_expiration_window: "open_only",
+  intraday_cutoff: "open_only",
+  play_entry: "open_only",
+  play_stop: "open_only",
+  play_slippage: "open_only",
+  play_time_stop: "open_only",
+  play_no_trade_condition: "open_only",
+
+  // Risk addition ceilings (Open only)
+  planned_risk_stated: "open_only",
+  planned_risk_per_play: "open_only",
+  daily_planned_risk: "open_only",
+  correlated_planned_risk: "open_only",
+  order_notional_ceiling: "open_only",
+  position_concentration: "open_only",
+  cluster_concentration: "open_only",
+  run_gross_deployed: "open_only",
+  daily_new_notional: "open_only",
+};
+
 const pctOf = (cents: number, equityCents: number): number => (cents / equityCents) * 100;
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
@@ -427,7 +474,11 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
       : instrument.failures.join(" "),
   );
   if (isOption) {
-    g.add("long_option_buy_only", input.side === "buy", input.side === "buy" ? "bounded long option opens with buy to open" : "Only buy-to-open long calls and long puts are supported; sell-to-open is blocked.");
+    if (isOpening) {
+      g.add("long_option_buy_only", input.side === "buy", input.side === "buy" ? "bounded long option opens with buy to open" : "Only buy-to-open long calls and long puts are supported; sell-to-open is blocked.");
+    } else {
+      g.add("long_option_sell_only", input.side === "sell", input.side === "sell" ? "closing long option exits with sell to close" : "Closing a long option position must be a sell order.");
+    }
     g.add("option_limit_day_only", input.orderType === "limit" && input.timeInForce === "day", input.orderType === "limit" && input.timeInForce === "day" ? "option order is limit + day" : "Long-option paper orders must use a limit price and day time-in-force.");
   }
 
@@ -444,12 +495,16 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
   const reason = checkNarrative(input.reason, "reason");
   g.add("reason", reason.ok, reason.ok ? "reason stated" : reason.reason!);
 
-  const invalidation = checkNarrative(input.invalidationCondition, "invalidationCondition");
-  g.add(
-    "invalidation_condition",
-    invalidation.ok,
-    invalidation.ok ? "invalidation condition stated" : invalidation.reason!,
-  );
+  if (isOpening) {
+    const invalidation = checkNarrative(input.invalidationCondition, "invalidationCondition");
+    g.add(
+      "invalidation_condition",
+      invalidation.ok,
+      invalidation.ok ? "invalidation condition stated" : invalidation.reason!,
+    );
+  } else {
+    g.note("closing order — invalidation condition applies to thesis entry, not risk-reducing exit");
+  }
 
   // ── Holding period + catalyst deadline ──────────────────────────────────────
   const hpValid = isHoldingPeriod(input.holdingPeriod);
@@ -462,43 +517,48 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
   );
 
   const rule = hpValid ? HOLDING_PERIODS[input.holdingPeriod as HoldingPeriod] : null;
-  const deadline = input.catalystDeadlineAt ?? null;
-  if (deadline == null) {
-    g.add("catalyst_deadline", false, "catalystDeadlineAt is required — a short-horizon trade with no expiry is a hold");
-  } else if (deadline <= now) {
-    g.add("catalyst_deadline", false, "catalystDeadlineAt is in the past", deadline, now);
-  } else if (rule) {
-    const horizonStart = mayQueueIntradayForNextRegularSession ? queuedRegularSessionOpen! : now;
-    const days = (deadline - horizonStart) / 86_400_000;
-    const ok = deadline >= horizonStart && days <= rule.maxHorizonDays;
-    g.add(
-      "catalyst_deadline",
-      ok,
-      ok
-        ? mayQueueIntradayForNextRegularSession
-          ? `catalyst is ${round2(days)}d after the next regular-session open, inside the ${rule.maxHorizonDays}d ${rule.label.toLowerCase()} horizon`
-          : `catalyst is ${round2(days)}d out, inside the ${rule.maxHorizonDays}d ${rule.label.toLowerCase()} horizon`
-        : deadline < horizonStart
-          ? "catalyst deadline must remain after the queued order reaches the next regular session"
-          : `catalyst is ${round2(days)}d out — beyond the ${rule.maxHorizonDays}d horizon for ${rule.label.toLowerCase()}`,
-      round2(days),
-      rule.maxHorizonDays,
-    );
+
+  if (isOpening) {
+    const deadline = input.catalystDeadlineAt ?? null;
+    if (deadline == null) {
+      g.add("catalyst_deadline", false, "catalystDeadlineAt is required — a short-horizon trade with no expiry is a hold");
+    } else if (deadline <= now) {
+      g.add("catalyst_deadline", false, "catalystDeadlineAt is in the past", deadline, now);
+    } else if (rule) {
+      const horizonStart = mayQueueIntradayForNextRegularSession ? queuedRegularSessionOpen! : now;
+      const days = (deadline - horizonStart) / 86_400_000;
+      const ok = deadline >= horizonStart && days <= rule.maxHorizonDays;
+      g.add(
+        "catalyst_deadline",
+        ok,
+        ok
+          ? mayQueueIntradayForNextRegularSession
+            ? `catalyst is ${round2(days)}d after the next regular-session open, inside the ${rule.maxHorizonDays}d ${rule.label.toLowerCase()} horizon`
+            : `catalyst is ${round2(days)}d out, inside the ${rule.maxHorizonDays}d ${rule.label.toLowerCase()} horizon`
+          : deadline < horizonStart
+            ? "catalyst deadline must remain after the queued order reaches the next regular session"
+            : `catalyst is ${round2(days)}d out — beyond the ${rule.maxHorizonDays}d horizon for ${rule.label.toLowerCase()}`,
+        round2(days),
+        rule.maxHorizonDays,
+      );
+    } else {
+      g.add("catalyst_deadline", false, "catalyst horizon cannot be checked without a valid holding period");
+    }
+    if (isOption && instrument.optionTerms) {
+      const optionExpiryAt = Date.parse(`${instrument.optionTerms.expirationDate}T20:00:00Z`);
+      const notZeroDte = optionExpiryAt - now > 24 * 60 * 60 * 1_000;
+      g.add(
+        "option_expiration_window",
+        notZeroDte && deadline != null && optionExpiryAt >= deadline,
+        !notZeroDte
+          ? "Opening same-day or next-day expiration options is outside this bounded paper flow"
+          : deadline == null || optionExpiryAt < deadline
+            ? "Option expiration must be on or after the declared thesis review deadline"
+            : `option expiration ${instrument.optionTerms.expirationDate} remains after the declared review deadline`,
+      );
+    }
   } else {
-    g.add("catalyst_deadline", false, "catalyst horizon cannot be checked without a valid holding period");
-  }
-  if (isOption && instrument.optionTerms) {
-    const optionExpiryAt = Date.parse(`${instrument.optionTerms.expirationDate}T20:00:00Z`);
-    const notZeroDte = optionExpiryAt - now > 24 * 60 * 60 * 1_000;
-    g.add(
-      "option_expiration_window",
-      notZeroDte && deadline != null && optionExpiryAt >= deadline,
-      !notZeroDte
-        ? "Opening same-day or next-day expiration options is outside this bounded paper flow"
-        : deadline == null || optionExpiryAt < deadline
-          ? "Option expiration must be on or after the declared thesis review deadline"
-          : `option expiration ${instrument.optionTerms.expirationDate} remains after the declared review deadline`,
-    );
+    g.note("closing order — catalyst deadline and option expiration entry windows apply to thesis entry, not risk-reducing exit");
   }
 
   // ── Market session ──────────────────────────────────────────────────────────
@@ -558,25 +618,29 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
 
     // Signed off 2026-08-13: this blocks, it does not merely flag.
     if (rule?.mustBeFlatBySessionEnd && session.etMinutes != null) {
-      const ok = mayQueueIntradayForNextRegularSession || session.etMinutes < mandate.intradayCutoffEtMinutes;
-      g.add(
-        "intraday_cutoff",
-        ok,
-        mayQueueIntradayForNextRegularSession
-          ? `queued for the next regular session before its ${fmtEt(mandate.intradayCutoffEtMinutes)} ET intraday cutoff`
-          : ok
-          ? `${fmtEt(session.etMinutes)} ET is before the ${fmtEt(mandate.intradayCutoffEtMinutes)} ET intraday cutoff`
-          : `no new intraday order after ${fmtEt(mandate.intradayCutoffEtMinutes)} ET (now ${fmtEt(session.etMinutes)} ET) — the position must be flat by the close`,
-        session.etMinutes,
-        mandate.intradayCutoffEtMinutes,
-      );
+      if (isOpening) {
+        const ok = mayQueueIntradayForNextRegularSession || session.etMinutes < mandate.intradayCutoffEtMinutes;
+        g.add(
+          "intraday_cutoff",
+          ok,
+          mayQueueIntradayForNextRegularSession
+            ? `queued for the next regular session before its ${fmtEt(mandate.intradayCutoffEtMinutes)} ET intraday cutoff`
+            : ok
+            ? `${fmtEt(session.etMinutes)} ET is before the ${fmtEt(mandate.intradayCutoffEtMinutes)} ET intraday cutoff`
+            : `no new intraday order after ${fmtEt(mandate.intradayCutoffEtMinutes)} ET (now ${fmtEt(session.etMinutes)} ET) — the position must be flat by the close`,
+          session.etMinutes,
+          mandate.intradayCutoffEtMinutes,
+        );
+      } else {
+        g.note(`closing order — intraday cutoff (${fmtEt(mandate.intradayCutoffEtMinutes)} ET) blocks new entries, not exiting to flat`);
+      }
     }
   }
 
   // ── Intraday play recipe ───────────────────────────────────────────────────
   // These are proposal-creation gates only. A time stop or invalidation never
   // closes a position automatically; it gives the human a documented review plan.
-  if (input.holdingPeriod === "intraday") {
+  if (isOpening && input.holdingPeriod === "intraday") {
     const entry = input.entryPriceCents ?? null;
     const stop = input.stopPriceCents ?? null;
     const slippage = input.slippageCents ?? null;
@@ -601,78 +665,82 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
   // ── Planned loss ───────────────────────────────────────────────────────────
   // The second sizing axis. Notional caps what an order commits; this caps what
   // the stop puts at risk. Both must pass.
-  const plannedRisk = plannedRiskCentsFor(input);
-  const riskRequired = isOption || PLANNED_RISK_REQUIRED.has(String(input.holdingPeriod));
+  if (isOpening) {
+    const plannedRisk = plannedRiskCentsFor(input);
+    const riskRequired = isOption || PLANNED_RISK_REQUIRED.has(String(input.holdingPeriod));
 
-  if (plannedRisk == null) {
-    if (riskRequired) {
+    if (plannedRisk == null) {
+      if (riskRequired) {
+        g.add(
+          "planned_risk_stated",
+          false,
+          isOption
+            ? "a long-option play must state whole contracts, limit premium and slippage so maximum premium loss can be measured"
+            : `a ${String(input.holdingPeriod)} play must state qty, entry, stop and slippage so its planned loss can be measured — an unmeasurable loss is not a small one`,
+        );
+      } else {
+        // Not a failure: a longer-horizon position may legitimately be held
+        // without a hard stop. Recorded so nobody later reads the silence as zero.
+        g.note(
+          `planned loss is not measurable for this order (needs qty, entry, stop and slippage) — the notional ceilings are the only sizing constraint applied`,
+        );
+      }
+    } else {
       g.add(
         "planned_risk_stated",
-        false,
+        true,
         isOption
-          ? "a long-option play must state whole contracts, limit premium and slippage so maximum premium loss can be measured"
-          : `a ${String(input.holdingPeriod)} play must state qty, entry, stop and slippage so its planned loss can be measured — an unmeasurable loss is not a small one`,
-      );
-    } else {
-      // Not a failure: a longer-horizon position may legitimately be held
-      // without a hard stop. Recorded so nobody later reads the silence as zero.
-      g.note(
-        `planned loss is not measurable for this order (needs qty, entry, stop and slippage) — the notional ceilings are the only sizing constraint applied`,
-      );
-    }
-  } else {
-    g.add(
-      "planned_risk_stated",
-      true,
-      isOption
-        ? `maximum premium loss $${dollars(plannedRisk)} = contracts x 100 x (limit premium + slippage)`
-        : `planned loss $${dollars(plannedRisk)} = qty x (|entry - stop| + slippage)`,
-      plannedRisk,
-    );
-
-    if (equityKnown) {
-      const e = equity!;
-
-      const perPlay = measurePctCeiling(0, plannedRisk, e, mandate.maxPlannedRiskPctPerPlay);
-      g.add(
-        "planned_risk_per_play",
-        perPlay.ok,
-        perPlay.ok
-          ? `planned loss is ${perPlay.pct}% of equity, within the ${mandate.maxPlannedRiskPctPerPlay}% per-play ceiling`
-          : `planned loss is ${perPlay.pct}% of equity, over the ${mandate.maxPlannedRiskPctPerPlay}% per-play ceiling — widen the stop and the size must come down`,
-        perPlay.pct,
-        mandate.maxPlannedRiskPctPerPlay,
+          ? `maximum premium loss $${dollars(plannedRisk)} = contracts x 100 x (limit premium + slippage)`
+          : `planned loss $${dollars(plannedRisk)} = qty x (|entry - stop| + slippage)`,
+        plannedRisk,
       );
 
-      const daily = measurePctCeiling(account.plannedRiskTodayCents, plannedRisk, e, mandate.maxDailyPlannedRiskPct);
-      g.add(
-        "daily_planned_risk",
-        daily.ok,
-        daily.ok
-          ? `planned loss across today's plays would be ${daily.pct}% of equity, within ${mandate.maxDailyPlannedRiskPct}%`
-          : `planned loss across today's plays would be ${daily.pct}% of equity, over the ${mandate.maxDailyPlannedRiskPct}% daily ceiling`,
-        daily.pct,
-        mandate.maxDailyPlannedRiskPct,
-      );
+      if (equityKnown) {
+        const e = equity!;
 
-      // Several plays on one theme are one bet. This is the ceiling that stops
-      // a housing ETF and a homebuilder from being counted as diversification.
-      const correlated = measurePctCeiling(
-        account.clusterPlannedRiskCents, plannedRisk, e, mandate.maxCorrelatedPlannedRiskPct,
-      );
-      g.add(
-        "correlated_planned_risk",
-        correlated.ok,
-        correlated.ok
-          ? `planned loss across "${account.clusterLabel}" would be ${correlated.pct}% of equity, within ${mandate.maxCorrelatedPlannedRiskPct}%`
-          : `planned loss across "${account.clusterLabel}" would be ${correlated.pct}% of equity, over the ${mandate.maxCorrelatedPlannedRiskPct}% correlated ceiling — these plays are one bet, not two`,
-        correlated.pct,
-        mandate.maxCorrelatedPlannedRiskPct,
-      );
-      if (!account.sectorKnown) {
-        g.note(`no sector fact for ${input.symbol} — the correlated planned-loss ceiling covers this name alone, so a genuine theme overlap would not be caught`);
+        const perPlay = measurePctCeiling(0, plannedRisk, e, mandate.maxPlannedRiskPctPerPlay);
+        g.add(
+          "planned_risk_per_play",
+          perPlay.ok,
+          perPlay.ok
+            ? `planned loss is ${perPlay.pct}% of equity, within the ${mandate.maxPlannedRiskPctPerPlay}% per-play ceiling`
+            : `planned loss is ${perPlay.pct}% of equity, over the ${mandate.maxPlannedRiskPctPerPlay}% per-play ceiling — widen the stop and the size must come down`,
+          perPlay.pct,
+          mandate.maxPlannedRiskPctPerPlay,
+        );
+
+        const daily = measurePctCeiling(account.plannedRiskTodayCents, plannedRisk, e, mandate.maxDailyPlannedRiskPct);
+        g.add(
+          "daily_planned_risk",
+          daily.ok,
+          daily.ok
+            ? `planned loss across today's plays would be ${daily.pct}% of equity, within ${mandate.maxDailyPlannedRiskPct}%`
+            : `planned loss across today's plays would be ${daily.pct}% of equity, over the ${mandate.maxDailyPlannedRiskPct}% daily ceiling`,
+          daily.pct,
+          mandate.maxDailyPlannedRiskPct,
+        );
+
+        // Several plays on one theme are one bet. This is the ceiling that stops
+        // a housing ETF and a homebuilder from being counted as diversification.
+        const correlated = measurePctCeiling(
+          account.clusterPlannedRiskCents, plannedRisk, e, mandate.maxCorrelatedPlannedRiskPct,
+        );
+        g.add(
+          "correlated_planned_risk",
+          correlated.ok,
+          correlated.ok
+            ? `planned loss across "${account.clusterLabel}" would be ${correlated.pct}% of equity, within ${mandate.maxCorrelatedPlannedRiskPct}%`
+            : `planned loss across "${account.clusterLabel}" would be ${correlated.pct}% of equity, over the ${mandate.maxCorrelatedPlannedRiskPct}% correlated ceiling — these plays are one bet, not two`,
+          correlated.pct,
+          mandate.maxCorrelatedPlannedRiskPct,
+        );
+        if (!account.sectorKnown) {
+          g.note(`no sector fact for ${input.symbol} — the correlated planned-loss ceiling covers this name alone, so a genuine theme overlap would not be caught`);
+        }
       }
     }
+  } else {
+    g.note("closing order — planned loss ceilings apply to taking risk, not shedding it");
   }
 
   // ── Notional ────────────────────────────────────────────────────────────────
@@ -701,19 +769,19 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
     const n = notional!;
     const e = equity!;
 
-    const ceiling = singleOrderCeilingCents(e, mandate);
-    const ok = n <= ceiling;
-    g.add(
-      "order_notional_ceiling",
-      ok,
-      ok
-        ? `order $${dollars(n)} is within the $${dollars(ceiling)} single-order ceiling`
-        : `order $${dollars(n)} exceeds the single-order ceiling of $${dollars(ceiling)} (${mandate.maxOrderNotionalPctOfEquity}% of equity, capped at $${dollars(mandate.maxOrderNotionalCents)})`,
-      n,
-      ceiling,
-    );
-
     if (isOpening) {
+      const ceiling = singleOrderCeilingCents(e, mandate);
+      const ok = n <= ceiling;
+      g.add(
+        "order_notional_ceiling",
+        ok,
+        ok
+          ? `order $${dollars(n)} is within the $${dollars(ceiling)} single-order ceiling`
+          : `order $${dollars(n)} exceeds the single-order ceiling of $${dollars(ceiling)} (${mandate.maxOrderNotionalPctOfEquity}% of equity, capped at $${dollars(mandate.maxOrderNotionalCents)})`,
+        n,
+        ceiling,
+      );
+
       // Absolute exposure. A short's market value is negative at the broker, and
       // netting it against the order would make a growing short position read as
       // shrinking concentration — the opposite of the truth.
@@ -770,6 +838,7 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
         mandate.maxDailyNewNotionalPctOfEquity,
       );
     } else {
+      g.note(`closing order ($${dollars(n)}) — single-order ceiling applies to taking risk, not shedding it`);
       g.note(`closing order — concentration, per-run and daily-new ceilings do not apply to exposure reduction (${resolved.basis})`);
     }
   }

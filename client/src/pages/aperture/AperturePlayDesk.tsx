@@ -17,6 +17,7 @@ import { arbitrateTodayRead, canShowQuietBriefing, type ApertureAttentionBriefin
 import { deskOrderReturn, formatMarkProvenance, formatReturnAmount, formatReturnPercent } from "@shared/positionReturn";
 import { DeskGlanceLayer } from "@/components/aperture/DeskGlanceLayer";
 import { PlayInspectionDrawer, type InspectableOrder } from "@/components/aperture/PlayInspectionDrawer";
+import { PositionExitModal, type ExitTarget } from "@/components/aperture/PositionExitModal";
 
 const money = (cents?: number | null) => cents == null
   ? "—"
@@ -114,7 +115,45 @@ export default function AperturePlayDesk() {
   const outcomes = trpc.aperture.runway.pending.useQuery(undefined, { retry: false });
   const [primaryKey, setPrimaryKey] = useState<string | null>(null);
   const [showAllRows, setShowAllRows] = useState(false);
+  const [exitTarget, setExitTarget] = useState<ExitTarget | null>(null);
+  const [exitModalOpen, setExitModalOpen] = useState(false);
   const refreshInFlight = useRef(false);
+
+  const openExitForOrder = (order: any) => {
+    setExitTarget({
+      symbol: order.symbol,
+      instrumentType: order.instrumentType,
+      underlyingSymbol: order.underlyingSymbol,
+      optionExpirationDate: order.optionExpirationDate,
+      optionStrikePriceCents: order.optionStrikePriceCents,
+      contractMultiplier: order.contractMultiplier,
+      qty: order.filledQty || order.qty || 1,
+      side: order.side,
+      accountId: order.accountId,
+      accountLabel: order.accountLabel,
+      runId: order.runId,
+      candidateId: order.candidateId,
+      lastPriceCents: order.latestMark?.lastPriceCents ?? order.filledAvgPriceCents,
+      marketValueCents: order.latestMark?.marketValueCents,
+    });
+    setExitModalOpen(true);
+  };
+
+  const openExitForPlay = (play: any) => {
+    setExitTarget({
+      symbol: play.symbol,
+      instrumentType: play.instrumentType,
+      underlyingSymbol: play.underlyingSymbol,
+      optionExpirationDate: play.optionExpirationDate,
+      optionStrikePriceCents: play.optionStrikePriceCents,
+      qty: 1,
+      side: play.side ?? "long",
+      accountId: play.accountId,
+      accountLabel: play.accountLabel,
+      runId: play.runId,
+    });
+    setExitModalOpen(true);
+  };
   const briefing = desk.data?.attention;
   const read = arbitrateTodayRead({ briefing: briefing ?? null, refreshing: desk.isFetching, failed: !!desk.error, primaryKey });
   const disclosure = read.layout;
@@ -309,7 +348,21 @@ export default function AperturePlayDesk() {
                   return <><span className="font-semibold" style={{ color: tone }}>{formatReturnAmount(result)}</span>{percent && <span className="block text-[11px] leading-4" style={{ color: tone }}>{percent}</span>}<span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{formatMarkProvenance(result)}</span></>;
                 })()}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: "var(--sh-text-primary)" }}>{money(order.plannedRiskCents)}<span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{isOptionInstrument(order.instrumentType) ? "Premium at risk" : "Planned loss at modeled stop"} · {quantities.ordered} ordered · {quantities.filled} filled · {quantities.remaining} remaining{!isOptionInstrument(order.instrumentType) ? " · Stop execution may differ from the modeled price." : ""}<span className="block">Human review: {(() => { const humanReview = deskHumanReview(order, pendingOutcomes); return humanReview ? new Date(humanReview.dueAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : outcomes.error || outcomes.data == null ? "Review status unavailable" : "No checkpoint recorded"; })()}</span></span></td>
-                <td className="px-3 py-2.5 text-right"><Button size="sm" variant="outline" className="min-h-11 whitespace-nowrap" onClick={() => state.href ? navigate(state.href) : navigate(playDeskFilterHref(search, { inspect: order.id }))}>{state.href ? "Open" : "Inspect"}</Button></td>
+                <td className="px-3 py-2.5 text-right">
+                  <div className="flex items-center justify-end gap-1.5">
+                    {order.status === "filled" && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="min-h-11 whitespace-nowrap text-xs font-semibold"
+                        onClick={() => openExitForOrder(order)}
+                      >
+                        Exit
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" className="min-h-11 whitespace-nowrap" onClick={() => state.href ? navigate(state.href) : navigate(playDeskFilterHref(search, { inspect: order.id }))}>{state.href ? "Open" : "Inspect"}</Button>
+                  </div>
+                </td>
               </tr>;
             })}
             {shownActivePlays.map((play) => <tr key={`play-${play.id}`} data-play-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
@@ -317,8 +370,27 @@ export default function AperturePlayDesk() {
               <td className="px-3 py-2.5"><span className="whitespace-nowrap text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>{briefing?.inMotion.find((item) => item.key === `play:${play.id}`)?.stateLabel ?? "Open position"}</span></td>
               <td className="px-3 py-2.5 text-right" style={{ color: "var(--sh-fg-muted)" }}>—</td>
               <td className="px-3 py-2.5 text-right" style={{ color: "var(--sh-fg-muted)" }}>—</td>
-              <td className="px-3 py-2.5 text-right"><Button size="sm" variant="outline" className="min-h-11 whitespace-nowrap" onClick={() => navigate(playDeskFilterHref(search, { play: play.id }))}>Open</Button></td>
+              <td className="px-3 py-2.5 text-right">
+                <div className="flex items-center justify-end gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="min-h-11 whitespace-nowrap text-xs font-semibold"
+                    onClick={() => openExitForPlay(play)}
+                  >
+                    Exit
+                  </Button>
+                  <Button size="sm" variant="outline" className="min-h-11 whitespace-nowrap" onClick={() => navigate(playDeskFilterHref(search, { play: play.id }))}>Open</Button>
+                </div>
+              </td>
             </tr>)}
+            {shownOrders.length === 0 && shownActivePlays.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-3 py-6 text-center text-xs" style={{ color: "var(--sh-fg-muted)" }}>
+                  No active orders or open positions to monitor.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -350,15 +422,25 @@ export default function AperturePlayDesk() {
       // records leaves the drawer shut rather than opening an empty panel.
       const inspected = (desk.data?.orders ?? []).find((order) => order.id === inspectOrderId) ?? null;
       const humanReview = inspected ? deskHumanReview(inspected, pendingOutcomes) : null;
-      return <PlayInspectionDrawer
-        order={inspected as InspectableOrder | null}
-        stateLabel={inspected ? deskOrderPresentation(inspected.id, briefing).label : ""}
-        humanReviewAt={humanReview?.dueAt ?? null}
-        reviewsUnavailable={Boolean(outcomes.error) || outcomes.data == null}
-        onClose={() => navigate(playDeskFilterHref(search, { inspect: null }))}
-        onOpenFull={(order) => navigate(deskOrderPresentation(order.id, briefing).href
-          ?? `/aperture/run/${order.runId}/execute?candidate=${order.candidateId ?? ""}`)}
-      />;
+      return <>
+        <PlayInspectionDrawer
+          order={inspected as InspectableOrder | null}
+          stateLabel={inspected ? deskOrderPresentation(inspected.id, briefing).label : ""}
+          humanReviewAt={humanReview?.dueAt ?? null}
+          reviewsUnavailable={Boolean(outcomes.error) || outcomes.data == null}
+          onClose={() => navigate(playDeskFilterHref(search, { inspect: null }))}
+          onOpenFull={(order) => navigate(deskOrderPresentation(order.id, briefing).href
+            ?? `/aperture/run/${order.runId}/execute?candidate=${order.candidateId ?? ""}`)}
+          onExit={(order) => openExitForOrder(order)}
+        />
+        {exitModalOpen && exitTarget && (
+          <PositionExitModal
+            open={exitModalOpen}
+            onOpenChange={setExitModalOpen}
+            target={exitTarget}
+          />
+        )}
+      </>;
     })()}
   </div></DashboardLayout>;
 }

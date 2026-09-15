@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { buildOccOptionSymbol, paperInstrumentLabel, type PaperInstrumentType } from "@shared/paperInstrument";
+import { PositionExitModal, type ExitTarget } from "@/components/aperture/PositionExitModal";
 
 const cents = (value: string) => {
   if (!value.trim()) return undefined;
@@ -35,6 +36,8 @@ export function AccountContextPanel({ accountId }: { accountId: number }) {
   const [stop, setStop] = useState("");
   const [target, setTarget] = useState("");
   const [thesis, setThesis] = useState("");
+  const [exitTarget, setExitTarget] = useState<ExitTarget | null>(null);
+  const [exitModalOpen, setExitModalOpen] = useState(false);
 
   const refresh = async () => {
     await Promise.all([
@@ -93,10 +96,44 @@ export function AccountContextPanel({ accountId }: { accountId: number }) {
 
     {(positionsFailed || playsFailed) && <div role="alert" className="text-sm"><p>{positionsFailed ? "Holdings could not be refreshed. " : ""}{playsFailed ? "Recorded plays could not be refreshed. " : ""}Any saved values shown may be out of date.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => { if (positionsFailed) void retryPositions(); if (playsFailed) void retryPlays(); }}>Retry portfolio data</Button></div>}
 
-    {!!positions?.length && <div className="flex flex-wrap gap-1.5" aria-label="Imported holdings">
-      {positions.slice(0, 12).map((position) => <Badge key={position.id} variant="outline" className="font-mono text-[11px]">{position.symbol} · {position.qty}</Badge>)}
+    {!!positions?.length && <div className="flex flex-wrap gap-2" aria-label="Imported holdings">
+      {positions.slice(0, 12).map((position) => (
+        <div
+          key={position.id}
+          className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-mono"
+          style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}
+        >
+          <span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{position.symbol}</span>
+          <span style={{ color: "var(--sh-fg-muted)" }}>· {position.qty}</span>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-5 px-1 text-[10px] text-destructive hover:bg-destructive/10"
+            onClick={() => {
+              setExitTarget({
+                symbol: position.symbol,
+                qty: Math.abs(Number(position.qty) || 1),
+                side: Number(position.qty) < 0 ? "short" : "long",
+                accountId,
+                marketValueCents: position.marketValueCents,
+                lastPriceCents: position.lastPriceCents,
+              });
+              setExitModalOpen(true);
+            }}
+          >
+            Exit
+          </Button>
+        </div>
+      ))}
       {positions.length > 12 && <Badge variant="outline" className="text-[11px]">+{positions.length - 12} more</Badge>}
     </div>}
+
+    {positions && positions.length === 0 && !positionsFailed && (
+      <p className="text-xs italic" style={{ color: "var(--sh-fg-muted)" }}>
+        No open positions in this account. Open a position through a thesis run or import holdings.
+      </p>
+    )}
 
     {!!plays?.length && <div className="space-y-2">
       {plays.filter((play) => play.status !== "closed").map((play) => <div key={play.id} className="flex flex-col gap-2 rounded-md border px-3 py-2 sm:flex-row sm:items-start sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
@@ -128,5 +165,12 @@ export function AccountContextPanel({ accountId }: { accountId: number }) {
       </div>
       <div className="flex justify-end"><Button className="min-h-11" onClick={save} disabled={upsert.isPending}>{upsert.isPending ? "Saving…" : "Save play context"}</Button></div>
     </div>}
+    {exitModalOpen && exitTarget && (
+      <PositionExitModal
+        open={exitModalOpen}
+        onOpenChange={setExitModalOpen}
+        target={exitTarget}
+      />
+    )}
   </section>;
 }

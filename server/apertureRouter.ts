@@ -424,8 +424,8 @@ async function evidenceReviewBlock(
  * through. Duplicating the numbers here would give two places to change them and
  * one of them would drift.
  */
-const orderCreateInput = z.object({
-  runId: z.number(),
+const orderCreateBase = z.object({
+  runId: z.number().optional(),
   candidateId: z.number().optional(),
   accountId: z.number(),
   portfolioContextAccountId: z.number().optional(),
@@ -436,22 +436,40 @@ const orderCreateInput = z.object({
   optionStrikePriceCents: z.number().int().positive().optional(),
   contractMultiplier: z.number().int().positive().optional(),
   side: z.enum(["buy", "sell"]),
+  intent: z.enum(["open", "close"]).default("open"),
   qty: z.number().optional(),
   notionalCents: z.number().optional(),
   orderType: z.enum(["market", "limit"]).default("market"),
   limitPriceCents: z.number().optional(),
   timeInForce: z.enum(["day", "gtc"]).default("day"),
   reason: z.string().min(MIN_NARRATIVE_CHARS),
-  invalidationCondition: z.string().min(MIN_NARRATIVE_CHARS),
+  invalidationCondition: z.string().max(4000).optional(),
   invalidationPriceCents: z.number().optional(),
   entryPriceCents: z.number().optional(),
   stopPriceCents: z.number().optional(),
   slippageCents: z.number().min(0).optional(),
   timeStopAt: z.number().optional(),
   noTradeConditions: z.array(z.string().min(2).max(300)).max(8).optional(),
-  holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]),
-  catalystDeadlineAt: z.number(),
+  holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]).optional(),
+  catalystDeadlineAt: z.number().optional(),
   paperAcknowledgement: z.literal(PAPER_ACKNOWLEDGEMENT),
+});
+
+const orderCreateInput = orderCreateBase.superRefine((val, ctx) => {
+  if (val.intent === "open") {
+    if (val.runId == null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Research runId is required for opening proposals", path: ["runId"] });
+    }
+    if (!val.invalidationCondition || val.invalidationCondition.length < MIN_NARRATIVE_CHARS) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Invalidation condition must be at least ${MIN_NARRATIVE_CHARS} characters`, path: ["invalidationCondition"] });
+    }
+    if (!val.holdingPeriod) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Holding period is required for opening proposals", path: ["holdingPeriod"] });
+    }
+    if (val.catalystDeadlineAt == null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Catalyst deadline is required for opening proposals", path: ["catalystDeadlineAt"] });
+    }
+  }
 });
 
 /**
@@ -465,11 +483,8 @@ const orderCreateInput = z.object({
  * against `orderCreateInput` and reports every schema error as blocking, so
  * `wouldPass` is false for exactly the inputs create would refuse.
  */
-const orderPreflightInput = orderCreateInput.extend({
+const orderPreflightInput = orderCreateBase.extend({
   reason: z.string().max(4000).optional(),
-  invalidationCondition: z.string().max(4000).optional(),
-  holdingPeriod: z.enum(HOLDING_PERIOD_KEYS as [string, ...string[]]).optional(),
-  catalystDeadlineAt: z.number().optional(),
   paperAcknowledgement: z.string().max(64).optional(),
 });
 
@@ -1001,6 +1016,32 @@ export const apertureRouter = router({
           updatedAt: now,
         });
         return { id: (result as any).insertId as number };
+      }),
+
+    disconnect: capitalOperatorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        await requireAccount(db, input.id, ctx.user.id);
+        const activeOrders = await db!.select({ id: brokerOrders.id })
+          .from(brokerOrders)
+          .where(and(
+            eq(brokerOrders.accountId, input.id),
+            eq(brokerOrders.userId, ctx.user.id),
+            inArray(brokerOrders.status, ["pending_approval", "approved", "submitted"])
+          ));
+        if (activeOrders.length) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Cannot disconnect account while ${activeOrders.length} order(s) are pending or submitted. Reconcile or stop orders first.`
+          });
+        }
+        await db!.transaction(async (tx) => {
+          await tx.delete(positions).where(eq(positions.accountId, input.id));
+          await tx.delete(apertureActivePlayContexts).where(eq(apertureActivePlayContexts.accountId, input.id));
+          await tx.delete(portfolioAccounts).where(and(eq(portfolioAccounts.id, input.id), eq(portfolioAccounts.userId, ctx.user.id)));
+        });
+        return { disconnected: true, id: input.id };
       }),
 
     sync: capitalOperatorProcedure
@@ -1801,6 +1842,33 @@ export const apertureRouter = router({
           return { resolved: true, decisionRunId: row.pending.decisionRunId, revisionId: row.pending.revisionId };
         });
       }),
+
+    reopen: capitalOperatorProcedure
+      .input(z.object({
+        decisionRunId: z.number(),
+        reason: z.string().min(5).max(500).default("Reopened by operator"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [decisionRun] = await db!.select().from(apertureDecisionRuns)
+          .where(and(
+            eq(apertureDecisionRuns.id, input.decisionRunId),
+            eq(apertureDecisionRuns.userId, ctx.user.id),
+          ))
+          .limit(1);
+        if (!decisionRun) throw new TRPCError({ code: "NOT_FOUND", message: "Decision run not found" });
+        if (decisionRun.lifecycle !== "closed") {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only closed missions can be reopened." });
+        }
+        const now = Date.now();
+        await db!.update(apertureDecisionRuns).set({
+          lifecycle: "mission",
+          closedAt: null,
+          updatedAt: now,
+        }).where(eq(apertureDecisionRuns.id, input.decisionRunId));
+        return { reopened: true, decisionRunId: input.decisionRunId };
+      }),
+
     library: capitalOperatorProcedure
       .input(z.object({
         canonicalThesisId: z.number().nullable().optional(),
@@ -3563,6 +3631,29 @@ export const apertureRouter = router({
     return memoResult;
     }),
 
+    cancel: capitalOperatorProcedure
+      .input(z.object({
+        id: z.number(),
+        reason: z.string().min(3).max(500).default("Cancelled by operator"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const [run] = await db!.select().from(apertureRuns)
+          .where(and(eq(apertureRuns.id, input.id), eq(apertureRuns.userId, ctx.user.id)))
+          .limit(1);
+        if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+        if (run.status === "completed") {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Completed runs cannot be cancelled." });
+        }
+        const now = Date.now();
+        await db!.update(apertureRuns).set({
+          status: "failed",
+          error: `Cancelled by operator: ${input.reason}`,
+          completedAt: now,
+        }).where(eq(apertureRuns.id, input.id));
+        return { cancelled: true, id: input.id };
+      }),
+
   // ── Daily trader plays ─────────────────────────────────────────────────────
   // This is a read model over completed short-horizon runs. It starts no
   // research, alters no thesis, and never reaches the broker adapter.
@@ -4689,14 +4780,44 @@ export const apertureRouter = router({
     create: capitalOperatorProcedure
       .input(orderCreateInput)
       .mutation(async ({ ctx, input }) => {
-        const recipeGap = missingIntradayRecipeMessage(input);
+        const isClosing = input.intent === "close";
+        const recipeGap = isClosing ? null : missingIntradayRecipeMessage(input);
         if (recipeGap) throw new TRPCError({ code: "PRECONDITION_FAILED", message: recipeGap });
         const db = await getDb();
         await requireAccount(db, input.accountId, ctx.user.id);
 
+        let resolvedRunId = input.runId;
+        if (!resolvedRunId && isClosing) {
+          const [matchingOrder] = await db!.select({ runId: brokerOrders.runId })
+            .from(brokerOrders)
+            .where(and(
+              eq(brokerOrders.userId, ctx.user.id),
+              eq(brokerOrders.accountId, input.accountId),
+              eq(brokerOrders.symbol, input.symbol),
+            ))
+            .orderBy(desc(brokerOrders.id))
+            .limit(1);
+          if (matchingOrder) {
+            resolvedRunId = matchingOrder.runId;
+          } else {
+            const [latestRun] = await db!.select({ id: apertureRuns.id })
+              .from(apertureRuns)
+              .where(eq(apertureRuns.userId, ctx.user.id))
+              .orderBy(desc(apertureRuns.id))
+              .limit(1);
+            if (!latestRun) {
+              throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No research run found for this operator account to attach the exit order to." });
+            }
+            resolvedRunId = latestRun.id;
+          }
+        }
+        if (!resolvedRunId) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Research runId is required." });
+        }
+
         // A run's own preset tightens the mandate for orders placed under it.
         const [run] = await db!.select().from(apertureRuns)
-          .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id)))
+          .where(and(eq(apertureRuns.id, resolvedRunId), eq(apertureRuns.userId, ctx.user.id)))
           .limit(1);
         if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
         if (run.droppedNote === "ILLUSTRATIVE_UAT_QUALIFIED_PLAY_ZERO_NETWORK_NOT_CURRENT_MARKET_DATA") {
@@ -4706,12 +4827,16 @@ export const apertureRouter = router({
         // A candidate-originated proposal cannot skip the operator's recorded review
         // of the evidence questions that can change the decision. Manual paper orders
         // remain possible for operational uses without a research-candidate link.
-        const evidenceBlock = await evidenceReviewBlock(db, ctx.user.id, input.runId, input.candidateId);
+        const evidenceBlock = isClosing ? null : await evidenceReviewBlock(db, ctx.user.id, resolvedRunId, input.candidateId);
         if (evidenceBlock) throw new TRPCError({ code: "PRECONDITION_FAILED", message: evidenceBlock });
 
         try {
           return await createOrder({
             ...input,
+            runId: resolvedRunId,
+            invalidationCondition: input.invalidationCondition ?? (isClosing ? "Position exit — closing or reducing held exposure." : undefined),
+            catalystDeadlineAt: input.catalystDeadlineAt ?? (isClosing ? Date.now() + 86400000 : undefined),
+            holdingPeriod: input.holdingPeriod ?? (isClosing ? (run.holdingPeriod ?? "swing") : undefined),
             userId: ctx.user.id,
             portfolioRules: {
               maxSingleNamePct: run.maxSingleNamePct ?? null,
@@ -4751,20 +4876,44 @@ export const apertureRouter = router({
     preflight: capitalOperatorProcedure
       .input(orderPreflightInput)
       .query(async ({ ctx, input }) => {
+        const isClosing = input.intent === "close";
         const db = await getDb();
         await requireAccount(db, input.accountId, ctx.user.id);
 
+        let resolvedRunId = input.runId;
+        if (!resolvedRunId && isClosing) {
+          const [matchingOrder] = await db!.select({ runId: brokerOrders.runId })
+            .from(brokerOrders)
+            .where(and(
+              eq(brokerOrders.userId, ctx.user.id),
+              eq(brokerOrders.accountId, input.accountId),
+              eq(brokerOrders.symbol, input.symbol),
+            ))
+            .orderBy(desc(brokerOrders.id))
+            .limit(1);
+          if (matchingOrder) resolvedRunId = matchingOrder.runId;
+          else {
+            const [latestRun] = await db!.select({ id: apertureRuns.id })
+              .from(apertureRuns)
+              .where(eq(apertureRuns.userId, ctx.user.id))
+              .orderBy(desc(apertureRuns.id))
+              .limit(1);
+            if (latestRun) resolvedRunId = latestRun.id;
+          }
+        }
+        if (!resolvedRunId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Research runId is required" });
+
         const [run] = await db!.select().from(apertureRuns)
-          .where(and(eq(apertureRuns.id, input.runId), eq(apertureRuns.userId, ctx.user.id)))
+          .where(and(eq(apertureRuns.id, resolvedRunId), eq(apertureRuns.userId, ctx.user.id)))
           .limit(1);
         if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
         const illustrativeFixture = run.droppedNote === "ILLUSTRATIVE_UAT_QUALIFIED_PLAY_ZERO_NETWORK_NOT_CURRENT_MARKET_DATA";
 
-        const evidenceBlock = await evidenceReviewBlock(db, ctx.user.id, input.runId, input.candidateId);
+        const evidenceBlock = isClosing ? null : await evidenceReviewBlock(db, ctx.user.id, resolvedRunId, input.candidateId);
 
         // Everything create's own zod would refuse, as messages rather than a
         // 400 — a half-typed ticket must still get an answer about the mandate.
-        const parsed = orderCreateInput.safeParse(input);
+        const parsed = orderCreateInput.safeParse({ ...input, runId: resolvedRunId });
         const schemaErrors = parsed.success
           ? []
           : parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`);
@@ -4773,6 +4922,10 @@ export const apertureRouter = router({
         try {
           preflight = await preflightOrder({
             ...input,
+            runId: resolvedRunId,
+            invalidationCondition: input.invalidationCondition ?? (isClosing ? "Position exit — closing or reducing held exposure." : undefined),
+            catalystDeadlineAt: input.catalystDeadlineAt ?? (isClosing ? Date.now() + 86400000 : undefined),
+            holdingPeriod: input.holdingPeriod ?? (isClosing ? (run.holdingPeriod ?? "swing") : undefined),
             userId: ctx.user.id,
             portfolioRules: {
               maxSingleNamePct: run.maxSingleNamePct ?? null,
@@ -4787,7 +4940,7 @@ export const apertureRouter = router({
         }
         const { evaluation, gatedNotionalCents, notionalBasis, session } = preflight;
 
-        const recipeGap = missingIntradayRecipeMessage(input);
+        const recipeGap = isClosing ? null : missingIntradayRecipeMessage(input);
         const fixtureBlock = illustrativeFixture ? ["Illustrative UAT fixtures may be reviewed but can never create a paper-order proposal."] : [];
         const blocking = [...fixtureBlock, ...evaluation.failures, ...schemaErrors, ...(recipeGap ? [recipeGap] : []), ...(evidenceBlock ? [evidenceBlock] : [])];
         return {
