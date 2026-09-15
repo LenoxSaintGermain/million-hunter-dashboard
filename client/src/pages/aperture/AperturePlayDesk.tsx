@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { deskOrderQuantities } from "@shared/deskOrderQuantities";
 import { useLocation, useSearch } from "wouter";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
+import { ArrowRight, CheckCircle2, RefreshCw, Sparkles } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -223,13 +223,19 @@ export default function AperturePlayDesk() {
 
   return <DashboardLayout><div className="mx-auto max-w-6xl space-y-5 pb-12">
     <header data-desk-header className="flex flex-wrap items-center justify-between gap-3">
-      <h1 className="font-serif text-2xl sm:text-3xl" style={{ color: "var(--sh-text-primary)" }}>Play Desk</h1>
-      <Button type="button" variant="outline" size="sm" className="min-h-11 aria-disabled:opacity-50" onClick={refresh} aria-disabled={isRefreshing} aria-describedby="desk-refresh-scope"><RefreshCw className="mr-2 h-4 w-4" />{isRefreshing ? "Refreshing…" : "Refresh status"}</Button>
+      <div>
+        <h1 className="font-serif text-2xl sm:text-3xl" style={{ color: "var(--sh-text-primary)" }}>Play Desk</h1>
+        <p className="mt-0.5 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Executive position monitoring &amp; rapid risk actions</p>
+      </div>
+      <Button type="button" variant="outline" size="sm" className="min-h-11 aria-disabled:opacity-50" onClick={refresh} aria-disabled={isRefreshing} aria-describedby="desk-refresh-scope"><RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />{isRefreshing ? "Refreshing…" : "Refresh status"}</Button>
     </header>
 
-    <div id="desk-refresh-scope" role="status" aria-live="polite" className="text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>
-      <p>{isRefreshing ? "Loading status; existing records stay visible." : desk.dataUpdatedAt ? <>Records loaded <time dateTime={new Date(desk.dataUpdatedAt).toISOString()}>{new Date(desk.dataUpdatedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time>.</> : "Status has not loaded yet."}</p>
-      <p>Refresh reads records only; no new checks.</p>
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2" style={{ borderColor: "var(--sh-border-1)" }}>
+      <div id="desk-refresh-scope" role="status" aria-live="polite" className="text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>
+        <p>{isRefreshing ? "Loading status; existing records stay visible." : desk.dataUpdatedAt ? <>Records loaded <time dateTime={new Date(desk.dataUpdatedAt).toISOString()}>{new Date(desk.dataUpdatedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time>.</> : "Status has not loaded yet."}</p>
+        <p>Refresh reads records only; no new checks.</p>
+      </div>
+      <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => navigate("/aperture/mission")}><Sparkles className="mr-2 h-4 w-4" />New research run</Button>
     </div>
     {unavailable.length > 0 && <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}>
       {unavailable.map(({ label, query }) => <div key={label} className="mb-3 last:mb-0"><p className="font-semibold">{label} status unavailable</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{query.data != null ? "Refresh failed. Last known records remain visible; they may be stale." : "This part of the desk could not be verified."}</p></div>)}
@@ -329,16 +335,34 @@ export default function AperturePlayDesk() {
             {shownOrders.map((order) => {
               const state = deskOrderPresentation(order.id, briefing);
               const quantities = deskOrderQuantities(order);
+              const occ = parseOccOptionSymbol(order.symbol);
+              const dte = occ?.expirationDate ? Math.max(0, Math.ceil((new Date(occ.expirationDate).getTime() - Date.now()) / 86_400_000)) : null;
               return <tr key={`order-${order.id}`} id={`order-${order.id}`} data-play-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
-                <th scope="row" className="px-3 py-2.5 text-left font-semibold" style={{ color: "var(--sh-text-primary)" }}><button
-                  type="button"
-                  data-inspect-order={order.id}
-                  aria-haspopup="dialog"
-                  aria-expanded={inspectOrderId === order.id}
-                  className="min-h-11 text-left font-semibold underline decoration-dotted underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => navigate(playDeskFilterHref(search, { inspect: order.id }))}
-                >{paperInstrumentDisplayLabel(order)}<span className="sr-only"> — inspect receipts and thesis context</span></button></th>
-                <td className="px-3 py-2.5"><span className="whitespace-nowrap text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>{state.label}</span><span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{state.detail}</span></td>
+                <th scope="row" className="px-3 py-2.5 text-left font-semibold" style={{ color: "var(--sh-text-primary)" }}>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      data-inspect-order={order.id}
+                      aria-haspopup="dialog"
+                      aria-expanded={inspectOrderId === order.id}
+                      className="min-h-11 text-left font-semibold underline decoration-dotted underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() => navigate(playDeskFilterHref(search, { inspect: order.id }))}
+                    >
+                      {paperInstrumentDisplayLabel(order)}<span className="sr-only"> — inspect receipts and thesis context</span>
+                    </button>
+                    {dte != null && (
+                      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-mono font-medium" style={{ background: dte <= 7 ? "color-mix(in srgb, var(--sh-red) 15%, transparent)" : "var(--sh-surface-2)", color: dte <= 7 ? "var(--sh-red)" : "var(--sh-fg-muted)" }}>
+                        {dte}d DTE
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <td className="px-3 py-2.5">
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: "color-mix(in srgb, var(--sh-signal) 12%, transparent)", color: "var(--sh-signal)" }}>
+                    {state.label}
+                  </span>
+                  <span className="block mt-0.5 text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{state.detail}</span>
+                </td>
                 <td data-play-return className="px-3 py-2.5 text-right tabular-nums align-top">{(() => {
                   const result = deskOrderReturn(order, Date.now());
                   if (!result.measured) return <><span className="text-xs font-semibold" style={{ color: "var(--sh-fg-muted)" }}>Not measured</span><span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{result.reason}</span></>;
@@ -347,7 +371,15 @@ export default function AperturePlayDesk() {
                   const percent = formatReturnPercent(result);
                   return <><span className="font-semibold" style={{ color: tone }}>{formatReturnAmount(result)}</span>{percent && <span className="block text-[11px] leading-4" style={{ color: tone }}>{percent}</span>}<span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{formatMarkProvenance(result)}</span></>;
                 })()}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: "var(--sh-text-primary)" }}>{money(order.plannedRiskCents)}<span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{isOptionInstrument(order.instrumentType) ? "Premium at risk" : "Planned loss at modeled stop"} · {quantities.ordered} ordered · {quantities.filled} filled · {quantities.remaining} remaining{!isOptionInstrument(order.instrumentType) ? " · Stop execution may differ from the modeled price." : ""}<span className="block">Human review: {(() => { const humanReview = deskHumanReview(order, pendingOutcomes); return humanReview ? new Date(humanReview.dueAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : outcomes.error || outcomes.data == null ? "Review status unavailable" : "No checkpoint recorded"; })()}</span></span></td>
+                <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: "var(--sh-text-primary)" }}>
+                  <div>{money(order.plannedRiskCents)}</div>
+                  {order.latestMark && (
+                    <div className="text-[11px] font-mono" style={{ color: "var(--sh-fg-muted)" }}>
+                      Mark {money(order.latestMark.lastPriceCents)} · Basis {money(order.latestMark.avgCostCents)}
+                    </div>
+                  )}
+                  <span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{isOptionInstrument(order.instrumentType) ? "Premium at risk" : "Planned loss at modeled stop"} · {quantities.ordered} ordered · {quantities.filled} filled · {quantities.remaining} remaining{!isOptionInstrument(order.instrumentType) ? " · Stop execution may differ from the modeled price." : ""}<span className="block">Human review: {(() => { const humanReview = deskHumanReview(order, pendingOutcomes); return humanReview ? new Date(humanReview.dueAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : outcomes.error || outcomes.data == null ? "Review status unavailable" : "No checkpoint recorded"; })()}</span></span>
+                </td>
                 <td className="px-3 py-2.5 text-right">
                   <div className="flex items-center justify-end gap-1.5">
                     {order.status === "filled" && (

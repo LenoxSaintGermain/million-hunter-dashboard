@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Activity, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Activity, ChevronDown, ChevronUp, Layers, PieChart, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { buildOccOptionSymbol, paperInstrumentLabel, type PaperInstrumentType } from "@shared/paperInstrument";
+import { buildOccOptionSymbol, paperInstrumentLabel, parseOccOptionSymbol, type PaperInstrumentType } from "@shared/paperInstrument";
 import { PositionExitModal, type ExitTarget } from "@/components/aperture/PositionExitModal";
 
 const cents = (value: string) => {
@@ -38,6 +38,47 @@ export function AccountContextPanel({ accountId }: { accountId: number }) {
   const [thesis, setThesis] = useState("");
   const [exitTarget, setExitTarget] = useState<ExitTarget | null>(null);
   const [exitModalOpen, setExitModalOpen] = useState(false);
+  const [exposureCategory, setExposureCategory] = useState<"all" | "shares" | "long_call" | "long_put" | "dte_near" | "dte_mid" | "dte_far">("all");
+
+  const breakdown = useMemo(() => {
+    if (!positions) return { shares: 0, calls: 0, puts: 0, near: 0, mid: 0, far: 0, totalMarketValueCents: 0 };
+    let shares = 0, calls = 0, puts = 0, near = 0, mid = 0, far = 0, totalMarketValueCents = 0;
+    for (const pos of positions) {
+      if (typeof pos.marketValueCents === "number") totalMarketValueCents += Math.abs(pos.marketValueCents);
+      const occ = parseOccOptionSymbol(pos.symbol);
+      if (!occ) {
+        shares += 1;
+        far += 1;
+      } else {
+        if (occ.instrumentType === "long_call") calls += 1;
+        else if (occ.instrumentType === "long_put") puts += 1;
+        else shares += 1;
+
+        const dte = Math.ceil((new Date(occ.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        if (dte <= 30) near += 1;
+        else if (dte <= 90) mid += 1;
+        else far += 1;
+      }
+    }
+    return { shares, calls, puts, near, mid, far, totalMarketValueCents };
+  }, [positions]);
+
+  const filteredPositions = useMemo(() => {
+    if (!positions) return [];
+    if (exposureCategory === "all") return positions;
+    return positions.filter((pos) => {
+      const occ = parseOccOptionSymbol(pos.symbol);
+      if (exposureCategory === "shares") return !occ;
+      if (exposureCategory === "long_call") return occ?.instrumentType === "long_call";
+      if (exposureCategory === "long_put") return occ?.instrumentType === "long_put";
+      if (!occ) return exposureCategory === "dte_far";
+      const dte = Math.ceil((new Date(occ.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      if (exposureCategory === "dte_near") return dte <= 30;
+      if (exposureCategory === "dte_mid") return dte > 30 && dte <= 90;
+      if (exposureCategory === "dte_far") return dte > 90;
+      return true;
+    });
+  }, [positions, exposureCategory]);
 
   const refresh = async () => {
     await Promise.all([
@@ -96,8 +137,91 @@ export function AccountContextPanel({ accountId }: { accountId: number }) {
 
     {(positionsFailed || playsFailed) && <div role="alert" className="text-sm"><p>{positionsFailed ? "Holdings could not be refreshed. " : ""}{playsFailed ? "Recorded plays could not be refreshed. " : ""}Any saved values shown may be out of date.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => { if (positionsFailed) void retryPositions(); if (playsFailed) void retryPlays(); }}>Retry portfolio data</Button></div>}
 
+    {!!positions?.length && (
+      <div className="space-y-2 rounded-md border p-2.5 text-xs" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 font-semibold text-[0.68rem] uppercase tracking-wider" style={{ color: "var(--sh-signal)" }}>
+            <Layers className="h-3.5 w-3.5" />
+            Exposure Breakdowns
+          </div>
+          <span className="font-mono text-xs tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>
+            Market Value: {money(breakdown.totalMarketValueCents)}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <span className="text-[11px] font-medium mr-1" style={{ color: "var(--sh-fg-muted)" }}>Asset Class / Strategy:</span>
+          <Button
+            type="button"
+            variant={exposureCategory === "all" ? "default" : "outline"}
+            size="sm"
+            className="h-6 px-2 text-[11px]"
+            onClick={() => setExposureCategory("all")}
+          >
+            All ({positions.length})
+          </Button>
+          <Button
+            type="button"
+            variant={exposureCategory === "shares" ? "default" : "outline"}
+            size="sm"
+            className="h-6 px-2 text-[11px]"
+            onClick={() => setExposureCategory(exposureCategory === "shares" ? "all" : "shares")}
+          >
+            Shares ({breakdown.shares})
+          </Button>
+          <Button
+            type="button"
+            variant={exposureCategory === "long_call" ? "default" : "outline"}
+            size="sm"
+            className="h-6 px-2 text-[11px]"
+            onClick={() => setExposureCategory(exposureCategory === "long_call" ? "all" : "long_call")}
+          >
+            Long Calls ({breakdown.calls})
+          </Button>
+          <Button
+            type="button"
+            variant={exposureCategory === "long_put" ? "default" : "outline"}
+            size="sm"
+            className="h-6 px-2 text-[11px]"
+            onClick={() => setExposureCategory(exposureCategory === "long_put" ? "all" : "long_put")}
+          >
+            Long Puts ({breakdown.puts})
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+          <span className="text-[11px] font-medium mr-1" style={{ color: "var(--sh-fg-muted)" }}>Expiration Horizon:</span>
+          <Button
+            type="button"
+            variant={exposureCategory === "dte_near" ? "default" : "outline"}
+            size="sm"
+            className="h-6 px-2 text-[11px]"
+            onClick={() => setExposureCategory(exposureCategory === "dte_near" ? "all" : "dte_near")}
+          >
+            Near-term &lt;30d ({breakdown.near})
+          </Button>
+          <Button
+            type="button"
+            variant={exposureCategory === "dte_mid" ? "default" : "outline"}
+            size="sm"
+            className="h-6 px-2 text-[11px]"
+            onClick={() => setExposureCategory(exposureCategory === "dte_mid" ? "all" : "dte_mid")}
+          >
+            Intermediate 30–90d ({breakdown.mid})
+          </Button>
+          <Button
+            type="button"
+            variant={exposureCategory === "dte_far" ? "default" : "outline"}
+            size="sm"
+            className="h-6 px-2 text-[11px]"
+            onClick={() => setExposureCategory(exposureCategory === "dte_far" ? "all" : "dte_far")}
+          >
+            Extended / Equity ({breakdown.far})
+          </Button>
+        </div>
+      </div>
+    )}
+
     {!!positions?.length && <div className="flex flex-wrap gap-2" aria-label="Imported holdings">
-      {positions.slice(0, 12).map((position) => (
+      {filteredPositions.slice(0, 12).map((position) => (
         <div
           key={position.id}
           className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-mono"
@@ -126,7 +250,8 @@ export function AccountContextPanel({ accountId }: { accountId: number }) {
           </Button>
         </div>
       ))}
-      {positions.length > 12 && <Badge variant="outline" className="text-[11px]">+{positions.length - 12} more</Badge>}
+      {filteredPositions.length > 12 && <Badge variant="outline" className="text-[11px]">+{filteredPositions.length - 12} more</Badge>}
+      {filteredPositions.length === 0 && <p className="text-xs italic" style={{ color: "var(--sh-fg-muted)" }}>No positions in selected exposure category.</p>}
     </div>}
 
     {positions && positions.length === 0 && !positionsFailed && (

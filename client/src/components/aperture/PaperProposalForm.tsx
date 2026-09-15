@@ -410,6 +410,9 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   const modeledQuantity = isOption ? (Number.isInteger(optionQty) && optionQty > 0 ? `${optionQty} contract${optionQty === 1 ? "" : "s"}` : "—") : constructedPlay?.qty == null ? "—" : `${constructedPlay.qty.toLocaleString()} shares`;
   const modeledLoss = isOption ? optionMaxLossCents : constructedPlay?.plannedLossCents;
   const modeledCapital = isOption ? optionMaxLossCents : constructedPlay?.notionalCents;
+  const projectedBuyingPowerCents = account?.buyingPowerCents != null
+    ? Math.max(0, account.buyingPowerCents - (currentPreflightData?.gatedNotionalCents ?? modeledCapital ?? 0))
+    : null;
 
   return <Card id="paper-proposal" className="scroll-mt-6 border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
     <CardContent className="space-y-4 pt-4">
@@ -432,6 +435,50 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
           {staleAccountId == null && <p className="w-full text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>This account is not resolved on this screen. Sync it from Portfolio, then reopen this ticket.</p>}
         </div>}
         {hardResolutionNeeded && <div className="mt-3 grid gap-2 sm:grid-cols-2"><Button type="button" variant="outline" className="min-h-11" onClick={onReturnToDecisionBrief}>Choose another play</Button><Button type="button" className="min-h-11" disabled={preserveCash.isPending} onClick={() => preserveCash.mutate({ runId, candidateId: candidate.id, decision: "skipped", reason: preserveHardBlockCashReason })}>{preserveCash.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CircleSlash2 className="mr-1.5 h-3.5 w-3.5" />}Preserve cash · $0 risk</Button></div>}
+      </section>
+
+      {/* Executive Preflight Impact Card */}
+      <section aria-label="Preflight execution impact" className="rounded-xl border p-3.5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5" style={{ borderColor: "var(--sh-border-1)" }}>
+          <div className="flex items-center gap-2">
+            <span className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Preflight Impact Analysis</span>
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{
+              background: currentPreflightData?.wouldPass ? "color-mix(in srgb, var(--sh-emerald) 15%, transparent)" : "color-mix(in srgb, var(--sh-signal) 15%, transparent)",
+              color: currentPreflightData?.wouldPass ? "var(--sh-emerald)" : "var(--sh-signal)"
+            }}>
+              {currentPreflightData?.wouldPass ? "Passes Alpaca Paper Route" : "Pending Requirements"}
+            </span>
+          </div>
+          <span className="text-[11px] font-mono tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>
+            Session: {currentPreflightData?.marketSession ?? "regular"}
+          </span>
+        </div>
+        <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="rounded-lg p-2" style={{ background: "var(--sh-surface-2)" }}>
+            <span className="text-[10px] font-medium uppercase tracking-[0.08em]" style={{ color: "var(--sh-fg-muted)" }}>Order Notional</span>
+            <p className="mt-0.5 font-mono text-sm font-bold tabular-nums" style={{ color: "var(--sh-text-primary)" }}>
+              {money(currentPreflightData?.gatedNotionalCents ?? modeledCapital ?? 0)}
+            </p>
+          </div>
+          <div className="rounded-lg p-2" style={{ background: "var(--sh-surface-2)" }}>
+            <span className="text-[10px] font-medium uppercase tracking-[0.08em]" style={{ color: "var(--sh-fg-muted)" }}>Buying Power Now</span>
+            <p className="mt-0.5 font-mono text-sm font-bold tabular-nums" style={{ color: "var(--sh-text-primary)" }}>
+              {account?.buyingPowerCents != null ? money(account.buyingPowerCents) : "—"}
+            </p>
+          </div>
+          <div className="rounded-lg p-2" style={{ background: "var(--sh-surface-2)" }}>
+            <span className="text-[10px] font-medium uppercase tracking-[0.08em]" style={{ color: "var(--sh-fg-muted)" }}>Projected BP After</span>
+            <p className="mt-0.5 font-mono text-sm font-bold tabular-nums" style={{ color: projectedBuyingPowerCents != null ? "var(--sh-signal)" : "var(--sh-text-primary)" }}>
+              {projectedBuyingPowerCents != null ? money(projectedBuyingPowerCents) : "—"}
+            </p>
+          </div>
+          <div className="rounded-lg p-2" style={{ background: "var(--sh-surface-2)" }}>
+            <span className="text-[10px] font-medium uppercase tracking-[0.08em]" style={{ color: "var(--sh-fg-muted)" }}>Max Ticket Loss</span>
+            <p className="mt-0.5 font-mono text-sm font-bold tabular-nums" style={{ color: "var(--sh-red)" }}>
+              {money(isOption ? (optionMaxLossCents ?? 0) : (modeledLoss ?? 0))}
+            </p>
+          </div>
+        </div>
       </section>
 
       {/* TSL-BUILD-2026-009: the decision leads with PLAY and RETURN; the price

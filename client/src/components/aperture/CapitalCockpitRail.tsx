@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Clock3, Info, Landmark } from "lucide-react";
+import { ChevronDown, Clock3, Info, Landmark, RefreshCw } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { formatMandatePercentPoints } from "@shared/cockpitPresentation";
 import { buildCockpitRailSummary, type CockpitHeadroomLine } from "@shared/cockpitRailSummary";
@@ -116,7 +116,124 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
     ? `${bindingSubject} uses ${money(summary.binding.usedCents)} of ${money(summary.binding.ceilingCents)}. Remaining headroom: ${money(Math.max(0, bindingRemainingCents ?? 0))}. Once exhausted, ${bindingSubject} must fall below ${money(summary.binding.ceilingCents)} to unlock more. Any higher ceiling must be changed in account governance.`
     : "No measurable running ceiling is available for this account.";
 
-  return <section className="mb-5 overflow-hidden rounded-xl border" style={{ borderColor: summary.severity === "critical" ? severityColor : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+  const deskQuery = (trpc.aperture as any)?.desk?.summary?.useQuery ? (trpc.aperture as any).desk.summary.useQuery(undefined, { retry: false, refetchOnWindowFocus: false }) : { data: null };
+  const syncMutation = (trpc.aperture as any)?.account?.sync?.useMutation ? (trpc.aperture as any).account.sync.useMutation({
+    onSuccess: () => {
+      cockpitQuery.refetch();
+      accountQuery.refetch();
+    },
+  }) : null;
+
+  const [syncing, setSyncing] = useState(false);
+  const handleRapidSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      if (preferredAccountId && syncMutation?.mutateAsync) {
+        await syncMutation.mutateAsync({ id: preferredAccountId });
+      } else {
+        await Promise.allSettled([cockpitQuery.refetch(), accountQuery.refetch()]);
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const equityCents = data.account.equityValueCents;
+  const cashCents = data.account.cashCents;
+  const buyingPowerCents = data.account.buyingPowerCents ?? cashCents;
+  const marginUtilPct = equityCents && cashCents != null
+    ? Math.max(0, Math.min(100, ((equityCents - cashCents) / equityCents) * 100)).toFixed(1)
+    : "0.0";
+  const unrealizedCents = deskQuery.data?.account?.unrealizedPnlCents ?? null;
+
+  return <section className="mb-5 overflow-hidden rounded-xl border shadow-sm" style={{ borderColor: summary.severity === "critical" ? severityColor : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+    {/* Executive Cockpit Ticker Tape (Desktop) */}
+    <div className="hidden sm:block">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-3.5 py-2 text-xs" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+        <div className="flex items-center gap-2.5">
+          <StateMark state="rule_qualified" label="Paper-only operator instrument" compact />
+          <RailHelp label="Explain paper-only boundary">This operator surface records research context and human review. It does not submit an order.</RailHelp>
+          <div className="h-3.5 w-px" style={{ background: "var(--sh-border-1)" }} />
+          {/* Ambient Staleness Pill with inline 1-click refresh */}
+          <div className="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ background: summary.accountStale ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "color-mix(in srgb, var(--sh-emerald) 12%, transparent)", color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-emerald)" }}>
+            <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: summary.accountStale ? "var(--sh-signal)" : "var(--sh-emerald)" }} />
+            <span>{staleText}</span>
+            <button
+              type="button"
+              onClick={handleRapidSync}
+              disabled={syncing}
+              title="Refresh marks & buying power snapshot"
+              className="ml-0.5 inline-flex items-center justify-center rounded p-0.5 hover:bg-black/10 focus-visible:outline-none"
+            >
+              <RefreshCw className={`h-2.5 w-2.5 ${syncing ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Live Capital & Risk Metrics Glance */}
+        <div className="flex items-center gap-4 text-[11px] tabular-nums font-mono">
+          <div><span style={{ color: "var(--sh-fg-muted)" }}>NAV: </span><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{money(equityCents) ?? "—"}</span></div>
+          <div><span style={{ color: "var(--sh-fg-muted)" }}>BP: </span><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{money(buyingPowerCents) ?? "—"}</span></div>
+          {unrealizedCents != null && (
+            <div>
+              <span style={{ color: "var(--sh-fg-muted)" }}>Unrealized: </span>
+              <span className="font-semibold" style={{ color: unrealizedCents >= 0 ? "var(--sh-emerald)" : "var(--sh-red)" }}>
+                {unrealizedCents >= 0 ? "+" : ""}{money(unrealizedCents)}
+              </span>
+            </div>
+          )}
+          <div><span style={{ color: "var(--sh-fg-muted)" }}>Util: </span><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{marginUtilPct}%</span></div>
+          {!compactOnly && (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls="cockpit-rail-detail"
+              aria-label={expanded ? "Hide instrument detail" : "Show instrument detail"}
+              onClick={changeExpanded}
+              className="flex items-center gap-1 rounded border px-2 py-1 text-[11px] font-sans font-medium transition-colors hover:bg-black/5"
+              style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}
+            >
+              <span>{expanded ? "Hide Rails" : "Rails / Ledger"}</span>
+              <ChevronDown className={`h-3 w-3 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Grid Row */}
+      <div className="grid min-h-11 gap-px" style={{ background: "var(--sh-border-1)" }}>
+        <div className="grid gap-px sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1.15fr]" style={{ background: "var(--sh-border-1)" }}>
+          <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: "var(--sh-surface)" }}>
+            <StateMark state={data.activeThesis ? "rule_qualified" : "unknown"} label="Active thesis" compact />
+            <span className="truncate text-xs font-semibold" title={data.activeThesis?.name ?? "No active thesis"} style={{ color: "var(--sh-text-primary)" }}>{data.activeThesis ? data.activeThesis.name : "Not assigned"}</span>
+            <RailHelp label="Explain active thesis">This is the canonical thesis selected for new missions. It is separate from holdings and account limits.</RailHelp>
+          </div>
+          <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: "var(--sh-surface)" }}>
+            <StateMark state={data.session.session === "unknown" ? "unknown" : "researchable"} label={data.session.session.replaceAll("_", " ")} compact />
+            <span className="truncate text-xs" style={{ color: "var(--sh-text-primary)" }}>· {data.session.nextBoundary?.label.toLowerCase() ?? "boundary —"}{boundaryMs != null ? ` ${duration(boundaryMs)}` : ""}</span>
+            <RailHelp label="Explain market boundary">Market timing context only; it is not a trade signal.</RailHelp>
+          </div>
+          <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: "var(--sh-surface)" }}>
+            <StateMark state={summary.accountStale ? "stale" : "rule_qualified"} label={data.account.label || "Paper account —"} compact />
+            <span className="truncate text-xs" style={{ color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-text-primary)" }}>· {staleText}</span>
+            <RailHelp label="Explain account freshness">Paper-account freshness controls the quality of measured ceilings. Every ceiling on this rail is measured against the equity value recorded at this sync.</RailHelp>
+          </div>
+          <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: summary.severity === "critical" ? "color-mix(in srgb, var(--sh-red) 5%, var(--sh-surface))" : "var(--sh-surface)" }}>
+            <StateMark state={summary.severity === "critical" ? "blocked" : summary.severity === "unmeasurable" ? "unknown" : "rule_qualified"} label="Portfolio constraint" compact />
+            <span className="min-w-0 truncate text-xs font-semibold" title={summary.binding ? `${summary.binding.label} · ${bindingSubject}` : "No measurable constraint"} style={{ color: "var(--sh-text-primary)" }}>{summary.binding ? bindingSubject : "Not measured"}</span>
+            <div className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full" style={{ background: "var(--sh-border-1)" }} role="progressbar" aria-label="Tightest constraint utilization" aria-valuemin={0} aria-valuemax={100} aria-valuenow={bindingUtilization} aria-valuetext={`${bindingUtilization.toFixed(0)}% used; ${bindingHeadroom.toFixed(0)}% headroom`}>
+              <div className="h-full rounded-full" style={{ width: `${bindingUtilization}%`, background: severityColor }} />
+            </div>
+            <BasisMark basis="measured" label={`${bindingUtilization.toFixed(0)}% / ${bindingHeadroom.toFixed(0)}%`} />
+            <RailHelp label={`Explain ${bindingSubject} headroom`}>{bindingThresholdText}</RailHelp>
+            <span className="font-mono text-[10px] tabular-nums font-semibold" style={{ color: severityColor }}>{bindingUtilization.toFixed(0)}% used</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Mobile Cockpit Header */}
     <div className="sm:hidden">
       <div className="flex min-h-11 items-center gap-2 border-b px-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
         <StateMark state="rule_qualified" label="Paper mode" compact />
@@ -130,18 +247,16 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
         {!compactOnly && <button type="button" aria-expanded={expanded} aria-controls="cockpit-rail-detail" aria-label={expanded ? "Hide instrument detail" : "Show instrument detail"} onClick={changeExpanded} className="min-h-11 shrink-0 rounded px-2 py-1 text-[11px] font-semibold" style={{ color: "var(--sh-text-primary)" }}>{expanded ? "Hide" : "Detail"}<ChevronDown className={`ml-1 inline h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} /></button>}
       </div>
     </div>
-    <div className="hidden sm:block">
-    <div className="flex min-h-11 items-center gap-2 border-b px-3 text-[11px]" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}><StateMark state="rule_qualified" label="Paper-only operator instrument" compact /><RailHelp label="Explain paper-only boundary">This operator surface records research context and human review. It does not submit an order.</RailHelp></div>
-    <div className="grid min-h-12 gap-px" style={{ background: "var(--sh-border-1)" }}>
-      <div className="grid gap-px sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1.15fr]" style={{ background: "var(--sh-border-1)" }}>
-        <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: "var(--sh-surface)" }}><StateMark state={data.activeThesis ? "rule_qualified" : "unknown"} label="Active thesis" compact /><span className="truncate text-xs font-semibold" title={data.activeThesis?.name ?? "No active thesis"} style={{ color: "var(--sh-text-primary)" }}>{data.activeThesis ? data.activeThesis.name : "Not assigned"}</span><RailHelp label="Explain active thesis">This is the canonical thesis selected for new missions. It is separate from holdings and account limits.</RailHelp></div>
-        <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: "var(--sh-surface)" }}><StateMark state={data.session.session === "unknown" ? "unknown" : "researchable"} label={data.session.session.replaceAll("_", " ")} compact /><span className="truncate text-xs" style={{ color: "var(--sh-text-primary)" }}>· {data.session.nextBoundary?.label.toLowerCase() ?? "boundary —"}{boundaryMs != null ? ` ${duration(boundaryMs)}` : ""}</span><RailHelp label="Explain market boundary">Market timing context only; it is not a trade signal.</RailHelp></div>
-        <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: "var(--sh-surface)" }}><StateMark state={summary.accountStale ? "stale" : "rule_qualified"} label={data.account.label || "Paper account —"} compact /><span className="truncate text-xs" style={{ color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-text-primary)" }}>· {staleText}</span><RailHelp label="Explain account freshness">Paper-account freshness controls the quality of measured ceilings. Every ceiling on this rail is measured against the equity value recorded at this sync.</RailHelp></div>
-        <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: summary.severity === "critical" ? "color-mix(in srgb, var(--sh-red) 5%, var(--sh-surface))" : "var(--sh-surface)" }}><StateMark state={summary.severity === "critical" ? "blocked" : summary.severity === "unmeasurable" ? "unknown" : "rule_qualified"} label="Portfolio constraint" compact /><span className="min-w-0 truncate text-xs font-semibold" title={summary.binding ? `${summary.binding.label} · ${bindingSubject}` : "No measurable constraint"} style={{ color: "var(--sh-text-primary)" }}>{summary.binding ? bindingSubject : "Not measured"}</span><div className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full" style={{ background: "var(--sh-border-1)" }} role="progressbar" aria-label="Tightest constraint utilization" aria-valuemin={0} aria-valuemax={100} aria-valuenow={bindingUtilization} aria-valuetext={`${bindingUtilization.toFixed(0)}% used; ${bindingHeadroom.toFixed(0)}% headroom`}><div className="h-full rounded-full" style={{ width: `${bindingUtilization}%`, background: severityColor }} /></div><BasisMark basis="measured" label={`${bindingUtilization.toFixed(0)}% / ${bindingHeadroom.toFixed(0)}%`} /><RailHelp label={`Explain ${bindingSubject} headroom`}>{bindingThresholdText}</RailHelp>{!compactOnly && <button type="button" aria-expanded={expanded} aria-controls="cockpit-rail-detail" aria-label={expanded ? "Hide instrument detail" : "Show instrument detail"} onClick={changeExpanded} className="min-h-11 rounded px-2 py-1 text-[11px] font-semibold sm:min-h-8" style={{ color: "var(--sh-text-primary)" }}>{expanded ? "Hide" : "Detail"}<ChevronDown className={`ml-1 inline h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} /></button>}</div>
+
+    {/* Critical Alert Bar: Streamlined & Non-bloating */}
+    {summary.severity === "critical" && (
+      <div className="flex items-center justify-between border-t px-4 py-1.5 text-[11px] leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 35%, var(--sh-border-1))", color: "var(--sh-red)", background: "color-mix(in srgb, var(--sh-red) 5%, var(--sh-surface))" }}>
+        <span>⚠️ {bindingSubject} uses {bindingUtilization.toFixed(0)}% of its ceiling, leaving {bindingHeadroom.toFixed(0)}%. New exposure that relies on {bindingSubject} is blocked; existing positions are unchanged.</span>
+        <button type="button" onClick={changeExpanded} className="ml-2 shrink-0 font-medium underline text-[10px]">
+          {expanded ? "Hide Details" : "Inspect Limits"}
+        </button>
       </div>
-    </div>
-    </div>
-    {summary.severity === "critical" && <div className="border-t px-4 py-1.5 text-[11px] leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 35%, var(--sh-border-1))", color: "var(--sh-red)" }}>{bindingSubject} uses {bindingUtilization.toFixed(0)}% of its ceiling, leaving {bindingHeadroom.toFixed(0)}%. New exposure that relies on {bindingSubject} is blocked; existing positions are unchanged.</div>}
+    )}
     {expanded && !compactOnly && <div id="cockpit-rail-detail">
     <div className="grid gap-px lg:grid-cols-3" style={{ background: "var(--sh-border-1)" }}>
       <div className="space-y-2 p-4" style={{ background: "var(--sh-surface)" }}><RailHead>Market clock</RailHead><div className="flex items-center gap-2"><Clock3 className="h-4 w-4" style={{ color: data.session.session === "unknown" ? "var(--sh-red)" : "var(--sh-signal)" }} /><p className="text-sm font-semibold capitalize" style={{ color: "var(--sh-text-primary)" }}>{data.session.session.replaceAll("_", " ")}</p></div>{data.session.unavailableReason ? <p className="text-xs leading-5" style={{ color: "var(--sh-red)" }}>{data.session.unavailableReason}</p> : <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.session.nextBoundary?.label ?? "No next boundary recorded"}{boundaryMs != null ? ` in ${duration(boundaryMs)}` : ""}{data.session.halfDay ? " · half day" : ""}</p>}</div>

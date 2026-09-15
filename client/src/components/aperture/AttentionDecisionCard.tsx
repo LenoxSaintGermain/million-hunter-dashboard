@@ -15,6 +15,27 @@ function evidenceUrl(value: string | undefined): string | undefined {
 /** Provenance stays one deliberate action away once it would dominate the card. */
 const INLINE_SOURCE_LIMIT = 3;
 
+function parseCatalystSummary(text: string | undefined) {
+  if (!text) return null;
+  const isEarnings = /earnings|q[1-4]\s*(?:results|report|release)|consensus|eps/i.test(text);
+  const isCatalyst = isEarnings || /catalyst|invalidation|fda|guidance|announcement|trial/i.test(text);
+  if (!isCatalyst) return null;
+
+  const daysMatch = text.match(/\bin\s+(\d+)\s+days?\b|\b(\d+)\s+days?\s+away\b|\b(\d+)d\b/i);
+  const days = daysMatch ? (daysMatch[1] ?? daysMatch[2] ?? daysMatch[3]) : null;
+  const dateMatch = text.match(/(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember))\s+\d{1,2}(?:,\s*\d{4})?/i);
+  const moveMatch = text.match(/[±+-]?\d+(?:\.\d+)?%/);
+  const epsMatch = text.match(/\$\d+(?:\.\d+)?\s*(?:consensus|EPS)?/i);
+
+  return {
+    isEarnings,
+    headline: isEarnings ? (days ? `Earnings in ${days}d` : "Earnings Catalyst") : "Event Catalyst",
+    date: dateMatch ? dateMatch[0] : null,
+    expectedMove: moveMatch ? moveMatch[0] : null,
+    consensusEps: epsMatch ? epsMatch[0] : null,
+  };
+}
+
 function sourceLinks(citations: string[]) {
   return citations.map((url, index) => evidenceUrl(url)
     ? <a key={`${index}:${url}`} href={evidenceUrl(url)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center break-all underline underline-offset-4" style={{ color: "var(--sh-signal)" }}>Source {index + 1}</a>
@@ -23,11 +44,29 @@ function sourceLinks(citations: string[]) {
 
 export function FindingEvidence({ evidence, label = "Evidence", expanded = false }: { evidence: NonNullable<ApertureAttentionItem["evidence"]>; label?: string; expanded?: boolean }) {
   const date = Number.isFinite(evidence.checkedAt) && Number.isFinite(new Date(evidence.checkedAt).getTime()) ? new Date(evidence.checkedAt).toLocaleString() : "Not recorded";
+  const catalyst = parseCatalystSummary(evidence.finding);
+
   return <details open={expanded || undefined} className="mt-2 border-t" style={{ borderColor: "var(--sh-border-1)" }}>
     <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">{label}</summary>
     <div className="space-y-3 pb-3 text-sm leading-6">
       <p>Recorded check: {date}. Opening evidence does not acknowledge or resolve this finding.</p>
       <p><strong>Selected-play rationale:</strong> {evidence.rationale ?? "Not included in this record. Inspect the selected play’s thesis before deciding; hedge intent is not assumed."}</p>
+      {catalyst && (
+        <div data-catalyst-summary className="rounded-lg border p-3 text-xs" style={{ background: "var(--sh-surface-2)", borderColor: "color-mix(in srgb, var(--sh-signal) 30%, var(--sh-border-1))" }}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: "color-mix(in srgb, var(--sh-signal) 15%, transparent)", color: "var(--sh-signal)" }}>
+              ⚠️ {catalyst.headline}
+            </span>
+            {catalyst.date && <span className="font-mono text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>{catalyst.date}</span>}
+          </div>
+          {(catalyst.expectedMove || catalyst.consensusEps) && (
+            <div className="mt-2 flex flex-wrap gap-4 text-xs font-mono">
+              {catalyst.expectedMove && <div><span style={{ color: "var(--sh-fg-muted)" }}>Expected Move: </span><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{catalyst.expectedMove}</span></div>}
+              {catalyst.consensusEps && <div><span style={{ color: "var(--sh-fg-muted)" }}>Consensus EPS: </span><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{catalyst.consensusEps}</span></div>}
+            </div>
+          )}
+        </div>
+      )}
       <div className="min-w-0 break-words [&_p]:my-2 [&_li]:ml-5 [&_ul]:list-disc [&_ol]:list-decimal"><Markdown
         rehypePlugins={[]}
         remarkPlugins={[]}

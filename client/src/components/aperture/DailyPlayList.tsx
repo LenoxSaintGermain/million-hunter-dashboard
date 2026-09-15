@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { ArrowRight, ChevronDown, CircleSlash2, FileSearch, GitCompareArrows, Loader2 } from "lucide-react";
+import { ArrowRight, ChevronDown, CircleSlash2, Compass, FileSearch, GitCompareArrows, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
@@ -159,7 +159,42 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
       <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Account mode</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{accountModeLabel}</p></div>
     </div></details>
 
-    <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><summary className="min-h-10 cursor-pointer px-4 py-3 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Why / correlated budget and provenance</summary><div className="border-t px-4 py-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Correlated planned-loss budget:</strong> {correlation?.usedCents != null && correlation.ceilingCents != null ? `${money(correlation.usedCents)} committed${correlation.subject ? ` in ${correlation.subject}` : ""} of ${money(correlation.ceilingCents)}.` : correlation?.reason ?? "Not measured."} Theme overlap is not assigned until factual preflight.</div></details>
+    {(() => {
+      const usedCents = correlation?.usedCents ?? 0;
+      const ceilingCents = correlation?.ceilingCents ?? 0;
+      const percentUsed = ceilingCents > 0 ? Math.min(100, Math.round((usedCents / ceilingCents) * 100)) : 0;
+      return <div className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <span className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Dynamic Risk Guardrail</span>
+            <p className="mt-0.5 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>
+              Cluster Risk Capacity {correlation?.subject ? `· ${correlation.subject}` : ""}
+            </p>
+          </div>
+          <div className="text-right">
+            <span className="font-mono text-sm font-bold tabular-nums" style={{ color: percentUsed > 85 ? "var(--sh-red)" : "var(--sh-text-primary)" }}>
+              {correlation?.usedCents != null && correlation.ceilingCents != null ? `${money(usedCents)} / ${money(ceilingCents)}` : "0% committed"}
+            </span>
+            <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-mono font-medium" style={{ background: percentUsed > 85 ? "color-mix(in srgb, var(--sh-red) 15%, transparent)" : "var(--sh-surface-2)", color: percentUsed > 85 ? "var(--sh-red)" : "var(--sh-fg-muted)" }}>
+              {percentUsed}% capacity
+            </span>
+          </div>
+        </div>
+        <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--sh-surface-2)" }}>
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={{
+              width: `${Math.max(2, percentUsed)}%`,
+              background: percentUsed > 85 ? "var(--sh-red)" : percentUsed > 50 ? "var(--sh-signal)" : "var(--sh-emerald)",
+            }}
+          />
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>
+          <span><strong style={{ color: "var(--sh-text-primary)" }}>Correlated planned-loss budget:</strong> {correlation?.usedCents != null && correlation.ceilingCents != null ? `${money(correlation.usedCents)} committed${correlation.subject ? ` in ${correlation.subject}` : ""} of ${money(correlation.ceilingCents)}.` : correlation?.reason ?? "No planned loss is committed in any cluster today."}</span>
+          <span>Theme overlap is not assigned until factual preflight.</span>
+        </div>
+      </div>;
+    })()}
 
     {runway?.latest?.branch === "cash" && <div className="flex gap-3 rounded-xl border px-4 py-3" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 5%, var(--sh-surface))" }}><CircleSlash2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Current decision</p><p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No new trade · $0 additional planned risk</p><p className="mt-0.5 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{runway.latest.reason ?? "A cash receipt is recorded for this mission."} Reopen: {currentCashReopen ?? "record a new revision"}. Existing positions and portfolio risk are unchanged.</p></div></div>}
     {decisionAnnouncement && <div role="status" className="rounded-lg border px-4 py-3 text-sm" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}><strong>{decisionAnnouncement === safeStatusError("comparison") ? "Request unconfirmed." : "Decision recorded."}</strong> {decisionAnnouncement}</div>}
@@ -168,7 +203,24 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
     {playsRefreshing && !isLoading && <p role="status" className="text-sm">Refreshing saved research records…</p>}
     {isLoading && <div role="status" className="flex items-center gap-2 py-6 text-sm" style={{ color: "var(--sh-fg-muted)" }}><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />Loading the saved research queue…</div>}
     {!isLoading && !playsError && playList != null && ranked.length === 0 && (playList.inMotionPlayCount ?? 0) > 0 && <div className="rounded-xl border p-5" style={{ borderColor: "color-mix(in srgb, var(--sh-emerald) 42%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-emerald)" }}>Already in motion</p><p className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{playList?.inMotionPlayCount} active or queued play{playList?.inMotionPlayCount === 1 ? "" : "s"}</p><p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>No new research candidate awaits a choice in this thesis queue. Review the briefing above for existing play decisions.</p></div><Button className="min-h-11 shrink-0" onClick={() => window.location.assign("/aperture/plays")}>Open Play Desk <ArrowRight className="ml-2 h-4 w-4" /></Button></div></div>}
-    {!isLoading && !playsError && playList != null && ranked.length === 0 && (playList.inMotionPlayCount ?? 0) === 0 && <div className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><p className="font-semibold">No research candidate awaiting a choice</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This queue covers the active thesis only. An empty queue does not record a cash decision or change existing positions.{playList.expiredPlayCount ? ` ${playList.expiredPlayCount} past-catalyst candidates are outside this queue.` : ""}</p></div>}
+    {!isLoading && !playsError && playList != null && ranked.length === 0 && (playList.inMotionPlayCount ?? 0) === 0 && <div className="rounded-xl border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>No research candidate awaiting a choice</p>
+          <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This queue covers the active thesis only. An empty queue does not record a cash decision or change existing positions.{playList.expiredPlayCount ? ` ${playList.expiredPlayCount} past-catalyst candidates are outside this queue.` : ""}</p>
+        </div>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Button variant="outline" size="sm" className="min-h-11" onClick={onNewResearch}><Sparkles className="mr-2 h-4 w-4" />Run screening</Button>
+          <Button variant="outline" size="sm" className="min-h-11" onClick={() => window.location.assign("/aperture/theses")}><Compass className="mr-2 h-4 w-4" />Switch thesis</Button>
+        </div>
+      </div>
+      <div className="mt-4 pt-4 border-t flex flex-wrap items-center gap-2" style={{ borderColor: "var(--sh-border-1)" }}>
+        <span className="text-xs font-medium" style={{ color: "var(--sh-fg-muted)" }}>Quick screening criteria:</span>
+        <button type="button" onClick={onNewResearch} className="rounded-md border px-2.5 py-1 text-xs font-medium hover:opacity-80 transition-opacity" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}>🔥 Near-term Catalyst (&lt;14d)</button>
+        <button type="button" onClick={onNewResearch} className="rounded-md border px-2.5 py-1 text-xs font-medium hover:opacity-80 transition-opacity" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}>⚡ High IV / Asymmetric</button>
+        <button type="button" onClick={onNewResearch} className="rounded-md border px-2.5 py-1 text-xs font-medium hover:opacity-80 transition-opacity" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}>🛡️ Correlated Macro Hedge</button>
+      </div>
+    </div>}
 
     {ranked.length > 0 && <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Queue order reflects readiness, then the nearest live catalyst deadline. It is not a predicted return ranking or a claim that the first play should be taken.</p>}
     <div className="space-y-3">

@@ -176,9 +176,14 @@ export function TodayAttentionBriefing({
       </div>
     </header>
 
-    {notice && <div data-status-notice role={read.state === "failed" ? "alert" : "status"} className="flex gap-3 p-4">
-      {!read.busy && <ShieldAlert aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-signal)" }} />}
-      <div><p className="font-semibold">{notice.title}</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{notice.detail}</p>{failedDetail && <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{failedDetail}</p>}</div>
+    {notice && <div data-status-notice role={read.state === "failed" ? "alert" : "status"} className="flex items-start sm:items-center gap-2.5 border-b px-4 py-2.5 text-xs" style={{ borderColor: "var(--sh-border-1)", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" }}>
+      {!read.busy && <ShieldAlert aria-hidden="true" className="mt-0.5 sm:mt-0 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} />}
+      <div className="flex-1 min-w-0 sm:flex sm:items-center sm:gap-2">
+        <p className="font-semibold shrink-0" style={{ color: "var(--sh-text-primary)" }}>{notice.title}</p>
+        <span className="hidden sm:inline" style={{ color: "var(--sh-fg-muted)" }}>·</span>
+        <p className="truncate" style={{ color: "var(--sh-fg-muted)" }}>{notice.detail}</p>
+        {failedDetail && <p className="mt-1 sm:mt-0" style={{ color: "var(--sh-signal)" }}>{failedDetail}</p>}
+      </div>
     </div>}
 
     {attention && <>
