@@ -587,15 +587,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, isAuthenticated, logout } = useAuth();
   const userRole = (user as any)?.role as string | undefined;
 
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location]);
+
   // Capital Aperture is an operator-only workspace, but it should feel like one
   // coherent Signal Hunter product rather than the legacy sidebar application.
   if (location.startsWith("/aperture")) {
     return <ApertureShell>{children}</ApertureShell>;
   }
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location]);
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--surface-container, #182028)" }}>

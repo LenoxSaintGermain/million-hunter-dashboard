@@ -81,6 +81,51 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
     preferenceApplied.current = true;
     setExpanded(preference.data.expanded);
   }, [compactOnly, preference.data]);
+  const deskQuery = (trpc.aperture as any)?.desk?.summary?.useQuery ? (trpc.aperture as any).desk.summary.useQuery(undefined, { retry: false, refetchOnWindowFocus: false }) : { data: null };
+  const syncMutation = (trpc.aperture as any)?.account?.sync?.useMutation ? (trpc.aperture as any).account.sync.useMutation({
+    onSuccess: () => {
+      cockpitQuery.refetch();
+      accountQuery.refetch();
+    },
+  }) : null;
+
+  const [syncing, setSyncing] = useState(false);
+  const utils = typeof (trpc as any).useUtils === "function" ? (trpc as any).useUtils() : null;
+  const activeThesisQuery = (trpc as any).thesis?.activeCapital?.useQuery
+    ? (trpc as any).thesis.activeCapital.useQuery()
+    : { data: null };
+  const thesesListQuery = (trpc as any).aperture?.thesis?.list?.useQuery
+    ? (trpc as any).aperture.thesis.list.useQuery()
+    : { data: [] };
+  const activateThesis = (trpc as any).aperture?.thesis?.activate?.useMutation
+    ? (trpc as any).aperture.thesis.activate.useMutation({
+        onSuccess: async (data: any) => {
+          if (utils) {
+            await Promise.all([
+              utils.aperture?.invalidate?.(),
+              utils.thesis?.invalidate?.(),
+            ]);
+          }
+          toast.success(`Active focus switched to "${data?.name ?? "selected thesis"}"`);
+        },
+        onError: (err: any) => toast.error(`Failed to switch thesis: ${err.message}`),
+      })
+    : null;
+
+  const handleRapidSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      if (preferredAccountId && syncMutation?.mutateAsync) {
+        await syncMutation.mutateAsync({ id: preferredAccountId });
+      } else {
+        await Promise.allSettled([cockpitQuery.refetch(), accountQuery.refetch()]);
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if ((!runId && accountQuery.error) || cockpitQuery.error) return <section role="alert" className="mb-5 rounded-xl border px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><p className="text-sm">Paper account constraints could not be verified. This is not a zero-risk or no-account state.</p><button type="button" className="mt-2 min-h-11 rounded border px-3 text-sm" onClick={() => { void accountQuery.refetch(); void cockpitQuery.refetch(); }}>Retry account context</button></section>;
   if ((!runId && accountQuery.isLoading) || isLoading || !data || !summary) return <section role="status" className="mb-5 animate-pulse motion-reduce:animate-none rounded-xl border px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Loading paper-research context…</span></section>;
 
@@ -117,29 +162,6 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
     ? `${bindingSubject} uses ${money(summary.binding.usedCents)} of ${money(summary.binding.ceilingCents)}. Remaining headroom: ${money(Math.max(0, bindingRemainingCents ?? 0))}. Once exhausted, ${bindingSubject} must fall below ${money(summary.binding.ceilingCents)} to unlock more. Any higher ceiling must be changed in account governance.`
     : "No measurable running ceiling is available for this account.";
 
-  const deskQuery = (trpc.aperture as any)?.desk?.summary?.useQuery ? (trpc.aperture as any).desk.summary.useQuery(undefined, { retry: false, refetchOnWindowFocus: false }) : { data: null };
-  const syncMutation = (trpc.aperture as any)?.account?.sync?.useMutation ? (trpc.aperture as any).account.sync.useMutation({
-    onSuccess: () => {
-      cockpitQuery.refetch();
-      accountQuery.refetch();
-    },
-  }) : null;
-
-  const [syncing, setSyncing] = useState(false);
-  const handleRapidSync = async () => {
-    if (syncing) return;
-    setSyncing(true);
-    try {
-      if (preferredAccountId && syncMutation?.mutateAsync) {
-        await syncMutation.mutateAsync({ id: preferredAccountId });
-      } else {
-        await Promise.allSettled([cockpitQuery.refetch(), accountQuery.refetch()]);
-      }
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const equityCents = data.account.equityValueCents;
   const cashCents = data.account.cashCents;
   const buyingPowerCents = data.account.buyingPowerCents ?? cashCents;
@@ -147,28 +169,6 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
     ? Math.max(0, Math.min(100, ((equityCents - cashCents) / equityCents) * 100)).toFixed(1)
     : "0.0";
   const unrealizedCents = deskQuery.data?.account?.unrealizedPnlCents ?? null;
-
-  const utils = typeof (trpc as any).useUtils === "function" ? (trpc as any).useUtils() : null;
-  const activeThesisQuery = (trpc as any).thesis?.activeCapital?.useQuery
-    ? (trpc as any).thesis.activeCapital.useQuery()
-    : { data: null };
-  const thesesListQuery = (trpc as any).aperture?.thesis?.list?.useQuery
-    ? (trpc as any).aperture.thesis.list.useQuery()
-    : { data: [] };
-  const activateThesis = (trpc as any).aperture?.thesis?.activate?.useMutation
-    ? (trpc as any).aperture.thesis.activate.useMutation({
-        onSuccess: async (data: any) => {
-          if (utils) {
-            await Promise.all([
-              utils.aperture?.invalidate?.(),
-              utils.thesis?.invalidate?.(),
-            ]);
-          }
-          toast.success(`Active focus switched to "${data?.name ?? "selected thesis"}"`);
-        },
-        onError: (err: any) => toast.error(`Failed to switch thesis: ${err.message}`),
-      })
-    : null;
 
   return <section className="mb-5 overflow-hidden rounded-xl border shadow-sm" style={{ borderColor: summary.severity === "critical" ? severityColor : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
     {/* Executive Cockpit Ticker Tape (Desktop) */}

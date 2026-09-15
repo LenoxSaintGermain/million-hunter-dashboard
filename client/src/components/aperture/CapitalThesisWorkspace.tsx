@@ -121,12 +121,12 @@ export function CapitalThesisWorkspace() {
     try {
       const result = await createCapital.mutateAsync({ thesisText: detailedThesisText(), name: draftName.trim() || undefined, details: { ...detail } });
       toast.success(`Saved exactly as “${result.persistedName}”`, { description: openMission ? "Opening Capital Mission." : `Canonical thesis #${result.compilationId}` });
-      if (openMission) await useInMissionFor(result.compilationId);
+      if (openMission) await openMissionFor(result.compilationId);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "No save confirmation was received.");
     }
   };
-  const useInMissionFor = async (compilationId: number) => {
+  const openMissionFor = async (compilationId: number) => {
     setMissionError(null);
     try {
       await activate.mutateAsync({ compilationId });
@@ -161,7 +161,7 @@ export function CapitalThesisWorkspace() {
       setMissionError(error instanceof Error ? error.message : "This thesis could not be bound to a Capital Mission. Review its type and try again.");
     }
   };
-  const useInMission = async () => { if (selected) await useInMissionFor(selected.id); };
+  const useInMission = async () => { if (selected) await openMissionFor(selected.id); };
 
   const alternatives = capitalTheses.filter((thesis: any) => thesis.id !== selected?.id);
   const visibleAlternatives = showMore ? alternatives : alternatives.slice(0, 3);

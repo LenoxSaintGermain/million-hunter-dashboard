@@ -41,10 +41,10 @@ export default function ApertureDeploy() {
   const [asked, setAsked] = useState(false);
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
 
-  const quickHitQuery = trpc.aperture.quickHit?.catalog?.useQuery;
-  const quickHitCatalog = quickHitQuery
-    ? quickHitQuery({ budgetUsd: quickHitBudget }, { enabled: deployMode === "quick_hits" })
-    : { data: [], isLoading: false };
+  const quickHitCatalog = trpc.aperture.quickHit.catalog.useQuery(
+    { budgetUsd: quickHitBudget },
+    { enabled: deployMode === "quick_hits" }
+  );
 
   const amountCents = Math.round(Number(amount.replace(/[^0-9.]/g, "")) * 100);
   const amountValid = Number.isFinite(amountCents) && amountCents > 0;
