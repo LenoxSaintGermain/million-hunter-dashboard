@@ -237,4 +237,51 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - Vitest focused test suite: 4 test files, 56/56 passing. Full Aperture suite: 160 files, 2,237 tests passing.
 - Rollback revision: `capital-aperture-00184-vuv`.
 
+## 2026-09-15 Production Ship: UAT Thesis Closures & Flank Radar Master-Detail UX
+
+- Branch: `codex/aperture-play-desk`.
+- Deployed source: `c00bcb6` (`c00bcb6921319c5c7d85317b2049e49339e76741`).
+- Release marker: `c00bcb6-uat-c06a799a`.
+- Cloud Build: `1965baf0-865f-4eaa-99a1-3915e743b119` — `SUCCESS` (4M19S).
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:c00bcb6-uat-c06a799a`.
+- Image digest: `sha256:156d862ffe24f44fd31c52a9fc93a524ac7d9191b0b6c20679ab4c33e6f6b793`.
+- Ready revision: `capital-aperture-00188-jej`, serving 100% of Cloud Run traffic.
+- Traffic tag: `uat-c06a799a` (`https://uat-c06a799a---capital-aperture-oxiyp4dcpq-uc.a.run.app`).
+- Public production URLs:
+  - `https://third-signal-capital-aperture.web.app`
+  - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app`
+- Client bundle: `index-B3bRVbU_.js`.
+- UAT feedback & UX refinements addressed:
+  1. **Reactive State Invalidation & Flank Status**:
+     - Added `listAll` endpoint in `server/aperture/monitoringReviewReceipt.ts`.
+     - Bound header count and radar row status to reactive resolution state (`resolvedFindingVersions`).
+     - Header badge reactively transitions to emerald `"ALL CHECKS INTACT"` when all findings are reviewed.
+     - Lower section banner decrements reactively upon receipt creation, transitioning to `"All open checks reviewed · Thesis boundaries intact"`.
+     - Radar table rows transition to emerald bullet with status `"Reviewed / Intact"` and bias `"Intact"`.
+  2. **Typography Cleanup & Greek Metrics Grid**:
+     - Stripped unparsed LaTeX `$` delimiters from `PositionSummaryBar.tsx`, rendering clean Unicode `Δ +0.48` and `Daily Θ Burn: -$4.80/day`.
+  3. **Unified Cockpit Header & Visual Range Bar**:
+     - Added unified dynamic posture badge directly in the cockpit header:
+       `STATUS: ACTIVE · BIAS: BULLISH ACCELERATION · THREAT: FOMC RATE HIKE (MONITORING)`
+     - Replaced flat text meter with a visual **Horizontal Milestone Range Bar**:
+       `[Stop $38.50] --------● ($41.20 | +7.0% Headroom) ---------------- [Target $48.00]`
+  4. **Radical Progressive Disclosure for Citations**:
+     - Replaced 15 individual pills with a single quiet link in `AttentionDecisionCard.tsx`: `Sourced from 15 market feeds ▾`.
+  5. **Master-Detail Layout Over Infinite Vertical Stacking**:
+     - Implemented 12-column responsive Master-Detail split pane in `ApertureExecute.tsx`:
+       - **Left Pane (5 cols)**: Tactical Flank Radar matrix with interactive active selection highlight and check runner.
+       - **Right Pane (7 cols)**: Focused flank inspector card with Direct Risk Boundary Assessment card, citation disclosure, and review action bar.
+  6. **Primary Decision Actions Hierarchy**:
+     - Elevated `"Maintain Thesis & Clear Review"` to solid primary emerald button styling.
+     - Kept contingent paths (`"Hedge / Adjust"`, `"Take Profit / Exit"`) in secondary outlined actions.
+- Validation:
+  - `system.health` returned `ok: true`.
+  - Served bundle `index-B3bRVbU_.js` verified live with `c00bcb6-uat-c06a799a`, `"Maintain Thesis & Clear Review"`, and `"ALL CHECKS INTACT"`.
+  - Typecheck `DATABASE_URL= pnpm check`: 0 errors.
+  - Vitest aperture suite: 6 test files, 57/57 tests passing (100%).
+- Remaining risk:
+  - None identified for this release; rollback revision remains ready.
+- Rollback revision: `capital-aperture-00186-lec`.
+
+
 
