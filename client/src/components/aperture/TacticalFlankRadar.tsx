@@ -176,125 +176,92 @@ export function TacticalFlankRadar({
         )}
       </div>
 
-      {/* Synthesis Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b text-[11px] font-semibold" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
-              <th className="py-2 pr-3 w-36">FLANK CATEGORY</th>
-              <th className="py-2 pr-3 w-32">CURRENT STATE</th>
-              <th className="py-2 pr-3">COCKPIT SYNTHESIS</th>
-              <th className="py-2 pr-3 w-32">IMPACT / BIAS</th>
-              <th className="py-2 text-right w-20">ACTION</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y" style={{ borderColor: "var(--sh-border-1)" }}>
-            {rows.map((row) => {
-              const isSelected = selectedKey === row.key;
-              const isFlagged = row.state === "Needs review";
-              const isReviewed = row.state === "Reviewed / Intact";
-              const isIntact = row.bias === "Intact";
-              const isWatch = row.bias.includes("Watch");
+      {/* Master Flank Navigation List */}
+      <div className="space-y-2">
+        {rows.map((row) => {
+          const isSelected = selectedKey === row.key;
+          const isFlagged = row.state === "Needs review";
+          const isReviewed = row.state === "Reviewed / Intact";
 
-              return (
-                <tr
-                  key={row.key}
-                  onClick={() => onSelectFlank?.(row.key)}
-                  className={`cursor-pointer transition-colors ${
-                    isSelected
-                      ? "bg-primary/10 border-l-4 border-l-primary"
-                      : "hover:bg-muted/20"
-                  }`}
-                >
-                  {/* Category */}
-                  <td className="py-2.5 pr-3 font-semibold">
-                    <div className="flex items-center gap-1.5">
-                      {row.icon}
-                      <span style={{ color: "var(--sh-text-primary)" }}>{row.category}</span>
-                    </div>
-                  </td>
-
-                  {/* Current State */}
-                  <td className="py-2.5 pr-3">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`h-2 w-2 rounded-full shrink-0 ${
-                          isFlagged
-                            ? "bg-amber-500 animate-pulse"
-                            : isReviewed
-                            ? "bg-emerald-500"
-                            : row.state === "Not verified"
-                            ? "bg-gray-400"
-                            : "bg-emerald-500/70"
-                        }`}
-                      />
-                      <span
-                        className={
-                          isFlagged
-                            ? "font-bold text-amber-500"
-                            : isReviewed
-                            ? "font-semibold text-emerald-400"
-                            : "text-muted-foreground"
-                        }
-                      >
-                        {row.state}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* Cockpit Synthesis */}
-                  <td className="py-2.5 pr-3 text-xs leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>
-                    {row.synthesis}
-                  </td>
-
-                  {/* Impact / Bias Badge */}
-                  <td className="py-2.5 pr-3">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-tight ${
-                        isFlagged
-                          ? "bg-rose-500/15 text-rose-400 border border-rose-500/30"
-                          : isReviewed || isIntact
-                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                          : isWatch
-                          ? "bg-blue-500/15 text-blue-400 border border-blue-500/30"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {row.bias}
-                    </span>
-                  </td>
-
-                  {/* Action */}
-                  <td className="py-2.5 text-right">
-                    {row.check && order && candidate && onOpenFinding ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenFinding(
-                            monitoringFindingHref({
-                              ...row.check!,
-                              runId,
-                              candidateId: candidate.id,
-                              orderId: order.id,
-                            })
-                          );
-                        }}
-                        className="h-7 px-2 text-xs font-medium text-primary hover:text-primary hover:bg-primary/10 gap-1"
-                      >
-                        <span>Inspect</span>
-                        <ArrowRight className="h-3 w-3" />
-                      </Button>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground">—</span>
-                    )}
-                  </td>
-                </tr>
+          const handleSelect = () => {
+            onSelectFlank?.(row.key);
+            if (row.check && order && candidate && onOpenFinding) {
+              onOpenFinding(
+                monitoringFindingHref({
+                  ...row.check,
+                  runId,
+                  candidateId: candidate.id,
+                  orderId: order.id,
+                })
               );
-            })}
-          </tbody>
-        </table>
+            }
+          };
+
+          return (
+            <div
+              key={row.key}
+              role="button"
+              tabIndex={0}
+              onClick={handleSelect}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleSelect();
+                }
+              }}
+              className={`group relative rounded-xl border p-3 transition-all text-left cursor-pointer select-none ${
+                isSelected
+                  ? "border-primary/60 bg-primary/10 shadow-sm ring-1 ring-primary/30 border-l-4 border-l-primary"
+                  : "border-border/60 hover:bg-muted/30 hover:border-border"
+              }`}
+            >
+              {/* Top Row: Icon + Category Name + Status Badge */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 rounded-md bg-muted/40 group-hover:bg-muted/70 transition-colors">
+                    {row.icon}
+                  </div>
+                  <span className="text-xs font-bold tracking-tight text-foreground">
+                    {row.category}
+                  </span>
+                </div>
+
+                {isFlagged ? (
+                  <Badge variant="destructive" className="text-[10px] font-mono px-2 py-0.5 font-bold bg-amber-500/15 text-amber-500 border border-amber-500/40 animate-pulse">
+                    ● NEEDS REVIEW
+                  </Badge>
+                ) : isReviewed ? (
+                  <Badge variant="outline" className="text-[10px] font-mono px-2 py-0.5 font-bold border-emerald-500/40 bg-emerald-500/15 text-emerald-400">
+                    ✓ REVIEWED · INTACT
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-[10px] font-mono px-2 py-0.5 font-medium text-muted-foreground border border-border/40">
+                    INTACT
+                  </Badge>
+                )}
+              </div>
+
+              {/* Subtitle / Excerpt: Bias pill + Truncated headline snippet */}
+              <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium font-mono shrink-0 ${
+                    isFlagged
+                      ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                      : isReviewed
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      : "bg-muted/40 text-muted-foreground border border-border/30"
+                  }`}>
+                    {row.bias}
+                  </span>
+                  <span className="truncate text-[11px] text-muted-foreground leading-normal" title={row.synthesis}>
+                    {row.synthesis}
+                  </span>
+                </div>
+                <ArrowRight className={`h-3 w-3 shrink-0 transition-transform ${isSelected ? "text-primary translate-x-0.5" : "text-muted-foreground/40 group-hover:text-foreground group-hover:translate-x-0.5"}`} />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

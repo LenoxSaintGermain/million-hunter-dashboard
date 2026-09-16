@@ -79,4 +79,30 @@ export function registerFirebaseAuthRoutes(app: Express) {
       res.status(message.startsWith("This email") ? 409 : 401).json({ error: message });
     }
   });
+
+  // Proxy /__/auth/* to Firebase Hosting auth handler so direct Cloud Run domain can also run same-origin auth
+  app.all("/__/auth/*", async (req, res) => {
+    const upstreamUrl = `https://third-signal-v2.firebaseapp.com${req.originalUrl || req.url}`;
+    try {
+      const response = await fetch(upstreamUrl, {
+        method: req.method,
+        headers: {
+          accept: req.headers.accept || "*/*",
+          "user-agent": req.headers["user-agent"] || "",
+        },
+      });
+      res.status(response.status);
+      response.headers.forEach((val, key) => {
+        const lower = key.toLowerCase();
+        if (lower !== "content-encoding" && lower !== "transfer-encoding") {
+          res.setHeader(key, val);
+        }
+      });
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.send(buffer);
+    } catch (err) {
+      console.error("[FirebaseAuthProxy] failed to proxy:", err);
+      res.status(502).send("Auth proxy error");
+    }
+  });
 }

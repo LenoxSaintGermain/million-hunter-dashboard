@@ -552,11 +552,11 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
           >
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold tracking-tight uppercase" style={{ color: "var(--sh-fg-muted)" }}>
-                {isFocusedHistorical ? "Selected historical finding" : "Focused Flank Inspection"} · {monitoringFindingPresentation({ check: focusedCheck, instrument: order }).stateLabel}
+                {isFocusedHistorical ? "Selected historical finding" : "Focused Flank Inspection"} · {isCheckResolved(focusedCheck) ? "Reviewed · Intact" : monitoringFindingPresentation({ check: focusedCheck, instrument: order }).stateLabel}
               </p>
               {isCheckResolved(focusedCheck) && (
                 <Badge variant="outline" className="text-xs border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
-                  Reviewed · Intact
+                  ✓ Verified Intact
                 </Badge>
               )}
             </div>
@@ -585,6 +585,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
               onRefresh={canCheck ? runScopedChecks : undefined}
               refreshing={runCheck.isPending}
               hideImplication={true}
+              isResolved={isCheckResolved(focusedCheck)}
             />
 
             {order && candidate && (
@@ -626,6 +627,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
                     onRefresh={canCheck ? runScopedChecks : undefined}
                     refreshing={runCheck.isPending}
                     hideImplication={true}
+                    isResolved={isCheckResolved(check)}
                   />
                   {order && candidate && (
                     <Button

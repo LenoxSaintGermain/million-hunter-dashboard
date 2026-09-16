@@ -86,67 +86,85 @@ export function MonitoringFindingReview({
     {receipts.isLoading && <p className="mt-2 text-sm" role="status">Loading saved review…</p>}
     {receipts.isError && <div className="mt-2 text-sm" role="alert"><p>Saved reviews could not load. No new review has been confirmed.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void receipts.refetch()}>Reload saved review</Button></div>}
 
-    {/* Primary Decision Hierarchy */}
-    <div className="mt-3 rounded-lg border p-3.5 space-y-2.5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-      <p className="text-[11px] font-bold tracking-tight uppercase" style={{ color: "var(--sh-fg-muted)" }}>Primary Decision Actions</p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-        {/* Action 1: Maintain Thesis & Clear Review (Primary Solid Action) */}
-        <Button
-          type="button"
-          className="h-auto py-2.5 px-3 flex flex-col items-start gap-1 text-left bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-sm border border-emerald-500"
-          disabled={record.isPending || !receipts.data || receipts.isError}
-          onClick={() => {
-            const resolveNote = "Sign Off / Maintain: Operator verified catalyst condition; thesis and risk parameters remain intact.";
-            request.current = { ...target, decision: "resolved", note: resolveNote, requestId: crypto.randomUUID() };
-            setDecision("resolved");
-            setNote(resolveNote);
-            record.mutate(request.current);
-          }}
-        >
-          <div className="flex items-center gap-1.5 font-bold text-xs text-white">
-            <ShieldCheck className="h-4 w-4" />
-            <span>Maintain Thesis & Clear Review</span>
-          </div>
-          <span className="text-[10px] text-emerald-100 leading-tight">Sign Off / Maintain · Acknowledge & clear</span>
-        </Button>
-
-        {/* Action 2: Hedge / Adjust (Secondary Action) */}
-        <Button
-          type="button"
-          variant="outline"
-          className="h-auto py-2.5 px-3 flex flex-col items-start gap-1 text-left border-amber-500/40 hover:bg-amber-500/10 hover:border-amber-500"
-          onClick={onHedge}
-        >
-          <div className="flex items-center gap-1.5 font-semibold text-xs text-amber-500">
-            <Layers className="h-3.5 w-3.5" />
-            <span>Hedge / Adjust</span>
-          </div>
-          <span className="text-[10px] text-muted-foreground leading-tight">Spread or delta hedge</span>
-        </Button>
-
-        {/* Action 3: Take Profit / Cut Loss (Secondary Action) */}
-        <Button
-          type="button"
-          variant="outline"
-          className="h-auto py-2.5 px-3 flex flex-col items-start gap-1 text-left border-primary/40 hover:bg-primary/10 hover:border-primary"
-          onClick={onExit}
-        >
-          <div className="flex items-center gap-1.5 font-semibold text-xs text-primary">
-            <DollarSign className="h-3.5 w-3.5" />
-            <span>Take Profit / Exit</span>
-          </div>
-          <span className="text-[10px] text-muted-foreground leading-tight">Route instant paper exit</span>
-        </Button>
+    {latest && !editing ? <div className="mt-3 rounded-lg border p-4 space-y-2.5" style={{ borderColor: latest.decision === "resolved" ? "rgba(52, 211, 153, 0.3)" : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+      <div className="flex items-center justify-between">
+        <p role="status" className="text-sm font-semibold">Review saved · {latest.decision === "needs_fresh_evidence" ? "Needs fresh evidence" : latest.decision === "resolved" ? "Closed" : "Concern kept open"}</p>
+        {latest.decision === "resolved" && (
+          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+            ✓ INTACT
+          </span>
+        )}
       </div>
-    </div>
-    {latest && !editing ? <div className="mt-3 space-y-2">
-      <p role="status" className="text-sm font-semibold">Review saved · {latest.decision === "needs_fresh_evidence" ? "Needs fresh evidence" : latest.decision === "resolved" ? "Closed" : "Concern kept open"}</p>
-      <p className="text-sm">{latest.note}</p>
+      <div className="rounded border p-2.5 text-xs font-mono" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+        <p className="text-sm font-sans">{latest.note}</p>
+      </div>
       <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{new Date(latest.reviewedAt).toLocaleString()} · No check was scheduled or order changed.{latest.decision === "resolved" ? " This version has left your attention list. A later check that flags again will return." : ""}</p>
-      <Button variant="outline" className="min-h-11" onClick={() => { request.current = null; setDecision(""); setNote(""); setPendingPreset(null); setDraftNotice(""); record.reset(); setEditing(true); }}>Record another review</Button>
-    </div> : <div className="mt-3 space-y-3">
-      <fieldset disabled={record.isPending || uncertain || !receipts.data || receipts.isError} className="space-y-2">
-        <legend className="mb-2 text-sm font-semibold">What is your assessment?</legend>
+      <div className="pt-1 flex items-center gap-2">
+        <Button variant="outline" className="min-h-11" onClick={() => { request.current = null; setDecision(""); setNote(""); setPendingPreset(null); setDraftNotice(""); record.reset(); setEditing(true); }}>Record another review</Button>
+        {onExit && (
+          <Button variant="ghost" className="min-h-11 text-xs text-muted-foreground hover:text-foreground" onClick={onExit}>
+            Exit position
+          </Button>
+        )}
+      </div>
+    </div> : <>
+      {/* Primary Decision Hierarchy */}
+      <div className="mt-3 rounded-lg border p-3.5 space-y-2.5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <p className="text-[11px] font-bold tracking-tight uppercase" style={{ color: "var(--sh-fg-muted)" }}>Primary Decision Actions</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {/* Action 1: Maintain Thesis & Clear Review (Primary Solid Action) */}
+          <Button
+            type="button"
+            className="h-auto py-2.5 px-3 flex flex-col items-start gap-1 text-left bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-sm border border-emerald-500"
+            disabled={record.isPending || !receipts.data || receipts.isError}
+            onClick={() => {
+              const resolveNote = "Sign Off / Maintain: Operator verified catalyst condition; thesis and risk parameters remain intact.";
+              request.current = { ...target, decision: "resolved", note: resolveNote, requestId: crypto.randomUUID() };
+              setDecision("resolved");
+              setNote(resolveNote);
+              record.mutate(request.current);
+            }}
+          >
+            <div className="flex items-center gap-1.5 font-bold text-xs text-white">
+              <ShieldCheck className="h-4 w-4" />
+              <span>Maintain Thesis & Clear Review</span>
+            </div>
+            <span className="text-[10px] text-emerald-100 leading-tight">Sign Off / Maintain · Acknowledge & clear</span>
+          </Button>
+
+          {/* Action 2: Hedge / Adjust (Secondary Action) */}
+          <Button
+            type="button"
+            variant="outline"
+            className="h-auto py-2.5 px-3 flex flex-col items-start gap-1 text-left border-amber-500/40 hover:bg-amber-500/10 hover:border-amber-500"
+            onClick={onHedge}
+          >
+            <div className="flex items-center gap-1.5 font-semibold text-xs text-amber-500">
+              <Layers className="h-3.5 w-3.5" />
+              <span>Hedge / Adjust</span>
+            </div>
+            <span className="text-[10px] text-muted-foreground leading-tight">Spread or delta hedge</span>
+          </Button>
+
+          {/* Action 3: Take Profit / Cut Loss (Secondary Action) */}
+          <Button
+            type="button"
+            variant="outline"
+            className="h-auto py-2.5 px-3 flex flex-col items-start gap-1 text-left border-primary/40 hover:bg-primary/10 hover:border-primary"
+            onClick={onExit}
+          >
+            <div className="flex items-center gap-1.5 font-semibold text-xs text-primary">
+              <DollarSign className="h-3.5 w-3.5" />
+              <span>Take Profit / Exit</span>
+            </div>
+            <span className="text-[10px] text-muted-foreground leading-tight">Route instant paper exit</span>
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-3">
+        <fieldset disabled={record.isPending || uncertain || !receipts.data || receipts.isError} className="space-y-2">
+          <legend className="mb-2 text-sm font-semibold">What is your assessment?</legend>
         {([
           ["resolved", "Closed — I have dealt with this", "Removes it from your attention list. A later check that flags again comes back."],
           ["reviewed_unresolved", "Still open — I have read it", "Stays on your list. Use this when you have looked but nothing is settled."],
@@ -171,7 +189,7 @@ export function MonitoringFindingReview({
       <Button className="min-h-11 w-full sm:w-auto" disabled={record.isPending || !!pendingPreset || (!uncertain && (!decision || note.trim().length < 10 || !receipts.data || receipts.isError))} onClick={submit}>{record.isPending ? "Saving review…" : uncertain ? "Retry same review" : "Save review"}</Button>
       {pendingPreset && <p className="text-sm">Choose which note to keep before saving.</p>}
       {!decision || note.trim().length < 10 ? <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Choose an assessment and add a reason (at least 10 characters).</p> : null}
-    </div>}
+    </div></>}
     {(receipts.data?.receipts.length ?? 0) > 1 && <details className="mt-3 border-t"><summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">Earlier reviews of this version</summary><ul className="space-y-2 text-sm">{receipts.data!.receipts.slice(0, -1).map(receipt => <li key={receipt.requestId}>{new Date(receipt.reviewedAt).toLocaleString()} · {receipt.note}</li>)}</ul></details>}
   </section>;
 }
