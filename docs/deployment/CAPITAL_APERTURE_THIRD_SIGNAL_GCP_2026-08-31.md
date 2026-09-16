@@ -283,5 +283,45 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - None identified for this release; rollback revision remains ready.
 - Rollback revision: `capital-aperture-00186-lec`.
 
+## 2026-09-16 Production Ship: Mobile Safari Storage Partitioning Fix & Flank Radar Master-Detail UX Overhaul
+
+- Branch: `codex/aperture-play-desk`.
+- Deployed source: `e121a72` (`e121a72f7ff0dca87d8df661338a08ff81e3a6c5`).
+- Release marker: `e121a72-uat-4bdfbeaf`.
+- Cloud Build: `e81d724e-12db-4deb-aa13-bd35a06be80a` — `SUCCESS` (4M25S).
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:e121a72-uat-4bdfbeaf`.
+- Image digest: `sha256:0ad940550c46ce6a8845a0f79f7f92d77f05ba3d43f778797a678ac097b2ed83`.
+- Ready revision: `capital-aperture-00190-zed`, serving 100% of Cloud Run traffic.
+- Traffic tag: `uat-4bdfbeaf` (`https://uat-4bdfbeaf---capital-aperture-oxiyp4dcpq-uc.a.run.app`).
+- Public production URLs:
+  - `https://third-signal-capital-aperture.web.app`
+  - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app`
+- Client bundle: `index-BqTemANF.js`.
+- Issues & UAT Refinements Resolved:
+  1. **Mobile Safari Authentication (Storage Partitioning / ITP Fix)**:
+     - Root Cause: Safari ITP isolated `sessionStorage` during cross-origin redirect to `third-signal-v2.firebaseapp.com` from `third-signal-capital-aperture.web.app`, causing `"Unable to process request due to missing initial state"`.
+     - Added `resolveAuthDomain()` in `client/src/lib/firebaseAuth.ts` dynamically binding `authDomain` to `window.location.host` for true same-origin authentication.
+     - Added Identity Platform authorized domains: `third-signal-capital-aperture.firebaseapp.com` and `third-signal-capital-aperture.web.app`.
+     - Added server-side reverse proxy for `/__/auth/*` in `server/_core/firebaseAuth.ts` so direct Cloud Run traffic also supports same-origin auth.
+  2. **Tactical Flank Radar Master-Detail Redesign**:
+     - Eliminated cramped 5-column HTML table that forced paragraph synthesis text into 2-word-per-line vertical ribbons in the 40% master pane.
+     - Replaced with a sleek **Master Flank Navigation List**: 4 interactive card rows with category icon, title, high-contrast status badge (`✓ REVIEWED · INTACT` / `● NEEDS REVIEW` / `INTACT`), bias pill, and 1-line truncated teaser.
+     - Clicking any card selects it, highlights with `border-l-4 border-l-primary bg-primary/10`, and loads the finding in the right-hand inspector.
+  3. **Detail Inspector State Reconciliation**:
+     - Fixed contradiction where signed-off checks still rendered `Catalyst · Needs review` and `FLAGGED FINDING · UNRESOLVED`.
+     - Added `isResolved` prop to `MonitoringFindingCard.tsx` rendering emerald `Catalyst · Reviewed / Intact` and a `✓ SIGNED OFF` badge.
+     - Reconciled header in `ApertureExecute.tsx` to display `Focused Flank Inspection · Reviewed · Intact` with `✓ Verified Intact` badge when resolved.
+     - Conditioned `Primary Decision Actions` in `MonitoringFindingReview.tsx` so unsubmitted actions are hidden once a finding is closed, presenting a verified audit receipt (`✓ INTACT` card with note and timestamp).
+- Validation:
+  - All public endpoints returned HTTP 200:
+    - `https://third-signal-capital-aperture.web.app` (200)
+    - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+    - `https://third-signal-capital-aperture.web.app/__/auth/handler` (200)
+    - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app/__/auth/handler` (200)
+  - TypeScript typecheck (`DATABASE_URL= pnpm check`): 0 errors.
+  - Contract & unit tests (`vitest run server/aperture/`): 2,237 tests passed.
+  - Deployed client asset `index-BqTemANF.js` verified live.
+- Rollback revision: `capital-aperture-00188-jej`.
+
 
 
