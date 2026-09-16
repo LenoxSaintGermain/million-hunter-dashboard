@@ -8,21 +8,7 @@ import {
 import { isLoginConfigured } from "@/const";
 
 function resolveAuthDomain(): string {
-  if (typeof window !== "undefined") {
-    const host = window.location.host;
-    // When served via Firebase Hosting, Cloud Run, or localhost, use same-origin authDomain
-    // to prevent iOS Safari ITP / WebKit storage partitioning from breaking mobile auth.
-    if (
-      host.includes("third-signal-capital-aperture") ||
-      host.includes("web.app") ||
-      host.includes("firebaseapp.com") ||
-      host.includes("run.app") ||
-      host.includes("localhost")
-    ) {
-      return host;
-    }
-  }
-  return import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "third-signal-capital-aperture.web.app";
+  return import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "third-signal-v2.firebaseapp.com";
 }
 
 function getFirebaseApp() {
