@@ -384,6 +384,37 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - Vitest test suite (`server/aperture/monitor.test.ts`): 5/5 passed.
 - Rollback revision: `capital-aperture-00192-xud`.
 
+### Release 2026-09-16 (Thesis Switching Schema Mismatch Fix)
+- Commit: `f81df42` (`fix(aperture): support compilationId in thesis activate schema and pass correct thesis id in header switcher`)
+- Release Tag: `f81df42-uat-70847f76`
+- Cloud Build: `c47381a4-f3f5-4345-8d5e-84d68eb77641` (`SUCCESS`, 4M47S)
+- Cloud Run Service: `capital-aperture` (project: `third-signal-v2`, region: `us-central1`)
+- Revision: `capital-aperture-00196-jov` (tag: `uat-f81df42`) serving **100%** of traffic.
+- Root Cause & Changes:
+  - **Server Procedure Schema (`server/apertureRouter.ts:960`)**:
+    - Updated `aperture.thesis.activate` input schema to accept `{ id: z.coerce.number().optional(), compilationId: z.coerce.number().optional() }` with `.refine` ensuring at least one is provided.
+    - Added resolver lookup by `sourceCompilationId` (and fallback to direct ID) if `id` is not passed, allowing both canonical compilation IDs and projection IDs to activate cleanly without schema errors.
+  - **Header Thesis Switcher (`client/src/components/aperture/CapitalCockpitRail.tsx`)**:
+    - Replaced `<option value={t.sourceCompilationId ?? t.id}>` with `<option value={t.id}>` to ensure numeric ID consistency.
+    - Memoized `currentActiveThesisId` by matching against `activeThesisQuery.data.thesis.id` / `isPrimary` / `status === "active"`.
+    - In `onChange`, passes `{ id: candidate.id, compilationId: candidate.sourceCompilationId ?? candidate.id }`.
+    - Added user-friendly JSON error parsing in `onError` toast so raw Zod error arrays are never rendered in UI banners.
+  - **Component Guard (`client/src/components/aperture/DailyPlayList.tsx`)**:
+    - Safeguarded `runsQuery` with optional chaining to prevent unmocked testing crashes.
+  - **Automated Validation (`server/aperture/thesisSwitchSchema.test.ts`)**:
+    - 6 unit tests added verifying numeric `id`, `compilationId`, combined payloads, string-coerced numbers, and missing input rejections.
+- Validation:
+  - TypeScript typecheck (`DATABASE_URL= pnpm check`): 0 errors.
+  - Unit test suite (`DATABASE_URL= pnpm vitest run server/aperture/thesisSwitchSchema.test.ts`): 6/6 passed.
+  - Thesis & daily briefing tests: 45/45 passed.
+  - All public endpoints returned HTTP 200:
+    - `https://third-signal-capital-aperture.web.app` (200)
+    - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+    - `https://uat-f81df42---capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+  - Client bundle `index-aVEyCt5O.js` verified live.
+- Rollback revision: `capital-aperture-00194-reb`.
+
+
 
 
 
