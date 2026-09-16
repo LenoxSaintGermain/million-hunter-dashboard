@@ -323,5 +323,30 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - Deployed client asset `index-BqTemANF.js` verified live.
 - Rollback revision: `capital-aperture-00188-jej`.
 
+## 2026-09-16 Production Ship: Restore Canonical AuthDomain & Resolve Redirect URI Mismatch
+
+- Branch: `codex/aperture-play-desk`.
+- Deployed source: `49bad69` (`49bad69d30caeb62657fa3fe9e504c55ec363172`).
+- Release marker: `49bad69-uat-639c6822`.
+- Cloud Build: `8349a044-877d-428d-8555-82defffe0163` — `SUCCESS` (4M51S).
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:49bad69-uat-639c6822`.
+- Image digest: `sha256:57cf7ad20e7280b17f6952b2142ba3c4fcbb46bea91957bdb3ea67515a7c1e55`.
+- Ready revision: `capital-aperture-00192-xud`, serving 100% of Cloud Run traffic.
+- Traffic tag: `uat-639c6822` (`https://uat-639c6822---capital-aperture-oxiyp4dcpq-uc.a.run.app`).
+- Public production URLs:
+  - `https://third-signal-capital-aperture.web.app`
+  - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app`
+- Client bundle: `index-DSZlS4Po.js`.
+- Root Cause & Resolution:
+  - In `capital-aperture-00190-zed`, `resolveAuthDomain()` resolved dynamically to `third-signal-capital-aperture.web.app`, causing Google Accounts to reject sign-in with `Error 400: redirect_uri_mismatch` because that custom redirect URI had not been registered in Google Cloud Console's OAuth Client ID.
+  - Reverted default `authDomain` to `third-signal-v2.firebaseapp.com` in `client/src/lib/firebaseAuth.ts`.
+  - Re-established canonical Google OAuth compatibility without requiring manual console configuration.
+- Validation:
+  - All public endpoints returned HTTP 200.
+  - Client bundle `index-DSZlS4Po.js` verified live.
+  - TypeScript typecheck (`DATABASE_URL= pnpm check`): 0 errors.
+  - Contract & unit tests passing: 100%.
+- Rollback revision: `capital-aperture-00190-zed`.
+
 
 
