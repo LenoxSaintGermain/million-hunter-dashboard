@@ -2,7 +2,7 @@ import React from "react";
 import { Zap, Globe, Calendar, ShieldCheck, ShieldAlert, ArrowRight, RefreshCw, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { monitoringFindingHref, type VersionedMonitoringFinding } from "@shared/monitoringFinding";
+import { monitoringFindingHref, monitoringFindingVersion, type VersionedMonitoringFinding } from "@shared/monitoringFinding";
 
 export interface TacticalFlankRadarProps {
   checks: Array<VersionedMonitoringFinding>;
@@ -20,6 +20,9 @@ export interface TacticalFlankRadarProps {
     symbol: string;
   } | null;
   runId: number;
+  selectedKey?: string;
+  onSelectFlank?: (key: string) => void;
+  resolvedFindingKeys?: Set<string>;
   onOpenFinding?: (href: string) => void;
   onRefreshAll?: () => void;
   refreshing?: boolean;
@@ -74,6 +77,9 @@ export function TacticalFlankRadar({
   order,
   candidate,
   runId,
+  selectedKey,
+  onSelectFlank,
+  resolvedFindingKeys,
   onOpenFinding,
   onRefreshAll,
   refreshing = false,
@@ -92,7 +98,13 @@ export function TacticalFlankRadar({
     let bias = cat.defaultBias;
 
     if (matchedCheck) {
-      if (matchedCheck.flagged) {
+      const checkVersionKey = `${matchedCheck.id}:${monitoringFindingVersion(matchedCheck)}`;
+      const isResolved = resolvedFindingKeys?.has(checkVersionKey) ?? false;
+
+      if (isResolved) {
+        state = "Reviewed / Intact";
+        bias = "Intact";
+      } else if (matchedCheck.flagged) {
         state = "Needs review";
         if (cat.key === "macro") bias = "Bearish Headwind";
         else if (cat.key === "catalyst") bias = "Catalyst Shift";
@@ -142,9 +154,11 @@ export function TacticalFlankRadar({
           </h2>
           <Badge
             variant={needsReviewCount > 0 ? "destructive" : "secondary"}
-            className="text-[11px] font-mono px-2 py-0.5"
+            className={`text-[11px] font-mono px-2 py-0.5 font-bold ${
+              needsReviewCount === 0 ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : ""
+            }`}
           >
-            {needsReviewCount > 0 ? `${needsReviewCount} Needs Review` : "All Checks Intact"}
+            {needsReviewCount > 0 ? `${needsReviewCount} NEEDS REVIEW` : "ALL CHECKS INTACT"}
           </Badge>
         </div>
 
@@ -176,14 +190,21 @@ export function TacticalFlankRadar({
           </thead>
           <tbody className="divide-y" style={{ borderColor: "var(--sh-border-1)" }}>
             {rows.map((row) => {
+              const isSelected = selectedKey === row.key;
               const isFlagged = row.state === "Needs review";
+              const isReviewed = row.state === "Reviewed / Intact";
               const isIntact = row.bias === "Intact";
               const isWatch = row.bias.includes("Watch");
 
               return (
                 <tr
                   key={row.key}
-                  className="hover:bg-muted/20 transition-colors"
+                  onClick={() => onSelectFlank?.(row.key)}
+                  className={`cursor-pointer transition-colors ${
+                    isSelected
+                      ? "bg-primary/10 border-l-4 border-l-primary"
+                      : "hover:bg-muted/20"
+                  }`}
                 >
                   {/* Category */}
                   <td className="py-2.5 pr-3 font-semibold">
@@ -200,13 +221,21 @@ export function TacticalFlankRadar({
                         className={`h-2 w-2 rounded-full shrink-0 ${
                           isFlagged
                             ? "bg-amber-500 animate-pulse"
+                            : isReviewed
+                            ? "bg-emerald-500"
                             : row.state === "Not verified"
                             ? "bg-gray-400"
-                            : "bg-emerald-500"
+                            : "bg-emerald-500/70"
                         }`}
                       />
                       <span
-                        className={isFlagged ? "font-bold text-amber-500" : "text-muted-foreground"}
+                        className={
+                          isFlagged
+                            ? "font-bold text-amber-500"
+                            : isReviewed
+                            ? "font-semibold text-emerald-400"
+                            : "text-muted-foreground"
+                        }
                       >
                         {row.state}
                       </span>
@@ -224,7 +253,7 @@ export function TacticalFlankRadar({
                       className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-tight ${
                         isFlagged
                           ? "bg-rose-500/15 text-rose-400 border border-rose-500/30"
-                          : isIntact
+                          : isReviewed || isIntact
                           ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                           : isWatch
                           ? "bg-blue-500/15 text-blue-400 border border-blue-500/30"
@@ -241,7 +270,8 @@ export function TacticalFlankRadar({
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() =>
+                        onClick={(e) => {
+                          e.stopPropagation();
                           onOpenFinding(
                             monitoringFindingHref({
                               ...row.check!,
@@ -249,8 +279,8 @@ export function TacticalFlankRadar({
                               candidateId: candidate.id,
                               orderId: order.id,
                             })
-                          )
-                        }
+                          );
+                        }}
                         className="h-7 px-2 text-xs font-medium text-primary hover:text-primary hover:bg-primary/10 gap-1"
                       >
                         <span>Inspect</span>

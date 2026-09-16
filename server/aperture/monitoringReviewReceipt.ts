@@ -38,6 +38,12 @@ export function createMonitoringReviewRouter(repo: MonitoringReviewRepository) {
       const snapshot = await repo.readBaseline(ctx.user.id);
       return { receipts: (snapshot?.monitoringReviews ?? []).filter(receipt => sameTarget(receipt, ctx.user.id, input)) };
     }),
+    listAll: capitalOperatorProcedure.input(z.object({ runId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
+      const snapshot = await repo.readBaseline(ctx.user.id);
+      const all = snapshot?.monitoringReviews ?? [];
+      const receipts = all.filter(receipt => receipt.userId === ctx.user.id && (!input?.runId || receipt.runId === input.runId));
+      return { receipts };
+    }),
     record: capitalOperatorProcedure.input(reviewSchema).mutation(async ({ ctx, input }) => repo.transaction(ctx.user.id, async locked => {
       await verifyTarget(locked, ctx.user.id, input);
       const prior = await locked.readBaseline(ctx.user.id);

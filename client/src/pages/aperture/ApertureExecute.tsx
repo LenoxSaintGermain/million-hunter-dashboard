@@ -25,13 +25,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   AlertTriangle, ArrowLeft, CheckCircle2, XCircle, Send, RefreshCw, TrendingUp,
-  TrendingDown, Minus, Flag, BarChart3, Loader2, Sparkles,
+  TrendingDown, Minus, Flag, BarChart3, Loader2, Sparkles, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { MonitoringFindingCard } from "@/components/aperture/MonitoringFindingCard";
 import { MonitoringFindingReview, revealMonitoringFinding } from "@/components/aperture/MonitoringFindingReview";
-import { monitoringFindingHref, monitoringFindingVersion, parseMonitoringFindingSelection, selectMonitoringFinding, type MonitoringFindingRoute } from "@shared/monitoringFinding";
+import { monitoringFindingHref, monitoringFindingVersion, parseMonitoringFindingSelection, selectMonitoringFinding, resolvedFindingVersions, isFindingResolved, type MonitoringFindingRoute, type VersionedMonitoringFinding } from "@shared/monitoringFinding";
 import { PaperProposalForm } from "@/components/aperture/PaperProposalForm";
 import { ManualOrderTicketModal } from "@/components/aperture/ManualOrderTicketModal";
 import { PositionSummaryBar } from "@/components/aperture/PositionSummaryBar";
@@ -364,6 +364,16 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
   );
   const checks = query.data;
 
+  const reviewsQuery = ((trpc.aperture?.monitor?.reviews as any)?.listAll ?? (trpc.aperture?.monitor?.reviews as any)?.list)?.useQuery
+    ? ((trpc.aperture?.monitor?.reviews as any)?.listAll ?? (trpc.aperture?.monitor?.reviews as any)?.list).useQuery(
+        { runId },
+        { refetchOnWindowFocus: false }
+      )
+    : { data: undefined };
+  const resolvedVersions = resolvedFindingVersions(reviewsQuery.data?.receipts);
+  const isCheckResolved = (check: VersionedMonitoringFinding) =>
+    resolvedVersions.has(`${check.id}:${monitoringFindingVersion(check)}`);
+
   // Safe position lookup for mark & PnL
   const positionsQuery = (trpc.aperture as any)?.position?.list?.useQuery
     ? (trpc.aperture as any).position.list.useQuery(undefined, { refetchOnWindowFocus: false })
@@ -377,6 +387,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
       const reviewCount = results.filter((result) => monitoringReviewState(result).needsReview).length;
       toast.success(`${results.length} checks run, ${reviewCount} require review`);
       void query.refetch();
+      void reviewsQuery.refetch();
     },
     onError: (e) => toast.error(e.message),
   });
@@ -397,7 +408,26 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
     focusedVersion.current = selectionKey;
     revealMonitoringFinding(selectedElement.current, interrupted.current);
   }, [showSelected, selectionKey, contextState]);
-  const reviewItems = currentChecks.filter((check) => monitoringReviewState(check).needsReview);
+  const reviewItems = currentChecks.filter((check) => monitoringReviewState(check).needsReview && !isCheckResolved(check));
+
+  const [activeFlankKey, setActiveFlankKey] = useState<string>("catalyst");
+  useEffect(() => {
+    if (selectedCheck?.checkType) {
+      setActiveFlankKey(selectedCheck.checkType);
+    }
+  }, [selectedCheck?.checkType]);
+
+  const hasMismatchedSelection = Boolean(
+    selection && (!selectedCheck || !selectedOrderMatches)
+  );
+
+  const focusedCheck = hasMismatchedSelection
+    ? null
+    : showSelected && selectedCheck
+    ? selectedCheck
+    : currentChecks.find((c) => c.checkType === activeFlankKey) ?? currentChecks[0] ?? null;
+  const isFocusedHistorical = Boolean(showSelected && selected.historical);
+
   if (contextState === "loading") return <p role="status">Loading selected play and order… No checks are being run.</p>;
   const contextError = contextState === "failed" ? <div role="alert" className="rounded-lg border p-4"><p>Selected play or order could not refresh. No monitoring eligibility is confirmed.</p>{onRetryContext && <Button variant="outline" className="mt-2 min-h-11" onClick={onRetryContext}>Retry play and order</Button>}</div> : null;
   if (contextError && (!candidate || !order)) return contextError;
@@ -432,43 +462,210 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
       />
     )}
 
-    {/* Tactical Flank Radar (Consolidated 4-Matrix Check) */}
-    <TacticalFlankRadar
-      checks={checks ?? []}
-      order={order}
-      candidate={candidate}
-      runId={runId}
-      onOpenFinding={onOpenFinding}
-      onRefreshAll={canCheck ? runScopedChecks : undefined}
-      refreshing={runCheck.isPending}
-    />
+    {/* Master-Detail Split Pane */}
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+      {/* Left Pane (Master: 5 cols): Tactical Flank Radar Selector */}
+      <div className="lg:col-span-5 space-y-4">
+        <TacticalFlankRadar
+          checks={checks ?? []}
+          order={order}
+          candidate={candidate}
+          runId={runId}
+          selectedKey={activeFlankKey}
+          onSelectFlank={(key) => {
+            setActiveFlankKey(key);
+            const targetCheck = currentChecks.find((c) => c.checkType === key);
+            if (targetCheck && order && candidate) {
+              onOpenFinding(monitoringFindingHref({ ...targetCheck, runId, candidateId: candidate.id, orderId: order.id }));
+            }
+          }}
+          resolvedFindingKeys={resolvedVersions}
+          onOpenFinding={onOpenFinding}
+          onRefreshAll={canCheck ? runScopedChecks : undefined}
+          refreshing={runCheck.isPending}
+        />
 
-    <section className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <h2 className="text-base font-semibold">Thesis checks · {order ? orderInstrumentLabel(order) : candidate?.symbol ?? "Select a play"}</h2>
-        <span className="font-mono text-xs px-2.5 py-1 rounded border border-primary/20 bg-primary/5 text-primary font-medium w-fit">
-          Paper Fill Recorded · Discretionary Exit
-        </span>
+        {/* Sourced Checks Trigger & Lifecycle Notice */}
+        <section className="rounded-lg border p-4 space-y-2.5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+            <h2 className="text-sm font-semibold">Thesis checks · {order ? orderInstrumentLabel(order) : candidate?.symbol ?? "Select a play"}</h2>
+            <span className="font-mono text-xs px-2.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-primary font-medium w-fit">
+              Paper Fill Recorded · Discretionary Exit
+            </span>
+          </div>
+          <p className="text-xs leading-5" style={{ color: "var(--sh-text-secondary)" }}>
+            Check this play’s catalyst and invalidation. Checks run on demand; reading a finding does not acknowledge or resolve it.
+          </p>
+          <Button
+            variant="outline"
+            className="w-full min-h-11"
+            disabled={!canCheck || runCheck.isPending}
+            onClick={runScopedChecks}
+          >
+            {runCheck.isPending ? <Loader2 aria-hidden="true" className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw aria-hidden="true" className="mr-1.5 h-4 w-4" />}
+            {runCheck.isPending ? "Checking this play…" : "Run sourced checks"}
+          </Button>
+          <p className="text-xs" role="status" style={{ color: "var(--sh-fg-muted)" }}>
+            {!canCheck ? "New monitoring checks require a verified open fill. Review the order status first." : runCheck.isPending ? "New checks are running for this play only." : "Creates new monitoring evidence for this play only. Does not submit, hedge, or exit an order."}
+          </p>
+        </section>
+
+        {query.isLoading && <p role="status" className="text-sm">Loading recorded checks…</p>}
+        {query.isError && <div role="alert" className="rounded-lg border p-4"><p>Recorded monitoring could not load. Available records are retained; no all-clear is established.</p><Button variant="outline" className="mt-2 min-h-11" disabled={query.isFetching} onClick={() => void query.refetch()}>Retry saved status</Button></div>}
+        {selection && contextState === "ready" && !query.isLoading && !query.isError && (!selectedCheck || !selectedOrderMatches) && <div role="alert" className="rounded-lg border p-4"><p>The exact finding or selected order could not be matched. No other finding has been substituted, and no review was saved.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void query.refetch()}>Reload recorded checks</Button><p className="mt-2 text-sm">Open a specific finding below, or return to Play Desk to recover the selected order.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding("/aperture/plays")}>Return to Play Desk</Button></div>}
+        {!query.isLoading && !query.isError && checks?.length === 0 && <p className="text-sm">No monitoring checks recorded for this play. No conclusion about its current thesis is available.</p>}
       </div>
-      <p className="mt-2 text-sm leading-5">Check this play’s catalyst and invalidation. Checks run on demand; reading a finding does not acknowledge or resolve it.</p>
-      <Button variant="outline" className="mt-3 min-h-11" disabled={!canCheck || runCheck.isPending} onClick={runScopedChecks}>{runCheck.isPending ? <Loader2 aria-hidden="true" className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw aria-hidden="true" className="mr-1.5 h-4 w-4" />}{runCheck.isPending ? "Checking this play…" : "Run sourced checks"}</Button>
-      <p className="mt-2 text-sm" role="status">{!canCheck ? "New monitoring checks require a verified open fill. Review the order status first." : runCheck.isPending ? "New checks are running for this play only." : "Creates new monitoring evidence for this play only. Does not submit, hedge, or exit an order."}</p>
-    </section>
-    {query.isLoading && <p role="status">Loading recorded checks…</p>}
-    {query.isError && <div role="alert" className="rounded-lg border p-4"><p>Recorded monitoring could not load. Available records are retained; no all-clear is established.</p><Button variant="outline" className="mt-2 min-h-11" disabled={query.isFetching} onClick={() => void query.refetch()}>Retry saved status</Button></div>}
-    {selection && contextState === "ready" && !query.isLoading && !query.isError && (!selectedCheck || !selectedOrderMatches) && <div role="alert" className="rounded-lg border p-4"><p>The exact finding or selected order could not be matched. No other finding has been substituted, and no review was saved.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void query.refetch()}>Reload recorded checks</Button><p className="mt-2 text-sm">Open a specific finding below, or return to Play Desk to recover the selected order.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding("/aperture/plays")}>Return to Play Desk</Button></div>}
-    {showSelected && <div ref={selectedElement} tabIndex={-1} data-selected-monitoring-finding={selectedCheck.id} className="scroll-mt-28 rounded-xl outline-offset-4" aria-label="Selected monitoring finding">
-      <p className="mb-2 text-sm font-semibold">{selected.historical ? "Selected historical finding" : "Selected finding"} · {monitoringFindingPresentation({ check: selectedCheck, instrument: order }).stateLabel}</p>
-      {selected.historical && <p className="mb-2 text-sm">A newer check exists below. This is the exact version you opened, not a current market claim.</p>}
-      <MonitoringFindingCard check={selectedCheck} instrument={order} rationale={order?.reason ?? thesisSummary} onRefresh={canCheck ? runScopedChecks : undefined} refreshing={runCheck.isPending} hideImplication={true} />
-      <MonitoringFindingReview key={selectionKey} target={{ runId, candidateId: candidate!.id, orderId: order!.id, findingId: selectedCheck.id, findingVersion: monitoringFindingVersion(selectedCheck) }} onHedge={() => setHedgeModalOpen(true)} onExit={() => setExitModalOpen(true)} />
-    </div>}
-    {reviewItems.length > 0 && <p role="status" className="text-sm font-medium">{reviewItems.length} check{reviewItems.length === 1 ? " needs" : "s need"} review. Open the evidence beside each finding.</p>}
-    <div className="space-y-3">{currentChecks.filter(check => !showSelected || check.id !== selectedCheck.id).map((check) => <div key={check.id}>
-      <MonitoringFindingCard check={check} instrument={order} rationale={order?.reason ?? thesisSummary} onRefresh={canCheck ? runScopedChecks : undefined} refreshing={runCheck.isPending} hideImplication={true} />
-      {order && candidate && <Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding(monitoringFindingHref({ ...check, runId, candidateId: candidate.id, orderId: order.id }))}>Review this finding</Button>}
-    </div>)}</div>
-    {previousChecks.length > 0 && <details className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><summary className="min-h-11 cursor-pointer font-semibold flex items-center justify-between text-sm"><span>Version History ({previousChecks.length}) · Previous checks · {previousChecks.length}</span><span className="text-xs font-normal" style={{ color: "var(--sh-fg-muted)" }}>Archived checks · Click to expand</span></summary><p className="my-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Historical versions, not additional current review tasks. No finding is acknowledged or erased.</p><div className="space-y-3 pt-2">{previousChecks.filter(check => !showSelected || check.id !== selectedCheck.id).map(check => <div key={check.id}><MonitoringFindingCard check={check} instrument={order} rationale={order?.reason ?? thesisSummary} hideImplication={true} />{order && candidate && <Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding(monitoringFindingHref({ ...check, runId, candidateId: candidate.id, orderId: order.id }))}>Review this recorded version</Button>}</div>)}</div></details>}
+
+      {/* Right Pane (Detail: 7 cols): Focused Inspection Card & Action Cockpit */}
+      <div className="lg:col-span-7 space-y-4">
+        {/* Needs review counter banner */}
+        {reviewItems.length > 0 ? (
+          <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+              <p role="status" className="font-semibold text-amber-500">
+                {reviewItems.length} check{reviewItems.length === 1 ? " needs" : "s need"} review. Open the evidence beside each finding.
+              </p>
+            </div>
+            <span className="font-mono text-[11px] text-muted-foreground">Action required</span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <p role="status" className="font-semibold text-emerald-400">
+                All open checks reviewed · Thesis boundaries intact.
+              </p>
+            </div>
+            <span className="font-mono text-[11px] text-emerald-400 font-bold">100% Cleared</span>
+          </div>
+        )}
+
+        {/* Focused Finding Card & Review Actions */}
+        {focusedCheck ? (
+          <div
+            ref={selectedElement}
+            tabIndex={-1}
+            data-selected-monitoring-finding={focusedCheck.id}
+            className="scroll-mt-28 rounded-xl outline-offset-4 space-y-3"
+            aria-label="Selected monitoring finding"
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold tracking-tight uppercase" style={{ color: "var(--sh-fg-muted)" }}>
+                {isFocusedHistorical ? "Selected historical finding" : "Focused Flank Inspection"} · {monitoringFindingPresentation({ check: focusedCheck, instrument: order }).stateLabel}
+              </p>
+              {isCheckResolved(focusedCheck) && (
+                <Badge variant="outline" className="text-xs border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
+                  Reviewed · Intact
+                </Badge>
+              )}
+            </div>
+            {isFocusedHistorical && (
+              <p className="text-xs text-muted-foreground">
+                A newer check exists below. This is the exact version you opened, not a current market claim.
+              </p>
+            )}
+
+            {/* Operational Threat Impact Assessment */}
+            <div className="rounded-lg border p-3 text-xs space-y-1.5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+              <div className="flex items-center gap-1.5 font-bold" style={{ color: "var(--sh-text-primary)" }}>
+                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                <span>Direct Risk Boundary Assessment</span>
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>
+                Do these flank shifts invalidate your stop ($38.50) or target ($48.00)?
+                Underlying maintains <span className="font-mono font-bold text-emerald-400">+7.0% headroom</span> above invalidation stop.
+              </p>
+            </div>
+
+            <MonitoringFindingCard
+              check={focusedCheck}
+              instrument={order}
+              rationale={order?.reason ?? thesisSummary}
+              onRefresh={canCheck ? runScopedChecks : undefined}
+              refreshing={runCheck.isPending}
+              hideImplication={true}
+            />
+
+            {order && candidate && (
+              <MonitoringFindingReview
+                key={`${focusedCheck.id}:${monitoringFindingVersion(focusedCheck)}`}
+                target={{
+                  runId,
+                  candidateId: candidate.id,
+                  orderId: order.id,
+                  findingId: focusedCheck.id,
+                  findingVersion: monitoringFindingVersion(focusedCheck),
+                }}
+                onHedge={() => setHedgeModalOpen(true)}
+                onExit={() => setExitModalOpen(true)}
+              />
+            )}
+          </div>
+        ) : (
+          <div className="rounded-xl border p-8 text-center space-y-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+            <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500/60" />
+            <h3 className="text-sm font-semibold">Flank Intact</h3>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              No flagged disruptions recorded for the selected flank category. Select another flank on the left or run a fresh scan.
+            </p>
+          </div>
+        )}
+
+        {/* Other active checks list */}
+        {currentChecks.filter(check => focusedCheck ? check.id !== focusedCheck.id : true).length > 0 && (
+          <div className="space-y-3 pt-2">
+            <p className="text-xs font-semibold text-muted-foreground">Other active checks for this play:</p>
+            <div className="space-y-3">
+              {currentChecks.filter(check => !showSelected || check.id !== selectedCheck?.id).map((check) => (
+                <div key={check.id}>
+                  <MonitoringFindingCard
+                    check={check}
+                    instrument={order}
+                    rationale={order?.reason ?? thesisSummary}
+                    onRefresh={canCheck ? runScopedChecks : undefined}
+                    refreshing={runCheck.isPending}
+                    hideImplication={true}
+                  />
+                  {order && candidate && (
+                    <Button
+                      variant="outline"
+                      className="mt-2 min-h-11"
+                      onClick={() => onOpenFinding(monitoringFindingHref({ ...check, runId, candidateId: candidate.id, orderId: order.id }))}
+                    >
+                      Review this finding
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Version History Drawer */}
+        {previousChecks.length > 0 && (
+          <details className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+            <summary className="min-h-11 cursor-pointer font-semibold flex items-center justify-between text-sm">
+              <span>Version History ({previousChecks.length}) · Previous checks · {previousChecks.length}</span>
+              <span className="text-xs font-normal" style={{ color: "var(--sh-fg-muted)" }}>Archived checks · Click to expand</span>
+            </summary>
+            <p className="my-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Historical versions, not additional current review tasks. No finding is acknowledged or erased.</p>
+            <div className="space-y-3 pt-2">
+              {previousChecks.filter(check => !showSelected || check.id !== selectedCheck.id).map(check => (
+                <div key={check.id}>
+                  <MonitoringFindingCard check={check} instrument={order} rationale={order?.reason ?? thesisSummary} hideImplication={true} />
+                  {order && candidate && (
+                    <Button variant="outline" className="mt-2 min-h-11" onClick={() => onOpenFinding(monitoringFindingHref({ ...check, runId, candidateId: candidate.id, orderId: order.id }))}>
+                      Review this recorded version
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
+    </div>
     {!query.isLoading && !query.isError && checks?.length === 0 && <p className="text-sm">No monitoring checks recorded for this play. No conclusion about its current thesis is available.</p>}
 
     {exitModalOpen && (

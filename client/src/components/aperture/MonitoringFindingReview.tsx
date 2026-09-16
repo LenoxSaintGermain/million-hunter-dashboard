@@ -40,6 +40,8 @@ export function MonitoringFindingReview({
           utils.aperture.desk.summary.invalidate(),
           utils.aperture.cockpit.invalidate(),
           utils.aperture.play.list.invalidate(),
+          utils.aperture.monitor.list.invalidate(),
+          utils.aperture.monitor.reviews.invalidate(),
         ]);
       }
       toast.success(
@@ -84,15 +86,14 @@ export function MonitoringFindingReview({
     {receipts.isLoading && <p className="mt-2 text-sm" role="status">Loading saved review…</p>}
     {receipts.isError && <div className="mt-2 text-sm" role="alert"><p>Saved reviews could not load. No new review has been confirmed.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void receipts.refetch()}>Reload saved review</Button></div>}
 
-    {/* Operational Cockpit Actions */}
-    <div className="mt-3 rounded-lg border p-3 space-y-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-      <p className="text-[11px] font-bold tracking-tight uppercase" style={{ color: "var(--sh-fg-muted)" }}>Operational Decisions</p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        {/* Action 1: Sign Off / Maintain */}
+    {/* Primary Decision Hierarchy */}
+    <div className="mt-3 rounded-lg border p-3.5 space-y-2.5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+      <p className="text-[11px] font-bold tracking-tight uppercase" style={{ color: "var(--sh-fg-muted)" }}>Primary Decision Actions</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        {/* Action 1: Maintain Thesis & Clear Review (Primary Solid Action) */}
         <Button
           type="button"
-          variant="outline"
-          className="h-auto py-2 px-3 flex flex-col items-start gap-0.5 text-left border-emerald-500/30 hover:bg-emerald-500/10 hover:border-emerald-500"
+          className="h-auto py-2.5 px-3 flex flex-col items-start gap-1 text-left bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-sm border border-emerald-500"
           disabled={record.isPending || !receipts.data || receipts.isError}
           onClick={() => {
             const resolveNote = "Sign Off / Maintain: Operator verified catalyst condition; thesis and risk parameters remain intact.";
@@ -102,18 +103,18 @@ export function MonitoringFindingReview({
             record.mutate(request.current);
           }}
         >
-          <div className="flex items-center gap-1.5 font-semibold text-xs text-emerald-500">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>Sign Off / Maintain</span>
+          <div className="flex items-center gap-1.5 font-bold text-xs text-white">
+            <ShieldCheck className="h-4 w-4" />
+            <span>Maintain Thesis & Clear Review</span>
           </div>
-          <span className="text-[10px] text-muted-foreground leading-tight">Acknowledge & resolve blocker</span>
+          <span className="text-[10px] text-emerald-100 leading-tight">Sign Off / Maintain · Acknowledge & clear</span>
         </Button>
 
-        {/* Action 2: Hedge / Adjust */}
+        {/* Action 2: Hedge / Adjust (Secondary Action) */}
         <Button
           type="button"
           variant="outline"
-          className="h-auto py-2 px-3 flex flex-col items-start gap-0.5 text-left border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-500"
+          className="h-auto py-2.5 px-3 flex flex-col items-start gap-1 text-left border-amber-500/40 hover:bg-amber-500/10 hover:border-amber-500"
           onClick={onHedge}
         >
           <div className="flex items-center gap-1.5 font-semibold text-xs text-amber-500">
@@ -123,11 +124,11 @@ export function MonitoringFindingReview({
           <span className="text-[10px] text-muted-foreground leading-tight">Spread or delta hedge</span>
         </Button>
 
-        {/* Action 3: Take Profit / Cut Loss */}
+        {/* Action 3: Take Profit / Cut Loss (Secondary Action) */}
         <Button
           type="button"
           variant="outline"
-          className="h-auto py-2 px-3 flex flex-col items-start gap-0.5 text-left border-primary/30 hover:bg-primary/10 hover:border-primary"
+          className="h-auto py-2.5 px-3 flex flex-col items-start gap-1 text-left border-primary/40 hover:bg-primary/10 hover:border-primary"
           onClick={onExit}
         >
           <div className="flex items-center gap-1.5 font-semibold text-xs text-primary">

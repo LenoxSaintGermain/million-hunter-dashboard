@@ -9,6 +9,7 @@ vi.mock("@/lib/trpc", () => ({ trpc: { aperture: { monitor: {
   run: { useMutation: () => ({ isPending: false, mutate: fixture.mutate }) },
   reviews: {
     list: { useQuery: () => ({ data: { receipts: fixture.receipts }, isLoading: false, isError: false, refetch: fixture.refetch }) },
+    listAll: { useQuery: () => ({ data: { receipts: fixture.receipts }, isLoading: false, isError: false, refetch: fixture.refetch }) },
     record: { useMutation: () => ({ isPending: false, isError: false, mutate: fixture.mutate, reset: vi.fn() }) },
   },
 } } } }));

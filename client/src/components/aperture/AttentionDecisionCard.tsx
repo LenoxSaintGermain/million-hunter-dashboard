@@ -135,7 +135,7 @@ export function FindingEvidence({ evidence, label = "Evidence", expanded = false
         const domainList = Array.from(new Set(evidence.citations.map(getCitationDomain))).filter(Boolean);
         const domainSummary = domainList.length > 0 ? ` · ${domainList.slice(0, 3).join(", ")}${domainList.length > 3 ? "..." : ""}` : "";
         return evidence.citations.length > INLINE_SOURCE_LIMIT
-          ? <details className="rounded-lg border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-semibold">Sources ({evidence.citations.length}){domainSummary}</summary><div className="flex flex-wrap gap-2 border-t p-3" style={{ borderColor: "var(--sh-border-1)" }}>{sourceLinks(evidence.citations)}</div></details>
+          ? <details className="rounded-lg border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground">Sourced from {evidence.citations.length} market feeds ▾{domainSummary}</summary><div className="flex flex-wrap gap-2 border-t p-3" style={{ borderColor: "var(--sh-border-1)" }}>{sourceLinks(evidence.citations)}</div></details>
           : <div className="flex flex-wrap gap-2">{sourceLinks(evidence.citations)}</div>;
       })() : <p>No source links recorded. This finding is not verified evidence.</p>}
     </div>

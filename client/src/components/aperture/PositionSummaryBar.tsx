@@ -32,6 +32,9 @@ export interface PositionSummaryBarProps {
     priceAsOf?: number | null;
   } | null;
   thesisSummary?: string | null;
+  postureStatus?: string;
+  postureBias?: string;
+  postureThreat?: string;
   onOpenExit?: () => void;
   onOpenHedge?: () => void;
 }
@@ -44,6 +47,9 @@ export function PositionSummaryBar({
   order,
   position,
   thesisSummary,
+  postureStatus,
+  postureBias = "BULLISH ACCELERATION",
+  postureThreat = "FOMC RATE HIKE (MONITORING)",
   onOpenExit,
   onOpenHedge,
 }: PositionSummaryBarProps) {
@@ -156,6 +162,28 @@ export function PositionSummaryBar({
         </div>
       </div>
 
+      {/* Dynamic Unified Posture & Threat Badge */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs font-mono" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <div className="flex items-center gap-1.5">
+          <span className="font-bold text-muted-foreground">STATUS:</span>
+          <span className={`px-2 py-0.5 rounded font-bold ${isAboveStop ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" : "bg-rose-500/10 text-rose-400 border border-rose-500/30"}`}>
+            {postureStatus ?? (isAboveStop ? "ACTIVE · THESIS INTACT" : "STOP BREACHED")}
+          </span>
+        </div>
+        <span className="text-muted-foreground/60">·</span>
+        <div className="flex items-center gap-1.5">
+          <span className="font-bold text-muted-foreground">BIAS:</span>
+          <span className="font-bold text-primary">{postureBias}</span>
+        </div>
+        <span className="text-muted-foreground/60">·</span>
+        <div className="flex items-center gap-1.5">
+          <span className="font-bold text-muted-foreground">THREAT:</span>
+          <span className="px-2 py-0.5 rounded font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+            {postureThreat}
+          </span>
+        </div>
+      </div>
+
       {/* Grid: 4 Core Metric Panels */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-1">
         {/* Metric 1: Entry vs Mark */}
@@ -219,7 +247,7 @@ export function PositionSummaryBar({
             </span>
           </div>
           <p className="text-[11px] font-mono" style={{ color: "var(--sh-fg-muted)" }}>
-            Daily $\Theta$ Burn: <span className="font-semibold text-rose-400">{thetaBurn}</span>
+            Daily Θ Burn: <span className="font-semibold text-rose-400">{thetaBurn}</span>
           </p>
         </div>
 
@@ -231,7 +259,7 @@ export function PositionSummaryBar({
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-lg font-bold font-mono" style={{ color: "var(--sh-text-primary)" }}>
-              $\Delta$ {delta}
+              Δ {delta}
             </span>
             <span className="text-xs font-mono" style={{ color: "var(--sh-fg-muted)" }}>
               ({shareEq})
@@ -243,9 +271,9 @@ export function PositionSummaryBar({
         </div>
       </div>
 
-      {/* Thesis Invalidation Stop Level & Proximity Gauge */}
+      {/* Visual Horizontal Range Bar: [Stop $38.50] --------● ($41.20 | +7.0% Headroom) ---------------- [Target $48.00] */}
       <div
-        className="rounded-lg border p-3 space-y-2"
+        className="rounded-lg border p-3.5 space-y-3"
         style={{
           borderColor: isAboveStop ? "color-mix(in srgb, var(--sh-emerald, #10b981) 30%, var(--sh-border-1))" : "var(--sh-red)",
           background: "var(--sh-surface)",
@@ -259,30 +287,66 @@ export function PositionSummaryBar({
               <ShieldAlert className="h-4 w-4 text-rose-500 shrink-0" />
             )}
             <span className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>
-              Thesis Invalidation Level:{" "}
-              <span className="font-mono font-bold text-amber-500">Underlying {underlying} &lt; ${stopPrice.toFixed(2)}</span>
+              Thesis Risk Boundaries:{" "}
+              <span className="font-mono font-bold text-amber-500">Underlying {underlying} Invalidation vs Target</span>
             </span>
           </div>
           <div className="flex items-center gap-2 text-xs font-mono">
             <span style={{ color: "var(--sh-fg-muted)" }}>Current {underlying}: <strong>${currentUnderlyingPrice.toFixed(2)}</strong></span>
-            <span className={`px-1.5 py-0.5 rounded font-bold ${isAboveStop ? "bg-emerald-500/15 text-emerald-500" : "bg-rose-500/15 text-rose-500"}`}>
+            <span className={`px-1.5 py-0.5 rounded font-bold ${isAboveStop ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-rose-500/15 text-rose-400 border border-rose-500/30"}`}>
               {isAboveStop ? `+${headroomDollars.toFixed(2)} (+${headroomPct.toFixed(1)}%) Headroom` : "STOP BREACHED"}
             </span>
           </div>
         </div>
 
-        {/* Visual Proximity Meter */}
-        <div className="space-y-1">
-          <div className="relative h-2 w-full rounded-full overflow-hidden bg-muted/40">
-            <div
-              className={`h-full transition-all duration-500 ${isAboveStop ? "bg-emerald-500" : "bg-rose-500"}`}
-              style={{ width: `${gaugePct}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-[10px] font-mono" style={{ color: "var(--sh-fg-muted)" }}>
-            <span>Stop: ${stopPrice.toFixed(2)} (Invalidation Threshold)</span>
-            <span>Current: ${currentUnderlyingPrice.toFixed(2)}</span>
-            <span>Target: ${targetPrice.toFixed(2)}</span>
+        {/* Milestone Horizontal Range Bar */}
+        <div className="pt-2 pb-1">
+          <div className="relative flex items-center gap-3">
+            {/* Left Milestone: Stop */}
+            <div className="shrink-0 flex flex-col items-start">
+              <span className="px-2 py-0.5 rounded text-xs font-mono font-bold border border-rose-500/40 bg-rose-500/10 text-rose-400">
+                Stop ${stopPrice.toFixed(2)}
+              </span>
+              <span className="text-[10px] font-mono text-muted-foreground mt-0.5">Invalidation</span>
+            </div>
+
+            {/* Range Bar Track with Position Marker */}
+            <div className="relative flex-1 py-3">
+              <div className="h-2.5 w-full rounded-full bg-muted/40 overflow-hidden relative border border-border/40">
+                <div
+                  className="h-full transition-all duration-500 rounded-full"
+                  style={{
+                    width: `${gaugePct}%`,
+                    background: isAboveStop
+                      ? "linear-gradient(to right, rgba(239, 68, 68, 0.4), rgba(16, 185, 129, 0.85))"
+                      : "rgba(239, 68, 68, 0.9)",
+                  }}
+                />
+              </div>
+
+              {/* Pin Callout Marker */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-500 flex flex-col items-center pointer-events-none"
+                style={{ left: `${Math.min(90, Math.max(10, gaugePct))}%` }}
+              >
+                <div className="whitespace-nowrap px-2 py-0.5 rounded-full text-[10px] font-mono font-bold shadow-md border border-primary/40 bg-card text-foreground flex items-center gap-1 -top-6 absolute">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>${currentUnderlyingPrice.toFixed(2)}</span>
+                  <span className="text-emerald-400">+{headroomPct.toFixed(1)}%</span>
+                </div>
+                <div className="h-3.5 w-3.5 rounded-full border-2 border-primary bg-background flex items-center justify-center shadow-sm">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Milestone: Target */}
+            <div className="shrink-0 flex flex-col items-end">
+              <span className="px-2 py-0.5 rounded text-xs font-mono font-bold border border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
+                Target ${targetPrice.toFixed(2)}
+              </span>
+              <span className="text-[10px] font-mono text-muted-foreground mt-0.5">Take Profit</span>
+            </div>
           </div>
         </div>
       </div>
