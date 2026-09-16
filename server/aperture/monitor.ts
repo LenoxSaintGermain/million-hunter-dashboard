@@ -42,22 +42,27 @@ async function sonarCheck(prompt: string): Promise<{ content: string; citations:
   const key = process.env.SONAR_API_KEY;
   if (!key) return { content: "", citations: [] };
 
-  const res = await fetch(`${SONAR_BASE}/chat/completions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "sonar-pro",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 512,
-      return_citations: true,
-    }),
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!res.ok) return { content: "", citations: [] };
-  const data: any = await res.json().catch(() => null);
-  const content = data?.choices?.[0]?.message?.content ?? "";
-  const citations: string[] = (data?.citations ?? []).filter((c: unknown) => typeof c === "string");
-  return { content, citations };
+  try {
+    const res = await fetch(`${SONAR_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "sonar-pro",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 512,
+        return_citations: true,
+      }),
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) return { content: "", citations: [] };
+    const data: any = await res.json().catch(() => null);
+    const content = data?.choices?.[0]?.message?.content ?? "";
+    const citations: string[] = (data?.citations ?? []).filter((c: unknown) => typeof c === "string");
+    return { content, citations };
+  } catch (err) {
+    console.warn("[Aperture Monitor] Sonar request failed or timed out:", err);
+    return { content: "", citations: [] };
+  }
 }
 
 // ── Per-check prompts ─────────────────────────────────────────────────────────
@@ -160,10 +165,9 @@ export async function runMonitoringChecks(
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
 
-  const results: MonitoringCheck[] = [];
   const now = Date.now();
 
-  for (const checkType of checkTypes) {
+  const runSingleCheck = async (checkType: CheckType): Promise<MonitoringCheck | null> => {
     let prompt: string;
     switch (checkType) {
       case "catalyst": prompt = catalystPrompt(symbol, thesisSummary); break;
@@ -176,22 +180,58 @@ export async function runMonitoringChecks(
     const validCitations = validMonitoringCitations(citations);
     const parsed = parseMonitoringProviderOutput(content, checkType, validCitations);
 
-    const [result] = await db.insert(monitoringChecks).values({
-      runId,
-      candidateId,
-      symbol,
-      checkType,
-      finding: parsed.finding,
-      flagged: parsed.flagged,
-      citations: validCitations,
-      checkedAt: now,
-      createdAt: now,
-    });
+    try {
+      const [result] = await db.insert(monitoringChecks).values({
+        runId,
+        candidateId,
+        symbol,
+        checkType,
+        finding: parsed.finding,
+        flagged: parsed.flagged,
+        citations: validCitations,
+        checkedAt: now,
+        createdAt: now,
+      });
 
-    const rows = await db.select().from(monitoringChecks)
-      .where(eq(monitoringChecks.id, (result as any).insertId))
-      .limit(1);
-    if (rows[0]) results.push(rows[0]);
+      const insertId = (result as any)?.insertId;
+      if (insertId) {
+        const rows = await db.select().from(monitoringChecks)
+          .where(eq(monitoringChecks.id, insertId))
+          .limit(1);
+        if (rows[0]) return rows[0];
+      }
+
+      const [latest] = await db.select().from(monitoringChecks)
+        .where(and(
+          eq(monitoringChecks.runId, runId),
+          eq(monitoringChecks.candidateId, candidateId),
+          eq(monitoringChecks.checkType, checkType),
+        ))
+        .orderBy(desc(monitoringChecks.checkedAt), desc(monitoringChecks.id))
+        .limit(1);
+      return latest ?? null;
+    } catch (err) {
+      console.error(`[Aperture Monitoring] Failed to persist check for ${symbol} (${checkType}):`, err);
+      return null;
+    }
+  };
+
+  // Run all check types in parallel with a 20-second timeout ceiling
+  const checkExecution = Promise.allSettled(checkTypes.map((type) => runSingleCheck(type)));
+  const timeoutGuard = new Promise<PromiseSettledResult<MonitoringCheck | null>[]>((resolve) => {
+    setTimeout(() => {
+      console.warn(`[Aperture Monitoring] Overall check run timed out at 20s for ${symbol}`);
+      resolve([]);
+    }, 20_000);
+  });
+
+  const settled = await Promise.race([checkExecution, timeoutGuard]);
+
+  const results: MonitoringCheck[] = [];
+  for (const item of settled) {
+    if (item.status === "fulfilled" && item.value) {
+      results.push(item.value);
+    }
   }
 
   return results;

@@ -279,6 +279,7 @@ function Router() {
         <Route path="/aperture/thesis/new">{() => <ApertureRoute component={ThesisGraphEditor} />}</Route>
         <Route path="/aperture/thesis/:id">{() => <ApertureRoute component={ThesisGraphEditor} />}</Route>
         <Route path="/aperture/runs">{() => <ApertureRoute component={ApertureRuns} />}</Route>
+        <Route path="/aperture/research">{() => <ApertureRoute component={ApertureRuns} />}</Route>
         <Route path="/aperture/plays">{() => <ApertureRoute component={AperturePlayDesk} />}</Route>
         <Route path="/aperture/record">{() => <ApertureRoute component={ApertureRecord} />}</Route>
         <Route path="/aperture/walkthrough">{() => <ApertureRoute component={CapitalWalkthrough} />}</Route>

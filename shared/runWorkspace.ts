@@ -11,6 +11,8 @@ export type RunWorkspaceItem = {
   actionableCandidateId?: number | null;
   actionableSymbol?: string | null;
   createdAt: number;
+  catalystDeadlineAt?: number | null;
+  holdingPeriod?: string | null;
 };
 
 export type ResearchJourney = {

@@ -382,21 +382,57 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
     (p: any) => p.symbol === order?.symbol || (order?.underlyingSymbol && p.symbol.startsWith(order.underlyingSymbol))
   );
 
+  const [timedOut, setTimedOut] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
+  const checkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
+    };
+  }, []);
+
   const runCheck = trpc.aperture.monitor.run.useMutation({
     onSuccess: (results) => {
+      if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
+      setTimedOut(false);
+      setCheckError(null);
       const reviewCount = results.filter((result) => monitoringReviewState(result).needsReview).length;
       toast.success(`${results.length} checks run, ${reviewCount} require review`);
       void query.refetch();
       void reviewsQuery.refetch();
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => {
+      if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
+      setTimedOut(false);
+      setCheckError(e.message);
+      toast.error(e.message);
+    },
   });
   const canCheck = Boolean(contextState === "ready" && candidate && order?.status === "filled");
   const runScopedChecks = () => {
     if (!candidate || !canCheck || runCheck.isPending) return;
+    setTimedOut(false);
+    setCheckError(null);
+    if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
+
+    // Timeout boundary: release pending state after 18s if backend hangs
+    checkTimeoutRef.current = setTimeout(() => {
+      setTimedOut(true);
+      (runCheck as any).reset?.();
+      toast.error("Check execution timed out awaiting market feeds. You can retry anytime.");
+    }, 18_000);
+
     runCheck.mutate({ runId, candidateId: candidate.id, symbol: candidate.symbol,
       thesisSummary: [order?.reason, thesisSummary].filter(Boolean).join(" · ") || `Monitor ${candidate.symbol} against the recorded paper thesis and its invalidation conditions.`,
     });
+  };
+
+  const cancelScopedCheck = () => {
+    if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
+    (runCheck as any).reset?.();
+    setTimedOut(false);
+    setCheckError(null);
   };
   const { current: currentChecks, history: previousChecks } = partitionMonitoringHistory(checks ?? []);
   const selected = selectMonitoringFinding(checks ?? [], selection);
@@ -496,6 +532,24 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
           <p className="text-xs leading-5" style={{ color: "var(--sh-text-secondary)" }}>
             Check this play’s catalyst and invalidation. Checks run on demand; reading a finding does not acknowledge or resolve it.
           </p>
+          {(timedOut || checkError || runCheck.isError) && (
+            <div role="alert" className="rounded-lg border p-3 text-xs space-y-2" style={{ borderColor: "var(--sh-red)", background: "color-mix(in srgb, var(--sh-red) 8%, var(--sh-surface))" }}>
+              <div className="flex items-center gap-2 font-semibold" style={{ color: "var(--sh-red)" }}>
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>{timedOut ? "Check execution timed out awaiting market feeds." : "Check execution could not complete."}</span>
+              </div>
+              <p style={{ color: "var(--sh-fg-muted)" }}>
+                {timedOut
+                  ? "The market search provider took longer than 18s to respond. No changes or orders were made."
+                  : checkError || runCheck.error?.message || "Market data feed error occurred."}
+              </p>
+              <Button variant="outline" size="sm" className="min-h-9 text-xs" onClick={runScopedChecks}>
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                Retry sourced checks
+              </Button>
+            </div>
+          )}
+
           <Button
             variant="outline"
             className="w-full min-h-11"
@@ -503,11 +557,19 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
             onClick={runScopedChecks}
           >
             {runCheck.isPending ? <Loader2 aria-hidden="true" className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw aria-hidden="true" className="mr-1.5 h-4 w-4" />}
-            {runCheck.isPending ? "Checking this play…" : "Run sourced checks"}
+            {runCheck.isPending ? "Checking this play…" : timedOut || checkError || runCheck.isError ? "Retry sourced checks" : "Run sourced checks"}
           </Button>
-          <p className="text-xs" role="status" style={{ color: "var(--sh-fg-muted)" }}>
-            {!canCheck ? "New monitoring checks require a verified open fill. Review the order status first." : runCheck.isPending ? "New checks are running for this play only." : "Creates new monitoring evidence for this play only. Does not submit, hedge, or exit an order."}
-          </p>
+
+          {runCheck.isPending ? (
+            <div className="flex items-center justify-between text-xs pt-1">
+              <span style={{ color: "var(--sh-fg-muted)" }}>Connecting to live market search…</span>
+              <button type="button" onClick={cancelScopedCheck} className="underline hover:opacity-80" style={{ color: "var(--sh-signal)" }}>Cancel check</button>
+            </div>
+          ) : (
+            <p className="text-xs" role="status" style={{ color: "var(--sh-fg-muted)" }}>
+              {!canCheck ? "New monitoring checks require a verified open fill. Review the order status first." : "Creates new monitoring evidence for this play only. Does not submit, hedge, or exit an order."}
+            </p>
+          )}
         </section>
 
         {query.isLoading && <p role="status" className="text-sm">Loading recorded checks…</p>}

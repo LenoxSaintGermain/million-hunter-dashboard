@@ -1,7 +1,8 @@
+import { useMemo } from "react";
 import { useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowRight, Clock3 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Clock3, X } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { buildResearchJourneys, type ResearchJourney } from "@shared/runWorkspace";
 import { formatDistanceToNow } from "date-fns";
@@ -71,14 +72,41 @@ export function researchHref(search: string, inspect: number | null) {
   return `/aperture/runs${params.size ? `?${params}` : ""}`;
 }
 
+const filterLabels: Record<string, string> = {
+  catalyst_14d: "🔥 Near-term Catalyst (<14d)",
+  high_iv: "⚡ High IV / Asymmetric",
+  macro_hedge: "🛡️ Correlated Macro Hedge",
+};
+
 export default function ApertureRuns() {
   const [, navigate] = useLocation();
   const search = useSearch();
   const inspectId = readResearchInspect(search);
+  const filter = new URLSearchParams(search).get("filter");
   const { data: runs, isLoading, refetch } = trpc.aperture.run.list.useQuery();
   const { data: pendingOutcomes } = trpc.aperture.runway.pending.useQuery();
   const journeys = buildResearchJourneys((runs ?? []) as any[]);
   const inspected = journeys.find((journey) => journey.rootId === inspectId) ?? null;
+
+  const filteredJourneys = useMemo(() => {
+    if (!filter) return journeys;
+    return journeys.filter((journey) => {
+      if (filter === "catalyst_14d") {
+        return journey.runs.some((r) => {
+          const deadline = r.catalystDeadlineAt;
+          const days = deadline ? Math.ceil((deadline - Date.now()) / 86400000) : null;
+          return (days != null && days <= 14 && days >= 0) || r.holdingPeriod === "intraday" || r.holdingPeriod === "catalyst_window";
+        });
+      }
+      if (filter === "high_iv") {
+        return journey.runs.some((r) => r.holdingPeriod === "intraday" || journey.thesisName.toLowerCase().includes("iv") || journey.thesisName.toLowerCase().includes("vol"));
+      }
+      if (filter === "macro_hedge") {
+        return journey.runs.some((r) => journey.thesisName.toLowerCase().includes("macro") || journey.thesisName.toLowerCase().includes("hedge"));
+      }
+      return true;
+    });
+  }, [journeys, filter]);
 
   return <DashboardLayout><div className="mx-auto max-w-6xl space-y-5 pb-12">
     <div className="flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}><AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} />Internal research tool — not investment advice. Research journeys never create or submit an order.</div>
@@ -88,9 +116,36 @@ export default function ApertureRuns() {
       <Button className="min-h-11" onClick={() => navigate("/aperture?setup=1&draft=1")}>Start a research brief<ArrowRight className="ml-2 h-4 w-4" /></Button>
     </header>
 
+    {filter && (
+      <div className="flex items-center justify-between rounded-xl border px-4 py-2.5 text-xs" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
+        <div className="flex items-center gap-2">
+          <span className="font-semibold" style={{ color: "var(--sh-signal)" }}>Active Screen:</span>
+          <span className="font-medium" style={{ color: "var(--sh-text-primary)" }}>{filterLabels[filter] ?? filter}</span>
+          <span style={{ color: "var(--sh-fg-muted)" }}>({filteredJourneys.length} matching journey{filteredJourneys.length === 1 ? "" : "s"})</span>
+        </div>
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => navigate("/aperture/runs")}>
+          <X className="mr-1 h-3.5 w-3.5" /> Clear filter
+        </Button>
+      </div>
+    )}
+
     {isLoading && <p role="status" className="py-12 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Loading your research journeys…</p>}
 
-    {!isLoading && journeys.length > 0 && <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+    {!isLoading && journeys.length > 0 && filteredJourneys.length === 0 && (
+      <div className="rounded-xl border p-8 text-center space-y-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>
+          No research journeys match the filter "{filterLabels[filter ?? ""] ?? filter}"
+        </p>
+        <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
+          There are {journeys.length} total research journeys in your workspace.
+        </p>
+        <Button variant="outline" size="sm" onClick={() => navigate("/aperture/runs")}>
+          Show all research journeys
+        </Button>
+      </div>
+    )}
+
+    {!isLoading && filteredJourneys.length > 0 && <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
       <table className="w-full min-w-[40rem] border-collapse text-sm">
         <thead><tr className="border-b text-left text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
           <th scope="col" className="px-3 py-2">Question</th>
@@ -99,7 +154,7 @@ export default function ApertureRuns() {
           <th scope="col" className="px-3 py-2 text-right">Next</th>
         </tr></thead>
         <tbody>
-          {journeys.map((journey) => {
+          {filteredJourneys.map((journey) => {
             const action = actionFor(journey);
             return <tr key={journey.rootId} data-journey-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
               <th scope="row" className="px-3 py-2.5 text-left font-semibold" style={{ color: "var(--sh-text-primary)" }}><button

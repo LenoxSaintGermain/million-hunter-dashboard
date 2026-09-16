@@ -1,12 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { ArrowRight, ChevronDown, CircleSlash2, Compass, FileSearch, GitCompareArrows, Loader2, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronDown, CircleSlash2, Compass, FileSearch, GitCompareArrows, Loader2, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { buildPlayRecipe } from "@shared/playRecipe";
 import { orderDailyPlayQueue, researchCoverageLabel } from "@shared/dailyPlayQueue";
 import { dailyPlayPrimaryDestination } from "@shared/dailyPlayActions";
+
+export type ScreeningCriteriaKey = "catalyst_14d" | "high_iv" | "macro_hedge";
+
+export const SCREENING_CRITERIA: Record<ScreeningCriteriaKey, {
+  label: string;
+  tagline: string;
+  description: string;
+}> = {
+  catalyst_14d: {
+    label: "Near-term Catalyst (<14d)",
+    tagline: "Short-horizon events, earnings releases, and scheduled macro decisions",
+    description: "Filters research candidates with a confirmed catalyst event expiring within 14 calendar days.",
+  },
+  high_iv: {
+    label: "High IV / Asymmetric",
+    tagline: "Volatile regime, asymmetric skew, and convex risk/reward setups",
+    description: "Filters research candidates with elevated implied volatility or defined option structure.",
+  },
+  macro_hedge: {
+    label: "Correlated Macro Hedge",
+    tagline: "Negative correlation, factor counterbalance, and systemic portfolio protection",
+    description: "Filters research candidates flagged for portfolio hedging and factor counterbalance.",
+  },
+};
 import { easternDateKeyFromEpoch } from "@shared/easternMarketTime";
 import { PlayRecipeCard } from "./PlayRecipeCard";
 import { ContextHelp } from "./ContextHelp";
@@ -67,6 +91,8 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
   if (playsError) failedSources.push("research");
   const statusErrors = failedSources.map(safeStatusError).join(" ") || null;
   const utils = trpc.useUtils();
+  const runsQuery = trpc.aperture.run.list.useQuery(undefined, { retry: false });
+  const [activeScreening, setActiveScreening] = useState<ScreeningCriteriaKey | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [showAllPlays, setShowAllPlays] = useState(false);
   const [reasons, setReasons] = useState<Record<number, string>>({});
@@ -106,6 +132,94 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
       }).readiness,
       catalystDeadlineAt: item.run.catalystDeadlineAt,
     }))), [playList]);
+
+  const screenedCandidates = useMemo(() => {
+    if (!activeScreening) return [];
+    const list: Array<{
+      runId: number;
+      candidateId: number;
+      symbol: string;
+      thesisName: string;
+      holdingPeriod: string;
+      catalystSummary: string;
+      timeRemaining: string;
+    }> = [];
+
+    // 1. Inspect plays in current thesis queue
+    for (const play of playList?.plays ?? []) {
+      let matches = false;
+      const deadline = play.run.catalystDeadlineAt;
+      const now = Date.now();
+      const daysToDeadline = deadline ? Math.ceil((deadline - now) / 86400000) : null;
+
+      if (activeScreening === "catalyst_14d") {
+        matches = Boolean(daysToDeadline != null && daysToDeadline <= 14 && daysToDeadline >= 0)
+          || play.run.holdingPeriod === "intraday"
+          || play.run.holdingPeriod === "catalyst_window";
+      } else if (activeScreening === "high_iv") {
+        matches = play.run.holdingPeriod === "intraday"
+          || Boolean(play.thesisName?.toLowerCase().includes("iv") || play.thesisName?.toLowerCase().includes("vol"));
+      } else if (activeScreening === "macro_hedge") {
+        matches = Boolean(play.thesisName?.toLowerCase().includes("macro") || play.thesisName?.toLowerCase().includes("hedge"));
+      }
+
+      if (matches) {
+        list.push({
+          runId: play.run.id,
+          candidateId: play.candidate.id,
+          symbol: play.candidate.symbol,
+          thesisName: play.thesisName ?? "Active thesis",
+          holdingPeriod: play.run.holdingPeriod ?? "catalyst",
+          catalystSummary: play.run.catalystDeadlineAt
+            ? `Catalyst window: ${new Date(play.run.catalystDeadlineAt).toLocaleDateString()}`
+            : "Active research play candidate",
+          timeRemaining: daysToDeadline != null && daysToDeadline >= 0
+            ? `${daysToDeadline}d remaining`
+            : "Active catalyst",
+        });
+      }
+    }
+
+    // 2. Also inspect runs across all research journeys if queue has none
+    if (list.length === 0 && runsQuery.data) {
+      for (const run of runsQuery.data) {
+        if (!run.actionableSymbol || !run.actionableCandidateId) continue;
+        let matches = false;
+        const deadline = run.catalystDeadlineAt;
+        const now = Date.now();
+        const daysToDeadline = deadline ? Math.ceil((deadline - now) / 86400000) : null;
+
+        if (activeScreening === "catalyst_14d") {
+          matches = Boolean(daysToDeadline != null && daysToDeadline <= 14 && daysToDeadline >= 0)
+            || run.holdingPeriod === "intraday"
+            || run.holdingPeriod === "catalyst_window";
+        } else if (activeScreening === "high_iv") {
+          matches = run.holdingPeriod === "intraday"
+            || Boolean(run.thesisName?.toLowerCase().includes("iv") || run.thesisName?.toLowerCase().includes("vol"));
+        } else if (activeScreening === "macro_hedge") {
+          matches = Boolean(run.thesisName?.toLowerCase().includes("macro") || run.thesisName?.toLowerCase().includes("hedge"));
+        }
+
+        if (matches) {
+          list.push({
+            runId: run.id,
+            candidateId: run.actionableCandidateId,
+            symbol: run.actionableSymbol,
+            thesisName: run.thesisName ?? "Research run",
+            holdingPeriod: run.holdingPeriod ?? "catalyst",
+            catalystSummary: run.catalystDeadlineAt
+              ? `Catalyst window: ${new Date(run.catalystDeadlineAt).toLocaleDateString()}`
+              : "Research journey candidate",
+            timeRemaining: daysToDeadline != null && daysToDeadline >= 0
+              ? `${daysToDeadline}d remaining`
+              : "Active horizon",
+          });
+        }
+      }
+    }
+
+    return list;
+  }, [activeScreening, playList, runsQuery.data]);
   const todayEt = easternDateKeyFromEpoch(Date.now());
   const hasTodayPlay = ranked.some(({ item }) => item.run.catalystDeadlineAt != null
     && easternDateKeyFromEpoch(item.run.catalystDeadlineAt) === todayEt);
@@ -216,10 +330,117 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
       </div>
       <div className="mt-4 pt-4 border-t flex flex-wrap items-center gap-2" style={{ borderColor: "var(--sh-border-1)" }}>
         <span className="text-xs font-medium" style={{ color: "var(--sh-fg-muted)" }}>Quick screening criteria:</span>
-        <button type="button" onClick={onNewResearch} className="rounded-md border px-2.5 py-1 text-xs font-medium hover:opacity-80 transition-opacity" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}>🔥 Near-term Catalyst (&lt;14d)</button>
-        <button type="button" onClick={onNewResearch} className="rounded-md border px-2.5 py-1 text-xs font-medium hover:opacity-80 transition-opacity" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}>⚡ High IV / Asymmetric</button>
-        <button type="button" onClick={onNewResearch} className="rounded-md border px-2.5 py-1 text-xs font-medium hover:opacity-80 transition-opacity" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}>🛡️ Correlated Macro Hedge</button>
+        <button
+          type="button"
+          onClick={() => setActiveScreening((cur) => cur === "catalyst_14d" ? null : "catalyst_14d")}
+          className="rounded-md border px-2.5 py-1 text-xs font-medium transition-all"
+          style={{
+            borderColor: activeScreening === "catalyst_14d" ? "var(--sh-signal)" : "var(--sh-border-1)",
+            background: activeScreening === "catalyst_14d" ? "color-mix(in srgb, var(--sh-signal) 12%, var(--sh-surface-2))" : "var(--sh-surface-2)",
+            color: activeScreening === "catalyst_14d" ? "var(--sh-signal)" : "var(--sh-text-primary)",
+            fontWeight: activeScreening === "catalyst_14d" ? 600 : 500,
+          }}
+        >
+          🔥 Near-term Catalyst (&lt;14d)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveScreening((cur) => cur === "high_iv" ? null : "high_iv")}
+          className="rounded-md border px-2.5 py-1 text-xs font-medium transition-all"
+          style={{
+            borderColor: activeScreening === "high_iv" ? "var(--sh-signal)" : "var(--sh-border-1)",
+            background: activeScreening === "high_iv" ? "color-mix(in srgb, var(--sh-signal) 12%, var(--sh-surface-2))" : "var(--sh-surface-2)",
+            color: activeScreening === "high_iv" ? "var(--sh-signal)" : "var(--sh-text-primary)",
+            fontWeight: activeScreening === "high_iv" ? 600 : 500,
+          }}
+        >
+          ⚡ High IV / Asymmetric
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveScreening((cur) => cur === "macro_hedge" ? null : "macro_hedge")}
+          className="rounded-md border px-2.5 py-1 text-xs font-medium transition-all"
+          style={{
+            borderColor: activeScreening === "macro_hedge" ? "var(--sh-signal)" : "var(--sh-border-1)",
+            background: activeScreening === "macro_hedge" ? "color-mix(in srgb, var(--sh-signal) 12%, var(--sh-surface-2))" : "var(--sh-surface-2)",
+            color: activeScreening === "macro_hedge" ? "var(--sh-signal)" : "var(--sh-text-primary)",
+            fontWeight: activeScreening === "macro_hedge" ? 600 : 500,
+          }}
+        >
+          🛡️ Correlated Macro Hedge
+        </button>
       </div>
+
+      {activeScreening && (
+        <div className="mt-3 rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-3" style={{ borderColor: "var(--sh-border-1)" }}>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>
+                Screening: {SCREENING_CRITERIA[activeScreening].label}
+              </p>
+              <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
+                {SCREENING_CRITERIA[activeScreening].tagline}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider" style={{ background: "color-mix(in srgb, var(--sh-signal) 15%, transparent)", color: "var(--sh-signal)" }}>
+                Live Screen Active
+              </span>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setActiveScreening(null)}>
+                <X className="mr-1 h-3.5 w-3.5" /> Clear
+              </Button>
+            </div>
+          </div>
+
+          {screenedCandidates.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+              {screenedCandidates.map((candidate) => (
+                <div key={`${candidate.runId}-${candidate.candidateId}`} className="rounded-lg border p-3 flex flex-col justify-between space-y-2.5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-base" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol}</span>
+                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
+                        {candidate.holdingPeriod ?? "catalyst"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs font-medium line-clamp-1" style={{ color: "var(--sh-text-primary)" }}>
+                      {candidate.thesisName}
+                    </p>
+                    <p className="mt-0.5 text-[11px] line-clamp-2" style={{ color: "var(--sh-fg-muted)" }}>
+                      {candidate.catalystSummary}
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t flex items-center justify-between gap-2" style={{ borderColor: "var(--sh-border-1)" }}>
+                    <span className="text-[10px] font-mono" style={{ color: "var(--sh-signal)" }}>
+                      {candidate.timeRemaining}
+                    </span>
+                    <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={() => onOpenRun(candidate.runId, candidate.candidateId, "evidence")}>
+                      Inspect evidence <ArrowRight className="ml-1 h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-4 text-center space-y-2">
+              <p className="text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>
+                No candidate in current queue meets "{SCREENING_CRITERIA[activeScreening].label}"
+              </p>
+              <p className="text-xs max-w-md mx-auto" style={{ color: "var(--sh-fg-muted)" }}>
+                {SCREENING_CRITERIA[activeScreening].description} You can inspect your broader research journeys or switch active thesis without losing context.
+              </p>
+              <div className="flex items-center justify-center gap-2 pt-1">
+                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => navigate(`/aperture/runs?filter=${activeScreening}`)}>
+                  Open research journeys <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => navigate("/aperture/theses")}>
+                  Switch thesis
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>}
 
     {ranked.length > 0 && <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Queue order reflects readiness, then the nearest live catalyst deadline. It is not a predicted return ranking or a claim that the first play should be taken.</p>}
