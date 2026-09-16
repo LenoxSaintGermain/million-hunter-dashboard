@@ -348,5 +348,42 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - Contract & unit tests passing: 100%.
 - Rollback revision: `capital-aperture-00190-zed`.
 
+## 2026-09-16 Production Ship: Tactical Radar Timeout Boundary & Research Queue Inline Screening
+
+- Branch: `codex/aperture-play-desk`.
+- Deployed source: `ffc74ed` (`ffc74ed732fc250bcfbf48c93af333f0ec321270`).
+- Release marker: `ffc74ed-uat-e4416d03`.
+- Cloud Build: `c7cd60cf-c556-423d-8c4b-3b19c7414d1b` — `SUCCESS` (4M51S).
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:ffc74ed-uat-e4416d03`.
+- Image digest: `sha256:f2658e78ae7d2d3fecedbc58dc5ead1af0cf5866b8df46101d6c49b47d2d7bc8`.
+- Ready revision: `capital-aperture-00194-reb`, serving 100% of Cloud Run traffic.
+- Traffic tag: `uat-e4416d03` (`https://uat-e4416d03---capital-aperture-oxiyp4dcpq-uc.a.run.app`).
+- Public production URLs:
+  - `https://third-signal-capital-aperture.web.app`
+  - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app`
+- Client bundle: `index-oY9-yDM5.js`.
+- Issues & UAT Refinements Resolved:
+  1. **Tactical Radar Sourced Checks Timeout & Error Boundary**:
+     - Parallelized all check types (catalyst, thesis invalidation, earnings, macro) via `Promise.allSettled` in `server/aperture/monitor.ts`, dropping check execution latency from ~80s to ~8-12s.
+     - Added 12s per-call search timeout and 20s overall server-side ceiling via `Promise.race` with fallback row lookup.
+     - Added 18s frontend timeout boundary in `ApertureExecute.tsx` that clears pending mutation state, notifies the operator, displays an error alert box, and exposes a dynamic `"Retry sourced checks"` button and an inline `"Cancel check"` link during execution.
+  2. **Research Queue Inline Screening Drawer & Direct Filtering**:
+     - Eliminated hardcoded route redirection to `/aperture?setup=1&draft=1` when clicking quick screening criteria chips (`🔥 Near-term Catalyst (<14d)`, `⚡ High IV / Asymmetric`, `🛡️ Correlated Macro Hedge`).
+     - Added interactive active screening criteria toggling in `DailyPlayList.tsx` with high-contrast signal pill styling.
+     - Implemented an **Inline Screening Candidates Drawer** displaying candidate symbol, holding period, catalyst timeline, and an direct *"Inspect evidence"* action without page reloads or route divergence.
+     - Added URL parameter filtering (`/aperture/runs?filter=...`) with an active screen banner and clear-filter button in `ApertureRuns.tsx`.
+     - Added route alias `<Route path="/aperture/research">{() => <ApertureRoute component={ApertureRuns} />}</Route>` in `App.tsx`.
+- Validation:
+  - All public endpoints returned HTTP 200:
+    - `https://third-signal-capital-aperture.web.app` (200)
+    - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+    - `https://uat-e4416d03---capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+  - `system.health` returned `ok: true` on all origins.
+  - Client bundle `index-oY9-yDM5.js` verified live.
+  - TypeScript typecheck (`DATABASE_URL= pnpm check`): 0 errors.
+  - Vitest test suite (`server/aperture/monitor.test.ts`): 5/5 passed.
+- Rollback revision: `capital-aperture-00192-xud`.
+
+
 
 
