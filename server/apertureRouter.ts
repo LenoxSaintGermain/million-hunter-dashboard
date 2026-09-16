@@ -958,11 +958,39 @@ export const apertureRouter = router({
       }),
 
     activate: capitalOperatorProcedure
-      .input(z.object({ id: z.number() }))
+      .input(
+        z.object({
+          id: z.coerce.number().optional(),
+          compilationId: z.coerce.number().optional(),
+        }).refine((data) => data.id != null || data.compilationId != null, {
+          message: "Either id or compilationId must be provided",
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
-        const thesis = await requireThesis(db, input.id, ctx.user.id);
-        await assertNotDiscoveryProjection(db!, ctx.user.id, input.id);
+        let targetId = input.id;
+        if (targetId == null && input.compilationId != null) {
+          const [found] = await db!.select({ id: capitalTheses.id })
+            .from(capitalTheses)
+            .where(and(eq(capitalTheses.userId, ctx.user.id), eq(capitalTheses.sourceCompilationId, input.compilationId)))
+            .limit(1);
+          if (found) {
+            targetId = found.id;
+          } else {
+            const [byDirectId] = await db!.select({ id: capitalTheses.id })
+              .from(capitalTheses)
+              .where(and(eq(capitalTheses.userId, ctx.user.id), eq(capitalTheses.id, input.compilationId)))
+              .limit(1);
+            if (byDirectId) {
+              targetId = byDirectId.id;
+            }
+          }
+        }
+        if (targetId == null) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Thesis not found" });
+        }
+        const thesis = await requireThesis(db, targetId, ctx.user.id);
+        await assertNotDiscoveryProjection(db!, ctx.user.id, targetId);
         const now = Date.now();
         // Deactivate all others first
         await db!.update(capitalTheses)
@@ -970,7 +998,7 @@ export const apertureRouter = router({
           .where(eq(capitalTheses.userId, ctx.user.id));
         await db!.update(capitalTheses)
           .set({ isPrimary: true, status: "active", updatedAt: now })
-          .where(eq(capitalTheses.id, input.id));
+          .where(eq(capitalTheses.id, targetId));
 
         let compilationId = thesis.sourceCompilationId;
         if (!compilationId) {
@@ -982,7 +1010,7 @@ export const apertureRouter = router({
           compilationId = Number((canonical as any).insertId);
           await db!.update(capitalTheses)
             .set({ sourceCompilationId: compilationId, updatedAt: now })
-            .where(and(eq(capitalTheses.id, input.id), eq(capitalTheses.userId, ctx.user.id)));
+            .where(and(eq(capitalTheses.id, targetId), eq(capitalTheses.userId, ctx.user.id)));
         }
 
         await db!.update(users)

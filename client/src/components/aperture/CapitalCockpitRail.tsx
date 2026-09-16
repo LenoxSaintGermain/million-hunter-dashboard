@@ -114,9 +114,32 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
           }
           toast.success(`Active focus switched to "${data?.name ?? "selected thesis"}"`);
         },
-        onError: (err: any) => toast.error(`Failed to switch thesis: ${err.message}`),
+        onError: (err: any) => {
+          let message = err?.message ?? "An error occurred";
+          try {
+            const parsed = JSON.parse(message);
+            if (Array.isArray(parsed) && parsed[0]?.message) {
+              message = parsed.map((p: any) => p.message).join(", ");
+            }
+          } catch {
+            // Not JSON
+          }
+          toast.error(`Failed to switch thesis: ${message}`);
+        },
       })
     : null;
+
+  const currentActiveThesisId = useMemo(() => {
+    if (!thesesListQuery.data || thesesListQuery.data.length === 0) return "";
+    if (activeThesisQuery.data?.thesis?.id) {
+      const match = thesesListQuery.data.find(
+        (t: any) => t.sourceCompilationId === activeThesisQuery.data.thesis.id
+      );
+      if (match) return String(match.id);
+    }
+    const primary = thesesListQuery.data.find((t: any) => t.isPrimary || t.status === "active");
+    return String(primary ? primary.id : thesesListQuery.data[0]?.id ?? "");
+  }, [activeThesisQuery.data, thesesListQuery.data]);
 
   const handleRapidSync = async () => {
     if (syncing) return;
@@ -216,18 +239,21 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
                   aria-label="Active Capital Thesis"
                   className="bg-transparent font-semibold cursor-pointer text-[11px] focus:outline-none"
                   style={{ color: "var(--sh-text-primary)", maxWidth: 170 }}
-                  value={activeThesisQuery.data?.thesis?.id ?? ""}
+                  value={currentActiveThesisId}
                   onChange={(e) => {
                     const selectedId = Number(e.target.value);
                     if (!selectedId) return;
-                    const candidate = thesesListQuery.data?.find((t: any) => (t.sourceCompilationId ?? t.id) === selectedId);
+                    const candidate = thesesListQuery.data?.find((t: any) => t.id === selectedId);
                     if (candidate && activateThesis?.mutate) {
-                      activateThesis.mutate({ compilationId: selectedId });
+                      activateThesis.mutate({
+                        id: candidate.id,
+                        compilationId: candidate.sourceCompilationId ?? candidate.id,
+                      });
                     }
                   }}
                 >
                   {thesesListQuery.data.map((t: any) => (
-                    <option key={t.id} value={t.sourceCompilationId ?? t.id} style={{ background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}>
+                    <option key={t.id} value={t.id} style={{ background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}>
                       {t.name}
                     </option>
                   ))}

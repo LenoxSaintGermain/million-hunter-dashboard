@@ -91,7 +91,7 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
   if (playsError) failedSources.push("research");
   const statusErrors = failedSources.map(safeStatusError).join(" ") || null;
   const utils = trpc.useUtils();
-  const runsQuery = trpc.aperture.run.list.useQuery(undefined, { retry: false });
+  const runsQuery = (trpc as any).aperture?.run?.list?.useQuery ? (trpc as any).aperture.run.list.useQuery(undefined, { retry: false }) : { data: [] };
   const [activeScreening, setActiveScreening] = useState<ScreeningCriteriaKey | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [showAllPlays, setShowAllPlays] = useState(false);
