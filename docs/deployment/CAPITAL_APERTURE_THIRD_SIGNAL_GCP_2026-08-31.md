@@ -176,4 +176,65 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - Vitest test suites: 116/116 unit tests passed. Typecheck: 0 errors.
 - Rollback revision: `capital-aperture-00106-qx2`.
 
+## 2026-09-15 Production Ship: Paper Ticket Staging Routing & Feedback Experience
+
+- Deployed source: `42f1b4c` (`42f1b4c5ba757650f9f310f8fa553400a4023766`).
+- Release marker: `42f1b4c-uat-bbe9ef4e`.
+- Cloud Build: `ecc88e2c-2d11-4c32-baab-6c0f50a470a2` — `SUCCESS`.
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:42f1b4c-uat-bbe9ef4e`.
+- Image digest: `sha256:c2593727092a1a809db7a12c652b2682c33f825a4a6913f39be39a5ca5fb19b3`.
+- Ready revision: `capital-aperture-00184-vuv`, serving 100% of Cloud Run traffic.
+- Traffic tag: `uat-bbe9ef4e` (`https://uat-bbe9ef4e---capital-aperture-oxiyp4dcpq-uc.a.run.app`).
+- Public production URL: `https://third-signal-capital-aperture.web.app` / `https://capital-aperture-oxiyp4dcpq-uc.a.run.app`.
+- User feedback addressed:
+  - "i stage the paper ticket. but then it gives toast. i'm stuck on the same screen. i close out and dont know whre to go. it should take me to the paper ticket i staged."
+- Changes shipped:
+  1. **Schema & Backend Fallback**:
+     - Relaxed `orderCreateInput` superRefine check so `runId` is optional during drafting.
+     - Added automatic fallback in `order.create` and `order.preflight` to attach ad-hoc tickets to the operator's latest run.
+     - Returned `{ ...result, runId: resolvedRunId }` from `order.create`.
+  2. **Play Desk & Ticket Modal UX**:
+     - `AperturePlayDesk` provides default `runId` from `runs.data?.[0]?.id`.
+     - `ManualOrderTicketModal` computes `effectiveRunId` and resolves ticket route upon staging.
+     - On successful stage: auto-dismisses modal, dispatches toast with `"View ticket"` button, and automatically navigates operator to `/aperture/run/${targetRunId}/execute?order=${res.orderId}`.
+  3. **Target Ticket Highlighting**:
+     - `ApertureExecute` parses `requestedOrderId` from query params and passes it to `OrderQueue`.
+     - Automatically scrolls the staged ticket into view and accents it with a `"Target Staged Ticket"` badge and signal ring styling.
+- Validation:
+  - `system.health` returned `204 No Content`.
+  - Client bundle `index-pgJCh-Og.js` verified with `"Target Staged Ticket"`.
+  - Automated tests: 17/17 orderFlow tests passed, 38/38 integration & safety tests passed. Typecheck: 0 errors.
+- Rollback revision: `capital-aperture-00182-dek`.
+
+## 2026-09-15 Production Ship: UAT Operator Friction & Gap Resolution
+
+- Deployed source: `5480275` (`5480275a535bfd5c31ea9dc60db3559385bbd331`).
+- Release marker: `5480275-uat-961038db`.
+- Cloud Build: `3c2577a5-7bf9-4c3a-8ed7-af7580e88feb` — `SUCCESS` (3M43S).
+- Container image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:5480275-uat-961038db`.
+- Image digest: `sha256:338ae5d27d85305527342e53ef9812457c943b4d3276dfcf18d215054a723498`.
+- Ready revision: `capital-aperture-00186-lec`, serving 100% of Cloud Run traffic.
+- Traffic tag: `uat-961038db` (`https://uat-961038db---capital-aperture-oxiyp4dcpq-uc.a.run.app`).
+- Public production URLs:
+  - `https://third-signal-capital-aperture.web.app`
+  - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app`
+- Client bundle: `index-UjzMr3GB.js`.
+- UAT operator friction addressed:
+  1. **Broker Telemetry Self-Healing**:
+     - Added dedicated **"Sync Broker Telemetry"** action button to the Play Desk action bar.
+     - Added automatic **Stale Broker Telemetry Alert Banner** when telemetry is >4h stale with a 1-click **"Sync Broker Balances"** trigger.
+     - Fixed `preferredAccountId` fallback in `CapitalCockpitRail` to default to Alpaca Paper (`id: 1`) and wired full query cache invalidation (`utils.aperture.desk.summary`, `cockpit`, `account.list`).
+  2. **Risk Capacity Paradox Clarification**:
+     - Introduced **Three-Layer Capacity Attribution** on Target Feasibility cards and Mission Runway (`Broker Layer / Liquid Cash` vs `Mandate Risk Layer / 100% Committed Loss Envelope` vs `Mission Layer / Sizing Ceiling`).
+     - Added inline operating explanations clarifying why $73k liquid cash is available while mission risk headroom is exhausted under the 3.0% NAV Mandate Planned-Loss Envelope.
+  3. **MGM $40 Call Audit Blocker Sign-Off Flow**:
+     - Converted "Hold / Maintain" button to **"Sign Off / Maintain: Acknowledge & resolve blocker"** submitting `decision: "resolved"`.
+     - Added attention query cache invalidation and automatic drawer collapse upon sign-off.
+- Validation:
+  - `system.health` returned `204 No Content` / `200 OK`.
+  - Client bundle verified with `"Three-Layer Capacity Attribution"`, `"Sign Off / Maintain"`, and `"Sync Broker Telemetry"`.
+  - Typecheck `DATABASE_URL= pnpm check`: 0 errors.
+  - Vitest focused test suite: 4 test files, 56/56 passing. Full Aperture suite: 160 files, 2,237 tests passing.
+- Rollback revision: `capital-aperture-00184-vuv`.
+
 
