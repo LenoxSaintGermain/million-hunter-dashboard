@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   AlertTriangle, ArrowLeft, CheckCircle2, XCircle, Send, RefreshCw, TrendingUp,
-  TrendingDown, Minus, Flag, BarChart3, Loader2,
+  TrendingDown, Minus, Flag, BarChart3, Loader2, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -99,9 +99,11 @@ function orderSizeLabel(order: { instrumentType?: string | null; qty?: number | 
 
 // ── Order Queue ───────────────────────────────────────────────────────────────
 
-function OrderQueue({ runId, focusCandidateId, ticketBuilderActive = false }: { runId: number; focusCandidateId?: number; ticketBuilderActive?: boolean }) {
+function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderActive = false }: { runId: number; focusCandidateId?: number; requestedOrderId?: number | null; ticketBuilderActive?: boolean }) {
   type Order = NonNullable<inferRouterOutputs<AppRouter>["aperture"]["order"]["list"]>[number];
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const targetHighlightId = requestedOrderId ?? Number(new URLSearchParams(search).get("order") || 0);
   const [confirmation, setConfirmation] = useState<{ kind: "approve" | "submit"; order: Order } | null>(null);
   const [confirmationText, setConfirmationText] = useState("");
   const [rejection, setRejection] = useState<Order | null>(null);
@@ -200,57 +202,76 @@ function OrderQueue({ runId, focusCandidateId, ticketBuilderActive = false }: { 
       )}
 
       <div className="space-y-2">
-        {scopedOrders.map((o) => (
-          <Card key={o.id} className="min-w-0 overflow-hidden">
-            <CardContent className="min-w-0 pb-3 pt-3">
-              <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-                  <span className="min-w-0 break-words font-mono text-sm font-bold" style={{ color: "var(--sh-text-primary)" }}>{orderInstrumentLabel(o)}</span>
-                  <Badge variant="outline" className="text-xs" style={{ color: o.side === "buy" ? "oklch(0.55 0.15 145)" : "var(--sh-red)" }}>
-                    {o.side.toUpperCase()}
-                  </Badge>
-                  <span className="min-w-0 basis-full break-words text-xs sm:basis-auto" style={{ color: "var(--sh-fg-muted)" }}>
-                    {orderSizeLabel(o)} · {o.orderType} · {o.timeInForce}
-                  </span>
-                  <Badge variant="outline" className="max-w-full whitespace-normal text-left text-xs" style={{ color: statusColor(o.status) }}>
-                    {statusLabel(o.status)}
-                  </Badge>
-                </div>
-                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
-                  {o.status === "filled" && o.filledAvgPriceCents && (
-                    <span className="text-xs tabular-nums" style={{ color: "oklch(0.55 0.15 145)" }}>
-                      filled @ {fmtPrice(o.filledAvgPriceCents)}{isOptionInstrument(o.instrumentType) ? " premium" : "/share"}
+        {scopedOrders.map((o) => {
+          const isTargetTicket = Boolean(targetHighlightId && o.id === targetHighlightId);
+          return (
+            <Card
+              key={o.id}
+              ref={isTargetTicket ? (el) => el?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined}
+              className={`min-w-0 overflow-hidden transition-all duration-300 ${isTargetTicket ? "ring-2 ring-[var(--sh-signal)] shadow-md" : ""}`}
+              style={isTargetTicket ? { borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" } : undefined}
+            >
+              <CardContent className="min-w-0 pb-3 pt-3">
+                {isTargetTicket && (
+                  <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>
+                    <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                    <span>Target Staged Ticket</span>
+                  </div>
+                )}
+                <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+                    <span className="min-w-0 break-words font-mono text-sm font-bold" style={{ color: "var(--sh-text-primary)" }}>{orderInstrumentLabel(o)}</span>
+                    <Badge variant="outline" className="text-xs" style={{ color: o.side === "buy" ? "oklch(0.55 0.15 145)" : "var(--sh-red)" }}>
+                      {o.side.toUpperCase()}
+                    </Badge>
+                    <span className="min-w-0 basis-full break-words text-xs sm:basis-auto" style={{ color: "var(--sh-fg-muted)" }}>
+                      {orderSizeLabel(o)} · {o.orderType} · {o.timeInForce}
                     </span>
-                  )}
-                  {o.status === "pending_approval" && (
-                    <>
-                      <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "approve", order: o }); setConfirmationText(""); }} disabled={approve.isPending}>
-                        <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Approve paper ticket
+                    <Badge variant="outline" className="max-w-full whitespace-normal text-left text-xs" style={{ color: statusColor(o.status) }}>
+                      {statusLabel(o.status)}
+                    </Badge>
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
+                    {o.status === "filled" && o.filledAvgPriceCents && (
+                      <span className="text-xs tabular-nums" style={{ color: "oklch(0.55 0.15 145)" }}>
+                        filled @ {fmtPrice(o.filledAvgPriceCents)}{isOptionInstrument(o.instrumentType) ? " premium" : "/share"}
+                      </span>
+                    )}
+                    {o.status === "pending_approval" && (
+                      <>
+                        <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "approve", order: o }); setConfirmationText(""); }} disabled={approve.isPending}>
+                          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Approve paper ticket
+                        </Button>
+                        <Button variant="outline" size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setRejection(o); setRejectionReason(""); }} disabled={reject.isPending}>
+                          <XCircle aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Do not approve
+                        </Button>
+                      </>
+                    )}
+                    {o.status === "approved" && (
+                      <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "submit", order: o }); setConfirmationText(""); }} disabled={submit.isPending}>
+                        <Send aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Submit / queue paper order
                       </Button>
-                      <Button variant="outline" size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setRejection(o); setRejectionReason(""); }} disabled={reject.isPending}>
-                        <XCircle aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Do not approve
-                      </Button>
-                    </>
-                  )}
-                  {o.status === "approved" && (
-                    <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "submit", order: o }); setConfirmationText(""); }} disabled={submit.isPending}>
-                      <Send aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Submit / queue paper order
-                    </Button>
-                  )}
-                  <span className="text-xs tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>
-                    {formatDistanceToNow(o.createdAt)} ago
-                  </span>
+                    )}
+                    <span className="text-xs tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>
+                      {formatDistanceToNow(o.updatedAt, { addSuffix: true })}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              {o.rejectionReason && (
-                <p className="mt-2 break-words text-xs" style={{ color: "var(--sh-red)" }}>Reason: {o.rejectionReason}</p>
-              )}
-              {o.dispatchError && (
-                <p className="mt-2 rounded border px-3 py-2 text-xs leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 45%, var(--sh-border-1))", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Broker response unresolved.</strong> The stable paper-order ID is being reconciled. Do not submit another order or change this mission disposition yet.</p>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                {o.reason && (
+                  <p className="mt-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
+                    {o.reason}
+                  </p>
+                )}
+                {o.rejectionReason && (
+                  <p className="mt-2 break-words text-xs" style={{ color: "var(--sh-red)" }}>Reason: {o.rejectionReason}</p>
+                )}
+                {o.dispatchError && (
+                  <p className="mt-2 rounded border px-3 py-2 text-xs leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 45%, var(--sh-border-1))", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Broker response unresolved.</strong> The stable paper-order ID is being reconciled. Do not submit another order or change this mission disposition yet.</p>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
       {otherRunOrders.length > 0 && focusCandidateId != null && (
         <div className="flex min-w-0 flex-col gap-2 rounded-lg border px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
@@ -1109,7 +1130,7 @@ export default function ApertureExecute() {
             <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-3 py-2 text-center leading-5" value="alpha">Outcome &amp; notes</TabsTrigger>
           </TabsList>
           <TabsContent value="orders" className="mt-4 min-w-0" aria-label="Paper ticket">
-            <OrderQueue runId={runId} focusCandidateId={proposalCandidate?.id} ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired && !candidateActiveOrder)} />
+            <OrderQueue runId={runId} focusCandidateId={proposalCandidate?.id} requestedOrderId={requestedOrderId ? Number(requestedOrderId) : null} ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired && !candidateActiveOrder)} />
           </TabsContent>
           <TabsContent value="monitoring" className="mt-4 min-w-0" aria-label="Check whether thesis still holds">
             <MonitoringPanel key={`${runId}:${proposalCandidate?.id}:${requestedOrderId ?? "default"}`} runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule} order={monitoringOrder} selection={findingSelection} onOpenFinding={navigate} contextState={monitoringContextState} onRetryContext={() => { void runQuery.refetch(); void ordersQuery.refetch(); }} />

@@ -150,7 +150,7 @@ export function TodayAttentionBriefing({
     if (!target || !inlineTask.evidence) return null;
     return <section aria-label="Review finding here" className="border-t p-4" style={{ borderColor: "var(--sh-border-1)" }}>
       <FindingEvidence evidence={inlineTask.evidence} expanded />
-      <MonitoringFindingReview key={inlineTask.href} target={target} />
+      <MonitoringFindingReview key={inlineTask.href} target={target} onClose={() => setInlineTask(null)} />
     </section>;
   };
   const dismiss = (item: ApertureAttentionItem | ApertureMotionItem) => {

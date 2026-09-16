@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { ShieldCheck, Layers, DollarSign } from "lucide-react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { type MonitoringFindingSelection, type MonitoringReviewDecision, type MonitoringReviewReceipt } from "@shared/monitoringFinding";
@@ -12,11 +13,14 @@ export function MonitoringFindingReview({
   target,
   onHedge,
   onExit,
+  onClose,
 }: {
   target: Target;
   onHedge?: () => void;
   onExit?: () => void;
+  onClose?: () => void;
 }) {
+  const utils = (trpc as any).useUtils?.();
   const receipts = trpc.aperture.monitor.reviews.list.useQuery(target, { refetchOnWindowFocus: false });
   const [decision, setDecision] = useState<MonitoringReviewDecision | "">("");
   const [note, setNote] = useState("");
@@ -26,7 +30,30 @@ export function MonitoringFindingReview({
   const [editing, setEditing] = useState(false);
   const request = useRef<(Target & { requestId: string; decision: MonitoringReviewDecision; note: string }) | null>(null);
   const record = trpc.aperture.monitor.reviews.record.useMutation({
-    onSuccess: result => { setSaved(result.receipt); setEditing(false); request.current = null; void receipts.refetch(); },
+    onSuccess: async (result) => {
+      setSaved(result.receipt);
+      setEditing(false);
+      request.current = null;
+      void receipts.refetch();
+      if (utils?.aperture) {
+        await Promise.allSettled([
+          utils.aperture.desk.summary.invalidate(),
+          utils.aperture.cockpit.invalidate(),
+          utils.aperture.play.list.invalidate(),
+        ]);
+      }
+      toast.success(
+        result.receipt.decision === "resolved"
+          ? "Finding signed off and closed. Removed from attention briefing."
+          : "Review recorded."
+      );
+      if (result.receipt.decision === "resolved" && onClose) {
+        onClose();
+      }
+    },
+    onError: (err) => {
+      toast.error(`Failed to record review: ${err.message}`);
+    },
   });
   const latest = saved ?? receipts.data?.receipts.at(-1) ?? null;
   const uncertain = record.isError && request.current != null;
@@ -61,25 +88,25 @@ export function MonitoringFindingReview({
     <div className="mt-3 rounded-lg border p-3 space-y-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
       <p className="text-[11px] font-bold tracking-tight uppercase" style={{ color: "var(--sh-fg-muted)" }}>Operational Decisions</p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        {/* Action 1: Hold / Maintain */}
+        {/* Action 1: Sign Off / Maintain */}
         <Button
           type="button"
           variant="outline"
           className="h-auto py-2 px-3 flex flex-col items-start gap-0.5 text-left border-emerald-500/30 hover:bg-emerald-500/10 hover:border-emerald-500"
           disabled={record.isPending || !receipts.data || receipts.isError}
           onClick={() => {
-            const holdNote = "Hold / Maintain: Position monitored, thesis and risk intact.";
-            request.current = { ...target, decision: "reviewed_unresolved", note: holdNote, requestId: crypto.randomUUID() };
-            setDecision("reviewed_unresolved");
-            setNote(holdNote);
+            const resolveNote = "Sign Off / Maintain: Operator verified catalyst condition; thesis and risk parameters remain intact.";
+            request.current = { ...target, decision: "resolved", note: resolveNote, requestId: crypto.randomUUID() };
+            setDecision("resolved");
+            setNote(resolveNote);
             record.mutate(request.current);
           }}
         >
           <div className="flex items-center gap-1.5 font-semibold text-xs text-emerald-500">
             <ShieldCheck className="h-3.5 w-3.5" />
-            <span>Hold / Maintain</span>
+            <span>Sign Off / Maintain</span>
           </div>
-          <span className="text-[10px] text-muted-foreground leading-tight">Acknowledge & keep active</span>
+          <span className="text-[10px] text-muted-foreground leading-tight">Acknowledge & resolve blocker</span>
         </Button>
 
         {/* Action 2: Hedge / Adjust */}

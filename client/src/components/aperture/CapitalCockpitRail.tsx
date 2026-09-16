@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Clock3, Info, Landmark, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { invalidateAccountRefreshReads } from "@/lib/accountRefreshInvalidation";
 import { formatMandatePercentPoints } from "@shared/cockpitPresentation";
 import { buildCockpitRailSummary, type CockpitHeadroomLine } from "@shared/cockpitRailSummary";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -51,7 +52,8 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
   const accounts = accountQuery.data;
   const preferredAccountId = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")?.id
     ?? accounts?.find((account) => account.isPaper)?.id
-    ?? null;
+    ?? accounts?.[0]?.id
+    ?? 1;
   const cockpitInput = useMemo(() => runId ? { runId } : preferredAccountId ? { accountId: preferredAccountId } : undefined, [runId, preferredAccountId]);
   // Do not ask for an unscoped cockpit while the operator's account is still
   // loading. That response can falsely claim no account on a cold device.
@@ -82,15 +84,19 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
     setExpanded(preference.data.expanded);
   }, [compactOnly, preference.data]);
   const deskQuery = (trpc.aperture as any)?.desk?.summary?.useQuery ? (trpc.aperture as any).desk.summary.useQuery(undefined, { retry: false, refetchOnWindowFocus: false }) : { data: null };
+  const utils = typeof (trpc as any).useUtils === "function" ? (trpc as any).useUtils() : null;
   const syncMutation = (trpc.aperture as any)?.account?.sync?.useMutation ? (trpc.aperture as any).account.sync.useMutation({
-    onSuccess: () => {
+    onSuccess: async (_data: any, variables: any) => {
+      const targetId = variables?.id ?? preferredAccountId ?? 1;
+      if (utils?.aperture) {
+        await invalidateAccountRefreshReads(utils.aperture, targetId);
+      }
       cockpitQuery.refetch();
       accountQuery.refetch();
     },
   }) : null;
 
   const [syncing, setSyncing] = useState(false);
-  const utils = typeof (trpc as any).useUtils === "function" ? (trpc as any).useUtils() : null;
   const activeThesisQuery = (trpc as any).thesis?.activeCapital?.useQuery
     ? (trpc as any).thesis.activeCapital.useQuery()
     : { data: null };
@@ -115,12 +121,20 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
   const handleRapidSync = async () => {
     if (syncing) return;
     setSyncing(true);
+    const toastId = "rapid-broker-sync";
+    const targetId = preferredAccountId ?? 1;
     try {
-      if (preferredAccountId && syncMutation?.mutateAsync) {
-        await syncMutation.mutateAsync({ id: preferredAccountId });
-      } else {
-        await Promise.allSettled([cockpitQuery.refetch(), accountQuery.refetch()]);
+      toast.loading("Synchronizing broker balances & marks...", { id: toastId });
+      if (syncMutation?.mutateAsync) {
+        await syncMutation.mutateAsync({ id: targetId });
       }
+      if (utils?.aperture) {
+        await invalidateAccountRefreshReads(utils.aperture, targetId);
+      }
+      await Promise.allSettled([cockpitQuery.refetch(), accountQuery.refetch()]);
+      toast.success("Broker telemetry synchronized", { id: toastId });
+    } catch (err: any) {
+      toast.error(`Broker sync failed: ${err?.message ?? "Network error"}`, { id: toastId });
     } finally {
       setSyncing(false);
     }

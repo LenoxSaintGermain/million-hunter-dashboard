@@ -1088,6 +1088,14 @@ export function MissionReviewFeasibility({ branch = "research", feasibility, ent
   return <section aria-label={branch === "research" ? "Target feasibility and effective risk" : "Effective risk for future research"} className="mt-4 rounded-lg border p-3 text-sm" style={{ borderColor: hasTarget && feasibility.classification === "extreme" ? "var(--sh-red)" : "var(--sh-border-1)" }}>
     <h3 className="font-semibold">{branch === "research" ? "Effective normal-play risk" : "Effective risk for future research"} <span className="mt-1 block font-serif text-2xl tabular-nums">{formatCents(feasibility.riskBudgetCents)}</span></h3>
     <p className="mt-2 leading-6"><strong>You entered {formatCents(enteredLossCents)}.</strong> {policyBinds ? `The normal-play policy caps risk at ${normalPolicyPct}% of your ${formatCents(feasibility.capitalBaseCents)} declared capital (${formatCents(policyCents)}).` : remainingHeadroomCents === 0 ? "Existing open risk uses this mission’s aggregate allowance." : "The smallest measured mission, policy, account or portfolio limit controls."}</p>
+    {(feasibility.riskBudgetCents === 0 || remainingHeadroomCents === 0) && (
+      <div className="mt-2.5 rounded border p-2.5 text-xs space-y-1" style={{ borderColor: "var(--sh-border-1)", background: "rgba(245, 158, 11, 0.06)" }}>
+        <p className="font-semibold text-amber-500">Why does this mission show no risk headroom when portfolio cash is available?</p>
+        <p className="leading-5" style={{ color: "var(--sh-fg-muted)" }}>
+          {feasibility.clarification ?? `Broker cash is liquid, but the Mandate Planned-Loss Envelope (${formatCents(feasibility.maxOpenRiskCents)} ceiling) is 100% committed by active positions. Downside risk capacity—not nominal broker cash—is the binding constraint.`}
+        </p>
+      </div>
+    )}
     {hasTarget && <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="font-semibold">{feasibility.requiredReturnPct}% per {feasibility.targetPeriod} required · {feasibility.classification}</p><p className="mt-1 leading-6" style={{ color: "var(--sh-fg-muted)" }}>{formatCents(feasibility.targetProfitCents)} target ÷ {formatCents(feasibility.capitalBaseCents)} declared mission capital. An aspiration, not a forecast; it never increases allowed risk.</p></div>}
     {branch !== "research" && feasibility.targetProfitCents != null && feasibility.targetPeriod != null && <p className="mt-2 leading-6">Your profit target is kept for research; it is not evaluated for this decision.</p>}
     {disclosure}

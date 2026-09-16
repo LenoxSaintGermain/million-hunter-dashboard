@@ -460,9 +460,6 @@ const orderCreateBase = z.object({
 
 const orderCreateInput = orderCreateBase.superRefine((val, ctx) => {
   if (val.intent === "open") {
-    if (val.runId == null) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Research runId is required for opening proposals", path: ["runId"] });
-    }
     if (!val.invalidationCondition || val.invalidationCondition.length < MIN_NARRATIVE_CHARS) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Invalidation condition must be at least ${MIN_NARRATIVE_CHARS} characters`, path: ["invalidationCondition"] });
     }
@@ -4821,20 +4818,18 @@ export const apertureRouter = router({
             .limit(1);
           if (matchingOrder) {
             resolvedRunId = matchingOrder.runId;
-          } else {
-            const [latestRun] = await db!.select({ id: apertureRuns.id })
-              .from(apertureRuns)
-              .where(eq(apertureRuns.userId, ctx.user.id))
-              .orderBy(desc(apertureRuns.id))
-              .limit(1);
-            if (!latestRun) {
-              throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No research run found for this operator account to attach the exit order to." });
-            }
-            resolvedRunId = latestRun.id;
           }
         }
         if (!resolvedRunId) {
-          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Research runId is required." });
+          const [latestRun] = await db!.select({ id: apertureRuns.id })
+            .from(apertureRuns)
+            .where(eq(apertureRuns.userId, ctx.user.id))
+            .orderBy(desc(apertureRuns.id))
+            .limit(1);
+          if (!latestRun) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: isClosing ? "No research run found for this operator account to attach the exit order to." : "No research run found for this operator account to attach the paper ticket to." });
+          }
+          resolvedRunId = latestRun.id;
         }
 
         // A run's own preset tightens the mandate for orders placed under it.
@@ -4853,7 +4848,7 @@ export const apertureRouter = router({
         if (evidenceBlock) throw new TRPCError({ code: "PRECONDITION_FAILED", message: evidenceBlock });
 
         try {
-          return await createOrder({
+          const result = await createOrder({
             ...input,
             runId: resolvedRunId,
             invalidationCondition: input.invalidationCondition ?? (isClosing ? "Position exit — closing or reducing held exposure." : undefined),
@@ -4865,6 +4860,10 @@ export const apertureRouter = router({
               minAvgDailyVolumeUsd: run.liquidityFloorAdvUsd ?? null,
             },
           });
+          return {
+            ...result,
+            runId: resolvedRunId,
+          };
         } catch (e: any) {
           if (e instanceof OrderGateError) {
             throw new TRPCError({
@@ -4914,14 +4913,14 @@ export const apertureRouter = router({
             .orderBy(desc(brokerOrders.id))
             .limit(1);
           if (matchingOrder) resolvedRunId = matchingOrder.runId;
-          else {
-            const [latestRun] = await db!.select({ id: apertureRuns.id })
-              .from(apertureRuns)
-              .where(eq(apertureRuns.userId, ctx.user.id))
-              .orderBy(desc(apertureRuns.id))
-              .limit(1);
-            if (latestRun) resolvedRunId = latestRun.id;
-          }
+        }
+        if (!resolvedRunId) {
+          const [latestRun] = await db!.select({ id: apertureRuns.id })
+            .from(apertureRuns)
+            .where(eq(apertureRuns.userId, ctx.user.id))
+            .orderBy(desc(apertureRuns.id))
+            .limit(1);
+          if (latestRun) resolvedRunId = latestRun.id;
         }
         if (!resolvedRunId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Research runId is required" });
 

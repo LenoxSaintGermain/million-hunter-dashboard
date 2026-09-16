@@ -442,6 +442,7 @@ export async function preflightOrder(input: CreateOrderInput): Promise<OrderEval
 export interface CreateOrderResult {
   orderId: number;
   created: boolean;
+  runId?: number;
 }
 
 async function lockCandidateProposalScope(tx: any, input: Pick<CreateOrderInput, "runId" | "candidateId" | "userId">) {

@@ -7,7 +7,9 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { invalidateAccountRefreshReads } from "@/lib/accountRefreshInvalidation";
 import { AttentionDecisionCard } from "@/components/aperture/AttentionDecisionCard";
 import { AttentionSourceRecovery } from "@/components/aperture/AttentionSourceRecovery";
 import { buildResearchJourneys } from "@shared/runWorkspace";
@@ -209,6 +211,33 @@ export default function AperturePlayDesk() {
     setStageFilter(next);
   };
 
+  const utils = (trpc as any).useUtils?.();
+  const syncBroker = (trpc.aperture as any)?.account?.sync?.useMutation?.() ?? { mutateAsync: async () => {} };
+  const [isSyncingBroker, setIsSyncingBroker] = useState(false);
+
+  const handleSyncBroker = async () => {
+    if (isSyncingBroker) return;
+    setIsSyncingBroker(true);
+    const toastId = "desk-broker-sync";
+    const targetAccountId = desk.data?.account?.id ?? 1;
+    try {
+      toast.loading("Synchronizing broker balances and marks from Alpaca...", { id: toastId });
+      await syncBroker.mutateAsync({ id: targetAccountId });
+      if (utils?.aperture) {
+        await invalidateAccountRefreshReads(utils.aperture, targetAccountId);
+      }
+      await Promise.allSettled([desk.refetch(), runs.refetch(), playList.refetch(), outcomes.refetch()]);
+      toast.success("Broker telemetry synchronized", { id: toastId });
+    } catch (err: any) {
+      toast.error(`Broker sync failed: ${err?.message ?? "Network error"}`, { id: toastId });
+    } finally {
+      setIsSyncingBroker(false);
+    }
+  };
+
+  const accountLastSyncedAt = desk.data?.account?.lastSyncedAt;
+  const isAccountTelemetryStale = !accountLastSyncedAt || (Date.now() - accountLastSyncedAt > 4 * 3600 * 1000);
+
   const refresh = async () => {
     // Keep the initiating control focusable while blocking repeated activation,
     // including a second event before query state has repainted.
@@ -229,7 +258,18 @@ export default function AperturePlayDesk() {
         <h1 className="font-serif text-2xl sm:text-3xl" style={{ color: "var(--sh-text-primary)" }}>Play Desk</h1>
         <p className="mt-0.5 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Executive position monitoring &amp; rapid risk actions</p>
       </div>
-      <Button type="button" variant="outline" size="sm" className="min-h-11 aria-disabled:opacity-50" onClick={refresh} aria-disabled={isRefreshing} aria-describedby="desk-refresh-scope"><RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />{isRefreshing ? "Refreshing…" : "Refresh status"}</Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="min-h-11 aria-disabled:opacity-50"
+        onClick={refresh}
+        aria-disabled={isRefreshing}
+        aria-describedby="desk-refresh-scope"
+      >
+        <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+        {isRefreshing ? "Refreshing…" : "Refresh status"}
+      </Button>
     </header>
 
     <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2" style={{ borderColor: "var(--sh-border-1)" }}>
@@ -238,6 +278,17 @@ export default function AperturePlayDesk() {
         <p>Refresh reads records only; no new checks.</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="min-h-11"
+          onClick={handleSyncBroker}
+          disabled={isSyncingBroker}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${isSyncingBroker ? "animate-spin" : ""}`} />
+          {isSyncingBroker ? "Syncing..." : "Sync Broker Telemetry"}
+        </Button>
         <Button type="button" size="sm" className="min-h-11 font-semibold" onClick={() => setManualModalOpen(true)}>
           <Sparkles className="mr-2 h-4 w-4" />
           + Draft Paper Ticket
@@ -247,6 +298,27 @@ export default function AperturePlayDesk() {
         </Button>
       </div>
     </div>
+
+    {isAccountTelemetryStale && (
+      <section role="alert" className="rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: "var(--sh-border-1)", background: "rgba(245, 158, 11, 0.07)" }}>
+        <div>
+          <p className="font-semibold text-amber-500">Broker Telemetry Out of Date</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Alpaca Paper snapshot was last refreshed {accountLastSyncedAt ? new Date(accountLastSyncedAt).toLocaleString() : "over 24 hours ago"}. Sync live telemetry to update cash balances, buying power, and active marks.
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          className="shrink-0 font-semibold bg-amber-500 text-black hover:bg-amber-400"
+          onClick={handleSyncBroker}
+          disabled={isSyncingBroker}
+        >
+          <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isSyncingBroker ? "animate-spin" : ""}`} />
+          {isSyncingBroker ? "Syncing live telemetry…" : "Sync Broker Balances"}
+        </Button>
+      </section>
+    )}
     {unavailable.length > 0 && <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}>
       {unavailable.map(({ label, query }) => <div key={label} className="mb-3 last:mb-0"><p className="font-semibold">{label} status unavailable</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{query.data != null ? "Refresh failed. Last known records remain visible; they may be stale." : "This part of the desk could not be verified."}</p></div>)}
       <p className="text-sm">This is not an all-clear. Refresh status to retry; no order will be resubmitted.</p>
@@ -500,6 +572,9 @@ export default function AperturePlayDesk() {
           <ManualOrderTicketModal
             open={manualModalOpen}
             onOpenChange={setManualModalOpen}
+            initialValues={{
+              runId: runs.data?.[0]?.id,
+            }}
           />
         )}
       </>;

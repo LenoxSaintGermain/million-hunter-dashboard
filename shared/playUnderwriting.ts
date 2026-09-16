@@ -39,6 +39,10 @@ export type TargetFeasibility = {
   lossLimitCents: number;
   assessment: string;
   mayInfluenceSizing: false;
+  bindingLayer?: "broker_cash" | "mandate_risk_envelope" | "portfolio_symbol_ceiling" | "mission_limit";
+  clarification?: string;
+  aggregatePolicyPct?: number;
+  aggregateOpenRiskBeforeCents?: number;
 };
 
 export type RegimeMetric = {
@@ -201,6 +205,15 @@ export function calculateTargetFeasibility(objective: CapitalObjective, risk: Un
   const assessment = requiredReturnPct == null
     ? "No profit target was requested. Risk remains governed by the measured envelope."
     : `${requiredReturnPct}% ${objective.targetPeriod} return required; classified ${classification}. The target does not increase allowed risk.`;
+  const aggregateOpenRiskBeforeCents = Math.max(0, risk.aggregateOpenRiskBeforeCents ?? 0);
+  const bindingLayer = aggregateRemaining <= 0
+    ? "mandate_risk_envelope"
+    : normalPlayRiskCents <= 0
+      ? "mission_limit"
+      : undefined;
+  const clarification = aggregateRemaining <= 0
+    ? `Mandate planned-loss ceiling (${risk.maxAggregateOpenRiskPct}% of capital = $${Math.round(maxOpenRiskCents / 100).toLocaleString()}) is 100% committed by active positions ($${Math.round(aggregateOpenRiskBeforeCents / 100).toLocaleString()} open risk). Broker cash is liquid, but downside loss capacity is binding.`
+    : undefined;
   return {
     capitalBaseCents: objective.deployableCapitalCents,
     targetProfitCents: objective.targetProfitCents,
@@ -215,6 +228,10 @@ export function calculateTargetFeasibility(objective: CapitalObjective, risk: Un
     lossLimitCents,
     assessment,
     mayInfluenceSizing: false,
+    bindingLayer,
+    clarification,
+    aggregatePolicyPct: risk.maxAggregateOpenRiskPct,
+    aggregateOpenRiskBeforeCents,
   };
 }
 
@@ -285,7 +302,7 @@ export function underwritePlayCandidates(input: {
     portfolioRisk: { ...base.portfolioRisk, bindingConstraint: reason },
   });
   if (remaining <= 0 || feasibility.riskBudgetCents <= 0) {
-    return refuse("portfolio_headroom_exhausted", "No measured risk capacity remains inside the current portfolio and mission limits.", "Reduce existing open risk or revise the mandate before re-underwriting.");
+    return refuse("portfolio_headroom_exhausted", "No measured risk capacity remains inside the current portfolio and mission limits. While broker cash is liquid, the Mandate Planned-Loss Envelope is 100% committed by active positions.", "Reduce existing open risk or revise the mandate before re-underwriting.");
   }
   if (!marketIsFresh(input.market)) {
     return refuse("market_data_stale", "The market snapshot is stale or incomplete, so current triggers and entries are withheld.", "Refresh provider-backed SPY, QQQ, and IWM observations.");

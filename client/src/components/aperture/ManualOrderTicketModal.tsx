@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ export interface ManualOrderTicketModalProps {
     suggestedAmountCents?: number;
     holdingPeriod?: "intraday" | "swing" | "catalyst_window" | "position";
   };
+  onStaged?: (orderId: number, runId?: number) => void;
 }
 
 export type PlayExpression = 
@@ -39,9 +41,14 @@ const EXPRESSIONS: { id: PlayExpression; label: string; badge: string; desc: str
   { id: "collar_hedge", label: "Skewed Collar / Tail Hedge", badge: "Collar", desc: "Protective Put funded by selling OTM Call against exposure.", regime: "Asymmetric Defense" },
 ];
 
-export function ManualOrderTicketModal({ open, onOpenChange, initialValues }: ManualOrderTicketModalProps) {
+export function ManualOrderTicketModal({ open, onOpenChange, initialValues, onStaged }: ManualOrderTicketModalProps) {
+  const [, navigate] = useLocation();
   const utils = typeof (trpc as any).useUtils === "function" ? (trpc as any).useUtils() : null;
   const accountsQuery = trpc.aperture.account.list.useQuery();
+  const runsQuery = (trpc as any)?.aperture?.run?.list?.useQuery
+    ? trpc.aperture.run.list.useQuery(undefined, { enabled: !initialValues?.runId })
+    : { data: undefined };
+  const effectiveRunId = initialValues?.runId ?? runsQuery.data?.[0]?.id;
 
   const paperAccounts = useMemo(() => {
     return (accountsQuery.data ?? []).filter((a) => a.isPaper);
@@ -141,11 +148,34 @@ export function ManualOrderTicketModal({ open, onOpenChange, initialValues }: Ma
 
   const createOrder = trpc.aperture.order.create.useMutation({
     onSuccess: async (res) => {
+      onOpenChange(false);
       if (utils?.aperture) {
         await utils.aperture.invalidate();
       }
-      toast.success(`Staged paper order #${res.orderId} for ${symbol} on Play Desk`);
-      onOpenChange(false);
+      const targetRunId = res.runId ?? effectiveRunId;
+      const targetCandidateId = initialValues?.candidateId;
+      const ticketUrl = targetRunId
+        ? `/aperture/run/${targetRunId}/execute?order=${res.orderId}${targetCandidateId ? `&candidate=${targetCandidateId}` : ""}`
+        : `/aperture/plays?stage=approve&inspect=${res.orderId}`;
+
+      toast.success(`Staged paper order #${res.orderId} for ${symbol}`, {
+        action: {
+          label: "View ticket",
+          onClick: () => {
+            if (onStaged) {
+              onStaged(res.orderId, targetRunId);
+            } else {
+              navigate(ticketUrl);
+            }
+          },
+        },
+      });
+
+      if (onStaged) {
+        onStaged(res.orderId, targetRunId);
+      } else {
+        navigate(ticketUrl);
+      }
     },
     onError: (err) => {
       toast.error(`Order staging failed: ${err.message}`);
@@ -213,7 +243,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, initialValues }: Ma
       holdingPeriod,
       catalystDeadlineAt: Date.now() + catalystDays * 86_400_000,
       paperAcknowledgement: "PAPER",
-      runId: initialValues?.runId,
+      runId: effectiveRunId,
       candidateId: initialValues?.candidateId,
     });
   };
