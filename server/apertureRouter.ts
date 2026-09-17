@@ -429,6 +429,8 @@ async function evidenceReviewBlock(
  */
 const orderCreateBase = z.object({
   runId: z.number().optional(),
+  decisionRunId: z.number().optional(),
+  decisionRevisionId: z.number().optional(),
   candidateId: z.number().optional(),
   accountId: z.number(),
   portfolioContextAccountId: z.number().optional(),
@@ -2879,6 +2881,10 @@ export const apertureRouter = router({
         researchRunId: apertureDecisionRuns.researchRunId,
         lifecycle: apertureDecisionRuns.lifecycle,
         contextKind: apertureDecisionRuns.contextKind,
+        accountId: apertureDecisionRuns.accountId,
+        capitalThesisId: apertureDecisionRuns.capitalThesisId,
+        canonicalThesisId: apertureDecisionRuns.canonicalThesisId,
+        effectiveBranch: apertureDecisionRevisions.effectiveBranch,
         missionText: apertureDecisionRevisions.missionText,
         deployableCapitalCents: apertureDecisionRevisions.deployableCapitalCents,
         maxPlannedLossCents: apertureDecisionRevisions.maxPlannedLossCents,
@@ -2976,7 +2982,7 @@ export const apertureRouter = router({
       const now = Date.now();
       const jobRecord = latestMission ? await readUnderwritingJob(db!, ctx.user.id, latestMission.decisionRunId, latestMission.revisionId) : null;
       const jobState = underwritingJobStatus(jobRecord, now);
-      const discoveryRead = latestMission?.contextKind === "objective" && jobRecord
+      const discoveryRead = latestMission && latestMission.contextKind === "objective"
         ? await readOptionalStatusSource("Discovery receipt", () => readObjectiveDiscovery(db!, ctx.user.id, {
           decisionRunId: latestMission.decisionRunId, decisionRevisionId: latestMission.revisionId,
         })) : null;
@@ -2997,7 +3003,12 @@ export const apertureRouter = router({
         mission: latestMission ? {
           decisionRunId: latestMission.decisionRunId,
           revisionId: latestMission.revisionId,
+          researchRunId: latestMission.researchRunId,
+          accountId: latestMission.accountId,
+          capitalThesisId: latestMission.capitalThesisId,
+          canonicalThesisId: latestMission.canonicalThesisId,
           lifecycle: latestMission.lifecycle,
+          effectiveBranch: latestMission.effectiveBranch,
           state: latestMission.missionText.trim().length >= MIN_NARRATIVE_CHARS && latestMission.deployableCapitalCents > 0 && latestMission.maxPlannedLossCents > 0 ? "complete" : "incomplete",
           title: latestMission.thesisName ?? latestMission.missionText,
           updatedAt: latestMission.updatedAt,
@@ -3625,6 +3636,27 @@ export const apertureRouter = router({
           createdAt: now,
         });
         const runId = (result as any).insertId as number;
+
+        // If the operator has an active Capital Mission for this thesis without a researchRunId, bind it!
+        try {
+          const canonicalId = thesis.sourceCompilationId ?? null;
+          await db!.update(apertureDecisionRuns)
+            .set({
+              researchRunId: runId,
+              lifecycle: "researching",
+              updatedAt: now,
+            })
+            .where(and(
+              eq(apertureDecisionRuns.userId, ctx.user.id),
+              or(
+                eq(apertureDecisionRuns.capitalThesisId, input.thesisId),
+                canonicalId ? eq(apertureDecisionRuns.canonicalThesisId, canonicalId) : undefined,
+              ),
+              isNull(apertureDecisionRuns.researchRunId),
+            ));
+        } catch (e: any) {
+          console.warn("[aperture] could not bind run to active mission:", e?.message ?? e);
+        }
 
         // Run async — do not await. The client polls status.
         executeRun(runId, ctx.user.id, thesis, input).catch((e) => {
@@ -4834,30 +4866,134 @@ export const apertureRouter = router({
         await requireAccount(db, input.accountId, ctx.user.id);
 
         let resolvedRunId = input.runId;
-        if (!resolvedRunId && isClosing) {
-          const [matchingOrder] = await db!.select({ runId: brokerOrders.runId })
-            .from(brokerOrders)
-            .where(and(
-              eq(brokerOrders.userId, ctx.user.id),
-              eq(brokerOrders.accountId, input.accountId),
-              eq(brokerOrders.symbol, input.symbol),
-            ))
-            .orderBy(desc(brokerOrders.id))
-            .limit(1);
-          if (matchingOrder) {
-            resolvedRunId = matchingOrder.runId;
+        let resolvedDecisionRunId: number | null = input.decisionRunId ?? null;
+        let resolvedDecisionRevisionId: number | null = input.decisionRevisionId ?? null;
+
+        if (isClosing) {
+          if (!resolvedRunId) {
+            const [matchingOrder] = await db!.select({ runId: brokerOrders.runId })
+              .from(brokerOrders)
+              .where(and(
+                eq(brokerOrders.userId, ctx.user.id),
+                eq(brokerOrders.accountId, input.accountId),
+                eq(brokerOrders.symbol, input.symbol),
+              ))
+              .orderBy(desc(brokerOrders.id))
+              .limit(1);
+            if (matchingOrder) {
+              resolvedRunId = matchingOrder.runId;
+            }
+          }
+          if (!resolvedRunId) {
+            const [latestRun] = await db!.select({ id: apertureRuns.id })
+              .from(apertureRuns)
+              .where(eq(apertureRuns.userId, ctx.user.id))
+              .orderBy(desc(apertureRuns.id))
+              .limit(1);
+            if (!latestRun) {
+              throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No research run found for this operator account to attach the exit order to." });
+            }
+            resolvedRunId = latestRun.id;
+          }
+        } else {
+          // OPENING paper order: verify authoritative Decision Run binding
+          let boundDecisionRun: { id: number; currentRevisionId: number | null; accountId: number; lifecycle: string } | null = null;
+          if (resolvedRunId) {
+            const [decisionByRun] = await db!.select({
+              id: apertureDecisionRuns.id,
+              currentRevisionId: apertureDecisionRuns.currentRevisionId,
+              accountId: apertureDecisionRuns.accountId,
+              lifecycle: apertureDecisionRuns.lifecycle,
+            }).from(apertureDecisionRuns)
+              .where(and(
+                eq(apertureDecisionRuns.userId, ctx.user.id),
+                eq(apertureDecisionRuns.researchRunId, resolvedRunId),
+              ))
+              .limit(1);
+            if (decisionByRun) boundDecisionRun = decisionByRun;
+          }
+
+          if (boundDecisionRun) {
+            resolvedDecisionRunId = boundDecisionRun.id;
+            resolvedDecisionRevisionId = boundDecisionRun.currentRevisionId;
+          } else {
+            // No authoritative binding on resolvedRunId (e.g. ad-hoc ticket from Play Desk).
+            // Look up operator's active Capital Mission
+            const [activeMission] = await db!.select({
+              decisionRun: apertureDecisionRuns,
+              revision: apertureDecisionRevisions,
+            }).from(apertureDecisionRuns)
+              .innerJoin(apertureDecisionRevisions, and(
+                eq(apertureDecisionRevisions.id, apertureDecisionRuns.currentRevisionId),
+                eq(apertureDecisionRevisions.decisionRunId, apertureDecisionRuns.id),
+              ))
+              .where(and(
+                eq(apertureDecisionRuns.userId, ctx.user.id),
+                inArray(apertureDecisionRuns.lifecycle, ["mission", "researching", "conditional", "eligible"]),
+              ))
+              .orderBy(desc(apertureDecisionRuns.updatedAt))
+              .limit(1);
+
+            if (!activeMission) {
+              throw new TRPCError({
+                code: "PRECONDITION_FAILED",
+                message: "No active Capital Mission found for this operator. Opening paper actions are fail-closed; start from Capital Mission to bind thesis, capital, and risk bounds.",
+              });
+            }
+
+            resolvedDecisionRunId = activeMission.decisionRun.id;
+            resolvedDecisionRevisionId = activeMission.decisionRun.currentRevisionId;
+
+            if (activeMission.decisionRun.researchRunId != null) {
+              resolvedRunId = activeMission.decisionRun.researchRunId;
+            } else {
+              // Discretionary Play Desk ticket without prior automated research:
+              // create container apertureRuns row and bind to the active Capital Mission
+              const now = Date.now();
+              const isOption = input.instrumentType === "long_call" || input.instrumentType === "long_put";
+              const [newRunResult] = await db!.insert(apertureRuns).values({
+                userId: ctx.user.id,
+                thesisId: activeMission.decisionRun.capitalThesisId ?? 0,
+                accountId: input.accountId,
+                deployableCapitalCents: activeMission.revision.deployableCapitalCents,
+                intendedTrades: [{
+                  symbol: input.symbol,
+                  dollarsCents: input.notionalCents ?? (input.limitPriceCents ? input.limitPriceCents * (input.qty ?? 1) : 0),
+                }],
+                holdingPeriod: (input.holdingPeriod as any) ?? activeMission.revision.holdingPeriod ?? "intraday",
+                instrumentPreference: activeMission.revision.instrumentPreference ?? (isOption ? "options" : "shares"),
+                catalystDeadlineAt: input.catalystDeadlineAt ?? (now + 86_400_000),
+                liquidityFloorAdvUsd: CURRENT_MANDATE.minAdvUsd30d,
+                maxSingleNamePct: CURRENT_MANDATE.maxPositionPctOfEquity,
+                invalidationRule: input.invalidationCondition ?? activeMission.revision.invalidationRule ?? "Discretionary paper play staged on Play Desk",
+                mandateVersion: CURRENT_MANDATE.version,
+                status: "completed",
+                droppedNote: "DISCRETIONARY_PLAY_DESK_TICKET",
+                createdAt: now,
+                completedAt: now,
+              });
+              const newRunId = Number((newRunResult as any).insertId);
+
+              await db!.update(apertureDecisionRuns).set({
+                researchRunId: newRunId,
+                accountId: input.accountId,
+                lifecycle: "eligible",
+                updatedAt: now,
+              }).where(eq(apertureDecisionRuns.id, activeMission.decisionRun.id));
+
+              if (activeMission.revision.effectiveBranch === "research") {
+                await db!.update(apertureDecisionRevisions).set({
+                  effectiveBranch: "eligible",
+                }).where(eq(apertureDecisionRevisions.id, activeMission.revision.id));
+              }
+
+              resolvedRunId = newRunId;
+            }
           }
         }
+
         if (!resolvedRunId) {
-          const [latestRun] = await db!.select({ id: apertureRuns.id })
-            .from(apertureRuns)
-            .where(eq(apertureRuns.userId, ctx.user.id))
-            .orderBy(desc(apertureRuns.id))
-            .limit(1);
-          if (!latestRun) {
-            throw new TRPCError({ code: "PRECONDITION_FAILED", message: isClosing ? "No research run found for this operator account to attach the exit order to." : "No research run found for this operator account to attach the paper ticket to." });
-          }
-          resolvedRunId = latestRun.id;
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Research runId is required to stage an order." });
         }
 
         // A run's own preset tightens the mandate for orders placed under it.
@@ -4879,6 +5015,8 @@ export const apertureRouter = router({
           const result = await createOrder({
             ...input,
             runId: resolvedRunId,
+            decisionRunId: resolvedDecisionRunId,
+            decisionRevisionId: resolvedDecisionRevisionId,
             invalidationCondition: input.invalidationCondition ?? (isClosing ? "Position exit — closing or reducing held exposure." : undefined),
             catalystDeadlineAt: input.catalystDeadlineAt ?? (isClosing ? Date.now() + 86400000 : undefined),
             holdingPeriod: input.holdingPeriod ?? (isClosing ? (run.holdingPeriod ?? "swing") : undefined),
@@ -4930,6 +5068,8 @@ export const apertureRouter = router({
         await requireAccount(db, input.accountId, ctx.user.id);
 
         let resolvedRunId = input.runId;
+        let resolvedDecisionRunId: number | null = null;
+        let resolvedDecisionRevisionId: number | null = null;
         if (!resolvedRunId && isClosing) {
           const [matchingOrder] = await db!.select({ runId: brokerOrders.runId })
             .from(brokerOrders)
@@ -4941,6 +5081,45 @@ export const apertureRouter = router({
             .orderBy(desc(brokerOrders.id))
             .limit(1);
           if (matchingOrder) resolvedRunId = matchingOrder.runId;
+        }
+        if (!isClosing) {
+          let hasAuthority = false;
+          if (resolvedRunId) {
+            const [decisionByRun] = await db!.select({
+              id: apertureDecisionRuns.id,
+              currentRevisionId: apertureDecisionRuns.currentRevisionId,
+            }).from(apertureDecisionRuns)
+              .where(and(
+                eq(apertureDecisionRuns.userId, ctx.user.id),
+                eq(apertureDecisionRuns.researchRunId, resolvedRunId),
+              ))
+              .limit(1);
+            if (decisionByRun) {
+              hasAuthority = true;
+              resolvedDecisionRunId = decisionByRun.id;
+              resolvedDecisionRevisionId = decisionByRun.currentRevisionId;
+            }
+          }
+          if (!hasAuthority) {
+            const [activeMission] = await db!.select({
+              id: apertureDecisionRuns.id,
+              currentRevisionId: apertureDecisionRuns.currentRevisionId,
+              researchRunId: apertureDecisionRuns.researchRunId,
+            }).from(apertureDecisionRuns)
+              .where(and(
+                eq(apertureDecisionRuns.userId, ctx.user.id),
+                inArray(apertureDecisionRuns.lifecycle, ["mission", "researching", "conditional", "eligible"]),
+              ))
+              .orderBy(desc(apertureDecisionRuns.updatedAt))
+              .limit(1);
+            if (activeMission) {
+              resolvedDecisionRunId = activeMission.id;
+              resolvedDecisionRevisionId = activeMission.currentRevisionId;
+              if (activeMission.researchRunId) {
+                resolvedRunId = activeMission.researchRunId;
+              }
+            }
+          }
         }
         if (!resolvedRunId) {
           const [latestRun] = await db!.select({ id: apertureRuns.id })
@@ -4972,6 +5151,8 @@ export const apertureRouter = router({
           preflight = await preflightOrder({
             ...input,
             runId: resolvedRunId,
+            decisionRunId: resolvedDecisionRunId,
+            decisionRevisionId: resolvedDecisionRevisionId,
             invalidationCondition: input.invalidationCondition ?? (isClosing ? "Position exit — closing or reducing held exposure." : undefined),
             catalystDeadlineAt: input.catalystDeadlineAt ?? (isClosing ? Date.now() + 86400000 : undefined),
             holdingPeriod: input.holdingPeriod ?? (isClosing ? (run.holdingPeriod ?? "swing") : undefined),

@@ -60,6 +60,14 @@ describe("Decision Runway authorization", () => {
       .toMatch(/binding/i);
   });
 
+  it("permits discretionary paper staging when backed by an active Capital Mission even if researchRunId is null", () => {
+    const discretionaryMission: DecisionAuthorizationSnapshot = {
+      ...eligible,
+      researchRunId: null,
+    };
+    expect(decisionActionBlock(discretionaryMission, "create_proposal", "open", { runId: 99, accountId: 4 })).toBeNull();
+  });
+
   it("fails closed for unbound opening actions while preserving a proven close", () => {
     expect(missingDecisionAuthorityBlock("open")).toMatch(/no authoritative Decision Run binding/i);
     expect(missingDecisionAuthorityBlock("unknown")).toMatch(/fail-closed/i);

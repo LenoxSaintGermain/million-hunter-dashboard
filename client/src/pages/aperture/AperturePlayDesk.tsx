@@ -572,8 +572,9 @@ export default function AperturePlayDesk() {
           <ManualOrderTicketModal
             open={manualModalOpen}
             onOpenChange={setManualModalOpen}
+            activeMission={briefing?.mission}
             initialValues={{
-              runId: runs.data?.[0]?.id,
+              runId: briefing?.mission?.researchRunId ?? runs.data?.[0]?.id,
             }}
           />
         )}

@@ -8,8 +8,13 @@ export type AttentionReadState = "loading" | "empty" | "stale" | "partial" | "fa
 export type AttentionMission = {
   decisionRunId: number;
   revisionId: number;
+  researchRunId?: number | null;
+  accountId?: number | null;
+  capitalThesisId?: number | null;
+  canonicalThesisId?: number | null;
   state: "incomplete" | "complete";
   lifecycle?: "mission" | "researching" | "conditional" | "eligible" | "cash" | "pending_outcome" | "closed";
+  effectiveBranch?: "research" | "eligible" | "conditional" | "cash" | "ineligible" | null;
   title: string;
   updatedAt: number;
 };
@@ -181,6 +186,7 @@ export type ApertureAttentionBriefing = {
   baseline: ApertureAttentionBaseline;
   baselineToken: string;
   sourceIssues?: AttentionSourceIssue[];
+  mission?: AttentionMission | null;
 };
 
 function canonical(value: unknown): string {

@@ -6,11 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { buildOccOptionSymbol, nextStandardMonthlyOptionExpiration } from "@shared/paperInstrument";
-import { TrendingDown, TrendingUp, Sparkles, Loader2 } from "lucide-react";
+import { TrendingDown, TrendingUp, Sparkles, Loader2, AlertTriangle } from "lucide-react";
+import type { AttentionMission } from "@shared/apertureAttention";
 
 export interface ManualOrderTicketModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  activeMission?: AttentionMission | null;
   initialValues?: {
     symbol?: string;
     direction?: "long" | "short";
@@ -41,20 +43,33 @@ const EXPRESSIONS: { id: PlayExpression; label: string; badge: string; desc: str
   { id: "collar_hedge", label: "Skewed Collar / Tail Hedge", badge: "Collar", desc: "Protective Put funded by selling OTM Call against exposure.", regime: "Asymmetric Defense" },
 ];
 
-export function ManualOrderTicketModal({ open, onOpenChange, initialValues, onStaged }: ManualOrderTicketModalProps) {
+export function ManualOrderTicketModal({ open, onOpenChange, activeMission: propActiveMission, initialValues, onStaged }: ManualOrderTicketModalProps) {
   const [, navigate] = useLocation();
   const utils = typeof (trpc as any).useUtils === "function" ? (trpc as any).useUtils() : null;
   const accountsQuery = trpc.aperture.account.list.useQuery();
+  const deskSummary = (trpc as any)?.aperture?.desk?.summary?.useQuery
+    ? (trpc as any).aperture.desk.summary.useQuery(undefined, {
+        enabled: open && !propActiveMission,
+      })
+    : { data: undefined, isLoading: false };
+  const activeMission = propActiveMission ?? deskSummary.data?.attention?.mission ?? null;
+
   const runsQuery = (trpc as any)?.aperture?.run?.list?.useQuery
-    ? trpc.aperture.run.list.useQuery(undefined, { enabled: !initialValues?.runId })
+    ? trpc.aperture.run.list.useQuery(undefined, { enabled: !initialValues?.runId && !activeMission?.researchRunId })
     : { data: undefined };
-  const effectiveRunId = initialValues?.runId ?? runsQuery.data?.[0]?.id;
+  const effectiveRunId = initialValues?.runId ?? activeMission?.researchRunId ?? runsQuery.data?.[0]?.id;
 
   const paperAccounts = useMemo(() => {
     return (accountsQuery.data ?? []).filter((a) => a.isPaper);
   }, [accountsQuery.data]);
 
-  const defaultAccount = paperAccounts.find((a) => a.brokerId === "alpaca_paper") ?? paperAccounts[0];
+  const defaultAccount = useMemo(() => {
+    if (activeMission?.accountId) {
+      const missionAccount = paperAccounts.find((a) => a.id === activeMission.accountId);
+      if (missionAccount) return missionAccount;
+    }
+    return paperAccounts.find((a) => a.brokerId === "alpaca_paper") ?? paperAccounts[0];
+  }, [paperAccounts, activeMission?.accountId]);
 
   const [accountId, setAccountId] = useState<number | null>(defaultAccount?.id ?? null);
   useEffect(() => {
@@ -64,6 +79,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, initialValues, onSt
   }, [defaultAccount, accountId]);
 
   const selectedAccount = paperAccounts.find((a) => a.id === accountId) ?? defaultAccount;
+  const [stageError, setStageError] = useState<string | null>(null);
 
   // Form State
   const [symbol, setSymbol] = useState(initialValues?.symbol ?? "NVDA");
@@ -148,6 +164,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, initialValues, onSt
 
   const createOrder = trpc.aperture.order.create.useMutation({
     onSuccess: async (res) => {
+      setStageError(null);
       onOpenChange(false);
       if (utils?.aperture) {
         await utils.aperture.invalidate();
@@ -178,11 +195,13 @@ export function ManualOrderTicketModal({ open, onOpenChange, initialValues, onSt
       }
     },
     onError: (err) => {
+      setStageError(err.message);
       toast.error(`Order staging failed: ${err.message}`);
     },
   });
 
   const handleSubmit = async () => {
+    setStageError(null);
     if (!selectedAccount) {
       toast.error("Please select an active paper account.");
       return;
@@ -269,6 +288,39 @@ export function ManualOrderTicketModal({ open, onOpenChange, initialValues, onSt
           <DialogDescription className="text-xs leading-5">
             Bypass automated recipe locks with an unconstrained paper ticket. All single-order ceilings, preflight margin bounds, and risk governance checks are verified prior to desk staging.
           </DialogDescription>
+
+          {activeMission ? (
+            <div className="flex items-center justify-between rounded-md border px-3 py-2 text-xs" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+              <div className="flex items-center gap-2 min-w-0">
+                <Badge variant="outline" className="text-[10px] uppercase font-mono tracking-wider shrink-0" style={{ borderColor: "var(--sh-signal)", color: "var(--sh-signal)" }}>
+                  Active Mission
+                </Badge>
+                <span className="font-semibold truncate" style={{ color: "var(--sh-text-primary)" }}>
+                  {activeMission.title}
+                </span>
+              </div>
+              <span className="font-mono text-[11px] shrink-0" style={{ color: "var(--sh-fg-muted)" }}>
+                Branch: {activeMission.effectiveBranch ?? "research"}
+              </span>
+            </div>
+          ) : !deskSummary.isLoading ? (
+            <div className="flex flex-col gap-2 rounded-md border p-3 text-xs" style={{ borderColor: "var(--sh-amber)", background: "color-mix(in srgb, var(--sh-amber) 10%, var(--sh-surface))" }}>
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-500">No Active Capital Mission Bound</p>
+                  <p className="mt-0.5 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
+                    Opening paper actions are strictly fail-closed. Start from Capital Mission to bind thesis, capital, and risk bounds before staging.
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <Button size="sm" variant="outline" className="h-7 text-xs font-semibold" onClick={() => { onOpenChange(false); navigate("/aperture/mission"); }}>
+                  Open Capital Mission &rarr;
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -518,6 +570,25 @@ export function ManualOrderTicketModal({ open, onOpenChange, initialValues, onSt
               </div>
             </div>
           </div>
+
+          {stageError && (
+            <div className="rounded-md border p-3 text-xs flex flex-col gap-1.5" style={{ borderColor: "var(--sh-red)", background: "color-mix(in srgb, var(--sh-red) 10%, var(--sh-surface))" }}>
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-red-500">Order Staging Failed</p>
+                  <p className="mt-0.5 font-mono text-[11px] leading-4 break-words" style={{ color: "var(--sh-text-primary)" }}>{stageError}</p>
+                </div>
+              </div>
+              {stageError.includes("Capital Mission") && (
+                <div className="flex justify-end pt-1">
+                  <Button size="sm" variant="outline" className="h-7 text-xs font-semibold" onClick={() => { onOpenChange(false); navigate("/aperture/mission"); }}>
+                    Go to Capital Mission &rarr;
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter className="flex flex-wrap items-center justify-between gap-2 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}>

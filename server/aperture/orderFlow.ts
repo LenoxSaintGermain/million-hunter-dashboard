@@ -105,6 +105,9 @@ export interface CreateOrderInput {
   now?: number;
   /** Internal only: prevent a stored proposal from counting itself during a gate rerun. */
   excludeOrderId?: number;
+  /** Explicit authoritative Decision Run binding if available. */
+  decisionRunId?: number | null;
+  decisionRevisionId?: number | null;
 }
 
 /**
@@ -239,6 +242,8 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
     runId: input.runId,
     accountId: portfolioContextAccount.id,
     intent: resolvedIntent.intent,
+    decisionRunId: input.decisionRunId,
+    decisionRevisionId: input.decisionRevisionId,
     orderId: input.excludeOrderId,
   });
   const mandate: Mandate = resolvedIntent.intent === "close"

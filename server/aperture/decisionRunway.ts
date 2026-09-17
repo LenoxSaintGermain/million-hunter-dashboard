@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, desc } from "drizzle-orm";
 import {
   apertureDecisionRevisions,
   apertureDecisionRuns,
@@ -68,7 +68,7 @@ export function decisionActionBlock(
     return "Decision Runway binding mismatch: an objective or incomplete thesis binding cannot authorize opening paper actions. Validate an explicit research handoff first.";
   }
   if (snapshot.source === "authoritative" && expected) {
-    if (snapshot.researchRunId !== expected.runId || snapshot.accountId !== expected.accountId) {
+    if ((snapshot.researchRunId != null && snapshot.researchRunId !== expected.runId) || snapshot.accountId !== expected.accountId) {
       return "Decision Runway binding mismatch: the mission revision, research run, and paper account must match exactly.";
     }
   }
@@ -101,10 +101,22 @@ export async function authorizeDecisionAction(input: {
   if (!db) throw new Error("database unavailable");
   const requiresCurrentBinding = requiresCurrentDecisionBinding(input.intent);
 
-  const [decisionRun] = await db.select().from(apertureDecisionRuns).where(and(
+  let [decisionRun] = await db.select().from(apertureDecisionRuns).where(and(
     eq(apertureDecisionRuns.userId, input.userId),
-    eq(apertureDecisionRuns.researchRunId, input.runId),
+    input.decisionRunId != null
+      ? eq(apertureDecisionRuns.id, input.decisionRunId)
+      : eq(apertureDecisionRuns.researchRunId, input.runId),
   )).limit(1);
+
+  if (!decisionRun && input.decisionRunId == null && input.runId != null) {
+    const [activeRun] = await db.select().from(apertureDecisionRuns).where(and(
+      eq(apertureDecisionRuns.userId, input.userId),
+      inArray(apertureDecisionRuns.lifecycle, ["mission", "researching", "conditional", "eligible"]),
+    )).orderBy(desc(apertureDecisionRuns.updatedAt)).limit(1);
+    if (activeRun && (activeRun.researchRunId === input.runId || activeRun.researchRunId == null)) {
+      decisionRun = activeRun;
+    }
+  }
 
   if (requiresCurrentBinding && input.decisionRunId != null && (!decisionRun || decisionRun.id !== input.decisionRunId)) {
     throw new DecisionRunwayBlockedError(
