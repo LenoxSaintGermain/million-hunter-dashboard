@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Play, Plus, RefreshCw, Trash2, BookOpen, TrendingUp, ArrowUpRight, Compass, Layers3, Target, Info, Lightbulb, DatabaseZap, CheckCircle2, KeyRound } from "lucide-react";
+import { Play, Plus, RefreshCw, Trash2, BookOpen, TrendingUp, ArrowUpRight, Compass, Layers3, Target, Info, Lightbulb, DatabaseZap, CheckCircle2, KeyRound, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { formatDistanceToNow } from "date-fns";
@@ -171,6 +171,15 @@ export default function ApertureHome() {
     onSuccess: () => { toast.success("Thesis deleted"); refetchTheses(); },
     onError: (e) => toast.error(e.message),
   });
+  const compileAndStage = (trpc as any).aperture?.pipeline?.compileAndStageBestFit?.useMutation
+    ? trpc.aperture.pipeline.compileAndStageBestFit.useMutation({
+        onSuccess: (result) => {
+          toast.success(`Pipeline complete: Staged ${result.symbol} paper order #${result.orderId} for desk authorization!`);
+          navigate(`/aperture/plays?stage=approve&inspect=${result.orderId}`);
+        },
+        onError: (error) => toast.error(error.message),
+      })
+    : { mutate: () => {}, isPending: false };
   const [canonicalThesisId, setCanonicalThesisId] = useState<string>("");
   const projectCanonicalThesis = trpc.thesis.useInAperture.useMutation({
     onSuccess: async ({ apertureThesisId, linked, compilerStatus, missingFields, incompatibilities }) => {
@@ -355,6 +364,26 @@ export default function ApertureHome() {
                     <div className="rounded-lg border p-3 text-xs" style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
                       <div className="flex items-center gap-2"><Target className="h-3.5 w-3.5" style={{ color: "var(--sh-signal)" }} /><span><strong style={{ color: "var(--sh-text-primary)" }}>Ready to frame:</strong> {selectedHorizon ?? "Aperture will prepare this saved belief for securities research when you build the brief."}</span></div>
                       <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Plays this thesis produced</p>{thesisProducedPlays.length ? <div className="mt-2 flex flex-wrap gap-1.5">{thesisProducedPlays.slice(0, 8).map((play) => <Link key={play.candidate.id} href={`/aperture/run/${play.run.id}?view=play&candidate=${play.candidate.id}`} className="inline-flex h-7 items-center rounded-md border px-2 text-[11px] hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{play.candidate.symbol} · {play.run.holdingPeriod ?? "research"}</Link>)}</div> : <p className="mt-1 leading-5">No short-horizon play is recorded for this thesis yet. Building a brief creates research, not a paper order.</p>}</div>
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}>
+                        <p className="text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>
+                          Compile thesis, verify SEC evidence, auto-size under risk bounds &amp; stage directly to desk.
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={compileAndStage.isPending}
+                          className="font-semibold text-white border-emerald-500/40"
+                          style={{ background: "var(--sh-signal)" }}
+                          onClick={() => {
+                            if (selectedThesisId) {
+                              compileAndStage.mutate({ thesisId: selectedThesisId });
+                            }
+                          }}
+                        >
+                          {compileAndStage.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                          ⚡ Compile &amp; Stage Best Fit
+                        </Button>
+                      </div>
                     </div>
                   )}
                   {projectCanonicalThesis.isPending && canonicalThesisId && (

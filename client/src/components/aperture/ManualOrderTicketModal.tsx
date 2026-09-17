@@ -172,6 +172,13 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
   const equityCents = selectedAccount?.equityValueCents ?? 0;
   const singleOrderCeilingCents = Math.min(10_000_00, Math.round(equityCents * 0.05));
   const singleNameCapCents = Math.round(equityCents * 0.10);
+  const effectiveCeilingCents = Math.min(singleOrderCeilingCents, singleNameCapCents);
+  const costPerUnitCents = expression === "shares"
+    ? Math.round(numLimitPrice * 100)
+    : Math.round(numLimitPrice * 100 * 100);
+  const maxAllowableUnits = costPerUnitCents > 0 && effectiveCeilingCents > 0
+    ? Math.floor(effectiveCeilingCents / costPerUnitCents)
+    : 0;
   const orderExceedsCeiling = equityCents > 0 && estimatedNotionalCents > singleOrderCeilingCents;
   const orderExceedsConcentration = equityCents > 0 && estimatedNotionalCents > singleNameCapCents;
   const concentrationPct = equityCents > 0 ? Math.round((estimatedNotionalCents / equityCents) * 100) : 0;
@@ -461,7 +468,18 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
               {expression === "shares" ? (
                 <>
                   <div>
-                    <label className="text-[10px] font-semibold uppercase block mb-1" style={{ color: "var(--sh-fg-muted)" }}>Shares Qty</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] font-semibold uppercase" style={{ color: "var(--sh-fg-muted)" }}>Shares Qty</label>
+                      {maxAllowableUnits > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShareCount(maxAllowableUnits)}
+                          className="text-[9px] text-emerald-400 hover:underline"
+                        >
+                          Auto-Fit: {maxAllowableUnits}
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="number"
                       min="1"
@@ -485,7 +503,18 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
               ) : (
                 <>
                   <div>
-                    <label className="text-[10px] font-semibold uppercase block mb-1" style={{ color: "var(--sh-fg-muted)" }}>Contracts</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] font-semibold uppercase" style={{ color: "var(--sh-fg-muted)" }}>Contracts</label>
+                      {maxAllowableUnits > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setContracts(maxAllowableUnits)}
+                          className="text-[9px] text-emerald-400 hover:underline"
+                        >
+                          Auto-Fit: {maxAllowableUnits}
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="number"
                       min="1"
@@ -580,6 +609,36 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                   <span>Order represents {concentrationPct}% of total equity, exceeding the 10% single-name cap (${Math.round(singleNameCapCents / 100).toLocaleString()}).</span>
                 </div>
               )}
+
+              {/* Defined-Risk Spread Recommendation */}
+              {expression !== "shares" && costPerUnitCents > effectiveCeilingCents && effectiveCeilingCents > 0 && (
+                <div className="rounded p-2 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 border" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 12%, var(--sh-surface))" }}>
+                  <div className="space-y-0.5">
+                    <p className="font-semibold text-[11px] flex items-center gap-1" style={{ color: "var(--sh-signal)" }}>
+                      <Sparkles className="h-3.5 w-3.5" /> Defined-Risk Spread Auto-Solution
+                    </p>
+                    <p className="text-[10px]" style={{ color: "var(--sh-fg-muted)" }}>
+                      1 naked contract (${(costPerUnitCents / 100).toFixed(0)}) breaches the ${(effectiveCeilingCents / 100).toFixed(0)} limit. Convert to a defined-risk vertical debit spread ($0.80 debit = $80 max risk) to fit account bounds.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 text-xs font-medium shrink-0 text-white"
+                    style={{ background: "var(--sh-signal)" }}
+                    onClick={() => {
+                      setExpression(direction === "short" ? "bear_put_spread" : "bull_call_spread");
+                      const curStrike = numStrike > 0 ? numStrike : 100;
+                      setStrikePrice(curStrike.toString());
+                      setSpreadUpperStrike((curStrike + 5).toString());
+                      setLimitPrice("0.80");
+                      setContracts(1);
+                    }}
+                  >
+                    ⚡ Apply Vertical Spread ($80 Risk)
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -600,20 +659,38 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1" style={{ color: "var(--sh-fg-muted)" }}>
-                Confirmation Acknowledgement (Type PAPER to authorize desk staging)
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>
+                  Confirmation Acknowledgement (Type PAPER to authorize desk staging)
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-[10px] font-mono border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                  onClick={() => setPaperAck("PAPER")}
+                >
+                  ⚡ Fast-Fill PAPER (⌘+Enter)
+                </Button>
+              </div>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={paperAck}
                   onChange={(e) => setPaperAck(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                      e.preventDefault();
+                      setPaperAck("PAPER");
+                      handleSubmit();
+                    }
+                  }}
                   placeholder="PAPER"
                   className="w-28 rounded border bg-transparent px-3 py-1 font-mono text-xs font-bold uppercase focus-visible:outline-none"
                   style={{ borderColor: paperAck === "PAPER" ? "var(--sh-signal)" : "var(--sh-border-1)" }}
                 />
                 <span className="text-xs flex items-center" style={{ color: "var(--sh-fg-muted)" }}>
-                  Mandatory guardrail: staged as a simulated paper ticket on the operator desk.
+                  Mandatory guardrail: staged as a simulated paper ticket on the operator desk. Press ⌘+Enter to instant-stage.
                 </span>
               </div>
             </div>

@@ -592,7 +592,40 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
         <label className="block text-xs font-medium">Why this proposal belongs<textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label><div className="-mt-2 flex flex-wrap gap-1"><button type="button" onClick={() => setReason(`Paper-only proposal based on the recorded human review of ${candidate.symbol} research evidence.`)} className="min-h-11 rounded-full border px-3 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Use reviewed research case</button><button type="button" onClick={() => setReason(`Modelled ${candidate.playSide === "short" ? "short" : "long"} paper exposure to test the stated catalyst while the reviewed invalidation remains false.`)} className="min-h-11 rounded-full border px-3 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Use catalyst test</button></div><label className="block text-xs font-medium">Reject or exit if<textarea value={invalidationCondition} onChange={(event) => setInvalidationCondition(event.target.value)} rows={2} className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label><div className="-mt-2 flex flex-wrap gap-1"><button type="button" onClick={() => setInvalidationCondition("Invalidate if the stated catalyst does not occur by the deadline, or its disclosed result contradicts the thesis.")} className="min-h-11 rounded-full border px-3 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Use catalyst failure</button>{isIntraday && <button type="button" onClick={() => setInvalidationCondition("Do not take, or exit, if price cannot hold the verified trigger level or the stated risk budget fails.")} className="min-h-11 rounded-full border px-3 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Use trigger failure</button>}</div>{isIntraday && <label className="block text-xs font-medium">No-trade conditions<input value={noTradeText} onChange={(event) => setNoTradeText(event.target.value)} placeholder="One condition per line" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>}
       </div></details>
 
-      {(isOption ? optionTermsReady : recipeCanPrepare) && currentPreflightData?.wouldPass && <label className="block rounded-lg border p-3 text-xs font-medium" style={{ borderColor: "var(--sh-border-1)" }}>Type <span className="font-mono">PAPER</span> to acknowledge a paper-only proposal<input ref={acknowledgementRef} value={paperAcknowledgement} onChange={(event) => setPaperAcknowledgement(event.target.value)} autoComplete="off" placeholder="PAPER" className="mt-2 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>}
+      {(isOption ? optionTermsReady : recipeCanPrepare) && currentPreflightData?.wouldPass && (
+        <div className="rounded-lg border p-3 space-y-2" style={{ borderColor: "var(--sh-border-1)" }}>
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium">
+              Type <span className="font-mono font-bold">PAPER</span> to stage paper proposal
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px] font-mono border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+              onClick={() => setPaperAcknowledgement("PAPER")}
+            >
+              ⚡ Fast-Fill PAPER (⌘+Enter)
+            </Button>
+          </div>
+          <input
+            ref={acknowledgementRef}
+            value={paperAcknowledgement}
+            onChange={(event) => setPaperAcknowledgement(event.target.value.toUpperCase())}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                setPaperAcknowledgement("PAPER");
+                takeReadinessAction();
+              }
+            }}
+            autoComplete="off"
+            placeholder="PAPER"
+            className="min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm font-mono font-bold uppercase"
+            style={{ borderColor: paperAcknowledgement === "PAPER" ? "var(--sh-signal)" : "var(--sh-border-1)" }}
+          />
+        </div>
+      )}
       {!optionResolutionNeeded && !riskResolutionNeeded && !hardResolutionNeeded && readiness.action !== "refresh_recipe" && <div className="sticky bottom-3 z-10 flex flex-col gap-2 rounded-lg border p-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="px-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Next guarded action: <strong style={{ color: "var(--sh-text-primary)" }}>{readiness.actionLabel}</strong></p><div className="flex gap-2">{readiness.action === "return_to_evidence" && <Button className="min-h-11" variant="outline" size="sm" onClick={onReturnToBrief}>Open evidence</Button>}<Button className="min-h-11 flex-1 sm:flex-none" size="sm" onClick={takeReadinessAction} disabled={create.isPending || constructed.isLoading || preflightBusy}>{create.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : readiness.action === "create_proposal" ? <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> : <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />}{readiness.actionLabel}</Button></div></div>}
     </CardContent>
   </Card>;

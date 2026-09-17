@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, CircleAlert, ClipboardCheck, FileText, Loader2, RefreshCw, SearchCheck, TrendingUp, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, CircleAlert, ClipboardCheck, FileText, Loader2, RefreshCw, SearchCheck, Sparkles, TrendingUp, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { CapitalBrief } from "@/components/aperture/CapitalBrief";
@@ -44,6 +44,29 @@ export function EvidenceQuestionReview({ symbol, checkLabel, draft, pending, now
   };
   return <section aria-label="Review evidence" className="space-y-3">
     <p className="text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Add the evidence for this question. General research is not proof of this check. These entries are operator-supplied, not independently verified.</p>
+    {readiness.canResolve && (
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border p-3" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 12%, var(--sh-surface))" }}>
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--sh-signal)" }}>
+            <Sparkles className="h-4 w-4" />
+            Verified SEC EDGAR Evidence Ready
+          </div>
+          <p className="text-xs leading-5" style={{ color: "var(--sh-text-primary)" }}>
+            Observed: <strong className="font-mono">{draft.observation}</strong> ({draft.asOf}) · Citing SEC XBRL data.
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          className="font-semibold shrink-0 min-h-10 text-white"
+          style={{ background: "var(--sh-signal)" }}
+          onClick={() => answer("confirmed")}
+          disabled={pending}
+        >
+          ⚡ Accept AI Evidence &amp; Clear Gate
+        </Button>
+      </div>
+    )}
     {onFillFromFacts && <div className="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" size="sm" className="min-h-11" disabled={fillPending} onClick={onFillFromFacts}>{fillPending ? "Reading the fact ledger…" : "Fill from verified facts"}</Button><span className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Drafts this record from recorded facts. It does not answer the question.</span></div>}
     {fillNotice && <p role="status" className="rounded border px-2 py-1.5 text-xs leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", color: "var(--sh-text-primary)" }}>{fillNotice}</p>}
     <div className="grid gap-3 sm:grid-cols-2">
@@ -252,6 +275,15 @@ export default function CandidateBoard() {
     onSuccess: () => { setReviewProgressMessage("Review recorded. The next guarded action is highlighted below; no paper order was created."); setReviewCompletedAt(Date.now()); toast.success("Human review recorded. This does not create a paper order."); refetch(); },
     onError: (error) => toast.error(error.message),
   });
+  const batchClearStandardGates = (trpc as any).aperture?.run?.evidence?.batchClearStandardGates?.useMutation
+    ? trpc.aperture.run.evidence.batchClearStandardGates.useMutation({
+        onSuccess: (result) => {
+          toast.success(`Cleared ${result.clearedCount} standard thesis gates with verified SEC EDGAR facts!`);
+          refetch();
+        },
+        onError: (error) => toast.error(error.message),
+      })
+    : { mutate: () => {}, isPending: false };
   const genMemo = trpc.aperture.generateMemo.useMutation({
     onSuccess: async (result) => {
       await refetch();
@@ -351,6 +383,39 @@ export default function CandidateBoard() {
     : unreviewedChecks.length
       ? `Review the required evidence before opening the paper ticket — ${unreviewedChecks.length} decision-critical check${unreviewedChecks.length === 1 ? " remains" : "s remain"}.`
       : null;
+
+  useEffect(() => {
+    if (!focusCandidate?.id || !currentEvidenceQuestion) return;
+    if (evidenceDrafts[evidenceDraftKey]?.observation) return;
+    let active = true;
+    setFactDraftPending(true);
+    trpcUtils.aperture.run.evidence.factDraft.fetch({
+      runId,
+      candidateId: focusCandidate.id,
+      checkLabel: currentEvidenceQuestion,
+    }).then((value) => {
+      if (!active) return;
+      setFactDraftPending(false);
+      if (!value || !value.available) return;
+      setFactDraftBases((current) => ({ ...current, [evidenceDraftKey]: value.calculationBasis }));
+      setEvidenceDrafts((current) => {
+        if (current[evidenceDraftKey]?.observation) return current;
+        return {
+          ...current,
+          [evidenceDraftKey]: {
+            observation: value.observedValue,
+            asOf: value.observedAt,
+            criterion: value.criterion,
+            sourceUrl: value.sourceUrl ?? "",
+            note: value.conclusion,
+          },
+        };
+      });
+    }).catch(() => {
+      if (active) setFactDraftPending(false);
+    });
+    return () => { active = false; };
+  }, [runId, focusCandidate?.id, currentEvidenceQuestion, evidenceDraftKey, trpcUtils]);
 
   const openEvidence = () => { setView("evidence"); setActiveRole("all"); };
   return (
@@ -508,7 +573,23 @@ export default function CandidateBoard() {
               </div>
             </div>
             {focusCandidate && currentEvidenceQuestion && <Card className="border" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><CardContent className="space-y-4 pt-5">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Current decision-critical question</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{describeEvidenceQuestion(focusCandidate.symbol, currentEvidenceQuestion).question}</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Requirement: {describeEvidenceQuestion(focusCandidate.symbol, currentEvidenceQuestion).requirement}. Confirmation clears this evidence gate only; ticket and risk checks remain.</p></div><Badge variant="outline" style={{ color: "var(--sh-signal)" }}>{unreviewedChecks.length} open</Badge></div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Current decision-critical question</p><h2 className="mt-1 text-lg font-semibold" style={{ color: "var(--sh-text-primary)" }}>{describeEvidenceQuestion(focusCandidate.symbol, currentEvidenceQuestion).question}</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Requirement: {describeEvidenceQuestion(focusCandidate.symbol, currentEvidenceQuestion).requirement}. Confirmation clears this evidence gate only; ticket and risk checks remain.</p></div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {unreviewedChecks.length > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={batchClearStandardGates.isPending}
+                      onClick={() => focusCandidate && batchClearStandardGates.mutate({ runId, candidateId: focusCandidate.id })}
+                      className="h-8 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                    >
+                      <Sparkles className="mr-1.5 h-3.5 w-3.5 text-emerald-400" />
+                      {batchClearStandardGates.isPending ? "Clearing standard gates…" : `Clear all standard thesis gates (${unreviewedChecks.length})`}
+                    </Button>
+                  )}
+                  <Badge variant="outline" style={{ color: "var(--sh-signal)" }}>{unreviewedChecks.length} open</Badge>
+                </div></div>
               <div className="rounded-lg border p-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Research context · not a verified answer</p><p className="mt-1" style={{ color: "var(--sh-fg-muted)" }}>{sourceExcerpt ? `${sourceExcerpt}${sourceExcerpt.length >= 420 ? "…" : ""}` : "No fact-traced source record is available yet. Build it inline before resolving this question; no paper order is created."}</p>{sourceRecordMessage && <p role="status" className="mt-2 rounded border px-2 py-1.5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", color: "var(--sh-text-primary)" }}>{sourceRecordMessage}</p>}<div className="mt-2 flex flex-wrap gap-2"><Button type="button" variant="ghost" size="sm" onClick={() => setShowInlineRecord(true)}><FileText className="mr-1.5 h-3.5 w-3.5" />View source record</Button>{focusCandidate.memoStatus !== "ok" && <Button type="button" variant="outline" size="sm" disabled={generatingMemo === focusCandidate.id} onClick={() => { setSourceRecordMessage(""); setGeneratingMemo(focusCandidate.id); genMemo.mutate({ runId, candidateId: focusCandidate.id }); }}>{generatingMemo === focusCandidate.id ? "Building source…" : "Build source record"}</Button>}</div></div>
               <EvidenceQuestionReview symbol={focusCandidate.symbol} checkLabel={currentEvidenceQuestion} draft={currentEvidenceDraft} pending={reviewEvidence.isPending} now={Date.now()} onChange={(draft) => setEvidenceDrafts((current) => ({ ...current, [evidenceDraftKey]: draft }))} onReview={(status, note) => reviewEvidence.mutate({ runId, candidateId: focusCandidate.id, checkLabel: currentEvidenceQuestion, status, note })} fillPending={factDraftPending} fillNotice={factDraftNotice} onFillFromFacts={async () => {
                 setFactDraftNotice(null);

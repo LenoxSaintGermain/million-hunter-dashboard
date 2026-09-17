@@ -32,6 +32,21 @@ export default function ApertureTheses() {
     onError: (error) => toast.error(error.message),
   });
 
+  const [stagingThesisId, setStagingThesisId] = useState<number | null>(null);
+  const compileAndStage = (trpc as any).aperture?.pipeline?.compileAndStageBestFit?.useMutation
+    ? trpc.aperture.pipeline.compileAndStageBestFit.useMutation({
+        onSuccess: (result) => {
+          setStagingThesisId(null);
+          toast.success(`Pipeline complete: Staged ${result.symbol} paper order #${result.orderId} for desk authorization!`);
+          navigate(`/aperture/plays?stage=approve&inspect=${result.orderId}`);
+        },
+        onError: (error) => {
+          setStagingThesisId(null);
+          toast.error(error.message);
+        },
+      })
+    : { mutate: () => {}, isPending: false };
+
   const activeCompilationId = activeContext?.thesis?.id;
 
   const filteredTheses = useMemo(() => {
@@ -257,6 +272,19 @@ export default function ApertureTheses() {
                           Use for today
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        disabled={stagingThesisId === thesis.id}
+                        className="font-semibold text-white border-emerald-500/40"
+                        style={{ background: "var(--sh-signal)" }}
+                        onClick={() => {
+                          setStagingThesisId(thesis.id);
+                          compileAndStage.mutate({ thesisId: thesis.id });
+                        }}
+                      >
+                        {stagingThesisId === thesis.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                        ⚡ Compile &amp; Stage Best Fit
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
