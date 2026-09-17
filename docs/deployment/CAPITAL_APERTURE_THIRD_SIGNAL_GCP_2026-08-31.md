@@ -476,9 +476,35 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - Client bundle `index-BdvPB89A.js` verified live.
 - Rollback revision: `capital-aperture-00198-pax`.
 
-
-
-
-
-
-
+### Release 2026-09-17 (Zero-Friction Automated Flow & Human-in-the-Loop Desk Staging)
+- Commit: `f55d3d1` (`feat(aperture): zero-friction automated flow & human-in-the-loop desk staging`)
+- Release Tag: `f55d3d1-uat-71c87235`
+- Cloud Build: `c0d46a2b-77ba-49c6-aa69-5627efe81227` (`SUCCESS`, 4M55S)
+- Container Image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:f55d3d1-uat-71c87235`
+- Image Digest: `sha256:ccadb17286d07b69ec8950ee82b837f2e61dcf38fdc04f9c4834e56c79104b5d`
+- Cloud Run Service: `capital-aperture` (project: `third-signal-v2`, region: `us-central1`)
+- Revision: `capital-aperture-00202-rix` (tag: `uat-f55d3d1`) serving **100%** of traffic.
+- Root Cause & Changes:
+  - **Automated Evidence Ingestion & Batch Gate Clearance (`server/apertureRouter.ts` & `CandidateBoard.tsx`)**:
+    - SEC EDGAR facts automatically queried via `edgarProvider.fetchSecurityFacts` for missing fact drafts.
+    - Added `aperture.gates.batchClearStandardGates` mutation that writes confirmed `aperture_evidence_reviews` records.
+    - Added 1-click `[⚡ Accept AI Evidence & Clear Gate]` banner and `[⚡ Clear all standard thesis gates]` batch header button in Candidate Board.
+  - **Dynamic Budget & Contract Sizer with Spread Auto-Solution (`ManualOrderTicketModal.tsx`)**:
+    - Added real-time sizing telemetry evaluating maximum allowable units within the `$100` (5%) single-order ceiling.
+    - Added `[Auto-Fit: N]` buttons for both shares and options contracts.
+    - When naked options breach the `$100` ceiling, automatically computes and surfaces **`[⚡ Apply Vertical Spread ($80 Risk)]`**, converting orders to vertical debit spreads.
+  - **Fast-Track PAPER Staging & Token Bypassing (`ManualOrderTicketModal.tsx` & `PaperProposalForm.tsx`)**:
+    - Added `[⚡ Fast-Fill PAPER (⌘+Enter)]` buttons and `Cmd+Enter` / `Ctrl+Enter` keyboard shortcuts to stage instantly without manual typing.
+  - **End-to-End Pipeline Linking (`server/apertureRouter.ts`, `ApertureTheses.tsx`, `ApertureHome.tsx`)**:
+    - Implemented `aperture.pipeline.compileAndStageBestFit` mutation.
+    - Added prominent `[⚡ Compile & Stage Best Fit]` buttons that compile, verify evidence, auto-size under `$100`, stage the draft ticket, and navigate directly to `/aperture/plays?stage=approve&inspect=${orderId}`.
+- Validation:
+  - TypeScript typecheck (`DATABASE_URL= pnpm check`): 0 errors.
+  - Vitest test suite (`DATABASE_URL= pnpm vitest run server/aperture/batchGateClearance.test.ts client/src/pages/aperture/candidateComparison.test.tsx server/aperture/evidenceQuestionPresentation.test.ts server/aperture/evidenceFactDraft.test.ts`): 27/27 passed.
+  - All public endpoints returned HTTP 200:
+    - `https://third-signal-capital-aperture.web.app` (200)
+    - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+    - `https://uat-f55d3d1---capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+  - `system.health` returned `ok: true`.
+  - Client bundle `index-bn8iupaH.js` verified live with release marker `f55d3d1-uat-71c87235`.
+- Rollback revision: `capital-aperture-00200-vak`.
