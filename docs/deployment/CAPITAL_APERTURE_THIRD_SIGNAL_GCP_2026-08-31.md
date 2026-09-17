@@ -414,6 +414,37 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - Client bundle `index-aVEyCt5O.js` verified live.
 - Rollback revision: `capital-aperture-00194-reb`.
 
+### Release 2026-09-17 (Play Desk Stage 5 Decision Authority & Staging Resilience)
+- Commit: `494d6de` (`fix(aperture): resolve Decision Runway authority for discretionary paper tickets`)
+- Release Tag: `494d6de-uat-651f185e`
+- Cloud Build: `3c3c158f-4dc6-4a7a-aa0f-4c16009ba256` (`SUCCESS`, 5M4S)
+- Cloud Run Service: `capital-aperture` (project: `third-signal-v2`, region: `us-central1`)
+- Revision: `capital-aperture-00198-pax` (tag: `uat-494d6de`) serving **100%** of traffic.
+- Root Cause & Changes:
+  - **Decision Runway Authority Resolution (`server/aperture/decisionRunway.ts`)**:
+    - Updated `authorizeDecisionAction` to accept explicit `input.decisionRunId` and fallback to the active Capital Mission where `researchRunId == input.runId || researchRunId == null`.
+    - Relaxed `decisionActionBlock`: only enforces `snapshot.researchRunId === expected.runId` when `snapshot.researchRunId != null`. Discretionary tickets staged directly from Play Desk now resolve authority from the operator's active Capital Mission.
+  - **Order Creation & Preflight Resolution (`server/apertureRouter.ts` & `server/aperture/orderFlow.ts`)**:
+    - Extended `CreateOrderInput` and `orderCreateBase` with `decisionRunId` and `decisionRevisionId`.
+    - In `order.create`: When active mission has no attached research run, synthesizes a container `apertureRuns` record (`droppedNote: "DISCRETIONARY_PLAY_DESK_TICKET"`), binds `researchRunId = newRunId`, promotes lifecycle to `"eligible"`, and advances `effectiveBranch` from `"research"` to `"eligible"`.
+    - In `aperture.run.start`: Automatically binds newly created research runs to unattached active Capital Missions.
+  - **Client UI Resilience (`client/src/components/aperture/ManualOrderTicketModal.tsx` & `AperturePlayDesk.tsx`)**:
+    - Added active mission banner and 1-click fallback warning banner.
+    - Added inline `stageError` alerts above modal actions with navigation links to `/aperture/mission`.
+  - **Sonner Toast Positioning (`client/src/components/ui/sonner.tsx`)**:
+    - Position set to `top-right` with `closeButton` so toasts never occlude Play Desk tab navigation controls.
+- Validation:
+  - TypeScript typecheck (`DATABASE_URL= pnpm check`): 0 errors.
+  - Vitest test suite (`DATABASE_URL= pnpm vitest run server/aperture/decisionRunway.test.ts server/aperture/orderFlow.test.ts server/aperture/recipeHorizon.test.ts`): 92/92 passed.
+  - All public endpoints returned HTTP 200:
+    - `https://third-signal-capital-aperture.web.app` (200)
+    - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+    - `https://uat-494d6de---capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+  - `system.health` returned `ok: true`.
+  - Client bundle `index-CRTuuU36.js` verified live.
+- Rollback revision: `capital-aperture-00196-jov`.
+
+
 
 
 
