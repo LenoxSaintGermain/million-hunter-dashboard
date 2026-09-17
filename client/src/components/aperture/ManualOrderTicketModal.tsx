@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -71,15 +71,25 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
     return paperAccounts.find((a) => a.brokerId === "alpaca_paper") ?? paperAccounts[0];
   }, [paperAccounts, activeMission?.accountId]);
 
+  const userSelectedAccountRef = useRef(false);
   const [accountId, setAccountId] = useState<number | null>(defaultAccount?.id ?? null);
   useEffect(() => {
-    if (defaultAccount && accountId == null) {
+    if (!userSelectedAccountRef.current && defaultAccount) {
       setAccountId(defaultAccount.id);
     }
-  }, [defaultAccount, accountId]);
+  }, [defaultAccount]);
 
   const selectedAccount = paperAccounts.find((a) => a.id === accountId) ?? defaultAccount;
   const [stageError, setStageError] = useState<string | null>(null);
+
+  const parsedErrors = useMemo(() => {
+    if (!stageError) return [];
+    const clean = stageError.replace(/^order blocked by the mandate:\s*/i, "").trim();
+    return clean
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }, [stageError]);
 
   // Form State
   const [symbol, setSymbol] = useState(initialValues?.symbol ?? "NVDA");
@@ -158,7 +168,14 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
     return Math.round(contracts * numLimitPrice * 100 * 100);
   }, [expression, shareCount, contracts, numLimitPrice]);
 
-  // Account Capacity Check
+  // Account Capacity & Sizing Limits
+  const equityCents = selectedAccount?.equityValueCents ?? 0;
+  const singleOrderCeilingCents = Math.min(10_000_00, Math.round(equityCents * 0.05));
+  const singleNameCapCents = Math.round(equityCents * 0.10);
+  const orderExceedsCeiling = equityCents > 0 && estimatedNotionalCents > singleOrderCeilingCents;
+  const orderExceedsConcentration = equityCents > 0 && estimatedNotionalCents > singleNameCapCents;
+  const concentrationPct = equityCents > 0 ? Math.round((estimatedNotionalCents / equityCents) * 100) : 0;
+
   const buyingPowerCents = selectedAccount?.buyingPowerCents ?? 0;
   const hasBuyingPower = buyingPowerCents >= estimatedNotionalCents;
 
@@ -196,7 +213,9 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
     },
     onError: (err) => {
       setStageError(err.message);
-      toast.error(`Order staging failed: ${err.message}`);
+      toast.error("Order blocked by mandate guardrails", {
+        description: "Review ceiling, concentration, or account constraints in the ticket.",
+      });
     },
   });
 
@@ -370,16 +389,24 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
               </label>
               <select
                 value={selectedAccount?.id ?? ""}
-                onChange={(e) => setAccountId(Number(e.target.value))}
+                onChange={(e) => {
+                  userSelectedAccountRef.current = true;
+                  setAccountId(Number(e.target.value));
+                }}
                 className="w-full rounded border bg-transparent px-2.5 py-1.5 text-xs font-medium focus-visible:outline-none"
                 style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}
               >
                 {paperAccounts.map((a) => (
                   <option key={a.id} value={a.id} className="bg-popover text-foreground">
-                    {a.label} (${Math.round((a.buyingPowerCents ?? 0) / 100).toLocaleString()} BP)
+                    {a.label} {a.brokerId === "manual" ? "(Offline Ledger · No Broker)" : "(Alpaca Broker Rail)"} — ${Math.round((a.buyingPowerCents ?? 0) / 100).toLocaleString()} BP
                   </option>
                 ))}
               </select>
+              {selectedAccount?.brokerId === "manual" && (
+                <p className="mt-1 text-[10px] leading-tight text-amber-400 font-mono">
+                  Offline manual ledger — cannot route electronic option contracts. Use for equity tracking only, or select an Alpaca Paper account.
+                </p>
+              )}
             </div>
           </div>
 
@@ -517,21 +544,42 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
             </div>
 
             {/* Sizing & Headroom Telemetry */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t text-xs font-mono" style={{ borderColor: "var(--sh-border-1)" }}>
-              <div>
-                <span style={{ color: "var(--sh-fg-muted)" }}>Est. Max Risk: </span>
-                <strong style={{ color: "var(--sh-red)" }}>${Math.round(estimatedRiskCents / 100).toLocaleString()}</strong>
+            <div className="pt-2 border-t text-xs font-mono space-y-2" style={{ borderColor: "var(--sh-border-1)" }}>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div>
+                  <span style={{ color: "var(--sh-fg-muted)" }}>Est. Max Risk: </span>
+                  <strong style={{ color: "var(--sh-red)" }}>${Math.round(estimatedRiskCents / 100).toLocaleString()}</strong>
+                </div>
+                <div>
+                  <span style={{ color: "var(--sh-fg-muted)" }}>Capital Required: </span>
+                  <strong style={{ color: "var(--sh-text-primary)" }}>${Math.round(estimatedNotionalCents / 100).toLocaleString()}</strong>
+                </div>
+                <div>
+                  <span style={{ color: "var(--sh-fg-muted)" }}>Single-Order Limit: </span>
+                  <strong style={{ color: orderExceedsCeiling ? "var(--sh-red)" : "var(--sh-emerald)" }}>
+                    ${Math.round(singleOrderCeilingCents / 100).toLocaleString()}
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ color: "var(--sh-fg-muted)" }}>Buying Power: </span>
+                  <strong style={{ color: hasBuyingPower ? "var(--sh-emerald)" : "var(--sh-red)" }}>
+                    {hasBuyingPower ? "PASSED" : "EXCEEDED"}
+                  </strong>
+                </div>
               </div>
-              <div>
-                <span style={{ color: "var(--sh-fg-muted)" }}>Capital Required: </span>
-                <strong style={{ color: "var(--sh-text-primary)" }}>${Math.round(estimatedNotionalCents / 100).toLocaleString()}</strong>
-              </div>
-              <div>
-                <span style={{ color: "var(--sh-fg-muted)" }}>Account Headroom: </span>
-                <strong style={{ color: hasBuyingPower ? "var(--sh-emerald)" : "var(--sh-red)" }}>
-                  {hasBuyingPower ? "PASSED" : "EXCEEDED"}
-                </strong>
-              </div>
+
+              {orderExceedsCeiling && (
+                <div className="rounded p-1.5 text-[11px] bg-red-950/40 border border-red-900/60 text-red-300 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-400" />
+                  <span>Order (${Math.round(estimatedNotionalCents / 100).toLocaleString()}) exceeds the 5% single-order ceiling (${Math.round(singleOrderCeilingCents / 100).toLocaleString()}) for this account.</span>
+                </div>
+              )}
+              {orderExceedsConcentration && (
+                <div className="rounded p-1.5 text-[11px] bg-red-950/40 border border-red-900/60 text-red-300 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-400" />
+                  <span>Order represents {concentrationPct}% of total equity, exceeding the 10% single-name cap (${Math.round(singleNameCapCents / 100).toLocaleString()}).</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -572,14 +620,37 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
           </div>
 
           {stageError && (
-            <div className="rounded-md border p-3 text-xs flex flex-col gap-1.5" style={{ borderColor: "var(--sh-red)", background: "color-mix(in srgb, var(--sh-red) 10%, var(--sh-surface))" }}>
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+            <div className="rounded-lg border p-3.5 text-xs flex flex-col gap-2.5" style={{ borderColor: "var(--sh-red)", background: "color-mix(in srgb, var(--sh-red) 12%, var(--sh-surface))" }}>
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-red-500">Order Staging Failed</p>
-                  <p className="mt-0.5 font-mono text-[11px] leading-4 break-words" style={{ color: "var(--sh-text-primary)" }}>{stageError}</p>
+                  <p className="font-semibold text-red-400 text-sm">Order Staging Blocked by Mandate</p>
+                  <p className="text-[11px] leading-4 mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>
+                    The submission violated portfolio risk guardrails or broker execution requirements:
+                  </p>
+                  <ul className="mt-2 space-y-1.5 pl-1">
+                    {parsedErrors.map((err, i) => (
+                      <li key={i} className="flex items-start gap-2 font-mono text-[11px] leading-4" style={{ color: "var(--sh-text-primary)" }}>
+                        <span className="text-red-400 font-bold shrink-0">&bull;</span>
+                        <span className="break-words">{err}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
+              {stageError.includes("manual portfolio") && (
+                <div className="flex justify-end pt-1">
+                  <Button size="sm" variant="outline" className="h-7 text-xs font-semibold" onClick={() => {
+                    const alpaca = paperAccounts.find((a) => a.brokerId === "alpaca_paper");
+                    if (alpaca) {
+                      userSelectedAccountRef.current = true;
+                      setAccountId(alpaca.id);
+                    }
+                  }}>
+                    Switch to Alpaca Paper Broker &rarr;
+                  </Button>
+                </div>
+              )}
               {stageError.includes("Capital Mission") && (
                 <div className="flex justify-end pt-1">
                   <Button size="sm" variant="outline" className="h-7 text-xs font-semibold" onClick={() => { onOpenChange(false); navigate("/aperture/mission"); }}>

@@ -101,6 +101,9 @@
   --sage:              oklch(0.55 0.06 155);
   --clay:              oklch(0.55 0.14 28);
   --rule:              oklch(0.85 0.012 85);
+  --popover:           var(--paper);
+  --popover-foreground: var(--ink);
+  --border:            var(--rule);
 
   /* Stitch Intelligence Terminal — Signal Gold tokens */
   --signal-gold:       #ffba20;
@@ -186,6 +189,9 @@
   --sage:   oklch(0.68 0.09 155);
   --clay:   oklch(0.68 0.16 28);
   --rule:   oklch(1 0 0 / 7%);
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+  --border: var(--rule);
   --sh-fg-1: oklch(0.96 0.008 80);
   --sh-fg-2: oklch(0.82 0.010 80);
   --sh-fg-3: oklch(0.60 0.010 80);

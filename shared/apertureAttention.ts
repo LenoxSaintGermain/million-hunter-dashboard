@@ -760,6 +760,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     baseline,
     baselineToken,
     sourceIssues: input.checks.issues ?? [],
+    mission: input.mission,
   };
 }
 
