@@ -444,6 +444,39 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - Client bundle `index-CRTuuU36.js` verified live.
 - Rollback revision: `capital-aperture-00196-jov`.
 
+### Release 2026-09-17 (Order Staging Mandate Guardrail Telemetry & Toast Polish)
+- Commit: `19a6ecc` (`fix(aperture): resolve sonner toast bleed, format mandate violations, and bind active mission`)
+- Release Tag: `19a6ecc-uat-a7a7c706`
+- Cloud Build: `a3b88d39-987a-4181-a744-a9523785baee` (`SUCCESS`, 4M43S)
+- Cloud Run Service: `capital-aperture` (project: `third-signal-v2`, region: `us-central1`)
+- Revision: `capital-aperture-00200-vak` (tag: `uat-19a6ecc`) serving **100%** of traffic.
+- Root Cause & Changes:
+  - **Active Mission Derivation Propagation (`shared/apertureAttention.ts`)**:
+    - Returned `mission: input.mission` in `deriveApertureAttention()` so `briefing.mission` is propagated to `AperturePlayDesk` and `ManualOrderTicketModal`, resolving the spurious "No Active Capital Mission Bound" warning banner.
+  - **Sonner Dark-Mode Popover Variable Fix (`client/src/index.css`)**:
+    - Added `--popover`, `--popover-foreground`, and `--border` variables to `:root` and `.dark` blocks, fixing the transparent toast background bleed-through.
+  - **Sonner Toast Styling & High-Contrast Elevation (`client/src/components/ui/sonner.tsx`)**:
+    - Configured explicit solid background (`var(--sh-surface-2, #1e2a34)`), high-contrast border (`var(--sh-border-1, #2d363e)`), 2xl elevation shadow, `max-w-md` width, and dark-red border for error toasts.
+  - **Concise Toast Error Notification (`client/src/components/aperture/ManualOrderTicketModal.tsx`)**:
+    - Replaced the monolithic 600-character raw semicolon error string in `toast.error()` with a concise notification: "Order blocked by mandate guardrails", pointing operators to the modal ticket.
+  - **Preflight Risk Ceiling & Concentration Telemetry (`client/src/components/aperture/ManualOrderTicketModal.tsx`)**:
+    - Added real-time evaluation of 5% single-order ceiling (`$100` on `$2,000` base) and 10% single-name concentration cap (`$200` on `$2,000` base) directly in the sizing telemetry grid before ticket submission.
+  - **Itemized Mandate Violation Formatting (`client/src/components/aperture/ManualOrderTicketModal.tsx`)**:
+    - Parsed semicolon-delimited mandate rejections into clean, readable bullet points with warning badges.
+  - **Account Selector Broker Distinction (`client/src/components/aperture/ManualOrderTicketModal.tsx`)**:
+    - Labeled accounts distinctly: `(Alpaca Broker Rail)` vs `(Offline Ledger · No Broker)`, with auto-selection tracking and helper guidance.
+- Validation:
+  - TypeScript typecheck (`DATABASE_URL= pnpm check`): 0 errors.
+  - Vitest test suite (`DATABASE_URL= pnpm vitest run server/aperture/todayAttentionBehavior.test.ts server/aperture/orderFlow.test.ts server/aperture/decisionRunway.test.ts server/aperture/gates.test.ts`): 194/194 passed.
+  - All public endpoints returned HTTP 200:
+    - `https://third-signal-capital-aperture.web.app` (200)
+    - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+    - `https://uat-19a6ecc---capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+  - `system.health` returned `ok: true`.
+  - Client bundle `index-BdvPB89A.js` verified live.
+- Rollback revision: `capital-aperture-00198-pax`.
+
+
 
 
 
