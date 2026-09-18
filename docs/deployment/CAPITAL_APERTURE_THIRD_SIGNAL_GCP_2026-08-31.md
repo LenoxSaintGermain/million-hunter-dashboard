@@ -508,3 +508,39 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - `system.health` returned `ok: true`.
   - Client bundle `index-bn8iupaH.js` verified live with release marker `f55d3d1-uat-71c87235`.
 - Rollback revision: `capital-aperture-00200-vak`.
+
+### Release 2026-09-18 (Candidate Review React #310 Fix, Auto-Fit Sizing Boundary, and Thesis Compile Action Harmonization)
+- Commit: `57baa86` (`fix(aperture): resolve candidate review crash, bound auto-fit sizing, and harmonize thesis compile actions`)
+- Release Tag: `57baa86-uat-94c3fa74`
+- Cloud Build: `405851b1-3ac1-44a6-b363-feaf8db717f5` (`SUCCESS`, 5M3S)
+- Container Image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:57baa86-uat-94c3fa74`
+- Image Digest: `sha256:f9fbff7f2f15f1c9ba343f125d113a01ebe8aa9b41e5c47a07962acabe8866fd`
+- Cloud Run Service: `capital-aperture` (project: `third-signal-v2`, region: `us-central1`)
+- Revision: `capital-aperture-00204-jus` (tag: `uat-57baa86`) serving **100%** of traffic.
+- Root Cause & Changes:
+  - **Client Crash Fix on Candidate Research View (`client/src/pages/aperture/CandidateBoard.tsx`)**:
+    - Hoisted all hook calls (`useEffect`, `batchClearStandardGates`, `genMemo`) above early returns (`if (isLoading) return ...`).
+    - Guarded against missing query mutations in unit test environments without hook count divergence.
+    - Eliminated React error #310 invariant violation completely when loading transitions.
+  - **Auto-Fit Sizing Boundary Solver (`client/src/components/aperture/ManualOrderTicketModal.tsx`)**:
+    - Defaulted `selectedAccount` to UAT $2,000 NAV paper account (`id === 60001` or `label` containing "uat"/"$2,000") with fallback capacity of $200,000 cents ($2,000 NAV).
+    - Initialized and synced `limitPrice`, `expression`, and `strikePrice` from `initialValues`.
+    - Auto-adjusted limit price between equity ($25.00) and options ($4.50) when switching between Direct Equity and Option Expressions.
+    - Initialized share quantity to 4 shares ($100 at $25 limit price) and contracts to 1 contract.
+    - Updated Auto-Fit buttons to render with clear ceiling telemetry and descriptive tooltips: `Auto-Fit: {units} (max ${dollarAmount})`.
+  - **Thesis Action Harmonization & Emerald Theme (`client/src/pages/aperture/ThesisGraphEditor.tsx` & `ApertureTheses.tsx`)**:
+    - Added `⚡ Compile & Stage Best Fit` button directly into the Thesis detail view (`/aperture/thesis/:id`).
+    - Styled `⚡ Compile & Stage Best Fit` buttons with emerald green styling (`bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500/40 shadow-sm`) across both grid cards and detail view.
+  - **Pipeline Target Account Resolution (`server/apertureRouter.ts`)**:
+    - Updated `compileAndStageBestFit` mutation to prioritize Account 60001 ($2,000 UAT declared paper account) over large accounts when `accountId` is omitted.
+- Validation:
+  - TypeScript typecheck (`DATABASE_URL= pnpm check`): 0 errors.
+  - Vitest test suite (`DATABASE_URL= pnpm vitest run server/aperture/batchGateClearance.test.ts server/aperture/candidateComparison.test.tsx server/aperture/evidenceQuestionPresentation.test.ts`): 17/17 passed.
+  - All public endpoints returned HTTP 200:
+    - `https://third-signal-capital-aperture.web.app` (200)
+    - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+    - `https://uat-57baa86---capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+  - `system.health` returned `ok: true`.
+  - Client bundle `index-CciCCNx9.js` verified live with release marker `57baa86-uat-94c3fa74`.
+- Rollback revision: `capital-aperture-00202-rix`.
+
