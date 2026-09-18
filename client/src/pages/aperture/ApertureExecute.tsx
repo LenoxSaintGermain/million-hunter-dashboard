@@ -109,18 +109,33 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
   const [rejection, setRejection] = useState<Order | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [gateError, setGateError] = useState<{ orderId: number; title: string; violations: string[] } | null>(null);
   const { data: orders, refetch } = trpc.aperture.order.list.useQuery({ runId });
+
+  const handleOrderError = (orderId: number, e: { message?: string }) => {
+    const rawMsg = e.message || "Order action failed";
+    const clean = rawMsg.replace(/^order blocked by the mandate:\s*/i, "").trim();
+    const violations = clean.split(";").map((s) => s.trim()).filter(Boolean);
+    if (violations.length > 1 || rawMsg.toLowerCase().includes("mandate") || rawMsg.toLowerCase().includes("gate")) {
+      toast.error("Order blocked by mandate guardrails. Review violations on ticket.");
+      setGateError({ orderId, title: "Order Blocked by Mandate Guardrails", violations });
+    } else {
+      toast.error(rawMsg);
+      setGateError({ orderId, title: "Action Failed", violations: [rawMsg] });
+    }
+  };
+
   const approve = trpc.aperture.order.approve.useMutation({
-    onSuccess: () => { toast.success("Order approved"); refetch(); },
-    onError: (e) => toast.error(e.message),
+    onSuccess: () => { toast.success("Order approved"); setGateError(null); refetch(); },
+    onError: (e, variables) => handleOrderError(variables.orderId, e),
   });
   const reject = trpc.aperture.order.reject.useMutation({
-    onSuccess: () => { toast.success("Order rejected"); refetch(); },
+    onSuccess: () => { toast.success("Order rejected"); setGateError(null); refetch(); },
     onError: (e) => toast.error(e.message),
   });
   const submit = trpc.aperture.order.submit.useMutation({
-    onSuccess: () => { toast.success("Paper order accepted or queued by the broker"); refetch(); },
-    onError: (e) => toast.error(e.message),
+    onSuccess: () => { toast.success("Paper order accepted or queued by the broker"); setGateError(null); refetch(); },
+    onError: (e, variables) => handleOrderError(variables.orderId, e),
   });
   const mirror = trpc.aperture.order.mirrorFills.useMutation({
     onSuccess: ({ updated }) => { toast.success(`${updated} fill(s) mirrored`); refetch(); },
@@ -159,13 +174,28 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
   const requiredConfirmation = confirmation?.kind === "submit" ? "SUBMIT PAPER" : "APPROVE PAPER";
   const confirmAction = () => {
     if (!confirmation || confirmationText !== requiredConfirmation) return;
+    const targetOrder = confirmation.order;
     if (confirmation.kind === "approve") {
-      approve.mutate({ orderId: confirmation.order.id, paperConfirmation: "APPROVE PAPER" });
+      approve.mutate(
+        { orderId: targetOrder.id, paperConfirmation: "APPROVE PAPER" },
+        {
+          onSuccess: () => {
+            setConfirmation(null);
+            setConfirmationText("");
+          },
+        }
+      );
     } else {
-      submit.mutate({ orderId: confirmation.order.id, paperConfirmation: "SUBMIT PAPER" });
+      submit.mutate(
+        { orderId: targetOrder.id, paperConfirmation: "SUBMIT PAPER" },
+        {
+          onSuccess: () => {
+            setConfirmation(null);
+            setConfirmationText("");
+          },
+        }
+      );
     }
-    setConfirmation(null);
-    setConfirmationText("");
   };
 
   return (
@@ -265,6 +295,31 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
                 {o.rejectionReason && (
                   <p className="mt-2 break-words text-xs" style={{ color: "var(--sh-red)" }}>Reason: {o.rejectionReason}</p>
                 )}
+                {gateError && gateError.orderId === o.id && (
+                  <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-semibold text-red-400">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                        <span>{gateError.title}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setGateError(null)}
+                        className="text-[11px] text-muted-foreground hover:text-foreground font-medium underline"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                    <ul className="space-y-1.5 pl-1">
+                      {gateError.violations.map((v, idx) => (
+                        <li key={idx} className="flex items-start gap-1.5 text-red-200/90 leading-relaxed">
+                          <span className="text-red-400 font-mono select-none">•</span>
+                          <span>{v}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {o.dispatchError && (
                   <p className="mt-2 rounded border px-3 py-2 text-xs leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 45%, var(--sh-border-1))", color: "var(--sh-fg-muted)" }}><strong style={{ color: "var(--sh-text-primary)" }}>Broker response unresolved.</strong> The stable paper-order ID is being reconciled. Do not submit another order or change this mission disposition yet.</p>
                 )}
@@ -304,6 +359,22 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
               </div>
             </div>
           )}
+          {gateError && gateError.orderId === confirmation?.order.id && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs space-y-2">
+              <div className="flex items-center gap-1.5 font-semibold text-red-400">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                <span>{gateError.title}</span>
+              </div>
+              <ul className="space-y-1.5 pl-1">
+                {gateError.violations.map((v, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5 text-red-200/90 leading-relaxed">
+                    <span className="text-red-400 font-mono select-none">•</span>
+                    <span>{v}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="space-y-2">
             <label htmlFor="paper-confirmation" className="text-sm font-medium">Type <span className="font-mono">{requiredConfirmation}</span> to continue</label>
             <Input id="paper-confirmation" className="min-h-11" autoComplete="off" value={confirmationText} onChange={(event) => setConfirmationText(event.target.value.toUpperCase())} />
@@ -311,6 +382,7 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
           <AlertDialogFooter>
             <AlertDialogCancel className="min-h-11">Go back</AlertDialogCancel>
             <Button className="min-h-11" onClick={confirmAction} disabled={confirmationText !== requiredConfirmation || approve.isPending || submit.isPending}>
+              {(approve.isPending || submit.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {confirmation?.kind === "submit" ? "Submit / queue paper order" : "Approve paper proposal"}
             </Button>
           </AlertDialogFooter>

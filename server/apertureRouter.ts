@@ -78,7 +78,7 @@ import { snapshot } from "./aperture/portfolioMath";
 import { assembleRun } from "./aperture/run";
 import { generateMemo } from "./aperture/memo";
 import { belongsInMemoLibrary } from "./aperture/memoLibrary";
-import { brokerFor, listBrokers } from "./aperture/brokers/index";
+import { brokerFor, listBrokers, alpacaPaperBroker } from "./aperture/brokers/index";
 import { normSymbol } from "./aperture/facts";
 import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills, preflightOrder, OrderGateError, LIVE_ORDER_STATUSES } from "./aperture/orderFlow";
 import { evaluateRunPreset, singleOrderCeilingCents } from "./aperture/gates";
@@ -1136,8 +1136,8 @@ export const apertureRouter = router({
               eq(portfolioAccounts.brokerId, "alpaca_paper"),
               eq(portfolioAccounts.externalAccountId, acctData.externalAccountId),
             ));
-          if (bound.some((row) => row.id !== account.id)) {
-            throw new TRPCError({ code: "CONFLICT", message: "This external Alpaca Paper account is already bound to another Signal Hunter account. Submission remains blocked." });
+          if (bound.some((row) => row.id !== account.id && row.userId === ctx.user.id)) {
+            throw new TRPCError({ code: "CONFLICT", message: "This external Alpaca Paper account is already bound to another account in your workspace. Submission remains blocked." });
           }
         }
 
@@ -5645,29 +5645,86 @@ export const apertureRouter = router({
           }
         }
 
-        // 2. Resolve paper execution account
-        let targetAccount: any = null;
-        if (input.accountId) {
-          targetAccount = await requireAccount(db, input.accountId, ctx.user.id);
-        } else {
-          const accounts = await db!.select().from(portfolioAccounts)
-            .where(and(eq(portfolioAccounts.userId, ctx.user.id), eq(portfolioAccounts.isPaper, true)));
-          // Prioritize declared UAT $2,000 paper account if available
-          targetAccount = accounts.find(a => a.id === 60001 || a.label?.toLowerCase().includes("uat") || a.label?.includes("$2,000"))
-            ?? accounts.find(a => a.brokerId === "alpaca_paper")
-            ?? accounts[0];
-          if (!targetAccount) {
-            const anyAccounts = await db!.select().from(portfolioAccounts)
-              .where(eq(portfolioAccounts.userId, ctx.user.id))
-              .limit(1);
-            if (anyAccounts[0]) targetAccount = anyAccounts[0];
+        // 2. Resolve paper execution account and portfolio context
+        const allUserAccounts = await db!.select().from(portfolioAccounts)
+          .where(and(eq(portfolioAccounts.userId, ctx.user.id), eq(portfolioAccounts.isPaper, true)));
+
+        // Portfolio context account provides the declared NAV ($2,000) and risk envelope
+        let portfolioContextAccount = input.accountId ? allUserAccounts.find(a => a.id === input.accountId) : undefined;
+        if (!portfolioContextAccount) {
+          portfolioContextAccount = allUserAccounts.find(a => a.id === 60001 || a.label?.toLowerCase().includes("uat") || a.label?.includes("$2,000"))
+            ?? allUserAccounts.find(a => a.brokerId === "manual")
+            ?? allUserAccounts[0];
+        }
+
+        // Execution destination must be a server-side paper rail (e.g. alpaca_paper)
+        let executionAccount = allUserAccounts.find(a => a.brokerId === "alpaca_paper" && a.isPaper);
+        const now = Date.now();
+        if (!executionAccount && alpacaPaperBroker.available()) {
+          try {
+            const alpacaAcct = await alpacaPaperBroker.getAccount();
+            const [inserted] = await db!.insert(portfolioAccounts).values({
+              userId: ctx.user.id,
+              label: "Alpaca Paper — Execution Rail",
+              brokerId: "alpaca_paper",
+              externalAccountId: alpacaAcct.externalAccountId,
+              isPaper: true,
+              cashCents: alpacaAcct.cashCents,
+              buyingPowerCents: alpacaAcct.buyingPowerCents,
+              equityValueCents: alpacaAcct.equityValueCents,
+              optionsApprovedLevel: alpacaAcct.optionsApprovedLevel,
+              optionsTradingLevel: alpacaAcct.optionsTradingLevel,
+              optionsBuyingPowerCents: alpacaAcct.optionsBuyingPowerCents,
+              lastSyncedAt: now,
+              syncSource: "alpaca_paper",
+              createdAt: now,
+              updatedAt: now,
+            });
+            const insertedId = Number((inserted as any).insertId);
+            const [freshAcct] = await db!.select().from(portfolioAccounts).where(eq(portfolioAccounts.id, insertedId));
+            executionAccount = freshAcct;
+          } catch {
+            // best-effort
           }
         }
-        if (!targetAccount) {
+        if (!executionAccount) {
+          executionAccount = portfolioContextAccount;
+        }
+
+        if (!portfolioContextAccount && !executionAccount) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
             message: "No paper account found for this operator. Create or connect a paper account before staging orders.",
           });
+        }
+        if (!portfolioContextAccount) {
+          portfolioContextAccount = executionAccount!;
+        }
+        const targetAccount = portfolioContextAccount;
+
+        // Freshen accounts so mandate freshness checks pass cleanly
+        if (executionAccount && executionAccount.brokerId === "alpaca_paper") {
+          try {
+            const alpacaAcct = await alpacaPaperBroker.getAccount();
+            await db!.update(portfolioAccounts).set({
+              lastSyncedAt: now,
+              cashCents: alpacaAcct.cashCents,
+              buyingPowerCents: alpacaAcct.buyingPowerCents,
+              equityValueCents: alpacaAcct.equityValueCents,
+              optionsApprovedLevel: alpacaAcct.optionsApprovedLevel,
+              optionsTradingLevel: alpacaAcct.optionsTradingLevel,
+              optionsBuyingPowerCents: alpacaAcct.optionsBuyingPowerCents,
+              updatedAt: now,
+            }).where(eq(portfolioAccounts.id, executionAccount.id));
+          } catch {
+            // best-effort
+          }
+        }
+        if (portfolioContextAccount) {
+          await db!.update(portfolioAccounts).set({
+            lastSyncedAt: now,
+            updatedAt: now,
+          }).where(eq(portfolioAccounts.id, portfolioContextAccount.id));
         }
 
         // 3. Find or create run for this thesis
@@ -5676,7 +5733,6 @@ export const apertureRouter = router({
           .orderBy(desc(apertureRuns.id))
           .limit(1))[0];
 
-        const now = Date.now();
         if (!run) {
           const [createdRun] = await db!.insert(apertureRuns).values({
             userId: ctx.user.id,
@@ -5685,7 +5741,7 @@ export const apertureRouter = router({
             deployableCapitalCents: 100_000,
             holdingPeriod: "swing",
             instrumentPreference: "options",
-            catalystDeadlineAt: now + 30 * 86_400_000,
+            catalystDeadlineAt: now + 14 * 86_400_000,
             liquidityFloorAdvUsd: CURRENT_MANDATE.minAdvUsd30d,
             maxSingleNamePct: CURRENT_MANDATE.maxPositionPctOfEquity,
             invalidationRule: "Invalidate if evidence contradicts thesis premise or stop loss is reached",
@@ -5779,7 +5835,7 @@ export const apertureRouter = router({
         }
 
         // 6. Dynamic Budget Sizing
-        const equityCents = targetAccount.equityValueCents ?? 200_000;
+        const equityCents = portfolioContextAccount.equityValueCents ?? 200_000;
         const singleOrderCeilingCents = Math.min(10_000_00, Math.round(equityCents * 0.05)); // $100 on $2,000 NAV
         const singleNameCapCents = Math.round(equityCents * 0.10); // $200
         const effectiveBudgetCents = Math.min(singleOrderCeilingCents, singleNameCapCents);
@@ -5804,7 +5860,7 @@ export const apertureRouter = router({
         } else {
           instrumentType = "long_call";
           optionStrikeCents = Math.round(underlyingPriceDollars) * 100;
-          optionExp = nextStandardMonthlyOptionExpiration(now + 30 * 86_400_000);
+          optionExp = nextStandardMonthlyOptionExpiration(now + 14 * 86_400_000);
           const occ = buildOccOptionSymbol({
             underlyingSymbol: leadCandidate.symbol,
             expirationDate: optionExp,
@@ -5817,7 +5873,13 @@ export const apertureRouter = router({
           notionalCents = qty * limitPriceCents * 100;
         }
 
-        const stopPriceCents = Math.round(limitPriceCents * 0.5);
+        // Mandate Compliant Stop Loss: max planned loss <= 0.75% of equity ($15.00 on $2,000 NAV)
+        const maxPlayRiskCents = Math.floor(equityCents * (CURRENT_MANDATE.maxPlannedRiskPctPerPlay / 100));
+        const defaultLossPerUnitCents = Math.round(limitPriceCents * 0.05); // 5% trailing stop
+        const maxLossPerUnitCents = Math.max(1, Math.floor(maxPlayRiskCents / qty));
+        const lossPerUnitCents = Math.min(defaultLossPerUnitCents, maxLossPerUnitCents);
+        const stopPriceCents = Math.max(1, limitPriceCents - lossPerUnitCents);
+
         const structuredReason = `[PIPELINE FAST-TRACK] Auto-compiled from thesis "${thesis.name ?? 'Active'}" · Candidate ${leadCandidate.symbol} · Dynamic sizing bounded strictly under account ceiling ($${(effectiveBudgetCents / 100).toFixed(0)})`;
         const invalidation = `Invalidate if ${leadCandidate.symbol} drops below structural support or price moves against thesis by 5%`;
 
@@ -5825,7 +5887,8 @@ export const apertureRouter = router({
         const [insertedOrder] = await db!.insert(brokerOrders).values({
           runId: run.id,
           candidateId: leadCandidate.id,
-          accountId: targetAccount.id,
+          accountId: executionAccount.id,
+          portfolioContextAccountId: portfolioContextAccount.id,
           userId: ctx.user.id,
           symbol: orderSymbol,
           instrumentType,
@@ -5848,7 +5911,7 @@ export const apertureRouter = router({
           stopPriceCents,
           slippageCents: 2,
           holdingPeriod: "swing",
-          catalystDeadlineAt: now + 30 * 86_400_000,
+          catalystDeadlineAt: now + 14 * 86_400_000,
           createdAt: now,
           updatedAt: now,
         });

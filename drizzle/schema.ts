@@ -1152,7 +1152,7 @@ export const portfolioAccounts = mysqlTable("portfolio_accounts", {
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
 }, (table) => ({
   syncScheduleTaskUidIdx: index("portfolio_accounts_sync_schedule_task_uid_idx").on(table.syncScheduleTaskUid),
-  brokerExternalUnique: uniqueIndex("portfolio_accounts_broker_external_uq").on(table.brokerId, table.externalAccountId),
+  brokerExternalUnique: uniqueIndex("portfolio_accounts_user_broker_external_uq").on(table.userId, table.brokerId, table.externalAccountId),
 }));
 export type PortfolioAccount = typeof portfolioAccounts.$inferSelect;
 export type InsertPortfolioAccount = typeof portfolioAccounts.$inferInsert;
