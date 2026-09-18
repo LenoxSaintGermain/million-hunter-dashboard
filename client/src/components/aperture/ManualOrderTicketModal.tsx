@@ -20,6 +20,9 @@ export interface ManualOrderTicketModalProps {
     candidateId?: number;
     suggestedAmountCents?: number;
     holdingPeriod?: "intraday" | "swing" | "catalyst_window" | "position";
+    limitPrice?: string;
+    expression?: PlayExpression;
+    strikePrice?: string;
   };
   onStaged?: (orderId: number, runId?: number) => void;
 }
@@ -68,7 +71,10 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
       const missionAccount = paperAccounts.find((a) => a.id === activeMission.accountId);
       if (missionAccount) return missionAccount;
     }
-    return paperAccounts.find((a) => a.brokerId === "alpaca_paper") ?? paperAccounts[0];
+    // Prioritize declared UAT $2,000 account if present
+    return paperAccounts.find((a) => a.id === 60001 || a.label?.toLowerCase().includes("uat") || a.label?.includes("$2,000"))
+      ?? paperAccounts.find((a) => a.brokerId === "alpaca_paper")
+      ?? paperAccounts[0];
   }, [paperAccounts, activeMission?.accountId]);
 
   const userSelectedAccountRef = useRef(false);
@@ -94,7 +100,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
   // Form State
   const [symbol, setSymbol] = useState(initialValues?.symbol ?? "NVDA");
   const [expression, setExpression] = useState<PlayExpression>(
-    initialValues?.direction === "short" ? "long_put" : "long_call"
+    initialValues?.expression ?? (initialValues?.direction === "short" ? "long_put" : "long_call")
   );
   const [direction, setDirection] = useState<"long" | "short">(initialValues?.direction ?? "long");
   const [holdingPeriod, setHoldingPeriod] = useState<"intraday" | "swing" | "catalyst_window" | "position">(
@@ -102,10 +108,12 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
   );
 
   // Pricing & Strikes
-  const [shareCount, setShareCount] = useState<number>(100);
-  const [contracts, setContracts] = useState<number>(5);
-  const [limitPrice, setLimitPrice] = useState<string>("4.50");
-  const [strikePrice, setStrikePrice] = useState<string>("150.00");
+  const [shareCount, setShareCount] = useState<number>(4);
+  const [contracts, setContracts] = useState<number>(1);
+  const [limitPrice, setLimitPrice] = useState<string>(
+    initialValues?.limitPrice ?? (initialValues?.expression === "shares" ? "25.00" : "4.50")
+  );
+  const [strikePrice, setStrikePrice] = useState<string>(initialValues?.strikePrice ?? "150.00");
   const [spreadUpperStrike, setSpreadUpperStrike] = useState<string>("160.00");
   const [expirationDate, setExpirationDate] = useState<string>(() => {
     try {
@@ -127,14 +135,23 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
   // Sync initialValues if reopened
   useEffect(() => {
     if (initialValues?.symbol) setSymbol(initialValues.symbol.toUpperCase());
+    if (initialValues?.expression) setExpression(initialValues.expression);
     if (initialValues?.direction) {
       setDirection(initialValues.direction);
-      if (initialValues.direction === "short") {
+      if (initialValues.direction === "short" && !initialValues.expression) {
         setExpression("long_put");
       }
     }
     if (initialValues?.holdingPeriod) {
       setHoldingPeriod(initialValues.holdingPeriod);
+    }
+    if (initialValues?.limitPrice) {
+      setLimitPrice(initialValues.limitPrice);
+    } else if (initialValues?.expression === "shares") {
+      setLimitPrice("25.00");
+    }
+    if (initialValues?.strikePrice) {
+      setStrikePrice(initialValues.strikePrice);
     }
   }, [initialValues, open]);
 
@@ -169,7 +186,9 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
   }, [expression, shareCount, contracts, numLimitPrice]);
 
   // Account Capacity & Sizing Limits
-  const equityCents = selectedAccount?.equityValueCents ?? 0;
+  const rawEquityCents = selectedAccount?.equityValueCents ?? 0;
+  // If account has 0 or unrecorded equity, fall back to $2,000 UAT NAV so safety ceilings still bind
+  const equityCents = rawEquityCents > 0 ? rawEquityCents : 200_000;
   const singleOrderCeilingCents = Math.min(10_000_00, Math.round(equityCents * 0.05));
   const singleNameCapCents = Math.round(equityCents * 0.10);
   const effectiveCeilingCents = Math.min(singleOrderCeilingCents, singleNameCapCents);
@@ -429,7 +448,18 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setExpression(item.id)}
+                    onClick={() => {
+                      setExpression(item.id);
+                      if (item.id === "shares") {
+                        if (limitPrice === "4.50" || limitPrice === "" || parseFloat(limitPrice) <= 5.0) {
+                          setLimitPrice("25.00");
+                        }
+                      } else {
+                        if (limitPrice === "25.00") {
+                          setLimitPrice("4.50");
+                        }
+                      }
+                    }}
                     className="flex flex-col text-left rounded-lg border p-2.5 transition-all focus-visible:outline-none"
                     style={{
                       borderColor: isSelected ? "var(--sh-signal)" : "var(--sh-border-1)",
@@ -474,9 +504,11 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                         <button
                           type="button"
                           onClick={() => setShareCount(maxAllowableUnits)}
-                          className="text-[9px] text-emerald-400 hover:underline"
+                          className="text-[9px] text-emerald-400 hover:underline flex items-center gap-1 font-mono font-medium"
+                          title={`5% Single-Order Ceiling ($${Math.round(singleOrderCeilingCents / 100)}) ÷ $${numLimitPrice.toFixed(2)} = ${maxAllowableUnits} shares`}
                         >
-                          Auto-Fit: {maxAllowableUnits}
+                          <Sparkles className="h-2.5 w-2.5" />
+                          Auto-Fit: {maxAllowableUnits} (max ${Math.round((maxAllowableUnits * costPerUnitCents) / 100)})
                         </button>
                       )}
                     </div>
@@ -509,9 +541,11 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                         <button
                           type="button"
                           onClick={() => setContracts(maxAllowableUnits)}
-                          className="text-[9px] text-emerald-400 hover:underline"
+                          className="text-[9px] text-emerald-400 hover:underline flex items-center gap-1 font-mono font-medium"
+                          title={`5% Single-Order Ceiling ($${Math.round(singleOrderCeilingCents / 100)}) ÷ $${(costPerUnitCents / 100).toFixed(2)} = ${maxAllowableUnits} contracts`}
                         >
-                          Auto-Fit: {maxAllowableUnits}
+                          <Sparkles className="h-2.5 w-2.5" />
+                          Auto-Fit: {maxAllowableUnits} (max ${Math.round((maxAllowableUnits * costPerUnitCents) / 100)})
                         </button>
                       )}
                     </div>

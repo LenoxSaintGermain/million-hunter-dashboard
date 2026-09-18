@@ -19,7 +19,7 @@ vi.mock("@/components/ui/sheet", () => ({
 vi.mock("@/lib/trpc", () => {
   const mutation = { useMutation: () => ({ mutate: state.mutate, isPending: false }) };
   return { trpc: { useUtils: () => ({}), aperture: {
-    run: { get: { useQuery: () => ({ data: state.data, isLoading: false, refetch: vi.fn() }) }, retry: mutation, followUp: mutation, evidence: { review: mutation, refreshFinancialFacts: mutation } },
+    run: { get: { useQuery: () => ({ data: state.data, isLoading: false, refetch: vi.fn() }) }, retry: mutation, followUp: mutation, evidence: { review: mutation, refreshFinancialFacts: mutation, batchClearStandardGates: mutation } },
     macro: { refresh: mutation }, generateMemo: mutation,
   } } };
 });

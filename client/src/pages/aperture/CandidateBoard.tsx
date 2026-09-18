@@ -304,44 +304,10 @@ export default function CandidateBoard() {
     },
   });
 
-  if (isLoading) return (
-    <DashboardLayout>
-      <div className="mx-auto max-w-6xl space-y-5">
-        <div className="flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-medium" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}>
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} /> Internal research tool — not investment advice. Paper-only decisions require human approval.
-        </div>
-        <section className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-          <div className="flex items-start gap-3 px-5 py-5" style={{ background: "var(--sh-surface-2)" }}>
-            <Loader2 className="mt-0.5 h-5 w-5 animate-spin" style={{ color: "var(--sh-signal)" }} />
-            <div>
-              <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Opening your paper research brief</p>
-              <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>This page stays with the brief. You will see its phase, evidence count, and any recovery action here—not in a separate status page.</p>
-            </div>
-          </div>
-          <div className="h-1" style={{ background: "var(--sh-border-1)" }}><div className="h-full w-[12%] animate-pulse" style={{ background: "var(--sh-signal)" }} /></div>
-          <div className="grid grid-cols-3 gap-3 p-5 sm:grid-cols-6">
-            {RUN_STEPS.map((step, index) => <div key={step.key} className="space-y-2"><div className={`h-2 rounded ${index === 0 ? "animate-pulse" : ""}`} style={{ background: index === 0 ? "var(--sh-signal)" : "var(--sh-surface-2)" }} /><p className="text-[10px]" style={{ color: "var(--sh-fg-muted)" }}>{step.label}</p></div>)}
-          </div>
-        </section>
-      </div>
-    </DashboardLayout>
-  );
-  if (!data) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Run not found.</div></DashboardLayout>;
-  if (data.decisionAuthority && !decisionAuthorityAllowsDownstream(data.decisionAuthority)) {
-    return <DashboardLayout><DecisionStepLock authority={data.decisionAuthority} step="Play Slate" onOpenReceipt={() => navigate(`/aperture/decision/${data.decisionAuthority!.decisionRunId}/revision/${data.decisionAuthority!.revisionId}`)} /></DashboardLayout>;
-  }
-
-  const { run, stale, candidates, macroFacts, brief, thesisContext, setAside, setAsideNote } = data;
-  const roles: Array<Role | "all"> = ["all", "core", "complementary", "remainder", "alternative_expression"];
-  const filtered = (activeRole === "all" ? candidates : candidates.filter((candidate) => candidate.role === activeRole))
-    .slice().sort((a, b) => decisionPriority(b) - decisionPriority(a));
+  const candidates = data?.candidates ?? [];
   const researchRankedCandidates = rankResearchCandidates(candidates);
-  const leadCandidate = candidates.find((candidate) => candidate.id === brief?.priorityCandidate?.id)
+  const leadCandidate = candidates.find((candidate) => candidate.id === data?.brief?.priorityCandidate?.id)
     ?? researchRankedCandidates[0];
-  // The lead is a research verdict and the UI names it as one, so it keeps its
-  // place. The alternatives beside it are ordered so names the account can
-  // actually take come first — affordability is a fact about the account, not a
-  // claim that the research is better. Research order survives inside each group.
   const alternatives = leadCandidate
     ? researchRankedCandidates.filter((candidate) => candidate.id !== leadCandidate.id)
     : [];
@@ -349,40 +315,14 @@ export default function CandidateBoard() {
   const candidateSequence = leadCandidate ? [leadCandidate, ...actionability.ordered] : [];
   const focusCandidate = candidateSequence.find((candidate) => candidate.id === requestedCandidateId)
     ?? candidateSequence.find((candidate) => candidate.id === selectedCandidateId) ?? leadCandidate;
-  const inspectionOpen = view === "play" && requestedCandidateId != null
-    && candidateSequence.some((candidate) => candidate.id === requestedCandidateId)
-    && new URLSearchParams(search).get("inspect") !== "0";
-  const inspectCandidate = (id: number, trigger: HTMLButtonElement) => {
-    inspectionTriggerRef.current = trigger;
-    setSelectedCandidateId(id);
-    navigate(candidateInspectionHref(runId, search, id));
-  };
-  const paperPositions = data.paperContext?.positions ?? [];
-  const focusChecks = Array.isArray(focusCandidate?.verifyFields) ? focusCandidate.verifyFields as string[] : [];
-  const evidenceReadiness = getEvidenceReviewReadiness(focusChecks, (data.evidenceReviews ?? []).filter((review: any) => review.candidateId === focusCandidate?.id));
-  const proposalChecks = evidenceReadiness.requiredChecks;
-  const ticketChecks = evidenceReadiness.ticketChecks;
-  const reviewedChecks = new Set(evidenceReadiness.reviewedChecks);
+
+  const focusChecks = Array.isArray(focusCandidate?.verifyFields) ? (focusCandidate.verifyFields as string[]) : [];
+  const candidateReviews = ((data?.evidenceReviews as any[]) ?? []).filter((review: any) => review.candidateId === focusCandidate?.id);
+  const evidenceReadiness = getEvidenceReviewReadiness(focusChecks, candidateReviews);
   const unreviewedChecks = evidenceReadiness.unreviewedChecks;
-  const paperProposalReady = evidenceReadiness.paperProposalReady;
-  const paperStageDeclined = evidenceReadiness.paperStageDeclined;
-  const negativeChecks = evidenceReadiness.negativeChecks;
   const currentEvidenceQuestion = selectedEvidenceQuestion && selectedEvidenceQuestion.candidateId === focusCandidate?.id && unreviewedChecks.includes(selectedEvidenceQuestion.checkLabel)
     ? selectedEvidenceQuestion.checkLabel : unreviewedChecks[0] ?? null;
   const evidenceDraftKey = `${runId}:${focusCandidate?.id}:${currentEvidenceQuestion}`;
-  const currentEvidenceDraft = evidenceDrafts[evidenceDraftKey] ?? EMPTY_EVIDENCE_QUESTION;
-  const focusMemo = (focusCandidate as any)?.memo;
-  const sourceExcerpt = typeof focusMemo === "string"
-    ? focusMemo.slice(0, 420)
-    : focusMemo && typeof focusMemo === "object"
-      ? Object.values(focusMemo as Record<string, unknown>).flatMap((value) => Array.isArray(value) ? value : [value]).filter((value): value is string => typeof value === "string").join(" ").slice(0, 420)
-      : null;
-  const alreadyHeld = Boolean(focusCandidate && paperPositions.some((position: any) => position.symbol === focusCandidate.symbol));
-  const proposalBlockedReason = paperStageDeclined
-    ? "A required evidence answer was not confirmed. This revision preserves cash and cannot open a paper ticket."
-    : unreviewedChecks.length
-      ? `Review the required evidence before opening the paper ticket — ${unreviewedChecks.length} decision-critical check${unreviewedChecks.length === 1 ? " remains" : "s remain"}.`
-      : null;
 
   useEffect(() => {
     if (!focusCandidate?.id || !currentEvidenceQuestion) return;
@@ -416,6 +356,66 @@ export default function CandidateBoard() {
     });
     return () => { active = false; };
   }, [runId, focusCandidate?.id, currentEvidenceQuestion, evidenceDraftKey, trpcUtils]);
+
+  if (isLoading) return (
+    <DashboardLayout>
+      <div className="mx-auto max-w-6xl space-y-5">
+        <div className="flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-medium" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}>
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} /> Internal research tool — not investment advice. Paper-only decisions require human approval.
+        </div>
+        <section className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+          <div className="flex items-start gap-3 px-5 py-5" style={{ background: "var(--sh-surface-2)" }}>
+            <Loader2 className="mt-0.5 h-5 w-5 animate-spin" style={{ color: "var(--sh-signal)" }} />
+            <div>
+              <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Opening your paper research brief</p>
+              <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>This page stays with the brief. You will see its phase, evidence count, and any recovery action here—not in a separate status page.</p>
+            </div>
+          </div>
+          <div className="h-1" style={{ background: "var(--sh-border-1)" }}><div className="h-full w-[12%] animate-pulse" style={{ background: "var(--sh-signal)" }} /></div>
+          <div className="grid grid-cols-3 gap-3 p-5 sm:grid-cols-6">
+            {RUN_STEPS.map((step, index) => <div key={step.key} className="space-y-2"><div className={`h-2 rounded ${index === 0 ? "animate-pulse" : ""}`} style={{ background: index === 0 ? "var(--sh-signal)" : "var(--sh-surface-2)" }} /><p className="text-[10px]" style={{ color: "var(--sh-fg-muted)" }}>{step.label}</p></div>)}
+          </div>
+        </section>
+      </div>
+    </DashboardLayout>
+  );
+  if (!data) return <DashboardLayout><div className="p-8 text-center text-sm" style={{ color: "var(--sh-fg-muted)" }}>Run not found.</div></DashboardLayout>;
+  if (data.decisionAuthority && !decisionAuthorityAllowsDownstream(data.decisionAuthority)) {
+    return <DashboardLayout><DecisionStepLock authority={data.decisionAuthority} step="Play Slate" onOpenReceipt={() => navigate(`/aperture/decision/${data.decisionAuthority!.decisionRunId}/revision/${data.decisionAuthority!.revisionId}`)} /></DashboardLayout>;
+  }
+
+  const { run, stale, macroFacts, brief, thesisContext, setAside, setAsideNote } = data;
+  const roles: Array<Role | "all"> = ["all", "core", "complementary", "remainder", "alternative_expression"];
+  const filtered = (activeRole === "all" ? candidates : candidates.filter((candidate) => candidate.role === activeRole))
+    .slice().sort((a, b) => decisionPriority(b) - decisionPriority(a));
+  const inspectionOpen = view === "play" && requestedCandidateId != null
+    && candidateSequence.some((candidate) => candidate.id === requestedCandidateId)
+    && new URLSearchParams(search).get("inspect") !== "0";
+  const inspectCandidate = (id: number, trigger: HTMLButtonElement) => {
+    inspectionTriggerRef.current = trigger;
+    setSelectedCandidateId(id);
+    navigate(candidateInspectionHref(runId, search, id));
+  };
+  const paperPositions = data.paperContext?.positions ?? [];
+  const proposalChecks = evidenceReadiness.requiredChecks;
+  const ticketChecks = evidenceReadiness.ticketChecks;
+  const reviewedChecks = new Set(evidenceReadiness.reviewedChecks);
+  const paperProposalReady = evidenceReadiness.paperProposalReady;
+  const paperStageDeclined = evidenceReadiness.paperStageDeclined;
+  const negativeChecks = evidenceReadiness.negativeChecks;
+  const currentEvidenceDraft = evidenceDrafts[evidenceDraftKey] ?? EMPTY_EVIDENCE_QUESTION;
+  const focusMemo = (focusCandidate as any)?.memo;
+  const sourceExcerpt = typeof focusMemo === "string"
+    ? focusMemo.slice(0, 420)
+    : focusMemo && typeof focusMemo === "object"
+      ? Object.values(focusMemo as Record<string, unknown>).flatMap((value) => Array.isArray(value) ? value : [value]).filter((value): value is string => typeof value === "string").join(" ").slice(0, 420)
+      : null;
+  const alreadyHeld = Boolean(focusCandidate && paperPositions.some((position: any) => position.symbol === focusCandidate.symbol));
+  const proposalBlockedReason = paperStageDeclined
+    ? "A required evidence answer was not confirmed. This revision preserves cash and cannot open a paper ticket."
+    : unreviewedChecks.length
+      ? `Review the required evidence before opening the paper ticket — ${unreviewedChecks.length} decision-critical check${unreviewedChecks.length === 1 ? " remains" : "s remain"}.`
+      : null;
 
   const openEvidence = () => { setView("evidence"); setActiveRole("all"); };
   return (

@@ -69,6 +69,16 @@ export default function ThesisGraphEditor() {
     onError: (e) => toast.error(e.message),
   });
 
+  const compileAndStage = trpc.aperture.pipeline.compileAndStageBestFit.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Pipeline complete: Staged ${result.symbol} paper order #${result.orderId} for desk authorization!`);
+      navigate(`/aperture/plays?stage=approve&inspect=${result.orderId}`);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
   useEffect(() => {
     if (thesis) {
       setName(thesis.name ?? "");
@@ -186,6 +196,16 @@ export default function ThesisGraphEditor() {
                       Update Legacy Thesis
                     </Button>
                   )}
+                  {!isNew && thesisId && (
+                    <Button
+                      disabled={compileAndStage.isPending}
+                      className="font-semibold text-white bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/40 shadow-sm"
+                      onClick={() => compileAndStage.mutate({ thesisId })}
+                    >
+                      {compileAndStage.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                      ⚡ Compile &amp; Stage Best Fit
+                    </Button>
+                  )}
                   {!thesis?.sourceCompilationId && (
                     <Button
                       variant="outline"
@@ -195,7 +215,7 @@ export default function ThesisGraphEditor() {
                       {compileThesis.isPending
                         ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         : <Sparkles className="h-4 w-4 mr-2" />}
-                      Compile
+                      Compile Graph Only
                     </Button>
                   )}
                 </div>

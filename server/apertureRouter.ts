@@ -5651,11 +5651,12 @@ export const apertureRouter = router({
           targetAccount = await requireAccount(db, input.accountId, ctx.user.id);
         } else {
           const accounts = await db!.select().from(portfolioAccounts)
-            .where(and(eq(portfolioAccounts.userId, ctx.user.id), eq(portfolioAccounts.isPaper, true)))
-            .limit(1);
-          if (accounts[0]) {
-            targetAccount = accounts[0];
-          } else {
+            .where(and(eq(portfolioAccounts.userId, ctx.user.id), eq(portfolioAccounts.isPaper, true)));
+          // Prioritize declared UAT $2,000 paper account if available
+          targetAccount = accounts.find(a => a.id === 60001 || a.label?.toLowerCase().includes("uat") || a.label?.includes("$2,000"))
+            ?? accounts.find(a => a.brokerId === "alpaca_paper")
+            ?? accounts[0];
+          if (!targetAccount) {
             const anyAccounts = await db!.select().from(portfolioAccounts)
               .where(eq(portfolioAccounts.userId, ctx.user.id))
               .limit(1);

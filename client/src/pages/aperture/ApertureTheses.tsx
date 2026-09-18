@@ -275,8 +275,7 @@ export default function ApertureTheses() {
                       <Button
                         size="sm"
                         disabled={stagingThesisId === thesis.id}
-                        className="font-semibold text-white border-emerald-500/40"
-                        style={{ background: "var(--sh-signal)" }}
+                        className="font-semibold text-white bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/40 shadow-sm"
                         onClick={() => {
                           setStagingThesisId(thesis.id);
                           compileAndStage.mutate({ thesisId: thesis.id });
