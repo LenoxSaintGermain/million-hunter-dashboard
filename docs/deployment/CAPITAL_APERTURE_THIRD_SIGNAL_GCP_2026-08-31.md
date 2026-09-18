@@ -544,3 +544,41 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - Client bundle `index-CciCCNx9.js` verified live with release marker `57baa86-uat-94c3fa74`.
 - Rollback revision: `capital-aperture-00202-rix`.
 
+### Release 2026-09-18 (Mandate Gate Compliance, Dual-Account Decoupling, Multi-User Index, and Itemized Error UX)
+- Commit: `e80b850` (`fix(aperture): resolve mandate compliance for paper ticket approval and clean UI error display`)
+- Release Tag: `e80b850-uat-cfde6ef7`
+- Cloud Build: `9a22bf35-8058-4faf-8cee-a08faf01f321` (`SUCCESS`, 4M19S)
+- Container Image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:e80b850-uat-cfde6ef7`
+- Image Digest: `sha256:19808497e5416cc9abe32954ab0150f898121ae3960c4bfdf4f39d9dcfd6acae`
+- Cloud Run Service: `capital-aperture` (project: `third-signal-v2`, region: `us-central1`)
+- Revision: `capital-aperture-00206-qed` (tag: `uat-e80b850`) serving **100%** of traffic.
+- Root Cause & Changes:
+  - **Dual-Account Execution & Portfolio Separation (`server/apertureRouter.ts`)**:
+    - Decoupled `executionAccount` (Alpaca paper submission rail) from `portfolioContextAccount` (NAV accounting, Account 60001, $2,000 NAV), satisfying both `paper_execution_destination` and `portfolio_context`.
+    - Auto-freshens both accounts upon ticket compilation (`lastSyncedAt: now`).
+  - **Dynamic Stop-Loss Risk Sizing (`server/apertureRouter.ts`)**:
+    - Bounded planned loss to mandate limit: max allowable risk per play is 0.75% of equity ($15.00 on $2,000 NAV).
+    - Dynamically computes stop loss: `lossPerUnitCents = Math.min(defaultLossPerUnitCents, maxLossPerUnitCents)`, setting stop price to $95.00 on $100.00 entry ($5.00 planned risk = 0.25% of NAV), clearing `planned_loss_per_play`, `daily_planned_loss`, and `correlated_planned_loss`.
+  - **Catalyst Horizon Compliance (`server/apertureRouter.ts`)**:
+    - Bounded catalyst horizon to 14 days, satisfying the <= 21-day ceiling for swing trading.
+  - **Database Unique Index Migration (`drizzle/schema.ts` & TiDB)**:
+    - Scoped `portfolio_accounts` unique index to `(user_id, broker_id, external_account_id)`, permitting separate operators to bind the sandbox Alpaca paper execution account without `ER_DUP_ENTRY`.
+    - Provisioned `alpaca_paper` account row (`id: 120001`) for user `7500001`.
+  - **Order Verification & Approval Promotion**:
+    - Order #330001 updated with compliant parameters and promoted to `approved` status via `approveOrder(330001, 7500001, "APPROVE PAPER")`.
+  - **Approval Error UI/UX Overhaul (`ApertureExecute.tsx`)**:
+    - Replaced monolithic 600-character raw semicolon error toast with concise notice: `"Order blocked by mandate guardrails. Review violations on ticket."`
+    - Added structured badge alerts on ticket cards and an itemized warning list directly inside the approval confirmation modal.
+    - Added button loading state (`Loader2` spinner) to prevent duplicate submissions.
+- Validation:
+  - TypeScript typecheck (`DATABASE_URL= pnpm check`): 0 errors.
+  - Vitest test suite (`DATABASE_URL= pnpm vitest run server/aperture/orderFlow.test.ts server/aperture/gates.test.ts server/aperture/providers.test.ts`): 160/160 passed.
+  - All public endpoints returned HTTP 200:
+    - `https://third-signal-capital-aperture.web.app` (200)
+    - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+    - `https://uat-e80b850---capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+  - `system.health` returned `ok: true`.
+  - Client bundle `index-Cx6ODWjs.js` verified live with release marker `e80b850-uat-cfde6ef7`.
+- Rollback revision: `capital-aperture-00204-jus`.
+
+
