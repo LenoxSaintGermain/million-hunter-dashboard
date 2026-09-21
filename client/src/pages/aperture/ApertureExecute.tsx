@@ -158,7 +158,7 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
       : submitted.length
         ? "Paper broker accepted the order; no complete fill is recorded yet. Check order status before taking another action."
         : terminal.some((order) => order.status === "filled")
-          ? "Position is open. Track your play and review whether your thesis holds."
+          ? "Fills are recorded. Check reconciled holdings for remaining exposure; a filled closing order is not an open position."
           : "Ready for your next play. Pick a candidate from your research to prepare a paper trade.";
 
   const statusColor = (s: string) => s === "filled" ? "oklch(0.55 0.15 145)" :
@@ -1369,9 +1369,9 @@ export default function ApertureExecute() {
       : candidateActiveOrder.status === "filled"
         ? {
             title: `${orderInstrumentLabel(candidateActiveOrder)} executed in paper account`,
-            detail: "Simulated order filled. Track price progress and review thesis validity as the market moves.",
-            action: "Monitor paper play",
-            lifecycleTab: "monitoring" as const,
+            detail: candidateActiveOrder.intent === "close" ? "Closing order filled. Refresh Portfolio to confirm remaining holdings. No new position was opened by this exit." : "Opening fill recorded. Review reconciled holdings and any subsequent closing fills before monitoring.",
+            action: candidateActiveOrder.intent === "close" ? "Review closing fill" : "Monitor paper play",
+            lifecycleTab: candidateActiveOrder.intent === "close" ? "orders" as const : "monitoring" as const,
           }
         : candidateActiveOrder.status === "approved"
           ? {

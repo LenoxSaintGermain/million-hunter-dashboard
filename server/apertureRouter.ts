@@ -64,7 +64,7 @@ import {
 } from "../drizzle/schema";
 import { capitalOperatorProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { sumMeasuredOpenRiskCents } from "../shared/measuredOpenRisk";
+import { sumOpenOrderRisk } from "../shared/openOrderRisk";
 import { applyCanonicalDeclarations, compileThesis, flattenExposureTree, resolveRunGraph, validateGraphForPersistence, type ThesisGraph } from "./aperture/thesisGraph";
 import { discoverUniverse, operatorDeclaredUniverse, thesisSummary } from "./aperture/universe";
 import { collectSecurityFacts, collectMacroFacts, describeAvailability, availabilityMap, MACRO_SYMBOL } from "./aperture/providers/index";
@@ -564,14 +564,14 @@ async function readAuthoritativeOpenRiskCents(
   userId: number,
   accountId: number,
 ) {
-  const rows = await db.select({ plannedRiskCents: brokerOrders.plannedRiskCents })
+  const rows = await db.select()
     .from(brokerOrders)
     .where(and(
       eq(brokerOrders.userId, userId),
       eq(brokerOrders.accountId, accountId),
       inArray(brokerOrders.status, [...LIVE_ORDER_STATUSES]),
     ));
-  const measuredRisk = sumMeasuredOpenRiskCents(rows);
+  const measuredRisk = sumOpenOrderRisk(rows);
   if (!measuredRisk.ok) throw new TRPCError({
     code: "PRECONDITION_FAILED",
     message: "Open portfolio risk is not fully measured in valid integer cents. Reconcile the active orders' risk before underwriting; unknown risk is not zero.",
@@ -747,12 +747,12 @@ export async function executeUnderwriting(input: {
     if (!currentDecision) throw new TRPCError({ code: "CONFLICT", message: "The mission changed while underwriting was running. Reopen the current mission." });
     const [job] = await tx.select().from(apertureUnderwritingJobs).where(eq(apertureUnderwritingJobs.id, claim.job.id)).for("update").limit(1);
     if (!job || !mayPublishUnderwriting(job, claim.job.attemptToken, Date.now())) throw new TRPCError({ code: "CONFLICT", message: "This analysis attempt no longer owns the job. Reconcile its saved progress before retrying." });
-    const currentRiskRows = await tx.select({ plannedRiskCents: brokerOrders.plannedRiskCents }).from(brokerOrders).where(and(
+    const currentRiskRows = await tx.select().from(brokerOrders).where(and(
       eq(brokerOrders.userId, input.userId),
       eq(brokerOrders.accountId, decisionRun.accountId),
       inArray(brokerOrders.status, [...LIVE_ORDER_STATUSES]),
     ));
-    const measuredCurrentRisk = sumMeasuredOpenRiskCents(currentRiskRows);
+    const measuredCurrentRisk = sumOpenOrderRisk(currentRiskRows);
     if (!measuredCurrentRisk.ok) throw new TRPCError({
       code: "PRECONDITION_FAILED",
       message: "Open portfolio risk could not be verified before publishing this result. Reconcile the active orders' risk; no underwriting result was published and unknown risk is not zero.",

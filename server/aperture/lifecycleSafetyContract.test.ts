@@ -44,7 +44,7 @@ describe("Capital Aperture lifecycle safety contracts", () => {
     const monitor = read("server/aperture/monitor.ts");
 
     expect(page).toContain('onProposalCreated={() => openLifecycle("orders")}');
-    expect(page).toContain('lifecycleTab: "monitoring"');
+    expect(page).toContain('lifecycleTab: candidateActiveOrder.intent === "close" ? "orders" as const : "monitoring" as const');
     expect(page).toContain("runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule}");
     expect(page).not.toContain("candidate={proposalCandidate ?? data?.candidates[0]}");
     expect(page).toContain("{ runId, candidateId: candidate?.id ?? -1 }");

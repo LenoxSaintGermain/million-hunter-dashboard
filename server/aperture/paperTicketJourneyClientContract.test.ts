@@ -144,7 +144,7 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     const execute = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/ApertureExecute.tsx"), "utf8");
 
     expect(execute).toContain("setLifecycleTab");
-    expect(execute).toContain('lifecycleTab: "monitoring"');
+    expect(execute).toContain('lifecycleTab: candidateActiveOrder.intent === "close" ? "orders" as const : "monitoring" as const');
     expect(execute).toContain("value={lifecycleTab}");
     expect(execute).not.toContain('<Tabs id="paper-lifecycle" defaultValue="orders"');
   });

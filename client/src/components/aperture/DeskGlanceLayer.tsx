@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buildDeskGlance, type GlanceAccount, type GlanceOrder } from "@shared/deskGlance";
-import { formatSignedCents, deskOrderReturn } from "@shared/positionReturn";
+import { formatSignedCents } from "@shared/positionReturn";
 
 const money = (cents: number) => new Intl.NumberFormat("en-US", {
   style: "currency", currency: "USD", maximumFractionDigits: 0,
@@ -40,50 +40,6 @@ export function DeskGlanceLayer({ orders, account, accountUnavailable, attention
   const pnl = glance.unrealized;
   const tone = pnl.pnlCents == null ? "var(--sh-text-primary)"
     : pnl.pnlCents > 0 ? "var(--sh-emerald)" : pnl.pnlCents < 0 ? "var(--sh-red)" : "var(--sh-text-primary)";
-
-  const now = Date.now();
-  let netDelta = 0;
-  let dailyThetaCents = 0;
-  let vegaCentsPerVol = 0;
-  let filledOrders = 0;
-
-  const velocityTriggers: Array<{
-    id?: number;
-    symbol: string;
-    returnPct: number;
-    pnlCents: number;
-  }> = [];
-
-  for (const o of orders) {
-    if (o.status !== "filled" && o.status !== "partially_filled") continue;
-    filledOrders++;
-    const qty = o.filledQty || o.qty || 0;
-    const sym = o.symbol ?? "EQUITY";
-
-    if (o.instrumentType === "direct_equity" || o.instrumentType === "shares") {
-      netDelta += qty;
-    } else if (o.instrumentType === "long_call") {
-      netDelta += Math.round(qty * 50);
-      const risk = o.plannedRiskCents ?? (o.latestMark?.marketValueCents ?? 15000);
-      dailyThetaCents += Math.round(risk * 0.02);
-      vegaCentsPerVol += Math.round(risk * 0.03);
-    } else if (o.instrumentType === "long_put") {
-      netDelta -= Math.round(qty * 50);
-      const risk = o.plannedRiskCents ?? (o.latestMark?.marketValueCents ?? 15000);
-      dailyThetaCents += Math.round(risk * 0.02);
-      vegaCentsPerVol += Math.round(risk * 0.03);
-    }
-
-    const ret = deskOrderReturn(o, now);
-    if (ret.measured && ret.returnPct != null && ret.returnPct >= 50) {
-      velocityTriggers.push({
-        id: o.id,
-        symbol: sym,
-        returnPct: Math.round(ret.returnPct),
-        pnlCents: ret.pnlCents,
-      });
-    }
-  }
 
   return <div className="space-y-3">
     <section aria-label="Desk at a glance" data-desk-glance className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -145,43 +101,6 @@ export function DeskGlanceLayer({ orders, account, accountUnavailable, attention
       </Card>
     </section>
 
-    {/* Executive Greek Exposure & Threat Profile Bar */}
-    <div className="grid gap-3 rounded-xl border p-3.5 text-xs sm:grid-cols-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-      <div className="space-y-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Portfolio Net Delta (Δ)</p>
-        <p className="font-mono text-sm font-semibold" style={{ color: netDelta > 0 ? "var(--sh-emerald)" : netDelta < 0 ? "var(--sh-red)" : "var(--sh-text-primary)" }}>
-          {netDelta > 0 ? `+${netDelta}` : netDelta} Δ <span className="text-[10px] font-normal" style={{ color: "var(--sh-fg-muted)" }}>({netDelta > 0 ? "Bullish bias" : netDelta < 0 ? "Bearish hedge" : "Delta neutral"})</span>
-        </p>
-      </div>
-      <div className="space-y-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Theta Decay (Θ / day)</p>
-        <p className="font-mono text-sm font-semibold" style={{ color: dailyThetaCents > 0 ? "var(--sh-red)" : "var(--sh-text-primary)" }}>
-          {dailyThetaCents > 0 ? `-$${(dailyThetaCents / 100).toFixed(2)} / day` : "$0.00 / day"}
-        </p>
-      </div>
-      <div className="space-y-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Vega Sensitivity (ν / 1% IV)</p>
-        <p className="font-mono text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>
-          {vegaCentsPerVol > 0 ? `+$${(vegaCentsPerVol / 100).toFixed(2)}` : "$0.00"}
-        </p>
-      </div>
-      <div className="space-y-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Capital Velocity Gate</p>
-        {velocityTriggers.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="font-semibold text-amber-500">⚡ {velocityTriggers.length} Trim Target{velocityTriggers.length > 1 ? "s" : ""}:</span>
-            {velocityTriggers.map(t => (
-              <span key={t.symbol} className="rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-amber-400">
-                {t.symbol} +{t.returnPct}%
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="font-mono text-xs font-semibold" style={{ color: "var(--sh-emerald)" }}>
-            ✓ Running within risk bands
-          </p>
-        )}
-      </div>
-    </div>
+    <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Portfolio Greeks not measured. Order-linked snapshots do not establish portfolio-wide risk clearance.</p>
   </div>;
 }
