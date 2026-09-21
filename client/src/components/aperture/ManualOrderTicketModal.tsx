@@ -92,7 +92,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
     if (!stageError) return [];
     const clean = stageError.replace(/^order blocked by the mandate:\s*/i, "").trim();
     return clean
-      .split(";")
+      .split(/[;\n]+/)
       .map((s) => s.trim())
       .filter(Boolean);
   }, [stageError]);
@@ -321,17 +321,17 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
               Aperture Play Desk
             </Badge>
             <span className="text-xs font-mono" style={{ color: "var(--sh-fg-muted)" }}>
-              Ad-Hoc Manual Order Builder
+              Custom Paper Trade Builder
             </span>
           </div>
           <DialogTitle className="font-serif text-2xl flex items-center justify-between">
-            <span>Stage Discretionary Paper Expression</span>
+            <span>Create Custom Paper Trade</span>
             <span className="text-sm font-mono font-normal tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>
               {symbol} · {direction.toUpperCase()}
             </span>
           </DialogTitle>
           <DialogDescription className="text-xs leading-5">
-            Bypass automated recipe locks with an unconstrained paper ticket. All single-order ceilings, preflight margin bounds, and risk governance checks are verified prior to desk staging.
+            Set custom order terms. Portfolio safety limits and broker execution rules remain active.
           </DialogDescription>
 
           {activeMission ? (
@@ -355,7 +355,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                 <div>
                   <p className="font-semibold text-amber-500">No Active Capital Mission Bound</p>
                   <p className="mt-0.5 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
-                    Opening paper actions are strictly fail-closed. Start from Capital Mission to bind thesis, capital, and risk bounds before staging.
+                    Every trade belongs to an active thesis. Open Capital Mission to set your strategy before staging.
                   </p>
                 </div>
               </div>
@@ -695,7 +695,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>
-                  Confirmation Acknowledgement (Type PAPER to authorize desk staging)
+                  Confirmation (Simulated Paper Trading)
                 </label>
                 <Button
                   type="button"
@@ -724,7 +724,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                   style={{ borderColor: paperAck === "PAPER" ? "var(--sh-signal)" : "var(--sh-border-1)" }}
                 />
                 <span className="text-xs flex items-center" style={{ color: "var(--sh-fg-muted)" }}>
-                  Mandatory guardrail: staged as a simulated paper ticket on the operator desk. Press ⌘+Enter to instant-stage.
+                  Safe simulation: this paper order stages on your desk. No real money is at risk. Press ⌘+Enter to instant-stage.
                 </span>
               </div>
             </div>
@@ -735,9 +735,9 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
               <div className="flex items-start gap-2.5">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-red-400 text-sm">Order Staging Blocked by Mandate</p>
+                  <p className="font-semibold text-red-400 text-sm">Trade Safety Suggestions</p>
                   <p className="text-[11px] leading-4 mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>
-                    The submission violated portfolio risk guardrails or broker execution requirements:
+                    Please review these suggestions to align with your portfolio safety limits:
                   </p>
                   <ul className="mt-2 space-y-1.5 pl-1">
                     {parsedErrors.map((err, i) => (

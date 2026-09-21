@@ -117,11 +117,11 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
     const clean = rawMsg.replace(/^order blocked by the mandate:\s*/i, "").trim();
     const violations = clean.split(";").map((s) => s.trim()).filter(Boolean);
     if (violations.length > 1 || rawMsg.toLowerCase().includes("mandate") || rawMsg.toLowerCase().includes("gate")) {
-      toast.error("Order blocked by mandate guardrails. Review violations on ticket.");
-      setGateError({ orderId, title: "Order Blocked by Mandate Guardrails", violations });
+      toast.error("Trade requires review. Check safety suggestions below.");
+      setGateError({ orderId, title: "Trade Safety Check: Suggested Adjustments", violations });
     } else {
       toast.error(rawMsg);
-      setGateError({ orderId, title: "Action Failed", violations: [rawMsg] });
+      setGateError({ orderId, title: "Action Needs Review", violations: [rawMsg] });
     }
   };
 
@@ -149,16 +149,16 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
   const submitted = scopedOrders.filter((o) => o.status === "submitted");
   const terminal = scopedOrders.filter((o) => ["filled", "rejected", "cancelled"].includes(o.status));
   const nextAction = ticketBuilderActive
-    ? "No ticket created. Resolve the current blocker or review the measured terms above; approval and submission remain separate."
+    ? "No ticket created yet. Choose your setup and sizing terms above to build a paper trade."
     : pending.length
-    ? "Review the waiting paper ticket. Approval changes only its paper-workflow state."
+    ? "Step 1 of 2: Review and Approve your simulated trade. Once approved, you can send it to your paper broker."
     : approved.length
-      ? "Submit the approved ticket now. An eligible LIMIT/DAY order will be held for the next eligible regular session when the market is closed."
+      ? "Step 2 of 2: Trade is approved! Click Send Order to Broker. If markets are closed, it queues for Monday 9:30 AM ET open."
       : submitted.length
-        ? "The broker accepted the paper order. It may be queued for the next eligible regular session; do not create a duplicate ticket."
+        ? "Order received by paper broker. It is queued and ready for execution at regular market open (Monday 9:30 AM ET)."
         : terminal.some((order) => order.status === "filled")
-          ? "Open “Check whether thesis still holds” at the recorded review time, then close the outcome loop."
-           : "Return to the decision brief to prepare a proposal, revise the mission, or preserve cash.";
+          ? "Position is open. Track your play and review whether your thesis holds."
+          : "Ready for your next play. Pick a candidate from your research to prepare a paper trade.";
 
   const statusColor = (s: string) => s === "filled" ? "oklch(0.55 0.15 145)" :
     s === "rejected" || s === "cancelled" ? "var(--sh-red)" :
@@ -269,17 +269,17 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
                     )}
                     {o.status === "pending_approval" && (
                       <>
-                        <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "approve", order: o }); setConfirmationText(""); }} disabled={approve.isPending}>
+                        <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "approve", order: o }); setConfirmationText("APPROVE PAPER"); }} disabled={approve.isPending}>
                           <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Approve paper ticket
                         </Button>
                         <Button variant="outline" size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setRejection(o); setRejectionReason(""); }} disabled={reject.isPending}>
-                          <XCircle aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Do not approve
+                          <XCircle aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Pass on this trade
                         </Button>
                       </>
                     )}
                     {o.status === "approved" && (
-                      <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "submit", order: o }); setConfirmationText(""); }} disabled={submit.isPending}>
-                        <Send aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Submit / queue paper order
+                      <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "submit", order: o }); setConfirmationText("SUBMIT PAPER"); }} disabled={submit.isPending}>
+                        <Send aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Send order to broker / queue
                       </Button>
                     )}
                     <span className="text-xs tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>
@@ -337,9 +337,9 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
       <AlertDialog open={confirmation != null} onOpenChange={(open) => { if (!open) { setConfirmation(null); setConfirmationText(""); } }}>
         <AlertDialogContent className="max-h-[90vh] w-[calc(100%_-_2rem)] max-w-[calc(100%_-_2rem)] overflow-x-hidden overflow-y-auto sm:max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>{confirmation?.kind === "submit" ? "Submit or queue this paper order" : "Approve this paper proposal"}</AlertDialogTitle>
+            <AlertDialogTitle>{confirmation?.kind === "submit" ? "Send paper order to broker" : "Approve this paper trade"}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action is paper-only. The server reruns the account, evidence, and risk gates first. When the market is closed, an eligible LIMIT/DAY order is held for the next eligible regular session; it cannot execute overnight and it cannot fill above your limit.
+              Simulated paper trade. All pricing, evidence, and risk safety limits are checked. When the market is closed, limit DAY orders queue automatically for Monday 9:30 AM ET regular open.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {confirmation && (
@@ -349,10 +349,10 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
               <div><span className="block text-xs text-muted-foreground">Order</span><strong>{confirmation.order.orderType.toUpperCase()} · {confirmation.order.timeInForce.toUpperCase()}{confirmation.order.limitPriceCents ? ` · limit ${fmtPrice(confirmation.order.limitPriceCents)}` : ""}</strong></div>
               <div><span className="block text-xs text-muted-foreground">{isOptionInstrument(confirmation.order.instrumentType) ? "Premium / protection" : "Entry / protective stop"}</span><strong>{isOptionInstrument(confirmation.order.instrumentType) ? `${fmtPrice(confirmation.order.entryPriceCents)} premium · fully defined by debit` : `${fmtPrice(confirmation.order.entryPriceCents)} / ${fmtPrice(confirmation.order.stopPriceCents)}`}</strong></div>
               <div><span className="block text-xs text-muted-foreground">Maximum planned loss</span><strong>{fmt(confirmation.order.plannedRiskCents)}</strong></div>
-              <div><span className="block text-xs text-muted-foreground">Human review time stop</span><strong>{confirmation.order.timeStopAt ? format(confirmation.order.timeStopAt, "PP p") : "Not recorded"}</strong></div>
-              <div className="sm:col-span-2"><span className="block text-xs text-muted-foreground">Invalidation</span><strong>{confirmation.order.invalidationCondition || "Not recorded"}</strong></div>
+              <div><span className="block text-xs text-muted-foreground">Review check-in time</span><strong>{confirmation.order.timeStopAt ? format(confirmation.order.timeStopAt, "PP p") : "Not recorded"}</strong></div>
+              <div className="sm:col-span-2"><span className="block text-xs text-muted-foreground">Exit / Invalidation trigger</span><strong>{confirmation.order.invalidationCondition || "Not recorded"}</strong></div>
               <div className="sm:col-span-2 rounded-md p-3" style={{ background: "var(--sh-surface-2)" }}>
-                <span className="block text-xs text-muted-foreground">Exact paper destination</span>
+                <span className="block text-xs text-muted-foreground">Destination broker account</span>
                 <strong>{confirmation.order.destinationAccount?.label ?? "Unavailable"}</strong>
                 <span className="block break-all text-xs text-muted-foreground">{confirmation.order.destinationAccount?.brokerId ?? "unknown broker"} · account {confirmation.order.destinationAccount?.externalAccountId ?? "not bound"}</span>
                 <span className="block text-xs text-muted-foreground">Portfolio context: {confirmation.order.portfolioContextAccount?.label ?? "Unavailable"}</span>
@@ -376,14 +376,26 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
             </div>
           )}
           <div className="space-y-2">
-            <label htmlFor="paper-confirmation" className="text-sm font-medium">Type <span className="font-mono">{requiredConfirmation}</span> to continue</label>
-            <Input id="paper-confirmation" className="min-h-11" autoComplete="off" value={confirmationText} onChange={(event) => setConfirmationText(event.target.value.toUpperCase())} />
+            <div className="flex items-center justify-between">
+              <label htmlFor="paper-confirmation" className="text-sm font-medium">Safety confirmation code: <span className="font-mono font-semibold">{requiredConfirmation}</span></label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs px-2 text-primary hover:underline"
+                onClick={() => setConfirmationText(requiredConfirmation)}
+              >
+                Auto-fill "{requiredConfirmation}"
+              </Button>
+            </div>
+            <Input id="paper-confirmation" className="min-h-11 font-mono tracking-wider font-semibold uppercase" autoComplete="off" value={confirmationText} onChange={(event) => setConfirmationText(event.target.value.toUpperCase())} />
+            <p className="text-[11px] text-muted-foreground">Simulated paper trading only. No real money will be charged or placed at risk.</p>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel className="min-h-11">Go back</AlertDialogCancel>
             <Button className="min-h-11" onClick={confirmAction} disabled={confirmationText !== requiredConfirmation || approve.isPending || submit.isPending}>
               {(approve.isPending || submit.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {confirmation?.kind === "submit" ? "Submit / queue paper order" : "Approve paper proposal"}
+              {confirmation?.kind === "submit" ? "Send Order to Broker / Queue" : "Confirm Approval"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -391,13 +403,17 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
       <AlertDialog open={rejection != null} onOpenChange={(open) => { if (!open) { setRejection(null); setRejectionReason(""); } }}>
         <AlertDialogContent className="w-[calc(100%_-_2rem)] max-w-[calc(100%_-_2rem)] overflow-x-hidden sm:max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>Do not approve {rejection?.symbol}</AlertDialogTitle>
-            <AlertDialogDescription>This permanently records why the operator declined the paper proposal. It creates no broker order and becomes part of the decision look-back.</AlertDialogDescription>
+            <AlertDialogTitle>Pass on this trade ({rejection?.symbol})</AlertDialogTitle>
+            <AlertDialogDescription>Records your note on why you passed on this trade. Your capital remains safe and no order is placed.</AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-2"><label htmlFor="paper-rejection-reason" className="text-sm font-medium">Operator reason</label><textarea id="paper-rejection-reason" rows={4} value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} className="min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} placeholder="What made cash, delay, or another play preferable?" /><p className="text-xs text-muted-foreground">At least 10 characters. Be specific enough to learn from tomorrow.</p></div>
+          <div className="space-y-2">
+            <label htmlFor="paper-rejection-reason" className="text-sm font-medium">Why are you passing on this trade?</label>
+            <textarea id="paper-rejection-reason" rows={4} value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} className="min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} placeholder="e.g. Waiting for Monday open momentum, spread is wider than expected, preserving cash..." />
+            <p className="text-xs text-muted-foreground">At least 10 characters. Be specific enough to learn from tomorrow.</p>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel className="min-h-11">Go back</AlertDialogCancel>
-            <Button variant="outline" className="min-h-11" disabled={!rejection || rejectionReason.trim().length < 10 || reject.isPending} onClick={() => { if (!rejection) return; reject.mutate({ orderId: rejection.id, reason: rejectionReason.trim() }); setRejection(null); setRejectionReason(""); }}>Record rejection</Button>
+            <Button variant="outline" className="min-h-11" disabled={!rejection || rejectionReason.trim().length < 10 || reject.isPending} onClick={() => { if (!rejection) return; reject.mutate({ orderId: rejection.id, reason: rejectionReason.trim() }); setRejection(null); setRejectionReason(""); }}>Record decision & keep cash safe</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1360,29 +1376,29 @@ export default function ApertureExecute() {
   const candidateOrderDecision = candidateActiveOrder
     ? candidateActiveOrder.status === "submitted"
       ? {
-          title: `${orderInstrumentLabel(candidateActiveOrder)} accepted and queued for the next eligible session`,
-          detail: "Done for now. The paper broker has the limit order; do not create another ticket. Monitor or mirror the fill from the receipt below.",
+          title: `${orderInstrumentLabel(candidateActiveOrder)} staged with paper broker`,
+          detail: "Your simulated order is received and queued for regular market open (Monday 9:30 AM ET). No duplicate order needed.",
           action: "View queued paper order",
           lifecycleTab: "orders" as const,
         }
       : candidateActiveOrder.status === "filled"
         ? {
-            title: `${orderInstrumentLabel(candidateActiveOrder)} executed in the paper account`,
-            detail: "The paper fill is recorded. The next useful action is to monitor whether the thesis still holds and record the outcome.",
+            title: `${orderInstrumentLabel(candidateActiveOrder)} executed in paper account`,
+            detail: "Simulated order filled. Track price progress and review thesis validity as the market moves.",
             action: "Monitor paper play",
             lifecycleTab: "monitoring" as const,
           }
         : candidateActiveOrder.status === "approved"
           ? {
-              title: `${orderInstrumentLabel(candidateActiveOrder)} approved · ready to submit or queue`,
-              detail: "The exact ticket already exists. Submit it once below; when the market is closed, the broker will hold an eligible LIMIT/DAY order for the next regular session.",
-              action: "Submit or queue order",
+              title: `${orderInstrumentLabel(candidateActiveOrder)} approved · ready to send to broker`,
+              detail: "Trade is approved! Click Send Order to Broker below. If the market is closed, it queues for Monday 9:30 AM ET open.",
+              action: "Send order to broker",
               lifecycleTab: "orders" as const,
             }
           : {
-              title: `${orderInstrumentLabel(candidateActiveOrder)} proposal ready for your review`,
-              detail: "The exact ticket already exists. Approve or decline it below; there is no need to enter the contract again.",
-              action: "Review paper proposal",
+              title: `${orderInstrumentLabel(candidateActiveOrder)} trade ready for your approval`,
+              detail: "Simulated trade terms are ready. Review safety limits and click Approve Paper Ticket below.",
+              action: "Review paper ticket",
               lifecycleTab: "orders" as const,
             }
     : null;
@@ -1406,6 +1422,13 @@ export default function ApertureExecute() {
     <DashboardLayout>
       <div className="mx-auto w-full min-w-0 max-w-5xl space-y-6 overflow-x-clip">
         <DisclaimerBanner />
+
+        <div className="flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-xs" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 40%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 8%, var(--sh-surface))" }}>
+          <Sparkles className="h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} />
+          <span style={{ color: "var(--sh-text-primary)" }}>
+            <strong>Off-Market Staging:</strong> Market opens Monday at 9:30 AM ET. You can stage and approve your simulated paper trades now; limit DAY orders will be queued and routed to your paper broker for the market open.
+          </span>
+        </div>
 
         <div>
           <div className="flex min-w-0 items-center gap-2">

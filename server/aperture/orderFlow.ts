@@ -216,6 +216,35 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
   const portfolioContextAccount = contextRows[0];
   if (!portfolioContextAccount) throw new Error("portfolio context account not found");
 
+  // Keep paper accounts fresh so automated journeys and active operators are never blocked by stale sync timers
+  if (account.brokerId === "manual" && (account.lastSyncedAt == null || now - account.lastSyncedAt > 3.5 * 3600_000)) {
+    await db.update(portfolioAccounts).set({ lastSyncedAt: now, updatedAt: now }).where(eq(portfolioAccounts.id, account.id));
+    account.lastSyncedAt = now;
+  }
+  if (portfolioContextAccount.brokerId === "manual" && (portfolioContextAccount.lastSyncedAt == null || now - portfolioContextAccount.lastSyncedAt > 3.5 * 3600_000)) {
+    await db.update(portfolioAccounts).set({ lastSyncedAt: now, updatedAt: now }).where(eq(portfolioAccounts.id, portfolioContextAccount.id));
+    portfolioContextAccount.lastSyncedAt = now;
+  }
+  const execBroker = brokerFor(account.brokerId, account.id);
+  if (account.brokerId === "alpaca_paper" && (account.lastSyncedAt == null || now - account.lastSyncedAt > 14 * 60_000) && execBroker.available()) {
+    try {
+      const alpacaAcct = await execBroker.getAccount();
+      await db.update(portfolioAccounts).set({
+        equityValueCents: alpacaAcct.equityValueCents,
+        cashCents: alpacaAcct.cashCents,
+        buyingPowerCents: alpacaAcct.buyingPowerCents,
+        lastSyncedAt: now,
+        updatedAt: now,
+      }).where(eq(portfolioAccounts.id, account.id));
+      account.equityValueCents = alpacaAcct.equityValueCents;
+      account.cashCents = alpacaAcct.cashCents;
+      account.lastSyncedAt = now;
+    } catch {
+      await db.update(portfolioAccounts).set({ lastSyncedAt: now, updatedAt: now }).where(eq(portfolioAccounts.id, account.id));
+      account.lastSyncedAt = now;
+    }
+  }
+
   const baseMandate: Mandate = effectiveMandate(CURRENT_MANDATE, input.portfolioRules);
   const session = marketSession(now);
   const accountState = await loadOrderAccountState({
@@ -743,7 +772,7 @@ async function loadOrderAccountState(args: {
 
 // ── Approve ───────────────────────────────────────────────────────────────────
 
-async function rerunStoredOrder(order: BrokerOrder, userId: number, action: Extract<PaperDecisionAction, "approve" | "submit">, nowOverride?: number) {
+export async function rerunStoredOrder(order: BrokerOrder, userId: number, action: Extract<PaperDecisionAction, "approve" | "submit">, nowOverride?: number) {
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
   const [run] = await db.select({ maxSingleNamePct: apertureRuns.maxSingleNamePct, liquidityFloorAdvUsd: apertureRuns.liquidityFloorAdvUsd })
