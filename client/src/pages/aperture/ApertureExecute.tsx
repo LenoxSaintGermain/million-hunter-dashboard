@@ -746,7 +746,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
           <div className="space-y-3 pt-2">
             <p className="text-xs font-semibold text-muted-foreground">Other active checks for this play:</p>
             <div className="space-y-3">
-              {currentChecks.filter(check => !showSelected || check.id !== selectedCheck?.id).map((check) => (
+              {currentChecks.filter(check => check.id !== focusedCheck?.id).map((check) => (
                 <div key={check.id}>
                   <MonitoringFindingCard
                     check={check}

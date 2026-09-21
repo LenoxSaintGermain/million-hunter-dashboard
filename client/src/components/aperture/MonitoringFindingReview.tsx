@@ -79,7 +79,7 @@ export function MonitoringFindingReview({
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
       <h3 className="text-base font-semibold">Your review</h3>
       <span className="text-xs px-2 py-0.5 rounded font-mono" style={{ background: "var(--sh-surface-3)", color: "var(--sh-fg-muted)" }}>
-        Paper Fill Recorded · Discretionary Exit
+        Recorded finding review
       </span>
     </div>
     <p className="mt-1 text-sm leading-5">Saves your assessment of this finding only—not an order change or exit.</p>
@@ -91,7 +91,7 @@ export function MonitoringFindingReview({
         <p role="status" className="text-sm font-semibold">Review saved · {latest.decision === "needs_fresh_evidence" ? "Needs fresh evidence" : latest.decision === "resolved" ? "Closed" : "Concern kept open"}</p>
         {latest.decision === "resolved" && (
           <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
-            ✓ INTACT
+            Review closed
           </span>
         )}
       </div>
@@ -108,59 +108,10 @@ export function MonitoringFindingReview({
         )}
       </div>
     </div> : <>
-      {/* Primary Decision Hierarchy */}
-      <div className="mt-3 rounded-lg border p-3.5 space-y-2.5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-        <p className="text-[11px] font-bold tracking-tight uppercase" style={{ color: "var(--sh-fg-muted)" }}>Primary Decision Actions</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          {/* Action 1: Maintain Thesis & Clear Review (Primary Solid Action) */}
-          <Button
-            type="button"
-            className="h-auto py-2.5 px-3 flex flex-col items-start gap-1 text-left bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-sm border border-emerald-500"
-            disabled={record.isPending || !receipts.data || receipts.isError}
-            onClick={() => {
-              const resolveNote = "Sign Off / Maintain: Operator verified catalyst condition; thesis and risk parameters remain intact.";
-              request.current = { ...target, decision: "resolved", note: resolveNote, requestId: crypto.randomUUID() };
-              setDecision("resolved");
-              setNote(resolveNote);
-              record.mutate(request.current);
-            }}
-          >
-            <div className="flex items-center gap-1.5 font-bold text-xs text-white">
-              <ShieldCheck className="h-4 w-4" />
-              <span>Maintain Thesis & Clear Review</span>
-            </div>
-            <span className="text-[10px] text-emerald-100 leading-tight">Sign Off / Maintain · Acknowledge & clear</span>
-          </Button>
-
-          {/* Action 2: Hedge / Adjust (Secondary Action) */}
-          <Button
-            type="button"
-            variant="outline"
-            className="h-auto py-2.5 px-3 flex flex-col items-start gap-1 text-left border-amber-500/40 hover:bg-amber-500/10 hover:border-amber-500"
-            onClick={onHedge}
-          >
-            <div className="flex items-center gap-1.5 font-semibold text-xs text-amber-500">
-              <Layers className="h-3.5 w-3.5" />
-              <span>Hedge / Adjust</span>
-            </div>
-            <span className="text-[10px] text-muted-foreground leading-tight">Spread or delta hedge</span>
-          </Button>
-
-          {/* Action 3: Take Profit / Cut Loss (Secondary Action) */}
-          <Button
-            type="button"
-            variant="outline"
-            className="h-auto py-2.5 px-3 flex flex-col items-start gap-1 text-left border-primary/40 hover:bg-primary/10 hover:border-primary"
-            onClick={onExit}
-          >
-            <div className="flex items-center gap-1.5 font-semibold text-xs text-primary">
-              <DollarSign className="h-3.5 w-3.5" />
-              <span>Take Profit / Exit</span>
-            </div>
-            <span className="text-[10px] text-muted-foreground leading-tight">Route instant paper exit</span>
-          </Button>
-        </div>
-      </div>
+      {(onHedge || onExit) && <div className="mt-3 flex flex-wrap gap-2">
+        {onHedge && <Button type="button" variant="outline" className="min-h-11" onClick={onHedge}>Review adjustment draft</Button>}
+        {onExit && <Button type="button" variant="outline" className="min-h-11" onClick={onExit}>Review exit draft</Button>}
+      </div>}
 
       <div className="mt-3 space-y-3">
         <fieldset disabled={record.isPending || uncertain || !receipts.data || receipts.isError} className="space-y-2">

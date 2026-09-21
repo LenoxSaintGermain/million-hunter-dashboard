@@ -42,6 +42,8 @@ describe("monitoring finding decision view", () => {
     fixture.checks = [];
     const html = render(null);
     expect(html).toContain("No monitoring checks recorded");
+    expect(html).not.toContain("Maintain Thesis &amp; Clear Review");
+    expect(html).not.toContain("Route instant paper exit");
     for (const claim of ["Thesis boundaries intact", "100% Cleared", "Flank Intact", "$38.50", "$48.00", "+7.0% headroom"]) expect(html).not.toContain(claim);
     expect(fixture.mutate).not.toHaveBeenCalled();
     expect(fixture.refetch).not.toHaveBeenCalled();
@@ -91,6 +93,8 @@ describe("monitoring finding decision view", () => {
     expect(html).toContain("DKNG · $20 Put · Nov 20, 2026");
     expect(html).toContain("Illustrative recorded put rationale");
     expect(html).toContain("What is your assessment?");
+    expect(html).not.toContain("Maintain Thesis &amp; Clear Review");
+    expect(html).not.toContain("Route instant paper exit");
     expect(html).not.toContain("Review saved");
     expect(fixture.mutate).not.toHaveBeenCalled(); expect(fixture.refetch).not.toHaveBeenCalled(); expect(fixture.navigate).not.toHaveBeenCalled();
   });
