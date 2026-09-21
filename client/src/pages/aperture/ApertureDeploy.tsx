@@ -82,7 +82,7 @@ export default function ApertureDeploy() {
           }`}
         >
           <Zap className="w-3.5 h-3.5 text-[var(--sh-amber)]" />
-          <span>Quick Hits & Symphony Lite ($25–$100)</span>
+          <span>Explore example strategies ($25–$100)</span>
         </button>
         <button
           type="button"
@@ -93,7 +93,7 @@ export default function ApertureDeploy() {
               : "bg-[var(--sh-surface-2)] text-[var(--sh-fg-2)] border border-[var(--sh-border-1)] hover:bg-[var(--sh-surface-3)]"
           }`}
         >
-          <span>Institutional Thesis Deploy (Options / Equities)</span>
+          <span>Find a researched trade</span>
         </button>
       </div>
 
@@ -104,10 +104,10 @@ export default function ApertureDeploy() {
               Event-Driven Quick Hits
             </p>
             <h1 className="mt-1 font-serif text-3xl leading-tight">
-              Event Momentum & Micro-Cap Cockpit
+              Explore short-term strategies
             </h1>
             <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
-              Disciplined short-term plays inspired by Composer rule-blocks. Automated brackets with mandatory limit orders — no manual audit friction.
+              Illustrative examples only. Prices, catalysts, and sample returns below are not verified current market evidence. Examples cannot create orders; use researched trades for the normal review and approval flow.
             </p>
           </header>
 
@@ -119,10 +119,10 @@ export default function ApertureDeploy() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="font-mono text-sm font-bold text-[var(--sh-text-primary)] uppercase tracking-wider">
-                  Curated Catalyst Plays
+                  Example trade setups
                 </h2>
                 <p className="text-xs text-[var(--sh-fg-muted)] mt-0.5">
-                  SEC 8-K filings, clinical catalysts, and breakout volume. Spread capped &le; 2.0%, ADV &gt; 500k shares.
+                  Fixed sample data for exploring sizing. Not current recommendations or verified historical performance.
                 </p>
               </div>
 

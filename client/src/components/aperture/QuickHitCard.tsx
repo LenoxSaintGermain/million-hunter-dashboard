@@ -209,7 +209,7 @@ export const QuickHitCard: React.FC<QuickHitCardProps> = ({
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-3.5 h-3.5 text-[var(--sh-emerald)]" />
                 <span className="font-mono text-[11px] font-semibold text-[var(--sh-fg-2)]">
-                  Pre-Flight Backtest:
+                  Illustrative sample results:
                 </span>
                 <span className="font-mono font-bold text-[var(--sh-emerald)]">
                   {play.backtest.winRatePct}% Win
@@ -316,7 +316,7 @@ export const QuickHitCard: React.FC<QuickHitCardProps> = ({
               </span>
             </div>
             <div className="flex justify-between text-[var(--sh-rose)] font-semibold border-t border-[var(--sh-border)] pt-1 mt-1">
-              <span>Max Dollar Risk (Stop):</span>
+              <span>Planned loss at stop:</span>
               <span>-${(sizing.maxCapitalAtRiskCents / 100).toFixed(2)}</span>
             </div>
           </div>
@@ -331,8 +331,8 @@ export const QuickHitCard: React.FC<QuickHitCardProps> = ({
         ) : (
           <button
             type="button"
-            disabled={authorizeMutation.isPending || sizing.shares <= 0}
-            onClick={handleAuthorize}
+            disabled
+            aria-describedby={`example-only-${play.id}`}
             className="w-full py-3 px-4 rounded-lg font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm hover:opacity-95 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--sh-primary-fg)]"
             style={{
               backgroundColor: isMicroBadge ? "var(--sh-purple)" : "var(--sh-primary)",
@@ -346,15 +346,15 @@ export const QuickHitCard: React.FC<QuickHitCardProps> = ({
             ) : (
               <>
                 <Zap className="w-4 h-4" />
-                <span>Authorize Play (${budgetUsd})</span>
+                <span>Example only · order unavailable</span>
               </>
             )}
           </button>
         )}
 
         {/* Structural Safe Guard Disclosure */}
-        <div className="text-[10px] text-center text-[var(--sh-fg-4)] font-mono">
-          Hard Limit Order • Capped at ${budgetUsd} • Paper Mode
+        <div id={`example-only-${play.id}`} className="text-sm text-center text-[var(--sh-fg-4)]">
+          Unverified sample data. Choose “Find a researched trade” above to review an eligible idea. No order is created here.
         </div>
       </div>
     </div>

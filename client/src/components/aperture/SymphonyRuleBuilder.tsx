@@ -67,11 +67,11 @@ export const SymphonyRuleBuilder: React.FC<SymphonyRuleBuilderProps> = ({
               <Layers className="w-4 h-4" />
             </span>
             <h3 className="font-mono text-base font-bold text-[var(--sh-fg-1)]">
-              Symphony Rule Engine (Composer-Style Modular Rules)
+              Explore trading rules
             </h3>
           </div>
           <p className="text-xs text-[var(--sh-fg-3)] mt-1">
-            Build event-driven rules visually: Trigger → Filter → Action with instant pre-flight backtesting.
+            Explore a trigger, filters, and a trade structure using fixed illustrative samples.
           </p>
         </div>
 
@@ -203,7 +203,7 @@ export const SymphonyRuleBuilder: React.FC<SymphonyRuleBuilderProps> = ({
 
           <div>
             <div className="font-mono text-sm font-bold text-[var(--sh-fg-1)]">
-              Automated Bracket Execution
+              Example bracket structure
             </div>
             <p className="text-xs text-[var(--sh-fg-3)] mt-1">
               Fixed dollar allocation with mandatory pre-calculated bracket stops.
@@ -241,9 +241,9 @@ export const SymphonyRuleBuilder: React.FC<SymphonyRuleBuilderProps> = ({
       >
         <div className="text-xs text-[var(--sh-fg-3)]">
           <span className="font-mono font-semibold text-[var(--sh-fg-1)]">
-            Pre-Flight Simulation:
+            Illustrative simulation:
           </span>{" "}
-          Simulate this recipe across historical catalyst distributions before placing live paper capital.
+          Explore fixed sample outcomes. This is not a verified historical backtest or a forecast.
         </div>
 
         <button
@@ -260,7 +260,7 @@ export const SymphonyRuleBuilder: React.FC<SymphonyRuleBuilderProps> = ({
           ) : (
             <>
               <Play className="w-3.5 h-3.5" />
-              <span>Run Pre-Flight Backtest</span>
+              <span>Run example simulation</span>
             </>
           )}
         </button>
@@ -279,11 +279,11 @@ export const SymphonyRuleBuilder: React.FC<SymphonyRuleBuilderProps> = ({
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-[var(--sh-emerald)]" />
               <span className="font-mono text-sm font-bold text-[var(--sh-fg-1)]">
-                Pre-Flight Backtest Results ({activeRecipe.name})
+                Illustrative simulation results ({activeRecipe.name})
               </span>
             </div>
             <span className="text-[10px] font-mono text-[var(--sh-fg-4)]">
-              {backtestResult.sampleOccurrences} historical catalyst events
+              {backtestResult.sampleOccurrences} illustrative samples
             </span>
           </div>
 
@@ -299,7 +299,7 @@ export const SymphonyRuleBuilder: React.FC<SymphonyRuleBuilderProps> = ({
 
             <div className="p-3 rounded-lg bg-[var(--sh-surface-1)] border border-[var(--sh-border)]">
               <div className="text-[10px] font-mono text-[var(--sh-fg-4)] uppercase">
-                Max Historical Drawdown
+                Sample drawdown
               </div>
               <div className="font-mono text-lg font-bold text-[var(--sh-rose)] mt-1">
                 {backtestResult.maxDrawdownPct}%
