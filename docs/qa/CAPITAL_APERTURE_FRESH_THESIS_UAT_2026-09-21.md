@@ -60,3 +60,45 @@ Full fresh-thesis-to-exit acceptance remains pending.
   `a5415f33-2d99-4d03-a932-072f71a8930d` includes both follow-up fixes.
 
 Remaining: connected retest of the combined repair and the new Mission outcome.
+
+## Final connected receipt
+
+- Runtime `7e67b867fa7dc8c91cd64f7fe2719ffca8fd20ce`, revision
+  `capital-aperture-00218-wes`, 100% production traffic. Staged and public release
+  checks 6/6; public verified at 17:04:41 UTC. Service configuration unchanged.
+- Latest unit lane: 2,601 passed, 10 skipped. TypeScript passed. Two old source
+  contracts required updating to distinguish closing-fill review from opening
+  position monitoring; their new assertions preserve that distinction.
+- Reloaded the same saved draft: risk preview now shows $15 effective risk,
+  $200 requested ceiling, $55 remaining aggregate headroom. No limit was raised.
+- Clicked Underwrite once. Mission 960001 / revision 1320001 completed with
+  `No candidate has sourced evidence sufficient to form a tactical thesis`.
+  Reopening condition: add a current source and re-underwrite. No new diesel
+  research run, proposal, approval or broker order was created.
+- Exact result URL reopened with thesis, account, $2,000 capital, shares,
+  requested and effective risk retained. Mobile viewport override 390x844
+  yielded actual document width/scroll width 351/351 CSS px (no overflow).
+  Screenshot inspected; this is not physical-device or user-tested usability.
+  Override reset before desktop checks.
+- Closing ticket now says closing order filled, not position open. Both RWM
+  fill receipts remain visible. Recomputed outcome records two fills and one
+  closed trade, process-only sufficiency; no positive-expectancy claim.
+- Play Desk shows zero open order-linked positions, PSX still approved/not
+  submitted, and no invented Greeks or risk-band all-clear.
+
+### Honest remaining scope
+
+This verifies fresh-thesis → persisted Mission → underwriting → no-trade, and
+the existing RWM test's separate paper approval → submission → fill → closure.
+It does not prove a newly generated diesel play → evidence → entry journey;
+that requires adequate sourced evidence. No evidence gate was bypassed.
+
+Non-blocking follow-up observations: Desk's summary says `awaiting a fill` for
+an approved/unsubmitted ticket; a scheduled RWM review remains after closure;
+the legacy run's cockpit names its original manual research account while the
+ticket correctly names the execution account. Outcome labels count two filled
+orders as two candidates and round the one-cent difference to whole dollars.
+These remain UX/reporting gaps, not a blanket clean-release signoff.
+
+Linear THI-266 remains ready to sync from this receipt; connector reauthentication
+was required in the previous pass. No external tracking comment is claimed.
