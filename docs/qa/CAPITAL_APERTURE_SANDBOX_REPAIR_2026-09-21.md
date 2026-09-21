@@ -30,3 +30,32 @@ sandbox workflow; server checks and the final confirmation are not bypassed.
   the behavioral guards. The unchanged timing assertion passes with bounded workers.
 - No production orders mutated by these tests. Isolated integration result and
   live release receipt are recorded below when verified, not inferred.
+
+## First release and live sandbox execution
+
+- Source `4934d03448e727bfadd441aca0dd4f12433228fc`, Cloud Build
+  `a03b0e52-9cbd-40e6-89c7-e007671be400`, revision `capital-aperture-00210-yew`.
+- Staged and public read-only release checks: 6/6 each; then 100% production traffic.
+- Isolated integration: 287 passed, 2 skipped. Disposable database removed.
+- User explicitly authorized paper approval/submission. Existing approved RWM
+  order 360001 (run 780001, candidate 630001), one share, was submitted once via
+  the explicit confirmation. Broker accepted; Mirror fills subsequently showed
+  one share filled at $14.08. Approval was already recorded before this test.
+- No duplicate RWM order, no PSX submission, no live order, no exit or hedge.
+
+## Blocking finding discovered after the fill
+
+Monitoring rendered an unrelated MGM call with fabricated mark, bid/ask, P&L,
+Greeks, market catalysts, and stop proximity. Missing evidence also generated
+an all-clear. This was production code, not a labeled fixture. Two rendered
+regression tests reproduced both defects before repair.
+
+The repair removes these fallback facts. It displays only selected-order facts;
+current quote/P&L/Greeks remain explicitly unmeasured. Monitoring categories use
+the shared evidence/freshness presentation. A saved review is not proof that a
+thesis is intact. Slow checks remain pending instead of inviting duplicate work.
+This screen cannot construct an exit from an unverified holding or guessed account.
+The portfolio's reconciled-position workflow remains the appropriate exit surface.
+
+Final release and browser retest are pending at the time of this entry. Do not
+treat the successful paper fill as complete UAT signoff.

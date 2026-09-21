@@ -3,9 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { monitoringFindingVersion } from "../../shared/monitoringFinding";
 
-const fixture = vi.hoisted(() => ({ checks: [] as any[], receipts: [] as any[], mutate: vi.fn(), refetch: vi.fn(), navigate: vi.fn(), failed: false }));
+const fixture = vi.hoisted(() => ({ checks: [] as any[], receipts: [] as any[], mutate: vi.fn(), refetch: vi.fn(), navigate: vi.fn(), failed: false, loading: false }));
 vi.mock("@/lib/trpc", () => ({ trpc: { aperture: { monitor: {
-  list: { useQuery: () => ({ data: fixture.checks, isLoading: false, isError: fixture.failed, refetch: fixture.refetch }) },
+  list: { useQuery: () => ({ data: fixture.checks, isLoading: fixture.loading, isError: fixture.failed, refetch: fixture.refetch }) },
   run: { useMutation: () => ({ isPending: false, mutate: fixture.mutate }) },
   reviews: {
     list: { useQuery: () => ({ data: { receipts: fixture.receipts }, isLoading: false, isError: false, refetch: fixture.refetch }) },
@@ -23,11 +23,29 @@ const selection = { orderId: 12, findingId: 1, findingVersion: monitoringFinding
 const render = (selected: typeof selection | null = selection, selectedOrder: any = order) => renderToStaticMarkup(React.createElement(MonitoringPanel, { runId: check.runId, candidate: { id: check.candidateId, symbol: check.symbol }, order: selectedOrder, selection: selected, onOpenFinding: fixture.navigate }));
 
 beforeEach(() => {
-  vi.stubGlobal("React", React); fixture.checks = [check, { ...check, id: 4, checkType: "macro", flagged: false }]; fixture.receipts = []; fixture.failed = false;
+  vi.stubGlobal("React", React); fixture.checks = [check, { ...check, id: 4, checkType: "macro", flagged: false }]; fixture.receipts = []; fixture.failed = false; fixture.loading = false;
   fixture.mutate.mockClear(); fixture.refetch.mockClear(); fixture.navigate.mockClear();
 });
 
 describe("monitoring finding decision view", () => {
+  it("never treats a loading or failed monitoring query as a healthy thesis", () => {
+    fixture.checks = [];
+    for (const state of ["loading", "failed"] as const) {
+      fixture.loading = state === "loading"; fixture.failed = state === "failed";
+      const html = render(null);
+      expect(html).toContain(state === "loading" ? "Loading recorded checks" : "Monitoring status unavailable");
+      for (const claim of ["Thesis boundaries intact", "100% Cleared", "Flank Intact"]) expect(html).not.toContain(claim);
+    }
+    expect(fixture.mutate).not.toHaveBeenCalled();
+  });
+  it("does not manufacture a healthy thesis, prices, or mutations when evidence is absent", () => {
+    fixture.checks = [];
+    const html = render(null);
+    expect(html).toContain("No monitoring checks recorded");
+    for (const claim of ["Thesis boundaries intact", "100% Cleared", "Flank Intact", "$38.50", "$48.00", "+7.0% headroom"]) expect(html).not.toContain(claim);
+    expect(fixture.mutate).not.toHaveBeenCalled();
+    expect(fixture.refetch).not.toHaveBeenCalled();
+  });
   it("waits for the exact play context instead of reporting a missing finding during hydration", () => {
     fixture.checks = [];
     const html = renderToStaticMarkup(React.createElement(MonitoringPanel, {

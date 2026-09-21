@@ -10,6 +10,7 @@
  * Paper only. No live capital.
  */
 import { useEffect, useRef, useState } from "react";
+import { Info } from "lucide-react";
 import { useRoute, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -462,13 +463,9 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
   const isCheckResolved = (check: VersionedMonitoringFinding) =>
     resolvedVersions.has(`${check.id}:${monitoringFindingVersion(check)}`);
 
-  // Safe position lookup for mark & PnL
-  const positionsQuery = (trpc.aperture as any)?.position?.list?.useQuery
-    ? (trpc.aperture as any).position.list.useQuery(undefined, { refetchOnWindowFocus: false })
-    : { data: undefined };
-  const currentPosition = positionsQuery.data?.find?.(
-    (p: any) => p.symbol === order?.symbol || (order?.underlyingSymbol && p.symbol.startsWith(order.underlyingSymbol))
-  );
+  // No account/order-linked quote source is available here. Never substitute a
+  // position sharing an underlying, or a synthetic mark, for this exact order.
+  const currentPosition = undefined;
 
   const [timedOut, setTimedOut] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
@@ -504,11 +501,11 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
     setCheckError(null);
     if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
 
-    // Timeout boundary: release pending state after 18s if backend hangs
+    // A slow response is not cancellation. Keep the request pending to prevent
+    // duplicate checks while the server may still be writing evidence.
     checkTimeoutRef.current = setTimeout(() => {
       setTimedOut(true);
-      (runCheck as any).reset?.();
-      toast.error("Check execution timed out awaiting market feeds. You can retry anytime.");
+      toast.info("Checks are taking longer than expected. The request is still pending.");
     }, 18_000);
 
     runCheck.mutate({ runId, candidateId: candidate.id, symbol: candidate.symbol,
@@ -518,7 +515,6 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
 
   const cancelScopedCheck = () => {
     if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
-    (runCheck as any).reset?.();
     setTimedOut(false);
     setCheckError(null);
   };
@@ -549,28 +545,16 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
     ? null
     : showSelected && selectedCheck
     ? selectedCheck
-    : currentChecks.find((c) => c.checkType === activeFlankKey) ?? currentChecks[0] ?? null;
+    : currentChecks.find((c) => c.checkType === activeFlankKey) ?? null;
   const isFocusedHistorical = Boolean(showSelected && selected.historical);
 
   if (contextState === "loading") return <p role="status">Loading selected play and order… No checks are being run.</p>;
   const contextError = contextState === "failed" ? <div role="alert" className="rounded-lg border p-4"><p>Selected play or order could not refresh. No monitoring eligibility is confirmed.</p>{onRetryContext && <Button variant="outline" className="mt-2 min-h-11" onClick={onRetryContext}>Retry play and order</Button>}</div> : null;
   if (contextError && (!candidate || !order)) return contextError;
 
-  const exitTarget: ExitTarget | null = order ? {
-    symbol: order.symbol,
-    underlyingSymbol: order.underlyingSymbol,
-    instrumentType: (order.instrumentType as any) ?? "long_call",
-    optionExpirationDate: order.optionExpirationDate,
-    optionStrikePriceCents: order.optionStrikePriceCents,
-    contractMultiplier: order.contractMultiplier ?? 100,
-    qty: order.qty ?? 1,
-    side: "long",
-    accountId: order.accountId ?? 1,
-    runId,
-    candidateId: candidate?.id,
-    lastPriceCents: currentPosition?.lastPriceCents ?? (order as any).filledAvgPriceCents ?? (order as any).limitPriceCents,
-    marketValueCents: currentPosition?.marketValueCents,
-  } : null;
+  // A filled order alone is not a verified current holding available to exit.
+  // Use the portfolio's reconciled position flow; do not invent a target here.
+  const exitTarget: ExitTarget | null = null;
 
   return <div className="space-y-4">
     {contextError}
@@ -581,8 +565,6 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
         order={order}
         position={currentPosition}
         thesisSummary={thesisSummary}
-        onOpenExit={() => setExitModalOpen(true)}
-        onOpenHedge={() => setHedgeModalOpen(true)}
       />
     )}
 
@@ -614,7 +596,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
             <h2 className="text-sm font-semibold">Thesis checks · {order ? orderInstrumentLabel(order) : candidate?.symbol ?? "Select a play"}</h2>
             <span className="font-mono text-xs px-2.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-primary font-medium w-fit">
-              Paper Fill Recorded · Discretionary Exit
+              {order?.status === "filled" ? "Paper fill recorded" : "Recorded order context"}
             </span>
           </div>
           <p className="text-xs leading-5" style={{ color: "var(--sh-text-secondary)" }}>
@@ -624,14 +606,14 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
             <div role="alert" className="rounded-lg border p-3 text-xs space-y-2" style={{ borderColor: "var(--sh-red)", background: "color-mix(in srgb, var(--sh-red) 8%, var(--sh-surface))" }}>
               <div className="flex items-center gap-2 font-semibold" style={{ color: "var(--sh-red)" }}>
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span>{timedOut ? "Check execution timed out awaiting market feeds." : "Check execution could not complete."}</span>
+                <span>{timedOut ? "Checks are still pending." : "Check execution could not complete."}</span>
               </div>
               <p style={{ color: "var(--sh-fg-muted)" }}>
                 {timedOut
-                  ? "The market search provider took longer than 18s to respond. No changes or orders were made."
+                  ? "The provider is taking longer than expected. This request may still save evidence. Do not start another check. No order action is performed."
                   : checkError || runCheck.error?.message || "Market data feed error occurred."}
               </p>
-              <Button variant="outline" size="sm" className="min-h-9 text-xs" onClick={runScopedChecks}>
+              <Button variant="outline" size="sm" className="min-h-11 text-xs" disabled={runCheck.isPending} onClick={runScopedChecks}>
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
                 Retry sourced checks
               </Button>
@@ -651,7 +633,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
           {runCheck.isPending ? (
             <div className="flex items-center justify-between text-xs pt-1">
               <span style={{ color: "var(--sh-fg-muted)" }}>Connecting to live market search…</span>
-              <button type="button" onClick={cancelScopedCheck} className="underline hover:opacity-80" style={{ color: "var(--sh-signal)" }}>Cancel check</button>
+              <span>Leaving this view does not cancel the server request.</span>
             </div>
           ) : (
             <p className="text-xs" role="status" style={{ color: "var(--sh-fg-muted)" }}>
@@ -680,14 +662,13 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
             <span className="font-mono text-[11px] text-muted-foreground">Action required</span>
           </div>
         ) : (
-          <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs">
+          <div className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <p role="status" className="font-semibold text-emerald-400">
-                All open checks reviewed · Thesis boundaries intact.
+              <Info className="h-4 w-4" />
+              <p role="status" className="font-semibold">
+                {query.isLoading ? "Loading recorded checks…" : query.isError ? "Monitoring status unavailable." : "No unresolved review tasks in the loaded records. This is not a current thesis verification."}
               </p>
             </div>
-            <span className="font-mono text-[11px] text-emerald-400 font-bold">100% Cleared</span>
           </div>
         )}
 
@@ -702,11 +683,11 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
           >
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold tracking-tight uppercase" style={{ color: "var(--sh-fg-muted)" }}>
-                {isFocusedHistorical ? "Selected historical finding" : "Focused Flank Inspection"} · {isCheckResolved(focusedCheck) ? "Reviewed · Intact" : monitoringFindingPresentation({ check: focusedCheck, instrument: order }).stateLabel}
+                {isFocusedHistorical ? "Selected historical finding" : "Selected check"} · {isCheckResolved(focusedCheck) ? "Review recorded" : monitoringFindingPresentation({ check: focusedCheck, instrument: order }).stateLabel}
               </p>
               {isCheckResolved(focusedCheck) && (
                 <Badge variant="outline" className="text-xs border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
-                  ✓ Verified Intact
+                  Review recorded
                 </Badge>
               )}
             </div>
@@ -723,8 +704,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
                 <span>Direct Risk Boundary Assessment</span>
               </div>
               <p className="text-xs leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>
-                Do these flank shifts invalidate your stop ($38.50) or target ($48.00)?
-                Underlying maintains <span className="font-mono font-bold text-emerald-400">+7.0% headroom</span> above invalidation stop.
+                Compare this finding with the recorded invalidation rule. Current stop proximity is not measured in this view; no automatic exit occurs.
               </p>
             </div>
 
@@ -748,17 +728,15 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
                   findingId: focusedCheck.id,
                   findingVersion: monitoringFindingVersion(focusedCheck),
                 }}
-                onHedge={() => setHedgeModalOpen(true)}
-                onExit={() => setExitModalOpen(true)}
               />
             )}
           </div>
         ) : (
           <div className="rounded-xl border p-8 text-center space-y-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-            <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500/60" />
-            <h3 className="text-sm font-semibold">Flank Intact</h3>
+            <Info className="mx-auto h-8 w-8" />
+            <h3 className="text-sm font-semibold">No finding selected</h3>
             <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-              No flagged disruptions recorded for the selected flank category. Select another flank on the left or run a fresh scan.
+              Select a recorded check or run sourced checks. Missing evidence does not establish that the thesis still holds.
             </p>
           </div>
         )}
@@ -827,7 +805,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
         target={exitTarget}
         onSuccess={() => {
           setExitModalOpen(false);
-          toast.success("Paper exit order submitted");
+          toast.success("Paper exit draft saved; submission is separate.");
           void query.refetch();
         }}
       />
@@ -838,7 +816,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
         open={hedgeModalOpen}
         onOpenChange={setHedgeModalOpen}
         initialValues={{
-          symbol: order?.underlyingSymbol ?? order?.symbol ?? "MGM",
+          symbol: order?.underlyingSymbol ?? order?.symbol ?? "",
           direction: "short",
           runId,
           candidateId: candidate?.id,

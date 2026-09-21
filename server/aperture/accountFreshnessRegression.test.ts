@@ -33,6 +33,7 @@ describe("real preflight account freshness boundary", () => {
     const saved = account("alpaca_paper"); harness.accounts = [saved];
     harness.getAccount.mockRejectedValue(new Error("provider unavailable"));
     await exercise();
+    expect(harness.getAccount).toHaveBeenCalledOnce();
     expect(harness.writes).toEqual([]);
     expect(saved.lastSyncedAt).toBe(old);
   });
@@ -40,6 +41,7 @@ describe("real preflight account freshness boundary", () => {
     const saved = account("alpaca_paper"); harness.accounts = [saved];
     harness.getAccount.mockResolvedValue({ externalAccountId: kind === "wrong identity" ? "other" : "paper-fixture", isPaper: kind !== "live account", asOf: kind === "stale snapshot" ? old : now });
     await exercise();
+    expect(harness.getAccount).toHaveBeenCalledOnce();
     expect(harness.writes).toEqual([]);
     expect(saved.lastSyncedAt).toBe(old);
   });

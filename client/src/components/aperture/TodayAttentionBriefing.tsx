@@ -200,7 +200,7 @@ export function TodayAttentionBriefing({
             <h2 className="text-sm font-semibold">Other critical issues · {criticalSplit.visible.length}</h2>
           </div>
           <div className="flex items-center gap-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
-            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[var(--sh-emerald)]" />Tactical Radar · Ambient Feeds Armed</span>
+            <span>Research checks run on demand</span>
           </div>
         </div>
         <p className="mt-1 px-4 text-xs" style={{ color: "var(--sh-fg-muted)" }}>All authorized plays, regardless of thesis or instrument filters.</p>

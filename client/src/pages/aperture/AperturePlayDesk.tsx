@@ -345,7 +345,7 @@ export default function AperturePlayDesk() {
             <h2 id="desk-critical-heading" className="text-base font-semibold">Tactical Radar · Watch My Six ({disclosure.otherCritical.length})</h2>
           </div>
           <div className="flex items-center gap-3 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
-            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[var(--sh-emerald)]" />Perplexity Sonar-Pro Armed</span>
+            <span>Research checks run on demand</span>
             <span>Visible across all filters</span>
           </div>
         </header>

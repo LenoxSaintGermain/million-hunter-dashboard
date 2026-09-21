@@ -15,7 +15,7 @@ export function MonitoringFindingCard({ check, instrument, rationale, now, onRef
 }) {
   const model = monitoringFindingPresentation({ check, instrument, rationale, now });
   const statusLabel = isResolved
-    ? `${model.checkLabel} · Reviewed / Intact`
+    ? `${model.checkLabel} · Review recorded`
     : `${model.checkLabel} · ${model.review.state === "unknown" ? "Not verified" : model.review.state === "flagged" ? "Needs review" : "No flagged change"}`;
 
   const statusColor = isResolved
