@@ -23,6 +23,7 @@ export default defineConfig({
     environment: "node",
     fileParallelism: false,
     include: [
+      "server/aperture/quickPlay.integration.test.ts",
       "server/aperture/executionEvidence.integration.test.ts",
       "server/aperture/monitoringReviewReceipt.integration.test.ts",
       "server/aperture/capitalLedger.integration.test.ts",

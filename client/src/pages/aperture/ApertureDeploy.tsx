@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { recipeHorizonRecovery } from "@shared/intradayRecipeGuard";
 import { ManualOrderTicketModal } from "@/components/aperture/ManualOrderTicketModal";
 import { QuickHitCard } from "@/components/aperture/QuickHitCard";
+import { QuickPlayWorkspace } from "@/components/aperture/QuickPlayWorkspace";
 import { SymphonyRuleBuilder } from "@/components/aperture/SymphonyRuleBuilder";
 
 /**
@@ -34,7 +35,7 @@ function readPreferences(): { amount: string; horizon: string } {
 export default function ApertureDeploy() {
   const [, navigate] = useLocation();
   const saved = readPreferences();
-  const [deployMode, setDeployMode] = useState<"standard" | "quick_hits">("standard");
+  const [deployMode, setDeployMode] = useState<"standard" | "quick_hits" | "quick_play">("standard");
   const [quickHitBudget, setQuickHitBudget] = useState<number>(50);
   const [amount, setAmount] = useState(saved.amount);
   const [horizon, setHorizon] = useState(saved.horizon);
@@ -72,6 +73,7 @@ export default function ApertureDeploy() {
     <section className={`mx-auto ${deployMode === "quick_hits" ? "max-w-5xl" : "max-w-3xl"} space-y-6 pb-16`}>
       {/* Strategy Mode Switcher: Quick Hits vs Standard Thesis */}
       <div className="flex flex-wrap items-center gap-2 border-b border-[var(--sh-border-1)] pb-4">
+        <Button type="button" className="min-h-11" variant={deployMode === "quick_play" ? "default" : "outline"} aria-pressed={deployMode === "quick_play"} onClick={() => setDeployMode("quick_play")}>Quick Plays · $25–$100</Button>
         <button
           type="button"
           onClick={() => setDeployMode("quick_hits")}
@@ -97,7 +99,7 @@ export default function ApertureDeploy() {
         </button>
       </div>
 
-      {deployMode === "quick_hits" ? (
+      {deployMode === "quick_play" ? <QuickPlayWorkspace /> : deployMode === "quick_hits" ? (
         <div className="space-y-8 animate-in fade-in duration-150">
           <header>
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>

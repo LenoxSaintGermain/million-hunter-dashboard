@@ -64,6 +64,7 @@ import {
 } from "../drizzle/schema";
 import { capitalOperatorProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { createQuickPlayRouter } from "./aperture/quickPlay";
 import { sumOpenOrderRisk } from "../shared/openOrderRisk";
 import { applyCanonicalDeclarations, compileThesis, flattenExposureTree, resolveRunGraph, validateGraphForPersistence, type ThesisGraph } from "./aperture/thesisGraph";
 import { discoverUniverse, operatorDeclaredUniverse, thesisSummary } from "./aperture/universe";
@@ -817,7 +818,159 @@ export async function executeUnderwriting(input: {
 
 // ── Router ────────────────────────────────────────────────────────────────────
 
+async function constructPlayForUser(ctx: { user: { id: number; openId?: string } }, input: { runId: number; candidateId: number }) {
+        const db = await getDb();
+        const [row] = await db!.select({ candidate: apertureCandidates, run: apertureRuns })
+          .from(apertureCandidates)
+          .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
+          .where(and(
+            eq(apertureCandidates.id, input.candidateId),
+            eq(apertureCandidates.runId, input.runId),
+            eq(apertureRuns.userId, ctx.user.id),
+          )).limit(1);
+        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Play not found in your research history" });
+
+        // Check the persisted, owner-scoped horizon before fixtures, accounts,
+        // market data, or any default direction can produce an intraday recipe.
+        const recovery = recipeHorizonRecovery({ holdingPeriod: row.run.holdingPeriod, playSide: row.candidate.playSide });
+        if (recovery) return {
+          play: null,
+          recovery,
+          marketContext: {
+            session: "unknown" as const,
+            nextRegularSessionOpenAt: null,
+            referencePriceCents: null,
+            referenceAsOf: null,
+          },
+          disclosure: "Research only. No recipe, proposal, approval, or order was created; the original research horizon is preserved.",
+        };
+
+        const illustrativeFixtureRecipe = isExactIsolatedUatRuntime()
+          && ctx.user.openId === "uat_jim_9c18799"
+          && row.run.droppedNote === "ILLUSTRATIVE_UAT_QUALIFIED_PLAY_ZERO_NETWORK_NOT_CURRENT_MARKET_DATA";
+        if (illustrativeFixtureRecipe) {
+          const isLead = row.candidate.symbol === "UATQ";
+          return {
+            play: {
+              symbol: row.candidate.symbol, side: "long" as const, holdingPeriod: "intraday" as const,
+              taxonomy: { marketPlay: { specificPlay: isLead ? "illustrative catalyst review" : "conditional alternative review", basis: "Illustrative UAT fixture — not current market data." }, execution: { direction: "long", strategy: "human-reviewed paper plan", instrument: "shares" }, horizon: { label: "Same-session human review", basis: "Modeled UAT horizon; no current market claim." }, signals: [{ label: "Named catalyst evidence", status: "unknown" }] },
+              readiness: "constructed" as const,
+              entry: { priceCents: isLead ? 2500 : 1800, modeled: true as const, basis: "Modeled illustrative level; not a quote or current market price." },
+              stop: { priceCents: isLead ? 2425 : 1746, modeled: true as const, basis: "Modeled risk boundary for UAT review only." },
+              slippage: { priceCents: 2, modeled: true as const, basis: "Illustrative slippage assumption." },
+              targets: [{ priceCents: isLead ? 2615 : 1890, modeled: true as const, rMultiple: 1.5, basis: "Modeled R-multiple illustration; not a return promise." }],
+              budgetCents: 15000, qty: isLead ? 55 : 45, notionalCents: isLead ? 137500 : 81000, plannedLossCents: isLead ? 4235 : 2520, plannedLossPctOfEquity: isLead ? 0.042 : 0.025, sizeLimitedByNotionalCeiling: false, timeStopAt: null,
+              noTradeConditions: ["Do not take this illustrative recipe unless the named catalyst evidence is independently confirmed.", "No current quote, tape, or provider fact was requested or supplied."],
+              trigger: { state: "unknown", basis: "Illustrative UAT fixture — live trigger observation intentionally unavailable.", vwap: null, lastPrice: null, feed: "unknown", lagMs: null, needsOperatorConfirmation: true },
+              tapeBasis: "Illustrative UAT fixture — not current market data; zero network provider calls.", feed: "unknown" as const,
+              unavailableReasons: ["Current tape and live pricing are intentionally unavailable in this isolated fixture."],
+              assumptions: ["Named values are modeled for a UAT review path only.", "No return, fill, or current-price outcome is represented."],
+            },
+            marketContext: {
+              session: "unknown" as const,
+              nextRegularSessionOpenAt: null,
+              referencePriceCents: null,
+              referenceAsOf: null,
+            },
+            disclosure: "Illustrative UAT fixture — not current market data. This paper-review surface cannot create, approve, or submit an order.",
+          };
+        }
+
+        const accounts = await db!.select().from(portfolioAccounts).where(eq(portfolioAccounts.userId, ctx.user.id));
+        const account = row.run.accountId
+          ? accounts.find((item) => item.id === row.run.accountId) ?? null
+          : accounts.find((item) => item.isPaper && item.brokerId === "alpaca_paper")
+            ?? accounts.find((item) => item.isPaper)
+            ?? null;
+        const now = Date.now();
+        const currentMarketSession = marketSession(now);
+        const [decisionAuthority] = await db!.select({ revision: apertureDecisionRevisions })
+          .from(apertureDecisionRuns)
+          .innerJoin(apertureDecisionRevisions, and(
+            eq(apertureDecisionRevisions.id, apertureDecisionRuns.currentRevisionId),
+            eq(apertureDecisionRevisions.decisionRunId, apertureDecisionRuns.id),
+          ))
+          .where(and(
+            eq(apertureDecisionRuns.userId, ctx.user.id),
+            eq(apertureDecisionRuns.researchRunId, row.run.id),
+          )).limit(1);
+        const queueAtOpenRequested = requestsQueueAtOpen(decisionAuthority?.revision);
+        const sessionDayStartMs = startOfEtDay(now);
+        const tape = queueAtOpenRequested || sessionDayStartMs == null
+          ? { bars: [], feed: "unknown" as const, unavailableReason: "the ET session day could not be determined, so no minute tape was requested" }
+          : await fetchIntradayBars(row.candidate.symbol, { startMs: sessionDayStartMs, timeoutMs: 4_000, maxPages: 1 });
+        const vwap = sessionVwap(tape.bars, { feed: tape.feed, now });
+        const range = openingRange(tape.bars, {
+          sessionOpenAt: (sessionDayStartMs ?? now) + REGULAR_OPEN * 60_000,
+          minutes: 30,
+          feed: tape.feed,
+          now,
+        });
+        const side = row.candidate.playSide ?? "long";
+        const trigger = checkVwapHold(tape.bars, vwap, { side: side === "long" ? "above" : "below", minutesRequired: 15, now });
+        const facts = await getFacts(row.candidate.symbol, now);
+        const advUsd = facts.find((fact) => fact.factKey === "adv_usd_30d" && fact.valueNum != null)?.valueNum ?? null;
+        const lastPriceFact = facts.find((fact) => fact.factKey === "last_price" && fact.basis === "verified" && fact.valueNum != null) ?? null;
+        const queueAtOpen = queueAtOpenRequested && decisionAuthority?.revision && lastPriceFact?.valueNum != null
+          ? {
+            referencePriceCents: Math.round(lastPriceFact.valueNum * 100),
+            referenceAsOf: lastPriceFact.asOf ?? lastPriceFact.fetchedAt,
+            referenceExpiresAt: lastPriceFact.expiresAt,
+            sourceName: lastPriceFact.sourceName ?? lastPriceFact.providerId,
+            maxNotionalCents: decisionAuthority.revision.deployableCapitalCents,
+            maxPlannedLossCents: decisionAuthority.revision.maxPlannedLossCents,
+            slippageCents: 3,
+            timeStopAt: decisionAuthority.revision.reviewAt ?? row.run.catalystDeadlineAt ?? now,
+          }
+          : queueAtOpenRequested
+            ? {
+              referencePriceCents: 0,
+              referenceAsOf: 0,
+              referenceExpiresAt: null,
+              sourceName: "verified market-data source",
+              maxNotionalCents: decisionAuthority?.revision.deployableCapitalCents ?? row.run.deployableCapitalCents,
+              maxPlannedLossCents: decisionAuthority?.revision.maxPlannedLossCents ?? 0,
+              slippageCents: 3,
+              timeStopAt: decisionAuthority?.revision.reviewAt ?? row.run.catalystDeadlineAt ?? now,
+            }
+            : null;
+        const play = constructPlay({
+          symbol: row.candidate.symbol,
+          side,
+          holdingPeriod: row.run.holdingPeriod as any,
+          instrumentPreference: row.run.instrumentPreference,
+          bars: tape.bars,
+          vwap,
+          range,
+          trigger,
+          equityCents: account?.equityValueCents ?? null,
+          sessionDayStartMs,
+          catalystDeadlineAt: row.run.catalystDeadlineAt,
+          advUsd,
+          queueAtOpen,
+          now,
+        });
+        const sideAssumption = row.candidate.playSide == null
+          ? "direction was not modelled on this legacy candidate; this recipe assumes a long setup until an operator records otherwise"
+          : null;
+        return {
+          play: {
+            ...play,
+            assumptions: sideAssumption ? [sideAssumption, ...play.assumptions] : play.assumptions,
+            unavailableReasons: !queueAtOpenRequested && tape.unavailableReason ? [tape.unavailableReason, ...play.unavailableReasons] : play.unavailableReasons,
+          },
+          marketContext: {
+            session: currentMarketSession.session,
+            nextRegularSessionOpenAt: currentMarketSession.session === "regular" ? null : nextRegularSessionOpen(now),
+            referencePriceCents: lastPriceFact?.valueNum == null ? null : Math.round(lastPriceFact.valueNum * 100),
+            referenceAsOf: lastPriceFact?.asOf ?? lastPriceFact?.fetchedAt ?? null,
+          },
+          disclosure: queueAtOpenRequested ? QUEUE_AT_OPEN_PLAY_DISCLOSURE : CONSTRUCTED_PLAY_DISCLOSURE,
+        };
+}
+
 export const apertureRouter = router({
+  quickPlay: createQuickPlayRouter({ construct: constructPlayForUser, evidenceBlock: evidenceReviewBlock }),
   strategy: strategyDiscoveryRouter,
 
   // ── Thesis management ──────────────────────────────────────────────────────
@@ -4039,156 +4192,7 @@ export const apertureRouter = router({
 
     construct: capitalOperatorProcedure
       .input(z.object({ runId: z.number(), candidateId: z.number() }))
-      .query(async ({ ctx, input }) => {
-        const db = await getDb();
-        const [row] = await db!.select({ candidate: apertureCandidates, run: apertureRuns })
-          .from(apertureCandidates)
-          .innerJoin(apertureRuns, eq(apertureCandidates.runId, apertureRuns.id))
-          .where(and(
-            eq(apertureCandidates.id, input.candidateId),
-            eq(apertureCandidates.runId, input.runId),
-            eq(apertureRuns.userId, ctx.user.id),
-          )).limit(1);
-        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Play not found in your research history" });
-
-        // Check the persisted, owner-scoped horizon before fixtures, accounts,
-        // market data, or any default direction can produce an intraday recipe.
-        const recovery = recipeHorizonRecovery({ holdingPeriod: row.run.holdingPeriod, playSide: row.candidate.playSide });
-        if (recovery) return {
-          play: null,
-          recovery,
-          marketContext: {
-            session: "unknown" as const,
-            nextRegularSessionOpenAt: null,
-            referencePriceCents: null,
-            referenceAsOf: null,
-          },
-          disclosure: "Research only. No recipe, proposal, approval, or order was created; the original research horizon is preserved.",
-        };
-
-        const illustrativeFixtureRecipe = isExactIsolatedUatRuntime()
-          && ctx.user.openId === "uat_jim_9c18799"
-          && row.run.droppedNote === "ILLUSTRATIVE_UAT_QUALIFIED_PLAY_ZERO_NETWORK_NOT_CURRENT_MARKET_DATA";
-        if (illustrativeFixtureRecipe) {
-          const isLead = row.candidate.symbol === "UATQ";
-          return {
-            play: {
-              symbol: row.candidate.symbol, side: "long" as const, holdingPeriod: "intraday" as const,
-              taxonomy: { marketPlay: { specificPlay: isLead ? "illustrative catalyst review" : "conditional alternative review", basis: "Illustrative UAT fixture — not current market data." }, execution: { direction: "long", strategy: "human-reviewed paper plan", instrument: "shares" }, horizon: { label: "Same-session human review", basis: "Modeled UAT horizon; no current market claim." }, signals: [{ label: "Named catalyst evidence", status: "unknown" }] },
-              readiness: "constructed" as const,
-              entry: { priceCents: isLead ? 2500 : 1800, modeled: true as const, basis: "Modeled illustrative level; not a quote or current market price." },
-              stop: { priceCents: isLead ? 2425 : 1746, modeled: true as const, basis: "Modeled risk boundary for UAT review only." },
-              slippage: { priceCents: 2, modeled: true as const, basis: "Illustrative slippage assumption." },
-              targets: [{ priceCents: isLead ? 2615 : 1890, modeled: true as const, rMultiple: 1.5, basis: "Modeled R-multiple illustration; not a return promise." }],
-              budgetCents: 15000, qty: isLead ? 55 : 45, notionalCents: isLead ? 137500 : 81000, plannedLossCents: isLead ? 4235 : 2520, plannedLossPctOfEquity: isLead ? 0.042 : 0.025, sizeLimitedByNotionalCeiling: false, timeStopAt: null,
-              noTradeConditions: ["Do not take this illustrative recipe unless the named catalyst evidence is independently confirmed.", "No current quote, tape, or provider fact was requested or supplied."],
-              trigger: { state: "unknown", basis: "Illustrative UAT fixture — live trigger observation intentionally unavailable.", vwap: null, lastPrice: null, feed: "unknown", lagMs: null, needsOperatorConfirmation: true },
-              tapeBasis: "Illustrative UAT fixture — not current market data; zero network provider calls.", feed: "unknown" as const,
-              unavailableReasons: ["Current tape and live pricing are intentionally unavailable in this isolated fixture."],
-              assumptions: ["Named values are modeled for a UAT review path only.", "No return, fill, or current-price outcome is represented."],
-            },
-            marketContext: {
-              session: "unknown" as const,
-              nextRegularSessionOpenAt: null,
-              referencePriceCents: null,
-              referenceAsOf: null,
-            },
-            disclosure: "Illustrative UAT fixture — not current market data. This paper-review surface cannot create, approve, or submit an order.",
-          };
-        }
-
-        const accounts = await db!.select().from(portfolioAccounts).where(eq(portfolioAccounts.userId, ctx.user.id));
-        const account = row.run.accountId
-          ? accounts.find((item) => item.id === row.run.accountId) ?? null
-          : accounts.find((item) => item.isPaper && item.brokerId === "alpaca_paper")
-            ?? accounts.find((item) => item.isPaper)
-            ?? null;
-        const now = Date.now();
-        const currentMarketSession = marketSession(now);
-        const [decisionAuthority] = await db!.select({ revision: apertureDecisionRevisions })
-          .from(apertureDecisionRuns)
-          .innerJoin(apertureDecisionRevisions, and(
-            eq(apertureDecisionRevisions.id, apertureDecisionRuns.currentRevisionId),
-            eq(apertureDecisionRevisions.decisionRunId, apertureDecisionRuns.id),
-          ))
-          .where(and(
-            eq(apertureDecisionRuns.userId, ctx.user.id),
-            eq(apertureDecisionRuns.researchRunId, row.run.id),
-          )).limit(1);
-        const queueAtOpenRequested = requestsQueueAtOpen(decisionAuthority?.revision);
-        const sessionDayStartMs = startOfEtDay(now);
-        const tape = queueAtOpenRequested || sessionDayStartMs == null
-          ? { bars: [], feed: "unknown" as const, unavailableReason: "the ET session day could not be determined, so no minute tape was requested" }
-          : await fetchIntradayBars(row.candidate.symbol, { startMs: sessionDayStartMs, timeoutMs: 4_000, maxPages: 1 });
-        const vwap = sessionVwap(tape.bars, { feed: tape.feed, now });
-        const range = openingRange(tape.bars, {
-          sessionOpenAt: (sessionDayStartMs ?? now) + REGULAR_OPEN * 60_000,
-          minutes: 30,
-          feed: tape.feed,
-          now,
-        });
-        const side = row.candidate.playSide ?? "long";
-        const trigger = checkVwapHold(tape.bars, vwap, { side: side === "long" ? "above" : "below", minutesRequired: 15, now });
-        const facts = await getFacts(row.candidate.symbol, now);
-        const advUsd = facts.find((fact) => fact.factKey === "adv_usd_30d" && fact.valueNum != null)?.valueNum ?? null;
-        const lastPriceFact = facts.find((fact) => fact.factKey === "last_price" && fact.basis === "verified" && fact.valueNum != null) ?? null;
-        const queueAtOpen = queueAtOpenRequested && decisionAuthority?.revision && lastPriceFact?.valueNum != null
-          ? {
-            referencePriceCents: Math.round(lastPriceFact.valueNum * 100),
-            referenceAsOf: lastPriceFact.asOf ?? lastPriceFact.fetchedAt,
-            referenceExpiresAt: lastPriceFact.expiresAt,
-            sourceName: lastPriceFact.sourceName ?? lastPriceFact.providerId,
-            maxNotionalCents: decisionAuthority.revision.deployableCapitalCents,
-            maxPlannedLossCents: decisionAuthority.revision.maxPlannedLossCents,
-            slippageCents: 3,
-            timeStopAt: decisionAuthority.revision.reviewAt ?? row.run.catalystDeadlineAt ?? now,
-          }
-          : queueAtOpenRequested
-            ? {
-              referencePriceCents: 0,
-              referenceAsOf: 0,
-              referenceExpiresAt: null,
-              sourceName: "verified market-data source",
-              maxNotionalCents: decisionAuthority?.revision.deployableCapitalCents ?? row.run.deployableCapitalCents,
-              maxPlannedLossCents: decisionAuthority?.revision.maxPlannedLossCents ?? 0,
-              slippageCents: 3,
-              timeStopAt: decisionAuthority?.revision.reviewAt ?? row.run.catalystDeadlineAt ?? now,
-            }
-            : null;
-        const play = constructPlay({
-          symbol: row.candidate.symbol,
-          side,
-          holdingPeriod: row.run.holdingPeriod as any,
-          instrumentPreference: row.run.instrumentPreference,
-          bars: tape.bars,
-          vwap,
-          range,
-          trigger,
-          equityCents: account?.equityValueCents ?? null,
-          sessionDayStartMs,
-          catalystDeadlineAt: row.run.catalystDeadlineAt,
-          advUsd,
-          queueAtOpen,
-          now,
-        });
-        const sideAssumption = row.candidate.playSide == null
-          ? "direction was not modelled on this legacy candidate; this recipe assumes a long setup until an operator records otherwise"
-          : null;
-        return {
-          play: {
-            ...play,
-            assumptions: sideAssumption ? [sideAssumption, ...play.assumptions] : play.assumptions,
-            unavailableReasons: !queueAtOpenRequested && tape.unavailableReason ? [tape.unavailableReason, ...play.unavailableReasons] : play.unavailableReasons,
-          },
-          marketContext: {
-            session: currentMarketSession.session,
-            nextRegularSessionOpenAt: currentMarketSession.session === "regular" ? null : nextRegularSessionOpen(now),
-            referencePriceCents: lastPriceFact?.valueNum == null ? null : Math.round(lastPriceFact.valueNum * 100),
-            referenceAsOf: lastPriceFact?.asOf ?? lastPriceFact?.fetchedAt ?? null,
-          },
-          disclosure: queueAtOpenRequested ? QUEUE_AT_OPEN_PLAY_DISCLOSURE : CONSTRUCTED_PLAY_DISCLOSURE,
-        };
-      }),
+      .query(({ ctx, input }) => constructPlayForUser(ctx, input)),
 
     decide: capitalOperatorProcedure
       .input(z.object({ runId: z.number(), candidateId: z.number(), decision: z.enum(["skipped", "deferred"]), reason: z.string().trim().min(3).max(1_000) }))
@@ -5511,110 +5515,8 @@ export const apertureRouter = router({
           oneSentenceHypothesis: z.string().optional(),
         }),
       )
-      .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        const symbol = input.symbol.trim().toUpperCase();
-
-        // 1. Calculate sizing: shares snapped to budget
-        const sizing = calculateBudgetSizing({
-          budgetUsd: input.budgetUsd,
-          limitPriceCents: input.limitPriceCents,
-          stopPriceCents: input.stopLossPriceCents,
-        });
-
-        if (sizing.shares <= 0) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Budget of $${input.budgetUsd} is insufficient to buy 1 share at limit price $${(input.limitPriceCents / 100).toFixed(2)}.`,
-          });
-        }
-
-        // 2. Resolve paper portfolio account
-        const [account] = await db!.select().from(portfolioAccounts)
-          .where(and(eq(portfolioAccounts.userId, ctx.user.id), eq(portfolioAccounts.isPaper, true)))
-          .orderBy(desc(portfolioAccounts.updatedAt))
-          .limit(1);
-
-        if (!account) {
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
-            message: "No active paper portfolio account found. Sync an account first.",
-          });
-        }
-
-        // 3. Resolve active run or create lightweight Quick Hit run
-        let [run] = await db!.select().from(apertureRuns)
-          .where(and(eq(apertureRuns.userId, ctx.user.id), eq(apertureRuns.status, "completed")))
-          .orderBy(desc(apertureRuns.createdAt))
-          .limit(1);
-
-        if (!run) {
-          let [thesis] = await db!.select().from(capitalTheses)
-            .where(eq(capitalTheses.userId, ctx.user.id))
-            .limit(1);
-          if (!thesis) {
-            const [newThesis] = await db!.insert(capitalTheses).values({
-              userId: ctx.user.id,
-              name: "Event-Driven & Micro-Cap Quick Hits",
-              rawText: "Automated event-driven and rule-based catalyst plays.",
-              status: "active",
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            }).$returningId();
-            thesis = { id: newThesis.id } as any;
-          }
-
-          const [newRun] = await db!.insert(apertureRuns).values({
-            userId: ctx.user.id,
-            thesisId: thesis!.id,
-            status: "completed",
-            deployableCapitalCents: 100_000,
-            startedAt: Date.now(),
-            completedAt: Date.now(),
-            createdAt: Date.now(),
-          }).$returningId();
-          run = { id: newRun.id } as any;
-        }
-
-        // 4. Synthesize robust risk-audited narrative to pass aperture gates cleanly
-        const catalystReason = input.catalystSummary || input.catalystHeadline || `Quick Hit event momentum execution for ${symbol}.`;
-        const invalidationCond = input.oneSentenceHypothesis
-          || `Price drops below stop loss of $${(input.stopLossPriceCents / 100).toFixed(2)}, invalidating event catalyst momentum.`;
-
-        // 5. Create order through Aperture order flow engine
-        const orderResult = await createOrder({
-          runId: run!.id,
-          accountId: account.id,
-          userId: ctx.user.id,
-          symbol,
-          instrumentType: "shares",
-          side: "buy",
-          intent: "open",
-          orderType: "limit",
-          limitPriceCents: input.limitPriceCents,
-          entryPriceCents: input.limitPriceCents,
-          stopPriceCents: input.stopLossPriceCents,
-          slippageCents: 2,
-          qty: sizing.shares,
-          holdingPeriod: "intraday",
-          catalystDeadlineAt: Date.now() + 3 * 86_400_000,
-          reason: `[QUICK_HIT] ${catalystReason}`,
-          invalidationCondition: invalidationCond,
-          invalidationPriceCents: input.stopLossPriceCents,
-          paperAcknowledgement: PAPER_ACKNOWLEDGEMENT,
-        });
-
-        return {
-          success: true,
-          symbol,
-          sizing,
-          bracket: {
-            limitPriceCents: input.limitPriceCents,
-            stopLossPriceCents: input.stopLossPriceCents,
-            takeProfitPriceCents: input.takeProfitPriceCents,
-          },
-          orderResult,
-        };
+      .mutation(() => {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Example strategies cannot create orders. Reload Quick Plays and choose a researched idea. No order was created." });
       }),
   }),
 

@@ -1,6 +1,4 @@
 import React, { useState, useMemo } from "react";
-import { trpc } from "../../lib/trpc";
-import { toast } from "sonner";
 import {
   type QuickHitPlay,
   calculateBudgetSizing,
@@ -31,7 +29,6 @@ export const QuickHitCard: React.FC<QuickHitCardProps> = ({
 }) => {
   const [budgetUsd, setBudgetUsd] = useState<number>(defaultBudget);
   const [showBacktestDetails, setShowBacktestDetails] = useState<boolean>(false);
-  const [authorized, setAuthorized] = useState<boolean>(false);
 
   // Dynamic budget calculation
   const sizing = useMemo(() => {
@@ -42,32 +39,6 @@ export const QuickHitCard: React.FC<QuickHitCardProps> = ({
     });
   }, [budgetUsd, play.bracket.limitPriceCents, play.bracket.stopLossPriceCents]);
 
-  const authorizeMutation = trpc.aperture.quickHit.authorize.useMutation({
-    onSuccess: (data) => {
-      setAuthorized(true);
-      toast.success(`Quick Hit Authorized: ${data.symbol}`, {
-        description: `Order queued for ${data.sizing.shares} shares @ $${(data.bracket.limitPriceCents / 100).toFixed(2)} limit. Max risk capped at $${(data.sizing.maxCapitalAtRiskCents / 100).toFixed(2)}.`,
-      });
-      if (onAuthorized) onAuthorized(data.symbol);
-    },
-    onError: (err) => {
-      toast.error(`Authorization Failed: ${err.message}`);
-    },
-  });
-
-  const handleAuthorize = () => {
-    authorizeMutation.mutate({
-      candidatePlayId: play.id,
-      symbol: play.symbol,
-      budgetUsd,
-      limitPriceCents: play.bracket.limitPriceCents,
-      stopLossPriceCents: play.bracket.stopLossPriceCents,
-      takeProfitPriceCents: play.bracket.takeProfitPriceCents,
-      catalystHeadline: play.catalyst.headline,
-      catalystSummary: play.catalyst.summary,
-      oneSentenceHypothesis: play.oneSentenceHypothesis,
-    });
-  };
 
   const isSubFive = play.currentPriceCents < 500;
   const isMicroBadge = play.catalyst.badge === "MICRO";
@@ -77,7 +48,7 @@ export const QuickHitCard: React.FC<QuickHitCardProps> = ({
       className="rounded-xl border transition-all duration-200 shadow-sm relative overflow-hidden"
       style={{
         backgroundColor: "var(--sh-surface-1)",
-        borderColor: authorized ? "var(--sh-emerald)" : "var(--sh-border)",
+        borderColor: "var(--sh-border)",
       }}
     >
       {/* Top Accent Ribbon */}
@@ -323,12 +294,6 @@ export const QuickHitCard: React.FC<QuickHitCardProps> = ({
         </div>
 
         {/* 1-Click Action Button */}
-        {authorized ? (
-          <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-[var(--sh-emerald-15)] border border-[var(--sh-emerald)] text-[var(--sh-emerald)] font-mono text-xs font-semibold">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Play Authorized & Queued ({sizing.shares} shares)</span>
-          </div>
-        ) : (
           <button
             type="button"
             disabled
@@ -338,19 +303,11 @@ export const QuickHitCard: React.FC<QuickHitCardProps> = ({
               backgroundColor: isMicroBadge ? "var(--sh-purple)" : "var(--sh-primary)",
             }}
           >
-            {authorizeMutation.isPending ? (
-              <>
-                <Clock className="w-4 h-4 animate-spin" />
-                <span>Auditing & Routing...</span>
-              </>
-            ) : (
               <>
                 <Zap className="w-4 h-4" />
                 <span>Example only · order unavailable</span>
               </>
-            )}
           </button>
-        )}
 
         {/* Structural Safe Guard Disclosure */}
         <div id={`example-only-${play.id}`} className="text-sm text-center text-[var(--sh-fg-4)]">
