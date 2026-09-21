@@ -13,14 +13,14 @@ const tabsSource = readFileSync(
 
 describe("Aperture Execute mobile and accessibility contract", () => {
   it("uses the clear three-step paper lifecycle language", () => {
-    expect(executeSource).toContain(">Paper ticket</TabsTrigger>");
+    expect(executeSource).toContain(">Practice order</TabsTrigger>");
     expect(executeSource).toContain(">Check whether thesis still holds</TabsTrigger>");
     expect(executeSource).toContain(">Outcome &amp; notes</TabsTrigger>");
     expect(executeSource).not.toContain("Decision follow-through");
   });
 
   it("keeps lifecycle navigation semantic and keyboard managed", () => {
-    expect(executeSource).toContain('aria-label="Paper lifecycle"');
+    expect(executeSource).toContain('aria-label="Order lifecycle"');
     expect(executeSource.match(/<TabsTrigger className="min-h-11/g)).toHaveLength(3);
     expect(tabsSource).toContain("TabsPrimitive.List");
     expect(tabsSource).toContain("TabsPrimitive.Trigger");
@@ -42,7 +42,7 @@ describe("Aperture Execute mobile and accessibility contract", () => {
     );
 
     expect(pendingActionStart).toBeGreaterThan(0);
-    expect(pendingActions).toContain("Approve paper ticket");
+    expect(pendingActions).toContain("Approve practice order");
     expect(pendingActions).toContain('<Button variant="outline"');
     expect(pendingActions).toContain("Pass on this trade");
   });

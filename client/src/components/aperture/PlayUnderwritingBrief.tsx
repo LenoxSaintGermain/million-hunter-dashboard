@@ -17,14 +17,14 @@ export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate
           <p className="mt-2 text-sm leading-6">{result.noTrade.explanation}</p>
           {result.noTrade.reopenCondition && <p className="mt-3 text-sm leading-6"><strong>Reassess when:</strong> {result.noTrade.reopenCondition}</p>}
           {result.noTrade.reviewAt != null && <p className="mt-2 text-sm">Review: {new Date(result.noTrade.reviewAt).toLocaleString()} · on demand</p>}
-          <p className="mt-3 text-sm" style={{ color: "var(--sh-fg-muted)" }}>No paper ticket created; existing positions unchanged.</p>
+          <p className="mt-3 text-sm" style={{ color: "var(--sh-fg-muted)" }}>No order created. Existing positions are unchanged.</p>
         </div>
       </div>
     </section> : <section aria-label="Trade ideas">
       <div className="mb-4">
         <h3 className="font-serif text-2xl">{result.plays.length} conditional {result.plays.length === 1 ? "play" : "plays"}</h3>
         <p className="mt-2 text-sm leading-6">{result.market.regime === "unknown" ? "Market context is incomplete." : result.market.regime.replaceAll("_", " ") + " market context."} {leadPlay ? leadPlay.symbol + " ranks first; confirm its entry condition and evidence before a ticket." : "No play is actionable without evidence."}</p>
-        <p className="mt-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}>Validate a play to open its evidence task. This does not create an order.</p>
+        <p className="mt-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}>Check an idea to review its supporting evidence. This does not create an order.</p>
       </div>
       <div className="space-y-4">{result.plays.map((play, index) => <TradePlayCard key={play.id} rank={index + 1} play={play} thesis={thesisById.get(play.tacticalThesisId) ?? null} portfolioRiskBeforeCents={result.portfolioRisk.beforeCents} maxOpenRiskCents={result.feasibility.maxOpenRiskCents} selected={selectedPlayId === play.id} busy={busy} onValidate={() => onValidate(play.id)} />)}</div>
     </section>}

@@ -24,7 +24,7 @@ describe("workspace chrome occupies one row, not two", () => {
     const bar = $()("[data-workspace-bar]");
     expect(bar).toHaveLength(1);
     expect(bar.text()).toContain("Capital Aperture");
-    expect(bar.text()).toMatch(/Paper only/i);
+    expect(bar.text()).toMatch(/Practice trading only/i);
     expect(bar.find("nav[aria-label='Capital Aperture workspace menu']")).toHaveLength(1);
   });
 
@@ -67,10 +67,10 @@ describe("workspace chrome occupies one row, not two", () => {
     // is desktop-only, which is what it was before this layout change too.
     const bar = $()("[data-workspace-bar]");
     expect(bar.find("[data-operating-invariant]").attr("class")).toContain("hidden");
-    expect(bar.text()).toMatch(/Paper only/i);
+    expect(bar.text()).toMatch(/Practice trading only/i);
   });
 
   it("states the paper-only boundary exactly once in the chrome", () => {
-    expect($()("[data-workspace-bar]").text().match(/Paper only/gi)).toHaveLength(1);
+    expect($()("[data-workspace-bar]").text().match(/Practice trading only/gi)).toHaveLength(1);
   });
 });

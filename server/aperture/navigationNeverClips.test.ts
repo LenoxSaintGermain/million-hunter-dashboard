@@ -87,7 +87,7 @@ describe("the cockpit rail fits its own cells", () => {
     // the same explanation already one control away.
     expect(source).not.toContain("ceilings are measured against ${syncedLabel");
     expect(source).toContain("const staleText = syncedLabel(data.account.stalenessMs);");
-    expect(source).toContain("measured against the equity value recorded at this sync");
+    expect(source).toContain("Account limits use this saved account value");
   });
 });
 

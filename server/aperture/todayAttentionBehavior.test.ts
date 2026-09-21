@@ -116,7 +116,7 @@ describe("Today component rendering against deterministic records", () => {
     });
     expect(JSON.stringify(result)).not.toContain("SQL_UAT_SENTINEL");
     expect(result.primary?.kind).toBe("dispatch_unresolved");
-    expect(render(result)).toContain("Reconcile dispatch");
+    expect(render(result)).toContain("Check order status");
   });
 
   it("shows a no-trade reopening condition without sending an empty portfolio to monitoring", () => {
@@ -169,7 +169,7 @@ describe("Today component rendering against deterministic records", () => {
       checks: { state: "partial", asOf: now, monitoring: "on_demand" },
       orders: [{ id: 9, runId: 10, candidateId: 11, symbol: "MGM", status: "submitted", qty: 1, filledQty: 0, brokerOrderId: null, updatedAt: now }],
     }), { loading: true });
-    expect(html).toContain("Reconcile dispatch");
+    expect(html).toContain("Check order status");
     expect(html).not.toContain('data-attention-key="status:partial"');
     expect(html).not.toContain("No new action identified");
     expect(mocks.mutate).not.toHaveBeenCalled();
@@ -222,7 +222,7 @@ describe("Today component rendering against deterministic records", () => {
   it("renders receipt-less submission as critical reconciliation without an error string", () => {
     const html = render(briefing({ orders: [{ id: 9, runId: 10, candidateId: 11, symbol: "MGM", status: "submitted", qty: 3, filledQty: 1, brokerOrderId: null, dispatchError: "", updatedAt: now }] }));
     expect(html).toContain("Dispatch unresolved");
-    expect(html).toContain("Reconcile dispatch");
+    expect(html).toContain("Check order status");
     expect(html).toContain("1 filled · 2 remaining");
     expect(html).not.toContain("Paper broker accepted");
     expect(html).not.toContain("No new action identified");

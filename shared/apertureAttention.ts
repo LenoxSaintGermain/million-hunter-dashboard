@@ -308,8 +308,8 @@ export function safeStatusError(source: AttentionStatusSource): string {
     thesis: "Thesis context is unavailable. Refresh status to retry.",
     research: "Research records are unavailable. Retry the research queue.",
     trigger: "Trigger evidence is unavailable. Refresh trigger evidence to retry.",
-    underwriting: "The saved analysis could not be completed. Open the underwriting task to review recovery options.",
-    dispatch: "The broker dispatch receipt could not be verified. Reconcile dispatch before taking another action.",
+    underwriting: "The saved analysis could not be completed. Open the analysis to review recovery options.",
+    dispatch: "We couldn’t confirm the broker order status. Check order status before taking another action.",
     comparison: "The comparison request could not be confirmed. Refresh status before retrying to check whether it was recorded.",
   };
   return messages[source] ?? messages.status;
@@ -363,7 +363,7 @@ function orderMotion(order: AttentionOrder): ApertureMotionItem | null {
   return {
     key: `order:${order.id}`,
     symbol: order.symbol,
-    stateLabel: order.brokerOrderId ? "Paper broker accepted; no fill yet" : "Submitted; broker status pending",
+    stateLabel: order.brokerOrderId ? "Broker accepted; no fill yet" : "Submitted; broker status pending",
     detail: order.brokerOrderId ? "Accepted order · no fill recorded" : "Reconcile before treating this as accepted",
     href: orderHref(order),
     updatedAt: order.updatedAt,
@@ -445,7 +445,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       key: "mission:draft", kind: "incomplete_mission", priority: 60,
       stateLabel: "Saved draft", title: `Resume ${section}`,
       reason: "An unfinished mission is saved to your account.",
-      consequence: "Return to the saved section without re-entering information. No underwriting or order has been authorized by this draft.",
+      consequence: "Return to the saved section without re-entering information. This draft has not started analysis or created an order.",
       actionLabel: "Resume mission setup", href: "/aperture/mission", updatedAt: input.draft.updatedAt,
     }));
   } else if (!input.mission && !hasExistingWork && readState === "complete") {
@@ -456,7 +456,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       stateLabel: "Mission needed",
       title: "Set the Capital Mission",
       reason: "No usable persisted mission is available.",
-      consequence: "This creates a plan for underwriting. No order is created or submitted.",
+      consequence: "This saves your plan for analysis. No order is created or submitted.",
       actionLabel: "Start Capital Mission",
       href: "/aperture/mission",
       updatedAt: input.now,
@@ -526,11 +526,11 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       key: `underwriting:${input.underwriting.decisionRunId}`,
       kind: "underwriting_underway",
       priority: 65,
-      stateLabel: "Underwriting underway",
+      stateLabel: "Analysis in progress",
       title: "The mission analysis is still running",
       reason: "The persisted job has not reached a usable result yet.",
       consequence: "Leaving this view does not restart the job or create an order.",
-      actionLabel: "View underwriting progress",
+      actionLabel: "View analysis progress",
       href: `/aperture/decision/${input.underwriting.decisionRunId}/revision/${input.underwriting.revisionId}/underwrite`,
       updatedAt: input.underwriting.updatedAt,
     }));
@@ -543,7 +543,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       title: "The mission did not produce a usable playbook",
       reason: safeStatusError("underwriting"),
       consequence: "The last successful result remains the record. No research or order was created.",
-      actionLabel: "Review underwriting failure",
+      actionLabel: "Review analysis issue",
       href: `/aperture/decision/${input.underwriting.decisionRunId}/revision/${input.underwriting.revisionId}/underwrite`,
       updatedAt: input.underwriting.updatedAt,
     }));
@@ -554,15 +554,15 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       key: `underwriting:${input.underwriting.decisionRunId}:complete`,
       kind: "underwriting_complete",
       priority: needsChoice ? 72 : 40,
-      stateLabel: noTrade ? "Underwriting complete · No trade" : "Underwriting complete · Playbook ready",
-      title: noTrade ? "Review the no-trade result" : "Review the underwriting result",
+      stateLabel: noTrade ? "Analysis complete · No trade" : "Analysis complete · Playbook ready",
+      title: noTrade ? "Review the no-trade result" : "Review the analysis result",
       reason: input.underwriting.resultSummary ?? (noTrade
         ? "No play cleared the recorded evidence and risk constraints."
         : "The saved mission produced a conditional playbook."),
       consequence: noTrade
-        ? `${input.underwriting.reopenCondition ?? "Reassess when the recorded condition changes."} No paper ticket was created.`
-        : needsChoice ? "Validate a play to enter evidence review. No paper ticket was created." : "A play selection is recorded. Its evidence and ticket status are shown separately.",
-      actionLabel: noTrade ? "Review no-trade result" : "Review underwriting result",
+        ? `${input.underwriting.reopenCondition ?? "Reassess when the recorded condition changes."} No practice order was created.`
+        : needsChoice ? "Validate a play to enter evidence review. No practice order was created." : "A play selection is recorded. Its evidence and ticket status are shown separately.",
+      actionLabel: noTrade ? "Review no-trade result" : "Review analysis result",
       href: `/aperture/decision/${input.underwriting.decisionRunId}/revision/${input.underwriting.revisionId}/underwrite`,
       updatedAt: input.underwriting.updatedAt,
     }));
@@ -577,7 +577,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       stateLabel: "Evidence missing",
       title: `${task.symbol} needs ${task.remaining} evidence check${task.remaining === 1 ? "" : "s"}`,
       reason: task.finding ?? "Decision-critical evidence remains unresolved.",
-      consequence: "A paper ticket cannot be prepared until these checks are resolved.",
+      consequence: "A practice order cannot be prepared until these checks are resolved.",
       actionLabel: "Review unresolved evidence",
       href: evidenceHref(task),
       updatedAt: task.updatedAt,
@@ -629,9 +629,9 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
         symbol: order.symbol,
         stateLabel: "Dispatch unresolved",
         title: `Reconcile ${order.symbol} paper dispatch`,
-        reason: `${order.dispatchError?.trim() ? safeStatusError("dispatch") : "Submission is recorded, but no broker order ID confirms acceptance. Reconcile the dispatch receipt."}${recordedFill}`,
+        reason: `${order.dispatchError?.trim() ? safeStatusError("dispatch") : "Submission is recorded, but no broker order ID confirms acceptance. Check the broker order status before trying again."}${recordedFill}`,
         consequence: "Broker acceptance is not confirmed. Do not submit a duplicate order.",
-        actionLabel: "Reconcile dispatch",
+        actionLabel: "Check order status",
         href: orderHref(order),
         updatedAt: order.updatedAt,
       }));
@@ -643,9 +643,9 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
         symbol: order.symbol,
         stateLabel: "Approved · not submitted",
         title: `Submit ${order.symbol} to the named paper broker`,
-        reason: "Human approval is recorded, but dispatch has not occurred.",
-        consequence: "Preflight must pass before an explicit paper submission.",
-        actionLabel: "Run preflight and submit",
+        reason: "Approved, but not sent to the broker.",
+        consequence: "Final order checks must pass before you send a practice order.",
+        actionLabel: "Review checks and send",
         href: orderHref(order),
         updatedAt: order.updatedAt,
       }));
@@ -678,7 +678,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
         ? `Check now: ${review.reviewBasis.trim()}`
         : "Review is due, but its condition is not recorded. Inspect the saved decision before reassessing.",
       consequence: "This is a human checkpoint, not proof that an automatic check or exit occurred.",
-      actionLabel: review.kind === "gate_review" ? "Review the exact gate" : "Review recorded outcome",
+      actionLabel: review.kind === "gate_review" ? "Review required check" : "Review recorded outcome",
       href: review.href,
       updatedAt: review.updatedAt,
       deadlineAt: review.dueAt,

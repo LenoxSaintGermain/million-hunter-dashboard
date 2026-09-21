@@ -35,7 +35,7 @@ describe("cold-device account constraint hydration", () => {
   it("reports failed hydration without raw SQL or a false no-account state", () => {
     mocks.account.data = undefined; mocks.account.error = { message: "PRIVATE_SQL_SENTINEL" }; mocks.account.isLoading = false;
     const html = renderToStaticMarkup(React.createElement(CapitalCockpitRail));
-    expect(html).toContain("constraints could not be verified");
+    expect(html).toContain("limits could not be verified");
     expect(html).toContain("Retry account details");
     expect(html).not.toContain("PRIVATE_SQL_SENTINEL");
     expect(mocks.cockpit.mock.lastCall?.[1].enabled).toBe(false);

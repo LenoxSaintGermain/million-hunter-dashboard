@@ -218,4 +218,10 @@ Account header uses verified practice/unknown mode, full account value and buyin
 
 Official broker names, trading terms, persisted states, limits, approval/submission guards, and navigation destinations are unchanged. This is the first presentation pass, not a global replacement: secondary diagnostics and execution-specific paper confirmation text remain for a separately verified pass. No backend capability was added or relabeled as real-money trading.
 
+### Remaining presentation passes — September 21
+
+Applied the library to Today, review forms, order preparation/approval/sending, account-limit explanations, and secondary research summaries. Practice order replaces paper ticket; final order checks and check order status replace preflight/dispatch wording in actionable messages. Technical API values, official broker names, stored historical text, and industry terms are intentionally retained. Existing stored analysis is not rewritten to match new copy. Navigation names remain stable.
+
+Removed the risk-detail assertion that broker cash is liquid/unconstrained: this component does not assess broker cash. It now states that limitation. The account/risk authority and all approval/submission checks remain unchanged. Release validation is recorded separately.
+
 Validation: `DATABASE_URL= pnpm exec vitest run --config vitest.unit.config.ts --maxWorkers=2 --minWorkers=1`: 2,603 passed, 10 skipped. `DATABASE_URL= pnpm check` and `DATABASE_URL= pnpm build` passed. Build retains bundle-size warnings. Rendered trade-card tests cover the new action/help copy; controlled workspace tests retain explicit-click/no-mount-mutation checks. No deployed-browser or human comprehension test was performed for this pass.

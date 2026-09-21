@@ -57,7 +57,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
               <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest whitespace-nowrap">Capital Aperture</span>
               <span className="inline-flex shrink-0 items-center gap-1.5 border border-amber/30 bg-amber/5 px-2 py-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber" />
-                <span className="font-eyebrow text-eyebrow text-amber uppercase tracking-widest whitespace-nowrap">Paper only</span>
+                <span className="font-eyebrow text-eyebrow text-amber uppercase tracking-widest whitespace-nowrap">Practice trading only</span>
               </span>
             </div>
             <nav data-workspace-menu className="flex shrink-0 min-w-max gap-5 sm:ml-auto" aria-label="Capital Aperture workspace menu">

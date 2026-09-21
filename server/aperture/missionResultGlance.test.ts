@@ -33,7 +33,7 @@ describe("completed Mission glance", () => {
     const $ = load(renderToStaticMarkup(React.createElement(MissionResultWorkspace, {
       result, accountLabel: "Illustrative Paper", accountAsOf: now, thesisLabel: "Illustrative PW", revisionLabel: "v3",
       selectedPlayId: null, busy: false, onEdit, onValidate,
-      riskDetails: React.createElement("details", {}, React.createElement("summary", {}, "Inspect effective constraint")),
+      riskDetails: React.createElement("details", {}, React.createElement("summary", {}, "See the limit affecting this trade")),
     })));
     expect($("[aria-label='Completed mission']")).toHaveLength(1);
     expect($("#mission-underwriting-result [aria-label='No new trade']")).toHaveLength(1);
@@ -59,8 +59,8 @@ describe("completed Mission glance", () => {
     expect(text).not.toContain("Mission synthesis");
     expect(text).toContain("No new trade");
     // Both substantive claims survive the shortened wording.
-    expect(text).toContain("No paper ticket created");
-    expect(text).toContain("existing positions unchanged");
+    expect(text).toContain("No order created");
+    expect(text).toContain("Existing positions are unchanged");
     expect(text).toContain(result.noTrade!.reopenCondition);
     expect(validate).not.toHaveBeenCalled();
   });

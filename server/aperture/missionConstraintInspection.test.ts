@@ -49,7 +49,7 @@ describe("UAT-06 effective constraint inspection", () => {
     const disclosure = $('details[data-risk-inspection]');
     expect(disclosure).toHaveLength(1);
     expect(disclosure.attr("open")).toBeUndefined();
-    expect(disclosure.find("summary").text()).toContain("Inspect effective constraint");
+    expect(disclosure.find("summary").text()).toContain("See the limit affecting this trade");
     expect(disclosure.find("summary").attr("class")).toContain("min-h-11");
     expect(disclosure.find("input,select,textarea")).toHaveLength(0);
     expect(refresh).not.toHaveBeenCalled();

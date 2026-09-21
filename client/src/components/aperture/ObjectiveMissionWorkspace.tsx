@@ -323,7 +323,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
               <dl className="space-y-2 text-sm">{matchingPreview.measuredLimits.map((limit, index) => <div key={`${limit.label}-${index}`}><dt className="font-medium">{limit.label}: {money(limit.valueCents)}</dt><dd style={muted}>{limit.context}</dd></div>)}</dl>
             </details>}
           </> : <p className="text-sm" style={muted}>No matching server preview yet. No permitted risk is inferred from your declarations.</p>}
-          <Button type="button" variant="outline" className="min-h-11" onClick={onInspectRisk}>Inspect effective constraint</Button>
+          <Button type="button" variant="outline" className="min-h-11" onClick={onInspectRisk}>See the limit affecting this trade</Button>
           {props.accountRefreshRequired && selectedAccount && <MissionAccountRefreshLink accountLabel={selectedAccount.label} />}
         </div>
         {issues.length > 0 && <Button type="button" variant="outline" className="min-h-11" disabled={locked} onClick={() => { setAttempted([1, 2]); change({ activeSection: issues[0].section }); }}>Review missing values</Button>}

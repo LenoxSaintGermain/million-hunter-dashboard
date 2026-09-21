@@ -442,7 +442,7 @@ export default function ApertureHome() {
                   </summary>
                   <div className="mt-3 grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <FieldLabel inputId="instrument-preference" label="Instrument" help="The run keeps this choice through research, recipe construction, and the paper ticket. Options are never replaced with shares." />
+                      <FieldLabel inputId="instrument-preference" label="Instrument" help="The run keeps this choice through research, recipe construction, and the practice order. Options are never replaced with shares." />
                       <Select value={instrumentPreference} onValueChange={(value) => setInstrumentPreference(value as "shares" | "options" | "either")}>
                         <SelectTrigger id="instrument-preference"><SelectValue placeholder="Choose" /></SelectTrigger>
                         <SelectContent><SelectItem value="shares">Shares only</SelectItem><SelectItem value="options">Defined-risk options</SelectItem><SelectItem value="either">Choose before research</SelectItem></SelectContent>

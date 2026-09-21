@@ -121,9 +121,9 @@ describe("The no-trade receipt states its consequence once", () => {
   it("keeps both substantive claims while dropping the restated sentence", () => {
     const text = load(mission()).text();
     expect(text).toContain("No new trade");
-    expect(text).toContain("No paper ticket created");
-    expect(text).toContain("existing positions unchanged");
-    expect(text).not.toContain("No paper ticket has been created. Existing positions are unchanged.");
+    expect(text).toContain("No order created");
+    expect(text).toContain("Existing positions are unchanged");
+    expect(text).not.toContain("No practice order has been created. Existing positions are unchanged.");
   });
 
   it("puts the mission result heading above its account line rather than below it", () => {

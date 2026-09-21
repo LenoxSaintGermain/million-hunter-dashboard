@@ -65,9 +65,9 @@ describe("final Mission review decision context", () => {
     expect(html).toContain("$187.50");
     expect(html).not.toContain("$188");
     expect(html).toContain("0.75% of your $25,000 declared capital ($187.50)");
-    expect(html).toContain("Inspect effective constraint");
+    expect(html).toContain("See the limit affecting this trade");
     expect(html).toContain("never increases allowed risk");
-    expect(html).toContain("Effective normal-play risk");
+    expect(html).toContain("Risk allowed for this trade");
     expect(html).not.toContain("Effective maximum loss");
   });
 

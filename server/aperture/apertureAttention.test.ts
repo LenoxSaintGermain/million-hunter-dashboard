@@ -86,7 +86,7 @@ describe("Capital Aperture attention briefing", () => {
     const seen = deriveApertureAttention(input, first.baseline);
     expect(seen.quiet).toBe(false);
     expect(seen.primary?.kind).toBe("underwriting_complete");
-    expect(seen.primary?.actionLabel).toBe("Review underwriting result");
+    expect(seen.primary?.actionLabel).toBe("Review analysis result");
   });
 
   it("does not resume a closed mission or its old not-started underwriting", () => {
@@ -104,7 +104,7 @@ describe("Capital Aperture attention briefing", () => {
     expect(result.entryState).toBe("resume");
     expect(result.primary).toMatchObject({ key: "mission:draft", title: "Resume Account & risk", href: "/aperture/mission" });
     expect(result.primary?.href).not.toContain("undefined");
-    expect(result.primary?.consequence).toContain("No underwriting or order");
+    expect(result.primary?.consequence).toContain("This draft has not started analysis or created an order");
   });
 
   it("keeps active dispatch ahead of a persisted draft while retaining its resume task", () => {
@@ -147,7 +147,7 @@ describe("Capital Aperture attention briefing", () => {
     expect(result.entryState).toBe("resume");
     expect(result.primary).toMatchObject({
       kind: "underwriting_underway",
-      actionLabel: "View underwriting progress",
+      actionLabel: "View analysis progress",
       href: "/aperture/decision/42/revision/7/underwrite",
     });
   });
@@ -163,7 +163,7 @@ describe("Capital Aperture attention briefing", () => {
     }), null);
 
     expect(result.entryState).toBe("check_in");
-    expect(result.primary).toMatchObject({ kind: "dispatch_unresolved", actionLabel: "Reconcile dispatch" });
+    expect(result.primary).toMatchObject({ kind: "dispatch_unresolved", actionLabel: "Check order status" });
     expect(result.primary?.stateLabel).toBe("Dispatch unresolved");
     expect(result.primary?.stateLabel).not.toContain("accepted");
     expect(result.otherCritical.map((item) => item.kind)).toContain("ready_for_paper_review");
@@ -175,7 +175,7 @@ describe("Capital Aperture attention briefing", () => {
     });
     const first = deriveApertureAttention(data, null);
     const seen = deriveApertureAttention(data, first.baseline);
-    expect(seen.primary).toMatchObject({ key: "order:9:dispatch", kind: "dispatch_unresolved", critical: true, actionLabel: "Reconcile dispatch", href: "/aperture/run/88/execute?candidate=3" });
+    expect(seen.primary).toMatchObject({ key: "order:9:dispatch", kind: "dispatch_unresolved", critical: true, actionLabel: "Check order status", href: "/aperture/run/88/execute?candidate=3" });
     expect(seen.primary?.reason).toContain("broker order ID");
     expect(seen.primary?.consequence).toContain("Do not submit a duplicate");
     expect(seen.quiet).toBe(false);

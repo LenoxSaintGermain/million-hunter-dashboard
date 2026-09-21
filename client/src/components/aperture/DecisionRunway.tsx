@@ -163,7 +163,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const [visibleMissionSection, dispatchMissionSection] = useReducer(missionSectionReducer, 1);
   const [sectionFocusRequest, setSectionFocusRequest] = useState<{ section: 1 | 2 | 3 } | null>(null);
   const [branch, setBranch] = useState<Branch>("research");
-  const reviewSectionLabel = branch === "research" ? "Review & underwrite" : "Review decision";
+  const reviewSectionLabel = branch === "research" ? "Review & analyze" : "Review decision";
   const dispositionEffect = branch === "cash" ? "Records no new allocation. Existing positions remain unchanged."
     : branch === "conditional" ? "Records a review condition. No proposal or broker order."
     : "Builds a research playbook. Does not create or submit an order.";
@@ -356,12 +356,12 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const commitOnce = async () => {
     if (unchangedResearchReceipt) return toast.info("This Mission is already recorded. Review its saved underwriting task; do not create it again.");
     if (missionContextLoading || missionContextError || draftError || draftConflict) return toast.error("Restore or save the Mission draft before starting analysis.");
-    if (horizonMismatch) return toast.info("Resolve the primary/underwriting horizon mismatch in Review & underwrite before starting a new analysis.");
+    if (horizonMismatch) return toast.info("Resolve the primary/underwriting horizon mismatch in Review & analyze before starting a new analysis.");
     if (needsRevisionReview) return toast.info("Review the changed Mission assumptions before applying this revision.");
     if (jobNeedsReconciliation || (currentDecisionRunId != null && (underwritingJob.isLoading || underwritingJob.isError))) return toast.info("Review the saved underwriting task before starting new analysis.");
     if (!activeCanonicalId || !paperAccount) return toast.error("Assign a thesis and paper account first.");
     if (branch === "research" && (persistedUnderwritingLoading || persistedUnderwritingUnavailable)) {
-      toast.info("Checking saved underwriting state.", { description: "New analysis remains unavailable until the saved result is reconciled." });
+      toast.info("Checking saved analysis state.", { description: "New analysis remains unavailable until the saved result is reconciled." });
       return;
     }
     if (branch === "research" && underwritingComplete) {
@@ -464,7 +464,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
       await utils.aperture.runway.latest.invalidate();
       if (branch === "research") {
         toast.success("Mission recorded. Underwriting is checking the target, risk envelope, and sourced market context.", {
-          description: "No research run, paper ticket, approval, submission, or broker order has been created.",
+          description: "No research run, practice order, approval, submission, or broker order has been created.",
         });
         try {
           if (launchedUnderwriting) {
@@ -475,8 +475,8 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
             utils.aperture.underwriter.get.invalidate({ decisionRunId: receipt.decisionRunId }),
             utils.aperture.desk.summary.invalidate(),
           ]);
-          toast.success("Underwriting complete. Review the playbook below.", {
-            description: "No paper ticket has been created.",
+          toast.success("Analysis complete. Review the playbook below.", {
+            description: "No practice order has been created.",
           });
           setUnderwritingDirty(false);
           setRevisingReceipt(false);
@@ -484,7 +484,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
         } catch (error: any) {
           void utils.aperture.underwriter.status.invalidate();
           toast.error("Mission saved; check underwriting progress.", {
-            description: `${error?.message ?? "The analysis response was interrupted."} The server task may still be running. Open its progress before retrying. No paper ticket or broker order was requested.`,
+            description: `${error?.message ?? "The analysis response was interrupted."} The server task may still be running. Open its progress before retrying. No practice order or broker order was requested.`,
           });
         }
       } else {
@@ -519,15 +519,15 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
         uatCase: uatCase ?? undefined,
       });
       if (started.status === "blocked") {
-        toast.error(started.message, { description: "No paper ticket or broker order was created." });
+        toast.error(started.message, { description: "No practice order or broker order was created." });
         return;
       }
       toast.success("Play selected. Research validation opened.", {
-        description: "No paper ticket has been created. Approval and submission remain separate.",
+        description: "No practice order has been created. Approval and submission remain separate.",
       });
       onOpenResearchRun(started.runId);
     } catch (error: any) {
-      toast.error(error?.message ?? "The play could not enter research.", { description: "No paper ticket or broker order was created." });
+      toast.error(error?.message ?? "The play could not enter research.", { description: "No practice order or broker order was created." });
     }
   };
 
@@ -824,8 +824,8 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     : unchangedResearchReceipt ? "This Mission is already recorded. Open the saved underwriting task to check progress; no new analysis will start here."
     : draftError ? "Resolve the draft save issue above before continuing."
     : draftConflict ? "Review the other device's draft before continuing."
-    : horizonMismatch ? "Primary and underwriting horizons disagree. Inspect both in Review & underwrite and explicitly choose the intended scope."
-    : needsRevisionReview ? "Review the before/after assumptions in Review & underwrite."
+    : horizonMismatch ? "Primary and underwriting horizons disagree. Inspect both in Review & analyze and explicitly choose the intended scope."
+    : needsRevisionReview ? "Review the before/after assumptions in Review & analyze."
     : !paperAccount ? "Select an available paper account in Account & risk."
     : branch === "research" && missionConfigured && authoritativePreview.isError ? riskInspection.failureReason ?? "Refresh the effective risk constraint in Account & risk before underwriting."
     : branch === "research" && missionConfigured && authoritativePreview.isLoading ? "Checking the effective account and portfolio constraint."
@@ -840,7 +840,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
         ? "Enter deployable capital in Account & risk."
         : "Enter a planned-loss limit in Account & risk."
       : !dispositionReady
-        ? "Complete the required decision fields in Review & underwrite."
+        ? "Complete the required decision fields in Review & analyze."
         : null;
   const openDiagnostic = (target: "thesis" | "evidence" | "mechanism" | "risk" | "gate") => {
     setExpandedMissionSection(target === "thesis" ? 1 : target === "risk" ? 2 : 3);
@@ -944,13 +944,13 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     {!receiptTarget && <div className="flex flex-wrap items-center justify-between gap-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}><p><strong style={{ color: "var(--sh-text-primary)" }}>{paperAccount?.label ?? "Select paper account"}</strong> · Paper</p><p role="status" aria-live="polite">{draftError ? "Draft not saved" : draftState === "saving" ? "Saving draft…" : draftState === "saved" ? `Saved · ${new Date(savedDraft!.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : draftTouched ? "Changes not yet saved" : handoff ? "New Mission draft · not saved" : savedDraft?.completedAt != null ? "From your saved Mission" : "Draft saves as you edit"}</p></div>}
     {missionContextError && draftInitialized && <div role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)" }}><p>Saved context could not be refreshed. Your last loaded values remain visible; underwriting is withheld.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void refreshMissionContext()}>Refresh saved context</Button></div>}
     {draftError && <section role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-semibold">{draftConflict ? (handoff ? "Choose which Mission draft to continue" : "Another device changed this draft") : "Draft save needs attention"}</h2><p className="mt-2 leading-6">{draftError}</p>{draftConflict ? <><p className="mt-2">Your edits are still here. Compare before choosing which version to keep.</p>{remoteDraft ? <><DraftDifference local={draftValues} remote={remoteDraft.values} /><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" className="min-h-11" onClick={useRemoteDraft}>Use saved draft</Button><Button className="min-h-11" onClick={() => void saveReviewedLocalDraft()}>Save these edits as a new revision</Button></div></> : <Button variant="outline" className="mt-3 min-h-11" onClick={() => void utils.aperture.runway.draft.get.fetch().then(setRemoteDraft).catch(() => toast.error("The saved draft could not be loaded. Your edits remain here."))}>Load saved draft for comparison</Button>}</> : !completedDraftRef.current ? <Button variant="outline" className="mt-3 min-h-11" onClick={() => void retryDraft()}>Retry saving draft</Button> : <Button variant="outline" className="mt-3 min-h-11" onClick={() => window.location.reload()}>Reload saved Mission</Button>}</section>}
-    {(unchangedResearchReceipt || jobNeedsReconciliation || runUnderwriting.error || underwritingStructureInvalid) && underwritingTaskPath && <section role="status" aria-live="polite" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}><h2 className="font-semibold">Saved underwriting task</h2><p className="mt-2 leading-6">{underwritingStructureInvalid ? "The saved result has malformed horizon data. Reload its corrected record; do not restart the completed job." : underwritingJob.data?.message ?? "Checking the saved analysis. No new analysis will start."}</p><Button className="mt-3 min-h-11" onClick={() => window.location.assign(underwritingTaskPath)}>{underwritingJob.data?.state === "running" ? "View underwriting progress" : "Review underwriting task"}</Button><p className="mt-2">Leaving this view does not cancel the task. No paper ticket has been requested.</p></section>}
+    {(unchangedResearchReceipt || jobNeedsReconciliation || runUnderwriting.error || underwritingStructureInvalid) && underwritingTaskPath && <section role="status" aria-live="polite" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}><h2 className="font-semibold">Saved underwriting task</h2><p className="mt-2 leading-6">{underwritingStructureInvalid ? "The saved result has malformed horizon data. Reload its corrected record; do not restart the completed job." : underwritingJob.data?.message ?? "Checking the saved analysis. No new analysis will start."}</p><Button className="mt-3 min-h-11" onClick={() => window.location.assign(underwritingTaskPath)}>{underwritingJob.data?.state === "running" ? "View analysis progress" : "Review underwriting task"}</Button><p className="mt-2">Leaving this view does not cancel the task. No practice order has been requested.</p></section>}
     <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm">Saved context & provenance</summary><div className="grid gap-px overflow-hidden rounded-b-xl border-t md:grid-cols-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
       {[
         ["Assigned thesis · from saved thesis", activeThesis?.name ?? "Not assigned"],
         ["Paper account · account snapshot", paperAccount ? paperAccount.label + (paperAccount.equityValueCents ? " · $" + Math.round(paperAccount.equityValueCents / 100).toLocaleString() : "") : "Not connected"],
         ["Freshness", paperAccount?.lastSyncedAt ? new Date(paperAccount.lastSyncedAt).toLocaleString() : "Not measured"],
-        ["Current decision", persistedUnderwritingLoading ? "Checking saved underwriting…" : persistedUnderwritingUnavailable ? "Saved underwriting unavailable" : underwritingComplete ? "Underwriting complete" : currentBindingMatches ? branchLabel(latestBranch) : "New draft context"],
+        ["Current decision", persistedUnderwritingLoading ? "Checking saved analysis…" : persistedUnderwritingUnavailable ? "Saved underwriting unavailable" : underwritingComplete ? "Analysis complete" : currentBindingMatches ? branchLabel(latestBranch) : "New draft context"],
       ].map(([label, value]) => <div key={label} className="p-4" style={{ background: "var(--sh-surface)" }}><p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>{label}</p><p className="mt-1 text-sm font-semibold" style={{ color: label === "Current decision" && currentBindingMatches && latestBranch === "cash" ? "var(--sh-signal)" : "var(--sh-text-primary)" }}>{value}</p></div>)}
     </div>
 
@@ -975,7 +975,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
         <nav aria-label="Capital Mission sections" className="border-b" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><ol className="grid grid-cols-3 gap-px" style={{ background: "var(--sh-border-1)" }}>{[
           { number: 1, label: "Thesis & horizon", summary: `${canonicalThesisLabel(activeThesis)} · ${horizonLabel(holdingPeriod)}` },
           { number: 2, label: "Account & risk", summary: missionConfigured ? `${formatCents(capitalCents)} allocated · ${effectiveRiskSummary}` : "Capital or loss limit missing" },
-          { number: 3, label: reviewSectionLabel, summary: persistedUnderwritingLoading ? "Checking saved result" : persistedUnderwritingUnavailable ? "Saved result unavailable" : underwritingComplete ? "Underwriting complete · review result" : primaryActionBlocker ?? (branch === "research" ? "Ready to underwrite" : branch === "conditional" ? "Ready to queue review" : "Ready to record no new trade") },
+          { number: 3, label: reviewSectionLabel, summary: persistedUnderwritingLoading ? "Checking saved result" : persistedUnderwritingUnavailable ? "Saved result unavailable" : underwritingComplete ? "Analysis complete · review result" : primaryActionBlocker ?? (branch === "research" ? "Ready to underwrite" : branch === "conditional" ? "Ready to queue review" : "Ready to record no new trade") },
         ].map((section) => <li key={section.number}><button type="button" aria-current={visibleMissionSection === section.number ? "step" : undefined} className="flex min-h-14 w-full items-start gap-2 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" style={{ background: visibleMissionSection === section.number ? "color-mix(in srgb, var(--sh-signal) 8%, var(--sh-surface-2))" : "var(--sh-surface-2)", color: visibleMissionSection === section.number ? "var(--sh-signal)" : "var(--sh-text-primary)" }} onClick={() => setExpandedMissionSection(section.number as 1 | 2 | 3)}><span className="font-mono text-xs tabular-nums">{section.number}</span><span className="min-w-0"><span className="block text-[0.62rem] font-semibold uppercase tracking-[0.08em]">{section.label}{section.number < activeMissionSection ? <span className="sr-only"> complete</span> : null}</span><span className="mt-1 hidden text-xs sm:block font-normal normal-case tracking-normal" style={{ color: "var(--sh-fg-muted)" }}>{section.summary}</span></span></button></li>)}</ol></nav>
         {receiptActive ? <DecisionReceipt branch={latestBranch as "cash" | "conditional"} reason={latestReason} blocker={latestBlocker} reopen={latestReopen} gateLabel={latestGate} reviewAt={latestReviewAt} revision={latestRevision} recordedAt={latestRecordedAt} binding={immutableReceipt?.binding} pendingCashOutcome={currentCashOutcome} recordedCashOutcome={authoritativeLatest?.cashOutcome} onRecordCashOutcome={recordCashOutcome} resolvingCashOutcome={resolveCashOutcome.isPending} onGateReview={reviseReceipt} onRevise={reviseReceipt} /> : <><div className="space-y-5 p-5 sm:p-7">
           <div hidden={visibleMissionSection !== 1} className="space-y-5"><section aria-labelledby="mission-section-thesis" className="space-y-3"><div className="flex items-center justify-between"><div><p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>1 · Thesis & horizon</p><h2 id="mission-section-thesis" tabIndex={-1} className="mt-1 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4" style={{ scrollMarginTop: "calc(var(--header-height, 4rem) + 1rem)" }}>What do you believe, and for how long?</h2></div><span className="text-xs" style={{ color: "var(--sh-emerald)" }}>Saved thesis</span></div><div id="assigned-thesis" className="rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 32%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" }}>
@@ -1031,10 +1031,10 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
         </div>
         {!underwritingComplete && <footer className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
           <div className="max-w-xl text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>
-            <p>{persistedUnderwritingLoading ? "Checking saved underwriting. No new analysis starts until its status is known." : persistedUnderwritingUnavailable ? "Saved result unavailable. Refresh its status before new analysis." : dispositionEffect}</p>
+            <p>{persistedUnderwritingLoading ? "Checking saved analysis. No new analysis starts until its status is known." : persistedUnderwritingUnavailable ? "Saved result unavailable. Refresh its status before new analysis." : dispositionEffect}</p>
             {primaryActionBlocker && !busy && !persistedUnderwritingLoading ? <p role={persistedUnderwritingUnavailable ? "alert" : "status"} className="mt-1 font-semibold" style={{ color: "var(--sh-signal)" }}>{primaryActionBlocker}</p> : null}
           </div>
-          <Button id="mission-primary-action" className="min-h-11 w-full sm:w-auto" disabled={busy || primaryActionBlocker != null || persistedUnderwritingLoading || underwritingComplete || persistedUnderwritingUnavailable} onClick={commit}>{runUnderwriting.isPending ? apertureLanguage.analyzingPlan : saveMission.isPending ? "Saving mission…" : persistedUnderwritingLoading ? "Checking saved underwriting…" : persistedUnderwritingUnavailable ? "Saved result unavailable" : branch === "cash" ? "Record no new trade" : branch === "conditional" ? "Queue conditional review" : apertureLanguage.analyzePlan}<ArrowRight className="ml-2 h-4 w-4" /></Button>
+          <Button id="mission-primary-action" className="min-h-11 w-full sm:w-auto" disabled={busy || primaryActionBlocker != null || persistedUnderwritingLoading || underwritingComplete || persistedUnderwritingUnavailable} onClick={commit}>{runUnderwriting.isPending ? apertureLanguage.analyzingPlan : saveMission.isPending ? "Saving mission…" : persistedUnderwritingLoading ? "Checking saved analysis…" : persistedUnderwritingUnavailable ? "Saved result unavailable" : branch === "cash" ? "Record no new trade" : branch === "conditional" ? "Queue conditional review" : apertureLanguage.analyzePlan}<ArrowRight className="ml-2 h-4 w-4" /></Button>
         </footer>}</>}
       </article>
 
@@ -1088,13 +1088,13 @@ function DraftDifference({ local, remote }: { local: MissionDraftValues; remote:
 export function MissionReviewFeasibility({ branch = "research", feasibility, enteredLossCents, normalPolicyPct, policyVersion = null, accountCeilingCents = null, openRiskCents = null, remainingHeadroomCents, inspection, onInspect }: { branch?: Branch; feasibility: TargetFeasibility | null; enteredLossCents: number; normalPolicyPct: number | null; policyVersion?: string | null; accountCeilingCents?: number | null; openRiskCents?: number | null; remainingHeadroomCents: number | null; inspection?: MissionRiskInspectionContext; onInspect: () => void }) {
   const disclosure = inspection
     ? <>{(inspection.loading || inspection.failed) && <p role="status" className="mt-2 leading-6" style={{ color: "var(--sh-signal)" }}>{inspection.loading ? "Refreshing constraints." : inspection.failureReason ?? "Constraint refresh failed."} Recorded values remain visible; current eligibility is not confirmed.</p>}{!inspection.loading && inspection.failed && inspection.failureReason && <a className="mt-2 inline-flex min-h-11 items-center underline" href="/aperture/plays">Review active orders</a>}<MissionRiskInspection context={inspection} enteredLossCents={enteredLossCents} policyVersion={policyVersion} onRefresh={onInspect} /></>
-    : <Button variant="outline" className="mt-2 min-h-11" onClick={onInspect}>{feasibility ? "Inspect effective constraint" : "Inspect account & risk"}</Button>;
+    : <Button variant="outline" className="mt-2 min-h-11" onClick={onInspect}>{feasibility ? "See the limit affecting this trade" : "Inspect account & risk"}</Button>;
   if (!feasibility) return <section className="mt-4 rounded-lg border p-3 text-sm" style={{ borderColor: "var(--sh-signal)" }}><p role="status">{branch === "research" ? "Effective risk and target feasibility are not verified yet. No analysis can start while the saved constraint is unavailable." : "Effective risk is not verified yet. This decision creates no allocation; inspect constraints before returning to research."}</p>{disclosure}</section>;
   const hasTarget = branch === "research" && feasibility.targetProfitCents != null && feasibility.targetPeriod != null;
   const policyCents = normalPolicyPct == null ? null : Math.floor(feasibility.capitalBaseCents * normalPolicyPct / 100);
   const policyBinds = policyCents != null && policyCents === feasibility.riskBudgetCents && policyCents < enteredLossCents;
-  return <section aria-label={branch === "research" ? "Target feasibility and effective risk" : "Effective risk for future research"} className="mt-4 rounded-lg border p-3 text-sm" style={{ borderColor: hasTarget && feasibility.classification === "extreme" ? "var(--sh-red)" : "var(--sh-border-1)" }}>
-    <h3 className="font-semibold">{branch === "research" ? "Effective normal-play risk" : "Effective risk for future research"} <span className="mt-1 block font-serif text-2xl tabular-nums">{formatCents(feasibility.riskBudgetCents)}</span></h3>
+  return <section aria-label={branch === "research" ? "Your target and risk limit" : "Effective risk for future research"} className="mt-4 rounded-lg border p-3 text-sm" style={{ borderColor: hasTarget && feasibility.classification === "extreme" ? "var(--sh-red)" : "var(--sh-border-1)" }}>
+    <h3 className="font-semibold">{branch === "research" ? "Risk allowed for this trade" : "Effective risk for future research"} <span className="mt-1 block font-serif text-2xl tabular-nums">{formatCents(feasibility.riskBudgetCents)}</span></h3>
     <p className="mt-2 leading-6"><strong>You entered {formatCents(enteredLossCents)}.</strong> {policyBinds ? `The normal-play policy caps risk at ${normalPolicyPct}% of your ${formatCents(feasibility.capitalBaseCents)} declared capital (${formatCents(policyCents)}).` : remainingHeadroomCents === 0 ? "Existing open risk uses this mission’s aggregate allowance." : "The smallest measured mission, policy, account or portfolio limit controls."}</p>
     {(feasibility.riskBudgetCents === 0 || remainingHeadroomCents === 0) && (
       <div className="mt-2.5 rounded border p-2.5 text-xs space-y-1" style={{ borderColor: "var(--sh-border-1)", background: "rgba(245, 158, 11, 0.06)" }}>
@@ -1146,13 +1146,13 @@ export function MissionRiskInspection({ context, enteredLossCents, policyVersion
   ];
   const binding = feasibility ? limits.filter(line => line.value === feasibility.riskBudgetCents).map(line => line.label) : [];
   return <details data-risk-inspection className="mt-3 rounded-lg border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
-    <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Inspect effective constraint</summary>
+    <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">See the limit affecting this trade</summary>
     <div className="space-y-3 border-t p-3 text-sm leading-6" style={{ borderColor: "var(--sh-border-1)" }}>
       <p className="font-semibold">{context.accountLabel} · Paper{context.accountId != null ? ` · Account #${context.accountId}` : ""}</p>
       <p style={{ color: "var(--sh-fg-muted)" }}>Account snapshot as of <RiskTimestamp at={context.accountAsOf} />. {context.calculationBasis} as of <RiskTimestamp at={context.calculationAsOf} />.</p>
       {context.accountAsOf != null && context.calculationAsOf != null && context.calculationAsOf - context.accountAsOf > STALE_ACCOUNT_MS && <p style={{ color: "var(--sh-signal)" }}>Account snapshot was stale at calculation time. Refreshing constraints reads saved account data; sync the paper account before relying on current capacity.</p>}
       {context.accountId != null && (context.accountAsOf == null || (context.calculationAsOf ?? Date.now()) - context.accountAsOf > STALE_ACCOUNT_MS) && <MissionAccountRefreshLink accountLabel={context.accountLabel} />}
-      <p><strong>Effective normal-play risk: {formatCents(feasibility?.riskBudgetCents)}.</strong> {binding.length ? `Binding: ${binding.join(" and ")}.` : "The binding limit is not fully measured here."}</p>
+      <p><strong>Risk allowed for this trade: {formatCents(feasibility?.riskBudgetCents)}.</strong> {binding.length ? `Binding: ${binding.join(" and ")}.` : "The binding limit is not fully measured here."}</p>
       <p>The smallest applicable measured limit controls. Policy {policyVersion ?? "not available"}; declared mission capital {formatCents(capitalCents)} is not total account equity.</p>
       <dl className="divide-y" style={{ borderColor: "var(--sh-border-1)" }}>{limits.map(line => <div key={line.label} className="py-2">
         <dt className="flex flex-wrap justify-between gap-2 font-semibold"><span>{line.label}</span><span className="tabular-nums">{formatCents(line.value)}</span></dt>

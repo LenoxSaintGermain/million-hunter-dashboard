@@ -32,11 +32,11 @@ export function DecisionFocusCard({ candidate, positions, reviewedChecks, onOpen
           <div>
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-emerald)" }}>Evidence review complete</p>
             <h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol} is ready for ticket preflight.</h2>
-            <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Finish the exact paper ticket here. Preflight will either prepare the proposal or name the rule that blocks it.</p>
+            <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Finish the exact practice order here. Preflight will either prepare the proposal or name the rule that blocks it.</p>
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {onPrepareProposal && <Button size="sm" className="min-h-11" onClick={onPrepareProposal}>Review paper ticket <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>}
+          {onPrepareProposal && <Button size="sm" className="min-h-11" onClick={onPrepareProposal}>Review practice order <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>}
           {onReviewEvidence && <button className="text-xs underline-offset-4 hover:underline" style={{ color: "var(--sh-fg-muted)" }} onClick={onReviewEvidence}>Evidence</button>}
         </div>
       </section>

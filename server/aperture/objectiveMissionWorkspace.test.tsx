@@ -317,7 +317,7 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
     expect(result.text).toContain("target never increases allowed risk");
     expect(result.text).not.toContain("$75.00");
     expect(result.visible('details').filter((_, node) => result.visible(node).text().includes("Measured limit context")).text()).toContain("Portfolio headroom: Not measured");
-    view.click("Inspect effective constraint");
+    view.click("See the limit affecting this trade");
     expect(view.onInspectRisk).toHaveBeenCalledOnce();
     expect(view.onChange).not.toHaveBeenCalled();
     expect(view.onUnderwrite).not.toHaveBeenCalled();

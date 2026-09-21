@@ -2,12 +2,12 @@
  * Aperture Execute — Phase 2 UI.
  *
  * Three lifecycle panels in one page:
- *   1. Paper ticket — pending_approval orders awaiting human action
+ *   1. Practice order — pending_approval orders awaiting human action
  *   2. Check whether thesis still holds — post-entry catalyst / thesis-invalidation checks
  *   3. Outcome & notes — the honest product metric and decision record
  *
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
- * Paper only. No live capital.
+ * Practice trading only. No live capital.
  */
 import { useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
@@ -45,7 +45,7 @@ import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
 import { monitoringFindingPresentation, monitoringReviewState, partitionMonitoringHistory } from "@shared/monitoringState";
 import { isOptionInstrument, paperInstrumentLabel } from "@shared/paperInstrument";
 
-const DISCLAIMER = "Internal research tool — not investment advice. Paper only — no real capital.";
+const DISCLAIMER = "Internal research tool — not investment advice. Practice trading only — no real capital.";
 
 function DisclaimerBanner() {
   return (
@@ -203,7 +203,7 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
     <div className="space-y-4">
       <div role="status" className="rounded-lg border px-4 py-3 text-sm leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 38%, var(--sh-border-1))", background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}><strong>Next:</strong> {nextAction}</div>
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 text-xs sm:flex sm:flex-wrap" aria-label="Paper ticket status summary">
+        <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 text-xs sm:flex sm:flex-wrap" aria-label="Practice order status summary">
           <span className="min-w-0" style={{ color: "var(--sh-signal)" }}>{pending.length} waiting for review</span>
           <span className="min-w-0" style={{ color: "var(--sh-fg-muted)" }}>{approved.length} ready to submit</span>
           <span className="min-w-0" style={{ color: "var(--sh-fg-muted)" }}>{submitted.length} accepted / queued</span>
@@ -271,7 +271,7 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
                     {o.status === "pending_approval" && (
                       <>
                         <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "approve", order: o }); setConfirmationText("APPROVE PAPER"); }} disabled={approve.isPending}>
-                          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Approve paper ticket
+                          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Approve practice order
                         </Button>
                         <Button variant="outline" size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setRejection(o); setRejectionReason(""); }} disabled={reject.isPending}>
                           <XCircle aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> Pass on this trade
@@ -338,9 +338,9 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
       <AlertDialog open={confirmation != null} onOpenChange={(open) => { if (!open) { setConfirmation(null); setConfirmationText(""); } }}>
         <AlertDialogContent className="max-h-[90vh] w-[calc(100%_-_2rem)] max-w-[calc(100%_-_2rem)] overflow-x-hidden overflow-y-auto sm:max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>{confirmation?.kind === "submit" ? "Send paper order to broker" : "Approve this paper trade"}</AlertDialogTitle>
+            <AlertDialogTitle>{confirmation?.kind === "submit" ? "Send practice order to broker" : "Approve this practice order"}</AlertDialogTitle>
             <AlertDialogDescription>
-              Paper only. Confirming reruns pricing, evidence, and risk checks. Eligible closed-market limit DAY orders may queue for the next eligible regular session. Acceptance is not a fill.
+              Practice trading only. Confirming reruns price, evidence, and risk checks. Eligible closed-market limit DAY orders may queue for the next eligible regular session. Acceptance is not a fill.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {confirmation && (
@@ -1382,8 +1382,8 @@ export default function ApertureExecute() {
             }
           : {
               title: `${orderInstrumentLabel(candidateActiveOrder)} trade ready for your approval`,
-              detail: "Simulated trade terms are ready. Review safety limits and click Approve Paper Ticket below.",
-              action: "Review paper ticket",
+              detail: "Simulated trade terms are ready. Review safety limits and click Approve practice order below.",
+              action: "Review practice order",
               lifecycleTab: "orders" as const,
             }
     : null;
@@ -1421,7 +1421,7 @@ export default function ApertureExecute() {
               <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             </Button>
             <h1 className="min-w-0 text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>
-              {lifecycleTab === "monitoring" ? "Review play" : "Paper ticket"}
+              {lifecycleTab === "monitoring" ? "Review play" : "Practice order"}
             </h1>
           </div>
           {run && (
@@ -1436,7 +1436,7 @@ export default function ApertureExecute() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Current human decision</p>
-                <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title ?? (paperStageDeclined ? "Paper stage declined — preserve cash for this candidate" : evidenceReviewRequired ? data.brief.nextDecision.title : `${proposalCandidate.symbol} evidence review complete · check ticket readiness`)}</p>
+                <p className="mt-1 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title ?? (paperStageDeclined ? "Order preparation declined — preserve cash for this candidate" : evidenceReviewRequired ? data.brief.nextDecision.title : `${proposalCandidate.symbol} evidence review complete · check ticket readiness`)}</p>
                 <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{candidateOrderDecision?.detail ?? (paperStageDeclined ? "A required evidence answer was recorded as not confirmed. This revision cannot prepare a proposal or create an order." : evidenceReviewRequired ? data.brief.nextDecision.detail : "The remaining path is exact contract → proposal → approve → submit. Each step stays separate and nothing is sent automatically.")}</p>
               </div>
               {candidateOrderDecision ? candidateOrderDecision.lifecycleTab !== lifecycleTab && <Button size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => openLifecycle(candidateOrderDecision.lifecycleTab)}>{candidateOrderDecision.action}</Button> : evidenceReviewRequired && <Button variant="outline" size="sm" className="min-h-11 w-full shrink-0 sm:w-auto" onClick={() => navigate(evidenceUrl)}>{`Review ${unreviewedEvidenceChecks.length} required check${unreviewedEvidenceChecks.length === 1 ? "" : "s"}`}</Button>}
@@ -1444,11 +1444,11 @@ export default function ApertureExecute() {
           </div>
         )}
 
-        {lifecycleTab !== "monitoring" && (proposalCandidate && candidateActiveOrder ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "color-mix(in srgb, var(--sh-emerald) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div className="min-w-0"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-emerald)" }}>Paper order already exists · do not duplicate</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{orderInstrumentLabel(candidateActiveOrder)}</h2><p className="mt-1 text-sm tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>{orderSizeLabel(candidateActiveOrder)} · {candidateActiveOrder.orderType.toUpperCase()} · {candidateActiveOrder.timeInForce.toUpperCase()}{candidateActiveOrder.limitPriceCents ? ` · limit ${fmtPrice(candidateActiveOrder.limitPriceCents)}` : ""}</p><p className="mt-2 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title}</p></div></div></section> : proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No paper proposal can be prepared from this revision.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(evidenceUrl)}>Review the recorded evidence decision</Button></section> : proposalCandidate && evidenceReviewRequired ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Paper ticket locked · step 1 of 4</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Review {unreviewedEvidenceChecks.length} decision-critical check{unreviewedEvidenceChecks.length === 1 ? "" : "s"} before building the ticket.</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This is the only blocker to address on this screen. After the final positive review, the flow advances to exact contract → proposal → approve → submit. A negative review preserves cash instead.</p><ol className="mt-4 space-y-2">{unreviewedEvidenceChecks.map((check, index) => <li key={check} className="flex gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}><span className="font-mono text-xs tabular-nums" style={{ color: "var(--sh-signal)" }}>{index + 1}</span><span>{check}</span></li>)}</ol><Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={() => navigate(evidenceUrl)}>Review {unreviewedEvidenceChecks.length} required check{unreviewedEvidenceChecks.length === 1 ? "" : "s"}</Button></section> : proposalCandidate && <PaperProposalForm key={`${runId}:${proposalCandidate.id}`} runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} evidenceReviewComplete={proposalEvidence?.paperProposalReady === true} onReturnToBrief={() => navigate(evidenceUrl)} onReturnToDecisionBrief={() => setShowAlternatives(true)} onProposalCreated={() => openLifecycle("orders")} onCashPreserved={() => navigate("/aperture/plays")} />)}
+        {lifecycleTab !== "monitoring" && (proposalCandidate && candidateActiveOrder ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "color-mix(in srgb, var(--sh-emerald) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div className="min-w-0"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-emerald)" }}>Practice order already exists · do not duplicate</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{orderInstrumentLabel(candidateActiveOrder)}</h2><p className="mt-1 text-sm tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>{orderSizeLabel(candidateActiveOrder)} · {candidateActiveOrder.orderType.toUpperCase()} · {candidateActiveOrder.timeInForce.toUpperCase()}{candidateActiveOrder.limitPriceCents ? ` · limit ${fmtPrice(candidateActiveOrder.limitPriceCents)}` : ""}</p><p className="mt-2 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title}</p></div></div></section> : proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No practice order can be prepared from this version.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(evidenceUrl)}>Review the recorded evidence decision</Button></section> : proposalCandidate && evidenceReviewRequired ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Practice order locked · step 1 of 4</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Review {unreviewedEvidenceChecks.length} decision-critical check{unreviewedEvidenceChecks.length === 1 ? "" : "s"} before building the ticket.</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This is the only blocker to address on this screen. After the final positive review, the flow advances to exact contract → proposal → approve → submit. A negative review preserves cash instead.</p><ol className="mt-4 space-y-2">{unreviewedEvidenceChecks.map((check, index) => <li key={check} className="flex gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}><span className="font-mono text-xs tabular-nums" style={{ color: "var(--sh-signal)" }}>{index + 1}</span><span>{check}</span></li>)}</ol><Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={() => navigate(evidenceUrl)}>Review {unreviewedEvidenceChecks.length} required check{unreviewedEvidenceChecks.length === 1 ? "" : "s"}</Button></section> : proposalCandidate && <PaperProposalForm key={`${runId}:${proposalCandidate.id}`} runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} evidenceReviewComplete={proposalEvidence?.paperProposalReady === true} onReturnToBrief={() => navigate(evidenceUrl)} onReturnToDecisionBrief={() => setShowAlternatives(true)} onProposalCreated={() => openLifecycle("orders")} onCashPreserved={() => navigate("/aperture/plays")} />)}
 
         {showAlternatives && proposalCandidate && <section className="scroll-mt-4 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }} aria-live="polite">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Resolve this decision here</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Choose another play in this run</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{proposalCandidate.symbol} remains blocked by the named preflight rule. Pick an alternative below; the next button opens only its unresolved checks or its ticket.</p></div>
+            <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Resolve this decision here</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Choose another play in this run</h2><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{proposalCandidate.symbol} remains blocked by the final order check. Pick an alternative below; the next button opens only its unresolved checks or its ticket.</p></div>
             <Button variant="ghost" size="sm" className="min-h-11 shrink-0" onClick={() => setShowAlternatives(false)}>Keep this ticket visible</Button>
           </div>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -1458,19 +1458,19 @@ export default function ApertureExecute() {
               return <button key={candidate.id} type="button" disabled={declined} className="flex min-h-16 items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left disabled:cursor-not-allowed disabled:opacity-55" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }} onClick={() => {
                 setShowAlternatives(false);
                 navigate(remaining > 0 ? `/aperture/run/${runId}?candidate=${candidate.id}&view=evidence` : `/aperture/run/${runId}/execute?candidate=${candidate.id}`);
-              }}><span><strong className="font-mono text-sm" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol}</strong><span className="mt-1 block text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>{declined ? "Paper stage declined" : remaining > 0 ? `${remaining} evidence check${remaining === 1 ? "" : "s"} remain` : "Evidence complete · open ticket"}</span></span><ArrowLeft className="h-4 w-4 rotate-180" style={{ color: "var(--sh-signal)" }} /></button>;
+              }}><span><strong className="font-mono text-sm" style={{ color: "var(--sh-text-primary)" }}>{candidate.symbol}</strong><span className="mt-1 block text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>{declined ? "Order preparation declined" : remaining > 0 ? `${remaining} evidence check${remaining === 1 ? "" : "s"} remain` : "Evidence complete · open ticket"}</span></span><ArrowLeft className="h-4 w-4 rotate-180" style={{ color: "var(--sh-signal)" }} /></button>;
             })}
           </div>
           {alternativeCandidates.length === 0 && <p className="mt-4 rounded-lg border p-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>No alternative play exists in this run. Preserve cash or revise the mission; no order was created.</p>}
         </section>}
 
         <Tabs id="paper-lifecycle" value={lifecycleTab} onValueChange={(value) => setLifecycleTab(value as "orders" | "monitoring" | "alpha")} className="min-w-0 scroll-mt-24">
-          <TabsList aria-label="Paper lifecycle" className="grid h-auto w-full min-w-0 grid-cols-1 gap-1 p-1 sm:grid-cols-3">
-            <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-3 py-2 text-center leading-5" value="orders">Paper ticket</TabsTrigger>
+          <TabsList aria-label="Order lifecycle" className="grid h-auto w-full min-w-0 grid-cols-1 gap-1 p-1 sm:grid-cols-3">
+            <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-3 py-2 text-center leading-5" value="orders">Practice order</TabsTrigger>
             <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-3 py-2 text-center leading-5" value="monitoring">Check whether thesis still holds</TabsTrigger>
             <TabsTrigger className="min-h-11 min-w-0 whitespace-normal px-3 py-2 text-center leading-5" value="alpha">Outcome &amp; notes</TabsTrigger>
           </TabsList>
-          <TabsContent value="orders" className="mt-4 min-w-0" aria-label="Paper ticket">
+          <TabsContent value="orders" className="mt-4 min-w-0" aria-label="Practice order">
             <OrderQueue runId={runId} focusCandidateId={proposalCandidate?.id} requestedOrderId={requestedOrderId ? Number(requestedOrderId) : null} ticketBuilderActive={Boolean(proposalCandidate && !paperStageDeclined && !evidenceReviewRequired && !candidateActiveOrder)} />
           </TabsContent>
           <TabsContent value="monitoring" className="mt-4 min-w-0" aria-label="Check whether thesis still holds">

@@ -24,7 +24,7 @@ export function CandidateBudgetHint({ value }: { value?: CandidateAffordability 
       <summary className="min-h-11 cursor-pointer py-3">{blocked ? "Why this limit · next step" : "Price and budget basis"}</summary>
       {measured && value.asOf != null && <p>{value.sourceName} · price recorded {new Date(value.asOf).toLocaleString("en-US")}. Not an executable quote.</p>}
       <p>{value.accountAsOf ? `Account snapshot ${new Date(value.accountAsOf).toLocaleString("en-US")}. ` : "Account snapshot not measured. "}The lower of the single-order policy limit and this research budget is shown. Other risk limits may be tighter.</p>
-      <p>{blocked ? "Nothing is raised for you. Revise the mission to declare more capital, research a lower-priced name, or continue this research without a paper ticket. Refresh account and price evidence before reassessment." : "Confirm fresh price, account capacity and all evidence at paper review. This comparison does not authorize a ticket."}</p>
+      <p>{blocked ? "Nothing is raised for you. Revise the mission to declare more capital, research a lower-priced name, or continue this research without a practice order. Refresh account and price evidence before reassessment." : "Confirm fresh price, account capacity and all evidence at paper review. This comparison does not authorize a ticket."}</p>
     </details>
   </div>;
 }

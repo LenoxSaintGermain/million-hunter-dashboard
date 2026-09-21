@@ -27,7 +27,7 @@ const toneFor = (state: ResearchJourney["state"]) => state === "ready_to_review"
 const labelFor = (state: ResearchJourney["state"]) => ({
   in_progress: "Researching",
   needs_attention: "Needs attention",
-  paper_stage_declined: "Paper stage declined",
+  paper_stage_declined: "Order preparation declined",
   ready_to_review: "Decision ready",
   more_research_available: "More evidence available",
 })[state];

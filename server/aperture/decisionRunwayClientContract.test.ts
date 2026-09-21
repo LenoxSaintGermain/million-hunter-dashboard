@@ -62,7 +62,7 @@ describe("Decision Runway client revision contract", () => {
     expect(source).not.toContain("setHoldingPeriod(event.target.value as HoldingPeriod); setMissionDirty(false);");
   });
 
-  it("keeps a declared run instrument immutable through the paper ticket", () => {
+  it("keeps a declared run instrument immutable through the practice order", () => {
     const source = readFileSync(
       resolve(process.cwd(), "client/src/components/aperture/PaperProposalForm.tsx"),
       "utf8",

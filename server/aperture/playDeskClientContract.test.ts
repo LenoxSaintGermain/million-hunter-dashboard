@@ -145,7 +145,7 @@ describe("Capital Aperture Play Desk contract", () => {
     const rail = readFileSync(resolve(process.cwd(), "client/src/components/aperture/CapitalCockpitRail.tsx"), "utf8");
 
     expect(rail).toContain("bindingSubject");
-    expect(rail).toContain("Remaining headroom");
+    expect(rail).toContain("Remaining allowance");
     expect(rail).toContain("must fall below");
   });
 });

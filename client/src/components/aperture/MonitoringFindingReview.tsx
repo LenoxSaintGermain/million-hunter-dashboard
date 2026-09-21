@@ -132,7 +132,7 @@ export function MonitoringFindingReview({
             <div className="mt-2 flex flex-wrap gap-2"><Button type="button" variant="outline" className="min-h-11" onClick={() => applyPreset(pendingPreset)}>Replace note</Button><Button type="button" variant="ghost" className="min-h-11" onClick={() => setPendingPreset(null)}>Keep my note</Button></div>
           </div>}
         </div>}
-        <label className="block text-sm font-semibold" htmlFor={`review-note-${target.findingId}`}>{decision === "resolved" ? "Why you are closing it" : "Reason or next check"}</label>
+        <label className="block text-sm font-semibold" htmlFor={`review-note-${target.findingId}`}>{decision === "resolved" ? "Why you’re closing this finding" : "Reason or next check"}</label>
         <textarea id={`review-note-${target.findingId}`} rows={2} maxLength={1000} value={note} onChange={event => { setNote(event.target.value); setPendingPreset(null); setDraftNotice(""); }} className="w-full rounded-md border p-3 text-base" style={{ background: "var(--sh-surface)" }} placeholder={decision === "resolved" ? "Why is this closed?" : "What still needs to be verified for this play?"} />
         {draftNotice && <p role="status" className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{draftNotice}</p>}
       </fieldset>

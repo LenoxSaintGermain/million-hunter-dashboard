@@ -248,7 +248,7 @@ export default function ApertureDeploy() {
           <strong style={{ color: "var(--sh-text-primary)" }}>{play.readiness === "expired" ? "This recipe\u2019s window has passed." : "Levels are not derivable yet."}</strong>{" "}
           {play.unavailableReasons?.[0] ?? "The constructor could not measure entry, stop or size from the recorded tape."}{" "}
           {play.readiness === "expired"
-            ? "Its levels were measured and remain readable, but they cannot be entered as a new paper ticket now. The next regular session re-derives them."
+            ? "Its levels were measured and remain readable, but they cannot be entered as a new practice order now. The next regular session re-derives them."
             : "The play stands; its entry and stop need an observed session before any figure can be stated."}
         </p>}
         {!recipeRecovery && construct.isError && <p role="alert" className="text-sm" style={{ color: "var(--sh-red)" }}>This play's recorded terms could not be read. Nothing was changed.</p>}

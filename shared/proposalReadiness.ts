@@ -16,7 +16,7 @@ function readableList(items: string[]): string {
 }
 
 function enterLabel(field: string | undefined): string {
-  if (!field) return "Complete paper ticket";
+  if (!field) return "Complete practice order";
   return `Enter ${field}`;
 }
 
@@ -39,7 +39,7 @@ export function buildProposalReadiness(input: {
     if (input.evidenceReviewComplete) {
       return {
         title: "Market checks needed",
-        explanation: `${input.unavailableReason || "Entry, stop, or trigger inputs are not yet verified."} Your evidence answers are saved. Refresh market checks here. No paper ticket has been created.`,
+        explanation: `${input.unavailableReason || "Entry, stop, or trigger inputs are not yet verified."} Your evidence answers are saved. Refresh market checks here. No practice order has been created.`,
         actionLabel: "Refresh market checks",
         action: "refresh_recipe",
       };
@@ -54,7 +54,7 @@ export function buildProposalReadiness(input: {
   if (input.ticketReady === false) {
     const missing = input.ticketMissing?.length ? input.ticketMissing : ["required ticket terms"];
     return {
-      title: "Complete the exact paper ticket",
+      title: "Complete the exact practice order",
       explanation: `Enter ${readableList(missing)} here. The ticket stays on this screen; nothing is sent until preflight, approval, and submission all clear separately.`,
       actionLabel: enterLabel(missing[0]),
       action: "complete_ticket",

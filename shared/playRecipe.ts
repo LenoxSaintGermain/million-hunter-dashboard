@@ -93,7 +93,7 @@ export function buildPlayRecipe({
         complete: !intraday && estimatedAmountCents != null,
       },
       {
-        label: "Review the paper ticket",
+        label: "Review the practice order",
         detail: "A proposal is a record for separate human approval; it never submits itself.",
         complete: readiness === "ready_to_prepare",
       },

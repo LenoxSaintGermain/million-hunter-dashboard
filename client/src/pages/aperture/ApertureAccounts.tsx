@@ -22,7 +22,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { AccountContextPanel } from "@/components/aperture/AccountContextPanel";
 import { parsePortfolioCsv } from "@shared/portfolioCsv";
 
-const DISCLAIMER = "Internal research tool — not investment advice. Paper only — no real capital.";
+const DISCLAIMER = "Internal research tool — not investment advice. Practice trading only — no real capital.";
 
 function fmt(cents: number | null | undefined): string {
   if (cents == null) return "—";
@@ -334,7 +334,7 @@ export default function ApertureAccounts() {
         {/* Broker status panel */}
         <details className="rounded-lg border border-rule p-4">
           <summary className="min-h-11 cursor-pointer content-center text-sm font-medium">Connections and order safeguards</summary>
-          <p className="mb-3 text-sm">Research → evidence review → paper ticket. Approval and submission are separate human actions.</p>
+          <p className="mb-3 text-sm">Research → evidence review → practice order. Approval and submission are separate human actions.</p>
           <Button variant="outline" className="mb-3 min-h-11" onClick={() => navigate("/aperture/runs")}>Open research <ArrowRight className="ml-2 h-4 w-4" /></Button>
         <Card>
           <CardHeader className="pb-2">

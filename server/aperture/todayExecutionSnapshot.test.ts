@@ -95,7 +95,7 @@ describe("compact rows reuse lifecycle state and exact record identity", () => {
     expect($.text()).not.toMatch(/Cancel|Replace|Approve|Submit/);
   });
   it("does not equate a partial fill or unresolved dispatch with acceptance", () => {
-    const $ = rows(data({ orders: [order({ status: "submitted", qty: 4, filledQty: 1 })] }), { ...motion, stateLabel: "Dispatch unresolved", detail: "Reconcile dispatch" });
+    const $ = rows(data({ orders: [order({ status: "submitted", qty: 4, filledQty: 1 })] }), { ...motion, stateLabel: "Dispatch unresolved", detail: "Check order status" });
     expect($.text()).toContain("Dispatch unresolved");
     expect($.text()).toContain("1 filled · 3 remaining");
     expect($.text()).toContain("Partial-fill return not measured");

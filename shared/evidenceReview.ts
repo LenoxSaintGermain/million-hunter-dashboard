@@ -8,7 +8,7 @@ export interface EvidenceReviewRecord {
 
 /**
  * These checks cannot be answered until the operator has chosen an exact OCC
- * contract in the paper ticket. Keeping them in the pre-ticket review creates
+ * contract in the practice order. Keeping them in the pre-ticket review creates
  * a circular lock: the ticket is needed to verify the contract, while the
  * contract review is required to open the ticket. They remain hard broker
  * preflight checks after contract selection; they are not waived.

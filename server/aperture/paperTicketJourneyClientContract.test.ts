@@ -6,7 +6,7 @@ describe("Capital Aperture paper-ticket journey contract", () => {
   it("does not open the ticket before candidate evidence review is complete", () => {
     const board = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/CandidateBoard.tsx"), "utf8");
 
-    expect(board).toContain("Review the required evidence before opening the paper ticket");
+    expect(board).toContain("Review the required evidence before opening the practice order");
     expect(board).toContain("unreviewedChecks.length");
   });
 
@@ -83,10 +83,10 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(board).toContain("onPrepareProposal={() => navigate(`/aperture/run/${runId}/execute?candidate=${focusCandidate.id}`)}");
     expect(focus).toContain("allChecksReviewed");
     expect(focus).toContain("Evidence review complete");
-    expect(focus).toContain("Review paper ticket");
+    expect(focus).toContain("Review practice order");
     expect(recipe).toContain("allChecksReviewed");
     expect(recipe).toContain("Ready for ticket preflight");
-    expect(recipe).toContain('exactOptionTicketCanResolve ? "Open paper ticket" : "Resolve blocker"');
+    expect(recipe).toContain('exactOptionTicketCanResolve ? "Open practice order" : "Resolve blocker"');
   });
 
   it("keeps a hard-blocked ticket in place and reveals alternatives inline", () => {
@@ -128,14 +128,14 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain("Accepted / queued at paper broker");
     expect(desk).toContain("arbitrateTodayRead({ briefing: briefing ?? null");
     const sharedAttention = readFileSync(resolve(process.cwd(), "shared/apertureAttention.ts"), "utf8");
-    expect(sharedAttention).toContain("Paper broker accepted; no fill yet");
+    expect(sharedAttention).toContain("Broker accepted; no fill yet");
   });
 
   it("replaces a duplicate ticket builder with the existing paper-order receipt", () => {
     const execute = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/ApertureExecute.tsx"), "utf8");
 
     expect(execute).toContain("candidateActiveOrder");
-    expect(execute).toContain("Paper order already exists · do not duplicate");
+    expect(execute).toContain("Practice order already exists · do not duplicate");
     expect(execute).toContain("The paper broker accepted this order. Check its actual fill status");
     expect(execute).toContain("!candidateActiveOrder");
   });

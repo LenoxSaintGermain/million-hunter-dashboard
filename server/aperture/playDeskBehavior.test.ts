@@ -156,7 +156,7 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
     const orders = [order()];
     fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }) });
     const html = render();
-    expect(html).toContain("Paper broker accepted; no fill yet");
+    expect(html).toContain("Broker accepted; no fill yet");
     expect(html).toContain("Accepted order · no fill recorded");
     expect(html).not.toContain("Position open");
     expect(html).not.toContain("Open position");
@@ -169,9 +169,9 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
     const state = deskOrderPresentation(12, shared);
     const html = render();
     expect(state.label).toMatch(/pending|unresolved/i);
-    expect(state.detail).toMatch(/reconcile|receipt|dispatch/i);
+    expect(state.detail).toMatch(/reconcile|receipt|dispatch|broker order status/i);
     expect(state.action).not.toMatch(/submit|approve/i);
-    expect(html).not.toContain("Paper broker accepted; no fill yet");
+    expect(html).not.toContain("Broker accepted; no fill yet");
     expect(html).not.toContain("Open position");
     expect(fixture.refetch).not.toHaveBeenCalled();
   });

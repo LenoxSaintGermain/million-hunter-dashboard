@@ -65,7 +65,7 @@ describe("guided underwriting and returning check-in UX contracts", () => {
 
     expect(feasibility).toContain("feasibility.targetPeriod == null");
     expect(feasibility).toContain("portfolio_headroom_exhausted");
-    expect(feasibility).toContain("Portfolio headroom exhausted");
+    expect(feasibility).toContain("No remaining risk allowance");
     expect(feasibility).toContain("Your planned-loss limit is configured");
     expect(feasibility).toContain("No proposal capacity remains");
     expect(runway).toContain("Enter deployable capital in Account & risk.");
@@ -80,9 +80,9 @@ describe("guided underwriting and returning check-in UX contracts", () => {
 
     expect(runway).toContain("const underwritingMatchesInputs");
     expect(runway).toContain("const underwritingComplete");
-    expect(runway).toContain("Underwriting complete · review result");
+    expect(runway).toContain("Analysis complete · review result");
     expect(runway).toContain("!editingCompletedMission && !draftError && !missionContextError");
-    expect(runway).toContain("No paper ticket has been created.");
+    expect(runway).toContain("No practice order has been created.");
     expect(result).toBeGreaterThan(-1);
     expect(suggestions).toBeGreaterThan(result);
     expect(runway).toContain("{!underwritingComplete && <footer");
@@ -95,7 +95,7 @@ describe("guided underwriting and returning check-in UX contracts", () => {
     expect(runway).toContain("const persistedUnderwritingLoading");
     expect(runway).toContain("currentDecisionRunId != null && currentUnderwriting.isLoading");
     expect(runway).toContain("underwritingResult.decisionRevisionId === currentDecisionRevisionId");
-    expect(runway).toContain("Checking saved underwriting…");
+    expect(runway).toContain("Checking saved analysis…");
     expect(runway).toContain("Checking saved result");
     expect(runway).toContain("persistedUnderwritingLoading || underwritingComplete");
   });
@@ -107,7 +107,7 @@ describe("guided underwriting and returning check-in UX contracts", () => {
     expect(briefing).toContain("Review / revise mission");
     expect(briefing).not.toContain("aperture.underwriter.get.useQuery");
     expect(attention).toContain('kind: "underwriting_complete"');
-    expect(attention).toContain("Review underwriting result");
+    expect(attention).toContain("Review analysis result");
     expect(attention).toContain("/aperture/decision/${input.underwriting.decisionRunId}/revision/${input.underwriting.revisionId}/underwrite");
   });
 

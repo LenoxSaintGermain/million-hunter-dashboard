@@ -144,7 +144,7 @@ export function buildOperatorAction(input: { chooseCount: number; orders: Operat
   if (pending) return {
     state: "action_required",
     assetStrategy: `${pending.symbol} · ${BUCKET_LABEL[executionBucketFor(pending)]}`,
-    currentState: `Paper ticket is waiting for review. Maximum planned loss: ${pending.plannedRiskCents == null ? "not measured" : dollars(-pending.plannedRiskCents)}.`,
+    currentState: `Practice order is waiting for review. Maximum planned loss: ${pending.plannedRiskCents == null ? "not measured" : dollars(-pending.plannedRiskCents)}.`,
     immediateAction: "Confirm the exact instrument, limit, invalidation, and maximum loss. Approval does not submit it.",
     nextActionLabel: `Review ${pending.symbol} ticket`,
     targetRunId: pending.runId,
@@ -159,7 +159,7 @@ export function buildOperatorAction(input: { chooseCount: number; orders: Operat
   if (approved) return {
     state: "action_required",
     assetStrategy: `${approved.symbol} · ${BUCKET_LABEL[executionBucketFor(approved)]}`,
-    currentState: "Paper ticket is approved but has not been sent to the named paper broker.",
+    currentState: "Practice order is approved but has not been sent to the named paper broker.",
     immediateAction: "Run the final preflight, then explicitly submit or queue the paper order.",
     nextActionLabel: `Submit or queue ${approved.symbol}`,
     targetRunId: approved.runId,

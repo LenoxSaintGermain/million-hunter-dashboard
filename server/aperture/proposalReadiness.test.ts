@@ -21,7 +21,7 @@ describe("buildProposalReadiness", () => {
     expect(evidence.unreviewedChecks).toHaveLength(0);
     expect(state.action).toBe("refresh_recipe");
     expect(state.actionLabel).toBe("Refresh market checks");
-    expect(state.explanation).toContain("No paper ticket has been created");
+    expect(state.explanation).toContain("No practice order has been created");
     expect(state.action).not.toBe("create_proposal");
   });
 

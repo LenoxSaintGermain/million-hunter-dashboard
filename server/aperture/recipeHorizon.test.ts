@@ -128,7 +128,7 @@ describe("real recipe procedure and card horizon boundary", () => {
     expect(seam.tape).toHaveBeenCalledTimes(1);
     const $ = render(row, result);
     expect($.text()).toContain("Ready to review");
-    expect($("button").text()).toContain("Review paper ticket");
+    expect($("button").text()).toContain("Review practice order");
     expect(seam.query.mock.calls.at(-1)?.[1]).toMatchObject({ enabled: true });
   });
 
@@ -190,7 +190,7 @@ describe("real recipe procedure and card horizon boundary", () => {
     seam.tape.mockResolvedValue({ feed: "unknown", bars: [], unavailableReason: "No minute bars available" });
     const result = await construct();
     expect(result.play).toMatchObject({ readiness: "needs_tape", entry: null, stop: null });
-    expect(render(row, result)("button").text()).not.toContain("Review paper ticket");
+    expect(render(row, result)("button").text()).not.toContain("Review practice order");
   });
 
   it("keeps the existing non-intraday trigger procedure non-applicable without tape", async () => {
@@ -257,7 +257,7 @@ describe("real recipe procedure and card horizon boundary", () => {
     seam.query.mockReturnValue({ data: await construct(), isLoading: false, isError: false });
     const $ = renderExecute(row);
     expect($.text()).not.toContain("Research only");
-    expect($.text()).toContain("Paper ticket");
+    expect($.text()).toContain("Practice order");
     expect($("input").length).toBeGreaterThan(0);
     if (instrumentPreference === "options") {
       expect($.text()).toContain("Long put");

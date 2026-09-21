@@ -11,7 +11,7 @@ describe("only exactly-known routine copy defers to the global banner", () => {
   });
 
   it("keeps a specific consequence that says more than the banner", () => {
-    expect(coveredByInvariant("A paper ticket cannot be prepared until these checks are resolved.")).toBe(false);
+    expect(coveredByInvariant("A practice order cannot be prepared until these checks are resolved.")).toBe(false);
     expect(coveredByInvariant("An empty result is not treated as an all-clear. Existing records remain unchanged.")).toBe(false);
   });
 

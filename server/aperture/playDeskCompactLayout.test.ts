@@ -54,7 +54,7 @@ describe("Play Desk compact attention — illustrative records, no API calls", (
     expect($('#desk-refresh-scope time').attr('datetime')).toBe(new Date(now).toISOString());
     expect($('#desk-refresh-scope').text()).toContain('Refresh reads records only; no new checks.');
     expect($('h1')).toHaveLength(1);
-    expect($.text()).not.toContain('Choose a play, move a paper ticket');
+    expect($.text()).not.toContain('Choose a play, move a practice order');
     expect($.text()).toContain('Recorded checks: stale. Status is not an all-clear.');
     expect(fixture.refetch).not.toHaveBeenCalled();
   });

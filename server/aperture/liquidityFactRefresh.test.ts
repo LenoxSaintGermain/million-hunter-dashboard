@@ -5,7 +5,7 @@ import type { SecurityFact } from "../../drizzle/schema";
 /**
  * Reproduces the deployed blocker found on 2026-09-10: every candidate in run
  * #690001 held a good modeled ADV (PWR $743M) recorded on Sept 9, all expired
- * by Sept 10, so the liquidity gate refused every paper ticket with
+ * by Sept 10, so the liquidity gate refused every practice order with
  * "no 30-day ADV fact" and no operator path existed to refresh it.
  */
 

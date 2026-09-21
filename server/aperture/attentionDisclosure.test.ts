@@ -69,7 +69,7 @@ describe("Today disclosure and availability", () => {
     const first = deriveApertureAttention(data, null);
     const seen = deriveApertureAttention(data, first.baseline);
     const displayed = attentionDisclosure(seen, "mission:draft");
-    expect(displayed.otherCritical[0]).toMatchObject({ key: "order:9:dispatch", actionLabel: "Reconcile dispatch" });
+    expect(displayed.otherCritical[0]).toMatchObject({ key: "order:9:dispatch", actionLabel: "Check order status" });
     expect(displayed.inMotion).toEqual([]);
     expect(canShowQuietBriefing(seen, false, null)).toBe(false);
   });

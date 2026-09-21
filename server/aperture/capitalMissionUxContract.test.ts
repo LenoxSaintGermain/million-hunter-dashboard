@@ -38,7 +38,7 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(runway).toContain("Underwrite");
     expect(runway).toContain("Research");
     expect(runway).toContain("Paper");
-    expect(runway).toContain("No research run, paper ticket, approval, submission, or broker order has been created");
+    expect(runway).toContain("No research run, practice order, approval, submission, or broker order has been created");
   });
 
   it("explains Capital Mission and ranked suggestions in concise, actionable language", () => {
@@ -96,7 +96,7 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(runway).toContain('aria-label="Capital Mission sections"');
     expect(runway).toContain("Thesis & horizon");
     expect(runway).toContain("Account & risk");
-    expect(runway).toContain("Review & underwrite");
+    expect(runway).toContain("Review & analyze");
     expect(runway).not.toContain("canOpenSlate");
   });
 
