@@ -1,6 +1,6 @@
 # Capital Aperture — language, voice, and product vocabulary
 
-Status: language system with initial implementation, 2026-09-21. Not deployed in this pass; no authorization for real-money trading.
+Status: language passes deployed on 2026-09-21 as `capital-aperture-00220-sun`. See [release verification](qa/CAPITAL_APERTURE_LANGUAGE_RELEASE_2026-09-21.md). No real-money trading capability or authorization was added.
 
 ## The voice
 
