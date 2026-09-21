@@ -21,7 +21,7 @@ describe("guided underwriting and returning check-in UX contracts", () => {
 
     expect(saveIndex).toBeGreaterThan(-1);
     expect(underwriteIndex).toBeGreaterThan(saveIndex);
-    expect(runway).toContain("Underwrite my mission");
+    expect(runway).toContain("apertureLanguage.analyzePlan");
     expect(runway).toContain("mission-underwriting-result");
     expect(mission).not.toContain("onOpenUnderwriting");
     expect(runway).not.toContain("Build today’s playbook");
@@ -113,7 +113,7 @@ describe("guided underwriting and returning check-in UX contracts", () => {
 
   it("puts conditional plays before supporting dashboards and labels risk honestly", () => {
     const brief = read("client/src/components/aperture/PlayUnderwritingBrief.tsx");
-    const cards = brief.indexOf("Conditional playbook");
+    const cards = brief.indexOf("Trade ideas");
     const evidence = brief.indexOf("Evidence and calculations behind this result");
     const card = read("client/src/components/aperture/TradePlayCard.tsx");
 

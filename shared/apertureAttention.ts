@@ -1,4 +1,5 @@
 import { monitoringFindingPresentation, type MonitoringInstrumentContext } from "./monitoringState";
+import { apertureLanguage } from "./apertureLanguage";
 import { monitoringFindingHref, monitoringFindingVersion, resolvedFindingVersions } from "./monitoringFinding";
 import { paperInstrumentDisplayLabel, parseOccOptionSymbol } from "./paperInstrument";
 
@@ -503,7 +504,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
           : running ? "The recorded job has not finished. Leaving does not restart it."
             : "Your question is saved. Analysis has not started.",
       consequence: "No allocation or order is created by discovery. Existing positions are unchanged.",
-      actionLabel: failed ? "Review analysis status" : complete ? "Review research findings" : running ? "View discovery progress" : "Underwrite my mission",
+      actionLabel: failed ? "Review analysis status" : complete ? "Review research findings" : running ? "View discovery progress" : apertureLanguage.analyzePlan,
       href: `/aperture/decision/${discovery.decisionRunId}/revision/${discovery.revisionId}`,
       updatedAt: discovery.updatedAt,
     }));
@@ -516,7 +517,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       title: "Underwrite the saved mission",
       reason: "The mission assumptions are persisted, but no playbook has been produced.",
       consequence: "Underwriting builds research candidates. It does not create or submit an order.",
-      actionLabel: "Underwrite my mission",
+      actionLabel: apertureLanguage.analyzePlan,
       href: `/aperture/decision/${input.underwriting.decisionRunId}/revision/${input.underwriting.revisionId}`,
       updatedAt: input.underwriting.updatedAt,
     }));

@@ -25,7 +25,7 @@ describe("research play risk disclosure", () => {
       thesis: null, portfolioRiskBeforeCents: 0, maxOpenRiskCents: 100, selected: false, busy: false, onValidate: vi.fn() });
     const html = load(renderToStaticMarkup(tree));
     expect(html('button').attr('class')).toContain('whitespace-normal');
-    expect(html('button span').text()).toBe('Validate this play');
+    expect(html('button span').text()).toBe('Check this idea');
   });
   it("does not present missing share sizing as zero loss or zero portfolio impact", () => {
     const text = view("shares", "insufficient_data", 0);
@@ -41,6 +41,8 @@ describe("research play risk disclosure", () => {
     expect(text).toContain("$15");
     expect(text).toContain("Portfolio impact not measured");
     expect(text).not.toContain("Bounded contract loss");
+    expect(text).toContain("What is a long call?");
+    expect(text).toContain("It can expire worthless.");
   });
   it("preserves measured stop scenarios and their execution uncertainty", () => {
     const text = view("shares", "scenario_modeled", 1500);

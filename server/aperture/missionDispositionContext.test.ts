@@ -366,7 +366,7 @@ describe("persisted Mission disposition context", () => {
       receiptTarget: { decisionRunId: 77, revisionId: 88 }, initialDraft: expect.objectContaining({ values, completedAt: now }),
     }));
     expect(view.$.text()).not.toContain("Illustrative PWR");
-    expect(view.$.text()).not.toContain("Underwrite my mission");
+    expect(view.$.text()).not.toContain("Analyze my plan");
     await vi.advanceTimersByTimeAsync(2000);
     expect(fixture.queries.latest.data).toEqual(before);
     for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();

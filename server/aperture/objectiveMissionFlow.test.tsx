@@ -215,7 +215,7 @@ describe("connected Objective Mission", () => {
     expect($('section[aria-label="Objective Mission setup"]').attr("aria-busy")).toBe("true");
     expect($.text()).not.toMatch(/Underwriting…|Underwriting is in progress\./);
     expect($('[role="status"]').text()).toContain("Saving your draft. Wait for confirmation.");
-    expect($("button").filter((_, button) => /Underwrite my mission|Saving draft/.test($(button).text())).is(":not([disabled])")).toBe(false);
+    expect($("button").filter((_, button) => /Analyze my plan|Saving draft/.test($(button).text())).is(":not([disabled])")).toBe(false);
     await view.workspace().onUnderwrite();
     expect(fixture.mutations.start.mutateAsync).not.toHaveBeenCalled();
     expect(fixture.mutations.run.mutateAsync).not.toHaveBeenCalled();

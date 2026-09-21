@@ -20,7 +20,7 @@ export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate
           <p className="mt-3 text-sm" style={{ color: "var(--sh-fg-muted)" }}>No paper ticket created; existing positions unchanged.</p>
         </div>
       </div>
-    </section> : <section aria-label="Conditional playbook">
+    </section> : <section aria-label="Trade ideas">
       <div className="mb-4">
         <h3 className="font-serif text-2xl">{result.plays.length} conditional {result.plays.length === 1 ? "play" : "plays"}</h3>
         <p className="mt-2 text-sm leading-6">{result.market.regime === "unknown" ? "Market context is incomplete." : result.market.regime.replaceAll("_", " ") + " market context."} {leadPlay ? leadPlay.symbol + " ranks first; confirm its entry condition and evidence before a ticket." : "No play is actionable without evidence."}</p>

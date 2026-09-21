@@ -57,7 +57,7 @@ describe("Capital Aperture attention briefing", () => {
   });
 
   it.each([
-    ["not_started", "Underwrite my mission"],
+    ["not_started", "Analyze my plan"],
     ["running", "View discovery progress"],
     ["failed", "Review analysis status"],
     ["complete", "Review research findings"],

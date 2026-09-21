@@ -127,7 +127,7 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
     expect(review.visible("#objective-test-section-1")).toHaveLength(0);
     expect(review.text).toContain("Illustrative Paper");
     expect(review.text).toContain("Paper · Declared capital $10,000");
-    expect(view.button("Underwrite my mission").props.disabled).toBe(true);
+    expect(view.button("Analyze my plan").props.disabled).toBe(true);
     view.click("Save draft");
     expect(view.onSave).toHaveBeenCalledOnce();
     expect(view.render().text).toContain("Unsaved changes");
@@ -135,7 +135,7 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
     view.props.saveState = "saved";
     expect(view.render().text).toContain("Builds research. No order is created or submitted.");
     expect(view.render().text).toContain("Saved");
-    view.click("Underwrite my mission");
+    view.click("Analyze my plan");
     expect(view.onUnderwrite).toHaveBeenCalledOnce();
     expect(view.props.values.strategyContext).toMatchObject({ requestId, declarationId });
   });
@@ -244,7 +244,7 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
   it("distinguishes the 8,000-character research limit from a longer saveable draft without truncation", () => {
     const values = { ...completeValues(), mission: "Illustrative: ".padEnd(8_000, "x") };
     const view = harness(values, { saveState: "saved" });
-    expect(view.button("Underwrite my mission").props.disabled).toBe(false);
+    expect(view.button("Analyze my plan").props.disabled).toBe(false);
     view.click("Edit question & scope");
     const raw = `${values.mission}x`;
     view.set("mission", raw);
@@ -255,7 +255,7 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
     expect(view.props.values.mission).toBe(raw);
     view.click("Save draft"); expect(view.onSave).toHaveBeenCalledOnce();
     view.props.saveState = "saved";
-    expect(view.button("Underwrite my mission").props.disabled).toBe(true);
+    expect(view.button("Analyze my plan").props.disabled).toBe(true);
     expect(view.onUnderwrite).not.toHaveBeenCalled();
   });
 
@@ -265,7 +265,7 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
     const blockedReason = "The combined Mission and thesis context exceeds the 8,000-character research limit. Shorten the reviewed context first.";
     const view = harness(values, { saveState: "saved", blockedReason });
     expect(view.render().text).toContain(blockedReason);
-    expect(view.button("Underwrite my mission").props.disabled).toBe(true);
+    expect(view.button("Analyze my plan").props.disabled).toBe(true);
     expect(view.props.values).toEqual(values);
     expect(view.onUnderwrite).not.toHaveBeenCalled();
   });
@@ -342,8 +342,8 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
     expect(result.text).toContain("Recorded effective constraint");
     expect(result.text).toContain("Recorded target feasibility");
     expect(result.text).not.toContain("Ready for your explicit request");
-    expect(view.button("Underwrite my mission").props.disabled).toBe(true);
-    view.button("Underwrite my mission").props.onClick!();
+    expect(view.button("Analyze my plan").props.disabled).toBe(true);
+    view.button("Analyze my plan").props.onClick!();
     expect(view.onUnderwrite).not.toHaveBeenCalled();
     view.click("Edit question & scope");
     expect(view.render().visible("[role=alert]").text()).toContain("current eligibility is not confirmed");
@@ -353,16 +353,16 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
     const view = harness(completeValues(), { saveState: "saved", riskPreview: { ...serverPreview, asOf: null } });
     expect(view.render().text).toContain("freshness is unconfirmed");
     expect(view.render().text).toContain("Recorded effective constraint");
-    expect(view.button("Underwrite my mission").props.disabled).toBe(true);
+    expect(view.button("Analyze my plan").props.disabled).toBe(true);
   });
 
   it("moves a ready preview to recorded-only on refresh failure without clearing declarations or dispatching", () => {
     const view = harness(completeValues(), { saveState: "saved", riskPreview: serverPreview });
-    expect(view.button("Underwrite my mission").props.disabled).toBe(false);
+    expect(view.button("Analyze my plan").props.disabled).toBe(false);
     const original = structuredClone(view.props.values);
     view.props.riskPreview = { ...serverPreview, status: "stale" };
     expect(view.render().text).toContain("Constraint is stale");
-    expect(view.button("Underwrite my mission").props.disabled).toBe(true);
+    expect(view.button("Analyze my plan").props.disabled).toBe(true);
     view.props.riskPreview = { ...serverPreview, status: "failed" };
     expect(view.render().text).toContain("Constraint refresh failed");
     expect(view.props.values).toEqual(original);
@@ -377,7 +377,7 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
     expect(result.visible("[role=alert]").text()).toContain("Illustrative save conflict");
     expect(result.text).not.toContain("Saved");
     expect(result.text).toContain(view.props.values.mission);
-    expect(view.button("Underwrite my mission").props.disabled).toBe(true);
+    expect(view.button("Analyze my plan").props.disabled).toBe(true);
     view.render(); expect(view.onSave).toHaveBeenCalledTimes(1);
     view.click("Retry save"); expect(view.onSave).toHaveBeenCalledTimes(2);
     expect(view.onUnderwrite).not.toHaveBeenCalled();
@@ -386,7 +386,7 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
   it("treats a new action failure as a failure even if the parent retains its previous saved state", () => {
     const view = harness(completeValues(), { saveState: "saved", failure: "Illustrative underwriting failure." });
     expect(view.render().text).not.toContain("Saved");
-    expect(view.button("Underwrite my mission").props.disabled).toBe(true);
+    expect(view.button("Analyze my plan").props.disabled).toBe(true);
     expect(view.render().visible("[role=alert]").text()).toContain("Illustrative underwriting failure");
   });
 
@@ -399,18 +399,18 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
     expect(view.onChange).not.toHaveBeenCalled(); expect(view.onSave).not.toHaveBeenCalled();
     expect(view.onUnderwrite).not.toHaveBeenCalled(); expect(view.onInspectRisk).not.toHaveBeenCalled();
     expect(view.props.values.strategyContext).toMatchObject({ requestId, declarationId });
-    view.click("Underwrite my mission"); expect(view.onUnderwrite).toHaveBeenCalledOnce();
+    view.click("Analyze my plan"); expect(view.onUnderwrite).toHaveBeenCalledOnce();
   });
 
   it("shows actual busy/loading and external blocks and guards the callback even if invoked directly", () => {
     const view = harness(completeValues(), { saveState: "saved", busy: true });
     expect(view.render().text).toContain("Underwriting is in progress");
-    view.button("Underwriting…").props.onClick!();
+    view.button("Analyzing your plan…").props.onClick!();
     view.props.busy = false; view.props.loading = true;
     expect(view.render().text).toContain("Loading the draft and account choices");
     view.props.loading = false; view.props.blockedReason = "Illustrative account review is required.";
     expect(view.render().text).toContain(view.props.blockedReason);
-    view.button("Underwrite my mission").props.onClick!();
+    view.button("Analyze my plan").props.onClick!();
     expect(view.onUnderwrite).not.toHaveBeenCalled();
   });
 
@@ -439,7 +439,7 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
     expect(view.onChange).not.toHaveBeenCalled();
     view.props.values = { ...completeValues(), baseDecisionRunId: 71, baseDecisionRevisionId: 72 };
     expect(view.render().text).toContain("already accepted");
-    expect(view.button("Underwrite my mission").props.disabled).toBe(true);
+    expect(view.button("Analyze my plan").props.disabled).toBe(true);
     expect(view.button("Save draft").props.disabled).toBe(true);
   });
 
@@ -450,7 +450,7 @@ describe("ObjectiveMissionWorkspace controlled new-draft journeys", () => {
     expect(view.props.values.strategyContext).toMatchObject({ requestId, declarationId: null });
     expect(view.render().text).toContain("parent workspace must initialize the capital declaration");
     view.click("Review"); view.props.saveState = "saved";
-    expect(view.button("Underwrite my mission").props.disabled).toBe(true);
+    expect(view.button("Analyze my plan").props.disabled).toBe(true);
   });
 
   it.each(["", "-1", "12.345", "1e4", "1,00", "9007199254740992"])("keeps invalid amount %j intact and explains it at the field", amount => {

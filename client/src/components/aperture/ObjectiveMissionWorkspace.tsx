@@ -1,4 +1,5 @@
 import React, { useId, useState } from "react";
+import { apertureLanguage } from "@shared/apertureLanguage";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { replacePrimaryMissionHorizon, type MissionDraftValues, type MissionSection, type MissionStrategyDraft } from "@shared/apertureMissionDraft";
@@ -327,7 +328,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
         </div>
         {issues.length > 0 && <Button type="button" variant="outline" className="min-h-11" disabled={locked} onClick={() => { setAttempted([1, 2]); change({ activeSection: issues[0].section }); }}>Review missing values</Button>}
         <div className="flex flex-wrap gap-2">
-          <Button type="button" className="min-h-11" disabled={!!actionBlock} aria-describedby={`${prefix}-effect ${prefix}-blocked`} onClick={() => { if (!actionBlock) onUnderwrite(); }}>{busy ? "Underwriting…" : saveState === "saving" ? "Saving draft…" : "Underwrite my mission"}</Button>
+          <Button type="button" className="min-h-11" disabled={!!actionBlock} aria-describedby={`${prefix}-effect ${prefix}-blocked`} onClick={() => { if (!actionBlock) onUnderwrite(); }}>{busy ? apertureLanguage.analyzingPlan : saveState === "saving" ? "Saving draft…" : apertureLanguage.analyzePlan}</Button>
         </div>
         <p id={`${prefix}-effect`} className="text-sm" style={muted}>{props.saveBeforeUnderwriting && saveState !== "saved" ? "Saves these assumptions and builds research. No order is created or submitted." : "Builds research. No order is created or submitted."}</p>
         <p id={`${prefix}-blocked`} role="status" className="text-sm" style={{ color: actionBlock ? "var(--sh-signal)" : "var(--sh-fg-muted)" }}>{actionBlock ?? "Ready for your explicit request."}</p>

@@ -82,7 +82,7 @@ describe("Capital Mission decision-path UX contract", () => {
     expect(runway).toContain("Search for a play");
     expect(runway).toContain("Hold for a condition");
     expect(runway).toContain("Preserve cash");
-    expect(runway).toContain('"Underwrite my mission"');
+    expect(runway).toContain('apertureLanguage.analyzePlan');
     expect(runway).toContain("Builds a research playbook. Does not create or submit an order.");
     expect(runway).not.toContain("Compile Play Slate");
   });
@@ -122,7 +122,7 @@ describe("Capital Mission decision-path UX contract", () => {
 
   it("keeps the mobile glance compact without hiding mode, freshness, thesis, or the binding constraint", () => {
     expect(cockpit).toContain('className="sm:hidden"');
-    expect(cockpit).toContain('label="Paper mode"');
+    expect(cockpit).toContain('label={practiceAccountLabel(data.account.isPaper)}');
     expect(cockpit).toContain("staleText");
     expect(cockpit).toContain("Thesis {data.activeThesis?.name");
     expect(cockpit).toContain('label="Constraint"');

@@ -18,7 +18,7 @@ export function MissionResultWorkspace({ result, accountLabel, accountAsOf, thes
       <p className="mt-1 text-sm" style={{ color: "var(--sh-fg-muted)" }}>{accountLabel} · Paper</p>
     </header>
     {notice}
-    <section id="mission-underwriting-result" aria-label="Underwriting result" className="scroll-mt-24 space-y-3">
+    <section id="mission-underwriting-result" aria-label="Analysis result" className="scroll-mt-24 space-y-3">
       <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Analysis saved <time dateTime={new Date(result.asOf).toISOString()}>{new Date(result.asOf).toLocaleString()}</time> · not a current eligibility check</p>
       <PlayUnderwritingBrief result={result} selectedPlayId={selectedPlayId} busy={busy} onValidate={onValidate} />
     </section>

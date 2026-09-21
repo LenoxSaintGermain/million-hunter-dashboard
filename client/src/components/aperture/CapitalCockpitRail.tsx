@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { invalidateAccountRefreshReads } from "@/lib/accountRefreshInvalidation";
 import { formatMandatePercentPoints } from "@shared/cockpitPresentation";
+import { apertureLanguage, practiceAccountLabel, accountFundsLabel } from "@shared/apertureLanguage";
 import { buildCockpitRailSummary, type CockpitHeadroomLine } from "@shared/cockpitRailSummary";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { BasisMark, StateMark } from "./DecisionVisualLanguage";
@@ -163,8 +164,8 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
     }
   };
 
-  if ((!runId && accountQuery.error) || cockpitQuery.error) return <section role="alert" className="mb-5 rounded-xl border px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><p className="text-sm">Paper account constraints could not be verified. This is not a zero-risk or no-account state.</p><button type="button" className="mt-2 min-h-11 rounded border px-3 text-sm" onClick={() => { void accountQuery.refetch(); void cockpitQuery.refetch(); }}>Retry account context</button></section>;
-  if ((!runId && accountQuery.isLoading) || isLoading || !data || !summary) return <section role="status" className="mb-5 animate-pulse motion-reduce:animate-none rounded-xl border px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Loading paper-research context…</span></section>;
+  if ((!runId && accountQuery.error) || cockpitQuery.error) return <section role="alert" className="mb-5 rounded-xl border px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><p className="text-sm">Paper account constraints could not be verified. This is not a zero-risk or no-account state.</p><button type="button" className="mt-2 min-h-11 rounded border px-3 text-sm" onClick={() => { void accountQuery.refetch(); void cockpitQuery.refetch(); }}>Retry account details</button></section>;
+  if ((!runId && accountQuery.isLoading) || isLoading || !data || !summary) return <section role="status" className="mb-5 animate-pulse motion-reduce:animate-none rounded-xl border px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Loading account details…</span></section>;
 
   const elapsedMs = Math.max(0, clockNow - responseAt.current);
   const boundaryMs = data.session.msToNextBoundary == null ? null : data.session.msToNextBoundary - elapsedMs;
@@ -202,9 +203,6 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
   const equityCents = data.account.equityValueCents;
   const cashCents = data.account.cashCents;
   const buyingPowerCents = data.account.buyingPowerCents ?? cashCents;
-  const marginUtilPct = equityCents && cashCents != null
-    ? Math.max(0, Math.min(100, ((equityCents - cashCents) / equityCents) * 100)).toFixed(1)
-    : "0.0";
   const unrealizedCents = deskQuery.data?.account?.unrealizedPnlCents ?? null;
 
   return <section className="mb-5 overflow-hidden rounded-xl border shadow-sm" style={{ borderColor: summary.severity === "critical" ? severityColor : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
@@ -212,8 +210,8 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
     <div className="hidden sm:block">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-3.5 py-2 text-xs" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
         <div className="flex items-center gap-2.5">
-          <StateMark state="rule_qualified" label="Paper-only operator instrument" compact />
-          <RailHelp label="Explain paper-only boundary">This operator surface records research context and human review. It does not submit an order.</RailHelp>
+          <StateMark state={data.account.isPaper === true ? "rule_qualified" : "unknown"} label={practiceAccountLabel(data.account.isPaper)} compact />
+          <RailHelp label="About account mode">Practice trading uses simulated money. Viewing this account does not send an order.</RailHelp>
           <div className="h-3.5 w-px" style={{ background: "var(--sh-border-1)" }} />
           {/* Ambient Staleness Pill with inline 1-click refresh */}
           <div className="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ background: summary.accountStale ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "color-mix(in srgb, var(--sh-emerald) 12%, transparent)", color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-emerald)" }}>
@@ -265,8 +263,8 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
 
         {/* Live Capital & Risk Metrics Glance */}
         <div className="flex items-center gap-4 text-[11px] tabular-nums font-mono">
-          <div><span style={{ color: "var(--sh-fg-muted)" }}>NAV: </span><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{money(equityCents) ?? "—"}</span></div>
-          <div><span style={{ color: "var(--sh-fg-muted)" }}>BP: </span><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{money(buyingPowerCents) ?? "—"}</span></div>
+          <div><span style={{ color: "var(--sh-fg-muted)" }}>Account value: </span><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{money(equityCents) ?? "Not available"}</span></div>
+          <div><span style={{ color: "var(--sh-fg-muted)" }}>{accountFundsLabel(data.account.buyingPowerCents)}: </span><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{money(buyingPowerCents) ?? "Not available"}</span></div>
           {unrealizedCents != null && (
             <div>
               <span style={{ color: "var(--sh-fg-muted)" }}>Unrealized: </span>
@@ -275,18 +273,17 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
               </span>
             </div>
           )}
-          <div><span style={{ color: "var(--sh-fg-muted)" }}>Util: </span><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{marginUtilPct}%</span></div>
           {!compactOnly && (
             <button
               type="button"
               aria-expanded={expanded}
               aria-controls="cockpit-rail-detail"
-              aria-label={expanded ? "Hide instrument detail" : "Show instrument detail"}
+              aria-label={expanded ? "Hide account details" : "Show account details"}
               onClick={changeExpanded}
               className="flex items-center gap-1 rounded border px-2 py-1 text-[11px] font-sans font-medium transition-colors hover:bg-black/5"
               style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}
             >
-              <span>{expanded ? "Hide Rails" : "Rails / Ledger"}</span>
+              <span>{expanded ? "Hide details" : apertureLanguage.accountDetails}</span>
               <ChevronDown className={`h-3 w-3 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} />
             </button>
           )}
@@ -328,7 +325,7 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
     {/* Mobile Cockpit Header */}
     <div className="sm:hidden">
       <div className="flex min-h-11 items-center gap-2 border-b px-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
-        <StateMark state="rule_qualified" label="Paper mode" compact />
+        <StateMark state={data.account.isPaper === true ? "rule_qualified" : "unknown"} label={practiceAccountLabel(data.account.isPaper)} compact />
         <span className="min-w-0 flex-1 truncate text-[11px]" title={`${data.account.label || "Paper account"} · ${staleText}`} style={{ color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-text-primary)" }}>{data.account.label || "Paper account"} · {staleText}</span>
         <span className="max-w-[7rem] shrink-0 truncate text-[11px] font-semibold" title={data.activeThesis?.name ?? "No active thesis"} style={{ color: "var(--sh-text-primary)" }}>Thesis {data.activeThesis?.name ?? "—"}</span>
       </div>
@@ -336,7 +333,7 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
         <StateMark state={summary.severity === "critical" ? "blocked" : summary.severity === "unmeasurable" ? "unknown" : "rule_qualified"} label="Constraint" compact />
         <span className="min-w-0 flex-1 truncate text-xs font-semibold" title={summary.binding ? `${summary.binding.label} · ${bindingSubject}` : "No measurable constraint"} style={{ color: "var(--sh-text-primary)" }}>{summary.binding ? bindingSubject : "Not measured"}</span>
         <span className="shrink-0 font-mono text-[10px] tabular-nums" style={{ color: severityColor }}>{bindingUtilization.toFixed(0)}% used</span>
-        {!compactOnly && <button type="button" aria-expanded={expanded} aria-controls="cockpit-rail-detail" aria-label={expanded ? "Hide instrument detail" : "Show instrument detail"} onClick={changeExpanded} className="min-h-11 shrink-0 rounded px-2 py-1 text-[11px] font-semibold" style={{ color: "var(--sh-text-primary)" }}>{expanded ? "Hide" : "Detail"}<ChevronDown className={`ml-1 inline h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} /></button>}
+        {!compactOnly && <button type="button" aria-expanded={expanded} aria-controls="cockpit-rail-detail" aria-label={expanded ? "Hide account details" : "Show account details"} onClick={changeExpanded} className="min-h-11 shrink-0 rounded px-2 py-1 text-[11px] font-semibold" style={{ color: "var(--sh-text-primary)" }}>{expanded ? "Hide" : "Detail"}<ChevronDown className={`ml-1 inline h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} /></button>}
       </div>
     </div>
 

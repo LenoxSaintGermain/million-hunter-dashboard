@@ -21,7 +21,7 @@ describe("cold-device account constraint hydration", () => {
     mocks.cockpit.mockReturnValue({ data: undefined, isLoading: false, error: null });
     const html = renderToStaticMarkup(React.createElement(CapitalCockpitRail));
     expect(mocks.cockpit.mock.lastCall?.[1].enabled).toBe(false);
-    expect(html).toContain("Loading paper-research context");
+    expect(html).toContain("Loading account details");
     expect(html).not.toContain("Account not selected");
     expect(html).not.toContain("No paper account");
   });
@@ -36,7 +36,7 @@ describe("cold-device account constraint hydration", () => {
     mocks.account.data = undefined; mocks.account.error = { message: "PRIVATE_SQL_SENTINEL" }; mocks.account.isLoading = false;
     const html = renderToStaticMarkup(React.createElement(CapitalCockpitRail));
     expect(html).toContain("constraints could not be verified");
-    expect(html).toContain("Retry account context");
+    expect(html).toContain("Retry account details");
     expect(html).not.toContain("PRIVATE_SQL_SENTINEL");
     expect(mocks.cockpit.mock.lastCall?.[1].enabled).toBe(false);
   });
