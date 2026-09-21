@@ -153,9 +153,9 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
     : pending.length
     ? "Step 1 of 2: Review and Approve your simulated trade. Once approved, you can send it to your paper broker."
     : approved.length
-      ? "Step 2 of 2: Trade is approved! Click Send Order to Broker. If markets are closed, it queues for Monday 9:30 AM ET open."
+      ? "Step 2 of 2: Review the named paper destination, then explicitly send the order. Current checks must pass."
       : submitted.length
-        ? "Order received by paper broker. It is queued and ready for execution at regular market open (Monday 9:30 AM ET)."
+        ? "Paper broker accepted the order; no complete fill is recorded yet. Check order status before taking another action."
         : terminal.some((order) => order.status === "filled")
           ? "Position is open. Track your play and review whether your thesis holds."
           : "Ready for your next play. Pick a candidate from your research to prepare a paper trade.";
@@ -339,7 +339,7 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
           <AlertDialogHeader>
             <AlertDialogTitle>{confirmation?.kind === "submit" ? "Send paper order to broker" : "Approve this paper trade"}</AlertDialogTitle>
             <AlertDialogDescription>
-              Simulated paper trade. All pricing, evidence, and risk safety limits are checked. When the market is closed, limit DAY orders queue automatically for Monday 9:30 AM ET regular open.
+              Paper only. Confirming reruns pricing, evidence, and risk checks. Eligible closed-market limit DAY orders may queue for the next eligible regular session. Acceptance is not a fill.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {confirmation && (
@@ -348,7 +348,7 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
               <div><span className="block text-xs text-muted-foreground">Size</span><strong>{orderSizeLabel(confirmation.order)}</strong></div>
               <div><span className="block text-xs text-muted-foreground">Order</span><strong>{confirmation.order.orderType.toUpperCase()} · {confirmation.order.timeInForce.toUpperCase()}{confirmation.order.limitPriceCents ? ` · limit ${fmtPrice(confirmation.order.limitPriceCents)}` : ""}</strong></div>
               <div><span className="block text-xs text-muted-foreground">{isOptionInstrument(confirmation.order.instrumentType) ? "Premium / protection" : "Entry / protective stop"}</span><strong>{isOptionInstrument(confirmation.order.instrumentType) ? `${fmtPrice(confirmation.order.entryPriceCents)} premium · fully defined by debit` : `${fmtPrice(confirmation.order.entryPriceCents)} / ${fmtPrice(confirmation.order.stopPriceCents)}`}</strong></div>
-              <div><span className="block text-xs text-muted-foreground">Maximum planned loss</span><strong>{fmt(confirmation.order.plannedRiskCents)}</strong></div>
+              <div><span className="block text-xs text-muted-foreground">{isOptionInstrument(confirmation.order.instrumentType) ? "Planned premium risk" : "Planned loss at modeled stop — execution may differ"}</span><strong>{fmt(confirmation.order.plannedRiskCents)}</strong></div>
               <div><span className="block text-xs text-muted-foreground">Review check-in time</span><strong>{confirmation.order.timeStopAt ? format(confirmation.order.timeStopAt, "PP p") : "Not recorded"}</strong></div>
               <div className="sm:col-span-2"><span className="block text-xs text-muted-foreground">Exit / Invalidation trigger</span><strong>{confirmation.order.invalidationCondition || "Not recorded"}</strong></div>
               <div className="sm:col-span-2 rounded-md p-3" style={{ background: "var(--sh-surface-2)" }}>
@@ -1350,6 +1350,13 @@ export default function ApertureExecute() {
   const { data: runOrders } = ordersQuery;
   const monitoringContextState = runQuery.isError || ordersQuery.isError ? "failed"
     : runQuery.isLoading || ordersQuery.isLoading ? "loading" : "ready";
+  if (monitoringContextState !== "ready") {
+    return <DashboardLayout><section aria-live="polite" className="mx-auto max-w-5xl space-y-3 p-6">
+      <h1 className="text-xl font-semibold">{monitoringContextState === "failed" ? "Ticket status unavailable" : "Loading your existing ticket…"}</h1>
+      <p>No new ticket or order has been created. Existing orders are unchanged.</p>
+      {monitoringContextState === "failed" && <Button onClick={() => { void runQuery.refetch(); void ordersQuery.refetch(); }}>Retry ticket status</Button>}
+    </section></DashboardLayout>;
+  }
   if (data?.decisionAuthority && !decisionAuthorityAllowsDownstream(data.decisionAuthority)) {
     return <DashboardLayout><DecisionStepLock authority={data.decisionAuthority} step="Ticket" onOpenReceipt={() => navigate(`/aperture/decision/${data.decisionAuthority!.decisionRunId}/revision/${data.decisionAuthority!.revisionId}`)} /></DashboardLayout>;
   }
@@ -1377,7 +1384,7 @@ export default function ApertureExecute() {
     ? candidateActiveOrder.status === "submitted"
       ? {
           title: `${orderInstrumentLabel(candidateActiveOrder)} staged with paper broker`,
-          detail: "Your simulated order is received and queued for regular market open (Monday 9:30 AM ET). No duplicate order needed.",
+          detail: "The paper broker accepted this order. Check its actual fill status below; do not create a duplicate.",
           action: "View queued paper order",
           lifecycleTab: "orders" as const,
         }
@@ -1391,7 +1398,7 @@ export default function ApertureExecute() {
         : candidateActiveOrder.status === "approved"
           ? {
               title: `${orderInstrumentLabel(candidateActiveOrder)} approved · ready to send to broker`,
-              detail: "Trade is approved! Click Send Order to Broker below. If the market is closed, it queues for Monday 9:30 AM ET open.",
+              detail: "Review the destination and submit the exact ticket below. Current checks must pass; approval alone does not send an order.",
               action: "Send order to broker",
               lifecycleTab: "orders" as const,
             }
@@ -1426,7 +1433,7 @@ export default function ApertureExecute() {
         <div className="flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-xs" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 40%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 8%, var(--sh-surface))" }}>
           <Sparkles className="h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} />
           <span style={{ color: "var(--sh-text-primary)" }}>
-            <strong>Off-Market Staging:</strong> Market opens Monday at 9:30 AM ET. You can stage and approve your simulated paper trades now; limit DAY orders will be queued and routed to your paper broker for the market open.
+            <strong>Paper execution:</strong> Approval and submission are separate. Eligible orders submitted outside trading hours may queue for the next eligible regular session; no fill is guaranteed.
           </span>
         </div>
 

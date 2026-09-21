@@ -620,10 +620,10 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
         : mayQueueOptionWhileClosed
           ? "market is closed — this limit-only paper option may be approved and queued for the next eligible options session; it cannot execute overnight and the limit caps the premium per share"
         : mayQueueEquityWhileClosed
-          ? "market is closed — this bounded limit + day paper order is queued for the next regular session (Monday 9:30 AM ET open); it cannot execute overnight and the limit price is strictly capped"
+          ? "market is closed — this bounded limit + day paper order is eligible to queue for the next regular session after explicit submission; it cannot execute overnight"
         : mayPrepareWhileClosed
           ? "market is closed — the paper proposal may be prepared, but approval and submission will recheck live market, account, and quote conditions"
-          : "market is closed — market orders cannot execute safely while the exchange is closed; use a limit order to queue for Monday 9:30 AM ET open",
+          : "market is closed — this order is not eligible for submission; review the order terms and next eligible session",
     );
 
     if (rule?.requiresRegularSession) {

@@ -44,6 +44,6 @@ describe("Aperture Execute mobile and accessibility contract", () => {
     expect(pendingActionStart).toBeGreaterThan(0);
     expect(pendingActions).toContain("Approve paper ticket");
     expect(pendingActions).toContain('<Button variant="outline"');
-    expect(pendingActions).toContain("Do not approve");
+    expect(pendingActions).toContain("Pass on this trade");
   });
 });

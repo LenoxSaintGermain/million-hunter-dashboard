@@ -50,7 +50,7 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(form).toContain("Open int.");
     expect(form).toContain("Retry live quote");
     expect(form).toContain("Choose another contract");
-    expect(form).toContain("Preserve cash · $0 risk");
+    expect(form).toContain("Pass on trade · Keep cash safe");
     expect(form).toContain("optionChainHasSelectableContract");
     expect(form).toContain("optionResolutionNeeded");
     expect(form).toContain("aperture.play.decide.useMutation");
@@ -95,7 +95,9 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(execute).toContain("showAlternatives");
     expect(execute).toContain("Choose another play in this run");
     expect(execute).toContain("setShowAlternatives(true)");
-    expect(execute).toContain("No ticket created. Resolve the current blocker or review the measured terms above");
+    expect(execute).toContain("No ticket created yet. Choose your setup and sizing terms above");
+    expect(execute).toContain('monitoringContextState !== "ready"');
+    expect(execute).toContain("Loading your existing ticket…");
     expect(execute).toContain("focusCandidateId={proposalCandidate?.id}");
     expect(execute).toContain("other paper order");
     expect(execute).toContain("Monitor in Play Desk");
@@ -119,8 +121,9 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     const execute = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/ApertureExecute.tsx"), "utf8");
     const desk = readFileSync(resolve(process.cwd(), "client/src/pages/aperture/AperturePlayDesk.tsx"), "utf8");
 
-    expect(execute).toContain("Submit / queue paper order");
-    expect(execute).toContain("held for the next eligible regular session");
+    expect(execute).toContain("Send order to broker / queue");
+    expect(execute).toContain("may queue for the next eligible regular session");
+    expect(execute).not.toContain("Market opens Monday");
     expect(execute).not.toContain("If the options session is closed");
     expect(execute).toContain("Accepted / queued at paper broker");
     expect(desk).toContain("arbitrateTodayRead({ briefing: briefing ?? null");
@@ -133,7 +136,7 @@ describe("Capital Aperture paper-ticket journey contract", () => {
 
     expect(execute).toContain("candidateActiveOrder");
     expect(execute).toContain("Paper order already exists · do not duplicate");
-    expect(execute).toContain("accepted and queued for the next eligible session");
+    expect(execute).toContain("The paper broker accepted this order. Check its actual fill status");
     expect(execute).toContain("!candidateActiveOrder");
   });
 
@@ -152,7 +155,7 @@ describe("Capital Aperture paper-ticket journey contract", () => {
     expect(form).toContain("riskCeilingResult");
     expect(form).toContain("Selected maximum loss");
     expect(form).toContain("Choose a lower-premium contract");
-    expect(form).toContain("Preserve cash · $0 risk");
+    expect(form).toContain("Pass on trade · Keep cash safe");
   });
 
   it("resolves a hard option guardrail in place without reviving the sticky loop", () => {

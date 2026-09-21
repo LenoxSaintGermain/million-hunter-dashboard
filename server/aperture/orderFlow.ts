@@ -216,32 +216,31 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
   const portfolioContextAccount = contextRows[0];
   if (!portfolioContextAccount) throw new Error("portfolio context account not found");
 
-  // Keep paper accounts fresh so automated journeys and active operators are never blocked by stale sync timers
-  if (account.brokerId === "manual" && (account.lastSyncedAt == null || now - account.lastSyncedAt > 3.5 * 3600_000)) {
-    await db.update(portfolioAccounts).set({ lastSyncedAt: now, updatedAt: now }).where(eq(portfolioAccounts.id, account.id));
-    account.lastSyncedAt = now;
-  }
-  if (portfolioContextAccount.brokerId === "manual" && (portfolioContextAccount.lastSyncedAt == null || now - portfolioContextAccount.lastSyncedAt > 3.5 * 3600_000)) {
-    await db.update(portfolioAccounts).set({ lastSyncedAt: now, updatedAt: now }).where(eq(portfolioAccounts.id, portfolioContextAccount.id));
-    portfolioContextAccount.lastSyncedAt = now;
-  }
+  // Manual declarations require operator reconfirmation, not timestamp renewal.
+  // Failed provider reads leave the last successful snapshot unchanged.
   const execBroker = brokerFor(account.brokerId, account.id);
   if (account.brokerId === "alpaca_paper" && (account.lastSyncedAt == null || now - account.lastSyncedAt > 14 * 60_000) && execBroker.available()) {
     try {
       const alpacaAcct = await execBroker.getAccount();
+      if (!account.isPaper || !alpacaAcct.isPaper || !account.externalAccountId
+        || alpacaAcct.externalAccountId !== account.externalAccountId
+        || !Number.isFinite(alpacaAcct.asOf) || alpacaAcct.asOf > Date.now()
+        || now - alpacaAcct.asOf > 14 * 60_000) {
+        throw new Error("Fresh matching paper-account snapshot unavailable");
+      }
       await db.update(portfolioAccounts).set({
         equityValueCents: alpacaAcct.equityValueCents,
         cashCents: alpacaAcct.cashCents,
         buyingPowerCents: alpacaAcct.buyingPowerCents,
-        lastSyncedAt: now,
+        lastSyncedAt: alpacaAcct.asOf,
         updatedAt: now,
       }).where(eq(portfolioAccounts.id, account.id));
       account.equityValueCents = alpacaAcct.equityValueCents;
       account.cashCents = alpacaAcct.cashCents;
-      account.lastSyncedAt = now;
+      account.buyingPowerCents = alpacaAcct.buyingPowerCents;
+      account.lastSyncedAt = alpacaAcct.asOf;
     } catch {
-      await db.update(portfolioAccounts).set({ lastSyncedAt: now, updatedAt: now }).where(eq(portfolioAccounts.id, account.id));
-      account.lastSyncedAt = now;
+      // Existing freshness gates remain authoritative; no invented fresh data.
     }
   }
 
