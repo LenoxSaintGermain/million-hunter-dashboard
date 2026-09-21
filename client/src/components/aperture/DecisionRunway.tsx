@@ -808,6 +808,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     risk: previewForAccount?.risk ?? null,
     loading: authoritativePreview.isFetching || cockpit.isFetching,
     failed: authoritativePreview.isError || cockpit.isError,
+    failureReason: authoritativePreview.error?.data?.code === "PRECONDITION_FAILED" ? authoritativePreview.error.message : null,
     lines: cockpitForAccount?.headroom.lines ?? [],
     headroomAsOf: cockpitForAccount?.generatedAt ?? null,
   };
@@ -825,7 +826,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     : horizonMismatch ? "Primary and underwriting horizons disagree. Inspect both in Review & underwrite and explicitly choose the intended scope."
     : needsRevisionReview ? "Review the before/after assumptions in Review & underwrite."
     : !paperAccount ? "Select an available paper account in Account & risk."
-    : branch === "research" && missionConfigured && authoritativePreview.isError ? "Refresh the effective risk constraint in Account & risk before underwriting."
+    : branch === "research" && missionConfigured && authoritativePreview.isError ? riskInspection.failureReason ?? "Refresh the effective risk constraint in Account & risk before underwriting."
     : branch === "research" && missionConfigured && authoritativePreview.isLoading ? "Checking the effective account and portfolio constraint."
     : jobNeedsReconciliation ? "Open the saved underwriting task to view progress or deliberately retry."
     : currentDecisionRunId != null && (underwritingJob.isLoading || underwritingJob.isError) ? "Check saved task status before starting new analysis."
@@ -1085,7 +1086,7 @@ function DraftDifference({ local, remote }: { local: MissionDraftValues; remote:
 
 export function MissionReviewFeasibility({ branch = "research", feasibility, enteredLossCents, normalPolicyPct, policyVersion = null, accountCeilingCents = null, openRiskCents = null, remainingHeadroomCents, inspection, onInspect }: { branch?: Branch; feasibility: TargetFeasibility | null; enteredLossCents: number; normalPolicyPct: number | null; policyVersion?: string | null; accountCeilingCents?: number | null; openRiskCents?: number | null; remainingHeadroomCents: number | null; inspection?: MissionRiskInspectionContext; onInspect: () => void }) {
   const disclosure = inspection
-    ? <>{(inspection.loading || inspection.failed) && <p role="status" className="mt-2 leading-6" style={{ color: "var(--sh-signal)" }}>{inspection.loading ? "Refreshing constraints." : "Constraint refresh failed."} Recorded values remain visible; current eligibility is not confirmed.</p>}<MissionRiskInspection context={inspection} enteredLossCents={enteredLossCents} policyVersion={policyVersion} onRefresh={onInspect} /></>
+    ? <>{(inspection.loading || inspection.failed) && <p role="status" className="mt-2 leading-6" style={{ color: "var(--sh-signal)" }}>{inspection.loading ? "Refreshing constraints." : inspection.failureReason ?? "Constraint refresh failed."} Recorded values remain visible; current eligibility is not confirmed.</p>}{!inspection.loading && inspection.failed && inspection.failureReason && <a className="mt-2 inline-flex min-h-11 items-center underline" href="/aperture/plays">Review active orders</a>}<MissionRiskInspection context={inspection} enteredLossCents={enteredLossCents} policyVersion={policyVersion} onRefresh={onInspect} /></>
     : <Button variant="outline" className="mt-2 min-h-11" onClick={onInspect}>{feasibility ? "Inspect effective constraint" : "Inspect account & risk"}</Button>;
   if (!feasibility) return <section className="mt-4 rounded-lg border p-3 text-sm" style={{ borderColor: "var(--sh-signal)" }}><p role="status">{branch === "research" ? "Effective risk and target feasibility are not verified yet. No analysis can start while the saved constraint is unavailable." : "Effective risk is not verified yet. This decision creates no allocation; inspect constraints before returning to research."}</p>{disclosure}</section>;
   const hasTarget = branch === "research" && feasibility.targetProfitCents != null && feasibility.targetPeriod != null;
@@ -1118,6 +1119,7 @@ type MissionRiskInspectionContext = {
   risk: UnderwritingRiskPolicy | null;
   loading: boolean;
   failed: boolean;
+  failureReason?: string | null;
   lines: CockpitHeadroomLine[];
   headroomAsOf: number | null;
 };

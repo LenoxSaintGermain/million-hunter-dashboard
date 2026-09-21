@@ -38,6 +38,12 @@ function render(overrides: Record<string, unknown> = {}) {
 }
 
 describe("UAT-06 effective constraint inspection", () => {
+  it("shows the actionable risk refusal outside disclosure and links to order review", () => {
+    const { $ } = render({ feasibility: null, inspection: { ...inspection, failed: true,
+      failureReason: "Open portfolio risk is not fully measured. Reconcile active orders before underwriting." } });
+    expect($('[role="status"]').text()).toContain("Reconcile active orders");
+    expect($('a[href="/aperture/plays"]').text()).toContain("Review active orders");
+  });
   it("opens an adjacent native disclosure instead of a tuning or navigation callback", () => {
     const { $, refresh } = render();
     const disclosure = $('details[data-risk-inspection]');
