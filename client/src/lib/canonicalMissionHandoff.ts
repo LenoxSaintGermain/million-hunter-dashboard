@@ -2,6 +2,11 @@ import { emptyMissionDraftValues, missionDraftValuesSchema, type MissionDraftVal
 
 export type CanonicalMissionHandoff = { canonicalThesisId: number; capitalThesisId: number };
 
+/** A new thesis must not depend on another mission's historical receipt. */
+export function missionReceiptReadEnabled(hasHandoff: boolean, exactReceipt: { decisionRunId: number; revisionId: number } | null): boolean {
+  return !hasHandoff || exactReceipt != null;
+}
+
 /** Syntax only. Ownership and source linkage must be checked against reads. */
 export function parseCanonicalMissionHandoff(search: string): CanonicalMissionHandoff | "invalid" | null {
   const params = new URLSearchParams(search);

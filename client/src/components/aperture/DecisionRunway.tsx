@@ -17,7 +17,7 @@ import { PlayUnderwritingBrief } from "./PlayUnderwritingBrief";
 import { MissionResultWorkspace } from "./MissionResultWorkspace";
 import { ObjectiveMissionFlow } from "./ObjectiveMissionFlow";
 import { MissionAccountRefreshLink } from "./MissionAccountRefreshLink";
-import { canonicalMissionHandoffValues, type CanonicalMissionHandoff } from "@/lib/canonicalMissionHandoff";
+import { canonicalMissionHandoffValues, missionReceiptReadEnabled, type CanonicalMissionHandoff } from "@/lib/canonicalMissionHandoff";
 
 type Branch = "research" | "conditional" | "cash";
 type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
@@ -82,7 +82,13 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const completedHandoffReceipt = completedValues?.baseDecisionRunId && completedValues.baseDecisionRevisionId
     ? { decisionRunId: completedValues.baseDecisionRunId, revisionId: completedValues.baseDecisionRevisionId } : null;
   const exactHandoffReceipt = handoffReceipt ?? completedHandoffReceipt;
-  const { data: savedRunwayResponse, error: receiptError, isLoading: receiptLoading } = trpc.aperture.runway.latest.useQuery(receiptTarget ?? exactHandoffReceipt ?? undefined, { retry: false });
+  const receiptReadEnabled = missionReceiptReadEnabled(!!handoff, receiptTarget ?? exactHandoffReceipt);
+  const receiptQuery = trpc.aperture.runway.latest.useQuery(receiptTarget ?? exactHandoffReceipt ?? undefined, { enabled: receiptReadEnabled, retry: false });
+  // Disabled queries can retain cached errors/data for the unscoped latest key.
+  // Those belong to another mission, not this new thesis handoff.
+  const savedRunwayResponse = receiptReadEnabled ? receiptQuery.data : undefined;
+  const receiptError = receiptReadEnabled ? receiptQuery.error : null;
+  const receiptLoading = receiptReadEnabled && receiptQuery.isLoading;
   // A new-thesis handoff is not a request to revise whichever receipt was last.
   const handoffReceiptMatches = exactHandoffReceipt && savedRunwayResponse?.latest?.authority === "authoritative"
     && savedRunwayResponse.latest.decisionRunId === exactHandoffReceipt.decisionRunId && savedRunwayResponse.latest.decisionRevisionId === exactHandoffReceipt.revisionId
