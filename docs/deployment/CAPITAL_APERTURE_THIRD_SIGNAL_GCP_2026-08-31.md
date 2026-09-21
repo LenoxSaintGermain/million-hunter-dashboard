@@ -581,4 +581,43 @@ Complete the Google account chooser once and confirm the verified owner lands in
   - Client bundle `index-Cx6ODWjs.js` verified live with release marker `e80b850-uat-cfde6ef7`.
 - Rollback revision: `capital-aperture-00204-jus`.
 
+### Release 2026-09-21 (Off-Market UAT Hardening, Closed Session Limit DAY Queuing, Auto-Freshness, and Novice UX Plain-Language Overhaul)
+- Commit: `f05392c` (`feat(aperture): off-market uat test suite and novice plain-language ux overhaul`)
+- Release Tag: `f05392c-uat-45476497`
+- Cloud Build: `5450e59c-7035-4fd5-9bf7-af77981efc39` (`SUCCESS`, 5M58S)
+- Container Image: `us-central1-docker.pkg.dev/third-signal-v2/cloud-run-source-deploy/capital-aperture:f05392c-uat-45476497`
+- Image Digest: `sha256:5cbc61a3ddb822d53467d83114ef871761fcb47ebbac1878542b6cca834a70ee`
+- Cloud Run Service: `capital-aperture` (project: `third-signal-v2`, region: `us-central1`)
+- Revision: `capital-aperture-00208-fiy` (tag: `uat-f05392c`) serving **100%** of traffic.
+- Root Cause & Changes:
+  - **Closed Market Bounded Limit Queuing (`server/aperture/gates.ts`)**:
+    - Added `mayQueueEquityWhileClosed`: permits bounded equity limit DAY orders to be staged and queued when the market is closed, routing for Monday 9:30 AM ET open.
+    - Added welcoming, explanatory gate text for pending regular session open.
+  - **Account Auto-Freshness Syncing (`server/aperture/orderFlow.ts`)**:
+    - Stale manual accounts (>3.5h) and Alpaca Paper accounts (>14m) auto-sync upon order evaluation, eliminating clock drift failures during preflight, approval, and submission.
+    - Exported `rerunStoredOrder`.
+  - **Automated Off-Market UAT Suite (`scripts/run-uat-offmarket.ts`)**:
+    - 7 core journeys (10 specific assertions) testing dual-account separation ($2,000 NAV context vs Alpaca execution rail), broker API connectivity, position/risk math, evidence fast-clear, off-market preflight, off-market approval (28 gates), and simulated Monday 10:00 AM ET regular session open (24 gates). 10/10 checks passing with 0 warnings/failures.
+  - **ApertureExecute Novice UX & Friction Elimination (`client/src/pages/aperture/ApertureExecute.tsx`)**:
+    - Replaced raw semicolon toast with `"Trade Safety Check: Suggested Adjustments"`.
+    - Added welcoming off-market staging banner explaining Monday 9:30 AM ET market open queueing.
+    - Pre-filled modal confirmation inputs (`"APPROVE PAPER"` / `"SUBMIT PAPER"`) with 1-click Auto-fill fallback.
+    - Clear 2-step progress guidance: *"Step 1 of 2: Review and Approve simulated trade"* $\to$ *"Step 2 of 2: Send Order to Broker"*.
+  - **Plain-Language Desk Copy Overhaul**:
+    - `CandidateBoard.tsx`: Replaced *"Preserve cash for this candidate"* and *"Paper stage declined"* with *"Pass on this trade · Cash remains safe"* and *"Trade skipped · Cash safe"*.
+    - `PaperProposalForm.tsx`: Replaced *"Preserve cash · $0 risk"* with *"Pass on trade · Keep cash safe"*.
+    - `ManualOrderTicketModal.tsx`: Renamed to *"Create Custom Paper Trade"*, replaced mandate error blocks with *"Trade Safety Suggestions"*, pre-filled 1-click stage.
+- Validation:
+  - TypeScript typecheck (`DATABASE_URL= pnpm check`): 0 errors.
+  - Vitest test suite (`DATABASE_URL= pnpm vitest run server/aperture/orderFlow.test.ts server/aperture/gates.test.ts`): 121/121 passed.
+  - Off-Market UAT Test Suite (`scripts/run-uat-offmarket.ts`): 10/10 passed, 0 failures.
+  - All public endpoints returned HTTP 200:
+    - `https://third-signal-capital-aperture.web.app` (200)
+    - `https://capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+    - `https://uat-f05392c---capital-aperture-oxiyp4dcpq-uc.a.run.app` (200)
+  - `system.health` returned `ok: true`.
+  - Client bundle `index-Cy3OwFYt.js` verified live with release marker `f05392c-uat-45476497`.
+- Rollback revision: `capital-aperture-00206-qed`.
+
+
 
