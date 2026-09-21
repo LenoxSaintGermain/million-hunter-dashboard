@@ -2,7 +2,7 @@
 
 ## Outcome
 
-Implemented locally; not deployed. Language QA instructions are in `LANGUAGE_VALIDATION_AGENT_PROMPT.md`.
+Deployed September 21, 2026. Language QA instructions are in `LANGUAGE_VALIDATION_AGENT_PROMPT.md`.
 
 The legacy action independently selected the newest account and completed research run. A regression test reproduced the resulting mission/run/account binding mismatch. That endpoint now rejects example strategies before database access or order creation.
 
@@ -33,4 +33,15 @@ This phase does not provide a market-wide catalyst feed, options Quick Plays, st
 
 ## Tracking handoff
 
-THI-266: Quick Play binding repair and language QA prompt. Linear requires reauthentication; this record is ready to sync, not posted. No production build or revision was created in this turn.
+THI-266: Quick Play binding repair and language QA prompt. Linear requires reauthentication; this record is ready to sync, not posted.
+
+## Deployment receipt
+
+- Source: `d8d176486d0935f1017838276428785b1b4b7845`, branch `codex/aperture-play-desk`, also pushed to main.
+- Cloud Build: `a0748e62-564b-4a42-89ea-be73dda9771d`, SUCCESS.
+- Production revision: `capital-aperture-00222-fit`, 100% traffic.
+- Previous revision: `capital-aperture-00220-sun`.
+- Runtime configuration fingerprint unchanged: `7e9609ae08b773b1ea790c1d856076edf934d9f09f152f4cf9067f305eda3866`.
+- Staged read-only release smoke: 6/6 passed, 2026-09-21T21:32:13.582Z.
+- Public read-only release smoke: 6/6 passed, 2026-09-21T21:32:37.742Z, https://third-signal-capital-aperture.web.app.
+- Exact client SHA, app shell, API health and unauthenticated access denial verified. No schema migration, broker mode change, order approval or submission performed during deployment. Positive order-journey UAT remains outstanding as above.
