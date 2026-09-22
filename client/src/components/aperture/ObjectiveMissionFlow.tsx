@@ -464,7 +464,23 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
         accounts={accounts} canonicalTheses={canonicalTheses} saveState={saveState} loading={loading}
         failure={failure || (contextFailure ? message(contextFailure) : null)} busy={busy}
         blockedReason={startBlock} onSave={() => save()} onUnderwrite={() => saveAndStart()} saveBeforeUnderwriting
-        riskPreview={riskPreview} accountRefreshRequired={accountRefreshRequired} onInspectRisk={inspectRisk} />
+        riskPreview={riskPreview} accountRefreshRequired={accountRefreshRequired} onInspectRisk={inspectRisk}
+        conflict={conflict}
+        conflictComparison={conflict?.compared ? (
+          <DraftComparison local={values} remote={conflict.remote?.values ?? null} accounts={accounts} theses={canonicalTheses} />
+        ) : null}
+        onResolveConflictUseCurrent={() => {
+          if (operation.current || uncertain || !conflict) return;
+          save(conflict.remote);
+        }}
+        onResolveConflictUseSaved={() => {
+          if (operation.current || uncertain || !conflict?.remote) return;
+          setBackup(values); setValues(conflict.remote.values); setSaved(conflict.remote); setInitialized(true);
+          setTarget(draftIdentity(conflict.remote)); setConflict(null); setFailure(null);
+        }}
+        onCompareConflict={() => {
+          if (conflict) setConflict({ ...conflict, compared: !conflict.compared });
+        }} />
       {(riskFailure || riskPending) && <p role={riskFailure ? "alert" : "status"} className="text-sm" style={{ color: "var(--sh-signal)" }}>{riskFailure || "Reading the effective constraint from the server…"}</p>}
       <Button type="button" variant="ghost" className="min-h-11" onClick={refreshDraft} disabled={refreshing || busy || saving}>Refresh saved draft</Button>
       {!values.strategyContext && !loading && <Button type="button" variant="outline" className="min-h-11" onClick={() => {
@@ -484,7 +500,7 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
       <Button type="button" variant="outline" className="min-h-11" onClick={() => setConflict({ ...conflict, compared: true })}>Compare saved draft</Button>
       {conflict.compared && <>
         <DraftComparison local={values} remote={conflict.remote?.values ?? null} accounts={accounts} theses={canonicalTheses} />
-        {conflict.remote && <Button type="button" variant="outline" className="min-h-11" disabled={busy || saving || !!uncertain} onClick={() => {
+        {conflict.remote && <Button type="button" variant="outline" className="min-h-11" disabled={busy || saving || !conflict.remote || !!uncertain} onClick={() => {
           if (operation.current || uncertain || !conflict.remote) return;
           setBackup(values); setValues(conflict.remote.values); setSaved(conflict.remote); setInitialized(true);
           setTarget(draftIdentity(conflict.remote)); setConflict(null); setFailure(null);

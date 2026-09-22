@@ -2,7 +2,7 @@ import React, { useId, useState } from "react";
 import { apertureLanguage } from "@shared/apertureLanguage";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { replacePrimaryMissionHorizon, type MissionDraftValues, type MissionSection, type MissionStrategyDraft } from "@shared/apertureMissionDraft";
+import { replacePrimaryMissionHorizon, type MissionDraftRecord, type MissionDraftValues, type MissionSection, type MissionStrategyDraft } from "@shared/apertureMissionDraft";
 import type { TargetFeasibility } from "@shared/playUnderwriting";
 import { ContextHelp } from "./ContextHelp";
 import { StateMark } from "./DecisionVisualLanguage";
@@ -50,6 +50,11 @@ export type ObjectiveMissionWorkspaceProps = {
   onInspectRisk: () => void;
   sourceEvidence?: React.ReactNode;
   sourcePicker?: React.ReactNode;
+  conflict?: { remote: MissionDraftRecord | null; compared: boolean } | null;
+  conflictComparison?: React.ReactNode;
+  onResolveConflictUseCurrent?: () => void;
+  onResolveConflictUseSaved?: () => void;
+  onCompareConflict?: () => void;
 };
 
 const scopeLabels: Record<MissionStrategyDraft["searchScope"], string> = {
@@ -157,13 +162,24 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
     : identityIssue;
   const matchingPreview = riskPreview?.accountId === values.accountId ? riskPreview : null;
   const previewCurrent = matchingPreview?.status === "ready" && matchingPreview.asOf != null && Number.isFinite(matchingPreview.asOf);
+  const isHeadroomExhausted = matchingPreview != null && (
+    matchingPreview.feasibility.riskBudgetCents === 0
+    || matchingPreview.measuredLimits?.some(limit => limit.label.toLowerCase().includes("headroom") && limit.valueCents === 0)
+  );
+  const openRiskLimit = matchingPreview?.measuredLimits?.find(limit => limit.label.toLowerCase().includes("open risk"));
+  const openRiskText = openRiskLimit?.valueCents != null ? money(openRiskLimit.valueCents) : null;
+  const headroomLimit = matchingPreview?.measuredLimits?.find(limit => limit.label.toLowerCase().includes("headroom"));
+  const headroomText = headroomLimit?.valueCents != null ? money(headroomLimit.valueCents) : "$0.00";
+  const headroomMessage = isHeadroomExhausted
+    ? `Cannot analyze: Risk limit reached (${headroomText} headroom remaining).`
+    : null;
   const previewWarning = matchingPreview && !previewCurrent
     ? `Constraint ${matchingPreview.status === "loading" ? "refreshing" : matchingPreview.status === "failed" ? "refresh failed" : matchingPreview.status === "stale" ? "is stale" : "freshness is unconfirmed"}. Recorded values only; current eligibility is not confirmed.` : null;
   const activityMessage = (loading || saveState === "loading" ? "Loading the draft and account choices." : null)
     || (busy ? "Underwriting is in progress." : null)
     || (saveState === "saving" ? "Saving your draft. Wait for confirmation." : null);
   const actionBlock = unavailable || activityMessage
-    || failureText || blockedReason || previewWarning || issues[0]?.message
+    || failureText || blockedReason || headroomMessage || previewWarning || issues[0]?.message
     || (saveState !== "saved" && !props.saveBeforeUnderwriting ? "Save this draft before underwriting." : null);
   const effectiveSaveState = failureText ? "failed" : loading ? "loading" : saveState;
   const saveLabel = { loading: "Loading draft", saving: "Saving…", saved: "Saved", unsaved: "Unsaved changes", failed: "Save or action failed" }[effectiveSaveState];
@@ -327,6 +343,90 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
           {props.accountRefreshRequired && selectedAccount && <MissionAccountRefreshLink accountLabel={selectedAccount.label} />}
         </div>
         {issues.length > 0 && <Button type="button" variant="outline" className="min-h-11" disabled={locked} onClick={() => { setAttempted([1, 2]); change({ activeSection: issues[0].section }); }}>Review missing values</Button>}
+        {isHeadroomExhausted && (
+          <div data-testid="risk-limit-exhausted-card" className="rounded-lg border p-3.5 text-sm space-y-2.5" style={{ borderColor: "var(--sh-signal)", background: "rgba(245, 158, 11, 0.08)" }}>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-amber-500">
+                Cannot analyze: Risk limit reached ({headroomText} headroom remaining)
+              </span>
+            </div>
+            <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>
+              Your account has liquid buying power, but your paper account's daily loss limit {openRiskText ? `(${openRiskText} open risk)` : ""} is full. Downside risk capacity—not nominal broker cash—is the binding constraint.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <a
+                href="/aperture/plays"
+                className="inline-flex items-center justify-center rounded-md text-xs font-medium min-h-9 px-3 border border-amber-500/40 hover:bg-amber-500/10 transition-colors"
+                style={{ color: "var(--sh-text-primary)" }}
+              >
+                View & Cancel Open Orders
+              </a>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="min-h-9 text-xs"
+                onClick={() => go(2)}
+              >
+                Adjust Daily Risk Limit
+              </Button>
+            </div>
+          </div>
+        )}
+        {props.conflict && (
+          <div data-testid="draft-conflict-resolver" className="rounded-lg border p-3.5 text-sm space-y-2.5" style={{ borderColor: "var(--sh-signal)", background: "rgba(245, 158, 11, 0.08)" }}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-amber-500">Draft conflict detected</span>
+              {props.conflict.remote?.version != null && (
+                <span className="text-xs px-2 py-0.5 rounded border" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
+                  Saved version {props.conflict.remote.version}
+                </span>
+              )}
+            </div>
+            <p className="text-xs leading-5" style={muted}>
+              {props.conflict.remote
+                ? `Saved version ${props.conflict.remote.version} was updated on the server, while you have unsaved local edits.`
+                : "A draft conflict was detected between your local session and the server."}
+            </p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {values.strategyContext && props.onResolveConflictUseCurrent && (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="min-h-9 text-xs"
+                  disabled={locked}
+                  onClick={props.onResolveConflictUseCurrent}
+                >
+                  Use My Current Edits
+                </Button>
+              )}
+              {props.conflict.remote && props.onResolveConflictUseSaved && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="min-h-9 text-xs"
+                  disabled={locked}
+                  onClick={props.onResolveConflictUseSaved}
+                >
+                  Revert to Saved Version {props.conflict.remote.version}
+                </Button>
+              )}
+              {props.onCompareConflict && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="min-h-9 text-xs"
+                  onClick={props.onCompareConflict}
+                >
+                  {props.conflict.compared ? "Hide diff" : "Compare details"}
+                </Button>
+              )}
+            </div>
+            {props.conflict.compared && props.conflictComparison}
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button type="button" className="min-h-11" disabled={!!actionBlock} aria-describedby={`${prefix}-effect ${prefix}-blocked`} onClick={() => { if (!actionBlock) onUnderwrite(); }}>{busy ? apertureLanguage.analyzingPlan : saveState === "saving" ? "Saving draft…" : apertureLanguage.analyzePlan}</Button>
         </div>

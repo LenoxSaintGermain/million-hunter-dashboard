@@ -534,3 +534,83 @@ describe("what the declared capital buys per order", () => {
     expect($.text()).toContain("Effective constraint");
   });
 });
+
+describe("risk limit exhausted contextual resolver", () => {
+  const zeroHeadroomPreview: ObjectiveMissionRiskPreview = {
+    ...serverPreview,
+    measuredLimits: [
+      { label: "Portfolio open risk", valueCents: 125100, context: "Pending orders." },
+      { label: "Remaining portfolio headroom", valueCents: 0, context: "No remaining headroom." },
+    ],
+    feasibility: {
+      ...serverPreview.feasibility,
+      riskBudgetCents: 0,
+    },
+  };
+
+  it("renders the contextual resolver card when risk headroom is exhausted", () => {
+    const view = harness(completeValues(), { saveState: "saved", riskPreview: zeroHeadroomPreview });
+    const { $ } = view.render();
+    const card = $("[data-testid=risk-limit-exhausted-card]");
+    expect(card).toHaveLength(1);
+    expect(card.text()).toContain("Cannot analyze: Risk limit reached ($0.00 headroom remaining)");
+    expect(card.text()).toContain("Downside risk capacity—not nominal broker cash—is the binding constraint");
+    expect(card.text()).toContain("$1,251.00 open risk");
+
+    const ordersLink = card.find("a[href='/aperture/plays']");
+    expect(ordersLink).toHaveLength(1);
+    expect(ordersLink.text()).toContain("View & Cancel Open Orders");
+
+    expect(view.button("Analyze my plan").props.disabled).toBe(true);
+    expect($.text()).toContain("Cannot analyze: Risk limit reached ($0.00 headroom remaining).");
+  });
+
+  it("navigates to Section 2 (Account & risk) when clicking Adjust Daily Risk Limit", () => {
+    const view = harness(completeValues(), { saveState: "saved", riskPreview: zeroHeadroomPreview });
+    view.click("Adjust Daily Risk Limit");
+    expect(view.props.values.activeSection).toBe(2);
+  });
+});
+
+describe("draft conflict inline resolver", () => {
+  const remoteRecord = {
+    id: 123,
+    identity: { requestId: "req-123", declarationId: null, completedAt: null },
+    version: 18,
+    values: { ...completeValues(), capital: "50000" },
+    completedAt: null,
+    updatedAt: 1700000000000,
+  };
+
+  it("renders the inline conflict resolver card when conflict is present", () => {
+    const onResolveConflictUseCurrent = vi.fn();
+    const onResolveConflictUseSaved = vi.fn();
+    const onCompareConflict = vi.fn();
+
+    const view = harness(completeValues(), {
+      saveState: "unsaved",
+      conflict: { remote: remoteRecord, compared: false },
+      onResolveConflictUseCurrent,
+      onResolveConflictUseSaved,
+      onCompareConflict,
+    });
+
+    const { $ } = view.render();
+    const resolver = $("[data-testid=draft-conflict-resolver]");
+    expect(resolver).toHaveLength(1);
+    expect(resolver.text()).toContain("Draft conflict detected");
+    expect(resolver.text()).toContain("Saved version 18");
+    expect(resolver.text()).toContain("Use My Current Edits");
+    expect(resolver.text()).toContain("Revert to Saved Version 18");
+    expect(resolver.text()).toContain("Compare details");
+
+    view.click("Use My Current Edits");
+    expect(onResolveConflictUseCurrent).toHaveBeenCalledOnce();
+
+    view.click("Revert to Saved Version 18");
+    expect(onResolveConflictUseSaved).toHaveBeenCalledOnce();
+
+    view.click("Compare details");
+    expect(onCompareConflict).toHaveBeenCalledOnce();
+  });
+});
