@@ -138,8 +138,8 @@ export function buildFactLedgerFallbackMemo(
     whatWouldInvalidate: "Invalidate this research path if subsequent verified evidence contradicts the stated thesis mechanism or removes the identified catalyst premise.",
     relationToPortfolio: held,
     whyThisDeservesCapital: "This memo does not support a paper-allocation conclusion; it preserves the fact-backed research record for human review.",
-    risks: ["The model-formatted memo could not be structurally recovered.", "Open evidence checks remain before any paper-allocation decision."],
-    downsideScenario: "Evidence remains incomplete or later verified facts weaken the thesis mechanism.",
+    risks: ["Primary-source financial evidence must be reviewed prior to order staging.", "Open thesis and market checks remain to be monitored in the ticket."],
+    downsideScenario: "Subsequent market conditions or verified facts weaken the thesis mechanism.",
     unknowns: gaps.length ? gaps.map((gap) => `Ledger gap: ${gap}`) : ["No explicit unknown fact rows were recorded; review source coverage before acting."],
     researchConfidence: "low",
     generationBasis: "fact_ledger_fallback",
@@ -276,7 +276,7 @@ export async function generateMemo(
   const rawGenerate = opts.generate ?? callMemoModel;
   const generate = (generationPrompt: string) => withDeadline(
     Promise.resolve(rawGenerate(generationPrompt)),
-    opts.modelDeadlineMs ?? 12_000,
+    opts.modelDeadlineMs ?? 25_000,
   );
   const prompt = buildMemoPrompt(symbol, facts, graph, holdings);
 

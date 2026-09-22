@@ -337,12 +337,18 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
       </div>
     </div>
 
-    {/* Critical Alert Bar: Streamlined & Non-bloating */}
+    {/* Subtle Portfolio Constraint Status Note */}
     {summary.severity === "critical" && (
-      <div className="flex items-center justify-between border-t px-4 py-1.5 text-[11px] leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 35%, var(--sh-border-1))", color: "var(--sh-red)", background: "color-mix(in srgb, var(--sh-red) 5%, var(--sh-surface))" }}>
-        <span>⚠️ {bindingSubject} uses {bindingUtilization.toFixed(0)}% of its ceiling, leaving {bindingHeadroom.toFixed(0)}%. New exposure that relies on {bindingSubject} is blocked; existing positions are unchanged.</span>
-        <button type="button" onClick={changeExpanded} className="ml-2 shrink-0 font-medium underline text-[10px]">
-          {expanded ? "Hide Details" : "Inspect Limits"}
+      <div className="flex items-center justify-between border-t px-3 py-1 text-[11px] leading-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}>
+        <div className="flex items-center gap-1.5 truncate">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+          <span className="font-mono font-medium text-[10px] text-amber-500 uppercase shrink-0">Portfolio Note:</span>
+          <span className="truncate text-[11px]">
+            {bindingSubject} uses {bindingUtilization.toFixed(0)}% of its ceiling, leaving {bindingHeadroom.toFixed(0)}%. New exposure that relies on {bindingSubject} is blocked; existing positions are unchanged.
+          </span>
+        </div>
+        <button type="button" onClick={changeExpanded} className="ml-2 shrink-0 font-mono text-[10px] underline hover:text-[var(--sh-text-primary)]" style={{ color: "var(--sh-fg-muted)" }}>
+          {expanded ? "Hide" : "Limits"}
         </button>
       </div>
     )}

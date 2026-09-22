@@ -89,7 +89,13 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   const [recipePrefilled, setRecipePrefilled] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [destinationAccountId, setDestinationAccountId] = useState<number | null>(null);
-  const [draftManualTicket, setDraftManualTicket] = useState(false);
+  const [draftManualTicket, setDraftManualTicket] = useState(() => {
+    if (typeof window !== "undefined") {
+      const s = window.location.search;
+      if (s.includes("manual=1") || s.includes("stage=1")) return true;
+    }
+    return false;
+  });
   const [instrumentType, setInstrumentType] = useState<PaperInstrumentType>(() => run?.instrumentPreference === "options" ? (candidate?.playSide === "short" ? "long_put" : "long_call") : "shares");
   const [optionExpirationDate, setOptionExpirationDate] = useState(() => nextStandardMonthlyOptionExpiration());
   const [optionStrikeDollars, setOptionStrikeDollars] = useState("");
@@ -384,7 +390,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
       <p className="text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{recipeRecovery.reason} {recipeRecovery.nextStep}</p>
       <div className="flex flex-wrap gap-2 pt-2">
         <Button type="button" className="min-h-11 font-semibold" onClick={() => setDraftManualTicket(true)}>
-          Draft Discretionary Paper Ticket
+          Prepare Discretionary Paper Ticket
         </Button>
         <Button type="button" variant="outline" className="min-h-11" onClick={onReturnToBrief}>View research</Button>
       </div>
