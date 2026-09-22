@@ -191,8 +191,8 @@ const CHAPTERS = [
     id: 4,
     label: "IC Votes",
     eyebrow: "IC CONSENSUS",
-    title: "Three models. Unanimous NO. The dissent is where the value lives.",
-    subtitle: "Claude, Gemini, and Sonar run independent investment committee reviews. When they agree, the signal is strong. When they diverge, the flag tells you exactly where the risk lives.",
+    title: "Three independent agents. Unanimous NO. The divergence is where the risk lives.",
+    subtitle: "The Structuralist, The Restructurer, and The Market Analyst run independent investment committee reviews. When they agree, conviction is absolute. When they diverge, the delta isolates the fatal vulnerability.",
     icon: Cpu,
     iconColor: "text-purple-400",
     iconBg: "bg-purple-500/10 border-purple-500/20",
@@ -631,8 +631,8 @@ export default function DemoTour() {
               <Radar className="w-3.5 h-3.5 text-[#ffba20]" />
             </div>
             <div className="hidden sm:block">
-              <div className="font-['Fraunces',_serif] font-black text-[#1a1208] text-xs leading-none">SIGNAL HUNTER</div>
-              <div className="text-[8px] tracking-[0.2em] text-[#8b7355] uppercase leading-none mt-0.5">DEMO MODE</div>
+              <div className="font-['Fraunces',_serif] font-black text-[#1a1208] text-xs leading-none">SIGNAL HUNTER OS</div>
+              <div className="text-[8px] tracking-[0.2em] text-[#8b7355] uppercase leading-none mt-0.5">DILIGENCE SUITE · DEMO RAILS</div>
             </div>
           </div>
 
@@ -739,15 +739,15 @@ export default function DemoTour() {
           {/* Bottom CTA */}
           <div className="mt-8 pt-6 border-t border-[#3d2e1e]">
             <p className="text-[#5c4a32] text-xs mb-4 leading-relaxed">
-              This is a static walkthrough using a composite deal from documented acquisition failures.
-              The real platform runs live AI analysis on every deal you source.
+              This is a deterministic walkthrough using a composite deal from documented acquisition failures.
+              The live suite runs adversarial multi-agent diligence across private operating companies, commercial real estate, and macro theses.
             </p>
             <a
               href={loginUrl}
               className="flex items-center justify-center gap-2 w-full bg-[#ffba20] text-[#1a1208] font-bold text-sm py-3 rounded-xl hover:bg-[#ffd060] transition-colors"
             >
               <Shield className="h-4 w-4" />
-              Run This on a Real Deal
+              Enter the Live Suite
             </a>
           </div>
         </div>

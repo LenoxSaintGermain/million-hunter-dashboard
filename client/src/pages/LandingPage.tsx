@@ -21,52 +21,53 @@ import {
   FileSearch,
   Layers,
   Zap,
+  Building2,
 } from "lucide-react";
 
 // ─── Static data ─────────────────────────────────────────────────────────────
 const STATS = [
-  { value: "70–90%", label: "Acquisition failure rate, industry-wide" },
-  { value: "54%", label: "Avg. revenue concentration in failed deals" },
-  { value: "3.1×", label: "Avg. add-back inflation in broker-presented SDE" },
-  { value: "48h", label: "From listing to full IC verdict" },
+  { value: "4 Pillars", label: "Private Companies · Commercial Real Estate · Macro Aperture · Deep Research" },
+  { value: "3 Agents", label: "Parallel IC Consensus: Structuralist · Restructurer · Market Analyst" },
+  { value: "100%", label: "Zero-API deterministic demo safety & tamper-resistant memo verification" },
+  { value: "48h", label: "Intake to cited Red Team verdict, debt modeling, and LP memo generation" },
 ];
 
 const FEATURES = [
   {
-    eyebrow: "RED TEAM — ALWAYS ON",
-    title: "The deal team that argues against you. On purpose.",
-    body: "Every analysis runs a mandatory devil's advocate pass. The Red Team stress-tests the thesis, surfaces the failure modes, and tells you what the broker's deck buried in footnote 14 — before you've spent a dollar on diligence.",
+    eyebrow: "PILLAR I — PRIVATE ACQUISITIONS",
+    title: "The Red Team and IC panel that kills bad deals on purpose.",
+    body: "Parallel reviews by The Structuralist, The Restructurer, and The Market Analyst. A mandatory devil's advocate pass strips out fictitious add-backs, tests customer concentration, and flags contract cliffs before you spend $25k on a QoE report.",
     Icon: ShieldCheck,
   },
   {
-    eyebrow: "QUALITY OF EARNINGS PROXY",
-    title: "The add-backs that aren't add-backs.",
-    body: "Owner salary above market replacement. Personal vehicles. Family consulting payments. One-time write-offs claimed as recurring. The QoE proxy flags every line before you commission the $25k report.",
-    Icon: FileSearch,
+    eyebrow: "PILLAR II — COMMERCIAL REAL ESTATE",
+    title: "Deep property asset dossiers. Zero blind spots on lease roll or zoning.",
+    body: "Forensic verification across tenant lease expirations, municipal zoning encumbrances, environmental registries, and debt coverage ratios. Audit commercial assets before earnest money goes hard.",
+    Icon: Building2,
   },
   {
-    eyebrow: "IC CONSENSUS",
-    title: "Three independent agents. One verdict. The divergence is the signal.",
-    body: "The Structuralist, The Restructurer, and The Market Analyst run parallel investment committee reviews on every deal. When they disagree, the divergence flag tells you exactly where the risk lives — and why it matters.",
-    Icon: Vote,
+    eyebrow: "PILLAR III — CAPITAL APERTURE",
+    title: "Macro thesis modeling with fail-closed decision runway.",
+    body: "Translate rates, duration shocks, and commodity cycles into systematic candidate boards. Practice paper execution rails with zero-hype risk bounds ensure capital preservation is treated as an explicit, measured outcome.",
+    Icon: Layers,
   },
   {
-    eyebrow: "OWNER DEPENDENCE AUDIT",
-    title: "How many hours does the business actually need the owner?",
-    body: "The most common post-close surprise isn't financial — it's operational. The Owner Dependence Audit maps key-person risk, management layer gaps, and the real replacement cost before you're locked in.",
-    Icon: Brain,
+    eyebrow: "PILLAR IV — DEEP RESEARCH & RADAR",
+    title: "Live Perplexity Sonar Pro radar with verifiable citations.",
+    body: "Continuously scan off-market regulatory moves, distressed assets, and emerging catalysts backed by verified web citations. RippleEffect monitors secondary supply-chain shocks across your active watchlists.",
+    Icon: Radar,
   },
   {
-    eyebrow: "TIDE CAPITAL FLOW",
-    title: "The federal government telegraphs its moves. Most people aren't listening.",
-    body: "TIDE reads USASpending disbursements, Federal Register actions, and FEC filings to surface capital convergence events 60–90 days before they appear in deal flow.",
+    eyebrow: "TIDE CAPITAL FLOW INTELLIGENCE",
+    title: "Track federal disbursements 60–90 days ahead of the market.",
+    body: "TIDE ingests USASpending disbursements, Federal Register rulemakings, and municipal allocations to identify public capital convergence long before it surfaces on commercial listing exchanges.",
     Icon: TrendingUp,
   },
   {
-    eyebrow: "SENTINEL SIGNALS",
-    title: "The macro environment is a signal, not a headline.",
-    body: "Rate shifts, SBA policy changes, sector tailwinds, and geographic arbitrage windows — weighted against your live pipeline. The market is always speaking. This is how you hear it.",
-    Icon: Radar,
+    eyebrow: "INVESTOR ECOSYSTEM & MEMO VAULT",
+    title: "LP-ready deal rooms and verified Investor DNA profiling.",
+    body: "Generate institutional investment memos, capital stack models, and LOIs in minutes. Distribute diligence through curated deal rooms matched precisely to syndicate LP criteria and mandate profiles.",
+    Icon: Vote,
   },
 ];
 
@@ -83,23 +84,23 @@ const CAPITAL_OPTIONS = [
 
 const FAILURE_MODES = [
   {
-    stat: "54%",
-    label: "of failed deals had customer concentration >40% in owner-personal relationships",
-    icon: AlertTriangle,
-  },
-  {
     stat: "3.1×",
-    label: "average add-back inflation ratio in broker-presented SDE vs. verified QoE",
+    label: "average add-back inflation in broker-presented SDE before independent forensic verification",
     icon: BarChart3,
   },
   {
-    stat: "87%",
-    label: "of post-close operational failures trace to undisclosed key-person dependency",
-    icon: Layers,
+    stat: "68%",
+    label: "of commercial property underperformance traces to unverified lease roll cliffs or deferred capex",
+    icon: Building2,
   },
   {
-    stat: "18mo",
-    label: "median time-to-failure in deals with government contract re-compete risk at close",
+    stat: "82%",
+    label: "of macro allocation drawdowns stem from unmeasured decision runway and unhedged duration shocks",
+    icon: AlertTriangle,
+  },
+  {
+    stat: "48h",
+    label: "to surface off-market regulatory, zoning, and federal capital flow signals with Sonar Pro citations",
     icon: Timer,
   },
 ];
@@ -227,12 +228,12 @@ function AccessRequestForm() {
       </div>
       <div className="mb-7">
         <label className="block text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase mb-2">
-          Deal Thesis <span className="text-[#5c4a32] normal-case tracking-normal font-normal">(optional — increases approval odds)</span>
+          Investment Mandate & Deal Thesis <span className="text-[#5c4a32] normal-case tracking-normal font-normal">(optional — increases approval odds)</span>
         </label>
         <textarea
           value={dealThesis}
           onChange={(e) => setDealThesis(e.target.value)}
-          placeholder="What type of business are you targeting? What's your acquisition thesis? What markets are you focused on?"
+          placeholder="Describe your investment mandate: lower-middle market operating companies, commercial real estate portfolios, macro/liquid theses, or special situations? What are your target asset parameters?"
           rows={3}
           className="w-full bg-[#1a1208] border border-[#3d2e1e] text-[#faf8f5] placeholder-[#5c4a32] px-4 py-3 text-sm focus:outline-none focus:border-[#ffba20] transition-colors resize-none"
         />
@@ -285,13 +286,13 @@ export default function LandingPage() {
               <Radar className="text-[#ffba20] w-4 h-4" />
             </div>
             <div>
-              <div className="font-['Fraunces',_serif] font-black text-[#1a1208] text-sm leading-none">SIGNAL HUNTER</div>
-              <div className="text-[9px] tracking-[0.2em] text-[#8b7355] uppercase leading-none mt-0.5">OS EDITORIAL</div>
+              <div className="font-['Fraunces',_serif] font-black text-[#1a1208] text-sm leading-none">SIGNAL HUNTER OS</div>
+              <div className="text-[9px] tracking-[0.2em] text-[#8b7355] uppercase leading-none mt-0.5">DECISION & DILIGENCE SUITE</div>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <Link href="/explore" className="text-sm text-[#5c4a32] hover:text-[#1a1208] transition-colors hidden sm:block">
-              Browse Deals
+              Explore Pipeline
             </Link>
             <a
               href={loginUrl}
@@ -308,7 +309,7 @@ export default function LandingPage() {
         <div className="max-w-4xl">
           <div className="flex items-center gap-3 mb-8">
             <div className="h-px w-12 bg-[#ffba20]" />
-            <span className="text-[10px] font-bold tracking-[0.25em] text-[#8b7355] uppercase">Acquisition Diligence Intelligence</span>
+            <span className="text-[10px] font-bold tracking-[0.25em] text-[#8b7355] uppercase">Multi-Asset Diligence & Decision Suite</span>
           </div>
           <h1
             className="font-['Fraunces',_serif] font-black text-[#1a1208] leading-[0.92] mb-8"
@@ -318,10 +319,10 @@ export default function LandingPage() {
             <span className="text-[#ffba20]">before they close.</span>
           </h1>
           <p className="text-[#5c4a32] text-xl leading-relaxed max-w-2xl mb-4">
-            70–90% of acquisitions fail to achieve their stated objectives. The failure modes are predictable. The signals are knowable before close. Signal Hunter OS surfaces them before you've spent a dollar on diligence.
+            Whether acquiring an operating business, auditing commercial property, or sizing macro capital exposure, 70–90% of capital allocations fail to achieve their mandate. The failure modes are predictable. The signals exist before capital is committed.
           </p>
           <p className="text-[#8b7355] text-base leading-relaxed max-w-xl mb-10">
-            Customer concentration. Add-back inflation. Owner dependence. Contract cliffs. The Red Team finds them. The IC votes on them. You decide with full information.
+            Add-back inflation. Tenant roll cliffs. Unhedged duration shocks. Undisclosed key-person risk. The Red Team exposes them. Independent IC agents vote on them. Live cited research verifies them. You allocate with institutional conviction.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <a
@@ -333,17 +334,17 @@ export default function LandingPage() {
               Request Operator Access
             </a>
             <Link
-              href="/demo-tour"
+              href="/walkthrough"
               className="inline-flex items-center justify-center gap-2 border border-[#1a1208] text-[#1a1208] text-base font-medium px-8 py-4 hover:bg-[#1a1208] hover:text-[#faf8f5] transition-colors"
             >
               <Search className="w-5 h-5" />
-              See a live diligence run
+              Inspect solo walkthrough
             </Link>
             <Link
               href="/explore"
               className="inline-flex items-center justify-center gap-2 text-[#5c4a32] text-base font-medium px-4 py-4 hover:text-[#1a1208] transition-colors underline underline-offset-4 decoration-[#ffba20]"
             >
-              Browse active deals
+              Browse active opportunities
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -386,13 +387,13 @@ export default function LandingPage() {
           <div className="lg:col-span-4 lg:sticky lg:top-24">
             <div className="flex items-center gap-3 mb-6">
               <div className="h-px w-8 bg-[#ffba20]" />
-              <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">The System</span>
+              <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">The Decision Suite</span>
             </div>
             <h2 className="font-['Fraunces',_serif] text-4xl lg:text-5xl font-black text-[#1a1208] leading-tight mb-6">
-              Six diligence layers. Before the teaser.
+              One institutional suite. Upstream of expensive mistakes.
             </h2>
             <p className="text-[#5c4a32] leading-relaxed mb-8">
-              The failure modes in acquisition are predictable. The signals are in the data. Signal Hunter OS reads them before you open the broker deck — so you walk in knowing what you're actually buying.
+              Signal Hunter OS replaces fragmented spreadsheets and broker decks with a multi-asset intelligence engine. From operating companies to commercial real estate, macro candidate boards, and cited research, every asset passes through adversarial scrutiny before you wire a retainer or commit capital.
             </p>
             <a
               href="#request-access"
@@ -417,14 +418,14 @@ export default function LandingPage() {
           <div>
             <div className="flex items-center gap-3 mb-3">
               <div className="h-px w-8 bg-[#ffba20]" />
-              <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Live Demo</span>
+              <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Deterministic Demo Rails</span>
             </div>
             <h2 className="font-['Fraunces',_serif] text-3xl lg:text-4xl font-black text-[#faf8f5] leading-tight mb-3">
-              Watch the IC vote no on a $2.1M deal.<br />
+              Watch the engine kill a compromised deal in seconds.<br />
               <span className="text-[#ffba20]">See exactly why.</span>
             </h2>
             <p className="text-[#8b7355] text-base max-w-xl">
-              A real composite deal. Broker sheet signals only. Three agents. Unanimous NO. The failure modes were all knowable before close.
+              Inspect an unvarnished audit across debt service, tenant concentration, and adversarial stress tests. Zero live API calls, zero login wall, zero hype. See how institutional agents expose what brokers bury.
             </p>
           </div>
           <Link
@@ -454,7 +455,7 @@ export default function LandingPage() {
                 <span className="text-[#ffba20]">that protects you.</span>
               </h2>
               <p className="text-[#8b7355] text-lg mb-8 leading-relaxed">
-                Signal Hunter OS is invite-only. Access is granted to operators with a defined deal thesis, verified capital access, and a bias toward execution over deliberation.
+                Signal Hunter OS is invite-only. We grant access to independent sponsors, real estate syndicators, family office allocators, and systematic capital operators who deploy with high conviction.
               </p>
               <div className="space-y-4">
                 {[
@@ -496,7 +497,7 @@ export default function LandingPage() {
             <span className="font-['Fraunces',_serif] font-black text-[#1a1208] text-xs">SIGNAL HUNTER OS</span>
           </div>
           <div className="text-[#8b7355] text-xs">
-            A Third Signal Lab product. Acquisition diligence intelligence for the independent operator.
+            A Third Signal Lab product. Multi-asset diligence & decision intelligence for high-conviction operators and allocators.
           </div>
           <div className="flex items-center gap-6 text-xs text-[#8b7355]">
             <Link href="/explore" className="hover:text-[#1a1208] transition-colors">Browse Deals</Link>

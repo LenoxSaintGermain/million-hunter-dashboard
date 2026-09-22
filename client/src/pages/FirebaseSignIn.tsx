@@ -54,18 +54,18 @@ export default function FirebaseSignIn() {
               <LockKeyhole className="h-4 w-4" aria-hidden="true" />
             </div>
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sh-fg-3)]">Third Signal</p>
-              <p className="text-sm font-semibold">Capital Aperture</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sh-fg-3)]">Third Signal Lab</p>
+              <p className="text-sm font-semibold">Signal Hunter OS</p>
             </div>
           </div>
-          <span className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--sh-fg-4)] sm:block">Paper research · human approval</span>
+          <span className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--sh-fg-4)] sm:block">Multi-Asset Diligence & Decision Suite</span>
         </header>
 
         <section className="grid flex-1 items-center gap-10 py-12 lg:grid-cols-[1.15fr_0.85fr] lg:py-20">
           <div>
             <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--amber)]">Verified operator access</p>
-            <h1 className="max-w-3xl font-display text-4xl leading-[1.04] tracking-[-0.035em] sm:text-5xl lg:text-6xl">Turn a market thesis into a clear, risk-bounded paper play.</h1>
-            <p className="mt-6 max-w-2xl text-[15px] leading-7 text-[var(--sh-fg-2)]">Sign in with the Google account tied to your invitation. Your thesis, portfolio context, research, and approvals remain attached to your operator profile.</p>
+            <h1 className="max-w-3xl font-display text-4xl leading-[1.04] tracking-[-0.035em] sm:text-5xl lg:text-6xl">Adversarial intelligence for high-conviction allocations.</h1>
+            <p className="mt-6 max-w-2xl text-[15px] leading-7 text-[var(--sh-fg-2)]">Sign in with the verified account tied to your invitation or subscription. Your deal pipeline, property dossiers, macro candidate boards, and syndicate memo rooms remain encrypted and attached to your operator profile.</p>
           </div>
 
           <aside className="overflow-hidden rounded-[12px] border border-[var(--rule)] bg-[var(--paper)]">
@@ -76,14 +76,14 @@ export default function FirebaseSignIn() {
             <div className="space-y-5 p-6">
               <div className="flex items-start gap-3 rounded-[8px] bg-[var(--sh-surface)] p-4">
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[var(--sage)]" aria-hidden="true" />
-                <p className="text-sm leading-6 text-[var(--sh-fg-2)]">We use your verified email to reconnect existing work or accept an email-specific invite. A new identity never inherits another operator’s account.</p>
+                <p className="text-sm leading-6 text-[var(--sh-fg-2)]">We use your verified email to reconnect existing pipeline deals, property dossiers, and LP memos. A new identity never inherits another operator's data or private pipeline.</p>
               </div>
               <Button className="min-h-12 w-full justify-between bg-[var(--ink)] px-5 text-[var(--bone)] hover:bg-[var(--ink)]/90" disabled={submitting} onClick={continueWithGoogle}>
                 <span>{submitting ? "Verifying account…" : "Continue with Google"}</span>
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Button>
               {error ? <p role="alert" className="rounded-[8px] border border-red-300 bg-red-50 p-3 text-sm leading-5 text-red-800">{error}</p> : null}
-              <p className="text-center font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--sh-fg-4)]">No real-money access · no automatic orders</p>
+              <p className="text-center font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--sh-fg-4)]">Deterministic diligence · institutional data isolation</p>
             </div>
           </aside>
         </section>

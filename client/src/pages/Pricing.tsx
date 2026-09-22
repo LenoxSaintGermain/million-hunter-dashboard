@@ -12,87 +12,88 @@ const TIERS = [
   {
     id: "scout",
     name: "Scout",
-    tagline: "The pre-QoE filter",
+    tagline: "The pre-commitment filter",
     price: 297,
     annual: 2970,
-    target: "Solo operators, SBA searchers, first-time acquirers",
+    target: "Independent operators, solo searchers, and emerging asset buyers",
     color: "var(--sh-accent)",
     badge: null,
     features: [
-      "Up to 10 active deals in pipeline",
-      "Full Third Signal analysis per deal",
-      "Thesis → IC Review → Red Team → Capital Stack",
-      "URL import with Sonar-pro extraction (10/mo)",
-      "Investment memo generation",
-      "Investor DNA profile",
-      "Community access",
+      "Up to 10 active deals or property dossiers in pipeline",
+      "Full 4-stage Third Signal diligence gauntlet",
+      "Private company & commercial real estate screening",
+      "URL import with Perplexity Sonar Pro extraction (10/mo)",
+      "Autonomous Red Team & IC scorecard generation",
+      "Capital Stack & DSCR debt modeling",
+      "Investment memo generation & Investor DNA profile",
     ],
     cta: "Start with Scout",
-    anchor: "Pays for itself the first time it saves you from a bad LOI.",
+    anchor: "Pays for itself the first time it kills a flawed deal before you wire a diligence retainer.",
   },
   {
     id: "operator",
     name: "Operator",
-    tagline: "Your deal team's second brain",
+    tagline: "Full multi-asset deal team",
     price: 697,
     annual: 6970,
-    target: "Independent sponsors running 5–15 active deals",
+    target: "Independent sponsors, real estate syndicators, and active deal principals",
     color: "#c9a96e",
     badge: "Most Popular",
     features: [
       "Everything in Scout",
-      "Unlimited active deals",
-      "Unlimited URL imports",
-      "Seller simulation (negotiation prep)",
-      "AI-drafted outreach pipeline",
-      "Priority AI processing (no queue)",
-      "Slack/email deal alerts",
-      "1 investor seat for LP dossier sharing",
+      "Unlimited active deals, property dossiers, and pipeline assets",
+      "Unlimited Sonar Pro cited imports & deep research queries",
+      "Full 3-agent IC Consensus (Structuralist, Restructurer, Market Analyst)",
+      "Commercial real estate lease roll, zoning & environmental verification queues",
+      "Live Opportunity Radar market scanning & RippleEffect tracking",
+      "Seller negotiation simulation & automated outreach pipeline",
+      "1 Syndicate seat with LP Deal Room sharing",
     ],
     cta: "Start with Operator",
-    anchor: "One avoided dead deal per quarter pays for 12 months.",
+    anchor: "One avoided dead deal or bad lease cliff per quarter pays for your entire year.",
   },
   {
     id: "family-office",
     name: "Family Office",
-    tagline: "Diligence infrastructure",
+    tagline: "Multi-asset family office infrastructure",
     price: 2500,
     annual: 25000,
-    target: "Single-family offices, small MFOs, sponsors with LP relationships",
+    target: "Single-family offices, private syndicates, and multi-asset investment committees",
     color: "#8b7355",
     badge: null,
     features: [
       "Everything in Operator",
-      "Up to 5 team seats",
-      "White-label dossier exports (your branding)",
-      "Custom Investor DNA for multiple allocators",
-      "Dedicated onboarding + quarterly strategy review",
-      "API access for portfolio integration",
+      "Up to 5 team seats with unified pipeline and dossier management",
+      "Capital Aperture access: systematic macro thesis modeling & risk-bounded paper rails",
+      "TIDE capital flow tracking & federal disbursement alert feeds",
+      "White-label investment memos & LP-ready deal room vaults",
+      "Multi-principal Investor DNA profiling for family members & LPs",
+      "Dedicated onboarding, quarterly mandate recalibration & API integration",
       "Priority support (4-hour SLA)",
     ],
     cta: "Talk to us",
-    anchor: "Benchmarks against analyst salaries, not SaaS tools.",
+    anchor: "Replaces $200k+ in junior analyst overhead with deterministic, institutional rigor.",
   },
   {
     id: "institutional",
     name: "Institutional",
-    tagline: "Custom infrastructure",
+    tagline: "Bespoke enterprise decision engine",
     price: null,
     annual: null,
-    target: "Multi-family offices, RIAs, lower-middle-market PE",
+    target: "Multi-family offices, LMM private equity, credit funds, and institutional allocators",
     color: "#5a4a3a",
     badge: null,
     features: [
-      "Everything in Family Office",
-      "Unlimited seats",
-      "Custom AI model configuration",
-      "Dedicated instance (data isolation)",
-      "Custom CRM / portfolio management integration",
-      "Quarterly model recalibration to your thesis",
-      "SLA-backed uptime guarantee",
+      "Everything in Family Office with unlimited team seats",
+      "Custom multi-agent IC personas calibrated to your firm's investment committee manual",
+      "Dedicated private instance with cryptographic data isolation & compliance rails",
+      "Full API & webhook integration for internal CRM, portfolio, and accounting stacks",
+      "Portfolio exposure maps & cross-asset stress-testing (rates, duration, sector shocks)",
+      "Quarterly model recalibration to your historical win/loss data",
+      "Dedicated quantitative architect & custom SLA-backed uptime guarantee",
     ],
     cta: "Request a briefing",
-    anchor: "Floor: $8,000/month. Scoped to your deal infrastructure.",
+    anchor: "Floor: $8,000/month. Scoped to your institutional mandate and volume.",
   },
 ];
 
@@ -102,7 +103,7 @@ const COMPETITORS = [
   { name: "Sourcescrub", category: "LMM Data", cost: "$20,000–$50,000+/yr", does: "Private company coverage", doesnt: "Workflow, diligence, or scoring" },
   { name: "PitchBook", category: "Institutional Data", cost: "$25,000+/yr per seat", does: "Deal history, fund data", doesnt: "SMB coverage, diligence workflow" },
   { name: "4Degrees", category: "Relationship CRM", cost: "$1,500–$3,000/seat/yr", does: "Relationship intelligence", doesnt: "Deal analysis of any kind" },
-  { name: "Signal Hunter OS", category: "Diligence Engine", cost: "$2,970–$25,000/yr", does: "Pre-QoE diligence, scoring, Red Team, Capital Stack, Memo/LOI", doesnt: "Nothing in this category" },
+  { name: "Signal Hunter OS", category: "Multi-Asset Decision Suite", cost: "$2,970–$25,000/yr", does: "Pre-QoE deal killing, Red Team adversarial review, IC consensus, CRE property dossiers, Capital Aperture macro theses, Sonar Pro cited research, and LP deal rooms", doesnt: "Unvetted listing broker spam; we evaluate and kill bad deals, not inflate pipeline vanity metrics" },
 ];
 
 const PROJECTIONS = [
@@ -113,7 +114,7 @@ const PROJECTIONS = [
     operator: 45,
     familyOffice: 8,
     institutional: 1,
-    note: "Organic growth through independent sponsor and ETA searcher communities",
+    note: "Organic growth across independent sponsors, ETA searchers, and boutique real estate syndicates",
   },
   {
     year: "Year 2",
@@ -122,7 +123,7 @@ const PROJECTIONS = [
     operator: 140,
     familyOffice: 28,
     institutional: 4,
-    note: "Channel partnerships with SBA lenders and M&A advisors",
+    note: "Channel partnerships with SBA lenders, commercial broker networks, and M&A advisors",
   },
   {
     year: "Year 3",
@@ -131,7 +132,7 @@ const PROJECTIONS = [
     operator: 320,
     familyOffice: 65,
     institutional: 10,
-    note: "Family office and RIA channel fully activated",
+    note: "Family office, institutional allocator, and multi-asset advisory channel fully activated",
   },
 ];
 
@@ -324,15 +325,15 @@ export default function Pricing() {
           className="text-center space-y-6"
         >
           <Badge variant="outline" className="text-[var(--sh-accent)] border-[var(--sh-accent)]/30 bg-[var(--sh-accent)]/5 px-4 py-1.5">
-            Monetization & Pricing
+            Suite Licensing & ROI
           </Badge>
           <h1 className="text-5xl md:text-6xl font-black text-[var(--sh-text)] leading-tight tracking-tight">
-            A bad acquisition costs<br />
-            <span className="text-[var(--sh-accent)]">$40,000–$80,000.</span>
+            A bad allocation costs<br />
+            <span className="text-[var(--sh-accent)]">$40,000 to millions.</span>
           </h1>
           <p className="text-xl text-[var(--sh-muted)] max-w-2xl mx-auto leading-relaxed">
-            Signal Hunter surfaces the landmine before you spend a dollar on professional diligence.
-            This is not a productivity tool. It is a pre-QoE diligence engine — priced accordingly.
+            Signal Hunter OS exposes structural flaws before you wire earnest money or sign an LOI.
+            This is not a pipeline CRM. It is a multi-asset decision & diligence engine — priced to protect your balance sheet.
           </p>
           <div className="flex items-center justify-center gap-3 pt-2">
             <span className={`text-sm font-medium ${!billingAnnual ? "text-[var(--sh-text)]" : "text-[var(--sh-muted)]"}`}>Monthly</span>
@@ -439,8 +440,8 @@ export default function Pricing() {
           <div className="text-center mb-10">
             <h2 className="text-3xl font-bold text-[var(--sh-text)]">The white space no one else occupies</h2>
             <p className="text-[var(--sh-muted)] mt-2 max-w-xl mx-auto">
-              Every other tool in the stack finds deals or tracks relationships. Signal Hunter validates them.
-              That is a different category.
+              Every other platform aggregates listings or logs relationships. Signal Hunter OS subjects private companies, commercial real estate, and macro theses to adversarial diligence.
+              That is an entirely different category.
             </p>
           </div>
 
@@ -631,26 +632,26 @@ export default function Pricing() {
           className="text-center space-y-6 py-8"
         >
           <h2 className="text-3xl font-bold text-[var(--sh-text)]">
-            The deal of your life is already listed somewhere.
+            High-conviction opportunities exist across every asset class.
           </h2>
           <p className="text-[var(--sh-muted)] max-w-lg mx-auto">
-            Signal Hunter makes sure you don't buy the wrong one first.
+            Signal Hunter OS ensures you eliminate the compromised ones before capital is committed.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a href={getLoginUrl()}>
               <Button size="lg" className="bg-[var(--sh-accent)] hover:bg-[var(--sh-accent)]/90 text-white px-8">
-                Get access to the live app
+                Get access to the live suite
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </a>
             <Link href="/walkthrough">
               <Button size="lg" variant="outline" className="px-8">
-                See the walkthrough first
+                Inspect solo walkthrough
               </Button>
             </Link>
           </div>
           <p className="text-xs text-[var(--sh-muted)]">
-            No credit card required for Scout tier · Cancel anytime
+            Transparent pricing · Institutional data isolation · Cancel anytime
           </p>
         </motion.div>
 

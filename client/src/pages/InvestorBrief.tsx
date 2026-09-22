@@ -169,14 +169,16 @@ const MEMO_EXCERPT = {
 
 // ─── CAPABILITY MATRIX ────────────────────────────────────────────────────────
 const CAPABILITY_MATRIX = [
-  { capability: "Thesis Engine", description: "Structure and score a buy-box against live deal flow", status: "Live" as const },
-  { capability: "IC Agent Consensus", description: "Multi-agent panel scoring with divergence detection", status: "Live" as const },
-  { capability: "Red Team — Always On", description: "Adversarial diligence: surfaces landmines from pre-close signals", status: "Live" as const },
+  { capability: "Thesis Engine", description: "Structure and score a multi-asset buy-box against live deal flow", status: "Live" as const },
+  { capability: "IC Agent Consensus", description: "Multi-agent panel scoring (Structuralist, Restructurer, Market Analyst) with divergence detection", status: "Live" as const },
+  { capability: "Red Team — Always On", description: "Adversarial diligence: surfaces landmines from pre-close signals and lease cliffs", status: "Live" as const },
   { capability: "Owner / Seller Simulation", description: "Seller persona, motivation read, negotiation leverage map", status: "Live" as const },
-  { capability: "Capital Stack Modeler", description: "SBA 7(a) + seller note + equity stack with DSCR validation", status: "Live" as const },
-  { capability: "Investment Memo + LOI", description: "Diligence brief and LOI draft from deal signals", status: "Live" as const },
-  { capability: "TIDE Intelligence", description: "Federal spend, SBA policy, and macro signal monitoring", status: "Live" as const },
-  { capability: "Market Scan", description: "Real cited listings via sonar-pro, sourced per-market", status: "Live" as const },
+  { capability: "Capital Stack Modeler", description: "SBA 7(a), commercial debt, seller notes, and equity stack with DSCR validation", status: "Live" as const },
+  { capability: "Capital Aperture", description: "Systematic macro thesis modeling, decision runway limits, and candidate boards", status: "Live" as const },
+  { capability: "Investment Memo + LOI", description: "Institutional diligence brief and LOI draft from verified deal signals", status: "Live" as const },
+  { capability: "TIDE Intelligence", description: "Federal spend, SBA policy, and macro capital flow tracking", status: "Live" as const },
+  { capability: "Opportunity Radar", description: "Perplexity Sonar Pro cited web intelligence, permit, and capital convergence", status: "Live" as const },
+  { capability: "Market Scan", description: "Real cited listings via Sonar Pro, sourced per-market", status: "Live" as const },
   { capability: "National Register universe", description: "63,127 listed buildings + 19,476 historic districts, queryable", status: "Live" as const },
   { capability: "Register verification", description: "Settles NRHP status as fact from a reference number, not a claim", status: "Live" as const },
   { capability: "County direct data", description: "Parcel assessments joined to tax liens — Allegheny County, PA", status: "Live" as const },
@@ -186,7 +188,6 @@ const CAPABILITY_MATRIX = [
   { capability: "Verification Queue", description: "Pools unverified critical fields, researches and writes back with citations", status: "Live" as const },
   { capability: "Scheduled sourcing", description: "Daily/weekly automated runs, disabled by default", status: "Live" as const },
   { capability: "CSV / CoStar ingest", description: "Broker exports scored through the same engine", status: "Live" as const },
-  { capability: "Opportunity Radar", description: "Permit, zoning, and capital convergence signal detection", status: "Demo" as const },
   { capability: "Searcher Intelligence DB", description: "Demand-side dataset from every diligence run — the moat", status: "Roadmap" as const },
   { capability: "Gated Free Run (/try)", description: "Public diligence run with email gate — top-of-funnel acquisition", status: "Roadmap" as const },
   { capability: "Matching Engine", description: "Thesis-to-deal matching using Searcher Intelligence DB", status: "Roadmap" as const },
@@ -826,18 +827,18 @@ export default function InvestorBrief() {
               className="text-4xl lg:text-5xl font-black leading-tight mb-6"
               style={{ fontFamily: "var(--font-serif, 'Fraunces', serif)", color: "var(--sh-text-primary)" }}
             >
-              Signal Hunter OS finds the deal, then tries to kill it — across operating businesses and property.
+              Signal Hunter OS finds the asset, then tries to kill it — across operating businesses, commercial property, and macro theses.
             </h1>
             <p className="text-lg leading-relaxed mb-4" style={{ color: "var(--sh-text-secondary)" }}>
               Two halves of the same job. <strong style={{ color: "var(--sh-text-primary)" }}>Sourcing</strong> starts
-              from the qualifying universe rather than the listings — 63,127 National Register buildings, county
-              ownership and tax records, a motivation score for whether an owner will actually sell. <strong style={{ color: "var(--sh-text-primary)" }}>Diligence</strong> then
-              asks the question a broker sheet never does — <em>what kills this deal?</em> — before the LOI, not after.
+              from the qualifying universe rather than fragmented listing aggregators — 63,127 National Register buildings, county
+              ownership and tax liens, and live Opportunity Radar signals backed by Sonar Pro. <strong style={{ color: "var(--sh-text-primary)" }}>Diligence</strong> then
+              asks the question a broker sheet never does — <em>what kills this allocation?</em> — before earnest capital is wired, not months after.
             </p>
             <p className="text-lg leading-relaxed mb-6" style={{ color: "var(--sh-text-secondary)" }}>
-              The original wedge was the $4.5 trillion small-business transition. The same engine now runs
-              bespoke property theses, where the qualifying set is finite and a listing platform cannot see
-              the buildings that are not for sale.
+              The initial wedge was the $4.5 trillion small-business transition. The suite now powers
+              commercial real estate underwriting, where county records and lease rolls dictate viability,
+              and Capital Aperture, where macro theses and duration shocks are evaluated with risk-bounded paper discipline.
             </p>
             <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>
               Market size estimate sourced from BizBuySell 2025 Insight Report and SBA Office of Advocacy SMB data. $4.5T represents total estimated value of US small businesses with owner age ≥55 expected to transact 2025–2035.
@@ -848,13 +849,13 @@ export default function InvestorBrief() {
           <section ref={setRef("problem")} id="problem" className="scroll-mt-20">
             <SectionLabel>Why Now</SectionLabel>
             <h2 className="text-3xl font-black mb-6" style={{ fontFamily: "var(--font-serif, 'Fraunces', serif)", color: "var(--sh-text-primary)" }}>
-              The silver tsunami is real. The diligence gap is bigger.
+              The transition wave is historic. The diligence gap is lethal.
             </h2>
             <div className="grid sm:grid-cols-3 gap-4 mb-8">
               {[
                 { stat: "~$4.5T", label: "estimated value of US small businesses with owners ≥55 expected to transact by 2035", source: "SBA Office of Advocacy, estimate" },
-                { stat: "10,000+", label: "new ETA searchers entering the market annually, per Stanford GSB ETA survey data", source: "Stanford GSB, estimate" },
-                { stat: "~30%", label: "of SBA 7(a) acquisitions experience significant post-close revenue decline within 24 months", source: "SBA OIG analysis, estimate" },
+                { stat: "10,000+", label: "new ETA searchers and CRE syndicators entering the market annually", source: "Stanford GSB & industry survey data, estimate" },
+                { stat: "~30%", label: "of private acquisitions and commercial assets underperform debt service within 24 months", source: "SBA OIG & industry debt analysis, estimate" },
               ].map((item) => (
                 <div key={item.stat} className="rounded-xl p-5" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
                   <p className="text-3xl font-black mb-1" style={{ color: "var(--sh-signal)", fontFamily: "var(--font-serif, 'Fraunces', serif)" }}>{item.stat}</p>
@@ -864,7 +865,7 @@ export default function InvestorBrief() {
               ))}
             </div>
             <p className="text-base leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>
-              The ETA market has a structural diligence gap: searchers are trained to find deals, not stress-test them. Brokers are incentivized to close. QoE firms charge $15–30k and take 6–8 weeks. Signal Hunter OS runs the adversarial analysis in minutes, before the LOI, from the broker sheet alone.
+              Across private acquisitions and tangible assets, buyers face the same structural blind spot: platforms are designed to market assets, not stress-test them. Brokers are paid on closing. Traditional QoE and engineering firms charge $25–$80k and require 6–10 weeks. Signal Hunter OS runs autonomous, adversarial diligence in minutes before the LOI is signed — catching fatal flaws while walking away is free.
             </p>
           </section>
 
@@ -958,11 +959,11 @@ export default function InvestorBrief() {
               </div>
               <div>
                 <h2 className="text-2xl font-black" style={{ fontFamily: "var(--font-serif, 'Fraunces', serif)", color: "var(--sh-text-primary)" }}>Capital Stack Modeler</h2>
-                <p className="text-sm mt-1" style={{ color: "var(--sh-text-secondary)" }}>SBA 7(a) + seller note + equity. DSCR validated on true SDE.</p>
+                <p className="text-sm mt-1" style={{ color: "var(--sh-text-secondary)" }}>SBA 7(a), commercial debt, seller paper, and equity returns. DSCR validated on true cash flows.</p>
               </div>
             </div>
             <p className="text-base leading-relaxed mb-6" style={{ color: "var(--sh-text-secondary)" }}>
-              The Capital Stack Modeler builds the financing structure and validates DSCR against the normalized SDE — not the broker's stated SDE. This is where the add-back inflation problem becomes a financing problem: a deal that looks fine on stated SDE can fail SBA underwriting on true SDE.
+              The Capital Stack Modeler builds debt and equity structures, testing DSCR against normalized operating income — not the broker's inflated pro-forma or stated SDE. Whether structuring an SBA 7(a) acquisition or commercial property financing, the engine models debt sensitivity to ensure cash flows survive rate shifts and revenue shocks.
             </p>
             <CapitalStackSimulator />
           </section>
@@ -1102,11 +1103,11 @@ export default function InvestorBrief() {
             </div>
 
             <p className="text-base leading-relaxed mb-4" style={{ color: "var(--sh-text-secondary)" }}>
-              The defensible position is not the agents — those are replaceable. It is the joined
-              dataset underneath them: a finite qualifying universe, per-county ownership and distress
-              records, and a scoring model that says plainly which figures are verified and which are
-              modelled. A competitor can copy a prompt in an afternoon. Wiring a county's own tables
-              and keeping the honesty contract intact is the part that takes time.
+              The defensible position is not the raw LLM prompts — those are replaceable. It is the joined
+              dataset underneath them: a finite qualifying universe (63,127 historic buildings), per-county ownership and distress
+              records, live Sonar Pro cited web intelligence, and an adversarial scoring model that says plainly which figures are verified and which are
+              modelled. A competitor can copy a prompt in an afternoon. Wiring a county's own tables, grounding findings with verifiable citations,
+              and keeping the honesty contract intact is the part that creates an institutional moat.
             </p>
 
             <div className="rounded-xl p-6 mb-8" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>

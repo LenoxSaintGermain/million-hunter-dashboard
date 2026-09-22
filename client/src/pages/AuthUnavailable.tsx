@@ -14,13 +14,13 @@ export default function AuthUnavailable() {
             </div>
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sh-fg-3)]">
-                Third Signal · Capital Aperture
+                Third Signal Lab · Signal Hunter OS
               </p>
               <p className="text-sm font-semibold">Access checkpoint</p>
             </div>
           </div>
           <span className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--sh-fg-4)] sm:block">
-            Paper research · no orders
+            Multi-Asset Diligence & Decision Suite
           </span>
         </header>
 
@@ -30,10 +30,10 @@ export default function AuthUnavailable() {
               Sign-in is being connected
             </p>
             <h1 className="max-w-3xl font-display text-4xl leading-[1.05] tracking-[-0.035em] sm:text-5xl lg:text-6xl">
-              The research workspace is protected. The public walkthrough is ready now.
+              The decision suite is protected. The public walkthrough is ready now.
             </h1>
             <p className="mt-6 max-w-2xl text-[15px] leading-7 text-[var(--sh-fg-2)]">
-              This Third Signal deployment is healthy, but its identity provider is not yet available on this host. We stopped here instead of showing an empty screen or opening an unverified session.
+              This Third Signal Lab deployment is healthy, but its identity provider is not yet active on this host. Diligence pipelines, property dossiers, and LP memos remain fail-closed. You can explore the full suite capabilities via the deterministic walkthrough below.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">

@@ -84,8 +84,8 @@ const ENGINE_STEPS = [
     id: "thesis",
     label: "Thesis",
     icon: Zap,
-    what: "Define your acquisition criteria",
-    why: "Prevents scope creep — you only evaluate deals that fit your capital and risk profile",
+    what: "Define your multi-asset mandate and criteria",
+    why: "Prevents scope creep — evaluate only opportunities that fit your capital, risk tolerance, and asset boundaries",
     demo: {
       label: "Sample Thesis — Sunbelt Commercial Services",
       items: [
@@ -101,8 +101,8 @@ const ENGINE_STEPS = [
     id: "ic",
     label: "IC Review",
     icon: Shield,
-    what: "Investment Committee scoring across 6 dimensions",
-    why: "Surfaces weak spots before you spend money — catches the deals that look good on paper but fail on fundamentals",
+    what: "Independent 3-agent IC consensus panel (Structuralist, Restructurer, Market Analyst)",
+    why: "Surfaces structural flaws and operational vulnerabilities — divergence between agents isolates the core risk",
     demo: {
       label: "IC Scorecard — Sunbelt Commercial Cleaning",
       scores: [
@@ -119,8 +119,8 @@ const ENGINE_STEPS = [
     id: "redteam",
     label: "Red Team",
     icon: AlertTriangle,
-    what: "Adversarial stress-test — the engine argues against the deal",
-    why: "Most buyers only look for reasons to say yes. The Red Team finds the reason the deal falls apart.",
+    what: "Adversarial stress-test — the engine argues against the allocation",
+    why: "Most buyers only look for reasons to say yes. The Red Team finds the fatal flaw, tenant cliff, or duration trap.",
     demo: {
       label: "Red Team Findings — Sunbelt Commercial Cleaning",
       findings: [
@@ -135,8 +135,8 @@ const ENGINE_STEPS = [
     id: "stack",
     label: "Capital Stack",
     icon: DollarSign,
-    what: "Model the financing structure before you commit",
-    why: "Knowing your debt service before you sign prevents the most common post-close surprise: cash flow that can't cover the loan",
+    what: "Model debt sizing, DSCR, and financing structures",
+    why: "Validates debt coverage and sensitivity to rate shifts before signing an LOI or committing earnest capital",
     demo: {
       label: "Capital Stack — $2.8M Acquisition",
       stack: [
@@ -153,8 +153,8 @@ const ENGINE_STEPS = [
     id: "memo",
     label: "Memo / LOI",
     icon: FileText,
-    what: "Auto-generate the investment memo and LOI draft",
-    why: "Cuts 6–8 hours of document work to minutes — and ensures every memo follows the same institutional standard",
+    what: "Auto-generate institutional investment memos and LOI drafts",
+    why: "Cuts days of document synthesis to minutes — packages rigorous, audit-ready diligence for partners, lenders, and syndicate LPs",
     demo: {
       label: "Memo Preview — Sunbelt Commercial Cleaning",
       sections: ["Executive Summary", "Business Overview", "Financial Analysis", "Risk Assessment", "Deal Structure", "Recommendation"],
@@ -255,10 +255,10 @@ function Step1() {
     <div className="space-y-8">
       <div>
         <h2 className="text-3xl md:text-4xl font-bold text-[var(--sh-text-primary)] mb-4 leading-tight">
-          Most deals fail<br />before they close.
+          Most capital allocations fail<br />before they close.
         </h2>
         <p className="text-lg text-[var(--sh-fg-muted)] max-w-xl">
-          And the ones that do close often fail in year one — for reasons that were discoverable before the buyer signed.
+          And the ones that do close often underperform in year one — for reasons that were fully knowable before committing capital.
         </p>
       </div>
 
@@ -266,21 +266,21 @@ function Step1() {
         {[
           {
             icon: DollarSign,
-            stat: "$40–50K",
-            label: "Average QoE cost",
-            desc: "Spent on Quality of Earnings before you know if the deal is even worth it",
+            stat: "$40–100K+",
+            label: "Average diligence waste",
+            desc: "Spent on QoE, environmental reviews, and legal retainers before fatal flaws are uncovered",
           },
           {
             icon: Clock,
             stat: "7 months",
-            label: "Average time to discover a fatal flaw",
-            desc: "After signing the LOI — when walking away is expensive",
+            label: "Average time to uncover a fatal flaw",
+            desc: "After executing an LOI or locking earnest money — when walking away is costly",
           },
           {
             icon: TrendingDown,
-            stat: "1 in 3",
-            label: "SMB acquisitions underperform in year 1",
-            desc: "Due to issues that were present in the data before close",
+            stat: "70–90%",
+            label: "Capital allocation underperformance rate",
+            desc: "Due to customer concentration, unverified lease cliffs, or unhedged macro duration",
           },
         ].map((item) => (
           <div
@@ -296,9 +296,9 @@ function Step1() {
       </div>
 
       <div className="p-5 rounded-xl border border-red-200 bg-red-50">
-        <p className="text-sm font-semibold text-red-800 mb-1">The real cost isn't the deal price.</p>
+        <p className="text-sm font-semibold text-red-800 mb-1">The real cost isn't the headline valuation.</p>
         <p className="text-sm text-red-700">
-          It's the $40–50K in QoE, 6 months of your time, and the opportunity cost of the deals you didn't look at — spent on a deal that had a fatal flaw you could have found in week one.
+          It's the wasted professional fees, months of tied-up focus, and severe opportunity cost spent on an asset with knowable failure modes that could have been eliminated in minutes.
         </p>
       </div>
     </div>
@@ -311,10 +311,10 @@ function Step2() {
     <div className="space-y-8">
       <div>
         <h2 className="text-3xl md:text-4xl font-bold text-[var(--sh-text-primary)] mb-4 leading-tight">
-          The diligence engine that catches what kills a deal — before you spend.
+          The diligence suite that catches what kills a deal — across private assets.
         </h2>
         <p className="text-lg text-[var(--sh-fg-muted)] max-w-xl">
-          Signal Hunter OS is a structured acquisition intelligence system. It runs every deal through the same institutional-grade process that private equity firms use — built for operators and family offices who don't have a 10-person deal team.
+          Signal Hunter OS is a unified decision engine spanning private company acquisitions, commercial real estate portfolios, and systematic macro theses. It delivers institutional-grade adversarial review for operators, syndicators, and family offices.
         </p>
       </div>
 
@@ -323,10 +323,10 @@ function Step2() {
           {
             label: "What it replaces",
             items: [
-              "6–8 hours of manual deal screening per opportunity",
-              "Spreadsheet-based IC scoring with no consistency",
-              "Forgetting to check the things that kill deals",
-              "Spending $40K on QoE before you know if the deal is worth it",
+              "Fragmented spreadsheets and single-purpose broker portals",
+              "Subjective, inconsistent investment committee evaluations",
+              "Unverified broker add-backs, undisclosed lease cliffs, and macro blind spots",
+              "Spending $50K on specialized diligence before fundamental viability is proven",
             ],
             color: "border-red-200 bg-red-50",
             textColor: "text-red-800",
@@ -337,10 +337,10 @@ function Step2() {
           {
             label: "What it gives you",
             items: [
-              "Structured deal scoring in minutes, not days",
-              "Consistent IC review across every deal — no deal slips through",
-              "Red Team adversarial analysis that argues against the deal",
-              "Capital stack modeling before you commit to a price",
+              "4-pillar coverage: SMB acquisitions, commercial real estate, macro aperture, and cited research",
+              "Adversarial Red Team and 3-agent IC consensus across every opportunity",
+              "Dynamic capital stack and debt service coverage modeling",
+              "Tamper-resistant investment memos and LP deal room packaging",
             ],
             color: "border-emerald-200 bg-emerald-50",
             textColor: "text-emerald-800",
@@ -366,7 +366,7 @@ function Step2() {
       <div className="p-5 rounded-xl border border-[var(--sh-border-1)] bg-[var(--sh-surface-1)]">
         <p className="text-xs font-semibold text-[var(--sh-text-primary)] uppercase tracking-widest mb-2">The core bet</p>
         <p className="text-sm text-[var(--sh-fg-muted)]">
-          Before you spend $40–50K on a Quality of Earnings report, Signal Hunter tells you which deals are even worth that spend — and which ones have a landmine you'd find in month seven.
+          Before you wire diligence retainers or commit equity, Signal Hunter OS stress-tests the underlying cash flows, contract longevity, and macro exposure — catching the landmine in minutes rather than month seven.
         </p>
       </div>
     </div>
@@ -754,20 +754,20 @@ function Step5() {
           <ul className="space-y-3">
             {[
               {
-                text: "Anchor tenant lease expiration dates — public record, rarely checked",
-                example: "e.g., the Amazon warehouse driving foot traffic has a lease ending in 11 months",
+                text: "Anchor tenant & client concentration cliffs — public record, rarely cross-referenced",
+                example: "e.g., primary anchor lease expiring in 11 months, or top client driving >40% revenue",
               },
               {
-                text: "Owner-operator dependency signals — key-man risk before you ask",
-                example: "e.g., owner is the named contact on 4 of 5 top client contracts",
+                text: "Key-person and operational dependencies — management friction identified early",
+                example: "e.g., owner holds primary client relationships or exclusive municipal permits",
               },
               {
-                text: "Regulatory transfer risk — licenses that don't transfer automatically",
-                example: "e.g., state pest control license requires 90-day re-certification",
+                text: "Regulatory, zoning, and title transfer encumbrances — hidden transition barriers",
+                example: "e.g., zoning variance required or state operating license non-transferable",
               },
               {
-                text: "Off-market broker blind spots — the things agents don't flag",
-                example: "e.g., undisclosed month-to-month on all top accounts",
+                text: "Live citations via Perplexity Sonar Pro — verifiable web and regulatory intelligence",
+                example: "e.g., pending municipal zoning reforms or regional supply chain disruptions with cited sources",
               },
             ].map((item) => (
               <li key={item.text} className="space-y-1">
@@ -785,7 +785,7 @@ function Step5() {
       <div className="p-5 rounded-xl border border-[var(--sh-border-1)] bg-[var(--sh-surface-1)]">
         <p className="text-xs font-semibold text-[var(--sh-text-primary)] uppercase tracking-widest mb-2">Honest about sourcing</p>
         <p className="text-sm text-[var(--sh-fg-muted)]">
-          The data layer is public records, government databases, and commercial listing platforms. The insight layer is the structured analysis engine running on top of that data — not proprietary data, but a proprietary process for finding what matters in the data that's already there.
+          The data layer combines public registries, government databases, county assessor files, and commercial listings. The insight layer is the autonomous adversarial engine running on top — transforming raw filings into cited, actionable decision intelligence.
         </p>
       </div>
     </div>
@@ -887,10 +887,10 @@ function Step7() {
     <div className="space-y-8">
       <div>
         <h2 className="text-3xl md:text-4xl font-bold text-[var(--sh-text-primary)] mb-4 leading-tight">
-          Built for capital with conviction — not a 10-person deal team.
+          Built for high-conviction capital — not bloated deal teams.
         </h2>
         <p className="text-[var(--sh-fg-muted)] max-w-xl">
-          Family offices, independent sponsors, and operators with capital to deploy — but without the infrastructure of a large private equity firm.
+          Independent sponsors, commercial real estate syndicators, family offices, and active deal principals deploying private capital.
         </p>
       </div>
 
@@ -899,20 +899,20 @@ function Step7() {
           {
             label: "Who it's for",
             items: [
-              "Family offices deploying $1M–$10M per acquisition",
-              "Independent sponsors running 1–3 deals per year",
-              "Operators looking to acquire their first or second business",
-              "Attorneys and CPAs advising acquisition clients",
+              "Independent sponsors running 1–3 acquisitions annually",
+              "Commercial real estate syndicators auditing multi-tenant or historic assets",
+              "Family offices deploying $1M–$15M across operating businesses and tangible property",
+              "M&A attorneys, CPAs, and advisory firms pre-screening client opportunities",
             ],
             color: "border-[var(--sh-border-1)] bg-[var(--sh-surface-1)]",
           },
           {
             label: "What it's not",
             items: [
-              "Not a replacement for a QoE — it tells you which deals are worth one",
-              "Not a broker or deal sourcing platform",
-              "Not a substitute for legal counsel on deal structure",
-              "Not a PE firm — it's the infrastructure PE firms already have, available to you",
+              "Not a replacement for final legal or tax counsel — it validates viability before you commission them",
+              "Not a generic listing scraper or uncurated broker directory",
+              "Not a black-box AI model — all reasoning is cited, auditable, and grounded in your thesis",
+              "Not an institutional PE firm — it provides independent operators with PE-grade infrastructure",
             ],
             color: "border-[var(--sh-border-1)] bg-[var(--sh-surface-1)]",
           },
@@ -934,7 +934,7 @@ function Step7() {
       <div className="p-5 rounded-xl border border-[var(--sh-border-1)] bg-[var(--sh-surface-1)]">
         <p className="text-xs font-semibold text-[var(--sh-text-primary)] uppercase tracking-widest mb-2">The moat</p>
         <p className="text-sm text-[var(--sh-fg-muted)]">
-          Signal Hunter isn't competing with what family offices and advisors do — it's saving them the $40–50K they spend to find out a deal was never worth pursuing. The engine runs before the QoE, not instead of it.
+          Signal Hunter OS sits upstream of expensive legal, accounting, and environmental retainers. It protects independent sponsors and allocators from committing capital to structurally compromised assets.
         </p>
       </div>
     </div>
@@ -947,22 +947,23 @@ function Step8() {
     <div className="space-y-8">
       <div>
         <h2 className="text-3xl md:text-4xl font-bold text-[var(--sh-text-primary)] mb-4 leading-tight">
-          Ready to run your own deals?
+          Ready to run your own pipeline?
         </h2>
         <p className="text-lg text-[var(--sh-fg-muted)] max-w-xl">
-          Everything you just saw is live in the full app — connected to real deal data, your acquisition thesis, and your pipeline.
+          Everything demonstrated here is fully active in the live suite — connected to live deal dossiers, real estate properties, macro candidate boards, and LP deal rooms.
         </p>
       </div>
 
       <div className="p-6 rounded-xl border-2 border-[var(--sh-text-primary)] bg-[var(--sh-surface-1)] space-y-4">
-        <p className="text-xs font-semibold text-[var(--sh-fg-muted)] uppercase tracking-widest">The live app includes</p>
+        <p className="text-xs font-semibold text-[var(--sh-fg-muted)] uppercase tracking-widest">The live suite includes</p>
         <ul className="space-y-2">
           {[
-            "Import any listing URL — LoopNet, CoStar, BizBuySell, Crexi",
-            "Full IC Review, Red Team, and Capital Stack on your real deals",
-            "Investment memo and LOI generation",
-            "Outreach tracking and broker relationship management",
-            "Opportunity Radar — live market signals for your target geography",
+            "Import any listing or property dossier — BizBuySell, Crexi, LoopNet, CoStar, or direct CIM",
+            "Full 3-agent IC Consensus, Red Team, and Capital Stack debt modeling",
+            "Commercial real estate verification: lease roll, zoning, and environmental queues",
+            "Capital Aperture: systematic macro thesis modeling and risk-bounded candidate boards",
+            "Live Opportunity Radar & TIDE federal capital flow tracking backed by Sonar Pro citations",
+            "Institutional investment memos, LOIs, and LP deal rooms",
           ].map((item) => (
             <li key={item} className="flex items-center gap-2 text-sm text-[var(--sh-text-primary)]">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -976,11 +977,11 @@ function Step8() {
           className="flex items-center justify-center gap-2 w-full md:w-auto px-8 py-3 rounded-lg bg-[var(--sh-text-primary)] text-[var(--sh-bg)] font-semibold text-sm hover:opacity-90 transition-opacity mt-4"
         >
           <Lock className="w-4 h-4" />
-          Log into the live app
+          Enter the live suite
           <ExternalLink className="w-3.5 h-3.5 opacity-70" />
         </a>
         <p className="text-xs text-[var(--sh-fg-muted)]">
-          This is a door, not a wall — the demo above required no login and never will.
+          Deterministic demo rails remain permanently accessible without login. Live suite access requires verified operator credentials.
         </p>
       </div>
     </div>
