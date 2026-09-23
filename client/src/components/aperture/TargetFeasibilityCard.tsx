@@ -56,6 +56,30 @@ export function TargetFeasibilityCard({ feasibility, noTrade, remainingHeadroomC
           <p className="text-[10px] text-muted-foreground leading-normal">
             <strong>Why this matters:</strong> Having cash available does not increase your risk allowance. Account limits still apply across active trades.
           </p>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <a
+              href="/aperture/plays"
+              className="inline-flex items-center justify-center rounded-md text-xs font-semibold min-h-8 px-3 border transition-colors shadow-xs"
+              style={{
+                background: "var(--sh-signal)",
+                color: "#000",
+                borderColor: "transparent",
+              }}
+            >
+              View & Cancel Open Orders
+            </a>
+            <a
+              href="/aperture/mission"
+              className="inline-flex items-center justify-center rounded-md text-xs font-medium min-h-8 px-3 border transition-colors"
+              style={{
+                background: "var(--sh-surface)",
+                borderColor: "var(--sh-border-1)",
+                color: "var(--sh-text-primary)",
+              }}
+            >
+              Adjust Daily Risk Limit
+            </a>
+          </div>
         </div>
       )}
 

@@ -829,6 +829,8 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     : !paperAccount ? "Select an available paper account in Account & risk."
     : branch === "research" && missionConfigured && authoritativePreview.isError ? riskInspection.failureReason ?? "Refresh the effective risk constraint in Account & risk before underwriting."
     : branch === "research" && missionConfigured && authoritativePreview.isLoading ? "Checking the effective account and portfolio constraint."
+    : branch === "research" && portfolioHeadroomExhausted
+    ? `Cannot analyze: Risk limit reached (${previewPortfolioRisk?.remainingHeadroomCents != null ? formatCents(previewPortfolioRisk.remainingHeadroomCents) : "$0.00"} headroom remaining).`
     : jobNeedsReconciliation ? "Open the saved underwriting task to view progress or deliberately retry."
     : currentDecisionRunId != null && (underwritingJob.isLoading || underwritingJob.isError) ? "Check saved task status before starting new analysis."
     : persistedUnderwritingUnavailable
@@ -1054,7 +1056,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     {underwritingResult && !underwritingComplete && !runUnderwriting.isPending && <section role="status" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><strong>Mission assumptions changed.</strong> The result below is from the previous revision; review changed assumptions before new analysis.</section>}
     {runUnderwriting.isPending && currentUnderwriting.data && <section role="status" aria-live="polite" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><strong>Updating the underwriting result.</strong> The last successful result from {new Date(currentUnderwriting.data.asOf).toLocaleString()} remains available below.</section>}
     {runUnderwriting.error && underwritingResult && <section role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><strong>Updated analysis failed.</strong> The last successful result remains visible and is not presented as fresh. No research, ticket, approval, submission, or order was created.</section>}
-    {underwritingResult && branch === "research" && !underwritingComplete && <section id="mission-underwriting-result" aria-labelledby="mission-underwriting-title" className="scroll-mt-20 space-y-4 rounded-2xl border p-4 sm:p-6" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><header><p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Analysis result · {new Date(underwritingResult.asOf).toLocaleString()}</p><h2 id="mission-underwriting-title" className="mt-1 font-serif text-3xl">Previous mission result</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Review changed assumptions before validating a play.</p></header><PlayUnderwritingBrief result={underwritingResult} selectedPlayId={underwritingResult.selectedPlayId} busy={busy || !underwritingComplete} onValidate={validateUnderwrittenPlay} /></section>}
+    {underwritingResult && branch === "research" && !underwritingComplete && <section id="mission-underwriting-result" aria-labelledby="mission-underwriting-title" className="scroll-mt-20 space-y-4 rounded-2xl border p-4 sm:p-6" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><header><p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Analysis result · {new Date(underwritingResult.asOf).toLocaleString()}</p><h2 id="mission-underwriting-title" className="mt-1 font-serif text-3xl">Previous mission result</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Review changed assumptions before validating a play.</p></header><PlayUnderwritingBrief result={underwritingResult} selectedPlayId={underwritingResult.selectedPlayId} busy={busy || !underwritingComplete} onValidate={validateUnderwrittenPlay} onAdjustRisk={() => openDiagnostic("risk")} /></section>}
 
     {currentBindingMatches && latestBranch === "cash" && <section className="rounded-2xl border p-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 45%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 7%, var(--sh-surface))" }}><div className="flex items-start justify-between gap-4"><div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Cash receipt · current mission</p><h2 className="mt-1 font-serif text-3xl">No new trade.</h2><p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{latestReason ?? "No new allocation was recorded for this mission. Existing positions are unchanged."}</p><p className="mt-2 text-xs"><strong>Blocked by:</strong> {latestBlocker ?? "Named decision boundary"} · <strong>Reopen when:</strong> {latestReopen ?? "A new revision is recorded"}</p></div><CircleSlash2 className="h-7 w-7" style={{ color: "var(--sh-signal)" }} /></div></section>}
 
@@ -1097,11 +1099,36 @@ export function MissionReviewFeasibility({ branch = "research", feasibility, ent
     <h3 className="font-semibold">{branch === "research" ? "Risk allowed for this trade" : "Effective risk for future research"} <span className="mt-1 block font-serif text-2xl tabular-nums">{formatCents(feasibility.riskBudgetCents)}</span></h3>
     <p className="mt-2 leading-6"><strong>You entered {formatCents(enteredLossCents)}.</strong> {policyBinds ? `The normal-play policy caps risk at ${normalPolicyPct}% of your ${formatCents(feasibility.capitalBaseCents)} declared capital (${formatCents(policyCents)}).` : remainingHeadroomCents === 0 ? "Existing open risk uses this mission’s aggregate allowance." : "The smallest measured mission, policy, account or portfolio limit controls."}</p>
     {(feasibility.riskBudgetCents === 0 || remainingHeadroomCents === 0) && (
-      <div className="mt-2.5 rounded border p-2.5 text-xs space-y-1" style={{ borderColor: "var(--sh-border-1)", background: "rgba(245, 158, 11, 0.06)" }}>
+      <div className="mt-2.5 rounded border p-2.5 text-xs space-y-2" style={{ borderColor: "var(--sh-border-1)", background: "rgba(245, 158, 11, 0.06)" }}>
         <p className="font-semibold text-amber-500">Why does this mission show no risk headroom when portfolio cash is available?</p>
         <p className="leading-5" style={{ color: "var(--sh-fg-muted)" }}>
           {feasibility.clarification ?? `Broker cash is liquid, but the Mandate Planned-Loss Envelope (${formatCents(feasibility.maxOpenRiskCents)} ceiling) is 100% committed by active positions. Downside risk capacity—not nominal broker cash—is the binding constraint.`}
         </p>
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <a
+            href="/aperture/plays"
+            className="inline-flex items-center justify-center rounded-md text-xs font-semibold min-h-8 px-3 border transition-colors shadow-xs"
+            style={{
+              background: "var(--sh-signal)",
+              color: "#000",
+              borderColor: "transparent",
+            }}
+          >
+            View & Cancel Open Orders
+          </a>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center rounded-md text-xs font-medium min-h-8 px-3 border transition-colors cursor-pointer"
+            style={{
+              background: "var(--sh-surface)",
+              borderColor: "var(--sh-border-1)",
+              color: "var(--sh-text-primary)",
+            }}
+            onClick={onInspect}
+          >
+            Adjust Daily Risk Limit
+          </button>
+        </div>
       </div>
     )}
     {hasTarget && <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="font-semibold">{feasibility.requiredReturnPct}% per {feasibility.targetPeriod} required · {feasibility.classification}</p><p className="mt-1 leading-6" style={{ color: "var(--sh-fg-muted)" }}>{formatCents(feasibility.targetProfitCents)} target ÷ {formatCents(feasibility.capitalBaseCents)} declared mission capital. An aspiration, not a forecast; it never increases allowed risk.</p></div>}

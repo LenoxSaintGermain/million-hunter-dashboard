@@ -4,20 +4,52 @@ import { TargetFeasibilityCard } from "./TargetFeasibilityCard";
 import { MarketRegimeBrief } from "./MarketRegimeBrief";
 import { TradePlayCard } from "./TradePlayCard";
 
-export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate }: { result: PlayUnderwritingResult; selectedPlayId: string | null; busy: boolean; onValidate: (playId: string) => void }) {
+export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate, onAdjustRisk }: { result: PlayUnderwritingResult; selectedPlayId: string | null; busy: boolean; onValidate: (playId: string) => void; onAdjustRisk?: () => void }) {
   const thesisById = new Map(result.tacticalTheses.map(thesis => [thesis.id, thesis]));
   const leadPlay = result.plays[0] ?? null;
   const fresh = Object.values(result.market.indexTrend).every(metric => metric.freshness === "fresh" && metric.asOf != null);
+  const isHeadroomExhausted = result.noTrade?.reason === "portfolio_headroom_exhausted"
+    || result.feasibility.riskBudgetCents === 0
+    || (result.portfolioRisk.remainingHeadroomCents != null && result.portfolioRisk.remainingHeadroomCents <= 0);
   return <div className="space-y-4">
     {result.noTrade ? <section aria-label="No new trade" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
       <div className="flex items-start gap-3">
         <CircleSlash2 aria-hidden="true" className="mt-1 h-5 w-5 shrink-0" style={{ color: "var(--sh-signal)" }} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h3 className="font-serif text-2xl">No new trade</h3>
           <p className="mt-2 text-sm leading-6">{result.noTrade.explanation}</p>
           {result.noTrade.reopenCondition && <p className="mt-3 text-sm leading-6"><strong>Reassess when:</strong> {result.noTrade.reopenCondition}</p>}
           {result.noTrade.reviewAt != null && <p className="mt-2 text-sm">Review: {new Date(result.noTrade.reviewAt).toLocaleString()} · on demand</p>}
           <p className="mt-3 text-sm" style={{ color: "var(--sh-fg-muted)" }}>No order created. Existing positions are unchanged.</p>
+          {isHeadroomExhausted && (
+            <div data-testid="no-trade-headroom-resolver" className="mt-4 pt-3 border-t" style={{ borderColor: "var(--sh-border-1)" }}>
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href="/aperture/plays"
+                  className="inline-flex items-center justify-center rounded-md text-xs font-semibold min-h-9 px-3.5 border transition-colors shadow-xs"
+                  style={{
+                    background: "var(--sh-signal)",
+                    color: "#000",
+                    borderColor: "transparent",
+                  }}
+                >
+                  View & Cancel Open Orders
+                </a>
+                <a
+                  href="/aperture/mission"
+                  className="inline-flex items-center justify-center rounded-md text-xs font-medium min-h-9 px-3.5 border transition-colors"
+                  style={{
+                    background: "var(--sh-surface)",
+                    borderColor: "var(--sh-border-1)",
+                    color: "var(--sh-text-primary)",
+                  }}
+                  onClick={onAdjustRisk ? (e) => { e.preventDefault(); onAdjustRisk(); } : undefined}
+                >
+                  Adjust Daily Risk Limit
+                </a>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section> : <section aria-label="Trade ideas">

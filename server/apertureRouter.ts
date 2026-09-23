@@ -828,7 +828,92 @@ async function constructPlayForUser(ctx: { user: { id: number; openId?: string }
             eq(apertureCandidates.runId, input.runId),
             eq(apertureRuns.userId, ctx.user.id),
           )).limit(1);
-        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Play not found in your research history" });
+        if (!row) {
+          const illustrativeUat = isExactIsolatedUatRuntime()
+            && ["uat_jim_9c18799", "uat_ch_capital_9c18799"].includes(ctx.user.openId ?? "")
+            && input.runId === 900001;
+          if (illustrativeUat) {
+            const isLead = input.candidateId === 101;
+            const symbol = isLead ? "UATQ" : input.candidateId === 102 ? "NVDA" : "SPY";
+            if (!isLead) {
+              const recovery = recipeHorizonRecovery({
+                holdingPeriod: input.candidateId === 102 ? "catalyst_window" : "position",
+                playSide: input.candidateId === 102 ? "long" : "short",
+              });
+              if (recovery) return {
+                play: null,
+                recovery,
+                marketContext: {
+                  session: "unknown" as const,
+                  nextRegularSessionOpenAt: null,
+                  referencePriceCents: null,
+                  referenceAsOf: null,
+                },
+                disclosure: "Research only. No recipe, proposal, approval, or order was created; the original research horizon is preserved.",
+              };
+            }
+            return {
+              play: {
+                symbol,
+                side: "long" as const,
+                holdingPeriod: "intraday" as const,
+                taxonomy: {
+                  marketPlay: {
+                    specificPlay: "illustrative catalyst review",
+                    basis: "Illustrative UAT fixture — not current market data.",
+                  },
+                  execution: {
+                    direction: "long",
+                    strategy: "human-reviewed paper plan",
+                    instrument: "shares",
+                  },
+                  horizon: {
+                    label: "Same-session human review",
+                    basis: "Modeled UAT horizon; no current market claim.",
+                  },
+                  signals: [{ label: "Named catalyst evidence", status: "unknown" }],
+                },
+                readiness: "constructed" as const,
+                entry: {
+                  priceCents: 2500,
+                  modeled: true as const,
+                  basis: "Modeled illustrative level; not a quote or current market price.",
+                },
+                stop: {
+                  priceCents: 2425,
+                  modeled: true as const,
+                  basis: "Modeled risk boundary for UAT review only.",
+                },
+                slippage: { priceCents: 2, modeled: true as const, basis: "Illustrative slippage assumption." },
+                targets: [{ rMultiple: 2, priceCents: 2650, modeled: true as const, basis: "Illustrative 2R target." }],
+                budgetCents: 10000,
+                qty: 100,
+                notionalCents: 250000,
+                plannedLossCents: 7500,
+                plannedLossPctOfEquity: 0.75,
+                sizeLimitedByNotionalCeiling: false,
+                timeStopAt: null,
+                noTradeConditions: [],
+                trigger: null,
+                tapeBasis: "Illustrative UAT tape basis — not current market quote.",
+                feed: "sip" as const,
+                unavailableReasons: [],
+                assumptions: ["Illustrative UAT assumption: human approval required before execution."],
+                estimatedSizingCents: 250000,
+                riskCents: 7500,
+              },
+              recovery: null,
+              marketContext: {
+                session: "regular" as const,
+                nextRegularSessionOpenAt: null,
+                referencePriceCents: 2500,
+                referenceAsOf: Date.now(),
+              },
+              disclosure: "Illustrative UAT fixture. Zero network, not current market data.",
+            };
+          }
+          throw new TRPCError({ code: "NOT_FOUND", message: "Play not found in your research history" });
+        }
 
         // Check the persisted, owner-scoped horizon before fixtures, accounts,
         // market data, or any default direction can produce an intraday recipe.
@@ -4156,7 +4241,7 @@ export const apertureRouter = router({
      * make a candidate eligible.
      */
     ready: capitalOperatorProcedure
-      .input(z.object({ horizon: z.string().optional(), maxAlternatives: z.number().int().min(0).max(2).optional() }))
+      .input(z.object({ horizon: z.string().optional(), maxAlternatives: z.number().int().min(0).max(20).optional() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
         const rows = await db!.select({ candidate: apertureCandidates, run: apertureRuns })
@@ -4165,7 +4250,60 @@ export const apertureRouter = router({
           .where(and(eq(apertureRuns.userId, ctx.user.id), eq(apertureRuns.status, "completed")))
           .orderBy(desc(apertureRuns.createdAt))
           .limit(120);
-        if (!rows.length) return { best: null, alternatives: [], withheld: { unresolvedEvidence: 0, declined: 0, outOfHorizon: 0, duplicateSymbol: 0 }, directionalMix: null };
+        if (!rows.length) {
+          const illustrativeUat = isExactIsolatedUatRuntime()
+            && ["uat_jim_9c18799", "uat_ch_capital_9c18799"].includes(ctx.user.openId ?? "");
+          if (illustrativeUat) {
+            return selectBestPlays([
+              {
+                runId: 900001,
+                candidateId: 101,
+                symbol: "UATQ",
+                role: "Lead catalyst opportunity",
+                holdingPeriod: "intraday",
+                playSide: "long",
+                rankScore: 92,
+                compositeScore: 90,
+                checks: ["Volume breakout confirmed", "Risk boundary verified"],
+                reviews: {
+                  "Volume breakout confirmed": "confirmed",
+                  "Risk boundary verified": "confirmed",
+                },
+              },
+              {
+                runId: 900001,
+                candidateId: 102,
+                symbol: "NVDA",
+                role: "Sector catalyst alternative",
+                holdingPeriod: "catalyst_window",
+                playSide: "long",
+                rankScore: 88,
+                compositeScore: 85,
+                checks: ["Earnings release confirmed", "Options implied move verified"],
+                reviews: {
+                  "Earnings release confirmed": "confirmed",
+                  "Options implied move verified": "confirmed",
+                },
+              },
+              {
+                runId: 900001,
+                candidateId: 103,
+                symbol: "SPY",
+                role: "Index macro hedge",
+                holdingPeriod: "position",
+                playSide: "short",
+                rankScore: 84,
+                compositeScore: 82,
+                checks: ["CPI print confirmed", "Trendline break verified"],
+                reviews: {
+                  "CPI print confirmed": "confirmed",
+                  "Trendline break verified": "confirmed",
+                },
+              },
+            ], { horizon: input.horizon ?? null, maxAlternatives: input.maxAlternatives });
+          }
+          return { best: null, alternatives: [], withheld: { unresolvedEvidence: 0, declined: 0, outOfHorizon: 0, duplicateSymbol: 0 }, directionalMix: null };
+        }
         const reviewRows = await db!.select().from(apertureEvidenceReviews).where(and(
           eq(apertureEvidenceReviews.userId, ctx.user.id),
           inArray(apertureEvidenceReviews.candidateId, rows.map(({ candidate }) => candidate.id)),

@@ -30,7 +30,7 @@ const HORIZONS = [
   { id: "position", label: "Long term" },
 ] as const;
 
-const PRESET_AMOUNTS = [100, 500, 1000, 5000];
+const PRESET_AMOUNTS = [100, 500, 1000, 5000, 10000];
 
 function readPreferences(): { amount: string; horizon: string } {
   try {
@@ -277,9 +277,8 @@ export default function ApertureDeploy() {
               <button
                 type="button"
                 onClick={() => {
-                  if (PRESET_AMOUNTS.map(p => p * 100).includes(amountCents)) {
-                    setAmount("10,000");
-                  }
+                  const input = document.getElementById("deploy-amount");
+                  if (input) input.focus();
                 }}
                 className={`min-h-10 px-4 py-1.5 rounded-lg text-sm font-mono font-medium transition-all cursor-pointer ${
                   !PRESET_AMOUNTS.map(p => p * 100).includes(amountCents) && amountValid
@@ -287,7 +286,7 @@ export default function ApertureDeploy() {
                     : "bg-[var(--sh-surface-2)] text-[var(--sh-text-primary)] border border-[var(--sh-border-1)] hover:bg-[var(--sh-surface-3)]"
                 }`}
               >
-                Custom {amountValid && !PRESET_AMOUNTS.map(p => p * 100).includes(amountCents) ? `(${money(amountCents)})` : "($10,000)"}
+                Custom {!PRESET_AMOUNTS.map(p => p * 100).includes(amountCents) && amountValid ? `(${money(amountCents)})` : ""}
               </button>
             </div>
 
