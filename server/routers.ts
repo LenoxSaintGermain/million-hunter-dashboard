@@ -45,6 +45,7 @@ import { agentRouter } from "./routers/agentRouter";
 import { rolePermissionsRouter } from "./rolePermissionsRouter";
 import { researchRouter } from "./routers/research";
 import { apertureRouter } from "./apertureRouter";
+import { PUBLIC_OPPORTUNITIES } from "../shared/publicOpportunities";
 
 export const appRouter = router({
   system: systemRouter,
@@ -294,39 +295,112 @@ export const appRouter = router({
       }),
   }),
   publicDeals: router({
-    // Sanitized, limited deal search for unauthenticated visitors.
-    // Returns only name, industry, location, and a blurred score — no financials.
+    // Multi-Asset Opportunity search for unauthenticated visitors and pipeline exploration.
+    // Follows Prime Directive 2 (Deterministic zero-API fallback) & Multi-Asset framing.
     search: publicProcedure
-      .input(z.object({ q: z.string().optional(), limit: z.number().optional() }))
+      .input(z.object({
+        q: z.string().optional(),
+        limit: z.number().optional(),
+        assetClass: z.string().optional(),
+      }))
       .query(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return { results: [], total: 0 };
-        const limit = Math.min(input.limit ?? 6, 12);
-        const q = (input.q ?? "").trim();
-        const rows = await db.execute(
-          q
-            ? sql`SELECT id, name, industry, location, stage, score FROM deals
-                  WHERE (name LIKE ${`%${q}%`} OR industry LIKE ${`%${q}%`} OR location LIKE ${`%${q}%`})
-                  AND is_archived = 0
-                  ORDER BY score DESC LIMIT ${limit}`
-            : sql`SELECT id, name, industry, location, stage, score FROM deals
-                  WHERE is_archived = 0
-                  ORDER BY score DESC LIMIT ${limit}`
-        );
-        const rowsArr = Array.isArray((rows as any)[0]) ? (rows as any)[0] : (rows as any);
-        // Sanitize: blur exact score (round to 1 decimal), strip financials
-        const results = (rowsArr as any[]).map((r: any) => ({
-          id: Number(r.id),
-          name: String(r.name ?? ""),
-          industry: String(r.industry ?? "Service Business"),
-          location: String(r.location ?? "Southeast US"),
-          stage: String(r.stage ?? "new"),
-          scoreBlurred: r.score != null ? Math.round(Number(r.score) * 10) / 10 : null,
+        const limit = Math.min(input.limit ?? 9, 30);
+        const q = (input.q ?? "").trim().toLowerCase();
+        const assetClassFilter = input.assetClass;
+
+        // Curated multi-asset base fixture (Pillars I - IV)
+        const curated = PUBLIC_OPPORTUNITIES.map((opp) => ({
+          id: opp.id,
+          name: opp.name,
+          industry: opp.category,
+          category: opp.category,
+          location: opp.location,
+          stage: opp.stage,
+          stageLabel: opp.stageLabel,
+          assetClass: opp.assetClass,
+          assetClassLabel: opp.assetClassLabel,
+          scoreBlurred: opp.scoreBlurred,
+          metric1Label: opp.metric1Label,
+          metric1Value: opp.metric1Value,
+          metric2Label: opp.metric2Label,
+          metric2Value: opp.metric2Value,
+          metric3Label: opp.metric3Label,
+          metric3Value: opp.metric3Value,
+          adversarialInsight: opp.adversarialInsight,
+          auditFlag: opp.auditFlag,
         }));
-        // Count total
-        const countRow = await db.execute(sql`SELECT COUNT(*) as cnt FROM deals WHERE is_archived = 0`);
-        const countArr = Array.isArray((countRow as any)[0]) ? (countRow as any)[0] : (countRow as any);
-        const total = Number((countArr as any[])[0]?.cnt ?? 0);
+
+        let dbResults: typeof curated = [];
+        try {
+          const db = await getDb();
+          if (db) {
+            const rows = await db.execute(
+              q
+                ? sql`SELECT id, name, industry, location, stage, score FROM deals
+                      WHERE (name LIKE ${`%${q}%`} OR industry LIKE ${`%${q}%`} OR location LIKE ${`%${q}%`})
+                      AND (isArchived = 0 OR isArchived IS NULL)
+                      ORDER BY score DESC LIMIT 12`
+                : sql`SELECT id, name, industry, location, stage, score FROM deals
+                      WHERE (isArchived = 0 OR isArchived IS NULL)
+                      ORDER BY score DESC LIMIT 12`
+            );
+            const rowsArr = Array.isArray((rows as any)[0]) ? (rows as any)[0] : (rows as any);
+            dbResults = (rowsArr as any[]).map((r: any) => ({
+              id: Number(r.id),
+              name: String(r.name ?? ""),
+              industry: String(r.industry ?? "Operating Business"),
+              category: String(r.industry ?? "Operating Business"),
+              location: String(r.location ?? "US Market"),
+              stage: (r.stage ?? "new") as "qualified" | "new" | "high_priority" | "in_diligence" | "active_scan",
+              stageLabel: String(r.stage ?? "new").replace("_", " ").toUpperCase(),
+              assetClass: "private_mna" as const,
+              assetClassLabel: "Private Buyout",
+              scoreBlurred: r.score != null ? Math.round(Number(r.score) * 10) / 10 : 0.7,
+              metric1Label: "Revenue",
+              metric1Value: "Audited Financials",
+              metric2Label: "Cash Flow",
+              metric2Value: "Normalized SDE",
+              metric3Label: "Multiple",
+              metric3Value: "Broker Asking",
+              adversarialInsight: "Subject to 3-agent IC consensus & Red Team add-back audit.",
+              auditFlag: "Operator access required for forensic verification dossier.",
+            }));
+          }
+        } catch (err: any) {
+          console.warn("[publicDeals.search] DB query fallback:", err?.message || err);
+        }
+
+        // Merge curated multi-asset fixtures + DB deals
+        let all = [...curated, ...dbResults];
+
+        // Deduplicate by name if identical
+        const seen = new Set<string>();
+        all = all.filter((item) => {
+          const key = item.name.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        // Filter by assetClass if specified
+        if (assetClassFilter && assetClassFilter !== "all") {
+          all = all.filter((item) => item.assetClass === assetClassFilter);
+        }
+
+        // Filter by text query if specified
+        if (q) {
+          all = all.filter((item) =>
+            item.name.toLowerCase().includes(q) ||
+            item.category.toLowerCase().includes(q) ||
+            item.location.toLowerCase().includes(q) ||
+            item.assetClassLabel.toLowerCase().includes(q) ||
+            item.adversarialInsight.toLowerCase().includes(q) ||
+            item.auditFlag.toLowerCase().includes(q)
+          );
+        }
+
+        const total = all.length;
+        const results = all.slice(0, limit);
         return { results, total };
       }),
   }),

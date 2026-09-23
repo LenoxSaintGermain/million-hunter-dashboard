@@ -326,7 +326,7 @@ export const insuranceRouter = router({
             LEFT JOIN insurance_prospects ip ON d.id = ip.deal_id
             WHERE ip.id IS NULL
             AND d.stage IN ('qualified', 'high_priority', 'in_diligence', 'loi_sent', 'under_contract')
-            AND d.is_archived = 0
+            AND (d.isArchived = 0 OR d.isArchived IS NULL)
             ORDER BY d.score DESC
             LIMIT 20`
       ) as unknown as { rows: Array<{ id: number }> };

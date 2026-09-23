@@ -313,9 +313,9 @@ export default function LandingPage() {
           </div>
           <h1
             className="font-['Fraunces',_serif] font-black text-[#1a1208] leading-[0.92] mb-8"
-            style={{ fontSize: "clamp(3.5rem, 9vw, 7rem)" }}
+            style={{ fontSize: "clamp(3.2rem, 8vw, 6.5rem)" }}
           >
-            Most deals fail<br />
+            Most capital allocations fail<br />
             <span className="text-[#ffba20]">before they close.</span>
           </h1>
           <p className="text-[#5c4a32] text-xl leading-relaxed max-w-2xl mb-4">
@@ -344,7 +344,7 @@ export default function LandingPage() {
               href="/explore"
               className="inline-flex items-center justify-center gap-2 text-[#5c4a32] text-base font-medium px-4 py-4 hover:text-[#1a1208] transition-colors underline underline-offset-4 decoration-[#ffba20]"
             >
-              Browse active opportunities
+              Explore multi-asset pipeline
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -421,11 +421,11 @@ export default function LandingPage() {
               <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Deterministic Demo Rails</span>
             </div>
             <h2 className="font-['Fraunces',_serif] text-3xl lg:text-4xl font-black text-[#faf8f5] leading-tight mb-3">
-              Watch the engine kill a compromised deal in seconds.<br />
+              Watch the engine stress-test an asset in seconds.<br />
               <span className="text-[#ffba20]">See exactly why.</span>
             </h2>
             <p className="text-[#8b7355] text-base max-w-xl">
-              Inspect an unvarnished audit across debt service, tenant concentration, and adversarial stress tests. Zero live API calls, zero login wall, zero hype. See how institutional agents expose what brokers bury.
+              Inspect an unvarnished audit across debt service, tenant concentration, and adversarial stress tests. Zero live API calls, zero login wall, zero hype. See how institutional agents expose what brokers and decks bury.
             </p>
           </div>
           <Link
@@ -433,7 +433,7 @@ export default function LandingPage() {
             className="shrink-0 inline-flex items-center gap-2 bg-[#ffba20] text-[#1a1208] font-bold text-sm px-8 py-4 hover:bg-[#ffd060] transition-colors whitespace-nowrap"
           >
             <ArrowRightLeft className="w-4 h-4" />
-            Run the demo diligence
+            Run demo diligence
           </Link>
         </div>
       </section>
@@ -500,7 +500,7 @@ export default function LandingPage() {
             A Third Signal Lab product. Multi-asset diligence & decision intelligence for high-conviction operators and allocators.
           </div>
           <div className="flex items-center gap-6 text-xs text-[#8b7355]">
-            <Link href="/explore" className="hover:text-[#1a1208] transition-colors">Browse Deals</Link>
+            <Link href="/explore" className="hover:text-[#1a1208] transition-colors">Explore Pipeline</Link>
             <Link href="/demo-tour" className="hover:text-[#1a1208] transition-colors">Demo</Link>
             <a href={loginUrl} className="hover:text-[#1a1208] transition-colors">Sign In</a>
           </div>
