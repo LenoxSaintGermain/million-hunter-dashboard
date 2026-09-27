@@ -1,18 +1,33 @@
 # Acquisition journey repair — 2026-09-27
 
-Status: repair in progress; live positive journey NOT YET certified.
+Status: requested thesis → sourced opportunity → evidence-review journey passed live. This is research UAT, not verification of a business, financing approval, or certification of every application module.
 
 ## Current acceptance ledger (latest state; sections below retain historical receipts)
 
-- Production: `capital-aperture-00246-cem`, source `d786146a8a87f14a060a6c9715e456e7ea6758f3`, 100% traffic. Build `ff750be9-fd77-4314-9b1f-72ce9e783220` succeeded. Staging smoke 6/6 at 06:43:46Z; production smoke 6/6 at 06:44:10Z on September 27. Runtime configuration unchanged; no migration.
+- Production: `capital-aperture-00248-vac`, source `558fa8890231ba0e6eb36e5948bbad9a32bdaafe`, 100% traffic. Build `dbab9968-49ae-4676-9de2-f72ba70faac8` succeeded. Staging smoke 6/6 at 06:58:36Z; production smoke 6/6 at 06:58:57Z on September 27. Runtime configuration unchanged; no migration.
 - Superseded build `9da87fb2-8f58-4e35-a851-4f44ccaebb9d` deliberately cancelled before promotion to include the rescan stage guard.
-- Isolated tests: 237 files pass, 4 skipped; 2696 tests pass, 18 skipped. TypeScript passes. No production DB tests.
+- Isolated tests: 237 files pass, 4 skipped; 2697 tests pass, 18 skipped. TypeScript passes. No production DB tests. Log: `/tmp/acquisition-null-industry-unit.log`.
 - Verified: original thesis compiles with declared financial/geographic criteria; unseeded search discovers source-linked opportunities; opportunity 3660002 opens its exact original listing; source-aware dossier saves and deliberately refreshes; reload does not rerun research; all citation links accessible; financing assumptions explicit.
-- Pending release/UAT: user-scoped thesis comparison persistence, weighted criteria/evidence display, incomplete/failed assessment presentation, comparison reload, direct opportunity handoff, and responsive visual check.
+- Live comparison UAT: search #3780001 / thesis #1200001 completed at 2:59:49 AM ET. 12 listings found, 3 financially qualified, 3 scored. Nine rejected for missing/outside financial bounds. All three automated source checks remained unresolved, explicitly disclosed. Each comparison reports fit incomplete, with only 20% weighted evidence coverage, not a fabricated overall score. Selected commercial HVAC criterion quotes `Established:1990`; other criteria remain not established.
+- Reload preserved the same search ID and saved timestamp. Direct comparison link opened `/deal/3660002`, its exact original listing, and the existing 15-source dossier (saved 2:13:47 AM). No research refresh was triggered by the read. Desktop and 390×844 mobile comparison inspected; no visible horizontal overflow. Temporary viewport reset. Screenshots: `/tmp/acquisition-comparison-desktop-20260927.png`, `/tmp/acquisition-comparison-mobile-20260927.png`.
 - Persistence and stage isolation have deterministic unit/SQL-boundary coverage, not a live multi-user/concurrent-DB test.
-- Current browser test: latest saved Southeast Essential Services Search opens with $300k–$1M cash flow, $1M–$5M asking price, GA/FL/NC/SC, and weights 25/20/20/15/10/10. One search launched on the new release and failed during listing research. The UI correctly reports an incomplete search, not no opportunities. Existing catalog records are not counted as new discoveries.
-- A DB-disabled provider reproduction with the original UAT text returned `industry: null`, causing the listing parser to throw. A deterministic extraction regression reproduced this exact error (1 failed / 5 passed). The fix preserves unknown industry as `Not disclosed`; targeted extraction/listing tests now 12/12 and TypeScript passes. The production failure's specific underlying cause was not logged, so this is a reproduced failure mode, not proof of that exact invocation's cause. Fresh live retest is still required after the repair is released.
+- Original saved criteria remain $300k–$1M cash flow, $1M–$5M asking price, GA/FL/NC/SC, weights 25/20/20/15/10/10. The preceding release's attempt failed during listing research and correctly showed failure, not no opportunities. A DB-disabled provider reproduction returned `industry: null`, causing parser rejection. A deterministic regression failed before the repair, then passed; unknown industry now stays `Not disclosed`. Targeted tests 12/12, provider probe 12 extracted records, and subsequent live search #3780001 passed. The failed production invocation did not log its specific cause; do not assert it was conclusively the same error.
+- Original listing reloaded successfully in the browser: https://www.bizbuysell.com/business-opportunity/commercial-hvac-sheet-metal-fabrication-and-installation/2489430/ — Columbia County GA, asking $1.1M, SDE $338,930, revenue $2,792,789, established 1990. These are broker/seller claims, not audited facts or confirmation from the seller that it remains available.
 - No seller outreach, offer, financing application, commitment or brokerage action is in scope or has been performed.
+
+### Completion audit and limits
+
+| Requested step | Evidence | Outcome |
+| --- | --- | --- |
+| Start from acquisition thesis | Original natural-language thesis compiled; saved filters inspected again before final launch | Pass |
+| Find business deals | Unseeded live search #3780001 produced source-linked financially screened candidates | Pass; three candidates, not three verified businesses |
+| Compare against thesis | Persisted exact weights, quote-grounded criterion points, explicit missing evidence | Pass |
+| Advance opportunity into evidence | Comparison → deal #3660002 → original listing and saved cited dossier | Pass |
+| Resume without duplicate work | Reload retained search ID/comparison time; dossier read retained research time | Pass |
+| Failure/unknown handling | Live failed search did not become all-clear; deterministic malformed-source and unavailable-assessment tests | Pass within tested cases |
+| Deploy and preserve existing records | Exact SHA smoke checks; append-only comparison snapshots; rescan stage SQL guard tests | Pass; concurrent production DB stress test not performed |
+
+No claim of investment merit, expected return, current seller availability, lender-approved DSCR, full WCAG conformance, measured usability, or all legacy-module UAT. Source retrieval may miss fields that are visible on the complete listing. Geography/industry research matching still depends on source extraction; only the financial/source gates and quote checks are deterministic. Multi-user isolation and concurrent-stage protection have unit/SQL-boundary coverage, not live cross-account UAT. The wider credential/database integration suite is not claimed green. Internal IC, outreach, LOI and financing execution are outside this requested thesis-to-opportunity journey and were not exercised.
 
 ## Follow-up release and second live run
 
