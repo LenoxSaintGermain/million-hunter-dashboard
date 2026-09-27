@@ -64,6 +64,22 @@ Remaining review: direct-source availability, constrained industry/geography fit
 
 ### Source-first discovery follow-up
 
+#### Live run on source 5389097
+
+Build `b178afda-979f-4193-8d89-50e7324362e0` succeeded; revision `capital-aperture-00240-quy` received 100% traffic. Staged smoke 6/6 at 05:45:53Z; production smoke 6/6 at 05:46:30Z. An earlier probe during traffic propagation saw the old SHA and failed, then passed after promotion finished. Configuration fingerprint stayed unchanged.
+
+Original unseeded thesis -> search **3720001** -> **12 found / 3 financially matched / 3 scored**. Reload preserved completion. Saved opportunity **3660001** (Bibb County) retained the exact original thesis, source URL and discovery time in its detail view; other records were **3660002** and **3660003**. This verifies UI navigation and persistence, not availability or investment merit.
+
+Browser inspection of the Bibb County original source displayed BizBuySell's "page could not be found" screen. The queue nevertheless labeled a different unverified indexed target HIGH CONVICTION and suggested outreach based on score. UAT is therefore not complete.
+
+Pending follow-up: source HTTP checks reject known 404/410 records, preserve 403/redirect/timeout as unverified conditional research, and persist both promoted/rejected screening reasons in existing activity records. A local read-only source probe returned 403 for both the missing-page URL and the previously readable Columbia benchmark, proving that automated access denial must not be equated with sale/unavailability. No bypass attempted.
+
+The dashboard now routes scored candidates to evidence review, labels claims unverified, distinguishes illustrative records, and displays screening history instead of blank activity rows. The rendered high-score handoff test failed against the old outreach link and passed after repair. New source-gate tests cover unavailable, blocked, redirect, timeout, and retained rejection records. Isolated unit lane: **228 files passed / 4 skipped; 2672 tests passed / 18 skipped**. Follow-up targeted lane **13/13 passed** and TypeScript passed. No database migration or seller contact.
+
+Positive original-source check: opportunity **3660002**, https://www.bizbuysell.com/business-opportunity/commercial-hvac-sheet-metal-fabrication-and-installation/2489430/ opened successfully in the browser. The page states Columbia County, GA; asking $1.1M; SDE $338,930; revenue $2,792,789; established 1990; 12 full-time employees. All remain seller/broker claims. It describes commercial ductwork fabrication/installation, secured project backlog, GA/SC mechanical-contractor licensing, and an owner willing to remain at buyer discretion. Recurring maintenance revenue is not established. No contact form interaction.
+
+Downstream gap reproduced: opening the new deal automatically generated a dossier using generic name/location/industry, omitting the original listing URL. It correctly declined to identify a legal business but searched unrelated companies and missed the source's disclosed location. The dossier query currently generates on reads, while its Refresh button only refetches the cached query and claims live updates. Next repair must pass the exact source context, separate saved reads from deliberate research, and verify refreshed evidence without borrowing identities from similarly named firms.
+
 Production revision `capital-aperture-00238-xih` (source `263f0cd830621787ea0284eb170c17b1bc885130`, build `8fe7b711-4b39-4ae5-ac5b-a7fe779ec596`) passed 6/6 staged and production release checks. The original browser thesis preserved its financial/geographic criteria but returned zero listings. A explicitly source-seeded diagnostic returned one listing with unknown financials and zero qualified candidates. Neither is a positive end-to-end discovery pass.
 
 The pending source-first repair retrieves individual Perplexity Search records before extracting claims with the existing Google model role. Host allowlisting, individual listing paths, exact source URLs, source titles, explicitly labeled amounts, unknown values, sidebar exclusion and duplicate-source handling are validated locally. No new provider or database migration. Read-only provider probes use `DATABASE_URL=` and do not create deals.

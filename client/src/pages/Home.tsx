@@ -48,7 +48,7 @@ function CoAnalystBanner({ stats, macroPosture }: { stats: any; macroPosture: an
   const h = new Date().getHours();
   const greeting = h < 12 ? "Morning" : h < 17 ? "Afternoon" : "Evening";
   const directive = stats?.highPriority
-    ? `${stats.highPriority} target${stats.highPriority > 1 ? "s" : ""} at high-conviction status. Deployment window open — initiate outreach protocol.`
+    ? `${stats.highPriority} target${stats.highPriority > 1 ? "s" : ""} ranked for review. Verify the original listing and financial claims before considering outreach.`
     : macroPosture?.tailwindCount > 0
     ? `${macroPosture.tailwindCount} active tailwind signal${macroPosture.tailwindCount > 1 ? "s" : ""} detected. Pipeline conditions favorable.`
     : `Good ${greeting}, Lenox. Acquisition intelligence is active. No immediate action required.`;
@@ -208,10 +208,11 @@ function DealCard({ deal, rank, onDelete }: { deal: any; rank: number; onDelete:
                   </span>
                 )}
                 {isTop && (
-                  <span className="font-eyebrow text-eyebrow text-amber bg-amber/10 border border-amber/30 px-2 py-0.5 rounded-sm">HIGH CONVICTION</span>
+                  <span className="font-eyebrow text-eyebrow text-amber bg-amber/10 border border-amber/30 px-2 py-0.5 rounded-sm">HIGH SCREENING SCORE</span>
                 )}
               </div>
               <h3 className="font-card-title text-card-title text-ink group-hover:text-amber transition-colors mb-4 leading-tight">{deal.name}</h3>
+              <p className="text-sm text-muted-foreground mb-3">{deal.isSynthetic ? "Illustrative record — not a real acquisition target" : "Source claims need verification"}</p>
               <div className="grid grid-cols-3 gap-8">
                 <div>
                   <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">CASH FLOW</p>
@@ -483,7 +484,7 @@ export default function Home() {
           {/* LEFT: Deal feed — col-span-8 */}
           <div className="lg:col-span-8">
             <div className="flex items-end justify-between mb-8 border-b border-rule pb-4">
-              <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">Validation Queue — High Conviction</span>
+              <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">Candidates — evidence review</span>
               <Link href="/scan">
                 <div className="flex items-center gap-1 text-ink/50 hover:text-amber transition-colors cursor-pointer">
                   <span className="font-eyebrow text-eyebrow uppercase tracking-widest">All Deals</span>
@@ -522,12 +523,12 @@ export default function Home() {
                 <div>
                   <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">LOGICAL NEXT</p>
                   <p className="font-card-title text-[22px] text-ink leading-tight">
-                    {stats?.highPriority ? "Initiate outreach on validated targets" : "Populate the validation queue — run a target scan"}
+                    Review source evidence before choosing a target
                   </p>
                 </div>
-                <Link href={stats?.highPriority ? "/outreach" : "/scan"}>
+                <Link href="/scan">
                   <div className="flex items-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-5 py-2.5 rounded-full hover:opacity-90 active:scale-[0.97] transition-all cursor-pointer">
-                    {stats?.highPriority ? "Start Outreach" : "Run Scan"}
+                    Review evidence
                     <ArrowRight className="w-3 h-3" />
                   </div>
                 </Link>
@@ -543,7 +544,15 @@ export default function Home() {
                   {data.recentActivity.slice(0, 5).map((act: any, i: number) => (
                     <div key={i} className="flex items-start gap-4 py-3 border-b border-rule last:border-0">
                       <span className="font-data-mono text-data-mono text-muted-foreground shrink-0 mt-0.5">{elapsed(act.createdAt)}</span>
-                      <p className="font-body-base text-body-base text-ink/70">{act.description ?? act.action}</p>
+                      <div className="min-w-0">
+                        <p className="font-body-base text-body-base text-ink/70">{act.title ?? act.description ?? act.action}</p>
+                        {/^Search #\d+: listing screening record$/.test(act.title ?? "") && act.detail && (
+                          <details className="mt-2 text-sm">
+                            <summary className="cursor-pointer">Screening reasons</summary>
+                            <p className="mt-2 whitespace-pre-wrap break-words">{act.detail}</p>
+                          </details>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { matchesAcquisitionFinancials, parseAcquisitionListings, type AcquisitionFinancials } from "./acquisitionListing";
+import { parseAcquisitionListings, type AcquisitionFinancials } from "./acquisitionListing";
 import { researchAcquisitionListings } from "./acquisitionResearch";
+import { assessAcquisitionListings } from "./acquisitionSourceCheck";
 import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { consensusScores, sellerSimulations, dealTrajectory, deals } from "../drizzle/schema";
@@ -4204,9 +4205,15 @@ async function runScanPipeline(
 
   // ── Phase 2: Filter by criteria ───────────────────────────────────────────
   await phase("Applying filters", "Checking disclosed figures against the saved search criteria", 35);
-  const qualified = listings.filter(
-    (l) => matchesAcquisitionFinancials(l, financials)
-  );
+  const assessments = await assessAcquisitionListings(listings, financials);
+  const qualified = assessments.filter(result => result.eligible).map(result => result.listing);
+  const financialRejected = assessments.filter(result => !result.sourceCheck).length;
+  const unavailable = assessments.filter(result => result.sourceCheck?.state === "unavailable").length;
+  const unchecked = assessments.filter(result => result.sourceCheck?.state === "unverified").length;
+  const screeningReceipt = `${financialRejected} missing/outside financial bounds; ${unavailable} original pages unavailable; ${unchecked} source checks unresolved. Reachable pages still require availability and financial verification.`;
+  await logActivity({ type: "system", title: `Search #${jobId}: listing screening record`, detail: assessments.map(({ listing, eligible, sourceCheck, reason }) =>
+    `${listing.name}\n${listing.listingUrl}\n${eligible ? "Research candidate" : "Not promoted"}: ${reason}\n${sourceCheck ? `Checked: ${sourceCheck.checkedAt}` : "Source check not requested: financial screen did not pass."}`
+  ).join("\n\n") });
   await updateScanJob(jobId, { listingsQualified: qualified.length });
 
   // ── Phase 3: Score each deal ──────────────────────────────────────────────
@@ -4223,7 +4230,7 @@ async function runScanPipeline(
       // Market Scan now pulls REAL sonar-sourced listings with real listingUrls —
       // no longer synthetic.
       const res = await createDeal({ ...listing, stage: "new", isSynthetic: false,
-        description: `Discovered by search #${jobId} on ${new Date().toISOString()}. Indexed source listing, not a current availability check. Financial figures are source-reported claims, not audited facts. Confirm the original listing is still available before relying on it. Search thesis: ${thesisText || "General acquisition search"}`,
+        description: `Discovered by search #${jobId} on ${new Date().toISOString()}. Indexed source listing. ${assessments.find(result => result.listing.listingUrl === listing.listingUrl)?.reason ?? "Source check unresolved."} Financial figures are source-reported claims, not audited facts. Confirm the original listing is still available before relying on it. Search thesis: ${thesisText || "General acquisition search"}`,
       }) as any;
       // ON DUPLICATE KEY UPDATE returns insertId=0 for updates — re-fetch if needed
       dealId = res[0].insertId || (await getDealIdByNameSource(listing.name, listing.source ?? null)) || 0;
@@ -4291,7 +4298,7 @@ async function runScanPipeline(
   }
 
   // ── Phase 4: Log and complete ─────────────────────────────────────────────
-  await phase("Finalizing results", `${qualified.length} deals scored · ${qualified.filter((_, i) => i < scored).length} added to pipeline`, 92);
+  await phase("Finalizing results", `${scored} listings scored; existing records are reused`, 92);
   await logActivity({
     type: "scan_completed",
     title: `Market scan complete: ${qualified.length} deals scored across ${sources.length} platforms`,
@@ -4301,7 +4308,7 @@ async function runScanPipeline(
   await updateScanJob(jobId, {
     status: "completed",
     currentPhase: "Scan complete",
-    phaseDetail: `${qualified.length} deals scored · ${qualified.length} added to pipeline`,
+    phaseDetail: `${qualified.length} scored. ${screeningReceipt}`,
     progressPct: 100,
     completedAt: new Date(),
   });

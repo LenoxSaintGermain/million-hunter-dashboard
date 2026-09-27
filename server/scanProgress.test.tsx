@@ -10,7 +10,7 @@ it("does not claim targets were added when no listings qualified", () => {
   state.query = { data: { status: "completed", listingsFound: 0, listingsQualified: 0, dealsScored: 0 } };
   const html = renderToStaticMarkup(<ScanProgress jobId={1} />);
   expect(html).not.toContain("Targets added");
-  expect(html).toContain("No listings matched");
+  expect(html).toContain("No candidates were added");
 });
 it("exposes query failure rather than an endless connecting message", () => {
   state.query = { isError: true };

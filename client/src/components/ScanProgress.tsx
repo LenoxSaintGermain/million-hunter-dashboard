@@ -197,15 +197,16 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
             </div>
             <div className="text-center">
               <p className="text-lg font-bold text-[var(--sage)] tabular-nums">{job.dealsScored ?? 0}</p>
-              <p className="text-[10px] text-muted-foreground">Scored & Added</p>
+              <p className="text-[10px] text-muted-foreground">Scored</p>
             </div>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
+          <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
             <TrendingUp className="w-3 h-3 text-[var(--sage)]" />
             {(job.dealsScored ?? 0) > 0
               ? "Scored listings are available in the validation queue. Verify source claims before proceeding."
-              : "No listings matched the documented criteria in this search. No targets were added. Review your criteria or deliberately search again later."}
+              : "No candidates were added in this search. Review the saved criteria and any screening reasons before searching again."}
           </p>
+          {job.phaseDetail && <p className="text-sm text-muted-foreground mt-2">{job.phaseDetail}</p>}
         </div>
       )}
 
