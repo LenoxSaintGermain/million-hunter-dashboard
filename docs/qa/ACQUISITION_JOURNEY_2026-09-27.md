@@ -10,6 +10,9 @@ Status: repair in progress; live positive journey NOT YET certified.
 - Recompiled original UAT text into Southeast Essential Trade Services. Unrequested franchise/PE exclusions were absent. FAIL: structured cash-flow/geography fields were omitted despite the narrative retaining them; launch misleadingly said National. This remains open.
 - Search #3660001 returned provider leads but FAILED saving. Cloud log confirms ER_DATA_TOO_LONG for source. Provider supplied a paragraph instead of a bounded source label and used a BizBuySell category URL rather than an individual listing URL. Raw SQL text leaked into the failure receipt. No positive discovery pass; no seller outreach or financial action.
 - Added three red regressions, then repaired bounded hostname provenance, rejection of category-page evidence and safe failed-search UI (including old persisted SQL messages). Targeted 8/8 tests and TypeScript pass. These latest save/error repairs are not yet deployed at this point.
+- Follow-up 263f0cd requires explicit core cash-flow/asking-price/geography fields in provider output and local validation. Null is allowed only as an explicit unstated financial criterion and remains absent, not zero, after normalization. Missing keys fail preparation rather than silently launching an altered scope. Red regression reproduced the original acceptance of missing criteria, then passed. This validates structural completeness, not perfect natural-language interpretation; repeat the original live thesis to verify interpretation.
+- Combined regression suite now 2,656 passed, 18 skipped across 225 passing files; TypeScript passed. Build 8fe7b711-4b39-4ae5-ac5b-a7fe779ec596 was submitted from exact source 263f0cd830621787ea0284eb170c17b1bc885130; deployment and positive live journey remain pending.
+- That build succeeded and deployed as capital-aperture-00238-xih with 100% traffic. Staged and production smoke passed 6/6; production receipt 2026-09-27T05:17:19Z. Runtime fingerprint unchanged. Browser reload confirms old failed-job SQL is no longer displayed. Positive discovery retest underway.
 
 ## First release and live retest
 
@@ -58,6 +61,20 @@ Compile → inspect exact filters → launch discovery once → await actual per
 Remaining review: direct-source availability, constrained industry/geography fit, partial-result presentation, historical unsupported numeric claims, and whether every result is easily traceable to its search. Do not label the full journey complete from unit tests or deployment health.
 
 ## Public-source discovery benchmark
+
+### Source-first discovery follow-up
+
+Production revision `capital-aperture-00238-xih` (source `263f0cd830621787ea0284eb170c17b1bc885130`, build `8fe7b711-4b39-4ae5-ac5b-a7fe779ec596`) passed 6/6 staged and production release checks. The original browser thesis preserved its financial/geographic criteria but returned zero listings. A explicitly source-seeded diagnostic returned one listing with unknown financials and zero qualified candidates. Neither is a positive end-to-end discovery pass.
+
+The pending source-first repair retrieves individual Perplexity Search records before extracting claims with the existing Google model role. Host allowlisting, individual listing paths, exact source URLs, source titles, explicitly labeled amounts, unknown values, sidebar exclusion and duplicate-source handling are validated locally. No new provider or database migration. Read-only provider probes use `DATABASE_URL=` and do not create deals.
+
+A prototype probe returned 12 individual listings, three matching the financial bounds on indexed claims. This is not current-availability verification or a browser UAT pass. One prior indexed Atlanta listing returned HTTP 404 on direct inspection; indexed discovery must not imply availability.
+
+Targeted source/extraction tests: 11/11 passed, including a duplicate-source regression observed red before repair. TypeScript passed. Isolated unit lane: 226 files passed, 4 skipped; 2,662 tests passed, 18 skipped. The broad test command, with production disconnected, failed 17 files (database/credential-dependent checks and an existing URL-path decoding issue); it is not an all-suite pass. Post-release browser journey remains pending.
+
+Direct inspection of the indexed Bibb County listing `/2483466/` returned HTTP 404 as well. Keep this as an explicit availability limitation; do not count indexed results as confirmed available opportunities.
+
+Open acceptance gaps: explain found-but-unqualified candidates; verify exact opportunity source and persisted record in the browser; distinguish generic screening score from thesis-specific weights; retain truthful unknown geography and source availability. No outreach, offers or financing actions were taken.
 
 Read 2026-09-27: https://www.bizbuysell.com/business-opportunity/turnkey-hvac-and-commercial-refrigeration-company/2528214/
 

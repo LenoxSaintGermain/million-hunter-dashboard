@@ -23,3 +23,7 @@ it("uses the listing hostname as bounded provenance, not provider prose", () => 
 it("rejects marketplace category pages as individual deal evidence", () => {
   expect(() => parseAcquisitionListings([{ name: "HVAC Business", listingUrl: "https://www.bizbuysell.com/georgia/atlanta-metro-area/hvac-businesses-for-sale/" }])).toThrow();
 });
+it("keeps an unknown location explicit instead of failing a sourced listing", () => {
+  const [row] = parseAcquisitionListings([{ name: "Illustrative fixture", listingUrl: "https://example.com/listing/fixture", location: null }]);
+  expect(row.location).toBe("Not disclosed");
+});

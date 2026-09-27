@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { matchesAcquisitionFinancials, parseAcquisitionListings, type AcquisitionFinancials } from "./acquisitionListing";
+import { researchAcquisitionListings } from "./acquisitionResearch";
 import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { consensusScores, sellerSimulations, dealTrajectory, deals } from "../drizzle/schema";
@@ -4182,45 +4183,24 @@ async function runScanPipeline(
 
   // ── Phase 1: sourced listing research; broker claims are not audited facts ──
   await phase("Scanning marketplaces", `Fetching listings from ${sources.join(", ")}`, 10);
-  await new Promise((r) => setTimeout(r, 1500));
 
-  // Fetch REAL, currently-listed businesses for sale via Perplexity sonar-pro
-  // (live web research with citations) — never fabricate listings or financials.
+  // Retrieve individual source records before extracting financial claims.
   const locationHint = targetLocations.length > 0
     ? `Focus on these markets: ${targetLocations.join(", ")}.`
     : "Focus on Southeast/Sun Belt US markets (Atlanta, Charlotte, Raleigh, Tampa, Nashville, Birmingham, Houston).";
-  const sourceHint = sources.join(", ");
-
   let listings: ReturnType<typeof parseAcquisitionListings> = [];
   try {
-    const key = process.env.SONAR_API_KEY;
-    if (!key) throw new Error("SONAR_API_KEY not configured");
-    const res = await fetch("https://api.perplexity.ai/v1/sonar", {
-      method: "POST",
-      signal: AbortSignal.timeout(90000),
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: "sonar-pro",
-        messages: [
-          { role: "system", content: "You are a business-acquisition research analyst. Report ONLY real businesses currently listed for sale that you can find and cite. Never invent listings, names, or financials. Use null when a figure is not disclosed. Follow marketplace category results through to individual listing pages before extracting a business. For BizBuySell, individual listing URLs use /business-opportunity/<title>/<numeric-id>/; category URLs ending businesses-for-sale are not individual listings. Never attach category-page aggregate figures to a named business. Return the listing's published title, not a generic invented company name. Always include the direct listing URL, not a search page. Use the source hostname as source. Listing claims are not independently verified facts. Output ONLY a JSON array." },
-          { role: "user", content: `Find up to ${4 + sources.length} real businesses for sale on ${sourceHint}. ${locationHint} Follow this saved thesis: ${thesisText || "Recession-resistant service businesses"}. Financial filters: ${JSON.stringify(financials)}. Preferences are not hard exclusions. Unknown management retention, license transfer, or customer concentration should remain verification tasks; do not require private diligence documents to surface a public listing. Return objects with name, industry, location, revenue, cashFlow,askingPrice, employees, yearEstablished, source, listingUrl. Numeric values must be numbers or null if undisclosed. Return [] only if no source-linked listings meet the explicit financial criteria. No invented financials, inferred seller motivation, or substituted industries.` },
-        ],
-      }),
+    listings = await researchAcquisitionListings({
+      thesisText: `${thesisText || "Recession-resistant service businesses"}. ${locationHint}`,
+      sources,
     });
-    if (!res.ok) throw new Error(`Sonar API error ${res.status}`);
-    const data: any = await res.json();
-    const content: string = data.choices?.[0]?.message?.content ?? "";
-    const match = content.match(/\[[\s\S]*\]/);
-    if (!match) throw new Error("Research returned no readable listing data");
-    listings = parseAcquisitionListings(JSON.parse(match[0]));
   } catch (e) {
     console.warn("[Scan] Listing research failed; no successful-empty result recorded");
     throw new Error("Listing research is unavailable or returned invalid evidence. No search conclusion can be drawn.");
   }
 
-  await phase("Extracting deal data", `Parsing ${listings.length} qualified listings`, 25);
+  await phase("Extracting deal data", `Parsing ${listings.length} source listings; criteria not yet applied`, 25);
   await updateScanJob(jobId, { listingsFound: listings.length });
-  await new Promise((r) => setTimeout(r, 1000));
 
   // ── Phase 2: Filter by criteria ───────────────────────────────────────────
   await phase("Applying filters", "Checking disclosed figures against the saved search criteria", 35);
@@ -4228,7 +4208,6 @@ async function runScanPipeline(
     (l) => matchesAcquisitionFinancials(l, financials)
   );
   await updateScanJob(jobId, { listingsQualified: qualified.length });
-  await new Promise((r) => setTimeout(r, 800));
 
   // ── Phase 3: Score each deal ──────────────────────────────────────────────
   await phase("Scoring candidates", `Applying the recorded screening model to ${qualified.length} listings`, 45);
@@ -4244,7 +4223,7 @@ async function runScanPipeline(
       // Market Scan now pulls REAL sonar-sourced listings with real listingUrls —
       // no longer synthetic.
       const res = await createDeal({ ...listing, stage: "new", isSynthetic: false,
-        description: `Discovered by search #${jobId} on ${new Date().toISOString()}. Source-reported listing; availability and financial claims require verification. Search thesis: ${thesisText || "General acquisition search"}`,
+        description: `Discovered by search #${jobId} on ${new Date().toISOString()}. Indexed source listing, not a current availability check. Financial figures are source-reported claims, not audited facts. Confirm the original listing is still available before relying on it. Search thesis: ${thesisText || "General acquisition search"}`,
       }) as any;
       // ON DUPLICATE KEY UPDATE returns insertId=0 for updates — re-fetch if needed
       dealId = res[0].insertId || (await getDealIdByNameSource(listing.name, listing.source ?? null)) || 0;
