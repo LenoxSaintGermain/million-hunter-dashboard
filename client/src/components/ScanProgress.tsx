@@ -6,6 +6,7 @@ import {
   Cpu, PackageCheck, AlertTriangle, TrendingUp, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AcquisitionThesisComparison } from "./AcquisitionThesisComparison";
 
 // ─── Phase definitions ────────────────────────────────────────────────────────
 const PHASES = [
@@ -209,6 +210,8 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
           {job.phaseDetail && <p className="text-sm text-muted-foreground mt-2">{job.phaseDetail}</p>}
         </div>
       )}
+
+      {isComplete && <AcquisitionThesisComparison jobId={jobId} />}
 
       {/* Error detail */}
       {isFailed && (

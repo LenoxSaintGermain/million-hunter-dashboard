@@ -2,7 +2,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ query: {} as any, refetch: vi.fn() }));
-vi.mock("@/lib/trpc", () => ({ trpc: { scan: { getStatus: { useQuery: () => ({ ...state.query, refetch: state.refetch }) } } } }));
+vi.mock("@/lib/trpc", () => ({ trpc: { scan: { getThesisComparison: { useQuery: () => ({ data: null }) }, getStatus: { useQuery: () => ({ ...state.query, refetch: state.refetch }) } } } }));
 import ScanProgress from "../client/src/components/ScanProgress";
 beforeAll(() => vi.stubGlobal("React", React));
 afterAll(() => vi.unstubAllGlobals());

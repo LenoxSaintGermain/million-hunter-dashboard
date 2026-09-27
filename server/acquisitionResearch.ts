@@ -21,7 +21,7 @@ function amountInSource(text: string, field: "askingPrice" | "cashFlow" | "reven
 }
 
 /** Retrieve sources first; synthesis cannot invent a source or a financial value. */
-export async function researchAcquisitionListings(input: { thesisText: string; sources: string[] }) {
+export async function researchAcquisitionListings(input: { thesisText: string; sources: string[]; onSources?: (sources: Array<{ url: string; excerpt: string; asOf: number }>) => void }) {
   if (!process.env.SONAR_API_KEY || !process.env.GEMINI_API_KEY) throw new Error("Research provider unavailable");
   const domains = input.sources.map(source => marketplace[source]).filter(Boolean).slice(0,5);
   if (!domains.length) throw new Error("No supported listing source selected");
@@ -47,6 +47,7 @@ export async function researchAcquisitionListings(input: { thesisText: string; s
     try { parseAcquisitionListings([{ name: record.title.slice(0,200), listingUrl: record.url }]); return true; }
     catch { return false; }
   }).slice(0,12).map(record => ({ ...record, snippet: primaryExcerpt(record.snippet) }));
+  input.onSources?.(records.map(record => ({ url: record.url, excerpt: `${record.title}\n${record.snippet}`, asOf: Date.now() })));
   if (!records.length) return [];
   const result = await model.models.generateContent({
     model: GEMINI_FAST,

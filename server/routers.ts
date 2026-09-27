@@ -2,6 +2,8 @@ import { z } from "zod";
 import { parseAcquisitionListings, type AcquisitionFinancials } from "./acquisitionListing";
 import { researchAcquisitionListings } from "./acquisitionResearch";
 import { assessAcquisitionListings } from "./acquisitionSourceCheck";
+import { assessThesisCriteria, saveThesisReview, readThesisReview, type ThesisReviewSnapshot } from "./acquisitionThesisReview";
+import { compareAcquisitionToThesis, type ComparisonSource } from "../shared/acquisitionThesisComparison";
 import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { consensusScores, sellerSimulations, dealTrajectory, deals } from "../drizzle/schema";
@@ -716,6 +718,8 @@ export const appRouter = router({
   }),
 
   scan: router({
+    getThesisComparison: protectedProcedure.input(z.object({ jobId: z.number().int().positive() }))
+      .query(({ ctx, input }) => readThesisReview(ctx.user.id, input.jobId)),
     getLatest: publicProcedure.query(async () => getLatestScanJob()),
 
     // Poll a specific scan job for real-time progress
@@ -748,6 +752,7 @@ export const appRouter = router({
         // Check ownership before creating any job and carry the full thesis into research.
         const thesisId = input?.thesisId;
         let thesisText = "";
+        let thesisReview: Pick<ThesisReviewSnapshot, "userId" | "thesisId" | "weights"> | undefined;
         let financials: AcquisitionFinancials = { cashFlowMin: minCashFlow, multipleMax: maxMultiple };
         if (thesisId) {
           const db = await getDb();
@@ -756,6 +761,9 @@ export const appRouter = router({
           const [thesis] = await db.select().from(thesisCompilations).where(eq(thesisCompilations.id, thesisId)).limit(1);
           if (!thesis || thesis.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND", message: "Saved thesis not found" });
           thesisText = thesis.thesisText;
+          const weights = typeof thesis.scoringWeights === "string" ? JSON.parse(thesis.scoringWeights) : thesis.scoringWeights;
+          compareAcquisitionToThesis({ weights, assessments: [], sources: [] });
+          thesisReview = { userId: ctx.user.id, thesisId, weights };
           const filters = typeof thesis.compiledFilters === "string" ? JSON.parse(thesis.compiledFilters) : thesis.compiledFilters;
           if (!filters) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Prepare and review this thesis before starting a search." });
           financials = { ...(filters ?? {}) };
@@ -787,7 +795,7 @@ export const appRouter = router({
         }
 
         // Run the full pipeline asynchronously — don't await, return immediately
-        runScanPipeline(jobId, sources, minCashFlow, maxMultiple, targetLocations, thesisText, financials)
+        runScanPipeline(jobId, sources, minCashFlow, maxMultiple, targetLocations, thesisText, financials, thesisReview)
           .then(async () => {
             if (!thesisId) return;
             const db = await getDb();
@@ -4178,7 +4186,10 @@ async function runScanPipeline(
   targetLocations: string[] = [],
   thesisText = "",
   financials: AcquisitionFinancials = { cashFlowMin: minCashFlow, multipleMax: maxMultiple },
+  thesisReview?: Pick<ThesisReviewSnapshot, "userId" | "thesisId" | "weights">,
 ) {
+  let comparisonSources: ComparisonSource[] = [];
+  const comparisonItems: ThesisReviewSnapshot["items"] = [];
   const phase = async (label: string, detail: string, pct: number) =>
     updateScanJob(jobId, { currentPhase: label, phaseDetail: detail, progressPct: pct });
 
@@ -4194,6 +4205,7 @@ async function runScanPipeline(
     listings = await researchAcquisitionListings({
       thesisText: `${thesisText || "Recession-resistant service businesses"}. ${locationHint}`,
       sources,
+      onSources: captured => { comparisonSources = captured; },
     });
   } catch (e) {
     console.warn("[Scan] Listing research failed; no successful-empty result recorded");
@@ -4236,7 +4248,19 @@ async function runScanPipeline(
       dealId = res[0].insertId || (await getDealIdByNameSource(listing.name, listing.source ?? null)) || 0;
     }
 
-    // Score the deal
+    if (thesisReview) {
+      await phase("Scoring candidates", `Checking saved thesis criteria for ${listing.name}`, 45 + Math.round((scored / qualified.length) * 35));
+      const source = comparisonSources.find(row => row.url === listing.listingUrl);
+      let assessments: ThesisReviewSnapshot["items"][number]["assessments"] = [];
+      let assessmentFailed = !source;
+      if (source) {
+        try { assessments = await assessThesisCriteria({ thesisText, weights: thesisReview.weights, source }); }
+        catch { assessmentFailed = true; }
+      }
+      comparisonItems.push({ dealId, name: listing.name, listingUrl: listing.listingUrl, assessments, assessmentFailed });
+    }
+
+    // The shared catalog score is separate from this user's thesis comparison.
     try {
       const deal = await getDealById(dealId);
       if (!deal) throw new Error("Saved listing could not be read back");
@@ -4299,6 +4323,8 @@ async function runScanPipeline(
 
   // ── Phase 4: Log and complete ─────────────────────────────────────────────
   await phase("Finalizing results", `${scored} listings scored; existing records are reused`, 92);
+  if (thesisReview) await saveThesisReview({ ...thesisReview, version: 1, jobId, thesisText,
+    sources: comparisonSources.filter(source => comparisonItems.some(item => item.listingUrl === source.url)), items: comparisonItems });
   await logActivity({
     type: "scan_completed",
     title: `Market scan complete: ${qualified.length} deals scored across ${sources.length} platforms`,
