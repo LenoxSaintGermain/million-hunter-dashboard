@@ -19,3 +19,9 @@ it("exposes query failure rather than an endless connecting message", () => {
   expect(html).not.toContain("Connecting to scan engine");
   expect(state.refetch).not.toHaveBeenCalled();
 });
+it("does not expose persisted database errors in a failed search", () => {
+  state.query = { data: { status: "failed", errorMessage: "Failed query: insert into deals params: private-thesis" } };
+  const html = renderToStaticMarkup(<ScanProgress jobId={3} />);
+  expect(html).not.toContain("private-thesis");
+  expect(html).toContain("Search could not finish");
+});

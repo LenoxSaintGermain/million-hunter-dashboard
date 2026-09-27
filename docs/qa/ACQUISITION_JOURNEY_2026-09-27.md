@@ -2,6 +2,15 @@
 
 Status: repair in progress; live positive journey NOT YET certified.
 
+## Follow-up release and second live run
+
+- Source 7132071f66c9a9dc3c9bf2e0524489e147f370d7, build 4c16ad26-6754-4dce-bab0-c7726dfde49d succeeded; revision capital-aperture-00236-yow now serves 100%. Staged and production smoke 6/6; production checked 2026-09-27T05:04:21Z. Runtime configuration fingerprint unchanged; no migration.
+- Final pre-release unit lane: 225 files passed, 4 skipped; 2,651 tests passed, 18 skipped. TypeScript passed. DATABASE_URL was empty.
+- Browser reload confirms the existing Tampa record is explicitly illustrative, risk is unknown before analysis, and citations are labeled saved sources. It is not a real discovered listing.
+- Recompiled original UAT text into Southeast Essential Trade Services. Unrequested franchise/PE exclusions were absent. FAIL: structured cash-flow/geography fields were omitted despite the narrative retaining them; launch misleadingly said National. This remains open.
+- Search #3660001 returned provider leads but FAILED saving. Cloud log confirms ER_DATA_TOO_LONG for source. Provider supplied a paragraph instead of a bounded source label and used a BizBuySell category URL rather than an individual listing URL. Raw SQL text leaked into the failure receipt. No positive discovery pass; no seller outreach or financial action.
+- Added three red regressions, then repaired bounded hostname provenance, rejection of category-page evidence and safe failed-search UI (including old persisted SQL messages). Targeted 8/8 tests and TypeScript pass. These latest save/error repairs are not yet deployed at this point.
+
 ## First release and live retest
 
 - Commit 9bac81a4c5edcb27c63b4ae7b59847baf61355ab pushed to main.
@@ -47,3 +56,11 @@ Use the existing hypothetical UAT thesis: Southeast HVAC/plumbing, Georgia/Flori
 Compile → inspect exact filters → launch discovery once → await actual persisted job result → open a sourced opportunity → inspect direct source and missing evidence → reload and verify persistence. Record IDs, source URLs and gaps. No seller outreach, offers, financing applications or trading actions.
 
 Remaining review: direct-source availability, constrained industry/geography fit, partial-result presentation, historical unsupported numeric claims, and whether every result is easily traceable to its search. Do not label the full journey complete from unit tests or deployment health.
+
+## Public-source discovery benchmark
+
+Read 2026-09-27: https://www.bizbuysell.com/business-opportunity/turnkey-hvac-and-commercial-refrigeration-company/2528214/
+
+The listing header advertises a Florida HVAC/refrigeration business: asking $1,650,000, SDE $409,140, EBITDA $309,140, revenue $1,216,000, established 2014. These are seller/broker claims, not audited figures or confirmed transaction availability. The narrative separately describes $452K 2025 SDE, so period/figure reconciliation is required. Retained technicians are not proof of retained management. No contact form was submitted.
+
+This primary listing meets the original numeric/geographic test scope on its face. Therefore zero discovery should not be interpreted as proof that no opportunities exist. Test provider discovery against this benchmark without pre-populating or inventing a deal record.

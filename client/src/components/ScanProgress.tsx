@@ -101,7 +101,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
             </p>
             <p className="text-[10px] text-muted-foreground mt-0.5">
               {isFailed
-                ? (job.errorMessage ?? "Unknown error")
+                ? "Search could not finish. Any saved results are incomplete; this is not a no-opportunity conclusion."
                 : isComplete
                 ? `${job.listingsFound ?? 0} listings found · ${job.listingsQualified ?? 0} qualified · ${job.dealsScored ?? 0} scored`
                 : job.phaseDetail ?? "Initializing…"}
@@ -216,7 +216,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
             <AlertTriangle className="w-3.5 h-3.5 text-[var(--clay)] mt-0.5 shrink-0" />
             <div>
               <p className="text-xs font-medium text-[var(--clay)]">Pipeline error</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{job.errorMessage ?? "An unexpected error occurred. Please retry."}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Search could not finish. Review your saved criteria before starting another search. Any already-saved results remain available.</p>
             </div>
           </div>
         </div>

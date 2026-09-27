@@ -798,7 +798,7 @@ export const appRouter = router({
             console.error("[Scan] Pipeline failed:", err);
             updateScanJob(jobId, {
               status: "failed",
-              errorMessage: err?.message ?? "Unknown error",
+              errorMessage: "Search could not finish. Results may be incomplete; do not treat this as no opportunities. Review the saved criteria before starting another search.",
               completedAt: new Date(),
               currentPhase: "Failed",
               progressPct: 0,
