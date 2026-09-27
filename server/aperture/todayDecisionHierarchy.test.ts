@@ -71,13 +71,13 @@ describe("Today keeps one focal decision and demotes everything else", () => {
     expect($("[data-attention-layout='compact']").length).toBeGreaterThanOrEqual(2);
   });
 
-  it("puts In Motion above the secondary attention sections", () => {
+  it("puts critical decisions before routine position status", () => {
     const html = render();
     const inMotion = html.indexOf("In motion");
     const otherCritical = html.indexOf("Other critical issues");
     expect(inMotion).toBeGreaterThan(-1);
     expect(otherCritical).toBeGreaterThan(-1);
-    expect(inMotion).toBeLessThan(otherCritical);
+    expect(otherCritical).toBeLessThan(inMotion);
   });
 
   it("states the changed-since baseline even when nothing changed", () => {

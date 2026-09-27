@@ -84,6 +84,18 @@ describe("Today shows sourced snapshots, not a trading permission", () => {
   });
 });
 describe("compact rows reuse lifecycle state and exact record identity", () => {
+  it("keeps state, quantity, account and stale risk visible while terms are one disclosure away", () => {
+    const value = order(); value.latestMark!.priceAsOf = now - 3600_000;
+    const $ = rows(data({ orders: [value] }));
+    expect($("details")).toHaveLength(1);
+    expect($("details").attr("open")).toBeUndefined();
+    expect($("details").text()).toContain("Basis $1.00");
+    $("details").remove();
+    expect($.text()).toContain("Stale");
+    expect($.text()).toContain("1 filled · 0 remaining");
+    expect($.text()).toContain("Illustrative Paper");
+    expect($.text()).toContain("Open position");
+  });
   it("shows terms, fill quantities, sourced basis and mark without trading actions", () => {
     const $ = rows();
     expect($.text()).toContain("FIX · $20 Put");

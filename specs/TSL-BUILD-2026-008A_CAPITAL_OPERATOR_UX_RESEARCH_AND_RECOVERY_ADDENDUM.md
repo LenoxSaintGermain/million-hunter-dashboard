@@ -14,6 +14,14 @@
 
 ## 0. Product decision
 
+### Today hierarchy refinement — 2026-09-27
+
+User review of Today found repeated monitoring warnings and order terms competing with the next decision. The default reading order is now: current read-state warning → primary decision → other critical decisions → source gaps with direct recovery → positions/orders → account snapshot → changes and checkpoint. Shared lifecycle ranking and exact destinations remain authoritative; this is not model-selected prioritization.
+
+Repeated source-impact text is explained once, but each affected record retains its state, last successful check and direct action. No failed or stale state is hidden. Position rows retain account identity, lifecycle state, filled/remaining quantities, measured return and freshness. Order terms, cost basis and mark provenance are one disclosure away; the exact play remains one action away. Evidence source lists remain at most a second disclosure. Do not truncate blocking notice copy or shrink essential text to gain density. No new queries, polling, trading actions or resolution mutations are introduced by this presentation change.
+
+Acceptance: isolated unit suite 2,701 passed / 18 skipped; TypeScript passed. Rendering tests verify critical-before-routine ordering, unique shared explanation, retained record recovery and visible stale/fill/account facts. Live visual retest remains required; these tests do not establish measured usability or complete accessibility.
+
 Capital Aperture must be a purpose-built operator workspace for deciding, verifying, staging, and learning from paper-only market theses. It must not be redesigned as a generic chat interface.
 
 The working model is:

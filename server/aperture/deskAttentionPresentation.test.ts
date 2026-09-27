@@ -15,6 +15,17 @@ const sources = (overrides = {}) => deskAttentionSourceIssues({ orders: [order],
 beforeEach(() => vi.stubGlobal("React", React));
 
 describe("Desk status adapter and selected-instrument monitoring", () => {
+  it("explains repeated source gaps once while preserving every recovery route and state", () => {
+    const issue = sources()[0];
+    const onOpen = vi.fn(), onRetry = vi.fn();
+    const html = renderToStaticMarkup(React.createElement(AttentionSourceRecovery, { issues: [issue, { ...issue, label: "Other account checks", href: "/aperture/plays?play=77" }], onOpen, onRetry }));
+    expect(html.split(issue.impact)).toHaveLength(2);
+    expect(html.split("Refresh reads saved status only")).toHaveLength(2);
+    expect(html).toContain("Checks needing attention · 2");
+    expect(html).toContain("Other account checks");
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(onRetry).not.toHaveBeenCalled();
+  });
   it("carries the exact selected instrument and all citations through the real adapter to the attention model", () => {
     const records = deskMonitoringFindings([order], byCandidate);
     expect(records[0].instrument).toMatchObject({ symbol: order.symbol, instrumentType: "long_put" });

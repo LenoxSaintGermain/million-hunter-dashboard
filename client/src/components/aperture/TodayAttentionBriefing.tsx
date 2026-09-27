@@ -181,7 +181,7 @@ export function TodayAttentionBriefing({
       <div className="flex-1 min-w-0 sm:flex sm:items-center sm:gap-2">
         <p className="font-semibold shrink-0" style={{ color: "var(--sh-text-primary)" }}>{notice.title}</p>
         <span className="hidden sm:inline" style={{ color: "var(--sh-fg-muted)" }}>·</span>
-        <p className="truncate" style={{ color: "var(--sh-fg-muted)" }}>{notice.detail}</p>
+        <p className="break-words" style={{ color: "var(--sh-fg-muted)" }}>{notice.detail}</p>
         {failedDetail && <p className="mt-1 sm:mt-0" style={{ color: "var(--sh-signal)" }}>{failedDetail}</p>}
       </div>
     </div>}
@@ -190,13 +190,12 @@ export function TodayAttentionBriefing({
       {primary ? <AttentionDecisionCard item={primary} prominent fingerprint={fingerprints.get(primary.key)} busy={primary.kind === "status_unavailable" && loading} onOpen={() => openTask(primary)} reviewOpen={inlineTask?.key === primary.key} /> : quiet ? <div data-quiet-status className="flex gap-3 p-4"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div><p className="font-semibold">No new action identified.</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.quietMessage}</p></div></div> : null}
       {primary && inlineReview(primary)}
     </>}
-    {(execution !== undefined || executionFailed !== undefined) && <TodayExecutionSnapshot data={execution} failed={!!executionFailed} loading={loading} />}
+    {!attention && (execution !== undefined || executionFailed !== undefined) && <TodayExecutionSnapshot data={execution} failed={!!executionFailed} loading={loading} />}
     {attention && <>
-      {visibleMotion.length > 0 && <section className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-4"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2></div>{execution ? <TodayOrderRows items={visibleMotion} data={execution} fingerprints={fingerprints} changedKeys={changedKeys} onOpen={onOpen} /> : visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
       {(layout?.otherCritical.length ?? 0) > 0 && <section aria-label="Other critical issues" className="border-t" style={{ borderColor: "var(--sh-border-1)" }}>
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[var(--sh-red)] animate-pulse" />
+            <span className="h-2 w-2 rounded-full bg-[var(--sh-red)]" />
             <h2 className="text-sm font-semibold">Other critical issues · {criticalSplit.visible.length}</h2>
           </div>
           <div className="flex items-center gap-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
@@ -209,6 +208,9 @@ export function TodayAttentionBriefing({
       </section>}
 
       <AttentionSourceRecovery issues={attention.sourceIssues ?? []} onOpen={onOpen} onRetry={onRetry} busy={read.busy} />
+
+      {visibleMotion.length > 0 && <section className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-3"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2></div>{execution ? <TodayOrderRows items={visibleMotion} data={execution} fingerprints={fingerprints} changedKeys={changedKeys} onOpen={onOpen} /> : visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
+      {(execution !== undefined || executionFailed !== undefined) && <TodayExecutionSnapshot data={execution} failed={!!executionFailed} loading={loading} />}
 
       {(layout?.otherAttention.length ?? 0) > 0 && <details open={tasksOpen} onToggle={event => setTasksOpen(event.currentTarget.open)} className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Other pending decisions · {attentionSplit.visible.length}</summary>{tasksOpen && attentionSplit.visible.map(row)}</details>}
 
