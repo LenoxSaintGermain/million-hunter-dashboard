@@ -6,7 +6,18 @@ User screenshot review identified a presentation defect despite the functional j
 
 Design changes: source research gets a full-width section before optional analysis; unknown risk remains visible; analysis tools and illustrative financing use an explicit disclosure, with existing actions unchanged. The wrapping analysis tab bar has automatic height and 44px controls. Home removes the duplicate co-analyst banner, uses acquisition-specific navigation, and prioritizes saved search results. Wingate inventory and primary navigation are reserved for role `investor` with completed onboarding and `assetClass=historic`. Missing/failed profile data, admin role, or other asset classes do not imply that preference. Wingate stays under More for other non-capital-only roles. This is presentation, not an access-control change; no migration.
 
-Validation and release receipt pending. Prior functional UAT below must not be mistaken for verification of this new layout.
+Released source `7657555a839b4e3f0770d836c08dd5d81d621814` on `main`. Build `269dc18d-f0ab-418e-954d-af43bd4de68a` succeeded; revision `capital-aperture-00250-lav` serves 100% of production traffic. Staged smoke passed 6/6 at 19:29:00Z and production smoke passed 6/6 at 19:29:22Z on September 27. Runtime configuration fingerprint unchanged; no migration or access-control change.
+
+Validation:
+- `DATABASE_URL= pnpm test:unit`: 239 files passed, 4 skipped; 2,699 tests passed, 18 skipped. `pnpm check` passed. Unit log: `/tmp/acquisition-layout-final-isolated.log`.
+- An additional broad `DATABASE_URL= pnpm test` was not green: 17 files failed, including database/credential-dependent lanes and a legacy encoded-path file lookup. It was not connected to production. Do not confuse the passing isolated unit lane with all integration coverage. Log: `/tmp/acquisition-layout-final-unit.log`.
+- Signed-in production home: acquisition heading and saved search precede results; no Wingate inventory or primary Wingate link for this admin account; More still exposes Wingate. Investor historic/nonhistoric/missing-profile variants are covered by deterministic helper and rendered-navigation tests, not a live cross-account session.
+- Desktop opportunity #3660002: expanded dossier uses the main content width, with no adjacent empty stretched grid. Unknown risk and unverified listing claims remain visible. Optional analysis/financing is collapsed by default; its existing actions are unchanged.
+- 390×844 mobile: home and dossier read in a single column; document scroll width 386px against a 390px viewport. Analysis disclosure opened and closed with Enter. A tab-arrow check was inconclusive, so complete keyboard navigation and WCAG conformance are not claimed. Temporary viewport restored.
+- Read-only inspection preserved dossier time `9/27/2026, 2:13:47 AM` and current home search #3810001 / saved comparison `3:11:39 PM`. No new scan, analysis, seller contact, financing action or order was initiated in this layout retest.
+- Screenshot artifacts: `/tmp/acquisition-home-layout-desktop.png`, `/tmp/acquisition-home-layout-mobile.png`, `/tmp/acquisition-deal-layout-desktop.png`, `/tmp/acquisition-deal-layout-mobile.png`. These are local review captures, not measured user usability results.
+
+The design-critique pass changed reading order and disclosure, not the evidence or financial gates. Prior functional UAT below is a separate historical receipt, not certification of all current UI interactions.
 
 Status: requested thesis → sourced opportunity → evidence-review journey passed live. This is research UAT, not verification of a business, financing approval, or certification of every application module.
 
