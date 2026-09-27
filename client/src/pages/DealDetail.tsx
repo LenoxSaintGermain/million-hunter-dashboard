@@ -169,20 +169,20 @@ export default function DealDetail() {
 
   return (
     <EditorialTopNav>
-      <div className="max-w-[1280px] mx-auto w-full px-6 lg:px-10 py-10">
+      <div className="max-w-[1280px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-5">
 
         {/* ── Back nav ─────────────────────────────────────────────────────── */}
         <Link href="/scan">
-          <div className="inline-flex items-center gap-2 font-eyebrow text-eyebrow text-muted-foreground hover:text-amber transition-colors cursor-pointer mb-10">
+          <div className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-amber transition-colors cursor-pointer mb-3">
             <ArrowLeft className="w-3 h-3" />
             PIPELINE
           </div>
         </Link>
 
         {/* ── Broadsheet Masthead ───────────────────────────────────────────── */}
-        <div className="border-b border-rule pb-10 mb-10">
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">INTELLIGENCE DOSSIER</span>
+        <div className="border-b border-rule pb-5 mb-5">
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
+            <span className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">Opportunity report</span>
             <span className="w-8 h-px bg-rule" />
             {deal.industry && (
               <span className="font-eyebrow text-eyebrow text-muted-foreground border border-rule px-2 py-0.5 rounded-sm">{deal.industry}</span>
@@ -193,48 +193,55 @@ export default function DealDetail() {
               </span>
             )}
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 items-end">
-            <div>
-              <p className="font-eyebrow text-eyebrow text-amber mb-2 uppercase tracking-widest">PROJECT {(deal.name || "").split(" ").slice(-1)[0].toUpperCase()}:</p>
-              <h1 className="font-hero-h1 text-hero-h1 text-ink leading-[1.05] mb-6">{deal.name}</h1>
-              <AcquisitionSourceBrief listingUrl={deal.listingUrl} description={deal.description} isSynthetic={deal.isSynthetic} />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-rule pt-8">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-4 items-start">
+            <div className="min-w-0">
+              <h1 className="font-card-title text-3xl sm:text-4xl text-ink leading-tight break-words">{deal.name}</h1>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => createShareToken.mutate({ dealId })} disabled={createShareToken.isPending}
+                className="inline-flex min-h-11 items-center gap-2 border border-rule bg-paper text-sm px-3 rounded-md hover:border-amber/40">
+                <Share2 className="w-4 h-4" />Share report
+              </button>
+              <button onClick={() => scoreDeal.mutate({ id: dealId })} disabled={scoreDeal.isPending}
+                className="inline-flex min-h-11 items-center gap-2 border border-rule text-sm px-3 rounded-md hover:border-amber/40">
+                {scoreDeal.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+                Re-score
+              </button>
+            </div>
+          </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-y border-rule py-4 my-4">
                 {[
                   { label: "CASH FLOW", value: fmt(deal.cashFlow) },
                   { label: "ASKING PRICE", value: fmt(deal.askingPrice) },
                   { label: "REVENUE", value: fmt(deal.revenue) },
-                  { label: "AI SCORE", value: score != null ? score.toFixed(3) : "—" },
+                  { label: "SCREENING SCORE", value: score != null ? score.toFixed(3) : "—" },
                 ].map((item, i) => (
                   <div key={i}>
                     <p className="font-eyebrow text-eyebrow text-muted-foreground mb-2 uppercase tracking-widest">{item.label}</p>
-                    <p className={`font-data-mono text-section-h2 leading-none ${i === 3 && score != null ? (score >= 0.8 ? "text-amber" : score >= 0.65 ? "text-sage" : "text-clay") : "text-ink"}`}>{item.value}</p>
+                    <p className="font-data-mono text-2xl sm:text-3xl text-ink leading-tight">{item.value}</p>
                   </div>
                 ))}
               </div>
-            </div>
-            <div className="flex flex-col items-end gap-3 shrink-0">
-              <button onClick={() => createShareToken.mutate({ dealId })} disabled={createShareToken.isPending}
-                className="flex items-center gap-2 border border-rule bg-paper font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:border-amber/40 hover:text-amber transition-all">
-                <Share2 className="w-3 h-3" />SHARE DOSSIER
-              </button>
-              <button onClick={() => scoreDeal.mutate({ id: dealId })} disabled={scoreDeal.isPending}
-                className="flex items-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:opacity-90 transition-all">
-                {scoreDeal.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
-                RE-SCORE
-              </button>
-            </div>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-start">
+            <AcquisitionSourceBrief listingUrl={deal.listingUrl} description={deal.description} isSynthetic={deal.isSynthetic} />
+            <aside aria-label="Next decision" className="border-l-2 border-amber pl-4 py-1 space-y-2">
+              <h2 className="font-card-title text-xl">{signal?.redTeamSummary ? "Review the recorded risks" : "Check the evidence first"}</h2>
+              <p className="text-sm text-muted-foreground">{signal?.redTeamSummary ? "Risk analysis is available below; it is not approval to proceed." : "Risk analysis has not been run; risk is still unknown."}</p>
+              <a href="#deal-research" className="inline-flex items-center min-h-11 text-sm font-medium underline">Review research <ArrowRight className="ml-2 w-4 h-4" /></a>
+              <p className="text-sm text-muted-foreground">Viewing this report does not contact the seller. Screening score is not thesis fit or verified quality.</p>
+            </aside>
           </div>
         </div>
 
         {/* ── Enrichment Strip ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border border-rule divide-x divide-rule mb-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border border-rule divide-x divide-rule mb-5">
           {[
             { label: "MULTIPLE", value: deal.askingPrice && deal.cashFlow ? `${(parseFloat(String(deal.askingPrice)) / parseFloat(String(deal.cashFlow))).toFixed(1)}x` : "—" },
             { label: "CASH COVERAGE · MODELED", value: financing?.cashCoverage?.toFixed(2) ?? "—" },
             { label: "EMPLOYEES", value: (deal as any).employeeCount ? String((deal as any).employeeCount) : "—" },
             { label: "YEARS EST.", value: (deal as any).yearsInOperation ? String((deal as any).yearsInOperation) : "—" },
           ].map((item, i) => (
-            <div key={i} className="px-6 py-4">
+            <div key={i} className="px-3 py-3 min-w-0">
               <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1 uppercase tracking-widest">{item.label}</p>
               <p className="font-data-mono text-[20px] text-ink leading-none">{item.value}</p>
             </div>
@@ -253,9 +260,12 @@ export default function DealDetail() {
           </div>
         )}
 
-        <section aria-label="Opportunity research" className="min-w-0 mb-6 space-y-3">
-          <h2 className="font-card-title text-2xl text-ink">Review the evidence</h2>
-          <p className="text-base text-muted-foreground">Start with the original listing and saved research. {signal?.redTeamSummary ? "Review the recorded risks above." : "Risk analysis has not been run; risk is still unknown."} No seller has been contacted by opening this page.</p>
+        <nav aria-label="Report sections" className="flex flex-wrap gap-4 border-b border-rule mb-4 text-sm font-medium">
+          <a href="#deal-research" className="inline-flex min-h-11 items-center underline">Research & sources</a>
+          <a href="#deal-workspace" className="inline-flex min-h-11 items-center underline">Analysis & next steps</a>
+        </nav>
+        <section id="deal-research" aria-label="Opportunity research" className="scroll-mt-20 min-w-0 mb-6 space-y-3">
+          <h2 className="font-card-title text-2xl text-ink">Research & sources</h2>
           <DealDossierModule dealId={dealId} />
         </section>
         <details className="mb-6 border border-rule p-4">
@@ -410,7 +420,7 @@ export default function DealDetail() {
         </details>
 
       {/* Tabs */}
-      <Tabs defaultValue="signals">
+      <Tabs id="deal-workspace" className="scroll-mt-20" defaultValue="signals">
         <TabsList className="bg-card border border-border h-auto min-h-11 flex-wrap justify-start gap-1 [&>button]:min-h-11">
           <TabsTrigger value="signals" className="text-xs h-7">Third Signal</TabsTrigger>
           <TabsTrigger value="memo" className="text-xs h-7">Investment Memo</TabsTrigger>

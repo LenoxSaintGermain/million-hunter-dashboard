@@ -1,5 +1,11 @@
 # Acquisition journey repair — 2026-09-27
 
+## Follow-up: opportunity report hierarchy
+
+DealDetail now uses a compact report masthead instead of the oversized marketing headline and generated PROJECT label. The financial strip, original listing/provenance, and next-decision summary lead; research and analysis have same-page navigation. Share and re-score remain explicit actions, never automatic. Screening score is labeled as neither thesis fit nor verified quality. Existing financial assumptions, unknown-risk state, evidence records and analysis actions remain intact. No provider/model, schema or approval changes.
+
+Validation: 2,704 isolated unit tests passed / 18 skipped; TypeScript passed. Rendered regression asserts report hierarchy, same-page destinations and risk/financing disclosures. Deterministic disconnected fixture `scripts/deal-report-visual-uat.mjs` inspected at 1084×1223 and 390×844, including long-title wrapping and research disclosure. Mutation handlers throw; no account changes or provider calls. Production deployment pending. This is a focused report-shell redesign, not certification of every analysis tab or user-tested usability.
+
 ## Follow-up: compact shortlist and evidence drawer
 
 The acquisition comparison is now a three-column desktop shortlist rather than repeated full-width reports. Each card keeps the exact opportunity, incomplete/failed assessment state, weighted evidence coverage and a direct opportunity link. Compare evidence opens a single focused sheet: all criteria/weights/statuses together, one missing-evidence explanation, then every supported explanation and source quote/link. Source access takes two actions from the shortlist. The sheet preserves the parent reading position, uses the existing dialog focus/Escape behavior, and fills the mobile width. No evidence score, ordering, ownership or workflow authority changes.

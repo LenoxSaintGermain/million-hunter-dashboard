@@ -25,3 +25,17 @@ it("shows a qualified amortized scenario, not a fabricated DSCR or SBA approval"
   expect(html.match(/data-testid="full-width-dossier"/g)).toHaveLength(1);
   expect(html).not.toContain("lg:col-span-4 lg:border-l");
 });
+it("leads with a compact report and offers same-page research and work sections", () => {
+  const html = renderToStaticMarkup(<DealDetail />);
+  expect(html).toContain("Opportunity report");
+  expect(html).not.toContain("text-hero-h1");
+  expect(html).not.toContain("PROJECT ");
+  expect(html).toContain('aria-label="Next decision"');
+  expect(html).toContain("Screening score is not thesis fit or verified quality.");
+  for (const id of ["deal-research", "deal-workspace"]) {
+    expect(html).toContain(`href="#${id}"`);
+    expect(html).toContain(`id="${id}"`);
+  }
+  expect(html).toContain("Share report");
+  expect(html).toContain("Re-score");
+});
