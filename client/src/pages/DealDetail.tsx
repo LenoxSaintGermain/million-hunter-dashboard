@@ -1,4 +1,5 @@
 import React from "react";
+import { modelAcquisitionFinancing, ACQUISITION_FINANCING_ASSUMPTIONS } from "@shared/acquisitionFinancing";
 import { AcquisitionSourceBrief } from "@/components/AcquisitionSourceBrief";
 import LOIGeneration from "./LOIGeneration";
 import { useParams } from "wouter";
@@ -162,6 +163,7 @@ export default function DealDetail() {
   }
 
   const { deal, signal, memo } = data;
+  const financing = modelAcquisitionFinancing(toNum(deal.askingPrice), toNum(deal.cashFlow));
   const score = toNum(deal.score);
   const scoreColorVal = score == null ? "var(--sh-fg-3)" : score >= 0.8 ? "var(--sage)" : score >= 0.65 ? "var(--amber)" : "var(--clay)";
 
@@ -228,7 +230,7 @@ export default function DealDetail() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border border-rule divide-x divide-rule mb-10">
           {[
             { label: "MULTIPLE", value: deal.askingPrice && deal.cashFlow ? `${(parseFloat(String(deal.askingPrice)) / parseFloat(String(deal.cashFlow))).toFixed(1)}x` : "—" },
-            { label: "DSCR", value: deal.cashFlow && deal.askingPrice ? `${(parseFloat(String(deal.cashFlow)) / (parseFloat(String(deal.askingPrice)) * 0.07)).toFixed(2)}` : "—" },
+            { label: "CASH COVERAGE · MODELED", value: financing?.cashCoverage?.toFixed(2) ?? "—" },
             { label: "EMPLOYEES", value: (deal as any).employeeCount ? String((deal as any).employeeCount) : "—" },
             { label: "YEARS EST.", value: (deal as any).yearsInOperation ? String((deal as any).yearsInOperation) : "—" },
           ].map((item, i) => (
@@ -302,17 +304,19 @@ export default function DealDetail() {
 
               {/* Module 4: Capital Study */}
               <div className="border border-rule bg-paper p-6">
-                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Capital Study</p>
+                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Illustrative financing</p>
                 {deal.askingPrice ? (
                   <div className="space-y-3">
                     <div>
-                      <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">SBA 7(a) DOWN</p>
-                      <p className="font-data-mono text-[20px] text-ink">{fmt(parseFloat(String(deal.askingPrice)) * 0.1)}</p>
+                      <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">Modeled buyer equity</p>
+                      <p className="font-data-mono text-[20px] text-ink">{fmt(financing?.equityAmount)}</p>
                     </div>
                     <div>
-                      <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">LOAN AMOUNT</p>
-                      <p className="font-data-mono text-[20px] text-ink">{fmt(parseFloat(String(deal.askingPrice)) * 0.9)}</p>
+                      <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">Modeled loan</p>
+                      <p className="font-data-mono text-[20px] text-ink">{fmt(financing?.loanAmount)}</p>
                     </div>
+                    <p className="text-sm text-muted-foreground">Assumes {ACQUISITION_FINANCING_ASSUMPTIONS.loanFraction * 100}% financing at {ACQUISITION_FINANCING_ASSUMPTIONS.annualRate * 100}% over {ACQUISITION_FINANCING_ASSUMPTIONS.months / 12} years, fully amortizing. Fees and working capital excluded. Not lender terms or financing approval.</p>
+                    <p className="text-sm text-muted-foreground">Cash coverage uses seller-reported cash flow before verifying owner compensation, capital spending and other obligations. It is not a lender-verified DSCR.</p>
                   </div>
                 ) : (
                   <p className="font-body-base text-body-base text-muted-foreground">No asking price set</p>

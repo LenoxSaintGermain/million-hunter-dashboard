@@ -17,6 +17,7 @@
  */
 
 import { GoogleGenAI } from "@google/genai";
+import { modelAcquisitionFinancing } from "../shared/acquisitionFinancing";
 import { poeJSON, POE_MODELS } from "./poe";
 import { GEMINI_STRONG, GEMINI_FAST, GEMINI_BALANCED, GEMINI_LITE } from "../shared/models";
 import type { Deal } from "../drizzle/schema";
@@ -391,13 +392,8 @@ function scoreCapitalStackCompatibility(deal: Deal): number {
 
   if (askingPrice <= 0 || cashFlow <= 0) return 0.3; // insufficient data — below neutral
 
-  // Estimate annual debt service: SBA 7(a) at 90% LTV, 10-year term, ~11.5% rate
-  // Monthly payment formula: P * r / (1 - (1+r)^-n)
-  const loanAmount = askingPrice * 0.90;
-  const monthlyRate = 0.115 / 12;
-  const nMonths = 120; // 10-year SBA
-  const monthlyPayment = loanAmount * monthlyRate / (1 - Math.pow(1 + monthlyRate, -nMonths));
-  const annualDebtService = monthlyPayment * 12;
+  // Shared illustrative screening assumptions, not lender terms or eligibility.
+  const { loanAmount, annualDebtService } = modelAcquisitionFinancing(askingPrice, cashFlow)!;
 
   // Sub-signal 1: DSCR
   const dscr = cashFlow / annualDebtService;
