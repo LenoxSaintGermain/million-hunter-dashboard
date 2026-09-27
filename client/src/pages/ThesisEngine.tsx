@@ -7,7 +7,7 @@
  *   Right — STRATEGIST output review (editable structured form + Approve & Run)
  */
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -140,7 +140,7 @@ export default function ThesisEngine() {
   const isCapitalOperator = user?.role === "capital_operator";
   const canUseAperture = canOperateCapital(user?.role);
   const [location, navigate] = useLocation();
-  const routeSearch = typeof window === "undefined" ? "" : window.location.search;
+  const routeSearch = useSearch();
   const requestedScope = new URLSearchParams(routeSearch).get("scope");
   const requestedUatCase = new URLSearchParams(routeSearch).get("uat_case");
   const initialScope: ThesisScope = isCapitalOperator || requestedScope === "capital"
@@ -155,6 +155,11 @@ export default function ThesisEngine() {
   const [compilationResult, setCompilationResult] = useState<any>(null);
   const [compilationId, setCompilationId] = useState<number | null>(null);
   const [isCompiling, setIsCompiling] = useState(false);
+  useEffect(() => {
+    if (requestedScope === "acquisition" || requestedScope === "property") {
+      setScope(requestedScope);
+    }
+  }, [requestedScope]);
   const templatesForScope = scope === "capital"
     ? CAPITAL_TEMPLATES
     : scope === "property"
@@ -271,13 +276,13 @@ export default function ThesisEngine() {
       return;
     }
     const targetLocations: string[] = f.geographies ?? [];
-    const minCashFlow = f.cashFlowMin ?? (f.revenueMin ? Math.round(f.revenueMin * 0.35) : 500000);
+    const minCashFlow = f.cashFlowMin ?? 0;
     const maxMultiple = f.multipleMax ?? 5;
     const geoLabel = targetLocations.length > 0
       ? targetLocations.slice(0, 3).join(", ") + (targetLocations.length > 3 ? ` +${targetLocations.length - 3}` : "")
       : "National";
     toast.info("Thesis approved — launching scan", {
-      description: `Geography: ${geoLabel} · Min cash flow: $${(minCashFlow / 1000).toFixed(0)}k · Max multiple: ${maxMultiple}x`,
+      description: `Geography: ${geoLabel} · Using the financial criteria in your saved thesis.`,
       duration: 3000,
     });
     triggerScan.mutate({ targetLocations, minCashFlow, maxMultiple, thesisId: compilationId ?? undefined });
@@ -286,7 +291,7 @@ export default function ThesisEngine() {
   function launchSavedAcquisitionSearch(thesis: any) {
     const filters = thesis.compiledFilters ?? {};
     const targetLocations: string[] = filters.geographies ?? [];
-    const minCashFlow = filters.cashFlowMin ?? (filters.revenueMin ? Math.round(filters.revenueMin * 0.35) : 500000);
+    const minCashFlow = filters.cashFlowMin ?? 0;
     const maxMultiple = filters.multipleMax ?? 5;
     toast.info("Launching acquisition search", {
       description: "Your thesis is now linked to this discovery run. Progress and results will appear in Command Center.",
@@ -679,14 +684,14 @@ export default function ThesisEngine() {
                       <p className="text-xl font-bold text-foreground tabular-nums">
                         {compilationResult.estimatedTargetsMin}–{compilationResult.estimatedTargetsMax}
                       </p>
-                      <p className="text-xs text-muted-foreground">qualified businesses</p>
+                      <p className="text-xs text-muted-foreground">Unverified planning estimate, not discovered listings</p>
                     </div>
                     <div className="rounded-lg border border-border bg-muted/10 p-3">
                       <p className="eyebrow text-muted-foreground mb-1">Estimated Cost</p>
                       <p className="text-xl font-bold text-foreground tabular-nums">
                         ${(compilationResult.estimatedCostMin / 1000).toFixed(0)}k–${(compilationResult.estimatedCostMax / 1000).toFixed(0)}k
                       </p>
-                      <p className="text-xs text-muted-foreground">to score full universe</p>
+                      <p className="text-xs text-muted-foreground">Unverified estimate, not a quote or charge</p>
                     </div>
                   </div>
 
@@ -698,6 +703,12 @@ export default function ThesisEngine() {
                         <p className="eyebrow text-muted-foreground">Compiled Filters</p>
                       </div>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                        {([['cashFlowMin', 'Minimum cash flow'], ['cashFlowMax', 'Maximum cash flow'], ['askingPriceMin', 'Minimum asking price'], ['askingPriceMax', 'Maximum asking price']] as const).map(([key, label]) => filters[key] != null && (
+                          <div key={key} className="flex justify-between">
+                            <span className="text-muted-foreground">{label}</span>
+                            <span className="font-mono text-foreground">${Number(filters[key]).toLocaleString()}</span>
+                          </div>
+                        ))}
                         {filters.revenueMin && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Revenue Min</span>

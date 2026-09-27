@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { resolveThesisEntryWorkspace } from "../shared/thesisEntryRoute";
+import { readFileSync } from "node:fs";
 
 describe("resolveThesisEntryWorkspace", () => {
+  it("subscribes to query-only navigation instead of reading an inert window snapshot", () => {
+    const source = readFileSync(new URL("../client/src/pages/ThesisEngine.tsx", import.meta.url), "utf8");
+    expect(source).toContain("const routeSearch = useSearch();");
+    expect(source).not.toContain("window.location.search");
+  });
   it("opens the thesis-first Capital workspace at the canonical route", () => {
     expect(resolveThesisEntryWorkspace(null, null)).toBe("capital");
     expect(resolveThesisEntryWorkspace("capital", null)).toBe("capital");

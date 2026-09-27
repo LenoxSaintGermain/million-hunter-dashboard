@@ -3,9 +3,11 @@
  * Spec: TSL-SCI-PROD-001-A1 · Section 12
  *
  * Compiles free-text investment theses into executable pipeline configurations
- * using Claude structured output. Saves compilations to thesis_compilations table.
+ * using the configured Google provider. Saves compilations to thesis_compilations.
  */
 import { z } from "zod";
+import { GoogleGenAI } from "@google/genai";
+import { validateAcquisitionCompilation } from "./acquisitionCompilation";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { capitalOperatorProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -153,6 +155,10 @@ const COMPILATION_SCHEMA = {
       properties: {
         revenueMin: { type: "string" as const, description: "USD integer as string e.g. '2000000'" },
         revenueMax: { type: "string" as const, description: "USD integer as string e.g. '5000000'" },
+        cashFlowMin: { type: "string" as const, description: "Explicit seller cash flow minimum in USD; omit if not declared" },
+        cashFlowMax: { type: "string" as const, description: "Explicit seller cash flow maximum in USD; omit if not declared" },
+        askingPriceMin: { type: "string" as const, description: "Explicit asking price minimum in USD; not revenue" },
+        askingPriceMax: { type: "string" as const, description: "Explicit asking price maximum in USD; not revenue" },
         geographies: { type: "array" as const, items: { type: "string" as const } },
         businessAgeMin: { type: "string" as const, description: "Years as integer string e.g. '10'" },
         headcountMin: { type: "string" as const, description: "Integer string e.g. '10'" },
@@ -208,7 +214,7 @@ const COMPILATION_SCHEMA = {
 export const thesisRouter = router({
   /**
    * Compile a free-text investment thesis into structured pipeline config.
-   * Calls STRATEGIST (Claude) with JSON schema enforcement.
+   * Calls the configured provider with schema enforcement and local validation.
    */
   compile: protectedProcedure
     .input(z.object({
@@ -226,107 +232,36 @@ export const thesisRouter = router({
       ) as any;
       const compilationId = insertResult.insertId as number;
 
-      // Call STRATEGIST via Forge API (Gemini 3.1 Flash)
-      // Schema uses string types for all numeric fields to avoid Gemini's
-      // structured-output bug where integer fields render as 32k-char decimals.
-      // We coerce strings back to numbers after parsing.
-      const { ENV } = await import("./_core/env");
-      const forgeUrl = ENV.forgeApiUrl
-        ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-        : "https://forge.manus.ai/v1/chat/completions";
-
-      let compiled: any;
+      // Use the configured Google provider, as the canonical thesis compiler does.
+      let compiled: ReturnType<typeof validateAcquisitionCompilation>;
       try {
-        const forgeRes = await fetch(forgeUrl, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${ENV.forgeApiKey}`,
+        if (!process.env.GEMINI_API_KEY) throw new Error("Acquisition compiler provider is not configured");
+        const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const response = await genai.models.generateContent({
+          model: GEMINI_FAST,
+          contents: [{ role: "user", parts: [{ text: STRATEGIST_SYSTEM_PROMPT
+            + "\n\nDo not infer revenue from asking price or seller cash flow. Preserve unsupported criteria in evidenceRequirements. Estimates are unverified planning assumptions, not discovered inventory.\n\nThesis: " + input.thesisText }] }],
+          config: {
+            responseMimeType: "application/json",
+            responseJsonSchema: COMPILATION_SCHEMA,
+            temperature: 0.1,
+            maxOutputTokens: 8192,
+            httpOptions: { timeout: 60000 },
           },
-          body: JSON.stringify({
-            model: GEMINI_FAST,
-            messages: [
-              { role: "system", content: STRATEGIST_SYSTEM_PROMPT },
-              { role: "user", content: `Compile this investment thesis into a JSON object with these exact keys: compiledFilters (object with revenueMin, revenueMax, geographies, businessAgeMin, headcountMin, headcountMax, exclusions), scoringWeights (array of {dimension, weight, isCustom}), evidenceRequirements (array), autoDisqualifiers (array), confidenceNotes (array), estimatedTargetsMin, estimatedTargetsMax, estimatedCostMin, estimatedCostMax, suggestedName.\n\nIMPORTANT: All numeric values MUST be plain integers with NO decimal points (e.g. 2000000 not 2000000.0).\n\nThesis: ${input.thesisText}` },
-            ],
-            response_format: {
-              type: "json_schema",
-              json_schema: {
-                name: "thesis_compilation",
-                strict: true,
-                schema: COMPILATION_SCHEMA,
-              },
-            },
-            max_tokens: 4096,
-          }),
-          signal: AbortSignal.timeout(60000),
         });
-        if (!forgeRes.ok) {
-          const errText = await forgeRes.text();
-          throw new Error(`Forge API error ${forgeRes.status}: ${errText.slice(0, 200)}`);
-        }
-        const forgeJson = await forgeRes.json() as any;
-        let rawContent = forgeJson.choices?.[0]?.message?.content;
-        const finishReason = forgeJson.choices?.[0]?.finish_reason;
-        // If truncated (finish_reason=length), retry without json_schema constraint
-        if (!rawContent || finishReason === "length") {
-          const retryRes = await fetch(forgeUrl, {
-            method: "POST",
-            headers: { "content-type": "application/json", authorization: `Bearer ${ENV.forgeApiKey}` },
-            body: JSON.stringify({
-              model: GEMINI_FAST,
-              messages: [
-                { role: "system", content: "You are STRATEGIST, a deal thesis compiler. Return ONLY a JSON object, no markdown, no explanation." },
-                { role: "user", content: `Compile this investment thesis into a JSON object with EXACTLY these keys:\n- compiledFilters: {revenueMin, revenueMax, geographies (state abbrevs array), businessAgeMin, headcountMin, headcountMax, exclusions (array)}\n- scoringWeights: array of {dimension, weight (integer 1-100), isCustom (bool)}, weights sum to 100\n- evidenceRequirements: string array\n- autoDisqualifiers: string array\n- confidenceNotes: string array\n- estimatedTargetsMin, estimatedTargetsMax (integers)\n- estimatedCostMin, estimatedCostMax (integers, USD thousands)\n- suggestedName (3-6 words)\n\nAll numbers as plain integers. Return ONLY the JSON object.\n\nThesis: ${input.thesisText}` },
-              ],
-              max_tokens: 4096,
-            }),
-            signal: AbortSignal.timeout(60000),
-          });
-          if (!retryRes.ok) throw new Error(`Retry Forge error ${retryRes.status}`);
-          const retryJson = await retryRes.json() as any;
-          rawContent = retryJson.choices?.[0]?.message?.content;
-          if (!rawContent) throw new Error(`Empty response on retry — finish_reason: ${retryJson.choices?.[0]?.finish_reason}`);
-        }
-        // Strip markdown code fences if present
-        const stripped = rawContent.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
-        let raw: any;
-        try {
-          raw = JSON.parse(stripped);
-        } catch {
-          const match = stripped.match(/\{[\s\S]*\}/);
-          if (!match) throw new Error("STRATEGIST returned non-JSON content");
-          raw = JSON.parse(match[0]);
-        }
-        // Coerce string numeric fields back to numbers (workaround for Gemini integer schema bug)
-        const toInt = (v: any) => v !== undefined && v !== null && v !== "" ? parseInt(String(v), 10) || 0 : undefined;
-        compiled = {
-          ...raw,
-          compiledFilters: {
-            ...raw.compiledFilters,
-            revenueMin: toInt(raw.compiledFilters?.revenueMin),
-            revenueMax: toInt(raw.compiledFilters?.revenueMax),
-            businessAgeMin: toInt(raw.compiledFilters?.businessAgeMin),
-            headcountMin: toInt(raw.compiledFilters?.headcountMin),
-            headcountMax: toInt(raw.compiledFilters?.headcountMax),
-          },
-          scoringWeights: (raw.scoringWeights ?? []).map((w: any) => ({
-            ...w,
-            weight: parseInt(String(w.weight), 10) || 0,
-          })),
-          estimatedTargetsMin: toInt(raw.estimatedTargetsMin) ?? 0,
-          estimatedTargetsMax: toInt(raw.estimatedTargetsMax) ?? 0,
-          estimatedCostMin: toInt(raw.estimatedCostMin) ?? 0,
-          estimatedCostMax: toInt(raw.estimatedCostMax) ?? 0,
-        };
+        const text = response.text?.trim().replace(/^\x60\x60\x60(?:json)?\s*/, "").replace(/\s*\x60\x60\x60$/, "");
+        if (!text) throw new Error("Acquisition compiler returned no structured output");
+        compiled = validateAcquisitionCompilation(JSON.parse(text));
       } catch (e) {
+        // Log only the failure category, never provider payloads or credentials.
+        console.error("[Acquisition compiler] Failed", { compilationId, kind: e instanceof Error ? e.name : "UnknownError" });
         // Mark as review so the user can retry
         await db.execute(
           sql`UPDATE thesis_compilations SET status = 'review' WHERE id = ${compilationId}`
         );
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "STRATEGIST compilation failed — please try again",
+          message: "We could not prepare this search. Your thesis is saved; retry when the research service is available. No search was started.",
         });
       }
 

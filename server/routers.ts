@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { matchesAcquisitionFinancials, parseAcquisitionListings, type AcquisitionFinancials } from "./acquisitionListing";
 import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { consensusScores, sellerSimulations, dealTrajectory, deals } from "../drizzle/schema";
@@ -742,6 +743,22 @@ export const appRouter = router({
         const maxMultiple = input?.maxMultiple ?? 6;
         const targetLocations = input?.targetLocations ?? [];
 
+        // Check ownership before creating any job and carry the full thesis into research.
+        const thesisId = input?.thesisId;
+        let thesisText = "";
+        let financials: AcquisitionFinancials = { cashFlowMin: minCashFlow, multipleMax: maxMultiple };
+        if (thesisId) {
+          const db = await getDb();
+          if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+          const { thesisCompilations } = await import("../drizzle/schema");
+          const [thesis] = await db.select().from(thesisCompilations).where(eq(thesisCompilations.id, thesisId)).limit(1);
+          if (!thesis || thesis.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND", message: "Saved thesis not found" });
+          thesisText = thesis.thesisText;
+          const filters = typeof thesis.compiledFilters === "string" ? JSON.parse(thesis.compiledFilters) : thesis.compiledFilters;
+          if (!filters) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Prepare and review this thesis before starting a search." });
+          financials = { ...(filters ?? {}) };
+        }
+
         // Create the scan job record immediately so the UI can poll it
         const insertResult = await createScanJob({
           status: "running",
@@ -752,7 +769,6 @@ export const appRouter = router({
           progressPct: 2,
         });
         const jobId = (insertResult as any)[0].insertId as number;
-        const thesisId = input?.thesisId;
 
         if (thesisId) {
           const db = await getDb();
@@ -769,7 +785,7 @@ export const appRouter = router({
         }
 
         // Run the full pipeline asynchronously — don't await, return immediately
-        runScanPipeline(jobId, sources, minCashFlow, maxMultiple, targetLocations)
+        runScanPipeline(jobId, sources, minCashFlow, maxMultiple, targetLocations, thesisText, financials)
           .then(async () => {
             if (!thesisId) return;
             const db = await getDb();
@@ -4158,11 +4174,13 @@ async function runScanPipeline(
   minCashFlow: number,
   maxMultiple: number,
   targetLocations: string[] = [],
+  thesisText = "",
+  financials: AcquisitionFinancials = { cashFlowMin: minCashFlow, multipleMax: maxMultiple },
 ) {
   const phase = async (label: string, detail: string, pct: number) =>
     updateScanJob(jobId, { currentPhase: label, phaseDetail: detail, progressPct: pct });
 
-  // ── Phase 1: LLM-generated marketplace listings (no hardcoded test data) ────
+  // ── Phase 1: sourced listing research; broker claims are not audited facts ──
   await phase("Scanning marketplaces", `Fetching listings from ${sources.join(", ")}`, 10);
   await new Promise((r) => setTimeout(r, 1500));
 
@@ -4173,43 +4191,31 @@ async function runScanPipeline(
     : "Focus on Southeast/Sun Belt US markets (Atlanta, Charlotte, Raleigh, Tampa, Nashville, Birmingham, Houston).";
   const sourceHint = sources.join(", ");
 
-  let listings: Array<{ name: string; industry: string; location: string; revenue: number; cashFlow: number; askingPrice: number; multiple: number; employees: number; yearEstablished: number; source: string; listingUrl?: string }> = [];
+  let listings: ReturnType<typeof parseAcquisitionListings> = [];
   try {
     const key = process.env.SONAR_API_KEY;
     if (!key) throw new Error("SONAR_API_KEY not configured");
     const res = await fetch("https://api.perplexity.ai/v1/sonar", {
       method: "POST",
+      signal: AbortSignal.timeout(90000),
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({
         model: "sonar-pro",
         messages: [
-          { role: "system", content: "You are a business-acquisition research analyst. Report ONLY real businesses currently listed for sale that you can find and cite. Never invent listings, names, or financials. If a figure is not stated in the source, use 0. Always include the real listing-page URL. Output ONLY a JSON array." },
-          { role: "user", content: `Find up to ${4 + sources.length} REAL businesses currently for sale on ${sourceHint}. ${locationHint} Prefer recession-resistant service businesses (HVAC, commercial cleaning, plumbing, electrical, pest control, logistics, roofing) with cash flow around or above $${Math.round(minCashFlow / 1000)}k. For each real listing return an object: {"name","industry","location","revenue","cashFlow","askingPrice","multiple","employees","yearEstablished","source","listingUrl"}. Use 0 for any figure not stated in the source. "listingUrl" MUST be the real listing page. Return ONLY a JSON array — no prose.` },
+          { role: "system", content: "You are a business-acquisition research analyst. Report ONLY real businesses currently listed for sale that you can find and cite. Never invent listings, names, or financials. Use null when a figure is not disclosed. Always include the direct listing URL, not a search page. Listing claims are not independently verified facts. Output ONLY a JSON array." },
+          { role: "user", content: `Find up to ${4 + sources.length} real businesses for sale on ${sourceHint}. ${locationHint} Follow this saved thesis exactly: ${thesisText || "Recession-resistant service businesses"}. Financial filters: ${JSON.stringify(financials)}. Return objects with name, industry, location, revenue, cashFlow, askingPrice, employees, yearEstablished, source, listingUrl. Numeric values must be numbers or null if undisclosed. Return [] if no sourced listings qualify. No invented financials, inferred seller motivation, or substituted industries.` },
         ],
       }),
     });
     if (!res.ok) throw new Error(`Sonar API error ${res.status}`);
     const data: any = await res.json();
     const content: string = data.choices?.[0]?.message?.content ?? "";
-    const citations: string[] = Array.isArray(data.citations) ? data.citations : [];
     const match = content.match(/\[[\s\S]*\]/);
-    const arr: any[] = match ? JSON.parse(match[0]) : [];
-    listings = (Array.isArray(arr) ? arr : []).map((l: any, i: number) => ({
-      name: String(l.name ?? "").slice(0, 200),
-      industry: String(l.industry ?? "Service Business"),
-      location: String(l.location ?? targetLocations[0] ?? ""),
-      revenue: Number(l.revenue) || 0,
-      cashFlow: Number(l.cashFlow) || 0,
-      askingPrice: Number(l.askingPrice) || 0,
-      multiple: Number(l.multiple) || 0,
-      employees: Number(l.employees) || 0,
-      yearEstablished: Number(l.yearEstablished) || 0,
-      source: String(l.source ?? sources[0] ?? "market-research"),
-      listingUrl: String(l.listingUrl ?? citations[i] ?? citations[0] ?? ""),
-    })).filter((l) => l.name);
+    if (!match) throw new Error("Research returned no readable listing data");
+    listings = parseAcquisitionListings(JSON.parse(match[0]));
   } catch (e) {
-    console.warn("[Scan] Sonar listing research failed, scan completes with 0 listings:", e);
-    listings = [];
+    console.warn("[Scan] Listing research failed; no successful-empty result recorded");
+    throw new Error("Listing research is unavailable or returned invalid evidence. No search conclusion can be drawn.");
   }
 
   await phase("Extracting deal data", `Parsing ${listings.length} qualified listings`, 25);
@@ -4217,15 +4223,15 @@ async function runScanPipeline(
   await new Promise((r) => setTimeout(r, 1000));
 
   // ── Phase 2: Filter by criteria ───────────────────────────────────────────
-  await phase("Applying filters", `Min cash flow $${(minCashFlow / 1000).toFixed(0)}k · Max ${maxMultiple}x multiple`, 35);
+  await phase("Applying filters", "Checking disclosed figures against the saved search criteria", 35);
   const qualified = listings.filter(
-    (l) => l.cashFlow >= minCashFlow && l.multiple <= maxMultiple
+    (l) => matchesAcquisitionFinancials(l, financials)
   );
   await updateScanJob(jobId, { listingsQualified: qualified.length });
   await new Promise((r) => setTimeout(r, 800));
 
   // ── Phase 3: Score each deal ──────────────────────────────────────────────
-  await phase("AI scoring", `Scoring ${qualified.length} deals with Gemini 3.1 Flash`, 45);
+  await phase("Scoring candidates", `Applying the recorded screening model to ${qualified.length} listings`, 45);
   let scored = 0;
   for (const listing of qualified) {
     // Upsert deal — ON DUPLICATE KEY UPDATE handles re-scan deduplication
@@ -4237,7 +4243,9 @@ async function runScanPipeline(
     } else {
       // Market Scan now pulls REAL sonar-sourced listings with real listingUrls —
       // no longer synthetic.
-      const res = await createDeal({ ...listing, stage: "new", isSynthetic: false }) as any;
+      const res = await createDeal({ ...listing, stage: "new", isSynthetic: false,
+        description: `Discovered by search #${jobId} on ${new Date().toISOString()}. Source-reported listing; availability and financial claims require verification. Search thesis: ${thesisText || "General acquisition search"}`,
+      }) as any;
       // ON DUPLICATE KEY UPDATE returns insertId=0 for updates — re-fetch if needed
       dealId = res[0].insertId || (await getDealIdByNameSource(listing.name, listing.source ?? null)) || 0;
     }
@@ -4245,6 +4253,7 @@ async function runScanPipeline(
     // Score the deal
     try {
       const deal = await getDealById(dealId);
+      if (!deal) throw new Error("Saved listing could not be read back");
       if (deal) {
         const { score, redFlagCount } = await scoreDeal(deal);
         await updateDealScore(dealId, score, redFlagCount);
@@ -4252,7 +4261,7 @@ async function runScanPipeline(
         await updateDealStage(dealId, stage);
 
         // OZ/TAD enrichment — runs async after scoring
-        enrichDealWithOZTAD(deal.location, deal.askingPrice, deal.cashFlow)
+        if (deal.askingPrice != null && deal.cashFlow != null) enrichDealWithOZTAD(deal.location, deal.askingPrice, deal.cashFlow)
           .then(async (enrichment) => {
             if (enrichment.opportunityZone || enrichment.tadDistrict || enrichment.eventProximityMiles) {
               const db = await getDb();
@@ -4290,6 +4299,7 @@ async function runScanPipeline(
       }
     } catch (e) {
       console.warn(`[Scan] Scoring failed for ${listing.name}:`, e);
+      throw new Error("Research found listings, but scoring did not finish. Saved listings remain available for review.");
     }
 
     scored++;
