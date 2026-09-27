@@ -4,8 +4,17 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ query: {} as any, refetch: vi.fn() }));
 vi.mock("@/lib/trpc", () => ({ trpc: { scan: { getThesisComparison: { useQuery: () => ({ data: null }) }, getStatus: { useQuery: () => ({ ...state.query, refetch: state.refetch }) } } } }));
 import ScanProgress from "../client/src/components/ScanProgress";
+import { load } from "cheerio";
 beforeAll(() => vi.stubGlobal("React", React));
 afterAll(() => vi.unstubAllGlobals());
+it("keeps completed scan machinery behind one receipt, without hiding a failure", () => {
+  state.query = { data: { status: "completed", listingsFound: 12, listingsQualified: 3, dealsScored: 3, phaseDetail: "Three source checks unresolved" } };
+  const $ = load(renderToStaticMarkup(<ScanProgress jobId={1} />));
+  expect($("details").attr("open")).toBeUndefined();
+  expect($("details").text()).toContain("Three source checks unresolved");
+  expect($.text()).not.toContain("ConnectScanExtract");
+  expect(state.refetch).not.toHaveBeenCalled();
+});
 it("does not claim targets were added when no listings qualified", () => {
   state.query = { data: { status: "completed", listingsFound: 0, listingsQualified: 0, dealsScored: 0 } };
   const html = renderToStaticMarkup(<ScanProgress jobId={1} />);

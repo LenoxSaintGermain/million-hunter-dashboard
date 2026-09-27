@@ -1,5 +1,13 @@
 # Acquisition journey repair — 2026-09-27
 
+## Follow-up: compact shortlist and evidence drawer
+
+The acquisition comparison is now a three-column desktop shortlist rather than repeated full-width reports. Each card keeps the exact opportunity, incomplete/failed assessment state, weighted evidence coverage and a direct opportunity link. Compare evidence opens a single focused sheet: all criteria/weights/statuses together, one missing-evidence explanation, then every supported explanation and source quote/link. Source access takes two actions from the shortlist. The sheet preserves the parent reading position, uses the existing dialog focus/Escape behavior, and fills the mobile width. No evidence score, ordering, ownership or workflow authority changes.
+
+Completed scan phases, duplicated metrics and screening receipts are secondary to the shortlist; running and failed states retain their progress/error presentation. Claims remain unverified and stale/failed assessments remain explicit. A compact source-coverage indicator is not a probability or return forecast.
+
+Validation: 2,703 isolated unit tests pass / 18 skipped; TypeScript passes. New criteria-rendering coverage preserves all weights, unknowns, explanations and source links without repeated missing-evidence prose. Zero-API fixture `scripts/acquisition-shortlist-visual-uat.mjs` inspected on desktop and 390×844 mobile; sheet open/close, Escape and trigger focus restoration verified. No live API runs or account/order actions in the fixture. Production release and signed-in retest pending.
+
 ## Follow-up: reading layout and profile relevance
 
 User screenshot review identified a presentation defect despite the functional journey passing: long dossier content was trapped in a four-column sidebar while the neighboring card grid stretched into empty space. Historic Wingate inventory also preceded the acquisition search for unrelated profiles.

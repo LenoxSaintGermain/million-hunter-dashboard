@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ query: {} as any, refetch: vi.fn() }));
 vi.mock("@/lib/trpc", () => ({ trpc: { scan: { getThesisComparison: { useQuery: () => ({ ...state.query, refetch: state.refetch }) } } } }));
 vi.mock("wouter", () => ({ Link: ({ children, href }: any) => <a href={href}>{children}</a> }));
-import { AcquisitionThesisComparison } from "../client/src/components/AcquisitionThesisComparison";
+import { AcquisitionThesisComparison, AcquisitionCriterionDetail } from "../client/src/components/AcquisitionThesisComparison";
 afterEach(() => vi.unstubAllGlobals());
 it("keeps failure distinct from no qualifying opportunities and does not retry on reads", () => {
   vi.stubGlobal("React", React); state.query = { isError: true };
@@ -18,5 +18,20 @@ it("shows incomplete evidence and the exact next opportunity without a fabricate
   const html = renderToStaticMarkup(<AcquisitionThesisComparison jobId={1} />);
   expect(html).toContain("Fit incomplete"); expect(html).not.toContain("Assessed fit:");
   expect(html).toContain('href="/deal/4"'); expect(html).toContain("out of date");
-  expect(html).toContain("Not established"); expect(state.refetch).not.toHaveBeenCalled();
+  expect(html).toContain("Compare evidence"); expect(html).toContain("evidence coverage");
+  expect(html).not.toContain("Not disclosed"); expect(state.refetch).not.toHaveBeenCalled();
+});
+it("preserves every criterion and source but explains missing evidence only once", () => {
+  vi.stubGlobal("React", React);
+  const comparison = { dimensions: [
+    { dimension: "Recurring revenue", weight: 50, score: null, contribution: null, explanation: "Repeated missing explanation", evidence: [] },
+    { dimension: "Owner transition", weight: 30, score: null, contribution: null, explanation: "Repeated missing explanation", evidence: [] },
+    { dimension: "History", weight: 20, score: 1, contribution: 20, explanation: "Seller reports establishment in 1990.", evidence: [{ quote: "Established:1990", sourceUrl: "https://example.org/listing" }] },
+  ] } as any;
+  const html = renderToStaticMarkup(<AcquisitionCriterionDetail comparison={comparison} />);
+  expect(html).toContain("Recurring revenue"); expect(html).toContain("Owner transition");
+  expect(html.match(/Not established/g)).toHaveLength(2);
+  expect(html).not.toContain("Repeated missing explanation");
+  expect(html).toContain("Established:1990"); expect(html).toContain('href="https://example.org/listing"');
+  expect(html).toContain("Missing information is not a positive or neutral score");
 });

@@ -1,34 +1,71 @@
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
+import { ArrowUpRight, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import type { compareAcquisitionToThesis } from "@shared/acquisitionThesisComparison";
+
+type Comparison = ReturnType<typeof compareAcquisitionToThesis>;
+
+export function AcquisitionCriterionDetail({ comparison }: { comparison: Comparison }) {
+  const missing = comparison.dimensions.filter(row => row.score == null);
+  return <div className="space-y-6">
+    <section aria-label="Criteria summary">
+      <h3 className="mb-2 text-sm font-semibold">Your criteria</h3>
+      <div className="divide-y divide-border rounded-lg border border-border">
+        {comparison.dimensions.map(row => <div key={row.dimension} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-3 py-2 text-sm">
+          <span>{row.dimension}<span className="ml-2 text-muted-foreground">{row.weight}% weight</span></span>
+          <span className="font-medium tabular-nums">{row.score == null ? "Not established" : `${row.contribution!.toFixed(1)} pts`}</span>
+        </div>)}
+      </div>
+      {missing.length > 0 && <p className="mt-2 text-sm text-muted-foreground">{missing.length} criteria still need evidence. Missing information is not a positive or neutral score.</p>}
+    </section>
+    {comparison.dimensions.filter(row => row.score != null).map(row => <section key={row.dimension} className="space-y-2">
+      <h3 className="font-semibold">{row.dimension}</h3><p className="text-sm leading-6">{row.explanation}</p>
+      {row.evidence.map((evidence, index) => <blockquote key={index} className="border-l-2 border-border pl-3 text-sm leading-6">
+        <p>{evidence.quote}</p><a className="inline-flex min-h-11 items-center gap-1 underline" href={evidence.sourceUrl} target="_blank" rel="noopener noreferrer">Inspect source claim<ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" /></a>
+      </blockquote>)}
+    </section>)}
+  </div>;
+}
 
 export function AcquisitionThesisComparison({ jobId }: { jobId: number }) {
   const { data, isLoading, isError, refetch } = trpc.scan.getThesisComparison.useQuery({ jobId });
-  if (isLoading) return <p role="status" className="p-4 text-sm">Loading thesis comparison…</p>;
+  if (isLoading) return <p role="status" className="p-4 text-sm">Loading shortlist…</p>;
   if (isError) return <div role="alert" className="p-4 text-sm">Thesis comparison could not load. This is not a no-opportunity result. <button className="underline min-h-11" onClick={() => refetch()}>Retry comparison</button></div>;
   if (!data) return null;
-  return <section aria-label="Thesis comparison" className="border-t border-border p-4 space-y-3">
-    <h3 className="font-semibold">How these opportunities fit your thesis</h3>
-    <p className="text-sm text-muted-foreground">Ordered by supported weighted points, not expected returns. Broker claims are unverified. Missing evidence keeps the overall score incomplete.</p>
-    {data.stale && <p role="alert" className="text-sm">This saved comparison is out of date. Recheck source availability and claims before relying on it.</p>}
-    <p className="text-sm text-muted-foreground">Saved {new Date(data.createdAt).toLocaleString()} · Thesis #{data.thesisId} · Search #{jobId}</p>
+  return <section aria-label="Thesis comparison" className="border-t border-border p-4 sm:p-5">
+    <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div><p className="text-xs uppercase tracking-widest text-muted-foreground">Thesis match</p><h3 className="mt-1 text-2xl font-serif">Your shortlist <span className="text-muted-foreground">/ {data.items.length}</span></h3></div>
+      <p className="text-sm text-muted-foreground">Saved {new Date(data.createdAt).toLocaleDateString()}</p>
+    </header>
+    <p className="mb-4 text-sm text-muted-foreground">Ranked by supported criteria—not expected returns. Seller claims are unverified.</p>
+    {data.stale && <p role="alert" className="mb-4 border-l-2 border-[var(--sh-signal)] pl-3 text-sm">This comparison is out of date. Recheck sources before relying on it.</p>}
     {!data.items.length && <p>No candidates passed the source and financial screen. Review the criteria and screening reasons above.</p>}
-    {data.items.map(item => <article key={item.dealId} className="border-t border-border pt-3 space-y-2">
-      <h4 className="font-medium">{item.name}</h4>
-      {item.assessmentFailed ? <p role="alert">Assessment unavailable. No thesis-fit conclusion can be drawn.</p> :
-        <p>{item.comparison.score == null ? "Fit incomplete" : `Assessed fit: ${item.comparison.score.toFixed(0)}/100`} · {item.comparison.coveredWeight}% of weighted criteria has source evidence</p>}
-      <details>
-        <summary className="min-h-11 cursor-pointer py-3 text-sm">Criteria, evidence and missing information</summary>
-        <ul className="space-y-3 text-sm">
-          {item.comparison.dimensions.map(row => <li key={row.dimension}>
-            <p className="font-medium">{row.dimension} · weight {row.weight}% · {row.score == null ? "Not established" : `${row.contribution!.toFixed(1)} points`}</p>
-            <p>{row.explanation}</p>
-            {row.evidence.map((evidence, index) => <blockquote key={index} className="border-l border-border pl-3 my-2">
-              <p>{evidence.quote}</p><a className="underline inline-flex min-h-11 items-center" href={evidence.sourceUrl} target="_blank" rel="noopener noreferrer">Inspect source claim</a>
-            </blockquote>)}
-          </li>)}
-        </ul>
-      </details>
-      <Link href={`/deal/${item.dealId}`} className="inline-flex min-h-11 items-center underline text-sm">Review opportunity evidence</Link>
-    </article>)}
+    <div className="grid gap-3 lg:grid-cols-3">
+      {data.items.map((item, index) => <article key={item.dealId} className="flex min-w-0 flex-col rounded-xl border border-border bg-[var(--sh-surface)] p-4">
+        <div className="mb-3 flex items-center justify-between gap-2"><span className="font-mono text-sm text-muted-foreground">{String(index + 1).padStart(2, "0")}</span><span className="rounded border border-border px-2 py-1 text-xs font-medium">{item.assessmentFailed ? "Assessment unavailable" : item.comparison.score == null ? "Fit incomplete" : `Assessed fit: ${item.comparison.score.toFixed(0)}/100`}</span></div>
+        <h4 className="font-serif text-lg leading-6">{item.name}</h4>
+        {item.assessmentFailed ? <p role="alert" className="mt-3 text-sm">No thesis-fit conclusion is available.</p> : <div className="my-4">
+          <p className="text-sm"><strong className="text-xl tabular-nums">{item.comparison.coveredWeight}%</strong> evidence coverage</p>
+          <div aria-hidden="true" className="my-2 h-1 overflow-hidden rounded bg-[var(--sh-border-1)]"><div className="h-full bg-[var(--sh-fg-muted)]" style={{ width: `${item.comparison.coveredWeight}%` }} /></div>
+          <p className="text-sm text-muted-foreground">{item.comparison.dimensions.filter(row => row.score != null).length} of {item.comparison.dimensions.length} criteria supported · weighted coverage</p>
+        </div>}
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
+          <Sheet><SheetTrigger asChild><Button variant="outline" className="min-h-11" aria-label={`Compare evidence for ${item.name}`}>Compare evidence</Button></SheetTrigger>
+            <SheetContent className="w-full overflow-y-auto sm:max-w-xl motion-reduce:transition-none motion-reduce:animate-none [&>button]:min-h-11 [&>button]:min-w-11">
+              <SheetHeader className="border-b border-border pr-16"><SheetTitle className="font-serif text-xl">{item.name}</SheetTitle><SheetDescription>Source claims, not verified facts. {item.comparison.score == null ? "Overall fit remains incomplete." : "Weighted assessment—not a return forecast."}</SheetDescription></SheetHeader>
+              <div className="space-y-5 px-4 pb-6">
+                {data.stale && <p role="alert" className="text-sm">Saved comparison is out of date. Recheck sources.</p>}
+                {item.assessmentFailed ? <p role="alert">Assessment unavailable. No thesis-fit conclusion can be drawn.</p> : <AcquisitionCriterionDetail comparison={item.comparison} />}
+                <Link href={`/deal/${item.dealId}`} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--sh-text-primary)] px-4 text-sm text-[var(--sh-surface)]">Review opportunity<ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
+                <p className="text-sm text-muted-foreground">Saved {new Date(data.createdAt).toLocaleString()} · Thesis #{data.thesisId} · Search #{jobId}</p>
+              </div>
+            </SheetContent>
+          </Sheet>
+          <Link href={`/deal/${item.dealId}`} className="inline-flex min-h-11 items-center gap-1 text-sm underline">Open opportunity<ArrowUpRight aria-hidden="true" className="h-4 w-4" /></Link>
+        </div>
+      </article>)}
+    </div>
   </section>;
 }

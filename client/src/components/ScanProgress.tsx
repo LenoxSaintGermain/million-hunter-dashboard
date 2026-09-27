@@ -100,7 +100,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
             <p className="text-xs font-semibold text-foreground">
               {isFailed ? "Scan Failed" : isComplete ? "Scan Complete" : "Market Scan Running"}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {isFailed
                 ? "Search could not finish. Any saved results are incomplete; this is not a no-opportunity conclusion."
                 : isComplete
@@ -123,7 +123,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
       </div>
 
       {/* Progress bar */}
-      {!isFailed && (
+      {isRunning && (
         <div className="h-1 bg-muted/30 w-full">
           <div
             className={cn(
@@ -136,7 +136,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
       )}
 
       {/* Phase steps */}
-      <div className="px-4 py-3">
+      {!isComplete && <div className="px-4 py-3">
         <div className="flex items-center gap-0">
           {PHASES.slice(0, -1).map((phase, i) => {
             const isActive = i === phaseIdx && isRunning;
@@ -182,11 +182,12 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
             );
           })}
         </div>
-      </div>
+      </div>}
 
       {/* Results summary (shown on complete) */}
       {isComplete && (
-        <div className="px-4 pb-4 pt-0">
+        <details className="px-4 py-2">
+          <summary className="min-h-11 cursor-pointer py-3 text-sm">Search receipt · {job.listingsFound ?? 0} found / {job.dealsScored ?? 0} scored</summary>
           <div className="rounded-lg bg-muted/20 border border-border/40 p-3 grid grid-cols-3 gap-3">
             <div className="text-center">
               <p className="text-lg font-bold text-foreground tabular-nums">{job.listingsFound ?? 0}</p>
@@ -208,7 +209,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
               : "No candidates were added in this search. Review the saved criteria and any screening reasons before searching again."}
           </p>
           {job.phaseDetail && <p className="text-sm text-muted-foreground mt-2">{job.phaseDetail}</p>}
-        </div>
+        </details>
       )}
 
       {isComplete && <AcquisitionThesisComparison jobId={jobId} />}
