@@ -8,6 +8,8 @@
  */
 
 import { useState } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { Streamdown } from "streamdown";
 import { trpc } from "@/lib/trpc";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -392,21 +394,24 @@ export default function AgentMonitoringPanel({ dealId }: AgentMonitoringPanelPro
 
 function DealDossierModule({ dealId }: { dealId: number }) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const canResearch = user?.role === "admin" || user?.role === "user";
   const [expanded, setExpanded] = useState(false);
 
-  const { data: dossier, isLoading, refetch } = trpc.research.getForDeal.useQuery(
+  const { data: dossier, isLoading, isError, refetch } = trpc.research.getForDeal.useQuery(
     { dealId },
     { enabled: !isNaN(dealId) }
   );
 
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await refetch();
-    setIsRefreshing(false);
-    toast({ title: "Dossier refreshed", description: "Live citations updated from sonar-pro." });
-  };
+  const refreshResearch = trpc.research.refreshForDeal.useMutation({
+    onSuccess: async () => {
+      await refetch();
+      toast({ title: "Research saved", description: "Review the sources and unresolved questions. No outreach was sent." });
+    },
+    onError: () => toast({ title: "Research could not finish", description: "A new result was not confirmed. Review the last displayed evidence; do not treat it as refreshed.", variant: "destructive" }),
+  });
+  const isRefreshing = refreshResearch.isPending;
+  const handleRefresh = () => refreshResearch.mutate({ dealId });
 
   return (
     <div className="border border-[#e8e0d4] rounded-lg overflow-hidden">
@@ -441,12 +446,15 @@ function DealDossierModule({ dealId }: { dealId: number }) {
             className="overflow-hidden"
           >
             <div className="px-3 pb-3 pt-1 border-t border-[#e8e0d4] bg-[#fffdf7] space-y-3">
+              {!canResearch && <p className="text-sm">You can read saved research. Ask an account operator to run a new check.</p>}
+              {isError && <p role="alert" className="text-sm">Saved research could not be loaded. Retry loading before starting another check. <button onClick={() => refetch()} className="underline">Retry loading</button></p>}
               {isLoading ? (
                 <div className="text-xs text-[#8b7355] py-3 text-center">Loading dossier...</div>
               ) : dossier ? (
                 <>
-                  <div className="text-[11px] text-[#4a3728] leading-relaxed line-clamp-6">
-                    {dossier.content}
+                  <p className="text-xs">Saved {new Date(dossier.createdAt).toLocaleString()} · source claims require review.</p>
+                  <div className="text-sm text-[#4a3728] leading-relaxed">
+                    <Streamdown>{dossier.content}</Streamdown>
                   </div>
                   {(dossier.citations as string[]).length > 0 && (
                     <div className="space-y-1">
@@ -473,19 +481,19 @@ function DealDossierModule({ dealId }: { dealId: number }) {
                   )}
                   <button
                     onClick={handleRefresh}
-                    disabled={isRefreshing}
+                    disabled={isRefreshing || !canResearch}
                     className="flex items-center gap-1.5 text-[10px] text-[#8b7355] hover:text-[#1a1208] transition-colors"
                   >
                     <RefreshCw className={cn("w-3 h-3", isRefreshing && "animate-spin")} />
                     {isRefreshing ? "Refreshing..." : "Refresh research"}
                   </button>
                 </>
-              ) : (
+              ) : !isError ? (
                 <div className="text-center py-4">
                   <div className="text-xs text-[#8b7355] mb-3">No research saved. Run a source-backed check for this business.</div>
                   <button
                     onClick={handleRefresh}
-                    disabled={isRefreshing || isLoading}
+                    disabled={isRefreshing || isLoading || !canResearch}
                     className="flex items-center gap-1.5 mx-auto px-3 py-1.5 rounded bg-[#1a1208] text-white text-xs font-medium hover:bg-[#2a2010] transition-colors"
                   >
                     {isRefreshing || isLoading ? (
@@ -496,7 +504,7 @@ function DealDossierModule({ dealId }: { dealId: number }) {
                     {isRefreshing || isLoading ? "Researching..." : "Run Deal Research"}
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
           </motion.div>
         )}

@@ -2,15 +2,14 @@
  * Research Router — tRPC procedures for deep research integration
  */
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
-import { getDealDossier, getRadarSignals, getCachedResearch, getIndustryResearch } from "../deepResearch";
+import { operatorProcedure, protectedProcedure, router } from "../_core/trpc";
+import { dealDossierKey, getDealDossier, getRadarSignals, getCachedResearch, getIndustryResearch } from "../deepResearch";
 import { getDealById } from "../db";
 import { TRPCError } from "@trpc/server";
 
 export const researchRouter = router({
   /**
-   * Get (or generate) a research dossier for a specific deal.
-   * Uses sonar-pro, cached 72h.
+   * Read saved research only. Page loads and query retries never run providers.
    */
   getForDeal: protectedProcedure
     .input(
@@ -23,15 +22,8 @@ export const researchRouter = router({
       const deal = await getDealById(input.dealId);
       if (!deal) throw new TRPCError({ code: "NOT_FOUND", message: "Deal not found" });
 
-      const result = await getDealDossier(
-        deal.id,
-        deal.name,
-        deal.location ?? "Unknown location",
-        deal.industry ?? "business",
-        input.forceRefresh
-      );
-
-      if (!result) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Research failed" });
+      const result = await getCachedResearch(dealDossierKey(deal.id, deal.listingUrl));
+      if (!result) return null;
 
       return {
         id: result.id,
@@ -49,8 +41,19 @@ export const researchRouter = router({
         costUsd: result.costUsd,
         createdAt: result.createdAt,
         expiresAt: result.expiresAt,
-        isCached: !input.forceRefresh,
+        isCached: true,
       };
+    }),
+
+  refreshForDeal: operatorProcedure
+    .input(z.object({ dealId: z.number() }))
+    .mutation(async ({ input }) => {
+      const deal = await getDealById(input.dealId);
+      if (!deal) throw new TRPCError({ code: "NOT_FOUND", message: "Deal not found" });
+      const result = await getDealDossier(deal.id, deal.name, deal.location ?? "Unknown location",
+        deal.industry ?? "business", true, deal.listingUrl, deal.description);
+      if (!result) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Research failed" });
+      return { id: result.id, createdAt: result.createdAt };
     }),
 
   /**
