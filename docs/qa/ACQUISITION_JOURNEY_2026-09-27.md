@@ -2,6 +2,16 @@
 
 Status: repair in progress; live positive journey NOT YET certified.
 
+## First release and live retest
+
+- Commit 9bac81a4c5edcb27c63b4ae7b59847baf61355ab pushed to main.
+- Build 5c2576e9-2ee3-4063-ba46-cca74ec9f310 succeeded. Revision capital-aperture-00234-hov promoted to 100% traffic after 6/6 staged smoke checks; production 6/6 at 2026-09-27T04:49:25Z. Runtime configuration fingerprint unchanged. No schema migration.
+- Live Acquisition → Capital → Acquisition switched correctly without reload.
+- Live compiler produced Southeast Essential Services Platform, correctly preserving $300k–$1M cash flow, $1M–$5M asking price and GA/FL/NC/SC. It introduced unrequested franchise/PE exclusions: FAIL, further repair required.
+- One research-only scan completed with zero listings, zero qualified and zero scored. Existing Tampa electrical listing was not a new result of this test.
+- Empty result incorrectly said Targets added: FAIL. Added failing component regressions for this and status-query failure before fixing them.
+- Linear progress comment: 89a3d515-6919-492d-b0c4-7a69f37a5c47 on THI-266.
+
 ## Reproduced in signed-in production UI
 
 - Acquisition selection changed the query string but not the workspace until reload.

@@ -240,7 +240,7 @@ export const thesisRouter = router({
         const response = await genai.models.generateContent({
           model: GEMINI_FAST,
           contents: [{ role: "user", parts: [{ text: STRATEGIST_SYSTEM_PROMPT
-            + "\n\nDo not infer revenue from asking price or seller cash flow. Preserve unsupported criteria in evidenceRequirements. Estimates are unverified planning assumptions, not discovered inventory.\n\nThesis: " + input.thesisText }] }],
+            + "\n\nMANDATORY OVERRIDES TO THE EXAMPLES: Extract only the investor's stated criteria. Never add exclusions such as PE-owned or franchises unless explicitly requested. A preference is not an auto-disqualifier. Missing evidence is a verification task, not a factual failure. Do not infer revenue from asking price or seller cash flow. Preserve unsupported criteria in evidenceRequirements. Estimates are unverified planning assumptions, not discovered inventory.\n\nThesis: " + input.thesisText }] }],
           config: {
             responseMimeType: "application/json",
             responseJsonSchema: COMPILATION_SCHEMA,

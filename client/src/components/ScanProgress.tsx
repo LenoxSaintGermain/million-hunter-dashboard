@@ -20,6 +20,7 @@ const PHASES = [
 
 function getPhaseIndex(currentPhase: string | null | undefined): number {
   if (!currentPhase) return 0;
+  if (currentPhase === "Scoring candidates") return PHASES.findIndex(p => p.key === "AI scoring");
   const idx = PHASES.findIndex((p) => p.key === currentPhase);
   return idx >= 0 ? idx : 0;
 }
@@ -37,7 +38,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
   onCompleteRef.current = onComplete;
 
   // Poll every 1.2 seconds while running
-  const { data: job, isLoading } = trpc.scan.getStatus.useQuery(
+  const { data: job, isLoading, isError, refetch } = trpc.scan.getStatus.useQuery(
     { jobId },
     {
       refetchInterval: done ? false : 1200,
@@ -45,13 +46,21 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
     }
   );
 
+  useEffect(() => { setDone(false); }, [jobId]);
+
   useEffect(() => {
-    if (job?.status === "completed" && !done) {
+    if ((job?.status === "completed" || job?.status === "failed") && !done) {
       setDone(true);
-      setTimeout(() => onCompleteRef.current?.(), 1800);
+      if (job.status === "completed") onCompleteRef.current?.();
     }
   }, [job?.status, done]);
 
+  if (isError && !job) return (
+    <div role="alert" className={className}>
+      <p>Search status unavailable. The search may still be running; do not start a duplicate.</p>
+      <Button variant="outline" onClick={() => refetch()}>Reload search status</Button>
+    </div>
+  );
   if (isLoading || !job) {
     return (
       <div className={cn("flex items-center gap-2 text-xs text-muted-foreground", className)}>
@@ -72,6 +81,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
 
   return (
     <div className={cn("rounded-xl border border-border bg-card overflow-hidden", className)}>
+      {isError && <p role="alert">Status refresh failed. Showing the last recorded result.</p>}
       {/* Header */}
       <div className={cn(
         "px-4 py-3 flex items-center justify-between border-b border-border/50",
@@ -192,7 +202,9 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
           </div>
           <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
             <TrendingUp className="w-3 h-3 text-[var(--sage)]" />
-            Targets added to validation queue — check the Command Center
+            {(job.dealsScored ?? 0) > 0
+              ? "Scored listings are available in the validation queue. Verify source claims before proceeding."
+              : "No listings matched the documented criteria in this search. No targets were added. Review your criteria or deliberately search again later."}
           </p>
         </div>
       )}
