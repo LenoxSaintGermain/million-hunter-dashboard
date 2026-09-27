@@ -2,6 +2,7 @@ import { z } from "zod";
 import { parseAcquisitionListings, type AcquisitionFinancials } from "./acquisitionListing";
 import { researchAcquisitionListings } from "./acquisitionResearch";
 import { assessAcquisitionListings } from "./acquisitionSourceCheck";
+import { updateAcquisitionScreeningStage } from "./acquisitionStage";
 import { assessThesisCriteria, saveThesisReview, readThesisReview, type ThesisReviewSnapshot } from "./acquisitionThesisReview";
 import { compareAcquisitionToThesis, type ComparisonSource } from "../shared/acquisitionThesisComparison";
 import { eq, desc, sql } from "drizzle-orm";
@@ -4268,7 +4269,9 @@ async function runScanPipeline(
         const { score, redFlagCount } = await scoreDeal(deal);
         await updateDealScore(dealId, score, redFlagCount);
         const stage = score >= 0.75 ? "high_priority" : score >= 0.60 ? "qualified" : "new";
-        await updateDealStage(dealId, stage);
+        const screeningDb = await getDb();
+        if (!screeningDb) throw new Error("Database unavailable for screening update");
+        await updateAcquisitionScreeningStage(screeningDb, dealId, stage);
 
         // OZ/TAD enrichment — runs async after scoring
         if (deal.askingPrice != null && deal.cashFlow != null) enrichDealWithOZTAD(deal.location, deal.askingPrice, deal.cashFlow)
