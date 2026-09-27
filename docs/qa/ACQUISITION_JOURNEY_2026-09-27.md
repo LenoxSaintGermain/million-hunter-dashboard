@@ -82,6 +82,8 @@ Downstream gap reproduced: opening the new deal automatically generated a dossie
 
 #### Dossier handoff repair (browser verified)
 
+Follow-up (not yet deployed): rendered dossier regression reproduced truncation at source 6 of 15, then passed after replacing the five-link cap with a numbered, keyboard-accessible all-sources disclosure. Targeted dossier tests 6/6 pass with DATABASE_URL empty. Rank/finance audit confirms `scoreDeal` uses fixed six-dimension weights without the saved thesis weights; DealDetail's top DSCR divides cash flow by asking price times 0.07 and its SBA down-payment card assumes 10% without showing that assumption. These remain substantive open work, not verified financing or thesis-specific ranking.
+
 Live opportunity 3660002: deliberate research saved at **9/27/2026 2:10:12 AM ET**, with 15 cited sources including the exact original listing and broker PDF. The report identifies Columbia County, GA, preserves the seller-reported $1.1M asking price, $338,930 SDE and $2,792,789 revenue, and explicitly leaves legal identity, audited financials, recurring revenue, licensing transfer and current availability unresolved. No similarly named business was substituted.
 
 Reload preserved the same saved timestamp and dossier. One explicit **Refresh research** retained the previous result while pending, then displayed a newer saved timestamp **2:13:47 AM ET**. This verifies the refreshed response is not simply the original cached result. No seller outreach, offer, financing or brokerage action occurred.

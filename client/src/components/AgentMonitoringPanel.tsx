@@ -392,7 +392,7 @@ export default function AgentMonitoringPanel({ dealId }: AgentMonitoringPanelPro
   );
 }
 
-function DealDossierModule({ dealId }: { dealId: number }) {
+export function DealDossierModule({ dealId }: { dealId: number }) {
   const { toast } = useToast();
   const { user } = useAuth();
   const canResearch = user?.role === "admin" || user?.role === "user";
@@ -457,10 +457,10 @@ function DealDossierModule({ dealId }: { dealId: number }) {
                     <Streamdown>{dossier.content}</Streamdown>
                   </div>
                   {(dossier.citations as string[]).length > 0 && (
-                    <div className="space-y-1">
-                      <div className="text-[10px] font-bold uppercase tracking-widest text-[#8b7355]">Sources</div>
+                    <details className="space-y-1">
+                      <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">Sources ({dossier.citations.length}) · match numbers in the report</summary>
                       <div className="flex flex-wrap gap-1">
-                        {(dossier.citations as string[]).slice(0, 5).map((url, i) => {
+                        {(dossier.citations as string[]).map((url, i) => {
                           let host = url;
                           try { host = new URL(url).hostname.replace('www.', ''); } catch {}
                           return (
@@ -469,15 +469,15 @@ function DealDossierModule({ dealId }: { dealId: number }) {
                               href={url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-[10px] text-amber-700 hover:bg-amber-100 transition-colors"
+                              className="inline-flex min-h-11 items-center gap-1 px-2 py-2 rounded border border-[var(--sh-border)] text-sm text-[var(--sh-text-primary)] underline break-all"
                             >
                               <ExternalLink className="w-2.5 h-2.5" />
-                              {host}
+                              [{i + 1}] {host}
                             </a>
                           );
                         })}
                       </div>
-                    </div>
+                    </details>
                   )}
                   <button
                     onClick={handleRefresh}
