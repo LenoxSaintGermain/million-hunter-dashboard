@@ -8,12 +8,15 @@ const ratio = z.union([z.number(), z.string().regex(/^(?:0(?:\.\d+)?|1(?:\.0+)?)
   .pipe(z.number().min(0).max(1));
 const boolean = z.union([z.boolean(), z.enum(["true", "false"]).transform(v => v === "true")]);
 const strings = z.array(z.string().trim().min(1));
+// The provider must explicitly answer each core criterion. Null means the
+// investor did not state it; an omitted key is an incomplete compilation.
+const declaredAmount = z.union([integer, z.null()]).transform(value => value ?? undefined);
 const schema = z.object({
   compiledFilters: z.object({
     revenueMin: integer.optional(), revenueMax: integer.optional(),
-    cashFlowMin: integer.optional(), cashFlowMax: integer.optional(),
-    askingPriceMin: integer.optional(), askingPriceMax: integer.optional(),
-    geographies: strings.optional(), exclusions: strings.optional(),
+    cashFlowMin: declaredAmount, cashFlowMax: declaredAmount,
+    askingPriceMin: declaredAmount, askingPriceMax: declaredAmount,
+    geographies: strings, exclusions: strings.optional(),
     businessAgeMin: integer.optional(), headcountMin: integer.optional(), headcountMax: integer.optional(),
     yearBuiltMax: integer.optional(), maxStories: integer.optional(), minOccupancyRate: ratio.optional(),
     requireHistoricRegister: boolean.optional(), requireStabilized: boolean.optional(),
