@@ -419,7 +419,7 @@ function DealDossierModule({ dealId }: { dealId: number }) {
           <div className="text-left">
             <div className="text-xs font-semibold text-[#1a1208]">Deal Dossier</div>
             <div className="text-[10px] text-[#8b7355]">
-              {dossier ? `${(dossier.citations as string[]).length} live citations` : "sonar-pro background research"}
+              {dossier ? `${(dossier.citations as string[]).length} saved sources · inspect relevance` : "Source-backed background research"}
             </div>
           </div>
         </div>
@@ -482,7 +482,7 @@ function DealDossierModule({ dealId }: { dealId: number }) {
                 </>
               ) : (
                 <div className="text-center py-4">
-                  <div className="text-xs text-[#8b7355] mb-3">No dossier yet. Run sonar-pro research to surface live citations for this deal.</div>
+                  <div className="text-xs text-[#8b7355] mb-3">No research saved. Run a source-backed check for this business.</div>
                   <button
                     onClick={handleRefresh}
                     disabled={isRefreshing || isLoading}

@@ -11,6 +11,10 @@ Status: repair in progress; live positive journey NOT YET certified.
 - One research-only scan completed with zero listings, zero qualified and zero scored. Existing Tampa electrical listing was not a new result of this test.
 - Empty result incorrectly said Targets added: FAIL. Added failing component regressions for this and status-query failure before fixing them.
 - Linear progress comment: 89a3d515-6919-492d-b0c4-7a69f37a5c47 on THI-266.
+- Follow-up commit 732c91b fixes empty/error receipts and tightens preference interpretation. Build 2a61f641-c5ab-4223-b011-68d8fa6ff9c5 was deliberately canceled before promotion to include the newly observed source-disclosure fix in one follow-up release.
+- Existing `/deal/2880003` opens, but saved dossier explicitly cannot verify Tampa Bay Electric Solutions' identity. This is NOT a discovered deal from this UAT and its financials are NOT validated. No seller contact or financial action was taken.
+- Deal review now exposes a direct listing link when recorded, otherwise an unverified-source warning; saved sources are not labeled live. Missing risk analysis is unknown, not a clean bill of health.
+- Targeted follow-up tests: 15 passed, including source-link safety and no false empty-result success.
 
 ## Reproduced in signed-in production UI
 

@@ -1,4 +1,5 @@
 import React from "react";
+import { AcquisitionSourceBrief } from "@/components/AcquisitionSourceBrief";
 import LOIGeneration from "./LOIGeneration";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -194,6 +195,7 @@ export default function DealDetail() {
             <div>
               <p className="font-eyebrow text-eyebrow text-amber mb-2 uppercase tracking-widest">PROJECT {(deal.name || "").split(" ").slice(-1)[0].toUpperCase()}:</p>
               <h1 className="font-hero-h1 text-hero-h1 text-ink leading-[1.05] mb-6">{deal.name}</h1>
+              <AcquisitionSourceBrief listingUrl={deal.listingUrl} description={deal.description} isSynthetic={deal.isSynthetic} />
               <div className="grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-rule pt-8">
                 {[
                   { label: "CASH FLOW", value: fmt(deal.cashFlow) },
@@ -291,7 +293,7 @@ export default function DealDetail() {
               <div className="border border-rule bg-paper p-6">
                 <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Red Team Analysis</p>
                 <p className="font-card-title text-[18px] text-ink leading-tight mb-3">
-                  {signal?.redTeamSummary ? String(signal.redTeamSummary).slice(0, 80) + "…" : "No risks flagged yet"}
+                  {signal?.redTeamSummary ? String(signal.redTeamSummary).slice(0, 80) + "…" : "Not analyzed — risk is unknown"}
                 </p>
                 {signal?.redTeamSummary && (
                   <span className="font-eyebrow text-eyebrow text-clay">RISKS IDENTIFIED</span>
