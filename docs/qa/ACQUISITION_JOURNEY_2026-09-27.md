@@ -4,13 +4,14 @@ Status: repair in progress; live positive journey NOT YET certified.
 
 ## Current acceptance ledger (latest state; sections below retain historical receipts)
 
-- Production: `capital-aperture-00244-hud`, source `38e535c`; citation and financing fixes verified live.
-- Candidate release: `d786146a8a87f14a060a6c9715e456e7ea6758f3`, build `ff750be9-fd77-4314-9b1f-72ce9e783220` working. Superseded build `9da87fb2-8f58-4e35-a851-4f44ccaebb9d` deliberately cancelled before promotion to include the rescan stage guard.
+- Production: `capital-aperture-00246-cem`, source `d786146a8a87f14a060a6c9715e456e7ea6758f3`, 100% traffic. Build `ff750be9-fd77-4314-9b1f-72ce9e783220` succeeded. Staging smoke 6/6 at 06:43:46Z; production smoke 6/6 at 06:44:10Z on September 27. Runtime configuration unchanged; no migration.
+- Superseded build `9da87fb2-8f58-4e35-a851-4f44ccaebb9d` deliberately cancelled before promotion to include the rescan stage guard.
 - Isolated tests: 237 files pass, 4 skipped; 2696 tests pass, 18 skipped. TypeScript passes. No production DB tests.
 - Verified: original thesis compiles with declared financial/geographic criteria; unseeded search discovers source-linked opportunities; opportunity 3660002 opens its exact original listing; source-aware dossier saves and deliberately refreshes; reload does not rerun research; all citation links accessible; financing assumptions explicit.
 - Pending release/UAT: user-scoped thesis comparison persistence, weighted criteria/evidence display, incomplete/failed assessment presentation, comparison reload, direct opportunity handoff, and responsive visual check.
 - Persistence and stage isolation have deterministic unit/SQL-boundary coverage, not a live multi-user/concurrent-DB test.
-- Current browser preparation: latest saved Southeast Essential Services Search opens with $300k–$1M cash flow, $1M–$5M asking price, GA/FL/NC/SC, and weights 25/20/20/15/10/10. No new search launched on the old release.
+- Current browser test: latest saved Southeast Essential Services Search opens with $300k–$1M cash flow, $1M–$5M asking price, GA/FL/NC/SC, and weights 25/20/20/15/10/10. One search launched on the new release and failed during listing research. The UI correctly reports an incomplete search, not no opportunities. Existing catalog records are not counted as new discoveries.
+- A DB-disabled provider reproduction with the original UAT text returned `industry: null`, causing the listing parser to throw. A deterministic extraction regression reproduced this exact error (1 failed / 5 passed). The fix preserves unknown industry as `Not disclosed`; targeted extraction/listing tests now 12/12 and TypeScript passes. The production failure's specific underlying cause was not logged, so this is a reproduced failure mode, not proof of that exact invocation's cause. Fresh live retest is still required after the repair is released.
 - No seller outreach, offer, financing application, commitment or brokerage action is in scope or has been performed.
 
 ## Follow-up release and second live run

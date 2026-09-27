@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const amount = z.number().finite().nonnegative().nullable().optional();
 const listing = z.object({
-  name: z.string().trim().min(1).max(200), industry: z.string().max(128).default("Service business"),
+  name: z.string().trim().min(1).max(200), industry: z.string().max(128).nullish().transform(value => value ?? "Not disclosed"),
   location: z.string().max(256).nullish().transform(value => value ?? "Not disclosed"), source: z.string().default("market-research"),
   listingUrl: z.string().url().refine(value => {
     const url = new URL(value);

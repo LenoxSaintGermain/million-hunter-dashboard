@@ -4,6 +4,20 @@ vi.mock("@google/genai", () => ({ GoogleGenAI: class { models = { generateConten
 import { researchAcquisitionListings } from "./acquisitionResearch";
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.resetAllMocks(); });
 const url = "https://www.bizbuysell.com/business-opportunity/illustrative-fixture/1234567/";
+it("keeps an undisclosed industry unknown instead of aborting valid source extraction", async () => {
+  vi.stubEnv("SONAR_API_KEY", "test-only"); vi.stubEnv("GEMINI_API_KEY", "test-only");
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results: [
+    { title: "Illustrative fixture", url, snippet: "Asking Price:$1,100,000 Cash Flow:$338,930" },
+  ] }) }));
+  generateContent.mockResolvedValueOnce({ text: JSON.stringify(["HVAC business for sale"]) });
+  generateContent.mockResolvedValueOnce({ text: JSON.stringify([{ name: "Illustrative fixture", listingUrl: url,
+    industry: null, location: null, askingPrice: 1100000, cashFlow: 338930 }]) });
+  const rows = await researchAcquisitionListings({ thesisText: "HVAC", sources: ["bizbuysell"] });
+  expect(rows).toHaveLength(1);
+  expect(rows[0].industry).toBe("Not disclosed");
+  expect(rows[0].cashFlow).toBe(338930);
+  expect(rows[0].revenue).toBeNull();
+});
 it("grounds extracted listings in returned individual source records", async () => {
   vi.stubEnv("SONAR_API_KEY", "test-only"); vi.stubEnv("GEMINI_API_KEY", "test-only");
   const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results: [
