@@ -80,7 +80,15 @@ Positive original-source check: opportunity **3660002**, https://www.bizbuysell.
 
 Downstream gap reproduced: opening the new deal automatically generated a dossier using generic name/location/industry, omitting the original listing URL. It correctly declined to identify a legal business but searched unrelated companies and missed the source's disclosed location. The dossier query currently generates on reads, while its Refresh button only refetches the cached query and claims live updates. Next repair must pass the exact source context, separate saved reads from deliberate research, and verify refreshed evidence without borrowing identities from similarly named firms.
 
-#### Dossier handoff repair (pending browser verification)
+#### Dossier handoff repair (browser verified)
+
+Live opportunity 3660002: deliberate research saved at **9/27/2026 2:10:12 AM ET**, with 15 cited sources including the exact original listing and broker PDF. The report identifies Columbia County, GA, preserves the seller-reported $1.1M asking price, $338,930 SDE and $2,792,789 revenue, and explicitly leaves legal identity, audited financials, recurring revenue, licensing transfer and current availability unresolved. No similarly named business was substituted.
+
+Reload preserved the same saved timestamp and dossier. One explicit **Refresh research** retained the previous result while pending, then displayed a newer saved timestamp **2:13:47 AM ET**. This verifies the refreshed response is not simply the original cached result. No seller outreach, offer, financing or brokerage action occurred.
+
+Remaining acceptance gaps: only five of the 15 citation links are exposed in the panel; generic screening scores are not proven to apply the compiled custom thesis weights; detail financial scenarios still need clearer assumption labels. The positive thesis → discovery → opportunity → source-aware research journey passes, but this is not a claim that every diligence module or all-suite integration test passes.
+
+Release: build `7e39c5b2-c8e7-4e88-bc88-b164c8b5dc86` succeeded; source `48bf8a27eaa08a50be8b84c0a06ccf9f66d42817` staged as `capital-aperture-00242-how`. Staged smoke 6/6 at 06:08:50Z; production smoke 6/6 at 06:09:22Z after promotion. Runtime configuration unchanged, no migration. Browser reload of opportunity 3660002 showed no source-aware dossier; expanding the panel still showed an explicit Run Deal Research action. One deliberate click started the request; its button disabled while running.
 
 `getForDeal` now reads saved evidence only, including legacy requests containing `forceRefresh`. Explicit `refreshForDeal` is an operator mutation that passes the original listing URL and saved discovery context to the provider. The cache key includes the listing URL and a source-aware version, preventing a generic-name dossier from masquerading as source-aware research. Older cache records are not relabeled. The client distinguishes loading failure, no saved evidence, a new research request, and a confirmed saved response; refresh no longer just refetches cache or claims live citations. Empty provider content is rejected before database access. Source text remains untrusted; similar-name businesses must not be substituted for an anonymous listing.
 
