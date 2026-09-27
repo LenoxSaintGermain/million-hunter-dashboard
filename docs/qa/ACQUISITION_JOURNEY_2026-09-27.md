@@ -2,6 +2,17 @@
 
 Status: repair in progress; live positive journey NOT YET certified.
 
+## Current acceptance ledger (latest state; sections below retain historical receipts)
+
+- Production: `capital-aperture-00244-hud`, source `38e535c`; citation and financing fixes verified live.
+- Candidate release: `d786146a8a87f14a060a6c9715e456e7ea6758f3`, build `ff750be9-fd77-4314-9b1f-72ce9e783220` working. Superseded build `9da87fb2-8f58-4e35-a851-4f44ccaebb9d` deliberately cancelled before promotion to include the rescan stage guard.
+- Isolated tests: 237 files pass, 4 skipped; 2696 tests pass, 18 skipped. TypeScript passes. No production DB tests.
+- Verified: original thesis compiles with declared financial/geographic criteria; unseeded search discovers source-linked opportunities; opportunity 3660002 opens its exact original listing; source-aware dossier saves and deliberately refreshes; reload does not rerun research; all citation links accessible; financing assumptions explicit.
+- Pending release/UAT: user-scoped thesis comparison persistence, weighted criteria/evidence display, incomplete/failed assessment presentation, comparison reload, direct opportunity handoff, and responsive visual check.
+- Persistence and stage isolation have deterministic unit/SQL-boundary coverage, not a live multi-user/concurrent-DB test.
+- Current browser preparation: latest saved Southeast Essential Services Search opens with $300k–$1M cash flow, $1M–$5M asking price, GA/FL/NC/SC, and weights 25/20/20/15/10/10. No new search launched on the old release.
+- No seller outreach, offer, financing application, commitment or brokerage action is in scope or has been performed.
+
 ## Follow-up release and second live run
 
 - Source 7132071f66c9a9dc3c9bf2e0524489e147f370d7, build 4c16ad26-6754-4dce-bab0-c7726dfde49d succeeded; revision capital-aperture-00236-yow now serves 100%. Staged and production smoke 6/6; production checked 2026-09-27T05:04:21Z. Runtime configuration fingerprint unchanged; no migration.
