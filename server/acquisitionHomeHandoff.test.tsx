@@ -11,6 +11,7 @@ vi.mock("@/lib/trpc", () => {
   const mutation = { useMutation: () => ({ mutate, isPending: false }) };
   return { trpc: {
     useUtils: () => ({}),
+    investor: { getDnaStatus: query(undefined) },
     dashboard: { stats: query({ dealStats: { total: 1, highPriority: 1 }, recentActivity: [{ title: "Search #1: listing screening record", detail: "Fixture not promoted: original page unavailable", createdAt: 0 }] }), macroPosture: query({}) },
     deals: { list: query([{ id: 1, name: "Illustrative indexed listing", score: 0.95, isSynthetic: false, listingUrl: "https://example.com/listing" }]), delete: mutation },
     thesis: { list: query([]) }, scout: { search: query({ results: [] }) }, scan: { trigger: mutation },
@@ -29,4 +30,8 @@ it("a high score sends the operator to evidence review, not outreach or implied 
   expect(html).toContain("Search #1: listing screening record");
   expect(html).toContain("Fixture not promoted: original page unavailable");
   expect(mutate).not.toHaveBeenCalled();
+  expect(html).not.toContain("Historic Pipeline · Wingate");
+  expect(html).toContain("Your acquisition workspace");
+  expect(html).toContain('href="/thesis?scope=acquisition"');
+  expect(html).not.toContain('href="/aperture/runs"');
 });

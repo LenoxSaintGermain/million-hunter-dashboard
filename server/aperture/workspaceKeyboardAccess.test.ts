@@ -8,7 +8,7 @@ vi.mock("wouter", () => ({
   Link: ({ href, children, ...props }: any) => React.createElement("a", { href, ...props }, children),
 }));
 vi.mock("@/_core/hooks/useAuth", () => ({ useAuth: () => ({ user: { role: "capital_operator", defaultWorkspace: "capital_aperture_trader" }, isAuthenticated: true, logout: vi.fn() }) }));
-vi.mock("@/lib/trpc", () => ({ trpc: { publicDeals: { search: { useQuery: () => ({ data: [], isLoading: false }) } } } }));
+vi.mock("@/lib/trpc", () => ({ trpc: { investor: { getDnaStatus: { useQuery: () => ({ data: undefined }) } }, publicDeals: { search: { useQuery: () => ({ data: [], isLoading: false }) } } } }));
 vi.mock("@/components/aperture/CapitalCockpitRail", () => ({ CapitalCockpitRail: () => React.createElement("section", { "aria-label": "Account and constraints" }, "Illustrative Paper · Constraint unavailable") }));
 import ApertureShell from "../../client/src/components/aperture/ApertureShell";
 

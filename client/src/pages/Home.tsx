@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { isTutorialAsset } from "@shared/tutorial";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { prioritizesWingate } from "@shared/wingatePresentation";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import ScanProgress from "@/components/ScanProgress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -382,7 +383,9 @@ function HistoricPipeline() {
 export default function Home() {
   const [activeScanJobId, setActiveScanJobId] = useState<number | null>(null);
   const utils = trpc.useUtils();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const { data: investorProfile } = trpc.investor.getDnaStatus.useQuery(undefined, { enabled: user?.role === "investor" });
+  const showWingate = prioritizesWingate(user?.role, investorProfile);
   const { data, isLoading } = trpc.dashboard.stats.useQuery();
   const { data: macroPosture } = trpc.dashboard.macroPosture.useQuery();
   const { data: topDealsData } = trpc.deals.list.useQuery({ limit: 10 });
@@ -414,8 +417,7 @@ export default function Home() {
 
   return (
     <EditorialTopNav>
-      <CoAnalystBanner stats={stats} macroPosture={macroPosture} />
-      <main className="max-w-[1280px] mx-auto w-full px-6 lg:px-10 py-12">
+      <main className="max-w-[1280px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-6">
 
         {/* ── Operator pulse: the work that needs attention, not a static mood ── */}
         <header className="mb-8 border-b border-rule pb-6">
@@ -426,7 +428,7 @@ export default function Home() {
                 <span className="w-5 h-px bg-rule" />
                 <span className="font-eyebrow text-eyebrow text-ink border border-rule px-2 py-1 rounded-sm">COMMAND CENTER</span>
               </div>
-              <h1 className="font-card-title text-[clamp(1.75rem,4vw,2.5rem)] leading-none text-ink">Your operator pulse</h1>
+              <h1 className="font-card-title text-[clamp(1.75rem,4vw,2.5rem)] leading-none text-ink">Your acquisition workspace</h1>
               <p className="mt-2 max-w-2xl font-body-base text-body-base text-ink/70">
                 {isLoading ? "Loading the work that needs review…" : stats?.highPriority
                   ? `${stats.highPriority} high-priority target${stats.highPriority === 1 ? " needs" : "s need"} human review before outreach.`
@@ -434,7 +436,7 @@ export default function Home() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2 sm:justify-end">
-              <Link href="/aperture/runs"><span className="inline-flex items-center gap-1.5 border border-rule bg-paper px-3 py-2 font-eyebrow text-eyebrow text-ink hover:border-amber hover:text-amber cursor-pointer">Research journeys <ArrowRight className="w-3 h-3" /></span></Link>
+              <Link href="/thesis?scope=acquisition"><span className="inline-flex min-h-11 items-center gap-1.5 border border-rule bg-paper px-3 py-2 font-eyebrow text-eyebrow text-ink hover:border-amber hover:text-amber cursor-pointer">Your acquisition thesis <ArrowRight className="w-3 h-3" /></span></Link>
               <button onClick={() => triggerScan.mutate({})} disabled={triggerScan.isPending}
                 className="flex items-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2 hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-50">
                 {triggerScan.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ScanLine className="w-3 h-3" />}
@@ -457,7 +459,7 @@ export default function Home() {
           </div>
         </header>
 
-        <HistoricPipeline />
+        {showWingate && <HistoricPipeline />}
 
         {visibleScanJobId !== null && (
           <div className="mb-8">

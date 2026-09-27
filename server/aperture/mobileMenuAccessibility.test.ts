@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import EditorialTopNav from "../../client/src/components/EditorialTopNav";
 
 vi.mock("@/_core/hooks/useAuth", () => ({ useAuth: () => ({ user: { name: "Fixture", role: "admin" }, isAuthenticated: true, logout: vi.fn() }) }));
-vi.mock("@/lib/trpc", () => ({ trpc: { publicDeals: { search: { useQuery: () => ({ data: undefined, isLoading: false }) } } } }));
+vi.mock("@/lib/trpc", () => ({ trpc: { investor: { getDnaStatus: { useQuery: () => ({ data: undefined }) } }, publicDeals: { search: { useQuery: () => ({ data: undefined, isLoading: false }) } } } }));
 vi.mock("wouter", () => ({
   useLocation: () => ["/aperture/mission", vi.fn()],
   Link: ({ href, children, ...props }: any) => React.createElement("a", { href, ...props }, children),

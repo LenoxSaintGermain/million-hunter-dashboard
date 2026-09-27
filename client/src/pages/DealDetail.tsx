@@ -6,7 +6,7 @@ import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import CoPilot from "@/components/CoPilot";
-import AgentMonitoringPanel from "@/components/AgentMonitoringPanel";
+import AgentMonitoringPanel, { DealDossierModule } from "@/components/AgentMonitoringPanel";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -253,12 +253,18 @@ export default function DealDetail() {
           </div>
         )}
 
-        {/* ── 12-col grid: main content + Agent Monitoring aside ───────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-10">
+        <section aria-label="Opportunity research" className="min-w-0 mb-6 space-y-3">
+          <h2 className="font-card-title text-2xl text-ink">Review the evidence</h2>
+          <p className="text-base text-muted-foreground">Start with the original listing and saved research. {signal?.redTeamSummary ? "Review the recorded risks above." : "Risk analysis has not been run; risk is still unknown."} No seller has been contacted by opening this page.</p>
+          <DealDossierModule dealId={dealId} />
+        </section>
+        <details className="mb-6 border border-rule p-4">
+          <summary className="min-h-11 cursor-pointer font-medium py-2">Analysis tools and financing assumptions</summary>
+        <div className="space-y-6 mt-4">
 
           {/* LEFT: Bento modules — col-span-8 */}
-          <div className="lg:col-span-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="min-w-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
               {/* Module 1: Owner Psychology */}
               <div className="border border-rule bg-paper p-6">
                 <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Owner Psychology</p>
@@ -397,14 +403,15 @@ export default function DealDetail() {
           </div>
 
           {/* RIGHT: Agent Monitoring Panel — col-span-4 */}
-          <div className="lg:col-span-4 lg:border-l lg:border-rule lg:pl-8">
-            <AgentMonitoringPanel dealId={dealId} />
+          <div className="min-w-0 border-t border-rule pt-4">
+            <AgentMonitoringPanel dealId={dealId} showDossier={false} />
           </div>
         </div>
+        </details>
 
       {/* Tabs */}
       <Tabs defaultValue="signals">
-        <TabsList className="bg-card border border-border h-9 flex-wrap gap-0.5">
+        <TabsList className="bg-card border border-border h-auto min-h-11 flex-wrap justify-start gap-1 [&>button]:min-h-11">
           <TabsTrigger value="signals" className="text-xs h-7">Third Signal</TabsTrigger>
           <TabsTrigger value="memo" className="text-xs h-7">Investment Memo</TabsTrigger>
           <TabsTrigger value="capital" className="text-xs h-7">Capital Stack</TabsTrigger>
@@ -992,7 +999,7 @@ export default function DealDetail() {
             </div>
             <div className="lg:col-span-1">
               <div className="sticky top-4 p-4 bg-[#faf7f2] border border-[#e8e0d4] rounded-xl">
-                <AgentMonitoringPanel dealId={dealId} />
+                <AgentMonitoringPanel dealId={dealId} showDossier={false} />
               </div>
             </div>
           </div>

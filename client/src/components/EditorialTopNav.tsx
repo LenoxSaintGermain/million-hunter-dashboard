@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolatedUatIdentity";
 import { canOperateCapital } from "@shared/capitalOperatorAccess";
+import { prioritizesWingate } from "@shared/wingatePresentation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -335,6 +336,9 @@ export default function EditorialTopNav({ children, workspaceId }: { children: R
   const isAdmin = userRole === "admin";
   const isCapitalOperator = userRole === "capital_operator";
   const hasCapitalAccess = canOperateCapital(userRole);
+  const { data: investorProfile } = trpc.investor.getDnaStatus.useQuery(undefined, { enabled: userRole === "investor" });
+  const showWingate = prioritizesWingate(userRole, investorProfile);
+  const profilePrimaryNav = PRIMARY_NAV.filter(item => item.href !== "/wingate" || showWingate);
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -366,7 +370,7 @@ export default function EditorialTopNav({ children, workspaceId }: { children: R
     : hasCapitalAccess
       ? [...ANALYZE_NAV, capitalNavItem]
       : ANALYZE_NAV;
-  const visibleMoreNav = isCapitalOperator ? [] : MORE_NAV;
+  const visibleMoreNav = isCapitalOperator ? [] : [...(!showWingate ? [PRIMARY_NAV.find(item => item.href === "/wingate")!] : []), ...MORE_NAV];
   const visibleActNav = isCapitalOperator ? [] : ACT_NAV;
   const hasMoreActive = visibleMoreNav.some((n) => isActive(n.href));
   const hasAnalyzeActive = analyzeNav.some((n) => isActive(n.href));
@@ -374,8 +378,8 @@ export default function EditorialTopNav({ children, workspaceId }: { children: R
   const primaryNav = isCapitalOperator
     ? [{ label: "Capital", href: "/aperture", icon: Landmark }]
     : isAdmin
-      ? [...PRIMARY_NAV, { label: "Capital", href: "/aperture", icon: Landmark }]
-    : PRIMARY_NAV;
+      ? [...profilePrimaryNav, { label: "Capital", href: "/aperture", icon: Landmark }]
+    : profilePrimaryNav;
 
   return (
     <div className="min-h-screen bg-[var(--bone)]">

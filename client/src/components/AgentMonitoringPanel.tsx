@@ -266,9 +266,10 @@ function RunCard({ run, isActive }: { run: any; isActive: boolean }) {
 
 interface AgentMonitoringPanelProps {
   dealId: number;
+  showDossier?: boolean;
 }
 
-export default function AgentMonitoringPanel({ dealId }: AgentMonitoringPanelProps) {
+export default function AgentMonitoringPanel({ dealId, showDossier = true }: AgentMonitoringPanelProps) {
   const { toast } = useToast();
   const [activeRun, setActiveRun] = useState<AnalysisType | null>(null);
 
@@ -387,7 +388,7 @@ export default function AgentMonitoringPanel({ dealId }: AgentMonitoringPanelPro
       )}
 
       {/* Deal Dossier — live sonar-pro research */}
-      <DealDossierModule dealId={dealId} />
+      {showDossier && <DealDossierModule dealId={dealId} />}
     </div>
   );
 }
@@ -416,8 +417,9 @@ export function DealDossierModule({ dealId }: { dealId: number }) {
   return (
     <div className="border border-[#e8e0d4] rounded-lg overflow-hidden">
       <button
+        aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-3 py-2.5 bg-white hover:bg-[#fffdf7] transition-colors"
+        className="w-full min-h-11 flex items-center justify-between px-4 py-3 bg-paper hover:bg-bone transition-colors"
       >
         <div className="flex items-center gap-2">
           <BookOpen className="h-4 w-4 text-[#8b7355]" />

@@ -1,5 +1,13 @@
 # Acquisition journey repair — 2026-09-27
 
+## Follow-up: reading layout and profile relevance
+
+User screenshot review identified a presentation defect despite the functional journey passing: long dossier content was trapped in a four-column sidebar while the neighboring card grid stretched into empty space. Historic Wingate inventory also preceded the acquisition search for unrelated profiles.
+
+Design changes: source research gets a full-width section before optional analysis; unknown risk remains visible; analysis tools and illustrative financing use an explicit disclosure, with existing actions unchanged. The wrapping analysis tab bar has automatic height and 44px controls. Home removes the duplicate co-analyst banner, uses acquisition-specific navigation, and prioritizes saved search results. Wingate inventory and primary navigation are reserved for role `investor` with completed onboarding and `assetClass=historic`. Missing/failed profile data, admin role, or other asset classes do not imply that preference. Wingate stays under More for other non-capital-only roles. This is presentation, not an access-control change; no migration.
+
+Validation and release receipt pending. Prior functional UAT below must not be mistaken for verification of this new layout.
+
 Status: requested thesis → sourced opportunity → evidence-review journey passed live. This is research UAT, not verification of a business, financing approval, or certification of every application module.
 
 ## Current acceptance ledger (latest state; sections below retain historical receipts)
