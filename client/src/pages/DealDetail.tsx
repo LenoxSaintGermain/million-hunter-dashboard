@@ -6,7 +6,6 @@ import LOIGeneration from "./LOIGeneration";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import EditorialTopNav from "@/components/EditorialTopNav";
-import CoPilot from "@/components/CoPilot";
 import AgentMonitoringPanel, { DealDossierModule } from "@/components/AgentMonitoringPanel";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,7 +55,7 @@ function SignalCard({
     <Card className="bg-card border-border">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center", color)}>
+          <div className="w-7 h-7 border border-rule flex items-center justify-center text-ink">
             <Icon className="w-3.5 h-3.5" />
           </div>
           <CardTitle className="text-sm font-semibold">{title}</CardTitle>
@@ -70,6 +69,17 @@ function SignalCard({
 export default function DealDetail() {
   const params = useParams<{ id: string }>();
   const dealId = Number(params.id);
+  const [workPane, setWorkPane] = React.useState("research");
+  const [readerFocus, setReaderFocus] = React.useState("report");
+  const selectWork = (value: string) => {
+    setWorkPane(value);
+    setReaderFocus("report");
+    requestAnimationFrame(() => {
+      const desk = document.getElementById("deal-workspace");
+      desk?.focus({ preventScroll: true });
+      desk?.scrollIntoView({ block: "start" });
+    });
+  };
 
   const { data, isLoading, refetch } = trpc.deals.getById.useQuery({ id: dealId });
   const analyzeSignals = trpc.signals.analyze.useMutation({
@@ -170,7 +180,7 @@ export default function DealDetail() {
 
   return (
     <EditorialTopNav>
-      <div className="max-w-[1280px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-5">
+      <div className="deal-edition mx-auto w-full py-5">
 
         {/* ── Back nav ─────────────────────────────────────────────────────── */}
         <Link href="/scan">
@@ -210,235 +220,61 @@ export default function DealDetail() {
               </button>
             </div>
           </div>
-          <div className="my-5 grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] items-center">
+        </div>
+        <div className="deal-focus-switch" aria-label="Reading focus">
+          <button aria-pressed={readerFocus === "report"} onClick={() => setReaderFocus("report")}>The report</button>
+          <button aria-pressed={readerFocus === "senior"} onClick={() => setReaderFocus("senior")}>The Senior ↗</button>
+        </div>
+      <Tabs value={workPane} onValueChange={selectWork} orientation="vertical" activationMode="manual" className="deal-reading-grid" data-focus={readerFocus}>
+        <aside className="deal-senior-rail" aria-label="The Senior">
+          <header><span className="hunter-eyebrow">Your margin partner</span><h2>The Senior.</h2><p>Read the evidence.<br />Question the assumptions.</p></header>
+          <p className="deal-rail-disclosure">Reading guide · saved outputs, not a new agent verdict. Opening a section does not run an analysis.</p>
+          <div aria-label="Next decision" className="deal-margin-note"><h3>{signal?.redTeamSummary ? "Read the recorded risks." : "The cash needs a second look."}</h3><p>{signal?.redTeamSummary ? "Review the saved analysis and its evidence; it is not approval." : "Risk analysis has not been run; risk is still unknown."}</p></div>
+          {typeof signal?.redTeamSummary === "string" && <div className="deal-margin-note"><span className="hunter-eyebrow">Red Team / saved analysis</span><p>{signal.redTeamSummary.slice(0, 240)}{signal.redTeamSummary.length > 240 ? "…" : ""}</p><button className="scan-rescore" onClick={() => selectWork("signals")}>Read the full challenge ↗</button></div>}
+          <TabsList aria-label="Senior reading desk" className="deal-rail-nav">
+            {[
+              ["research", "Follow the sources", "Listing & research dossier"],
+              ["signals", "Challenge the cash", signal ? "Recorded specialist analysis" : "Analysis not yet run"],
+              ["capital", "Test the financing", "Assumptions & capital structure"],
+              ["consensus", "Hear the committee", consensusData ? "Saved panel view" : "Panel has not reported"],
+              ["memo", "Build the argument", memo ? "Read the investment memo" : "Memo not yet commissioned"],
+            ].map(([value, title, note], index) => <TabsTrigger key={value} value={value}><span>{String(index + 1).padStart(2, "0")}</span><div>{title}<small>{note}</small></div><ArrowRight size={16}/></TabsTrigger>)}
+            <details className="deal-desk-drawer"><summary>Specialists & next moves</summary>
+              {[
+                ["outreach", "Prepare outreach", "Review before any contact"],
+                ["seller", "Explore a seller scenario", "Simulation, not verified psychology"],
+                ["agents", "Direct the specialists", "Run controls & recorded activity"],
+                ["trajectory", "Trace the reasoning", "Saved analysis history"],
+                ["loi", "Prepare an LOI", "Draft for human review"],
+              ].map(([value, title, note]) => <TabsTrigger key={value} value={value}><ArrowRight size={16}/><div>{title}<small>{note}</small></div></TabsTrigger>)}
+            </details>
+          </TabsList>
+          <details className="deal-financing-note"><summary>Pencilled financing assumptions</summary>
+            <p className="hunter-eyebrow">CASH COVERAGE · MODELED</p><strong>{financing?.cashCoverage?.toFixed(2) ?? "—"}×</strong>
+            <dl><div><dt>Buyer equity</dt><dd>{fmt(financing?.equityAmount)}</dd></div><div><dt>Modeled loan</dt><dd>{fmt(financing?.loanAmount)}</dd></div></dl>
+            <p>Assumes {ACQUISITION_FINANCING_ASSUMPTIONS.loanFraction * 100}% financing at {ACQUISITION_FINANCING_ASSUMPTIONS.annualRate * 100}% over {ACQUISITION_FINANCING_ASSUMPTIONS.months / 12} years, fully amortizing. Fees and working capital excluded. Not lender terms or financing approval.</p>
+            <p>Cash coverage uses seller-reported cash flow before owner compensation, capital spending and other obligations. It is not a lender-verified DSCR.</p>
+          </details>
+          <p className="deal-rail-disclosure">Screening score: {score != null ? score.toFixed(3) : "not available"}. Screening score is not thesis fit or verified quality. Viewing does not contact the seller.</p>
+        </aside>
+
+        <div className="deal-work-pane">
             <AlignmentPortrait title="The economics. The open questions." subtitle={deal.isSynthetic ? "Illustrative — composite deal, not a real customer" : "Saved deal figures · independent verification not established here"} measures={[
               { id: "asking", label: "Asking price", value: toNum(deal.askingPrice), unit: "usd", basis: "reported", wanted: "An asking price", explanation: "Saved asking price. This detail record does not include the search's thesis bounds; no target band is invented." },
               { id: "cash", label: "Annual cash flow", value: toNum(deal.cashFlow), unit: "usd", basis: "reported", wanted: "Reconciled cash flow", explanation: "Saved reported cash flow. Reconcile add-backs, owner replacement costs and recurring expenses; this is not independently verified earnings." },
               { id: "revenue", label: "Annual revenue", value: toNum(deal.revenue), unit: "usd", basis: "reported", wanted: "Revenue records", explanation: "Saved revenue figure. Inspect the listing and research below for its basis and period." },
               { id: "coverage", label: "Debt coverage", value: financing?.cashCoverage ?? null, unit: "multiple", basis: "modeled", wanted: "Financing terms", explanation: "Calculated using the illustrative financing assumptions disclosed below. This is not a lender quote or approval; fees, reserves and taxes may change the result." },
             ]} />
-            <div><p className="hunter-eyebrow">Your investigation starts here</p><h2 className="font-serif text-3xl">A price is an opening.<br />Evidence makes the case.</h2><p className="mt-4 text-sm leading-6 text-muted-foreground">Tap a measure to inspect its basis. Then follow the original listing, recorded risks and financing assumptions below. Screening score: {score != null ? score.toFixed(3) : "not available"}—not thesis fit or verified quality.</p></div>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-start">
-            <AcquisitionSourceBrief listingUrl={deal.listingUrl} description={deal.description} isSynthetic={deal.isSynthetic} />
-            <aside aria-label="Next decision" className="border-l-2 border-amber pl-4 py-1 space-y-2">
-              <h2 className="font-card-title text-xl">{signal?.redTeamSummary ? "Review the recorded risks" : "Check the evidence first"}</h2>
-              <p className="text-sm text-muted-foreground">{signal?.redTeamSummary ? "Risk analysis is available below; it is not approval to proceed." : "Risk analysis has not been run; risk is still unknown."}</p>
-              <a href="#deal-research" className="inline-flex items-center min-h-11 text-sm font-medium underline">Review research <ArrowRight className="ml-2 w-4 h-4" /></a>
-              <p className="text-sm text-muted-foreground">Viewing this report does not contact the seller. Screening score is not thesis fit or verified quality.</p>
-            </aside>
-          </div>
-        </div>
 
-        {/* ── Enrichment Strip ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border border-rule divide-x divide-rule mb-5">
-          {[
-            { label: "MULTIPLE", value: deal.askingPrice && deal.cashFlow ? `${(parseFloat(String(deal.askingPrice)) / parseFloat(String(deal.cashFlow))).toFixed(1)}x` : "—" },
-            { label: "CASH COVERAGE · MODELED", value: financing?.cashCoverage?.toFixed(2) ?? "—" },
-            { label: "EMPLOYEES", value: (deal as any).employeeCount ? String((deal as any).employeeCount) : "—" },
-            { label: "YEARS EST.", value: (deal as any).yearsInOperation ? String((deal as any).yearsInOperation) : "—" },
-          ].map((item, i) => (
-            <div key={i} className="px-3 py-3 min-w-0">
-              <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1 uppercase tracking-widest">{item.label}</p>
-              <p className="font-data-mono text-[20px] text-ink leading-none">{item.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Macro Alignment Alert ────────────────────────────────────────── */}
-        {signal?.redTeamSummary && (
-          <div className="border-l-2 border-amber pl-6 mb-10 py-2">
-            <p className="font-eyebrow text-eyebrow text-amber mb-2 uppercase tracking-widest">MACRO STRATEGIC ALIGNMENT</p>
-            <p className="font-body-base text-body-base text-ink/80 leading-relaxed max-w-3xl">
-              {typeof signal.redTeamSummary === "string"
-                ? signal.redTeamSummary.slice(0, 320) + (signal.redTeamSummary.length > 320 ? "…" : "")
-                : "Third Signal analysis available in the Intelligence tab below."}
-            </p>
-          </div>
-        )}
-
-        <nav aria-label="Report sections" className="flex flex-wrap gap-4 border-b border-rule mb-4 text-sm font-medium">
-          <a href="#deal-research" className="inline-flex min-h-11 items-center underline">Research & sources</a>
-          <a href="#deal-workspace" className="inline-flex min-h-11 items-center underline">Analysis & next steps</a>
-        </nav>
-        <section id="deal-research" aria-label="Opportunity research" className="scroll-mt-20 min-w-0 mb-6 space-y-3">
-          <h2 className="font-card-title text-2xl text-ink">Research & sources</h2>
-          <DealDossierModule dealId={dealId} />
-        </section>
-        <details className="mb-6 border border-rule p-4">
-          <summary className="min-h-11 cursor-pointer font-medium py-2">Analysis tools and financing assumptions</summary>
-        <div className="space-y-6 mt-4">
-
-          {/* LEFT: Bento modules — col-span-8 */}
-          <div className="min-w-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-              {/* Module 1: Owner Psychology */}
-              <div className="border border-rule bg-paper p-6">
-                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Owner Psychology</p>
-                <p className="font-card-title text-[18px] text-ink leading-tight mb-3">
-                  {(sellerData?.personaJson as any)?.motivation ?? "Run Third Signal to analyze"}
-                </p>
-                {(sellerData?.personaJson as any)?.urgencyLevel && (
-                  <div>
-                    <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">URGENCY</p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1 bg-rule rounded-full overflow-hidden">
-                        <div className="h-full bg-amber rounded-full" style={{ width: `${(((sellerData?.personaJson as any)?.urgencyLevel ?? 0) / 10) * 100}%` }} />
-                      </div>
-                      <span className="font-data-mono text-data-mono text-ink">{(sellerData?.personaJson as any)?.urgencyLevel ?? 0}/10</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Module 2: Digital Audit */}
-              <div className="border border-rule bg-paper p-6">
-                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Digital Audit</p>
-                <p className="font-card-title text-[18px] text-ink leading-tight mb-3">
-                  {signal?.digitalAuditSummary ? String(signal.digitalAuditSummary).slice(0, 80) + "…" : "Pending analysis"}
-                </p>
-                <button onClick={() => analyzeSignals.mutate({ dealId })} disabled={analyzeSignals.isPending}
-                  className="font-eyebrow text-eyebrow text-amber hover:underline flex items-center gap-1">
-                  {analyzeSignals.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                  {signal?.digitalAuditSummary ? "Re-analyze" : "Run Analysis"}
-                </button>
-              </div>
-
-              {/* Module 3: Red Team Analysis */}
-              <div className="border border-rule bg-paper p-6">
-                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Red Team Analysis</p>
-                <p className="font-card-title text-[18px] text-ink leading-tight mb-3">
-                  {signal?.redTeamSummary ? String(signal.redTeamSummary).slice(0, 80) + "…" : "Not analyzed — risk is unknown"}
-                </p>
-                {signal?.redTeamSummary && (
-                  <span className="font-eyebrow text-eyebrow text-clay">RISKS IDENTIFIED</span>
-                )}
-              </div>
-
-              {/* Module 4: Capital Study */}
-              <div className="border border-rule bg-paper p-6">
-                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Illustrative financing</p>
-                {deal.askingPrice ? (
-                  <div className="space-y-3">
-                    <div>
-                      <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">Modeled buyer equity</p>
-                      <p className="font-data-mono text-[20px] text-ink">{fmt(financing?.equityAmount)}</p>
-                    </div>
-                    <div>
-                      <p className="font-eyebrow text-eyebrow text-muted-foreground mb-1">Modeled loan</p>
-                      <p className="font-data-mono text-[20px] text-ink">{fmt(financing?.loanAmount)}</p>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Assumes {ACQUISITION_FINANCING_ASSUMPTIONS.loanFraction * 100}% financing at {ACQUISITION_FINANCING_ASSUMPTIONS.annualRate * 100}% over {ACQUISITION_FINANCING_ASSUMPTIONS.months / 12} years, fully amortizing. Fees and working capital excluded. Not lender terms or financing approval.</p>
-                    <p className="text-sm text-muted-foreground">Cash coverage uses seller-reported cash flow before verifying owner compensation, capital spending and other obligations. It is not a lender-verified DSCR.</p>
-                  </div>
-                ) : (
-                  <p className="font-body-base text-body-base text-muted-foreground">No asking price set</p>
-                )}
-              </div>
-
-              {/* Module 5: Investment Memo — col-span-2 */}
-              <div className="border border-rule bg-paper p-6 md:col-span-2">
-                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">Investment Memo</p>
-                {memo ? (
-                  <div>
-                    <p className="font-card-title text-[18px] text-ink leading-tight mb-4">
-                      {typeof memo.executiveSummary === "string" ? memo.executiveSummary.slice(0, 200) + "…" : "Memo generated"}
-                    </p>
-                    <button className="font-eyebrow text-eyebrow text-amber hover:underline flex items-center gap-1">
-                      VIEW FULL MEMO <ArrowRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="font-body-base text-body-base text-muted-foreground mb-4">Commission a diligence brief from The Architect — financials, risk flags, and IC posture in one document</p>
-                    <button onClick={() => generateMemo.mutate({ dealId })} disabled={generateMemo.isPending}
-                      className="flex items-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2 rounded-full hover:opacity-90 transition-all">
-                      {generateMemo.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
-                      COMMISSION BRIEF
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Module 6: Model Consensus */}
-              <div className="border border-rule bg-paper p-6">
-                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-3 uppercase tracking-widest">IC Agent Consensus</p>
-                {consensusData ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className={`font-data-mono text-[28px] leading-none ${parseFloat(String(consensusData.consensusScore ?? 0)) >= 0.7 ? "text-sage" : "text-clay"}`}>
-                        {parseFloat(String(consensusData.consensusScore ?? 0)).toFixed(3)}
-                      </span>
-                      {consensusData.divergenceFlag && (
-                        <span className="font-eyebrow text-eyebrow text-clay border border-clay/30 px-2 py-0.5 rounded-sm">DIVERGE</span>
-                      )}
-                    </div>
-                    <p className="font-eyebrow text-eyebrow text-muted-foreground">{(consensusData as any).overallRecommendation ?? (consensusData as any).recommendation ?? "—"}</p>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="font-body-base text-body-base text-muted-foreground mb-4">Three-agent weighted panel vote</p>
-                    <button onClick={() => consensusScore.mutate({ dealId })} disabled={consensusScore.isPending}
-                      className="font-eyebrow text-eyebrow text-amber hover:underline flex items-center gap-1">
-                      {consensusScore.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                      RUN CONSENSUS
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Quick action strip */}
-            <div className="grid grid-cols-3 border border-rule divide-x divide-rule mt-6">
-              {[
-                { icon: Brain, label: "Third Signal", sub: "Macro + competitive analysis", action: () => analyzeSignals.mutate({ dealId }), pending: analyzeSignals.isPending },
-                { icon: FileText, label: "Diligence Brief", sub: "IC-ready document", action: () => generateMemo.mutate({ dealId }), pending: generateMemo.isPending },
-                { icon: Mail, label: "Draft Outreach", sub: "Personalized approach", action: () => toast.info("Navigate to Outreach tab"), pending: false },
-              ].map((act, i) => (
-                <button key={i} onClick={act.action} disabled={act.pending}
-                  className="flex items-center gap-3 p-5 text-left hover:bg-bone/60 transition-colors disabled:opacity-50 group">
-                  <div className="w-8 h-8 border border-rule rounded-sm flex items-center justify-center shrink-0 group-hover:border-amber/40 transition-colors">
-                    {act.pending ? <Loader2 className="w-4 h-4 animate-spin text-amber" /> : <act.icon className="w-4 h-4 text-muted-foreground group-hover:text-amber transition-colors" />}
-                  </div>
-                  <div>
-                    <p className="font-eyebrow text-eyebrow text-ink group-hover:text-amber transition-colors">{act.label}</p>
-                    <p className="font-body-base text-[11px] text-muted-foreground mt-0.5">{act.sub}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* RIGHT: Agent Monitoring Panel — col-span-4 */}
-          <div className="min-w-0 border-t border-rule pt-4">
-            <AgentMonitoringPanel dealId={dealId} showDossier={false} />
-          </div>
-        </div>
-        </details>
-
-      {/* Tabs */}
-      <Tabs id="deal-workspace" className="scroll-mt-20" defaultValue="signals">
-        <TabsList className="bg-card border border-border h-auto min-h-11 flex-wrap justify-start gap-1 [&>button]:min-h-11">
-          <TabsTrigger value="signals" className="text-xs h-7">Third Signal</TabsTrigger>
-          <TabsTrigger value="memo" className="text-xs h-7">Investment Memo</TabsTrigger>
-          <TabsTrigger value="capital" className="text-xs h-7">Capital Stack</TabsTrigger>
-          <TabsTrigger value="outreach" className="text-xs h-7">Outreach</TabsTrigger>
-          <TabsTrigger value="consensus" className="text-xs h-7">
-            <BarChart3 className="w-3 h-3 mr-1" />Consensus
-          </TabsTrigger>
-          <TabsTrigger value="seller" className="text-xs h-7">
-            <UserSearch className="w-3 h-3 mr-1" />Seller Sim
-          </TabsTrigger>
-          <TabsTrigger value="agents" className="text-xs h-7">
-            <Bot className="h-3 w-3 mr-1" />Agent Loop
-          </TabsTrigger>
-          <TabsTrigger value="trajectory" className="text-xs h-7">
-            <GitBranch className="w-3 h-3 mr-1" />Trajectory
-          </TabsTrigger>
-          <TabsTrigger value="loi" className="text-xs h-7">
-            <FileText className="w-3 h-3 mr-1" />LOI Draft
-          </TabsTrigger>
-        </TabsList>
+          <div id="deal-workspace" className="deal-chapter" tabIndex={-1}><span className="hunter-eyebrow">The reading desk / {workPane === "research" ? "Sources" : workPane}</span></div>
+          <TabsContent value="research">
+            <section id="deal-research" aria-label="Opportunity research" className="scroll-mt-24">
+              <h2 className="deal-chapter-title">What stands behind the numbers?</h2>
+              <AcquisitionSourceBrief listingUrl={deal.listingUrl} description={deal.description} isSynthetic={deal.isSynthetic} />
+              <dl className="deal-record-facts"><div><dt>Employees · recorded</dt><dd>{(deal as any).employeeCount ?? "Not disclosed"}</dd></div><div><dt>Operating years · recorded</dt><dd>{(deal as any).yearsInOperation ?? "Not disclosed"}</dd></div></dl>
+              <DealDossierModule dealId={dealId} />
+            </section>
+          </TabsContent>
 
         {/* Third Signal Tab */}
         <TabsContent value="signals" className="mt-4 space-y-4">
@@ -648,8 +484,8 @@ export default function DealDetail() {
         <TabsContent value="capital" className="mt-4">
           <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-sm font-semibold">Dynamic Capital Stack Wizard</CardTitle>
-              <CardDescription className="text-xs">Model the optimal financing structure for this acquisition</CardDescription>
+              <CardTitle className="text-sm font-semibold">The financing worksheet</CardTitle>
+              <CardDescription className="text-xs">Modeled structure, not a lender offer or approval</CardDescription>
             </CardHeader>
             <CardContent>
               {!signal?.sbaEligible && !signal?.recommendedSbaAmount ? (
@@ -1000,15 +836,11 @@ export default function DealDetail() {
           </Card>
         </TabsContent>
         <TabsContent value="agents" className="mt-4">
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+          <div className="space-y-6">
+            <AgentMonitoringPanel dealId={dealId} showDossier={false} />
+            <details className="deal-desk-drawer"><summary>Architect → challenge → remediation</summary>
               <AgentLoopPanel dealId={dealId} dealName={deal.name} />
-            </div>
-            <div className="lg:col-span-1">
-              <div className="sticky top-4 p-4 bg-[#faf7f2] border border-[#e8e0d4] rounded-xl">
-                <AgentMonitoringPanel dealId={dealId} showDossier={false} />
-              </div>
-            </div>
+            </details>
           </div>
         </TabsContent>
 
@@ -1016,9 +848,8 @@ export default function DealDetail() {
         <TabsContent value="loi" className="mt-4">
           <LOIGeneration dealId={dealId} dealName={deal.name} askingPrice={deal.askingPrice} />
         </TabsContent>
+        </div>
        </Tabs>
-      {/* Co-Pilot with deal-specific context injected */}
-      <CoPilot dealId={dealId} dealName={deal.name} />
       </div>
     </EditorialTopNav>
   );

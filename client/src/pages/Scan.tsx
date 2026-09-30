@@ -21,6 +21,13 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import ScanProgress from "@/components/ScanProgress";
+import { AlignmentPortrait } from "@/components/AlignmentPortrait";
+
+const finiteAmount = (value: unknown): number | null => {
+  if (value == null || String(value).trim() === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
 
 // ── Preset location groups ─────────────────────────────────────────────────
 const LOCATION_PRESETS = [
@@ -73,7 +80,7 @@ export default function Scan() {
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
-  const [showConfig, setShowConfig] = useState(true);
+  const [showConfig, setShowConfig] = useState(false);
   const [form, setForm] = useState({ name: "", industry: "", location: "", askingPrice: "", revenue: "", cashFlow: "" });
 
   // ── Scan config state ──────────────────────────────────────────────────
@@ -93,7 +100,7 @@ export default function Scan() {
     offMarketSignal: string; acquisitionAngle: string; urgencyScore: number; contactStrategy: string;
   }>>([]);
 
-  const { data: deals, isLoading, refetch } = trpc.deals.list.useQuery({ limit: 100 });
+  const { data: deals, isLoading, isError, refetch } = trpc.deals.list.useQuery({ limit: 100 });
   const triggerScan = trpc.scan.trigger.useMutation({
     onSuccess: (r) => {
       toast.success(`Scan launched — ${r.message}`);
@@ -105,6 +112,7 @@ export default function Scan() {
   });
   const scoreDeal = trpc.deals.score.useMutation({
     onSuccess: (d) => { toast.success(`Scored: ${parseFloat(String(d.score)).toFixed(3)}`); refetch(); },
+    onError: (e) => toast.error(`Scoring failed: ${e.message}`),
   });
 
   const createDeal = trpc.deals.create.useMutation({
@@ -164,24 +172,24 @@ export default function Scan() {
 
   return (
     <EditorialTopNav>
+      <div className="scan-edition">
       {/* ── Page Header ──────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <Radar className="w-5 h-5 text-primary" />
-            Market Scan
+          <p className="hunter-eyebrow">Market Scan / Experimental sourcing desk</p>
+          <h1 className="scan-edition-title">
+            Find the next question.
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
               Labs
             </span>
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {(deals ?? []).length} deal{(deals ?? []).length !== 1 ? "s" : ""} in pipeline
+            {isError ? "Pipeline unavailable" : isLoading ? "Reading your pipeline…" : `${(deals ?? []).length} saved opportunities`}
           </p>
           {/* runScanPipeline now fetches REAL listings via Perplexity sonar-pro with
               real listing URLs — verify financials against each source before acting. */}
           <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            Sonar-sourced — real current listings via Perplexity sonar-pro; verify financials against each listing
+            Saved inventory, not a fresh availability check. Verify each source before acting.
           </p>
         </div>
         <div className="flex gap-2">
@@ -376,78 +384,7 @@ export default function Scan() {
         </Card>
       )}
 
-      {/* ── Off-Market Scout ──────────────────────────────────────────────── */}
-      <Card className="border-dashed border-amber-500/40 bg-amber-500/5">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <CardTitle className="text-sm font-semibold text-[var(--amber)]">Off-Market Scout</CardTitle>
-              <Badge variant="outline" className="text-xs border-amber-500/40 text-[var(--amber)]">The Scout</Badge>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs gap-1.5 border-amber-500/40 text-[var(--amber)] hover:bg-amber-500/10"
-              onClick={() => navigate("/off-market")}
-            >
-              <Search className="w-3 h-3" />Off-Market Discovery
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-The Scout proactively surfaces unlisted businesses matching your criteria — owner-operated, aging owners, distressed signals, and acquisition-ready targets not yet visible on broker platforms.
-          </p>
-        </CardHeader>
-        {showOffMarket && offMarketResults.length > 0 && (
-          <CardContent className="pt-0">
-            <div className="space-y-3">
-              {offMarketResults.map((opp, i) => (
-                <div key={i} className="rounded-lg border border-amber-500/20 bg-background p-3 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold">{opp.name}</p>
-                      <p className="text-xs text-muted-foreground">{opp.industry} · {opp.location}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <div className={`w-1.5 h-1.5 rounded-full ${opp.urgencyScore >= 8 ? 'bg-red-400' : opp.urgencyScore >= 6 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-                      <span className="text-xs font-mono text-muted-foreground">Urgency {opp.urgencyScore}/10</span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div><span className="text-muted-foreground">Est. Revenue</span><br /><span className="font-medium">${(opp.estimatedRevenue / 1e6).toFixed(1)}M</span></div>
-                    <div><span className="text-muted-foreground">Est. Cash Flow</span><br /><span className="font-medium">${(opp.estimatedCashFlow / 1e3).toFixed(0)}k</span></div>
-                    <div><span className="text-muted-foreground">Est. Asking</span><br /><span className="font-medium">${(opp.estimatedAskingPrice / 1e6).toFixed(1)}M</span></div>
-                  </div>
-                  <div className="text-xs space-y-1">
-                    <p><span className="text-[var(--amber)] font-medium">Signal:</span> {opp.offMarketSignal}</p>
-                    <p><span className="text-blue-400 font-medium">Angle:</span> {opp.acquisitionAngle}</p>
-                    <p><span className="text-[var(--sage)] font-medium">Contact:</span> {opp.contactStrategy}</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 text-xs w-full"
-                    onClick={() => {
-                      createDeal.mutate({
-                        name: opp.name,
-                        industry: opp.industry,
-                        location: opp.location,
-                        askingPrice: opp.estimatedAskingPrice,
-                        revenue: opp.estimatedRevenue,
-                        cashFlow: opp.estimatedCashFlow,
-                        source: "off-market-scout",
-                        description: `Signal: ${opp.offMarketSignal}\nAngle: ${opp.acquisitionAngle}\nContact: ${opp.contactStrategy}`,
-                      });
-                    }}
-                  >
-                    Add to Pipeline
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        )}
-      </Card>
+      <div className="scan-discovery-link"><div><span className="hunter-eyebrow">Beyond the listing</span><p>Looking off-market?</p></div><Link href="/off-market">Open the discovery desk <ArrowUpRight size={16}/></Link></div>
 
       {/* ── Scan Progress ─────────────────────────────────────────────────── */}
       {activeScanJobId && (
@@ -458,127 +395,6 @@ The Scout proactively surfaces unlisted businesses matching your criteria — ow
         />
       )}
 
-      {/* ── Macro Signal Alignment ──────────────────────────────────────── */}
-      {(deals ?? []).length > 0 && (() => {
-        const TIDE_SIGNALS = [
-          { signal: "Defense Spending — Southeast Region", match: 87, deals: ["Miami Metro HVAC Solutions", "Atlanta Bright Electrical Services"] },
-          { signal: "Supply Chain Nearshoring — Sun Belt", match: 64, deals: ["Dallas Logistics Dispatch", "Houston Rapid Plumbing"] },
-        ];
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card className="border-border bg-card">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-                  <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">TIDE Pulse</span>
-                </div>
-                <CardTitle className="text-sm font-semibold">Macro Signal Alignment</CardTitle>
-                <p className="text-xs text-muted-foreground">Current market inventory evaluated against active TIDE-detected macro signals. High conviction overlaps highlighted.</p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {TIDE_SIGNALS.map((s, i) => (
-                  <div key={i} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-foreground">{s.signal}</span>
-                      <span className="text-xs font-mono font-bold text-[var(--amber)]">{s.match}% Match</span>
-                    </div>
-                    <div className="h-1 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-[var(--amber)] rounded-full" style={{ width: `${s.match}%` }} />
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {s.deals.map(d => (
-                        <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border">{d.split(" ").slice(0, 3).join(" ")}</span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-            <Card className="border-border bg-card">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[var(--amber)] animate-pulse" />
-                  <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Agentic Hunting — Off-Market</span>
-                  <Badge variant="outline" className="text-[10px] border-[var(--amber)]/40 text-[var(--amber)] h-4 px-1.5">The Scout Active</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {[
-                  { time: "10:43 AM", text: "Verifying ownership structure for Gray-Market Lead #8842 (B2B Logistics, TX).", type: "info" },
-                  { time: "10:45 AM", text: "Anomaly detected: Significant divergence between reported fleet size and satellite imagery.", type: "flag" },
-                  { time: "10:48 AM", text: "Drafting exploratory outreach to registered agent. Awaiting approval.", type: "action" },
-                ].map((item, i) => (
-                  <div key={i} className="flex gap-2.5 items-start">
-                    <span className="text-[10px] font-mono text-muted-foreground shrink-0 mt-0.5">{item.time}</span>
-                    <p className={`text-xs leading-relaxed ${item.type === "flag" ? "text-[var(--amber)] font-medium" : "text-muted-foreground"}`}>{item.text}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      })()}
-
-      {/* ── Deal DNA v2026 Comparison ─────────────────────────────────────── */}
-      {(deals ?? []).filter(d => parseFloat(String(d.score ?? 0)) >= 0.7).length >= 2 && (() => {
-        const topDeals = (deals ?? []).filter(d => parseFloat(String(d.score ?? 0)) >= 0.7).slice(0, 2);
-        const VECTORS = [
-          { label: "SDE Multiple", format: (d: any) => d.multiple ? `${parseFloat(String(d.multiple)).toFixed(1)}x` : "—", highlight: (a: any, b: any) => parseFloat(String(a.multiple ?? 99)) < parseFloat(String(b.multiple ?? 99)) ? 0 : 1 },
-          { label: "Operational Moat", format: (d: any) => { const ind = (d.industry ?? "").toLowerCase(); return ind.includes("hvac") || ind.includes("electric") ? "Proprietary / Contract" : ind.includes("logistics") ? "Manual / Process-heavy" : "Managed / Multi-Tier"; }, highlight: () => 0 },
-          { label: "Key-Man Risk", format: (d: any) => { const s = parseFloat(String(d.score ?? 0)); return s >= 0.82 ? "Low / Managed" : s >= 0.75 ? "Managed / Multi-Tier" : "High / Founder-Dependent"; }, highlight: (a: any, b: any) => parseFloat(String(a.score ?? 0)) > parseFloat(String(b.score ?? 0)) ? 0 : 1 },
-          { label: "Pricing Power", format: (d: any) => { const ind = (d.industry ?? "").toLowerCase(); return ind.includes("hvac") || ind.includes("pest") ? "Contractual / Recurring" : "Spot / Transactional"; }, highlight: () => 0 },
-          { label: "Institutional Readiness", format: (d: any) => { const s = parseFloat(String(d.score ?? 0)); return s >= 0.82 ? "Clean Audits (Big 4)" : s >= 0.75 ? "Regional CPA" : "Cash-Basis / Co-Mingled"; }, highlight: (a: any, b: any) => parseFloat(String(a.score ?? 0)) > parseFloat(String(b.score ?? 0)) ? 0 : 1 },
-          { label: "Owner Psychology", format: (d: any) => { const s = parseFloat(String(d.score ?? 0)); return s >= 0.82 ? "Distressed / Urgent Exit" : s >= 0.75 ? "Motivated / Flexible" : "Retiring / Legacy Focused"; }, highlight: () => 0 },
-        ];
-        return (
-          <Card className="border-border bg-card">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Structural Comparison</span>
-                <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-border">v2026</Badge>
-              </div>
-              <CardTitle className="text-sm font-semibold">Validation Vector Analysis</CardTitle>
-              <p className="text-xs text-muted-foreground">Qualitative and structural risk vectors beyond the financials. Orange = stronger validated position.</p>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-2 pr-4 text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase w-36">Vector</th>
-                      {topDeals.map(d => (
-                        <th key={d.id} className="text-left py-2 px-3 font-semibold text-foreground">
-                          {d.name.split(" ").slice(0, 3).join(" ")}
-                          <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">{parseFloat(String(d.score ?? 0)).toFixed(3)}</span>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {VECTORS.map(vec => (
-                      <tr key={vec.label} className="hover:bg-muted/20 transition-colors">
-                        <td className="py-2.5 pr-4 text-[10px] font-bold tracking-[0.1em] text-muted-foreground uppercase">{vec.label}</td>
-                        {topDeals.map((d, idx) => {
-                          const winner = vec.highlight(topDeals[0], topDeals[1]);
-                          const cls = winner === idx ? "text-[var(--amber)] font-semibold" : "text-muted-foreground";
-                          return (
-                            <td key={d.id} className={`py-2.5 px-3 text-xs ${cls}`}>
-                              {vec.format(d)}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-4 pt-3 border-t border-border">
-                <p className="text-[10px] text-muted-foreground"><span className="text-[var(--amber)] font-semibold">The Structuralist</span> · "14% compression in asking prices for logistics targets in the $5M range. Recommend aggressive LOI positioning on the HVAC target — distressed psychology indicators confirmed."</p>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })()}
 
       {/* ── Search + Results ──────────────────────────────────────────────── */}
       <div className="space-y-4">
@@ -604,6 +420,8 @@ The Scout proactively surfaces unlisted businesses matching your criteria — ow
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-xl" />)}
           </div>
+        ) : isError ? (
+          <div role="alert" className="deal-source-receipt">The pipeline could not be loaded. <button onClick={() => refetch()}>Try again</button></div>
         ) : !filtered.length ? (
           <Card className="bg-card border-border">
             <CardContent className="flex flex-col items-center justify-center py-20 text-center">
@@ -623,99 +441,21 @@ The Scout proactively surfaces unlisted businesses matching your criteria — ow
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((deal) => {
-              const sc = deal.score == null ? null : parseFloat(String(deal.score));
-              const scColor = sc == null ? "oklch(0.40 0.01 260)" : sc >= 0.8 ? "oklch(0.70 0.18 160)" : sc >= 0.65 ? "oklch(0.75 0.20 80)" : "oklch(0.60 0.22 25)";
-              return (
-              <div key={deal.id} className="card-hover-lift" style={{
-                background: "var(--paper)",
-                border: "1px solid var(--rule)",
-                borderRadius: 12,
-                padding: "16px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-              }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <Link href={`/deal/${deal.id}`}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", cursor: "pointer", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.4 }}>
-                        {deal.name}
-                      </p>
-                    </Link>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
-                      {deal.location && (
-                        <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--sh-fg-3)" }}>
-                          <MapPin style={{ width: 10, height: 10 }} />{deal.location}
-                        </span>
-                      )}
-                      {deal.opportunityZone && (
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: "0 6px", height: 16, borderRadius: 9999, background: "oklch(0.70 0.18 160 / 0.15)", color: "oklch(0.70 0.18 160)", border: "1px solid oklch(0.70 0.18 160 / 0.20)", display: "inline-flex", alignItems: "center" }}>OZ</span>
-                      )}
-                      {deal.tadDistrict && (
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: "0 6px", height: 16, borderRadius: 9999, background: "oklch(0.65 0.22 250 / 0.15)", color: "oklch(0.65 0.22 250)", border: "1px solid oklch(0.65 0.22 250 / 0.20)", display: "inline-flex", alignItems: "center" }}>TAD</span>
-                      )}
-                    </div>
-                  </div>
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6, flexShrink: 0, background: "var(--bone)", color: "var(--sh-fg-3)", border: "1px solid var(--rule)" }}>
-                    {deal.stage.replace(/_/g, " ")}
-                  </span>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
-                  {[
-                    { label: "Revenue", value: fmt(deal.revenue) },
-                    { label: "Cash Flow", value: fmt(deal.cashFlow) },
-                    { label: "Asking", value: fmt(deal.askingPrice) },
-                  ].map((f) => (
-                    <div key={f.label} style={{ background: "var(--bone)", borderRadius: 8, padding: "8px", textAlign: "center" }}>
-                      <p style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--sh-fg-3)", marginBottom: 3 }}>{f.label}</p>
-                      <p style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>{f.value}</p>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--sh-fg-3)" }}>AI Score</span>
-                    {deal.redFlagCount != null && deal.redFlagCount > 0 && (
-                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "var(--clay)" }}>
-                        <AlertTriangle style={{ width: 10, height: 10 }} />
-                        {deal.redFlagCount} flags
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ flex: 1, height: 4, borderRadius: 2, background: "var(--bone)", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${Math.round((sc ?? 0) * 100)}%`, background: scColor, borderRadius: 2, transition: "width 0.85s cubic-bezier(0.16,1,0.3,1)" }} />
-                    </div>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: scColor, flexShrink: 0 }}>
-                      {sc != null ? sc.toFixed(3) : "—"}
-                    </span>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
-                  <button
-                    className="btn-press"
-                    style={{ flex: 1, height: 30, fontSize: 11, fontWeight: 500, borderRadius: 7, background: "transparent", border: "1px solid var(--rule)", color: "var(--sh-fg-3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
-                    onClick={() => scoreDeal.mutate({ id: deal.id })}
-                    disabled={scoreDeal.isPending}
-                  >
-                    <Zap style={{ width: 10, height: 10 }} />
-                    Score
-                  </button>
-                  <Link href={`/deal/${deal.id}`} style={{ flex: 1 }}>
-                    <button
-                      className="btn-press"
-                      style={{ width: "100%", height: 30, fontSize: 11, fontWeight: 500, borderRadius: 7, background: "oklch(0.65 0.22 250)", border: "none", color: "oklch(0.98 0.005 260)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
-                    >
-                      <ArrowUpRight style={{ width: 10, height: 10 }} />
-                      War Room
-                    </button>
-                  </Link>
-                </div>
+          <div className="scan-profile-feed">
+            {filtered.map((deal, index) => <article key={deal.id} className="scan-opportunity">
+              <header><div className="scan-monogram" aria-hidden="true">{deal.name.split(/\s+/).slice(0, 2).map(word => word[0]).join("")}</div><div><p className="hunter-eyebrow">{String(index + 1).padStart(2, "0")} / {deal.industry || "Industry not recorded"}</p><h2><Link href={`/deal/${deal.id}`}>{deal.name}</Link></h2><p className="scan-location">{deal.location || "Location not disclosed"} · {deal.stage.replace(/_/g, " ")}</p></div></header>
+              <AlignmentPortrait compact title="The numbers. The next questions." subtitle={deal.isSynthetic ? "Illustrative — composite deal, not a real customer" : "Saved figures · reported, not independently verified"} measures={[
+                { id: "asking", label: "Asking price", value: finiteAmount(deal.askingPrice), unit: "usd", basis: "reported", wanted: "An asking price", explanation: "Saved asking price. Verify current availability and price against the original listing." },
+                { id: "cash", label: "Annual cash flow", value: finiteAmount(deal.cashFlow), unit: "usd", basis: "reported", wanted: "Reconciled earnings", explanation: "Reported annual cash flow. Request tax returns and reconcile owner pay and add-backs." },
+                { id: "revenue", label: "Annual revenue", value: finiteAmount(deal.revenue), unit: "usd", basis: "reported", wanted: "Revenue records", explanation: "Reported revenue, not audited financials. Its period and basis need verification." },
+                { id: "multiple", label: "Price / cash flow", value: finiteAmount(deal.askingPrice) != null && (finiteAmount(deal.cashFlow) ?? 0) > 0 ? finiteAmount(deal.askingPrice)! / finiteAmount(deal.cashFlow)! : null, unit: "multiple", basis: "modeled", wanted: "Price & earnings", explanation: "Asking price divided by reported annual cash flow. This arithmetic is not a quality or return score." },
+              ]}/>
+              <div className="scan-profile-foot">
+                <p>{deal.redFlagCount != null ? `${deal.redFlagCount} recorded flags · review their basis` : "Risk flags not recorded"}<small>Screening score: {finiteAmount(deal.score)?.toFixed(3) ?? "not available"} · not thesis fit or verified quality.</small></p>
+                <Link className="hunter-cta" href={`/deal/${deal.id}`}>Read the opportunity <ArrowUpRight size={16}/></Link>
+                <button className="scan-rescore" disabled={scoreDeal.isPending} onClick={() => scoreDeal.mutate({ id: deal.id })}>Re-score</button>
               </div>
-            );
-            })}
+            </article>)}
           </div>
         )}
       </div>
@@ -765,6 +505,7 @@ The Scout proactively surfaces unlisted businesses matching your criteria — ow
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </EditorialTopNav>
   );
 }

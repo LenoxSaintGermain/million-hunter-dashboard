@@ -8,12 +8,15 @@ export function AcquisitionSourceBrief({ listingUrl, description, isSynthetic }:
     const url = new URL(listingUrl ?? "");
     if (url.protocol === "https:" || url.protocol === "http:") source = url.href;
   } catch { /* Missing or malformed source is not evidence. */ }
-  return <section aria-label="Listing evidence" className="mb-6 border border-rule p-4">
-    <p className="font-semibold">{isSynthetic
+  return <section aria-label="Listing evidence" className="deal-source-receipt">
+    <div className="deal-source-mark" aria-hidden="true">↗</div>
+    <div className="min-w-0"><span className="hunter-eyebrow">Source receipt</span>
+    <h3>{isSynthetic
       ? "Illustrative record — not a verified business opportunity"
-      : source ? "Source-reported listing — not independently verified" : "Listing source missing — opportunity unverified"}</p>
-    <p>Verify the business identity, availability and financial claims before relying on these figures.</p>
+      : source ? "Source-reported listing — not independently verified" : "Listing source missing — opportunity unverified"}</h3>
+    <p className="deal-source-caution">Identity, availability and financial claims still need verification.</p>
     {source && <a href={source} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline">Open original listing</a>}
-    {description && <details><summary className="cursor-pointer py-2">Discovery record</summary><p className="whitespace-pre-wrap">{description}</p></details>}
+    {description && <details><summary>Discovery record · original capture</summary><p className="deal-source-capture">{description}</p></details>}
+    </div>
   </section>;
 }

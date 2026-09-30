@@ -20,7 +20,8 @@ it("shows a qualified amortized scenario, not a fabricated DSCR or SBA approval"
   expect(html).toContain("CASH COVERAGE · MODELED");
   expect(html).toContain("Not lender terms or financing approval.");
   expect(html).toContain("It is not a lender-verified DSCR.");
-  expect(html.indexOf('aria-label="Opportunity research"')).toBeLessThan(html.indexOf("Analysis tools and financing assumptions"));
+  expect(html).not.toContain("Analysis tools and financing assumptions");
+  expect(html).toContain('aria-label="The Senior"');
   expect(html).toContain("Risk analysis has not been run; risk is still unknown.");
   expect(html.match(/data-testid="full-width-dossier"/g)).toHaveLength(1);
   expect(html).not.toContain("lg:col-span-4 lg:border-l");
@@ -33,9 +34,10 @@ it("leads with a compact report and offers same-page research and work sections"
   expect(html).toContain('aria-label="Next decision"');
   expect(html).toContain("Screening score is not thesis fit or verified quality.");
   for (const id of ["deal-research", "deal-workspace"]) {
-    expect(html).toContain(`href="#${id}"`);
     expect(html).toContain(`id="${id}"`);
   }
+  expect(html).toContain('aria-label="Senior reading desk"');
+  expect(html).not.toContain("Open AI Co-Pilot");
   expect(html).toContain("Share report");
   expect(html).toContain("Re-score");
 });

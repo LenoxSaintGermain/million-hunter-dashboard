@@ -273,7 +273,7 @@ export default function AgentMonitoringPanel({ dealId, showDossier = true }: Age
   const { toast } = useToast();
   const [activeRun, setActiveRun] = useState<AnalysisType | null>(null);
 
-  const { data: latestRuns, refetch, isLoading } = trpc.agent.getLatestRuns.useQuery(
+  const { data: latestRuns, refetch, isLoading, isError } = trpc.agent.getLatestRuns.useQuery(
     { dealId },
     { refetchInterval: activeRun ? 3000 : false }
   );
@@ -291,6 +291,7 @@ export default function AgentMonitoringPanel({ dealId, showDossier = true }: Age
   });
 
   const handleTrigger = (type: AnalysisType) => {
+    if (!window.confirm(`Run ${ANALYSIS_TYPES.find(item => item.id === type)?.label} on this deal? This sends saved deal data to the configured analysis providers and may incur API charges. No seller contact is sent.`)) return;
     setActiveRun(type);
     triggerRun.mutate({ dealId, analysisType: type });
   };
@@ -301,33 +302,16 @@ export default function AgentMonitoringPanel({ dealId, showDossier = true }: Age
   }
 
   return (
-    <div className="space-y-4">
+    <div className="specialist-notebook space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-xs font-medium text-[#8b7355] uppercase tracking-wider mb-0.5">Agent Orchestration</div>
-          <div className="text-sm font-semibold text-[#1a1208]">Analysis Runs</div>
+          <div className="hunter-eyebrow">The specialist notebook</div>
+          <h3 className="deal-chapter-title">Ask a sharper question.</h3>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className={cn(
-            "w-1.5 h-1.5 rounded-full",
-            activeRun || triggerRun.isPending ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
-          )} />
-          <span className="text-xs text-[#8b7355]">
-            {activeRun || triggerRun.isPending ? "Running" : "Ready"}
-          </span>
-        </div>
+        {triggerRun.isPending && <span role="status" className="text-xs">Request in progress</span>}
       </div>
-
-      {/* Model status strip */}
-      <div className="grid grid-cols-3 gap-2">
-        {MODEL_LABELS.map(({ label, color }) => (
-          <div key={label} className="flex items-center gap-1.5 px-2 py-1.5 bg-white border border-[#e8e0d4] rounded text-xs">
-            <span className={cn("w-1.5 h-1.5 rounded-full", activeRun ? "animate-pulse bg-amber-400" : "bg-emerald-400")} />
-            <span className={cn("font-medium", color)}>{label}</span>
-          </div>
-        ))}
-      </div>
+      <p className="text-sm text-muted-foreground">Each request is a separate analysis. Review its sources and assumptions; a model verdict is not verification.</p>
 
       {/* Trigger buttons */}
       <div className="grid grid-cols-1 gap-1.5">
@@ -341,9 +325,8 @@ export default function AgentMonitoringPanel({ dealId, showDossier = true }: Age
               onClick={() => handleTrigger(type.id)}
               disabled={triggerRun.isPending}
               className={cn(
-                "flex items-center justify-between px-3 py-2 rounded border text-left transition-all",
-                "hover:border-[#ffba20] hover:bg-[#fffdf7]",
-                isRunning ? "border-amber-300 bg-amber-50" : "border-[#e8e0d4] bg-white",
+                "specialist-request flex items-center justify-between px-3 py-3 border-b border-rule text-left transition-colors hover:bg-paper",
+                isRunning ? "bg-paper" : "bg-transparent",
                 triggerRun.isPending && "opacity-60 cursor-not-allowed"
               )}
             >
@@ -372,6 +355,8 @@ export default function AgentMonitoringPanel({ dealId, showDossier = true }: Age
       {/* Results */}
       {isLoading ? (
         <div className="text-xs text-[#8b7355] text-center py-4">Loading runs...</div>
+      ) : isError ? (
+        <p role="alert">Recorded runs could not be loaded. <button className="underline min-h-11" onClick={() => refetch()}>Try again</button></p>
       ) : latestRuns && latestRuns.length > 0 ? (
         <div className="space-y-2">
           <div className="text-xs font-medium text-[#8b7355] uppercase tracking-wider">Latest Results</div>
