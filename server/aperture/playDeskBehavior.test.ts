@@ -185,7 +185,7 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
     expect(html).not.toContain("Max loss");
   });
 
-  it("answers what is at stake, what it is worth and what is deployable before any row", () => {
+  it("shows saved risk, return and broker buying power without implying deployment clearance", () => {
     const orders = [
       order({ status: "filled", filledQty: 2, plannedRiskCents: 42_000,
         latestMark: { qty: 2, avgCostCents: 258, lastPriceCents: 305, marketValueCents: 61_000, priceAsOf: Date.now() - 60_000, priceSource: "alpaca_paper" } }),
@@ -196,15 +196,21 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
       account: { label: "Alpaca Paper", cashCents: 500_000, buyingPowerCents: 1_200_000, lastSyncedAt: Date.now() - 60_000, syncSource: "alpaca_paper" },
     });
     const html = render();
-    expect(html).toContain("data-desk-glance");
+    const $ = loadHtml(html);
+    const evidence = $('[aria-label="Saved desk evidence"]');
+    expect(evidence).toHaveLength(1);
+    expect(evidence.find('[data-desk-evidence]')).toHaveLength(3);
     expect(html).toContain("$516");      // at stake: 42_000 + 9_600
     expect(html).toContain("+$94.00");   // unrealized, the one markable position
-    expect(html).toContain("$12,000");   // deployable buying power
-    expect(html).toContain("1 of 1 open marked");
+    expect(html).toContain("$12,000");   // saved broker buying power, not deployable
+    expect(html).toContain("1 of 1 filled positions marked");
+    expect(evidence.text()).toContain("Not deployable capital. Risk gates and human approval still apply.");
+    expect(html.indexOf('id="desk-attention"')).toBeLessThan(html.indexOf('aria-label="Saved desk evidence"'));
+    expect(evidence.find('button')).toHaveLength(0);
     expect(html).toContain("Find my best play");
   });
 
-  it("refuses a deployable figure the account cannot support instead of showing zero", () => {
+  it("refuses an unsupported broker figure instead of showing zero", () => {
     const orders = [order({ status: "submitted", plannedRiskCents: 9_600 })];
     fixture.queries.desk = query({
       orders, activePlays: [], attention: attention({ orders: orders as any }),
@@ -212,7 +218,7 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
     });
     const html = render();
     expect(html).toContain("Not measured");
-    expect(html).toContain("never reported a synced balance");
+    expect(html).toContain("No verified synced balance is available");
     expect(html).not.toContain(">$0<");
   });
 

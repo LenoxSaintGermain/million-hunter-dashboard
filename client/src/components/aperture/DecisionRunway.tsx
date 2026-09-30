@@ -1096,8 +1096,11 @@ export function MissionReviewFeasibility({ branch = "research", feasibility, ent
   const hasTarget = branch === "research" && feasibility.targetProfitCents != null && feasibility.targetPeriod != null;
   const policyCents = normalPolicyPct == null ? null : Math.floor(feasibility.capitalBaseCents * normalPolicyPct / 100);
   const policyBinds = policyCents != null && policyCents === feasibility.riskBudgetCents && policyCents < enteredLossCents;
+  const visualLimits = [{ label: "Your limit", cents: enteredLossCents }, { label: "Policy cap", cents: policyCents }, { label: "Effective", cents: feasibility.riskBudgetCents }];
+  const visualMax = Math.max(1, ...visualLimits.map(row => row.cents ?? 0));
   return <section aria-label={branch === "research" ? "Your target and risk limit" : "Effective risk for future research"} className="mt-4 rounded-lg border p-3 text-sm" style={{ borderColor: hasTarget && feasibility.classification === "extreme" ? "var(--sh-red)" : "var(--sh-border-1)" }}>
     <h3 className="font-semibold">{branch === "research" ? "Risk allowed for this trade" : "Effective risk for future research"} <span className="mt-1 block font-serif text-2xl tabular-nums">{formatCents(feasibility.riskBudgetCents)}</span></h3>
+    <div className="mission-limit-visual" aria-label="Planned-loss boundaries, not portfolio allocation">{visualLimits.map(row => <div key={row.label}><span>{row.label}</span><div aria-hidden="true"><i style={{ width: `${row.cents == null ? 0 : Math.max(0, row.cents) / visualMax * 100}%` }} /></div><strong>{row.cents == null ? "Unknown" : formatCents(row.cents)}</strong></div>)}</div>
     <p className="mt-2 leading-6"><strong>You entered {formatCents(enteredLossCents)}.</strong> {policyBinds ? `The normal-play policy caps risk at ${normalPolicyPct}% of your ${formatCents(feasibility.capitalBaseCents)} declared capital (${formatCents(policyCents)}).` : remainingHeadroomCents === 0 ? "Existing open risk uses this mission’s aggregate allowance." : "The smallest measured mission, policy, account or portfolio limit controls."}</p>
     {(feasibility.riskBudgetCents === 0 || remainingHeadroomCents === 0) && (
       <div className="mt-2.5 rounded border p-2.5 text-xs space-y-2" style={{ borderColor: "var(--sh-border-1)", background: "rgba(245, 158, 11, 0.06)" }}>
@@ -1115,7 +1118,7 @@ export function MissionReviewFeasibility({ branch = "research", feasibility, ent
               borderColor: "transparent",
             }}
           >
-            View & Cancel Open Orders
+            Review open orders
           </a>
           <button
             type="button"
@@ -1127,7 +1130,7 @@ export function MissionReviewFeasibility({ branch = "research", feasibility, ent
             }}
             onClick={onInspect}
           >
-            Adjust Daily Risk Limit
+            Review mission limits
           </button>
         </div>
       </div>

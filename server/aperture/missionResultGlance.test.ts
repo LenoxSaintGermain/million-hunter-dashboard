@@ -52,9 +52,10 @@ describe("completed Mission glance", () => {
   it("states the no-trade reason once, without empty playbook headings or an order mutation", () => {
     const validate = vi.fn();
     const $ = load(renderToStaticMarkup(React.createElement(PlayUnderwritingBrief, { result, selectedPlayId: null, busy: false, onValidate: validate })));
+    expect($("details").first().text()).toContain(result.noTrade!.explanation);
     $("details").remove();
     const text = $.text();
-    expect(text.split(result.noTrade!.explanation)).toHaveLength(2);
+    expect(text).toContain("The saved analysis");
     expect(text).not.toContain("Best plays—or sit out");
     expect(text).not.toContain("Mission synthesis");
     expect(text).toContain("No new trade");

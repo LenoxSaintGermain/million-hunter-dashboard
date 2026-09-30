@@ -1,0 +1,140 @@
+.account-portfolio {
+  color: var(--ink);
+  background: var(--paper);
+}
+.account-portfolio h1 {
+  font: clamp(32px, 5vw, 48px) / 1.1 var(--font-display);
+}
+.account-portfolio .account-sheet {
+  border-radius: 0;
+  border: 0;
+  border-top: 3px solid var(--ink);
+  background: var(--paper);
+  box-shadow: none;
+}
+.account-portfolio .account-title {
+  font: 28px/1.2 var(--font-display);
+}
+.account-annotation {
+  font: 10px/1.6 var(--font-mono);
+  letter-spacing: 0.06em;
+}
+.account-spread {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.4fr);
+  border-bottom: 1px solid var(--rule);
+}
+.account-value {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 24px;
+  min-width: 0;
+}
+.account-value > strong {
+  display: block;
+  font: clamp(30px, 4vw, 48px) / 1.2 var(--font-display);
+  margin: 16px 0;
+  overflow-wrap: anywhere;
+}
+.account-value dl {
+  margin: 20px 0;
+}
+.account-value dl div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid color-mix(in srgb, var(--paper) 25%, transparent);
+  font-size: 12px;
+}
+.account-value dd {
+  font-family: var(--font-mono);
+}
+.account-value p,
+.account-value small {
+  font-size: 11px;
+  line-height: 1.6;
+}
+.account-exposure {
+  padding: 24px;
+  min-width: 0;
+}
+.account-exposure h3 {
+  font: 28px/1.2 var(--font-display);
+  margin: 8px 0 16px;
+}
+.account-exposure p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.account-exposure-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+.account-exposure-list li {
+  border-bottom: 1px solid var(--rule);
+  padding: 10px 0;
+}
+.account-exposure-list li > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  margin-bottom: 6px;
+  font: 11px/1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.account-exposure-list small {
+  font: 10px/1.5 var(--font-mono);
+  color: var(--sh-fg-muted);
+}
+.account-exposure-bar {
+  height: 8px;
+  align-self: center;
+  background: var(--rule);
+}
+.account-exposure-bar i {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+}
+.account-portfolio summary,
+.account-more {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 0;
+  font: 11px/1.6 var(--font-mono);
+}
+.account-portfolio details > summary {
+  border-bottom: 1px solid var(--rule);
+}
+.account-portfolio button {
+  min-height: 44px;
+  white-space: normal;
+}
+.account-portfolio :is(button, summary, input, textarea):focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.account-portfolio .account-controls {
+  padding-top: 8px;
+}
+@media (max-width: 640px) {
+  .account-spread {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .account-value,
+  .account-exposure {
+    padding: 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .account-portfolio *,
+  .account-portfolio *::before,
+  .account-portfolio *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

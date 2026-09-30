@@ -66,7 +66,7 @@ export function TargetFeasibilityCard({ feasibility, noTrade, remainingHeadroomC
                 borderColor: "transparent",
               }}
             >
-              View & Cancel Open Orders
+              Review open orders
             </a>
             <a
               href="/aperture/mission"
@@ -77,7 +77,7 @@ export function TargetFeasibilityCard({ feasibility, noTrade, remainingHeadroomC
                 color: "var(--sh-text-primary)",
               }}
             >
-              Adjust Daily Risk Limit
+              Review mission limits
             </a>
           </div>
         </div>

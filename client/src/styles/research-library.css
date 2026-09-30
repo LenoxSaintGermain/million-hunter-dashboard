@@ -1,0 +1,74 @@
+/* Local reading-desk layer. Reuses Today / PortfolioPortrait tokens. */
+.research-library {
+  --sh-text-primary: var(--ink);
+  --sh-fg-muted: var(--sh-fg-2);
+  --sh-surface: var(--paper);
+  --sh-surface-2: var(--paper);
+  --sh-border-1: var(--rule);
+  --sh-signal: var(--ink);
+  color: var(--ink);
+  background: var(--paper);
+  border-top: 3px solid var(--ink);
+  padding-top: 24px;
+  padding-bottom: 48px;
+  overflow-wrap: anywhere;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+/* Let nested flex/grid items shrink inside the integrated shell, not just the fixture. */
+.research-library :where(div, section, article, header, label, details, p, h1, h2, dl, dt, dd) { min-width: 0; }
+.research-library :is(button, input, select) { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.research-library button { white-space: normal; height: auto; }
+.research-library h1 { font: clamp(28px, 3.5vw, 40px)/1.15 var(--font-display); margin: 10px 0; }
+.research-library h2 { font: 24px/1.25 var(--font-display); margin: 12px 0; }
+.research-library p { line-height: 1.65; }
+.research-library .desk-label { font: 10px/1.6 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
+.research-library .desk-caption { font-size: 11px; line-height: 1.7; }
+.research-library .desk-controls { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 16px; padding-bottom: 18px; }
+.research-library :is(button, summary, input, select) { min-height: 44px; }
+.research-library :is(button, [data-slot="card"], [data-slot="badge"], .rounded-xl, .rounded-lg) { border-radius: 0; box-shadow: none; }
+.research-library button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.research-library .desk-search { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; font: 10px var(--font-mono); }
+.research-library :is(input, select) { background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-radius: 0; padding: 10px; font-size: 13px; max-width: 100%; }
+.research-library .desk-action { display: inline-flex; align-items: center; justify-content: center; background: var(--ink); color: var(--paper); padding: 10px 16px; font-size: 12px; border: 1px solid var(--ink); border-radius: 0; white-space: normal; height: auto; }
+.research-library .desk-link { font-size: 12px; text-decoration: underline; text-underline-offset: 4px; text-align: left; }
+.research-library button:disabled { opacity: .55; cursor: not-allowed; }
+.research-library :is(button, input, select, summary):focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.research-library .desk-thesis { border-top: 3px solid var(--ink); align-self: start; }
+.research-library .desk-state { font: 11px/1.5 var(--font-mono); border-left: 3px solid var(--amber); padding-left: 8px; }
+.research-library [data-state="needs_attention"] .desk-state,
+.research-library [data-state="paper_stage_declined"] .desk-state { border-color: var(--clay); }
+.research-library .desk-evidence { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 20px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.research-library .desk-evidence > div { padding: 12px 8px; }
+.research-library .desk-evidence > div + div { border-left: 1px solid var(--rule); }
+.research-library dt { font: 10px/1.6 var(--font-mono); }
+.research-library dd { font: 18px/1.4 var(--font-display); margin-top: 5px; }
+.research-library .desk-detail { border-top: 1px solid var(--rule); margin-top: 18px; }
+.research-library summary { cursor: pointer; padding: 12px 0; font: 11px/1.6 var(--font-mono); }
+.research-library .desk-full-text { white-space: pre-line; max-height: 20rem; overflow-y: auto; font-size: 13px; }
+.research-library .desk-premise-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
+  line-height: 1.65;
+  max-height: 3.3em;
+}
+.research-library .desk-empty { padding: 30px 20px; border: 1px solid var(--rule); margin: 20px 0; }
+.research-library .desk-journey { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px; padding: 24px 0; border-bottom: 1px solid var(--rule); }
+.research-library .desk-journey h2 button { text-align: left; }
+.research-library .desk-journey .desk-evidence { margin: 0 0 12px; }
+.research-library .desk-journey .desk-action { margin-top: 12px; }
+@media (max-width: 640px) {
+  .research-library .desk-context-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .research-library .desk-context-strip > :first-child { grid-column: 1 / -1; }
+  .research-library .desk-context-strip p { font-size: 11px; }
+  .research-library .desk-journey { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .research-library .desk-thesis > [data-slot="card-content"] { padding-inline: 16px; }
+  .research-library .desk-search, .research-library .desk-action { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .research-library *, .research-library *::before, .research-library *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

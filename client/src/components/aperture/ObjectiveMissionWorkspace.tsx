@@ -359,7 +359,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
                 className="inline-flex items-center justify-center rounded-md text-xs font-medium min-h-9 px-3 border border-amber-500/40 hover:bg-amber-500/10 transition-colors"
                 style={{ color: "var(--sh-text-primary)" }}
               >
-                View & Cancel Open Orders
+                Review open orders
               </a>
               <Button
                 type="button"
@@ -368,7 +368,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
                 className="min-h-9 text-xs"
                 onClick={() => go(2)}
               >
-                Adjust Daily Risk Limit
+                Review mission limits
               </Button>
             </div>
           </div>

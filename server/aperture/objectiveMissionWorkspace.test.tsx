@@ -559,15 +559,15 @@ describe("risk limit exhausted contextual resolver", () => {
 
     const ordersLink = card.find("a[href='/aperture/plays']");
     expect(ordersLink).toHaveLength(1);
-    expect(ordersLink.text()).toContain("View & Cancel Open Orders");
+    expect(ordersLink.text()).toContain("Review open orders");
 
     expect(view.button("Analyze my plan").props.disabled).toBe(true);
     expect($.text()).toContain("Cannot analyze: Risk limit reached ($0.00 headroom remaining).");
   });
 
-  it("navigates to Section 2 (Account & risk) when clicking Adjust Daily Risk Limit", () => {
+  it("navigates to Section 2 (Account & risk) when clicking Review mission limits", () => {
     const view = harness(completeValues(), { saveState: "saved", riskPreview: zeroHeadroomPreview });
-    view.click("Adjust Daily Risk Limit");
+    view.click("Review mission limits");
     expect(view.props.values.activeSection).toBe(2);
   });
 });

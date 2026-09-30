@@ -25,7 +25,7 @@ export default function ApertureMission() {
   const seedCapitalCents = Number.isFinite(seedCapital) && seedCapital > 0 ? Math.round(seedCapital * 100) : null;
   const invalidReceipt = isReceiptRoute && !receiptTarget;
 
-  return <DashboardLayout>
+  return <DashboardLayout><div className="mission-workspace-edition">
     <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <Button variant="ghost" className="min-h-11 px-0" onClick={() => navigate("/aperture")}><ArrowLeft className="mr-2 h-4 w-4" />Today</Button>
@@ -52,5 +52,5 @@ export default function ApertureMission() {
       onNewResearch={() => navigate("/aperture?setup=1&draft=1")}
       onOpenResearchRun={(runId) => navigate(`/aperture/run/${runId}`)}
     />}
-  </DashboardLayout>;
+  </div></DashboardLayout>;
 }

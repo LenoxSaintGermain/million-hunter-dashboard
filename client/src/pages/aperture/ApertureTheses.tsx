@@ -1,12 +1,13 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft, ArrowUpRight, CheckCircle2, FileText, Layers, Loader2, Shield, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
+import "@/styles/research-library.css";
 
 function formatUpdated(value: number | null | undefined) {
   return value ? new Date(value).toLocaleString() : "Not measured";
@@ -15,12 +16,21 @@ function formatUpdated(value: number | null | undefined) {
 const money = (cents: number | null | undefined) =>
   cents == null ? "Not set" : `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+/** An excerpt of the saved text, never a generated summary. */
+export function thesisPremisePreview(value: string | null | undefined) {
+  const text = value?.trim() || "No thesis text recorded.";
+  if (text.length <= 140) return text;
+  const prefix = text.slice(0, 140);
+  const boundary = prefix.lastIndexOf(" ");
+  return `${prefix.slice(0, boundary > 100 ? boundary : 140).trimEnd()}…`;
+}
+
 export default function ApertureTheses() {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const [filter, setFilter] = useState<"all" | "active" | "review" | "archived">("all");
   const { data: theses, isLoading, error, refetch } = trpc.aperture.thesis.list.useQuery();
-  const { data: activeContext } = trpc.thesis.activeCapital.useQuery();
+  const { data: activeContext, isLoading: contextLoading, error: contextError } = trpc.thesis.activeCapital.useQuery();
   const activate = trpc.aperture.thesis.activate.useMutation({
     onSuccess: async (data) => {
       await Promise.all([
@@ -32,35 +42,22 @@ export default function ApertureTheses() {
     onError: (error) => toast.error(error.message),
   });
 
-  const [stagingThesisId, setStagingThesisId] = useState<number | null>(null);
-  const compileAndStage = (trpc as any).aperture?.pipeline?.compileAndStageBestFit?.useMutation
-    ? trpc.aperture.pipeline.compileAndStageBestFit.useMutation({
-        onSuccess: (result) => {
-          setStagingThesisId(null);
-          toast.success(`Pipeline complete: Staged ${result.symbol} paper order #${result.orderId} for desk authorization!`);
-          navigate(`/aperture/plays?stage=approve&inspect=${result.orderId}`);
-        },
-        onError: (error) => {
-          setStagingThesisId(null);
-          toast.error(error.message);
-        },
-      })
-    : { mutate: () => {}, isPending: false };
-
+  const [query, setQuery] = useState("");
   const activeCompilationId = activeContext?.thesis?.id;
 
   const filteredTheses = useMemo(() => {
     if (!theses) return [];
-    if (filter === "all") return theses;
-    if (filter === "active") return theses.filter((t) => (activeCompilationId != null && t.sourceCompilationId === activeCompilationId) || t.isPrimary || t.status === "active");
-    if (filter === "review") return theses.filter((t) => t.status === "review" || t.status === "compiling");
-    if (filter === "archived") return theses.filter((t) => t.status === "archived");
-    return theses;
-  }, [theses, filter, activeCompilationId]);
+    const matching = theses.filter(t => `${t.name ?? ""} ${t.rawText ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()));
+    if (filter === "all") return matching;
+    if (filter === "active") return matching.filter((t) => (activeCompilationId != null && t.sourceCompilationId === activeCompilationId) || t.isPrimary || t.status === "active");
+    if (filter === "review") return matching.filter((t) => t.status === "review" || t.status === "compiling");
+    if (filter === "archived") return matching.filter((t) => t.status === "archived");
+    return matching;
+  }, [theses, filter, activeCompilationId, query]);
 
   return (
     <DashboardLayout>
-      <div className="mx-auto max-w-5xl space-y-6">
+      <div className="research-library mx-auto max-w-5xl space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3">
             <Button variant="ghost" size="icon" aria-label="Back to Capital decision center" onClick={() => navigate("/aperture")}>
@@ -68,11 +65,11 @@ export default function ApertureTheses() {
             </Button>
             <div>
               <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>
-                Capital Operator · multi-thesis lifecycle
+                Capital Aperture / Thesis library
               </p>
-              <h1 className="mt-1 font-serif text-3xl" style={{ color: "var(--sh-text-primary)" }}>Saved theses</h1>
+              <h1 className="mt-1 font-serif text-3xl" style={{ color: "var(--sh-text-primary)" }}>What’s your conviction?</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
-                Manage and switch active investment theses framing today’s paper research. Toggle between active focus, drafts, and archived books with budgeted risk guardrails.
+                Revisit the argument. Choose the context for your next paper decision.
               </p>
             </div>
           </div>
@@ -81,14 +78,14 @@ export default function ApertureTheses() {
           </Button>
         </div>
 
-        <div className="grid gap-px overflow-hidden rounded-xl border sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
+        <div className="desk-context-strip grid gap-px overflow-hidden rounded-xl border sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
           <div className="p-3" style={{ background: "var(--sh-surface-2)" }}>
             <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Active focus thesis</p>
-            <p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{activeContext?.thesis?.name ?? "No active Capital thesis"}</p>
+            <p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{contextLoading ? "Reading active context…" : contextError ? "Active context unavailable" : activeContext?.thesis?.name ?? "No active Capital thesis"}</p>
           </div>
           <div className="p-3" style={{ background: "var(--sh-surface-2)" }}>
             <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Lifecycle tracking</p>
-            <p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{theses?.length ?? 0} saved thesis books</p>
+            <p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{isLoading || error ? "Not available" : `${theses?.length ?? 0} saved thesis books`}</p>
           </div>
           <div className="p-3" style={{ background: "var(--sh-surface-2)" }}>
             <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Execution boundary</p>
@@ -96,7 +93,9 @@ export default function ApertureTheses() {
           </div>
         </div>
 
-        {/* Multi-thesis lifecycle switcher tabs */}
+        <p className="desk-caption">Selecting a thesis does not start research or create an order.</p>
+        <label className="desk-search">Find a thesis<input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Name or thesis text" /></label>
+        {/* Local filters never trigger research. */}
         <div className="flex flex-wrap items-center gap-2 border-b pb-3" style={{ borderColor: "var(--sh-border-1)" }}>
           <span className="text-xs font-medium mr-1" style={{ color: "var(--sh-fg-muted)" }}>Thesis Lifecycle:</span>
           <Button
@@ -104,36 +103,40 @@ export default function ApertureTheses() {
             size="sm"
             variant={filter === "all" ? "default" : "outline"}
             className="h-7 px-3 text-xs"
+            aria-pressed={filter === "all"}
             onClick={() => setFilter("all")}
           >
-            All ({theses?.length ?? 0})
+            All
           </Button>
           <Button
             type="button"
             size="sm"
             variant={filter === "active" ? "default" : "outline"}
             className="h-7 px-3 text-xs"
+            aria-pressed={filter === "active"}
             onClick={() => setFilter("active")}
           >
-            Active Focus ({theses?.filter(t => (activeCompilationId != null && t.sourceCompilationId === activeCompilationId) || t.isPrimary || t.status === "active").length ?? 0})
+            Active Focus
           </Button>
           <Button
             type="button"
             size="sm"
             variant={filter === "review" ? "default" : "outline"}
             className="h-7 px-3 text-xs"
+            aria-pressed={filter === "review"}
             onClick={() => setFilter("review")}
           >
-            Under Review ({theses?.filter(t => t.status === "review" || t.status === "compiling").length ?? 0})
+            Under Review
           </Button>
           <Button
             type="button"
             size="sm"
             variant={filter === "archived" ? "default" : "outline"}
             className="h-7 px-3 text-xs"
+            aria-pressed={filter === "archived"}
             onClick={() => setFilter("archived")}
           >
-            Archived ({theses?.filter(t => t.status === "archived").length ?? 0})
+            Archived
           </Button>
         </div>
 
@@ -171,13 +174,14 @@ export default function ApertureTheses() {
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
+            {!filteredTheses.length && <section className="desk-empty"><h2>No theses match this view.</h2><button className="desk-link" onClick={() => { setFilter("all"); setQuery(""); }}>Clear library filters</button></section>}
             {filteredTheses.map((thesis) => {
               const isActive = (activeCompilationId != null && thesis.sourceCompilationId === activeCompilationId) || thesis.isPrimary;
               const recovered = thesis.confidenceNotes?.some((note: string) => note.startsWith("Recovered verbatim"));
               return (
                 <Card
                   key={thesis.id}
-                  className="border"
+                  className="desk-thesis border"
                   style={{
                     borderColor: isActive ? "var(--sh-signal)" : "var(--sh-border-1)",
                     background: "var(--sh-surface-2)",
@@ -204,49 +208,22 @@ export default function ApertureTheses() {
                       </div>
                     </div>
 
-                    <p className="line-clamp-3 whitespace-pre-line text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
-                      {thesis.rawText}
+                    <p className="desk-premise-preview text-sm" style={{ color: "var(--sh-fg-muted)" }}>
+                      {thesisPremisePreview(thesis.rawText)}
                     </p>
+                    <details className="desk-detail desk-premise-disclosure">
+                      <summary>Full premise</summary>
+                      <p className="desk-full-text">{thesis.rawText || "No thesis text recorded."}</p>
+                    </details>
 
-                    {/* Budgeted vs. Deployed Risk Meter */}
-                    <div className="rounded-lg border p-3 text-xs space-y-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-[0.68rem] uppercase tracking-wider flex items-center gap-1" style={{ color: "var(--sh-signal)" }}>
-                          <Shield className="h-3 w-3" />
-                          Risk Budget & Capacity
-                        </span>
-                        <span className="font-mono tabular-nums text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>
-                          {thesis.missionDefaults?.maxPlannedLossCents ? money(thesis.missionDefaults.maxPlannedLossCents) : "Standard Mandate"} / play
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>
-                        <div>
-                          <span>Horizon: </span>
-                          <strong style={{ color: "var(--sh-text-primary)" }}>
-                            {thesis.missionDefaults?.holdingPeriod ? thesis.missionDefaults.holdingPeriod.replace(/_/g, " ") : "Multi-week"}
-                          </strong>
-                        </div>
-                        <div>
-                          <span>Instrument: </span>
-                          <strong style={{ color: "var(--sh-text-primary)" }}>
-                            {thesis.missionDefaults?.instrumentPreference ? thesis.missionDefaults.instrumentPreference.replace(/_/g, " ") : "Multi-asset"}
-                          </strong>
-                        </div>
-                      </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--sh-surface-2)" }}>
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: isActive ? "65%" : "20%",
-                            background: isActive ? "var(--sh-signal)" : "var(--sh-fg-muted)",
-                          }}
-                        />
-                      </div>
-                      <p className="text-[10px]" style={{ color: "var(--sh-fg-muted)" }}>
-                        {isActive ? "Active research focus · risk meters synchronized to today's play desk" : "Standby thesis · risk headroom available"}
-                      </p>
-                    </div>
-
+                    <dl className="desk-evidence">
+                      <div><dt>Planned loss / play</dt><dd>{money(thesis.missionDefaults?.maxPlannedLossCents)}</dd></div>
+                      <div><dt>Holding period</dt><dd>{thesis.missionDefaults?.holdingPeriod?.replace(/_/g, " ") ?? "Not set"}</dd></div>
+                    </dl>
+                    <Button className="desk-action" onClick={() => navigate(`/aperture/thesis/${thesis.id}`)}>Review context →</Button>
+                    <details className="desk-detail"><summary>Mandate, source &amp; focus</summary>
+                      <p>Instrument: {thesis.missionDefaults?.instrumentPreference?.replace(/_/g, " ") ?? "Not set"}</p>
+                      <p className="desk-caption">Canonical compilation: {thesis.sourceCompilationId ?? "Not linked"}. Saved mandate values are not measured exposure or available risk capacity.</p>
                     {thesis.readDiagnostics.confidenceNotes.status === "unknown" ? (
                       <p className="rounded-lg border px-3 py-2 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
                         Legacy compiler notes were withheld rather than inferred. Diagnostic: {thesis.readDiagnostics.confidenceNotes.code}
@@ -259,32 +236,19 @@ export default function ApertureTheses() {
                     )}
 
                     <div className="flex flex-wrap gap-2 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}>
-                      <Button variant="outline" size="sm" onClick={() => navigate(`/aperture/thesis/${thesis.id}`)}>
-                        <FileText className="mr-1.5 h-3.5 w-3.5" />Review context
-                      </Button>
                       {!isActive && (
                         <Button
                           size="sm"
-                          disabled={activate.isPending}
+                          disabled={activate.isPending || contextLoading || !!contextError}
                           onClick={() => activate.mutate({ id: thesis.id })}
                         >
                           {activate.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
                           Use for today
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        disabled={stagingThesisId === thesis.id}
-                        className="font-semibold text-white bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/40 shadow-sm"
-                        onClick={() => {
-                          setStagingThesisId(thesis.id);
-                          compileAndStage.mutate({ thesisId: thesis.id });
-                        }}
-                      >
-                        {stagingThesisId === thesis.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-                        ⚡ Compile &amp; Stage Best Fit
-                      </Button>
                     </div>
+                    <p className="desk-caption">Switching the shared context for Today, Mission and Research is not an order approval.</p>
+                    </details>
                   </CardContent>
                 </Card>
               );

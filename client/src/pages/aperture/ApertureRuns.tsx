@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ArrowRight, Clock3, X } from "lucide-react";
+import "@/styles/research-library.css";
 import DashboardLayout from "@/components/DashboardLayout";
 import { buildResearchJourneys, type ResearchJourney } from "@shared/runWorkspace";
 import { formatDistanceToNow } from "date-fns";
@@ -21,7 +22,7 @@ import { ResearchJourneyDrawer, type JourneyAction } from "@/components/aperture
  */
 
 const toneFor = (state: ResearchJourney["state"]) => state === "ready_to_review"
-  ? "oklch(0.52 0.15 145)"
+  ? "var(--ink)"
   : state === "needs_attention" || state === "paper_stage_declined" ? "var(--sh-red)" : "var(--sh-signal)";
 
 const labelFor = (state: ResearchJourney["state"]) => ({
@@ -83,8 +84,15 @@ export default function ApertureRuns() {
   const search = useSearch();
   const inspectId = readResearchInspect(search);
   const filter = new URLSearchParams(search).get("filter");
-  const { data: runs, isLoading, refetch } = trpc.aperture.run.list.useQuery();
+  const { data: runs, isLoading, error, refetch } = trpc.aperture.run.list.useQuery();
   const { data: pendingOutcomes } = trpc.aperture.runway.pending.useQuery();
+  const [state, setState] = useState("all");
+  const [query, setQuery] = useState("");
+  const clearScreen = () => {
+    const params = new URLSearchParams(search);
+    params.delete("filter");
+    navigate(`/aperture/runs${params.size ? `?${params}` : ""}`);
+  };
   const journeys = buildResearchJourneys((runs ?? []) as any[]);
   const inspected = journeys.find((journey) => journey.rootId === inspectId) ?? null;
 
@@ -108,11 +116,13 @@ export default function ApertureRuns() {
     });
   }, [journeys, filter]);
 
-  return <DashboardLayout><div className="mx-auto max-w-6xl space-y-5 pb-12">
+  const visibleJourneys = filteredJourneys.filter(j => (state === "all" || state === j.state) && j.thesisName.toLowerCase().includes(query.trim().toLowerCase()));
+
+  return <DashboardLayout><div className="research-library mx-auto max-w-6xl space-y-5 pb-12">
     <div className="flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}><AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} />Internal research tool — not investment advice. Research journeys never create or submit an order.</div>
 
     <header data-research-header className="flex flex-wrap items-center justify-between gap-3">
-      <h1 className="font-serif text-2xl sm:text-3xl" style={{ color: "var(--sh-text-primary)" }}>Research</h1>
+      <div><p className="desk-label">Capital Aperture / Research desk</p><h1>What needs a closer look?</h1><p>Follow the evidence. Keep the decision yours.</p></div>
       <Button className="min-h-11" onClick={() => navigate("/aperture?setup=1&draft=1")}>Start a research brief<ArrowRight className="ml-2 h-4 w-4" /></Button>
     </header>
 
@@ -123,7 +133,7 @@ export default function ApertureRuns() {
           <span className="font-medium" style={{ color: "var(--sh-text-primary)" }}>{filterLabels[filter] ?? filter}</span>
           <span style={{ color: "var(--sh-fg-muted)" }}>({filteredJourneys.length} matching journey{filteredJourneys.length === 1 ? "" : "s"})</span>
         </div>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => navigate("/aperture/runs")}>
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={clearScreen}>
           <X className="mr-1 h-3.5 w-3.5" /> Clear filter
         </Button>
       </div>
@@ -139,44 +149,42 @@ export default function ApertureRuns() {
         <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>
           There are {journeys.length} total research journeys in your workspace.
         </p>
-        <Button variant="outline" size="sm" onClick={() => navigate("/aperture/runs")}>
+        <Button variant="outline" size="sm" onClick={clearScreen}>
           Show all research journeys
         </Button>
       </div>
     )}
 
-    {!isLoading && filteredJourneys.length > 0 && <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-      <table className="w-full min-w-[40rem] border-collapse text-sm">
-        <thead><tr className="border-b text-left text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
-          <th scope="col" className="px-3 py-2">Question</th>
-          <th scope="col" className="px-3 py-2">State</th>
-          <th scope="col" className="px-3 py-2 text-right">Coverage</th>
-          <th scope="col" className="px-3 py-2 text-right">Next</th>
-        </tr></thead>
-        <tbody>
-          {filteredJourneys.map((journey) => {
-            const action = actionFor(journey);
-            return <tr key={journey.rootId} data-journey-row className="border-b last:border-b-0" style={{ borderColor: "var(--sh-border-1)" }}>
-              <th scope="row" className="px-3 py-2.5 text-left font-semibold" style={{ color: "var(--sh-text-primary)" }}><button
-                type="button"
-                data-inspect-journey={journey.rootId}
-                aria-haspopup="dialog"
-                aria-expanded={inspectId === journey.rootId}
-                className="min-h-11 text-left font-semibold underline decoration-dotted underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={() => navigate(researchHref(search, journey.rootId))}
-              >{journey.thesisName}<span className="sr-only"> — inspect coverage, chapters and next step</span></button>
-                <span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>Updated {formatDistanceToNow(Number(journey.latest.createdAt))} ago · {journey.runs.length} chapter{journey.runs.length === 1 ? "" : "s"}</span>
-              </th>
-              <td className="px-3 py-2.5"><span className="whitespace-nowrap text-xs font-semibold" style={{ color: toneFor(journey.state) }}>{labelFor(journey.state)}</span></td>
-              <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: "var(--sh-text-primary)" }}>{journey.symbolsReviewed} symbols<span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{journey.evidenceCandidates} candidates{journey.remainingDeferred ? ` · ${journey.remainingDeferred} deferred` : ""}</span></td>
-              <td className="px-3 py-2.5 text-right"><Button size="sm" variant="outline" className="min-h-11 whitespace-nowrap" onClick={() => navigate(action.route)}>{action.label}</Button></td>
-            </tr>;
-          })}
-        </tbody>
-      </table>
-    </div>}
+    <div className="desk-controls">
+      <label className="desk-search">Find a research question<input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search thesis name" /></label>
+      <label className="desk-search">Research state<select value={state} onChange={e => setState(e.target.value)}>
+        <option value="all">All states</option>
+        {(["in_progress", "needs_attention", "paper_stage_declined", "ready_to_review", "more_research_available"] as const).map(value => <option key={value} value={value}>{labelFor(value)}</option>)}
+      </select></label>
+    </div>
+    {error && <section className="desk-empty" role="alert"><h2>Research could not be refreshed.</h2><p>{runs ? "Previously loaded journeys remain below; their state may be out of date." : "No research state has been substituted."}</p><Button variant="outline" onClick={() => refetch()}>Retry research read</Button></section>}
+    {!isLoading && filteredJourneys.length > 0 && !visibleJourneys.length && <section className="desk-empty"><h2>No questions match this view.</h2><button className="desk-link" onClick={() => { setState("all"); setQuery(""); }}>Clear search and state</button></section>}
+    {!isLoading && visibleJourneys.length > 0 && <section aria-label="Research journeys">
+      <p className="desk-label" role="status">{visibleJourneys.length} matching journey{visibleJourneys.length === 1 ? "" : "s"} · Recorded evidence, not approval</p>
+      <p className="desk-caption">Counts span recorded chapters, not unique holdings. Select a question to inspect its evidence trail.</p>
+      {visibleJourneys.map(journey => {
+        const action = actionFor(journey);
+        return <article key={journey.rootId} data-journey-row data-state={journey.state} className="desk-journey">
+          <div>
+            <span className="desk-state">{labelFor(journey.state)}</span>
+            <h2><button type="button" data-inspect-journey={journey.rootId} aria-haspopup="dialog" aria-expanded={inspectId === journey.rootId} onClick={() => navigate(researchHref(search, journey.rootId))}>{journey.thesisName}<span className="sr-only"> — inspect evidence</span></button></h2>
+            <p className="desk-caption">Updated {formatDistanceToNow(Number(journey.latest.createdAt))} ago · {journey.runs.length} chapter{journey.runs.length === 1 ? "" : "s"}</p>
+          </div>
+          <div>
+            <dl className="desk-evidence"><div><dt>Symbols reviewed</dt><dd>{journey.symbolsReviewed}</dd></div><div><dt>Evidence candidates</dt><dd>{journey.evidenceCandidates}</dd></div></dl>
+            <p className="desk-caption">{journey.remainingDeferred} deferred</p>
+            <Button variant="outline" className="desk-action" onClick={() => navigate(action.route)}>{action.label} →</Button>
+          </div>
+        </article>;
+      })}
+    </section>}
 
-    {!isLoading && !journeys.length && <div className="rounded-xl border py-12 text-center" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+    {!isLoading && !error && !journeys.length && <div className="rounded-xl border py-12 text-center" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
       <Clock3 className="mx-auto h-6 w-6" style={{ color: "var(--sh-signal)" }} />
       <p className="mt-3 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>No research journeys yet</p>
       <p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Build a paper research brief to start one connected trail.</p>

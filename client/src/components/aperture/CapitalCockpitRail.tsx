@@ -54,7 +54,7 @@ function ConnectedPortfolioPortrait({ accountId, ...props }: Omit<React.Componen
   return <PortfolioPortrait {...props} holdings={positions.data} loading={positions.isFetching} failed={positions.isError} />;
 }
 
-export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = false }: { runId?: number; compactOnly?: boolean; visualHero?: boolean }) {
+export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = false, editorialContext = false }: { runId?: number; compactOnly?: boolean; visualHero?: boolean; editorialContext?: boolean }) {
   const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false });
   const accounts = accountQuery.data;
   const preferredAccountId = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")?.id
@@ -372,6 +372,14 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
     {summary.duplicatedUnclassifiedCluster && <p className="border-t px-4 py-2 text-[11px]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>The largest correlated cluster equals the largest name because no sector fact is recorded; it is shown once above rather than double-counted.</p>}
     {data.run && <div className="border-t px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><RailHead>Run preset · #{data.run.runId}</RailHead>{data.run.unavailableReason ? <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.run.unavailableReason}</p> : <div className="mt-1 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4" style={{ color: "var(--sh-fg-muted)" }}><p>{data.run.holdingPeriodLabel || "holding period not measured"}</p><p>{deadlineMs == null ? "catalyst deadline not measured" : deadlineMs < 0 ? `catalyst window expired ${duration(-deadlineMs)} ago` : `catalyst deadline in ${duration(deadlineMs)}`}</p><p className="tabular-nums">Liquidity floor {data.run.liquidityFloorAdvUsd == null ? "not measured" : `$${Math.round(data.run.liquidityFloorAdvUsd).toLocaleString()}`}</p><p className="tabular-nums">Single-name cap {data.run.maxSingleNamePct == null ? "not measured" : `${data.run.maxSingleNamePct.toFixed(1)}%`}</p><p className="sm:col-span-2 lg:col-span-4">Invalidation: {data.run.invalidationRule || "not measured"}</p>{data.run.providerGaps === null ? <p className="sm:col-span-2 lg:col-span-4">Provider availability was not recorded for this run.</p> : data.run.providerGaps.length ? <p className="sm:col-span-2 lg:col-span-4">Provider gaps: {data.run.providerGaps.join(", ")}</p> : <p className="sm:col-span-2 lg:col-span-4">Every provider recorded for this run was live.</p>}</div>}</div>}
     </div>}
+  </section>;
+  if (editorialContext) return <section className="capital-context" aria-label="Account context">
+    <div className="capital-context-strip">
+      <div><span className="capital-context-label">{practiceAccountLabel(data.account.isPaper)}</span><strong>{money(equityCents) ?? "Value unavailable"}</strong><small>{staleText} · saved snapshot</small></div>
+      <div><span className="capital-context-label">Research lens</span><p>{data.activeThesis?.name ?? "No active thesis"}</p></div>
+      <div className="capital-context-limit" style={{ borderColor: severityColor }}><span className="capital-context-label">Recorded constraint</span><p>{summary.binding ? bindingSubject : "Not established"}</p><small>{summary.accountStale ? "Refresh before judging capacity" : "Saved limits · not trade clearance"}</small></div>
+    </div>
+    <details className="capital-context-controls"><summary>Account controls & evidence <span aria-hidden="true">↗</span></summary>{rail}</details>
   </section>;
   return visualHero ? <><ConnectedPortfolioPortrait key={data.account.accountId ?? "unknown"} accountId={data.account.accountId} account={data.account} thesis={data.activeThesis?.name ?? null} binding={summary.binding} now={clockNow}/><details className="portrait-machinery"><summary>Account controls, market clock & all constraints</summary>{rail}</details></> : rail;
 }

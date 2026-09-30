@@ -12,12 +12,13 @@ export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate
     || result.feasibility.riskBudgetCents === 0
     || (result.portfolioRisk.remainingHeadroomCents != null && result.portfolioRisk.remainingHeadroomCents <= 0);
   return <div className="space-y-4">
-    {result.noTrade ? <section aria-label="No new trade" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
+    {result.noTrade ? <section aria-label="No new trade" className="mission-no-trade border-y py-6" style={{ borderColor: "var(--sh-signal)" }}>
       <div className="flex items-start gap-3">
         <CircleSlash2 aria-hidden="true" className="mt-1 h-5 w-5 shrink-0" style={{ color: "var(--sh-signal)" }} />
         <div className="min-w-0 flex-1">
           <h3 className="font-serif text-2xl">No new trade</h3>
-          <p className="mt-2 text-sm leading-6">{result.noTrade.explanation}</p>
+          <p className="mt-2 text-sm leading-6">{isHeadroomExhausted ? "The saved analysis has no room for additional planned loss." : "The saved analysis did not establish an eligible play."}</p>
+          <details className="mt-3 border-y" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer py-3 text-sm">Read the reason</summary><p className="pb-4 text-sm leading-6">{result.noTrade.explanation}</p></details>
           {result.noTrade.reopenCondition && <p className="mt-3 text-sm leading-6"><strong>Reassess when:</strong> {result.noTrade.reopenCondition}</p>}
           {result.noTrade.reviewAt != null && <p className="mt-2 text-sm">Review: {new Date(result.noTrade.reviewAt).toLocaleString()} · on demand</p>}
           <p className="mt-3 text-sm" style={{ color: "var(--sh-fg-muted)" }}>No order created. Existing positions are unchanged.</p>
@@ -33,7 +34,7 @@ export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate
                     borderColor: "transparent",
                   }}
                 >
-                  View & Cancel Open Orders
+                  Review open orders
                 </a>
                 <a
                   href="/aperture/mission"
@@ -45,9 +46,10 @@ export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate
                   }}
                   onClick={onAdjustRisk ? (e) => { e.preventDefault(); onAdjustRisk(); } : undefined}
                 >
-                  Adjust Daily Risk Limit
+                  Review mission limits
                 </a>
               </div>
+              <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Review first. Neither action cancels an order or changes a limit by itself.</p>
             </div>
           )}
         </div>

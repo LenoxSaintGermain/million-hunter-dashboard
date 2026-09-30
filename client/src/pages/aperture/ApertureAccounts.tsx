@@ -21,6 +21,8 @@ import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { AccountContextPanel } from "@/components/aperture/AccountContextPanel";
 import { parsePortfolioCsv } from "@shared/portfolioCsv";
+import { AccountHoldingsPortrait, accountMoney, accountStamp } from "@/components/aperture/AccountHoldingsPortrait";
+import "@/styles/account-portfolio-editorial.css";
 
 const DISCLAIMER = "Internal research tool — not investment advice. Practice trading only — no real capital.";
 
@@ -73,16 +75,18 @@ export default function ApertureAccounts() {
   });
 
   const importCsv = trpc.aperture.account.importCsv.useMutation({
-    onSuccess: ({ imported }) => {
+    onSuccess: async ({ imported }, variables) => {
       toast.success(`${imported} position(s) imported`);
       setCsvText(""); setCsvAccountId(null);
-      refetch();
+      await invalidateAccountRefreshReads(utils.aperture, variables.accountId);
     },
     onError: (e) => toast.error(e.message),
   });
 
   const handleCreate = () => {
     if (!label.trim()) return toast.error("Enter an account label");
+    if (startingCash.trim() && (!Number.isFinite(Number(startingCash)) || Number(startingCash) < 0)) return toast.error("Enter a valid non-negative paper cash amount");
+    if (!window.confirm(`Create paper account “${label.trim()}” with ${brokerId}? No order will be placed.`)) return;
     createAccount.mutate({
       label: label.trim(),
       brokerId,
@@ -101,12 +105,15 @@ export default function ApertureAccounts() {
     if (!csvText.trim()) return toast.error("Paste CSV data first");
     if (csvErrors.length) return toast.error(csvErrors[0]?.error ?? "Fix the invalid CSV rows before importing.");
     if (!csvRows.length) return toast.error("No valid holdings found.");
+    const target = accounts?.find(account => account.id === accountId);
+    if (!target || csvAccountId !== accountId) return;
+    if (!window.confirm(`${mode === "replace" ? "Replace all existing holdings" : "Merge holdings"} in “${target.label}” (account #${accountId}) with ${csvRows.length} CSV rows? ${mode === "replace" ? "Existing holdings will be removed first. " : "Other tickers will be preserved. "}No broker order will be placed.`)) return;
     importCsv.mutate({ accountId, mode, rows: csvRows });
   };
 
   return (
     <DashboardLayout>
-      <div className="mx-auto max-w-5xl space-y-5 px-4 py-5 sm:px-6 sm:py-7">
+      <div className="account-portfolio mx-auto max-w-5xl space-y-5 px-4 py-5 sm:px-6 sm:py-7">
         {/* Disclaimer */}
         <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium"
           style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", border: "1px solid var(--sh-border-1)" }}>
@@ -122,7 +129,7 @@ export default function ApertureAccounts() {
           <div>
             <h1 className="text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>Portfolio</h1>
             <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>
-              Balances, holdings, and account updates.
+              A saved portrait of each account. Balances stay separate.
             </p>
           </div>
           <Button className="ml-auto min-h-11" size="sm" onClick={() => setShowCreate(!showCreate)}>
@@ -195,11 +202,12 @@ export default function ApertureAccounts() {
         )}
 
         {accounts?.map((account) => (
-          <Card key={account.id}>
+          <Card key={account.id} className="account-sheet">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <CardTitle className="text-base flex flex-wrap items-center gap-2 break-words">
+                  <p className="account-annotation">Account #{account.id} / isolated snapshot</p>
+                  <CardTitle className="account-title flex flex-wrap items-center gap-2 break-words">
                     {account.label}
                     <Badge variant="outline" className="text-xs">
                       {brokers?.find((broker) => broker.id === account.brokerId)?.label ?? (account.brokerId === "alpaca_paper" ? "Alpaca Paper" : account.brokerId === "manual" ? "Manual import" : "Robinhood context")}
@@ -208,19 +216,16 @@ export default function ApertureAccounts() {
                       <Badge className="text-xs" style={{ background: "oklch(0.45 0.15 145)", color: "#fff" }}>paper</Badge>
                     )}
                   </CardTitle>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>
-                    Cash: {fmt(account.cashCents)} · Buying power: {fmt(account.buyingPowerCents)} · Equity: {fmt(account.equityValueCents)}
-                  </p>
                   <p className="text-xs mt-1 break-words" style={{ color: "var(--sh-fg-muted)" }}>
                     {account.externalAccountId ? `Paper account · ${account.externalAccountId}` : account.brokerId === "manual" ? "Research only · cannot send orders" : "Paper account not linked yet"}
-                    {account.lastSyncedAt ? ` · refreshed ${new Date(account.lastSyncedAt).toLocaleString()}` : " · never refreshed"}
+                    {` · ${accountStamp(account.lastSyncedAt)}`}
                   </p>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   className="min-h-11 shrink-0"
-                  onClick={() => syncAccount.mutate({ id: account.id })}
+                  onClick={() => { if (window.confirm(`Refresh saved balances and holdings for “${account.label}” (account #${account.id}) from the broker? No orders or research will be started.`)) syncAccount.mutate({ id: account.id }); }}
                   disabled={syncAccount.isPending || account.brokerId === "manual"}
                 >
                   <RefreshCw className="h-3.5 w-3.5 mr-1" />
@@ -234,6 +239,21 @@ export default function ApertureAccounts() {
               )}
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="account-spread">
+                <div className="account-value">
+                  <span className="account-annotation">Recorded account equity</span>
+                  <strong>{accountMoney(account.equityValueCents)}</strong>
+                  <p>{accountStamp(account.lastSyncedAt)}</p>
+                  <p>Source: {account.syncSource || (account.brokerId === "manual" ? "Manual record" : "Not recorded")}</p>
+                  {account.syncError && <p role="alert">Last sync failed: {account.syncError}. These are saved values.</p>}
+                  <dl><div><dt>Cash</dt><dd>{accountMoney(account.cashCents)}</dd></div><div><dt>Broker buying power</dt><dd>{accountMoney(account.buyingPowerCents)}</dd></div></dl>
+                  <small>Buying power may include leverage. It is not cash or permission to deploy.</small>
+                </div>
+                <AccountHoldingsPortrait accountId={account.id} />
+              </div>
+              <details className="account-controls">
+                <summary>Account controls · connection, CSV and freshness schedule</summary>
+                <div className="space-y-3 py-3">
               {/* Broker availability */}
               {account.brokerId === "manual" ? (
                 <div className="flex items-center gap-2 text-xs">
@@ -244,7 +264,7 @@ export default function ApertureAccounts() {
                 <div className="flex items-center gap-2 text-xs">
                   {brokers.find((b) => b.id === account.brokerId)!.available ? (
                     <><CheckCircle2 className="h-3.5 w-3.5" style={{ color: "oklch(0.55 0.15 145)" }} />
-                    <span style={{ color: "oklch(0.55 0.15 145)" }}>Connected · refreshing balances does not place or change orders.</span></>
+                    <span style={{ color: "var(--sh-fg-muted)" }}>Broker available · account linkage and snapshot freshness are separate checks.</span></>
                   ) : (
                     <><XCircle className="h-3.5 w-3.5" style={{ color: "var(--sh-fg-muted)" }} />
                     <span style={{ color: "var(--sh-fg-muted)" }}>
@@ -276,7 +296,7 @@ export default function ApertureAccounts() {
                       variant={account.syncScheduleEnabled ? "outline" : "default"}
                       size="sm"
                       className="min-h-11 shrink-0"
-                      onClick={() => configureSyncSchedule.mutate({ id: account.id, enabled: !account.syncScheduleEnabled })}
+                      onClick={() => { if (window.confirm(`${account.syncScheduleEnabled ? "Pause" : "Enable"} automatic balance updates for “${account.label}” (account #${account.id})? This affects balances only, never research or orders.`)) configureSyncSchedule.mutate({ id: account.id, enabled: !account.syncScheduleEnabled }); }}
                       disabled={configureSyncSchedule.isPending || !brokers?.find((b) => b.id === account.brokerId)?.available}
                     >
                       {account.syncScheduleEnabled ? "Pause updates" : "Enable updates"}
@@ -296,6 +316,7 @@ export default function ApertureAccounts() {
                 {csvAccountId === account.id ? (
                   <div className="space-y-2">
                     <textarea
+                      aria-label={`CSV holdings for ${account.label}, account ${account.id}`}
                       className="w-full h-24 text-xs p-2 rounded border font-mono resize-none"
                       style={{ background: "var(--sh-surface-2)", borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}
                       placeholder={"symbol,qty,avg_cost,market_value\nNVDA,50,450.00,22500\nMSFT,30,380.00,11400"}
@@ -320,13 +341,19 @@ export default function ApertureAccounts() {
                     </div>
                   </div>
                 ) : (
-                  <Button variant="outline" size="sm" onClick={() => setCsvAccountId(account.id)}>
+                  <Button variant="outline" size="sm" onClick={() => { setCsvText(""); setCsvAccountId(account.id); }}>
                     <Upload className="h-3.5 w-3.5 mr-1" /> Import CSV
                   </Button>
                 )}
               </div>
 
-              <AccountContextPanel accountId={account.id} />
+                </div>
+              </details>
+              <details>
+                <summary>Holding actions · exit review and recorded plays</summary>
+                <p className="account-annotation py-3">Account #{account.id} only. Exit opens a review; approval and submission remain separate human actions.</p>
+                <AccountContextPanel accountId={account.id} />
+              </details>
             </CardContent>
           </Card>
         ))}

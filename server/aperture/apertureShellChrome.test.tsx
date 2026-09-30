@@ -55,11 +55,11 @@ describe("workspace chrome occupies one row, not two", () => {
     expect(row.find("[data-operating-invariant]")).toHaveLength(0);
   });
 
-  it("makes the menu the element that refuses to shrink", () => {
+  it("lets the menu own narrow overflow without clipping its destinations", () => {
     const menu = $()("[data-workspace-menu]");
     expect(menu).toHaveLength(1);
-    expect(menu.attr("class")).toContain("shrink-0");
-    expect(menu.attr("class")).toContain("min-w-max");
+    expect(menu.attr("class")).toContain("min-w-0");
+    expect(menu.text()).toContain("New thesis");
   });
 
   it("keeps the boundary chip visible at every width, unlike the sentence", () => {

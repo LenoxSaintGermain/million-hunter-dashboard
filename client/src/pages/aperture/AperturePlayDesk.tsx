@@ -10,14 +10,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { invalidateAccountRefreshReads } from "@/lib/accountRefreshInvalidation";
-import { AttentionDecisionCard } from "@/components/aperture/AttentionDecisionCard";
+import { AttentionDecisionCard, FindingEvidence } from "@/components/aperture/AttentionDecisionCard";
+import { InlineGateReview, inlineGateTarget } from "@/components/aperture/InlineGateReview";
+import { MonitoringFindingReview } from "@/components/aperture/MonitoringFindingReview";
+import { inlineMonitoringTarget } from "@shared/monitoringFinding";
+import { PlayDeskEvidence } from "@/components/aperture/PlayDeskEvidence";
+import "@/styles/play-desk-editorial.css";
 import { AttentionSourceRecovery } from "@/components/aperture/AttentionSourceRecovery";
 import { buildResearchJourneys } from "@shared/runWorkspace";
 import { playDeskJourneyLane } from "@shared/playDeskState";
 import { isOptionInstrument, paperInstrumentDisplayLabel, parseOccOptionSymbol } from "@shared/paperInstrument";
 import { arbitrateTodayRead, canShowQuietBriefing, type ApertureAttentionBriefing, type ApertureAttentionItem } from "@shared/apertureAttention";
 import { deskOrderReturn, formatMarkProvenance, formatReturnAmount, formatReturnPercent } from "@shared/positionReturn";
-import { DeskGlanceLayer } from "@/components/aperture/DeskGlanceLayer";
 import { PlayInspectionDrawer, type InspectableOrder } from "@/components/aperture/PlayInspectionDrawer";
 import { PositionExitModal, type ExitTarget } from "@/components/aperture/PositionExitModal";
 import { ManualOrderTicketModal } from "@/components/aperture/ManualOrderTicketModal";
@@ -216,10 +220,10 @@ export default function AperturePlayDesk() {
   const [isSyncingBroker, setIsSyncingBroker] = useState(false);
 
   const handleSyncBroker = async () => {
-    if (isSyncingBroker) return;
+    if (isSyncingBroker || !desk.data?.account?.id) return;
     setIsSyncingBroker(true);
     const toastId = "desk-broker-sync";
-    const targetAccountId = desk.data?.account?.id ?? 1;
+    const targetAccountId = desk.data.account.id;
     try {
       toast.loading("Synchronizing broker balances and marks from Alpaca...", { id: toastId });
       await syncBroker.mutateAsync({ id: targetAccountId });
@@ -236,7 +240,7 @@ export default function AperturePlayDesk() {
   };
 
   const accountLastSyncedAt = desk.data?.account?.lastSyncedAt;
-  const isAccountTelemetryStale = !accountLastSyncedAt || (Date.now() - accountLastSyncedAt > 4 * 3600 * 1000);
+  const isAccountTelemetryStale = !accountLastSyncedAt || (Date.now() - accountLastSyncedAt > 15 * 60 * 1000);
 
   const refresh = async () => {
     // Keep the initiating control focusable while blocking repeated activation,
@@ -252,11 +256,11 @@ export default function AperturePlayDesk() {
     }
   };
 
-  return <DashboardLayout><div className="mx-auto max-w-6xl space-y-5 pb-12">
+  return <DashboardLayout><div className="play-desk-edition mx-auto max-w-6xl space-y-5 pb-12">
     <header data-desk-header className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 className="font-serif text-2xl sm:text-3xl" style={{ color: "var(--sh-text-primary)" }}>Play Desk</h1>
-        <p className="mt-0.5 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Executive position monitoring &amp; rapid risk actions</p>
+        <p className="desk-annotation">Paper decisions · choose / approve / monitor</p>
       </div>
       <Button
         type="button"
@@ -284,10 +288,10 @@ export default function AperturePlayDesk() {
           size="sm"
           className="min-h-11"
           onClick={handleSyncBroker}
-          disabled={isSyncingBroker}
+          disabled={isSyncingBroker || !desk.data?.account?.id}
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${isSyncingBroker ? "animate-spin" : ""}`} />
-          {isSyncingBroker ? "Syncing..." : "Sync Broker Telemetry"}
+          {isSyncingBroker ? "Syncing..." : "Sync broker snapshot"}
         </Button>
         <Button type="button" size="sm" className="min-h-11 font-semibold" onClick={() => setManualModalOpen(true)}>
           <Sparkles className="mr-2 h-4 w-4" />
@@ -299,26 +303,7 @@ export default function AperturePlayDesk() {
       </div>
     </div>
 
-    {isAccountTelemetryStale && (
-      <section role="alert" className="rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: "var(--sh-border-1)", background: "rgba(245, 158, 11, 0.07)" }}>
-        <div>
-          <p className="font-semibold text-amber-500">Broker Telemetry Out of Date</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Alpaca Paper snapshot was last refreshed {accountLastSyncedAt ? new Date(accountLastSyncedAt).toLocaleString() : "over 24 hours ago"}. Sync live telemetry to update cash balances, buying power, and active marks.
-          </p>
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          className="shrink-0 font-semibold bg-amber-500 text-black hover:bg-amber-400"
-          onClick={handleSyncBroker}
-          disabled={isSyncingBroker}
-        >
-          <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isSyncingBroker ? "animate-spin" : ""}`} />
-          {isSyncingBroker ? "Syncing live telemetry…" : "Sync Broker Balances"}
-        </Button>
-      </section>
-    )}
+    <p className="desk-annotation" role="status">Broker snapshot: {accountLastSyncedAt ? `${isAccountTelemetryStale ? "stale" : "saved"} · ${new Date(accountLastSyncedAt).toLocaleString()}` : "sync time not recorded"}. Sync updates balances and marks, not research or approvals.</p>
     {unavailable.length > 0 && <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}>
       {unavailable.map(({ label, query }) => <div key={label} className="mb-3 last:mb-0"><p className="font-semibold">{label} status unavailable</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{query.data != null ? "Refresh failed. Last known records remain visible; they may be stale." : "This part of the desk could not be verified."}</p></div>)}
       <p className="text-sm">This is not an all-clear. Refresh status to retry; no order will be resubmitted.</p>
@@ -326,23 +311,14 @@ export default function AperturePlayDesk() {
     </section>}
     {briefing && read.state !== "complete" && <section role="status" className="rounded-xl border px-4 py-3 text-sm leading-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}><p className="font-semibold">Recorded checks: {read.state}. Status is not an all-clear.</p>{!briefing.sourceIssues?.length && <p>Missing source not identified in this saved snapshot. Refresh status to identify the gap.</p>}</section>}
 
-    {desk.data && <DeskGlanceLayer
-      orders={desk.data.orders ?? []}
-      account={desk.data.account ?? null}
-      accountUnavailable={desk.data.accountUnavailable ?? null}
-      attentionCount={(disclosure?.primary ? 1 : 0) + (disclosure?.otherCritical.length ?? 0)}
-      primaryLabel={disclosure?.primary?.actionLabel ?? null}
-      onPrimary={() => disclosure?.primary?.href && navigate(disclosure.primary.href)}
-      onFindBestPlay={() => navigate("/aperture/deploy")}
-    />}
-
     <section id="desk-attention" aria-label="Attention across all plays" className="space-y-3">
+      <p className="desk-annotation">01 / Your next decision · saved priorities</p>
       {disclosure?.primary && <AttentionTask item={disclosure.primary} prominent onOpen={navigate} />}
       {!!disclosure?.otherCritical.length && <section id="desk-critical" aria-labelledby="desk-critical-heading" className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
         <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b px-4 py-3" style={{ borderColor: "var(--sh-border-1)" }}>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-[var(--sh-red)] animate-pulse" />
-            <h2 id="desk-critical-heading" className="text-base font-semibold">Tactical Radar · Watch My Six ({disclosure.otherCritical.length})</h2>
+            <h2 id="desk-critical-heading" className="text-base font-semibold">Also needs review ({disclosure.otherCritical.length})</h2>
           </div>
           <div className="flex items-center gap-3 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
             <span>Research checks run on demand</span>
@@ -357,6 +333,9 @@ export default function AperturePlayDesk() {
 
     <AttentionSourceRecovery issues={briefing?.sourceIssues ?? []} onOpen={navigate} onRetry={refresh} busy={isRefreshing} />
 
+    {desk.data && <PlayDeskEvidence orders={desk.data.orders ?? []} account={desk.data.account ?? null} accountUnavailable={desk.data.accountUnavailable} />}
+    <Button variant="outline" className="min-h-11" onClick={() => navigate("/aperture/deploy")}>Find my best play · saved research<ArrowRight className="ml-2 h-4 w-4" /></Button>
+
     {selectedPlayId != null && <section id={`play-${selectedPlayId}`} tabIndex={-1} aria-label={`Selected play ${selectedPlayId}`} className="scroll-mt-24 rounded-xl border-2 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}>
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">Selected play · #{selectedPlayId}</h2><Button variant="outline" className="min-h-11" onClick={() => navigate(playDeskFilterHref(search, { play: null }))}>Return to filtered desk</Button></div>
       {selectedPlay ? <><ActivePlayDetails play={selectedPlay} state={briefing?.inMotion.find((item) => item.key === `play:${selectedPlayId}`)?.stateLabel} />
@@ -369,7 +348,7 @@ export default function AperturePlayDesk() {
     </section>}
 
     <section className="grid grid-cols-3 overflow-hidden rounded-xl border" aria-label="Filter by workflow stage" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-      <StageMetric label="Choose" value={runs.data == null ? null : decisionReady.length} detail="plays to decide" active={stageFilter === "choose"} onSelect={() => selectStage("choose")} />
+      <StageMetric label="Choose" value={runs.data == null ? null : decisionReady.length} detail="research journeys · all instruments" active={stageFilter === "choose"} onSelect={() => selectStage("choose")} />
       <StageMetric label="Approve / send" value={desk.data == null ? null : visibleOrderActions.length} detail="tickets to move" active={stageFilter === "approve"} onSelect={() => selectStage("approve")} />
       <StageMetric label="Monitor" value={desk.data == null ? null : visibleOrders.length + visibleActivePlays.length} detail={outcomes.data == null ? "reviews unavailable" : `${visiblePendingOutcomes.length} scheduled reviews`} active={stageFilter === "monitor"} onSelect={() => selectStage("monitor")} />
     </section>
@@ -586,7 +565,14 @@ export default function AperturePlayDesk() {
 export { deskOrderQuantities } from "@shared/deskOrderQuantities";
 
 function AttentionTask({ item, prominent = false, compact = false, onOpen }: { item: ApertureAttentionItem; prominent?: boolean; compact?: boolean; onOpen: (href: string) => void }) {
-  return <AttentionDecisionCard item={item} prominent={prominent} compact={compact} onOpen={onOpen} />;
+  const [open, setOpen] = useState(false);
+  const gate = inlineGateTarget(item);
+  const finding = item.evidence ? inlineMonitoringTarget(item.href) : null;
+  return <div><AttentionDecisionCard item={item} prominent={prominent} compact={compact} reviewOpen={gate || finding ? open : undefined} onOpen={() => gate || finding ? setOpen(!open) : onOpen(item.href)} />
+    {open && <section className="border-t p-4" aria-label="Review this decision here">
+      {gate ? <InlineGateReview key={item.href} target={gate} onRevise={() => onOpen(item.href)} /> : finding && item.evidence ? <><FindingEvidence evidence={item.evidence} expanded /><MonitoringFindingReview key={item.href} target={finding} onClose={() => setOpen(false)} /></> : null}
+    </section>}
+  </div>;
 }
 
 /** Match the persisted order identity, never another position in the same ticker. */
