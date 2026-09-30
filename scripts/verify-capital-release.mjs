@@ -24,7 +24,10 @@ try {
   check('Same-origin application bundle is referenced', !!asset);
   const bundle = await read(asset);
   check('Served bundle matches the exact source SHA', bundle.response.status === 200 && bundle.body.includes(sha));
-  check('Compact Today copy is included', bundle.body.includes('At a glance'));
+  check('Capital reading desk is included', bundle.body.includes('Your thesis. The world as it stands.') && bundle.body.includes('Boundary not measured'));
+  check('Public Capital UAT preview is included', bundle.body.includes('/walkthrough/capital-desk') && bundle.body.includes('illustrative composite records'));
+  check('Deal Senior reading desk is included', bundle.body.includes('Follow the sources') && bundle.body.includes('Challenge the cash'));
+  check('Scan story harness is included', bundle.body.includes('Find the next question.'));
   const health = await read('/api/trpc/system.health?input='+encodeURIComponent(JSON.stringify({ json: { timestamp: Date.now() } })));
   check('API health returns JSON, not hosting fallback HTML', health.response.status === 200 && (health.response.headers.get('content-type') ?? '').includes('application/json') && JSON.parse(health.body)?.result?.data?.json?.ok === true);
   const protectedRead = await read('/api/trpc/aperture.account.list');
