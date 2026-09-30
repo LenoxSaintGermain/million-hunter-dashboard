@@ -1,0 +1,213 @@
+.portfolio-portrait {
+  color: var(--ink);
+  background: var(--paper);
+  border-top: 3px solid var(--ink);
+  margin-bottom: 18px;
+}
+.portfolio-portrait header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 11px;
+}
+.portfolio-portrait .portrait-label {
+  font: 10px var(--font-mono);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.portrait-spread {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.85fr) minmax(0, 1.4fr);
+}
+.portrait-value {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.portrait-value .portrait-equity {
+  font: clamp(36px, 4.4vw, 62px) / 1.2 var(--font-display);
+  margin: 18px 0 8px;
+  overflow-wrap: anywhere;
+}
+.portrait-value p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.portrait-value .portrait-time {
+  font-size: 11px;
+  opacity: 0.75;
+  margin-top: 12px;
+}
+.portrait-value dl {
+  margin: 26px 0 16px;
+  border-top: 1px solid color-mix(in srgb, var(--paper) 30%, transparent);
+}
+.portrait-value dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  font-size: 12px;
+}
+.portrait-value dd {
+  font-family: var(--font-mono);
+}
+.portrait-value small {
+  font-size: 11px;
+  line-height: 1.6;
+  opacity: 0.8;
+}
+.portrait-holdings {
+  padding: 26px 28px;
+  min-width: 0;
+}
+.portrait-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.portfolio-portrait h2 {
+  font: clamp(24px, 3vw, 34px) / 1.2 var(--font-display);
+  margin: 8px 0;
+}
+.portfolio-portrait a {
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  display: inline-block;
+  padding: 12px 0;
+}
+.portrait-caption,
+.portrait-source {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--sh-fg-2);
+}
+.portrait-exposures {
+  margin: 18px 0;
+}
+.portrait-holding {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(70px, 1fr) auto;
+  gap: 7px 12px;
+  text-align: left;
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--rule);
+  font: 11px var(--font-mono);
+  transition: background 0.15s;
+}
+.portrait-holding-name {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.portrait-holding[aria-pressed="true"],
+.portrait-holding:hover {
+  background: var(--bone);
+}
+.portrait-bar {
+  display: block;
+  height: 9px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  align-self: center;
+}
+.portrait-bar i {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  transition: width 0.2s;
+}
+.portrait-holding[aria-pressed="true"] .portrait-bar i {
+  background: var(--amber);
+}
+.portfolio-portrait button:focus-visible,
+.portfolio-portrait a:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.portrait-source {
+  border-left: 2px solid var(--amber);
+  padding-left: 12px;
+}
+.portrait-more {
+  font-size: 12px;
+  text-decoration: underline;
+  min-height: 44px;
+}
+.portrait-outlook {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 3px double var(--ink);
+}
+.portrait-outlook section {
+  padding: 22px 28px;
+  border-top: 1px solid var(--rule);
+}
+.portrait-outlook section + section {
+  border-left: 1px solid var(--rule);
+}
+.portrait-outlook h3 {
+  font: 24px/1.3 var(--font-display);
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.portrait-outlook p {
+  font-size: 12px;
+  line-height: 1.7;
+  max-width: 55ch;
+}
+.portrait-outlook section[data-constrained="true"] {
+  background: color-mix(in srgb, var(--clay) 8%, var(--paper));
+}
+.portrait-limit {
+  height: 8px;
+  background: var(--rule);
+  margin: 14px 0 8px;
+  border-right: 2px solid var(--ink);
+}
+.portrait-limit i {
+  display: block;
+  height: 100%;
+  background: var(--clay);
+}
+.portrait-machinery {
+  margin-bottom: 26px;
+}
+.portrait-machinery > summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font: 11px var(--font-mono);
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 640px) {
+  .portrait-spread,
+  .portrait-outlook {
+    grid-template-columns: 1fr;
+  }
+  .portfolio-portrait header {
+    flex-direction: column;
+  }
+  .portrait-value,
+  .portrait-holdings,
+  .portrait-outlook section {
+    padding: 22px;
+  }
+  .portrait-outlook section + section {
+    border-left: 0;
+  }
+  .portrait-value .portrait-equity {
+    font-size: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .portrait-holding,
+  .portrait-bar i {
+    transition: none;
+  }
+}

@@ -84,7 +84,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
         </div>
       </section>
       <main id="aperture-workspace" tabIndex={-1} aria-label="Capital Aperture workspace" className="aperture-editorial scroll-mt-16 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 max-w-[1280px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-5 sm:py-8 lg:py-10">
-        <CapitalCockpitRail runId={runId} compactOnly={location === "/aperture/plays" || location.startsWith("/aperture/run/")} />
+        <CapitalCockpitRail runId={runId} visualHero={location === "/aperture"} compactOnly={location === "/aperture/plays" || location.startsWith("/aperture/run/")} />
         {children}
       </main>
     </EditorialTopNav>

@@ -46,6 +46,7 @@ import DemoTour from "./pages/DemoTour";
 import RippleEffect from "./pages/RippleEffect";
 import InvestorBrief from "./pages/InvestorBrief";
 import Walkthrough from "./pages/HunterWalkthrough";
+import JimsFile from "./pages/JimsFile";
 import CapitalDeskPreview from "./pages/aperture/CapitalDeskPreview";
 import Pricing from "./pages/Pricing";
 import Wingate from "./pages/Wingate";
@@ -206,10 +207,11 @@ function OnboardingGuard() {
 
 function Router() {
   const [location] = useLocation();
+  const isOfflineDemo = ["/walkthrough", "/walkthrough/capital-desk", "/demo-tour", "/brief", "/jims-file", "/pricing"].includes(location);
   useEffect(() => { document.title = workspaceTitle(location); }, [location]);
   return (
     <>
-      {location !== "/walkthrough" && location !== "/walkthrough/capital-desk" && <OnboardingGuard />}
+      {!isOfflineDemo && <OnboardingGuard />}
       <Switch>
         {/* Lobby — cinematic first-login onboarding */}
         <Route path="/lobby" component={Lobby} />
@@ -229,6 +231,7 @@ function Router() {
         <Route path="/demo" component={DemoScenario} />
         <Route path="/demo-tour" component={DemoTour} />
         <Route path="/brief" component={InvestorBrief} />
+        <Route path="/jims-file" component={JimsFile} />
         <Route path="/walkthrough" component={Walkthrough} />
         <Route path="/walkthrough/capital-desk" component={CapitalDeskPreview} />
         <Route path="/pricing" component={Pricing} />

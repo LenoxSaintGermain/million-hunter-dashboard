@@ -205,10 +205,11 @@ export function AttentionDecisionCard({ item, prominent = false, compact = false
   return <article aria-labelledby={titleId} data-attention-key={item.key} data-attention-layout={prominent ? "primary" : "card"} data-attention-fingerprint={fingerprint} className="min-w-0 border-t p-4 first:border-t-0" style={{ borderColor: "var(--sh-border-1)", background: prominent ? "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" : "var(--sh-surface)" }}>
     <p className="text-xs font-semibold" style={{ color: item.critical ? "var(--sh-red)" : "var(--sh-signal)" }}>{prominent ? "Needs you now · " : ""}{item.stateLabel}</p>
     <h2 id={titleId} className={prominent ? "mt-1 font-serif text-xl leading-tight" : "mt-1 text-base font-semibold"}>{item.title}</h2>
-    <p className="mt-2 text-sm leading-5">{item.reason}</p>
+    <p className={`mt-2 text-sm leading-5${prominent ? " capital-primary-reason" : ""}`}>{item.reason}</p>
     {action}
     {busy && <p id={busyId} role="status" className="mt-2 text-sm leading-5">Refreshing this task. Its action will be available when status returns.</p>}
     {!routine && <p className="mt-2 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{item.consequence}</p>}
+    {prominent && <details className="capital-mobile-reason"><summary>Why this needs review</summary><p>{item.reason}</p></details>}
     {evidenceWarnings}
     {item.evidence && !reviewOpen && <FindingEvidence evidence={item.evidence} />}
   </article>;

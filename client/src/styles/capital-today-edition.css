@@ -1,0 +1,44 @@
+/* Approved portrait grammar, scoped to the Today reading desk. */
+.capital-mobile-reason { display: none; }
+.capital-margin-disclosure > summary { display: none; }
+.capital-briefing { border-top: 1px solid var(--rule); }
+.capital-briefing > header { padding: 30px 28px 24px; background: var(--paper); }
+.capital-edition-kicker { font: 10px/1.5 var(--font-mono); text-transform: uppercase; letter-spacing: .14em; color: var(--sh-fg-2); }
+.capital-briefing h1, .capital-story-desk .capital-briefing h1 { font: clamp(27px,3vw,38px)/1.18 var(--font-display); letter-spacing: -.025em; margin: 10px 0 12px; }
+.capital-briefing .capital-briefing-spread { grid-template-columns: minmax(0,1.4fr) minmax(260px,.85fr); align-items: stretch; }
+.capital-briefing .capital-lead-story [data-attention-layout=primary] { padding: 32px 28px; }
+.capital-briefing .capital-lead-story [data-attention-layout=primary] h2 { font-size: clamp(24px,2.5vw,32px); line-height: 1.25; margin: 16px 0; }
+.capital-briefing .capital-lead-story [data-attention-layout=primary] > button { margin: 22px 0 10px; border-radius: 0; box-shadow: none; }
+.capital-briefing .capital-account-strip { background: var(--bone); }
+.capital-account-strip > .capital-edition-kicker { padding: 28px 24px 0; }
+.capital-briefing .capital-snapshot { padding: 18px 24px 24px; }
+.capital-briefing .capital-snapshot-measures { grid-template-columns: 1fr; gap: 20px; }
+.capital-briefing .capital-snapshot-measures > div { grid-column: auto; }
+.capital-briefing .capital-snapshot-measures dd:nth-child(2) { font-size: 30px; font-weight: 400; }
+.capital-briefing .capital-motion { margin-top: 24px; }
+.capital-briefing .capital-position-stories { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; padding: 18px 28px 32px; overflow: visible; }
+.capital-briefing .capital-position-story { padding: 20px 0 0; border: 0; border-top: 2px solid var(--ink); background: transparent; }
+.capital-briefing .capital-position-story[data-changed=true] { border-top-color: var(--amber); }
+.capital-briefing .capital-position-story:hover, .capital-briefing .capital-position-story:focus-within { background: var(--bone); }
+.capital-briefing .capital-position-story h3 { font-size: 23px; line-height: 1.3; }
+.capital-briefing .capital-position-mark { padding-top: 18px; }
+.capital-briefing .capital-position-mark strong { font-size: 34px; }
+.capital-briefing .capital-swipe-hint { display: none; }
+.capital-briefing button:focus-visible, .capital-briefing summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+@media(max-width:900px) { .capital-briefing .capital-position-stories { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:767px) { .capital-briefing .capital-briefing-spread { grid-template-columns: 1fr; } .capital-briefing .capital-snapshot-measures { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:640px) { .capital-briefing > header, .capital-briefing .capital-lead-story [data-attention-layout=primary] { padding: 22px 18px; } .capital-briefing .capital-position-stories { grid-template-columns: 1fr; padding: 18px; gap: 28px; } .capital-briefing .capital-snapshot-measures dd:nth-child(2) { font-size: 25px; } }
+@media(max-width:640px) {
+  .capital-briefing > header { padding: 14px 18px; }
+  .capital-briefing h1, .capital-story-desk .capital-briefing h1 { font-size: 22px; margin: 6px 0; }
+  .capital-briefing .capital-lead-story [data-attention-layout=primary] { padding: 18px; }
+  .capital-briefing .capital-lead-story [data-attention-layout=primary] h2 { font-size: 23px; margin: 10px 0; }
+  .capital-briefing .capital-lead-story [data-attention-layout=primary] > button { margin: 10px 0; width: 100%; }
+  .capital-briefing .capital-primary-reason { display: none; }
+  .capital-briefing .capital-mobile-reason, .capital-margin-disclosure > summary { display: block; }
+  .capital-mobile-reason { margin-top: 14px; border-top: 1px solid var(--rule); }
+  .capital-mobile-reason summary, .capital-margin-disclosure summary { min-height: 44px; padding: 12px 0; cursor: pointer; font-size: 12px; }
+  .capital-mobile-reason p { font-size: 13px; line-height: 1.65; padding-bottom: 12px; }
+  .capital-margin-disclosure { padding: 0 18px; }
+  .capital-briefing .capital-account-strip > .capital-edition-kicker { display: none; }
+}

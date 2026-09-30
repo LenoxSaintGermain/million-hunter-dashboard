@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 import { buildDeskGlance, type GlanceAccount, type GlanceOrder } from "@shared/deskGlance";
 import { deskOrderQuantities } from "@shared/deskOrderQuantities";
 import { deskOrderReturn, formatSignedCents } from "@shared/positionReturn";
@@ -26,6 +27,18 @@ const stamp = (at: number | null) => at == null || !Number.isFinite(at) ? "Time 
 const border = { borderColor: "var(--sh-border-1)" };
 
 /** Reads the existing desk response. No provider call, polling or mutation. */
+export function TodayAccountMargin(props: { data?: TodayExecutionData; loading: boolean; failed: boolean; now?: number }) {
+  const [mobile, setMobile] = useState(() => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 640px)").matches);
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 640px)");
+    const update = () => setMobile(media.matches);
+    update(); media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return <details className="capital-margin-disclosure" open={!mobile || expanded} onToggle={event => { if (mobile) setExpanded(event.currentTarget.open); }}><summary>Order-linked snapshot · {props.failed ? "refresh failed" : props.loading ? "loading" : "saved data"}</summary><TodayExecutionSnapshot {...props}/></details>;
+}
+
 export function TodayExecutionSnapshot({ data, loading, failed, now = Date.now() }: {
   data?: TodayExecutionData;
   loading: boolean;

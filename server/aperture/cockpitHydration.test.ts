@@ -6,9 +6,10 @@ import { CapitalCockpitRail } from "../../client/src/components/aperture/Capital
 const mocks = vi.hoisted(() => ({
   account: { data: undefined as any, isLoading: true, error: null as any, refetch: vi.fn() },
   cockpit: vi.fn(),
+  positions: vi.fn((_input: { accountId: number }, _options: { enabled: boolean }) => ({ data: undefined, isFetching: false, isError: false })),
 }));
 vi.mock("@/lib/trpc", () => ({ trpc: { aperture: {
-  account: { list: { useQuery: () => mocks.account } },
+  account: { list: { useQuery: () => mocks.account }, getPositions: { useQuery: mocks.positions } },
   cockpit: { useQuery: mocks.cockpit },
   cockpitPreference: { get: { useQuery: () => ({ data: null }) }, set: { useMutation: () => ({ mutate: vi.fn() }) } },
 } } }));
@@ -21,6 +22,7 @@ describe("cold-device account constraint hydration", () => {
     mocks.cockpit.mockReturnValue({ data: undefined, isLoading: false, error: null });
     const html = renderToStaticMarkup(React.createElement(CapitalCockpitRail));
     expect(mocks.cockpit.mock.lastCall?.[1].enabled).toBe(false);
+    expect(mocks.positions).not.toHaveBeenCalled();
     expect(html).toContain("Loading account details");
     expect(html).not.toContain("Account not selected");
     expect(html).not.toContain("No paper account");

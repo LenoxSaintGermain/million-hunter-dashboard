@@ -47,13 +47,17 @@ describe("Today briefing header does not stack repeated account chrome above the
   beforeAll(() => vi.stubGlobal("React", React));
   afterAll(() => vi.unstubAllGlobals());
 
-  it("states the mode and the account on one line instead of two stacked blocks", () => {
+  it("separates the editorial kicker from a single combined mode and account line", () => {
     const $ = load(today());
     const header = $("[aria-labelledby='today-briefing-title'] > header");
     expect(header).toHaveLength(1);
-    // Before: an eyebrow paragraph AND a separate account paragraph.
-    expect(header.find("p")).toHaveLength(1);
-    const line = header.find("p").text();
+    const kicker = header.find("p.capital-edition-kicker");
+    expect(kicker).toHaveLength(1);
+    expect(kicker.text()).toBe("The decision desk / Today");
+    const accountLine = header.find("p").not(".capital-edition-kicker");
+    expect(accountLine).toHaveLength(1);
+    expect(header.find("h1").next("p").get(0)).toBe(accountLine.get(0));
+    const line = accountLine.text();
     expect(line).toContain("Paper");
     expect(line).toContain("Alpaca Paper — AI Thesis");
   });

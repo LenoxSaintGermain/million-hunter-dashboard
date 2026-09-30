@@ -47,6 +47,9 @@ describe("Capital reading desk production and public UAT contract", () => {
     expect(preview).not.toMatch(/useQuery|useMutation|fetch\(/);
     expect(preview).toContain("<TodayAttentionBriefing previewOnly");
     const app = readFileSync("client/src/App.tsx", "utf8");
-    expect(app).toContain('location !== "/walkthrough/capital-desk" && <OnboardingGuard');
+    const offlineRoutes = app.match(/const isOfflineDemo = (\[[^;]+\])\.includes\(location\);/)?.[1];
+    expect(offlineRoutes).toBeDefined();
+    expect(JSON.parse(offlineRoutes!)).toContain("/walkthrough/capital-desk");
+    expect(app).toContain("{!isOfflineDemo && <OnboardingGuard />}");
   });
 });

@@ -4,6 +4,14 @@ import { describe, expect, it } from "vitest";
 // Source-contract regression guards; these do not replace authenticated browser UAT.
 const page = (name: string) => readFileSync(new URL(`../client/src/pages/${name}.tsx`, import.meta.url), "utf8");
 describe("migration truth contracts", () => {
+  it("keeps deterministic public demos outside the authentication-query shell", () => {
+    const app = readFileSync(new URL("../client/src/App.tsx", import.meta.url), "utf8");
+    expect(app).toContain('const isOfflineDemo = ["/walkthrough", "/walkthrough/capital-desk", "/demo-tour", "/brief", "/jims-file", "/pricing"].includes(location)');
+    expect(app).toContain("!isOfflineDemo && <OnboardingGuard />");
+    for (const name of ["HunterWalkthrough", "DemoTour", "InvestorBrief", "JimsFile", "Pricing"]) {
+      expect(page(name)).not.toMatch(/\b(?:fetch|axios|trpc)\s*[.(]/);
+    }
+  });
   it("does not reintroduce invented operator scores or activity", () => {
     const source = page("OperatorRegistry");
     for (const fabricated of ["7919", "98.4%", "LIVE_FEED", "ALGO v1.1", "Cerberus", "Active Orchestration"])

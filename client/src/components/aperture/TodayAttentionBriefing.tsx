@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import "@/styles/capital-today-edition.css";
 import { ArrowRight, CheckCircle2, Clock3, RefreshCw, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
@@ -7,7 +8,7 @@ import { MonitoringFindingReview } from "./MonitoringFindingReview";
 import { InlineGateReview, inlineGateTarget } from "./InlineGateReview";
 import { inlineMonitoringTarget } from "@shared/monitoringFinding";
 import { AttentionSourceRecovery } from "./AttentionSourceRecovery";
-import { TodayExecutionSnapshot, TodayOrderRows, type TodayExecutionData } from "./TodayExecutionSnapshot";
+import { TodayAccountMargin, TodayOrderRows, type TodayExecutionData } from "./TodayExecutionSnapshot";
 import { paperInstrumentDisplayLabel, parseOccOptionSymbol } from "@shared/paperInstrument";
 import { partitionDismissed, recordDismissal, restoreDismissal, parseDismissals, DISMISSAL_STORAGE_KEY, type AttentionDismissal } from "@shared/attentionDismissal";
 import { arbitrateTodayRead, displayedAttentionBaseline, safeStatusError, type AttentionStatusSource, type ApertureAttentionBriefing, type ApertureAttentionItem, type ApertureMotionItem } from "@shared/apertureAttention";
@@ -178,7 +179,7 @@ export function TodayAttentionBriefing({
   return <section ref={root} aria-labelledby="today-briefing-title" aria-busy={read.busy} data-read-state={read.state} data-mobile-focus={mobileFocus} className="capital-briefing" >
     <header className="border-b p-4" style={{ borderColor: "var(--sh-border-1)" }}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0"><h1 id="today-briefing-title" className="font-serif text-2xl leading-tight sm:text-3xl">Your thesis. The world as it stands.</h1><p className="mt-1 text-xs leading-5"><span className="font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Today · {modeLabel}</span><span style={{ color: "var(--sh-fg-muted)" }}> · {accountLabel}</span></p></div>
+        <div className="min-w-0"><p className="capital-edition-kicker">The decision desk / Today</p><h1 id="today-briefing-title" className="font-serif text-2xl leading-tight sm:text-3xl">What needs your judgment.</h1><p className="mt-1 text-xs leading-5"><span className="font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Today · {modeLabel}</span><span style={{ color: "var(--sh-fg-muted)" }}> · {accountLabel}</span></p></div>
         <Button variant="ghost" size="sm" className="min-h-11 min-w-11 shrink-0 aria-disabled:opacity-50" aria-label={read.busy ? "Refreshing status" : read.state === "failed" ? "Retry status refresh" : "Refresh status"} aria-disabled={read.busy} onClick={() => { if (!read.busy) onRetry(); }}><RefreshCw aria-hidden="true" className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">{read.busy ? "Refreshing status…" : read.state === "failed" ? "Retry status refresh" : "Refresh status"}</span></Button>
       </div>
     </header>
@@ -205,7 +206,8 @@ export function TodayAttentionBriefing({
     </>}
     </div>
     <aside className="capital-account-strip" aria-label="Recorded account context">
-      {(execution !== undefined || executionFailed !== undefined) && <TodayExecutionSnapshot data={execution} failed={!!executionFailed} loading={loading} />}
+      <p className="capital-edition-kicker">The margin / Order-linked exposure</p>
+      {(execution !== undefined || executionFailed !== undefined) && <TodayAccountMargin data={execution} failed={!!executionFailed} loading={loading} />}
     </aside>
     </div>
     {attention && <>

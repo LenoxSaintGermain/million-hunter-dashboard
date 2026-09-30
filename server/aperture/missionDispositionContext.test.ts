@@ -460,7 +460,11 @@ describe("persisted Mission disposition context", () => {
     const { $ } = render();
     expect($("h1")).toHaveLength(0); // The enclosing Mission page owns h1.
     expect($("#mission-section-thesis").prop("tagName")).toBe("H2");
-    expect($("h3").filter((_, node) => $(node).text() === fixture.queries.draft.data.values.mission)).toHaveLength(1);
+    const brief = $(".mission-reading-brief");
+    expect(brief).toHaveLength(1);
+    expect(brief.find("h3")).toHaveLength(1);
+    expect(brief.find("h3").text()).toBe("Illustrative PWR");
+    expect(brief.find(".mission-brief-passage > p").map((_, node) => $(node).text()).get().join(" ")).toBe(fixture.queries.draft.data.values.mission);
     expect(fixture.mutations.begin.mutateAsync).not.toHaveBeenCalled();
     expect(fixture.mutations.run.mutateAsync).not.toHaveBeenCalled();
   });

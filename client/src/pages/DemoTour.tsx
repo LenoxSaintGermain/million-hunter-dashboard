@@ -144,13 +144,13 @@ const MAIN_STREET_PLAY = {
   contract: "All clients on written annual contracts",
   owner: "Operations manager in place — owner works 20 hrs/week",
   stack: "SBA 7(a) $1.26M · Seller carry $140K · Equity $140K",
-  urgency: "Act within 60 days",
+  urgency: "Illustrative terms — verify before proceeding",
   whyBetter: [
-    "No single client above 11% of revenue — concentration risk eliminated",
+    "Example assumes no client above 11% — verify concentration and retention",
     "All contracts written, all auto-renewing — no rebid cliffs",
     "Operations manager already in seat — owner is not the business",
-    "True SDE verified at $510K — no add-back games",
-    "2.7× multiple on real earnings vs. 4.2× on inflated Apex numbers",
+    "Example assumes $510K SDE — not independently verified earnings",
+    "Illustrative 2.7× multiple vs. 4.2× on adjusted Apex figures",
   ],
 };
 
@@ -159,10 +159,10 @@ const MAIN_STREET_PLAY = {
 const CHAPTERS = [
   {
     id: 1,
-    label: "Signal Detected",
-    eyebrow: "RIPPLEEFFECT SCANNER",
-    title: "The anchor filed. Most buyers won't see the opportunity for 6 months.",
-    subtitle: "RippleEffect surfaces anchor developments — permits, EDC announcements, workforce filings — before they appear in deal flow. Then it finds the businesses that will benefit.",
+    label: "Case Context",
+    eyebrow: "ONE POSSIBLE ENTRYPOINT",
+    title: "A signal starts a question. Evidence makes the case.",
+    subtitle: "This illustrative case begins with a sourcing signal. Your own target or broker introduction can frame the same diligence questions. Search is one entrypoint, not the decision.",
     icon: Waves,
     iconColor: "text-cyan-400",
     iconBg: "bg-cyan-500/10 border-cyan-500/20",
@@ -172,7 +172,7 @@ const CHAPTERS = [
     label: "Deal Scored",
     eyebrow: "TIDE INTELLIGENCE",
     title: "The broker sheet looked clean. Six dimensions told a different story.",
-    subtitle: "Signal Hunter OS scores every deal across cash flow, capital stack, macro timing, and three other dimensions. Two flags were already amber before diligence opened.",
+    subtitle: "Read the fixed example across six dimensions, then ask what supports each score. Seller-reported figures and modeled assumptions are not independently verified earnings.",
     icon: BarChart3,
     iconColor: "text-[#ffba20]",
     iconBg: "bg-[#ffba20]/10 border-[#ffba20]/20",
@@ -182,7 +182,7 @@ const CHAPTERS = [
     label: "Red Team Fires",
     eyebrow: "RED TEAM ANALYSIS",
     title: "Five flags. Four critical. The deal was dead before the LOI.",
-    subtitle: "Red Team runs adversarial diligence on every deal — not to find reasons to buy, but to find the reasons deals fail. This one had all three of the most common failure modes.",
+    subtitle: "Review the prewritten counterargument: concentration, owner dependence and questionable add-backs. These are reasons to investigate or stop, not a substitute for QoE or legal diligence.",
     icon: FileWarning,
     iconColor: "text-rose-400",
     iconBg: "bg-rose-500/10 border-rose-500/20",
@@ -192,17 +192,17 @@ const CHAPTERS = [
     label: "IC Votes",
     eyebrow: "IC CONSENSUS",
     title: "Three independent agents. Unanimous NO. The divergence is where the risk lives.",
-    subtitle: "The Structuralist, The Restructurer, and The Market Analyst run independent investment committee reviews. When they agree, conviction is absolute. When they diverge, the delta isolates the fatal vulnerability.",
+    subtitle: "Compare three cached review perspectives. Agreement is not proof, and disagreement points to questions that need evidence. The buyer or investment team owns the decision.",
     icon: Cpu,
     iconColor: "text-purple-400",
     iconBg: "bg-purple-500/10 border-purple-500/20",
   },
   {
     id: 5,
-    label: "Better Play Found",
+    label: "Compare Alternatives",
     eyebrow: "MAIN STREET PLAY",
-    title: "The scanner found a better deal 22 miles away. Same thesis. Half the risk.",
-    subtitle: "Rejecting Apex wasn't the end of the search — it was the beginning of a better one. The same anchor development that surfaced Apex also surfaced a cleaner target with verified earnings and no concentration risk.",
+    title: "Reject, revisit or compare. No score commits capital.",
+    subtitle: "The alternative is also illustrative, not a sourced recommendation. Compare the stated terms and unresolved conditions. A more attractive example still needs independent diligence.",
     icon: Target,
     iconColor: "text-emerald-400",
     iconBg: "bg-emerald-500/10 border-emerald-500/20",
@@ -739,15 +739,15 @@ export default function DemoTour() {
           {/* Bottom CTA */}
           <div className="mt-8 pt-6 border-t border-[#3d2e1e]">
             <p className="text-[#5c4a32] text-xs mb-4 leading-relaxed">
-              This is a deterministic walkthrough using a composite deal from documented acquisition failures.
-              The live suite runs adversarial multi-agent diligence across private operating companies, commercial real estate, and macro theses.
+              Illustrative — composite deal, not a real customer. Fixed examples for buyers, acquisition entrepreneurs, sponsors and investment teams. No agents run here.
+              Document-first roadmap: bring evidence, review source-linked claims, pressure-test, then decide. PDF upload and ingestion are not connected here.
             </p>
             <a
               href={loginUrl}
               className="flex items-center justify-center gap-2 w-full bg-[#ffba20] text-[#1a1208] font-bold text-sm py-3 rounded-xl hover:bg-[#ffd060] transition-colors"
             >
               <Shield className="h-4 w-4" />
-              Enter the Live Suite
+              Sign in to the workspace
             </a>
           </div>
         </div>
@@ -852,7 +852,7 @@ export default function DemoTour() {
           <div className="mt-8 pt-5 border-t border-[#e8e0d4] flex items-center gap-2 text-[#c4b89a]">
             <Lock className="h-3 w-3" />
             <span className="text-[10px] tracking-wide uppercase">
-              Static demo · No live data · No API calls · No account required · GT-001 composite deal
+              Static demo · No live analysis · No account required · Illustrative composite deals
             </span>
           </div>
         </div>

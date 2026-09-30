@@ -169,28 +169,15 @@ const MEMO_EXCERPT = {
 
 // ─── CAPABILITY MATRIX ────────────────────────────────────────────────────────
 const CAPABILITY_MATRIX = [
-  { capability: "Thesis Engine", description: "Structure and score a multi-asset buy-box against live deal flow", status: "Live" as const },
-  { capability: "IC Agent Consensus", description: "Multi-agent panel scoring (Structuralist, Restructurer, Market Analyst) with divergence detection", status: "Live" as const },
-  { capability: "Red Team — Always On", description: "Adversarial diligence: surfaces landmines from pre-close signals and lease cliffs", status: "Live" as const },
-  { capability: "Owner / Seller Simulation", description: "Seller persona, motivation read, negotiation leverage map", status: "Live" as const },
-  { capability: "Capital Stack Modeler", description: "SBA 7(a), commercial debt, seller notes, and equity stack with DSCR validation", status: "Live" as const },
-  { capability: "Capital Aperture", description: "Systematic macro thesis modeling, decision runway limits, and candidate boards", status: "Live" as const },
-  { capability: "Investment Memo + LOI", description: "Institutional diligence brief and LOI draft from verified deal signals", status: "Live" as const },
-  { capability: "TIDE Intelligence", description: "Federal spend, SBA policy, and macro capital flow tracking", status: "Live" as const },
-  { capability: "Opportunity Radar", description: "Perplexity Sonar Pro cited web intelligence, permit, and capital convergence", status: "Live" as const },
-  { capability: "Market Scan", description: "Real cited listings via Sonar Pro, sourced per-market", status: "Live" as const },
-  { capability: "National Register universe", description: "63,127 listed buildings + 19,476 historic districts, queryable", status: "Live" as const },
-  { capability: "Register verification", description: "Settles NRHP status as fact from a reference number, not a claim", status: "Live" as const },
-  { capability: "County direct data", description: "Parcel assessments joined to tax liens — Allegheny County, PA", status: "Live" as const },
-  { capability: "Owner motivation scoring", description: "Distress and ownership signals, scored apart from the thesis score", status: "Live" as const },
-  { capability: "Cross-client thesis matching", description: "Surfaces buildings that fail one thesis but fit another client's", status: "Live" as const },
-  { capability: "Thesis Studio", description: "Client-editable criteria dials with a live match preview", status: "Live" as const },
-  { capability: "Verification Queue", description: "Pools unverified critical fields, researches and writes back with citations", status: "Live" as const },
-  { capability: "Scheduled sourcing", description: "Daily/weekly automated runs, disabled by default", status: "Live" as const },
-  { capability: "CSV / CoStar ingest", description: "Broker exports scored through the same engine", status: "Live" as const },
-  { capability: "Searcher Intelligence DB", description: "Demand-side dataset from every diligence run — the moat", status: "Roadmap" as const },
-  { capability: "Gated Free Run (/try)", description: "Public diligence run with email gate — top-of-funnel acquisition", status: "Roadmap" as const },
-  { capability: "Matching Engine", description: "Thesis-to-deal matching using Searcher Intelligence DB", status: "Roadmap" as const },
+  { capability: "Document-first diligence / PDF ingestion", description: "Bring documents, review source-linked claims and prepare a decision. Not connected in this brief.", status: "Roadmap" as const },
+  { capability: "Thesis fit", description: "Fixed criteria and flags for the illustrative case", status: "Demo" as const },
+  { capability: "IC review", description: "Cached perspectives; agreement is not independent verification", status: "Demo" as const },
+  { capability: "Red Team", description: "Prewritten risks revealed locally; no agent runs", status: "Demo" as const },
+  { capability: "Seller simulation", description: "Illustrative negotiation assumptions, not knowledge of a real seller", status: "Demo" as const },
+  { capability: "Capital stack", description: "Local scenario calculations, not lender approval", status: "Demo" as const },
+  { capability: "Investment memo", description: "Fixed decision brief; not a generated review of your documents", status: "Demo" as const },
+  { capability: "Sourcing and research", description: "Optional entrypoints described below; not exercised or production-verified by this brief. Market Scan remains experimental.", status: "Preview" as const },
+  { capability: "Cross-case intelligence and matching", description: "Future concepts requiring consent, permissions and validation", status: "Roadmap" as const },
 ];
 
 // ─── NAV SECTIONS ─────────────────────────────────────────────────────────────
@@ -203,8 +190,8 @@ const NAV_SECTIONS = [
   { id: "seller", label: "Seller Sim" },
   { id: "capital", label: "Capital Stack" },
   { id: "memo", label: "Memo + LOI" },
-  { id: "hunt", label: "The Hunt" },
-  { id: "moat", label: "The Moat" },
+  { id: "hunt", label: "Sourcing Context" },
+  { id: "moat", label: "Future Extensions" },
   { id: "model", label: "Business Model" },
   { id: "rigor", label: "Rigor Gate" },
   { id: "ask", label: "The Ask" },
@@ -234,9 +221,10 @@ function DemoLabel() {
   );
 }
 
-function StatusBadge({ status }: { status: "Live" | "Demo" | "Roadmap" }) {
+function StatusBadge({ status }: { status: "Live" | "Demo" | "Roadmap" | "Preview" }) {
   const styles = {
     Live: { color: "#16a34a", bg: "oklch(0.55 0.12 145 / 0.10)", border: "oklch(0.55 0.12 145 / 0.30)" },
+    Preview: { color: "var(--sh-text-secondary)", bg: "var(--sh-surface-2)", border: "var(--sh-border-1)" },
     Demo: { color: "var(--sh-signal)", bg: "oklch(0.66 0.14 55 / 0.10)", border: "oklch(0.66 0.14 55 / 0.30)" },
     Roadmap: { color: "var(--sh-fg-3)", bg: "var(--sh-primary-8)", border: "var(--sh-border)" },
   };
@@ -475,7 +463,7 @@ function RedTeamSimulator() {
             <Shield className="w-7 h-7" style={{ color: "#dc2626" }} />
           </div>
           <p className="text-sm font-medium mb-1" style={{ color: "var(--sh-text-primary)" }}>Pre-acquisition signals loaded</p>
-          <p className="text-xs mb-5" style={{ color: "var(--sh-fg-muted)" }}>Broker sheet only. No outcome data. Red Team runs cold.</p>
+          <p className="text-xs mb-5" style={{ color: "var(--sh-fg-muted)" }}>Fixed composite broker sheet. Prewritten findings; no agent runs here.</p>
           <button
             onClick={run}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all"
@@ -703,7 +691,7 @@ function MemoSimulator() {
         style={{ background: "var(--sh-surface-3)", border: "1px solid var(--sh-border-1)" }}
       >
         <Lock className="w-4 h-4 shrink-0" style={{ color: "var(--sh-fg-muted)" }} />
-        <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>LOI draft available on the live platform — conditional offer template with earnout and written contract closing conditions pre-populated.</p>
+        <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>A real LOI requires legal review and buyer authorization. This fixed memo does not generate or send one.</p>
       </div>
     </div>
   );
@@ -772,7 +760,7 @@ export default function InvestorBrief() {
           className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all"
           style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
         >
-          Log in to run the live flow
+          Sign in to workspace
           <ArrowRight className="w-3.5 h-3.5" />
         </a>
       </header>
@@ -811,7 +799,7 @@ export default function InvestorBrief() {
               className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold"
               style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
             >
-              Run live flow
+              Sign in
               <ArrowRight className="w-3 h-3" />
             </a>
           </div>
@@ -827,21 +815,17 @@ export default function InvestorBrief() {
               className="text-4xl lg:text-5xl font-black leading-tight mb-6"
               style={{ fontFamily: "var(--font-serif, 'Fraunces', serif)", color: "var(--sh-text-primary)" }}
             >
-              Signal Hunter OS finds the asset, then tries to kill it — across operating businesses, commercial property, and macro theses.
+              Pressure-test the deal before committing capital.
             </h1>
             <p className="text-lg leading-relaxed mb-4" style={{ color: "var(--sh-text-secondary)" }}>
-              Two halves of the same job. <strong style={{ color: "var(--sh-text-primary)" }}>Sourcing</strong> starts
-              from the qualifying universe rather than fragmented listing aggregators — 63,127 National Register buildings, county
-              ownership and tax liens, and live Opportunity Radar signals backed by Sonar Pro. <strong style={{ color: "var(--sh-text-primary)" }}>Diligence</strong> then
-              asks the question a broker sheet never does — <em>what kills this allocation?</em> — before earnest capital is wired, not months after.
+              An evidence-first deal diligence and decision desk for buyers, acquisition entrepreneurs, sponsors and investment teams.
+              Start with a target, a broker introduction or a search result. Test seller claims, challenge assumptions and keep missing evidence visible. Search is one entrypoint, not the product’s identity.
             </p>
             <p className="text-lg leading-relaxed mb-6" style={{ color: "var(--sh-text-secondary)" }}>
-              The initial wedge was the $4.5 trillion small-business transition. The suite now powers
-              commercial real estate underwriting, where county records and lease rolls dictate viability,
-              and Capital Aperture, where macro theses and duration shocks are evaluated with risk-bounded paper discipline.
+              Document-first journey — roadmap preview: bring your own CIM, financial statements and contracts; review extracted claims and source references; pressure-test the case; prepare a decision with open questions intact. PDF upload and ingestion are not connected in this brief.
             </p>
             <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>
-              Market size estimate sourced from BizBuySell 2025 Insight Report and SBA Office of Advocacy SMB data. $4.5T represents total estimated value of US small businesses with owner age ≥55 expected to transact 2025–2035.
+              Illustrative — composite deal, not a real customer. All simulators use fixed examples; no live agent calls. This brief does not demonstrate document ingestion or completion of parallel engine work.
             </p>
           </section>
 
@@ -849,13 +833,13 @@ export default function InvestorBrief() {
           <section ref={setRef("problem")} id="problem" className="scroll-mt-20">
             <SectionLabel>Why Now</SectionLabel>
             <h2 className="text-3xl font-black mb-6" style={{ fontFamily: "var(--font-serif, 'Fraunces', serif)", color: "var(--sh-text-primary)" }}>
-              The transition wave is historic. The diligence gap is lethal.
+              A seller’s claim is the start of diligence.
             </h2>
             <div className="grid sm:grid-cols-3 gap-4 mb-8">
               {[
-                { stat: "~$4.5T", label: "estimated value of US small businesses with owners ≥55 expected to transact by 2035", source: "SBA Office of Advocacy, estimate" },
-                { stat: "10,000+", label: "new ETA searchers and CRE syndicators entering the market annually", source: "Stanford GSB & industry survey data, estimate" },
-                { stat: "~30%", label: "of private acquisitions and commercial assets underperform debt service within 24 months", source: "SBA OIG & industry debt analysis, estimate" },
+                { stat: "Claims", label: "What does the seller report, and where is it documented?", source: "Review question — not independent verification" },
+                { stat: "Assumptions", label: "What changes when earnings or financing terms move?", source: "Scenario modeling — not a forecast" },
+                { stat: "Gaps", label: "What must be checked before the next commitment?", source: "Buyer-owned decision — not automatic approval" },
               ].map((item) => (
                 <div key={item.stat} className="rounded-xl p-5" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
                   <p className="text-3xl font-black mb-1" style={{ color: "var(--sh-signal)", fontFamily: "var(--font-serif, 'Fraunces', serif)" }}>{item.stat}</p>
@@ -865,7 +849,7 @@ export default function InvestorBrief() {
               ))}
             </div>
             <p className="text-base leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>
-              Across private acquisitions and tangible assets, buyers face the same structural blind spot: platforms are designed to market assets, not stress-test them. Brokers are paid on closing. Traditional QoE and engineering firms charge $25–$80k and require 6–10 weeks. Signal Hunter OS runs autonomous, adversarial diligence in minutes before the LOI is signed — catching fatal flaws while walking away is free.
+              Signal Hunter sits upstream of Quality of Earnings (QoE): organize the questions, challenge the case and decide what deserves deeper diligence. It does not replace independent accounting, legal review, lender underwriting or the buyer’s judgment.
             </p>
           </section>
 
@@ -918,7 +902,7 @@ export default function InvestorBrief() {
               </div>
             </div>
             <p className="text-base leading-relaxed mb-4" style={{ color: "var(--sh-text-secondary)" }}>
-              The Red Team runs from the broker sheet alone — no outcome data, no prompting. It surfaces the landmines that sink deals after close: customer concentration, owner dependence, add-back inflation, contract cliffs, undisclosed key-person risk. The demo below runs cold on GT-001, the same composite deal that resulted in a $1.76M buyer loss in the documented failure pattern.
+              Examine the cached GT-001 findings: customer concentration, owner dependence, add-back inflation and contract cliffs. The demo reveals prewritten findings, not a cold agent run. The loss scenario is illustrative, not a customer outcome.
             </p>
             <div
               className="rounded-lg px-4 py-3 mb-5 flex items-start gap-3"
@@ -989,7 +973,7 @@ export default function InvestorBrief() {
           {/* ── 9. MOAT ── */}
           {/* ── 9a. THE HUNT — property sourcing spine ── */}
           <section ref={setRef("hunt")} id="hunt" className="scroll-mt-20">
-            <SectionLabel>The Hunt — Live</SectionLabel>
+            <SectionLabel>Sourcing — an optional entrypoint</SectionLabel>
             <div className="flex items-start gap-4 mb-5">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
                 <Target className="w-5 h-5" style={{ color: "var(--sh-primary)" }} />
@@ -1142,19 +1126,17 @@ export default function InvestorBrief() {
               </div>
             </div>
             <p className="text-base leading-relaxed mb-4" style={{ color: "var(--sh-text-secondary)" }}>
-              Every diligence run captures a searcher's live thesis: what they're looking for, what they rejected, what they flagged as a deal-killer. Aggregated across thousands of runs, this becomes a proprietary demand-side dataset that no competitor holds — a real-time map of what the acquisition market actually wants, before it appears in any listing or broker data.
+              A possible future research layer could capture consented investment criteria, rejection reasons and diligence questions. No aggregated customer dataset or volume of runs is claimed here. Confidential deal evidence must not become shared intelligence by default.
             </p>
             <p className="text-base leading-relaxed mb-6" style={{ color: "var(--sh-text-secondary)" }}>
-              The Searcher Intelligence DB is the path from a diligence tool to a data and matching
-              business. It extends the spine above rather than replacing it: the supply side is already
-              enumerable, and this would make the demand side legible too.
+              This optional roadmap does not define the product. The core job remains helping a buyer or investment team examine a deal and decide what to verify next.
             </p>
             <div className="rounded-xl p-6" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
               <div className="grid sm:grid-cols-3 gap-4">
                 {[
-                  { icon: Zap, label: "Demand Signal", desc: "Every run captures a live thesis — what the searcher wants, what they rejected, what killed the deal." },
-                  { icon: BarChart3, label: "Compound Value", desc: "Each run makes the dataset richer. The 10,000th run is worth more than the 100th." },
-                  { icon: Target, label: "Matching Engine", desc: "Roadmap: match sellers to the searchers most likely to close — before the deal hits a listing platform." },
+                  { icon: Zap, label: "Decision Context", desc: "Roadmap: retain investment criteria and review outcomes with explicit consent." },
+                  { icon: BarChart3, label: "Evidence Controls", desc: "Roadmap: define permissions and provenance before any cross-case reuse." },
+                  { icon: Target, label: "Matching Engine", desc: "Roadmap: compare opportunities with buyer criteria, without promising a close." },
                 ].map((item) => (
                   <div key={item.label} className="text-center p-4">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: "var(--sh-surface-3)", border: "1px solid var(--sh-border-1)" }}>
@@ -1180,19 +1162,19 @@ export default function InvestorBrief() {
                   step: "1",
                   label: "Free Gated Run",
                   status: "Roadmap",
-                  desc: "Searcher inputs a deal. Red Team runs. One concern surfaced free, rest locked. Name + email captured. Searcher Intelligence DB record written with consent.",
+                  desc: "Proposed entrypoint: a buyer supplies a case for a bounded diligence preview. Requires implementation, evidence controls and explicit consent.",
                 },
                 {
                   step: "2",
                   label: "Subscription Conversion",
                   status: "Live",
-                  desc: "Full platform access: all 6 modules, unlimited runs, IC consensus, memo generation. Priced for the individual searcher and the search fund.",
+                  desc: "Full platform access: all 6 modules, unlimited runs, IC consensus, memo generation. For buyers, acquisition entrepreneurs, sponsors and investment teams.",
                 },
                 {
                   step: "3",
                   label: "Data Asset Compounding",
                   status: "Roadmap",
-                  desc: "Every run enriches the Searcher Intelligence DB. At scale: matching, broker partnerships, institutional licensing. The tool is the wedge; the data is the business.",
+                  desc: "Possible future extensions: consented cross-case learning and matching. These are roadmap concepts, not current traction or automatic reuse of deal documents.",
                 },
               ].map((item) => (
                 <div key={item.step} className="flex gap-4 rounded-xl p-5" style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}>
@@ -1305,20 +1287,20 @@ export default function InvestorBrief() {
               What the catalog needs. What comes next.
             </h2>
             <p className="text-base leading-relaxed mb-8" style={{ color: "var(--sh-text-secondary)" }}>
-              Signal Hunter OS is in active development with a working platform, documented rigor gate results, and a clear path to the Searcher Intelligence DB moat. The next build priorities are the gated free run (/try), the Searcher Intelligence DB schema, and the matching engine foundation.
+              The document-first direction is a roadmap, not a completed ingestion workflow. Connecting documents to reviewable claims, source references and decision outputs still requires implementation and end-to-end verification. Existing engine and UX work must pass its own checks before it is described as ready.
             </p>
             <div
               className="rounded-2xl p-8 text-center"
               style={{ background: "var(--sh-surface-2)", border: "1px solid var(--sh-border-1)" }}
             >
-              <p className="text-lg font-semibold mb-2" style={{ color: "var(--sh-text-primary)" }}>Ready to run the live flow?</p>
-              <p className="text-sm mb-6" style={{ color: "var(--sh-text-secondary)" }}>Log in to run a real deal through the full IC panel, Red Team, and capital stack — not a demo.</p>
+              <p className="text-lg font-semibold mb-2" style={{ color: "var(--sh-text-primary)" }}>Have a case to evaluate?</p>
+              <p className="text-sm mb-6" style={{ color: "var(--sh-text-secondary)" }}>Sign in to the workspace. This brief does not upload documents, launch analysis or authorize a commitment.</p>
               <a
                 href={getLoginUrl()}
                 className="inline-flex items-center gap-2 px-8 py-3 rounded-xl text-base font-semibold transition-all"
                 style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
               >
-                Log in to run the live flow
+                Sign in to workspace
                 <ArrowRight className="w-4 h-4" />
               </a>
             </div>
@@ -1326,9 +1308,9 @@ export default function InvestorBrief() {
 
           {/* ── 13. CAPABILITY MATRIX ── */}
           <section ref={setRef("matrix")} id="matrix" className="scroll-mt-20">
-            <SectionLabel>Capability Matrix — FIS Catalog</SectionLabel>
+            <SectionLabel>What this brief demonstrates</SectionLabel>
             <h2 className="text-3xl font-black mb-6" style={{ fontFamily: "var(--font-serif, 'Fraunces', serif)", color: "var(--sh-text-primary)" }}>
-              Honest status per capability.
+              Demo, preview or roadmap.
             </h2>
             <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--sh-border-1)" }}>
               <table className="w-full text-sm">
@@ -1359,7 +1341,7 @@ export default function InvestorBrief() {
               </table>
             </div>
             <p className="text-xs mt-4" style={{ color: "var(--sh-fg-muted)" }}>
-              Live = deployed and functional in the current build. Demo = working simulator, not connected to live data. Roadmap = scoped and designed, not yet built. No capability is labeled Live unless it is running in production.
+              Demo = fixed example or local simulator. Preview = product context, not exercised or production-verified here. Roadmap = intended workflow, not connected in this brief. These statuses do not certify a deployed document-ingestion pipeline.
             </p>
           </section>
 
@@ -1377,7 +1359,7 @@ export default function InvestorBrief() {
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold"
           style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
         >
-          Run live flow
+          Sign in
           <ChevronRight className="w-3.5 h-3.5" />
         </a>
       </div>

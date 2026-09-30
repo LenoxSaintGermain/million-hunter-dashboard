@@ -1,0 +1,16 @@
+.mission-reading-brief{container-type:inline-size;color:var(--ink);padding-top:8px}
+.mission-brief-heading{border-bottom:1px solid var(--rule);padding-bottom:22px;margin-bottom:24px}
+.mission-brief-heading>p,.mission-brief-eyebrow,.mission-brief-next>span{font:10px/1.6 var(--font-mono);letter-spacing:.13em;text-transform:uppercase;color:var(--sh-fg-3)}
+.mission-brief-heading h3{font:clamp(26px,3.5cqw,36px)/1.2 var(--font-display);letter-spacing:-.025em;max-width:30ch;margin:10px 0 12px;overflow-wrap:anywhere}
+.mission-brief-heading>span{font-size:11px;color:var(--sh-fg-3)}
+.mission-brief-spread{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(190px,1fr);gap:36px;align-items:start}
+.mission-brief-passage{padding:0 0 22px;margin:0 0 22px;border-bottom:1px solid var(--rule)}
+.mission-brief-passage:last-child{border-bottom:0;margin-bottom:0}
+.mission-brief-passage h4{display:flex;gap:12px;font:18px/1.35 var(--font-display);margin-bottom:12px}.mission-brief-passage h4>span{font:10px/2.2 var(--font-mono);color:var(--sh-fg-3)}
+.mission-brief-passage>p{font:15px/1.85 var(--font-sans);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--sh-fg-2);max-width:68ch}
+.mission-brief-margin{border-top:2px solid var(--ink);padding-top:14px}.mission-brief-margin>h4{font:italic 24px/1.25 var(--font-display);margin:16px 0 24px}.mission-brief-margin dl{border-block:1px solid var(--rule);padding:14px 0}.mission-brief-margin dt{font:10px/1.6 var(--font-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--sh-fg-3)}.mission-brief-margin dd{font:18px/1.4 var(--font-display);margin:6px 0 16px}.mission-brief-margin dd:last-child{margin-bottom:0}
+.mission-brief-margin>p:not(.mission-brief-eyebrow),.mission-brief-next p{font:12px/1.75 var(--font-sans);color:var(--sh-fg-3);margin:16px 0}.mission-brief-next{margin-top:24px;border-left:2px solid var(--amber);padding-left:14px}
+.mission-thesis-assignment{border-block:1px solid var(--rule);padding:16px 0;margin-bottom:20px}.mission-thesis-assignment>div{display:grid;grid-template-columns:1fr minmax(0,1fr);gap:20px;align-items:center}.mission-thesis-assignment select{max-width:100%;width:100%;border-radius:0!important;border-color:var(--rule)!important}.mission-thesis-assignment svg{display:none}.mission-thesis-assignment p:nth-child(2){display:none}
+.mission-editorial-article{border-radius:0!important;background:var(--paper)!important}.mission-editorial-article>header{background:transparent!important}
+@container(max-width:640px){.mission-brief-spread{grid-template-columns:1fr;gap:20px}.mission-brief-margin{border-top:1px solid var(--rule);border-left:2px solid var(--amber);padding:16px}.mission-brief-heading h3{font-size:28px}}
+@media(max-width:640px){.mission-thesis-assignment>div{grid-template-columns:1fr;gap:12px}}

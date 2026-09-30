@@ -52,7 +52,16 @@ describe("expanded attention cards do not duplicate the inline review", () => {
     expect($.text()).toContain("No source links recorded; finding unverified");
     expect($.text()).toContain("Check time not recorded");
     expect($("button[aria-expanded=true]").text()).toBe("Close review");
-    expect($("details")).toHaveLength(0);
+    const reason = $("details.capital-mobile-reason");
+    expect(reason).toHaveLength(compact ? 0 : 1);
+    if (!compact) {
+      expect(reason.find("summary").text()).toBe("Why this needs review");
+      expect(reason.find("p").text()).toBe(item.reason);
+      expect(reason.attr("open")).toBeUndefined();
+    }
+    expect($("details").not(".capital-mobile-reason")).toHaveLength(0);
+    expect($.text()).not.toContain(item.evidence.finding);
+    expect($.text()).not.toContain(item.evidence.rationale);
   });
   it("restores evidence access and the normal action when closed", () => {
     const $ = load(renderToStaticMarkup(createElement(AttentionDecisionCard, { item, reviewOpen: false, onOpen: vi.fn() })));

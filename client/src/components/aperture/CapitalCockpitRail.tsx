@@ -8,6 +8,7 @@ import { apertureLanguage, practiceAccountLabel, accountFundsLabel } from "@shar
 import { buildCockpitRailSummary, type CockpitHeadroomLine } from "@shared/cockpitRailSummary";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { BasisMark, StateMark } from "./DecisionVisualLanguage";
+import { PortfolioPortrait } from "./PortfolioPortrait";
 
 type HeadroomLine = CockpitHeadroomLine;
 
@@ -48,7 +49,12 @@ function MeasureLine({ line }: { line: HeadroomLine }) {
   </div>;
 }
 
-export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: number; compactOnly?: boolean }) {
+function ConnectedPortfolioPortrait({ accountId, ...props }: Omit<React.ComponentProps<typeof PortfolioPortrait>, "holdings" | "loading" | "failed"> & { accountId: number | null }) {
+  const positions = trpc.aperture.account.getPositions.useQuery({ accountId: accountId ?? 0 }, { enabled: accountId != null, retry: false, refetchInterval: 60_000, refetchIntervalInBackground: false });
+  return <PortfolioPortrait {...props} holdings={positions.data} loading={positions.isFetching} failed={positions.isError} />;
+}
+
+export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = false }: { runId?: number; compactOnly?: boolean; visualHero?: boolean }) {
   const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false });
   const accounts = accountQuery.data;
   const preferredAccountId = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")?.id
@@ -205,7 +211,7 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
   const buyingPowerCents = data.account.buyingPowerCents ?? cashCents;
   const unrealizedCents = deskQuery.data?.account?.unrealizedPnlCents ?? null;
 
-  return <section className="mb-5 overflow-hidden rounded-xl border shadow-sm" style={{ borderColor: summary.severity === "critical" ? severityColor : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+  const rail = <section className="mb-5 overflow-hidden rounded-xl border shadow-sm" style={{ borderColor: summary.severity === "critical" ? severityColor : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
     {/* Executive Cockpit Ticker Tape (Desktop) */}
     <div className="hidden sm:block">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-3.5 py-2 text-xs" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
@@ -367,4 +373,5 @@ export function CapitalCockpitRail({ runId, compactOnly = false }: { runId?: num
     {data.run && <div className="border-t px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><RailHead>Run preset · #{data.run.runId}</RailHead>{data.run.unavailableReason ? <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.run.unavailableReason}</p> : <div className="mt-1 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4" style={{ color: "var(--sh-fg-muted)" }}><p>{data.run.holdingPeriodLabel || "holding period not measured"}</p><p>{deadlineMs == null ? "catalyst deadline not measured" : deadlineMs < 0 ? `catalyst window expired ${duration(-deadlineMs)} ago` : `catalyst deadline in ${duration(deadlineMs)}`}</p><p className="tabular-nums">Liquidity floor {data.run.liquidityFloorAdvUsd == null ? "not measured" : `$${Math.round(data.run.liquidityFloorAdvUsd).toLocaleString()}`}</p><p className="tabular-nums">Single-name cap {data.run.maxSingleNamePct == null ? "not measured" : `${data.run.maxSingleNamePct.toFixed(1)}%`}</p><p className="sm:col-span-2 lg:col-span-4">Invalidation: {data.run.invalidationRule || "not measured"}</p>{data.run.providerGaps === null ? <p className="sm:col-span-2 lg:col-span-4">Provider availability was not recorded for this run.</p> : data.run.providerGaps.length ? <p className="sm:col-span-2 lg:col-span-4">Provider gaps: {data.run.providerGaps.join(", ")}</p> : <p className="sm:col-span-2 lg:col-span-4">Every provider recorded for this run was live.</p>}</div>}</div>}
     </div>}
   </section>;
+  return visualHero ? <><ConnectedPortfolioPortrait key={data.account.accountId ?? "unknown"} accountId={data.account.accountId} account={data.account} thesis={data.activeThesis?.name ?? null} binding={summary.binding} now={clockNow}/><details className="portrait-machinery"><summary>Account controls, market clock & all constraints</summary>{rail}</details></> : rail;
 }

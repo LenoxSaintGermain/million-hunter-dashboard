@@ -24,7 +24,10 @@ try {
   check('Same-origin application bundle is referenced', !!asset);
   const bundle = await read(asset);
   check('Served bundle matches the exact source SHA', bundle.response.status === 200 && bundle.body.includes(sha));
-  check('Capital reading desk is included', bundle.body.includes('Your thesis. The world as it stands.') && bundle.body.includes('Boundary not measured'));
+  check('Capital reading desk is included', bundle.body.includes('What needs your judgment.') && bundle.body.includes('Boundary not measured'));
+  check('Document-first framing is included', bundle.body.includes('Pressure-test the deal before committing capital.'));
+  check('Illustrative venture route is included', bundle.body.includes('/jims-file'));
+  check('Portfolio portrait is included', bundle.body.includes('Where capital sits.'));
   check('Public Capital UAT preview is included', bundle.body.includes('/walkthrough/capital-desk') && bundle.body.includes('illustrative composite records'));
   check('Deal Senior reading desk is included', bundle.body.includes('Follow the sources') && bundle.body.includes('Challenge the cash'));
   check('Scan story harness is included', bundle.body.includes('Find the next question.'));
