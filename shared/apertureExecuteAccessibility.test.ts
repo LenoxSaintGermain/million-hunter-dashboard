@@ -12,6 +12,16 @@ const tabsSource = readFileSync(
 );
 
 describe("Aperture Execute mobile and accessibility contract", () => {
+  it("reads lifecycle from router search on entry and navigation and keeps proposal UI on orders only", () => {
+    expect(executeSource).toContain("return parseApertureLifecycle(search)");
+    expect(executeSource).toContain("setLifecycleTab(parseApertureLifecycle(search))");
+    expect(executeSource).toContain("[search, runId]");
+    expect(executeSource).toContain('{lifecycleTab === "orders" && (proposalCandidate');
+    expect(executeSource).toContain('lifecycleTab === "alpha" ? "Outcome & notes"');
+    expect(executeSource).toContain('{lifecycleTab !== "alpha" && proposalCandidate && data?.brief');
+    expect(executeSource).toContain('<ScheduledPlayOutcomeReview runId={runId} candidateId={proposalCandidate?.id} />');
+    expect(executeSource).toContain("onClick={() => compute.mutate({ runId })}");
+  });
   it("uses the clear three-step paper lifecycle language", () => {
     expect(executeSource).toContain(">Practice order</TabsTrigger>");
     expect(executeSource).toContain(">Check whether thesis still holds</TabsTrigger>");

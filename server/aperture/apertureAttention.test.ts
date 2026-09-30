@@ -23,6 +23,12 @@ function base(overrides: Partial<ApertureAttentionInput> = {}): ApertureAttentio
 }
 
 describe("Capital Aperture attention briefing", () => {
+  it("lands a due outcome review on outcome notes, preserving its candidate", () => {
+    const review = { id: 12, kind: "play_outcome" as const, dueAt: now - 1, updatedAt: now,
+      title: "RWM review", href: "/aperture/run/780001/execute?candidate=630001" };
+    expect(deriveApertureAttention(base({ pendingReviews: [review] }), null).primary?.href)
+      .toBe("/aperture/run/780001/execute?candidate=630001&lifecycle=alpha");
+  });
   it("shows the saved gate condition without implying it was evaluated", () => {
     const review = { id: 12, kind: "gate_review" as const, dueAt: now - 1, updatedAt: now - 100,
       title: "Portfolio-gap deployment", href: "/aperture/decision/12/revision/4",

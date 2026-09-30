@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearch } from "wouter";
-import { ArrowRight, ChevronDown, FileCheck2, Loader2, Pencil, Save, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, FileCheck2, Loader2, Pencil, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
@@ -184,7 +184,10 @@ export function CapitalThesisWorkspace() {
   </section>;
 
   return (
-    <main className="mx-auto w-full max-w-[1040px] space-y-5 px-4 py-8 sm:px-6 lg:py-10">
+    <div className="mx-auto w-full max-w-[1040px] space-y-5">
+      <a href={route("/aperture/theses")} className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
+        <ArrowLeft aria-hidden="true" className="h-4 w-4" />Saved theses
+      </a>
       <section className="border-b pb-5" style={{ borderColor: "var(--sh-border-1)" }}>
         <p className="font-mono text-[0.66rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-fg-muted)" }}>Thesis workspace · owner-scoped</p>
         <h1 className="mt-2 font-serif text-[clamp(1.75rem,4vw,2.65rem)] leading-[1.04]" style={{ color: "var(--sh-text-primary)" }}>What belief should frame this decision?</h1>
@@ -234,6 +237,6 @@ export function CapitalThesisWorkspace() {
           <div className="flex flex-col gap-2 sm:flex-row"><Button className="min-h-11 flex-1" onClick={() => void useInMission()} disabled={activate.isPending || project.isPending}>{activate.isPending || project.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}Use in Capital Mission</Button><Button variant="outline" className="min-h-11" onClick={() => { setMissionError(null); setCreating(true); setDraftName(""); setDraftText(""); setSaveError(null); setSaveReceipt(null); setDetail(EMPTY_DETAIL); setEditing(false); }}>Create new Capital thesis</Button></div>
         </>
       ) : <section className="rounded-lg border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-paper)" }}><p className="font-mono text-[0.65rem] uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>New Capital thesis</p><h2 className="mt-2 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>Frame the decision in one statement.</h2>{renderComposer()}</section>}
-    </main>
+    </div>
   );
 }

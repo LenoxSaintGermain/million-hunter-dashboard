@@ -12,6 +12,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import { useRoute, useLocation, useSearch } from "wouter";
+import { parseApertureLifecycle } from "@shared/apertureLifecycleNavigation";
+import { ScheduledPlayOutcomeReview } from "@/components/aperture/ScheduledPlayOutcomeReview";
 import { trpc } from "@/lib/trpc";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../../server/routers";
@@ -1310,13 +1312,11 @@ export default function ApertureExecute() {
   const findingSelection = parseMonitoringFindingSelection(search);
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [lifecycleTab, setLifecycleTab] = useState<"orders" | "monitoring" | "alpha">(() => {
-    const requested = new URLSearchParams(window.location.search).get("lifecycle");
-    return requested === "monitoring" || requested === "alpha" ? requested : "orders";
+    return parseApertureLifecycle(search);
   });
   useEffect(() => {
-    const requested = new URLSearchParams(search).get("lifecycle");
-    if (requested === "monitoring" || requested === "alpha") setLifecycleTab(requested);
-  }, [search]);
+    setLifecycleTab(parseApertureLifecycle(search));
+  }, [search, runId]);
   const openLifecycle = (tab: "orders" | "monitoring" | "alpha") => {
     setLifecycleTab(tab);
     window.requestAnimationFrame(() => document.getElementById("paper-lifecycle")?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -1421,7 +1421,7 @@ export default function ApertureExecute() {
               <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             </Button>
             <h1 className="min-w-0 text-xl font-bold" style={{ color: "var(--sh-text-primary)" }}>
-              {lifecycleTab === "monitoring" ? "Review play" : "Practice order"}
+              {lifecycleTab === "alpha" ? "Outcome & notes" : lifecycleTab === "monitoring" ? "Review play" : "Practice order"}
             </h1>
           </div>
           {run && (
@@ -1431,7 +1431,7 @@ export default function ApertureExecute() {
           )}
         </div>
 
-        {proposalCandidate && data?.brief && (
+        {lifecycleTab !== "alpha" && proposalCandidate && data?.brief && (
           <div className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -1444,7 +1444,7 @@ export default function ApertureExecute() {
           </div>
         )}
 
-        {lifecycleTab !== "monitoring" && (proposalCandidate && candidateActiveOrder ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "color-mix(in srgb, var(--sh-emerald) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div className="min-w-0"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-emerald)" }}>Practice order already exists · do not duplicate</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{orderInstrumentLabel(candidateActiveOrder)}</h2><p className="mt-1 text-sm tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>{orderSizeLabel(candidateActiveOrder)} · {candidateActiveOrder.orderType.toUpperCase()} · {candidateActiveOrder.timeInForce.toUpperCase()}{candidateActiveOrder.limitPriceCents ? ` · limit ${fmtPrice(candidateActiveOrder.limitPriceCents)}` : ""}</p><p className="mt-2 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title}</p></div></div></section> : proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No practice order can be prepared from this version.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(evidenceUrl)}>Review the recorded evidence decision</Button></section> : proposalCandidate && evidenceReviewRequired ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Practice order locked · step 1 of 4</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Review {unreviewedEvidenceChecks.length} decision-critical check{unreviewedEvidenceChecks.length === 1 ? "" : "s"} before building the ticket.</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This is the only blocker to address on this screen. After the final positive review, the flow advances to exact contract → proposal → approve → submit. A negative review preserves cash instead.</p><ol className="mt-4 space-y-2">{unreviewedEvidenceChecks.map((check, index) => <li key={check} className="flex gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}><span className="font-mono text-xs tabular-nums" style={{ color: "var(--sh-signal)" }}>{index + 1}</span><span>{check}</span></li>)}</ol><Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={() => navigate(evidenceUrl)}>Review {unreviewedEvidenceChecks.length} required check{unreviewedEvidenceChecks.length === 1 ? "" : "s"}</Button></section> : proposalCandidate && <PaperProposalForm key={`${runId}:${proposalCandidate.id}`} runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} evidenceReviewComplete={proposalEvidence?.paperProposalReady === true} onReturnToBrief={() => navigate(evidenceUrl)} onReturnToDecisionBrief={() => setShowAlternatives(true)} onProposalCreated={() => openLifecycle("orders")} onCashPreserved={() => navigate("/aperture/plays")} />)}
+        {lifecycleTab === "orders" && (proposalCandidate && candidateActiveOrder ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "color-mix(in srgb, var(--sh-emerald) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div className="min-w-0"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-emerald)" }}>Practice order already exists · do not duplicate</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>{orderInstrumentLabel(candidateActiveOrder)}</h2><p className="mt-1 text-sm tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>{orderSizeLabel(candidateActiveOrder)} · {candidateActiveOrder.orderType.toUpperCase()} · {candidateActiveOrder.timeInForce.toUpperCase()}{candidateActiveOrder.limitPriceCents ? ` · limit ${fmtPrice(candidateActiveOrder.limitPriceCents)}` : ""}</p><p className="mt-2 text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>{candidateOrderDecision?.title}</p></div></div></section> : proposalCandidate && paperStageDeclined ? <section className="min-w-0 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--sh-red) 45%, var(--sh-border-1))", background: "var(--sh-surface-2)" }}><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>No practice order can be prepared from this version.</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>The not-confirmed evidence answer remains attached to this Decision Run. No proposal or broker order was created.</p><Button className="mt-3 min-h-11 w-full sm:w-auto" variant="outline" size="sm" onClick={() => navigate(evidenceUrl)}>Review the recorded evidence decision</Button></section> : proposalCandidate && evidenceReviewRequired ? <section className="min-w-0 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Practice order locked · step 1 of 4</p><h2 className="mt-1 font-serif text-xl" style={{ color: "var(--sh-text-primary)" }}>Review {unreviewedEvidenceChecks.length} decision-critical check{unreviewedEvidenceChecks.length === 1 ? "" : "s"} before building the ticket.</h2><p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This is the only blocker to address on this screen. After the final positive review, the flow advances to exact contract → proposal → approve → submit. A negative review preserves cash instead.</p><ol className="mt-4 space-y-2">{unreviewedEvidenceChecks.map((check, index) => <li key={check} className="flex gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}><span className="font-mono text-xs tabular-nums" style={{ color: "var(--sh-signal)" }}>{index + 1}</span><span>{check}</span></li>)}</ol><Button className="mt-4 min-h-11 w-full sm:w-auto" onClick={() => navigate(evidenceUrl)}>Review {unreviewedEvidenceChecks.length} required check{unreviewedEvidenceChecks.length === 1 ? "" : "s"}</Button></section> : proposalCandidate && <PaperProposalForm key={`${runId}:${proposalCandidate.id}`} runId={runId} candidate={proposalCandidate} account={data?.paperContext?.account} run={run} evidenceReviewComplete={proposalEvidence?.paperProposalReady === true} onReturnToBrief={() => navigate(evidenceUrl)} onReturnToDecisionBrief={() => setShowAlternatives(true)} onProposalCreated={() => openLifecycle("orders")} onCashPreserved={() => navigate("/aperture/plays")} />)}
 
         {showAlternatives && proposalCandidate && <section className="scroll-mt-4 rounded-xl border p-4 sm:p-5" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }} aria-live="polite">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -1477,6 +1477,7 @@ export default function ApertureExecute() {
             <MonitoringPanel key={`${runId}:${proposalCandidate?.id}:${requestedOrderId ?? "default"}`} runId={runId} candidate={proposalCandidate} thesisSummary={run?.invalidationRule} order={monitoringOrder} selection={findingSelection} onOpenFinding={navigate} contextState={monitoringContextState} onRetryContext={() => { void runQuery.refetch(); void ordersQuery.refetch(); }} />
           </TabsContent>
           <TabsContent value="alpha" className="mt-4 min-w-0" aria-label="Outcome and notes">
+            <ScheduledPlayOutcomeReview runId={runId} candidateId={proposalCandidate?.id} />
             <AlphaDashboard runId={runId} />
           </TabsContent>
         </Tabs>

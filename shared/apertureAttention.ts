@@ -1,5 +1,6 @@
 import { monitoringFindingPresentation, type MonitoringInstrumentContext } from "./monitoringState";
 import { apertureLanguage } from "./apertureLanguage";
+import { outcomeReviewHref } from "./apertureLifecycleNavigation";
 import { monitoringFindingHref, monitoringFindingVersion, resolvedFindingVersions } from "./monitoringFinding";
 import { paperInstrumentDisplayLabel, parseOccOptionSymbol } from "./paperInstrument";
 
@@ -679,7 +680,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
         : "Review is due, but its condition is not recorded. Inspect the saved decision before reassessing.",
       consequence: "This is a human checkpoint, not proof that an automatic check or exit occurred.",
       actionLabel: review.kind === "gate_review" ? "Review required check" : "Review recorded outcome",
-      href: review.href,
+      href: review.kind === "play_outcome" ? outcomeReviewHref(review.href) : review.href,
       updatedAt: review.updatedAt,
       deadlineAt: review.dueAt,
     }));

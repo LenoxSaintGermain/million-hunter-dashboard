@@ -23,6 +23,7 @@ import { acceptObjectiveMission, acceptObjectiveMissionInput, readAcceptedObject
 import { parsePersistedJson } from "../shared/persistedJson";
 import { deskAttentionSourceIssues, deskMonitoringFindings } from "./aperture/deskAttentionPresentation";
 import { monitoringReviewRouter } from "./aperture/monitoringReviewReceipt";
+import { playOutcomeRouter } from "./aperture/playOutcomeReview";
 import { strategyDiscoveryRouter } from "./aperture/strategyDiscoveryRouter";
 import { objectiveDiscoveryEnabled, readObjectiveDiscovery } from "./aperture/strategyDiscoveryWorkflow";
 import { assertNotDiscoveryProjection, discoverySelectionInput, readDiscoveryResearchBinding, readDiscoverySelections, selectDiscoveryForResearch } from "./aperture/discoverySelection";
@@ -1055,6 +1056,7 @@ async function constructPlayForUser(ctx: { user: { id: number; openId?: string }
 }
 
 export const apertureRouter = router({
+  playOutcome: playOutcomeRouter,
   quickPlay: createQuickPlayRouter({ construct: constructPlayForUser, evidenceBlock: evidenceReviewBlock }),
   strategy: strategyDiscoveryRouter,
 

@@ -887,6 +887,17 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
 
   if (!receiptTarget && !draftInitialized && missionContextError) {
     if (handoffError) return <section role="alert" className="mx-auto max-w-3xl rounded-2xl border p-5" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-serif text-2xl">We couldn’t load your saved thesis.</h2><p className="mt-2 text-sm leading-6">{handoffError}</p><Button className="mt-4 min-h-11" onClick={() => void refreshMissionContext()}>Try again</Button></section>;
+    // A rejected binding is not a transient account-refresh failure. Preserve
+    // the receipt guard; the page's capability-gated sentence entry remains
+    // available for a separately reviewed plan, never an inferred repair.
+    if (receiptError?.data?.code === "PRECONDITION_FAILED" && receiptError.message === "Decision binding unavailable") {
+      return <section role="alert" className="mx-auto max-w-3xl rounded-2xl border p-5" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}>
+        <h2 className="font-serif text-2xl">This saved plan needs recovery.</h2>
+        <p className="mt-2 text-sm leading-6">Its saved account and thesis binding could not be verified. Analysis from this record remains blocked; retrying alone will not repair it.</p>
+        <p className="mt-2 text-sm leading-6">If available above, choose “Start from a sentence” to review a separate plan. This does not repair or replace this record. Current account and risk checks still apply.</p>
+        <Button variant="outline" className="mt-4 min-h-11" onClick={() => void refreshMissionContext()}>Check recovery status</Button>
+      </section>;
+    }
     return <section role="alert" className="mx-auto max-w-3xl rounded-2xl border p-5" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-serif text-2xl">We couldn’t load your saved plan.</h2><p className="mt-2 text-sm leading-6">Your saved plan or account details are unavailable. Try again before making changes.</p><Button className="mt-4 min-h-11" onClick={() => void refreshMissionContext()}>Try again</Button></section>;
   }
   const discoveryReceipt = runway?.latest?.authority === "authoritative" && runway.latest.contextKind === "discovery"

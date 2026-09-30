@@ -106,6 +106,17 @@ function visibleText($: ReturnType<typeof load>) {
   const glance = load($.html()); glance("[hidden],details").remove(); return glance.text();
 }
 
+it("explains a rejected receipt binding without hydrating or approving it", () => {
+  fixture.queries.latest = { ...query(undefined), isError: true,
+    error: Object.assign(new Error("Decision binding unavailable"), { data: { code: "PRECONDITION_FAILED" } }) };
+  const { $ } = render();
+  expect($.text()).toContain("This saved plan needs recovery.");
+  expect($.text()).toContain("Start from a sentence");
+  expect($.text()).toContain("does not repair or replace this record");
+  expect(fixture.mutations.begin.mutateAsync).not.toHaveBeenCalled();
+  expect(fixture.mutations.run.mutateAsync).not.toHaveBeenCalled();
+});
+
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(now); vi.clearAllMocks();
   vi.stubGlobal("React", React);

@@ -36,7 +36,7 @@ export default function ThesisGraphEditor() {
   const [rawText, setRawText] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const { data: thesis, error: thesisError, refetch: refetchThesis } = trpc.aperture.thesis.get.useQuery(
+  const { data: thesis, isLoading: thesisLoading, error: thesisError, refetch: refetchThesis } = trpc.aperture.thesis.get.useQuery(
     { id: thesisId! },
     { enabled: !isNew && !!thesisId },
   );
@@ -87,6 +87,7 @@ export default function ThesisGraphEditor() {
   }, [thesis]);
 
   const handleSave = async () => {
+    if (!isNew && (!thesis || thesisError || thesis.sourceCompilationId)) return;
     if (!rawText.trim()) return toast.error("Write your thesis first");
     setSaving(true);
     try {
@@ -127,6 +128,29 @@ export default function ThesisGraphEditor() {
 
   if (thesisError) {
     return <DashboardLayout><div className="mx-auto max-w-2xl"><Card><CardContent className="space-y-4 pt-6"><div><p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>This thesis context could not load.</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>No graph, assignment, or decision binding has been substituted. Retry the read or return to the Decision Center.</p></div><p className="text-xs font-medium" style={{ color: "var(--sh-fg-muted)" }}>Diagnostic: THESIS-READ-{thesisId}</p><div className="flex flex-wrap gap-2"><Button onClick={() => refetchThesis()}><Loader2 className="mr-2 h-4 w-4" />Retry</Button><Button variant="outline" onClick={() => navigate("/aperture")}>Return to Decision Center</Button></div>{import.meta.env.DEV ? <details className="text-xs" style={{ color: "var(--sh-fg-muted)" }}><summary>Development diagnostic</summary><pre className="mt-2 whitespace-pre-wrap">{thesisError.message}</pre></details> : null}</CardContent></Card></div></DashboardLayout>;
+  }
+
+  if (!thesis || thesisLoading) {
+    return (
+      <DashboardLayout>
+        <div className="mx-auto max-w-2xl">
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              <p role="status" aria-live="polite" className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>
+                {thesisLoading ? "Loading thesis context…" : "This thesis context is unavailable."}
+              </p>
+              <p className="text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
+                Editing and compilation remain unavailable until the saved record is loaded.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {!thesisLoading && <Button onClick={() => refetchThesis()}>Retry</Button>}
+                <Button variant="outline" onClick={() => navigate("/aperture/theses")}>Return to saved theses</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
   }
 
   return (

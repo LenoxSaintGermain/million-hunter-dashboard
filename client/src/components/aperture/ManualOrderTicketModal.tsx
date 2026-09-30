@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { buildOccOptionSymbol, nextStandardMonthlyOptionExpiration } from "@shared/paperInstrument";
 import { TrendingDown, TrendingUp, Sparkles, Loader2, AlertTriangle } from "lucide-react";
 import type { AttentionMission } from "@shared/apertureAttention";
+import { manualTicketBlocker } from "@shared/manualTicketReadiness";
 
 export interface ManualOrderTicketModalProps {
   open: boolean;
@@ -57,10 +58,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
     : { data: undefined, isLoading: false };
   const activeMission = propActiveMission ?? deskSummary.data?.attention?.mission ?? null;
 
-  const runsQuery = (trpc as any)?.aperture?.run?.list?.useQuery
-    ? trpc.aperture.run.list.useQuery(undefined, { enabled: !initialValues?.runId && !activeMission?.researchRunId })
-    : { data: undefined };
-  const effectiveRunId = initialValues?.runId ?? activeMission?.researchRunId ?? runsQuery.data?.[0]?.id;
+  const effectiveRunId = initialValues?.runId ?? activeMission?.researchRunId;
 
   const paperAccounts = useMemo(() => {
     return (accountsQuery.data ?? []).filter((a) => a.isPaper);
@@ -71,9 +69,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
       const missionAccount = paperAccounts.find((a) => a.id === activeMission.accountId);
       if (missionAccount) return missionAccount;
     }
-    // Prioritize declared UAT $2,000 account if present
-    return paperAccounts.find((a) => a.id === 60001 || a.label?.toLowerCase().includes("uat") || a.label?.includes("$2,000"))
-      ?? paperAccounts.find((a) => a.brokerId === "alpaca_paper")
+    return paperAccounts.find((a) => a.brokerId === "alpaca_paper")
       ?? paperAccounts[0];
   }, [paperAccounts, activeMission?.accountId]);
 
@@ -130,7 +126,9 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
   const [reason, setReason] = useState<string>(
     "Ad-hoc manual play staged from Aperture Play Desk to express strategic conviction."
   );
-  const [paperAck, setPaperAck] = useState<string>("PAPER");
+  const [paperAck, setPaperAck] = useState<string>("");
+
+  useEffect(() => { setPaperAck(""); }, [open, accountId, expression, direction, symbol, limitPrice, strikePrice, contracts, shareCount]);
 
   // Sync initialValues if reopened
   useEffect(() => {
@@ -187,8 +185,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
 
   // Account Capacity & Sizing Limits
   const rawEquityCents = selectedAccount?.equityValueCents ?? 0;
-  // If account has 0 or unrecorded equity, fall back to $2,000 UAT NAV so safety ceilings still bind
-  const equityCents = rawEquityCents > 0 ? rawEquityCents : 200_000;
+  const equityCents = rawEquityCents > 0 ? rawEquityCents : 0;
   const singleOrderCeilingCents = Math.min(10_000_00, Math.round(equityCents * 0.05));
   const singleNameCapCents = Math.round(equityCents * 0.10);
   const effectiveCeilingCents = Math.min(singleOrderCeilingCents, singleNameCapCents);
@@ -204,6 +201,10 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
 
   const buyingPowerCents = selectedAccount?.buyingPowerCents ?? 0;
   const hasBuyingPower = buyingPowerCents >= estimatedNotionalCents;
+  const stagingBlocker = manualTicketBlocker({ expression, missionAccountId: activeMission?.accountId,
+    accountId: selectedAccount?.id, runId: effectiveRunId, brokerId: selectedAccount?.brokerId,
+    equityCents, notionalCents: estimatedNotionalCents, buyingPowerCents,
+    exceedsLimit: orderExceedsCeiling || orderExceedsConcentration, acknowledgement: paperAck });
 
   const createOrder = trpc.aperture.order.create.useMutation({
     onSuccess: async (res) => {
@@ -247,6 +248,10 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
 
   const handleSubmit = async () => {
     setStageError(null);
+    if (createOrder.isPending || stagingBlocker) {
+      if (stagingBlocker) setStageError(stagingBlocker);
+      return;
+    }
     if (!selectedAccount) {
       toast.error("Please select an active paper account.");
       return;
@@ -295,7 +300,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
       optionExpirationDate: isOption ? expirationDate : undefined,
       optionStrikePriceCents: isOption ? Math.round(numStrike * 100) : undefined,
       contractMultiplier: isOption ? 100 : undefined,
-      side: direction === "long" ? "buy" : "sell",
+      side: isOption ? "buy" : direction === "long" ? "buy" : "sell",
       intent: "open",
       qty: isOption ? contracts : shareCount,
       notionalCents: !isOption ? estimatedNotionalCents : undefined,
@@ -448,6 +453,8 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                   <button
                     key={item.id}
                     type="button"
+                    disabled={!["shares", "long_call", "long_put"].includes(item.id)}
+                    title={!["shares", "long_call", "long_put"].includes(item.id) ? "Unavailable: this ticket supports single-leg orders only." : undefined}
                     onClick={() => {
                       setExpression(item.id);
                       if (item.id === "shares") {
@@ -649,28 +656,12 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                 <div className="rounded p-2 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 border" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 12%, var(--sh-surface))" }}>
                   <div className="space-y-0.5">
                     <p className="font-semibold text-[11px] flex items-center gap-1" style={{ color: "var(--sh-signal)" }}>
-                      <Sparkles className="h-3.5 w-3.5" /> Defined-Risk Spread Auto-Solution
+                      <AlertTriangle className="h-3.5 w-3.5" /> This contract exceeds the recorded limit
                     </p>
                     <p className="text-[10px]" style={{ color: "var(--sh-fg-muted)" }}>
-                      1 naked contract (${(costPerUnitCents / 100).toFixed(0)}) breaches the ${(effectiveCeilingCents / 100).toFixed(0)} limit. Convert to a defined-risk vertical debit spread ($0.80 debit = $80 max risk) to fit account bounds.
+                      One contract costs ${(costPerUnitCents / 100).toFixed(0)} against a ${(effectiveCeilingCents / 100).toFixed(0)} limit. Choose another verified contract or preserve cash. Multi-leg orders are unavailable here; no spread price is assumed.
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-7 text-xs font-medium shrink-0 text-white"
-                    style={{ background: "var(--sh-signal)" }}
-                    onClick={() => {
-                      setExpression(direction === "short" ? "bear_put_spread" : "bull_call_spread");
-                      const curStrike = numStrike > 0 ? numStrike : 100;
-                      setStrikePrice(curStrike.toString());
-                      setSpreadUpperStrike((curStrike + 5).toString());
-                      setLimitPrice("0.80");
-                      setContracts(1);
-                    }}
-                  >
-                    ⚡ Apply Vertical Spread ($80 Risk)
-                  </Button>
                 </div>
               )}
             </div>
@@ -702,9 +693,9 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                   variant="outline"
                   size="sm"
                   className="h-6 text-[10px] font-mono border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
-                  onClick={() => setPaperAck("PAPER")}
+                  disabled
                 >
-                  ⚡ Fast-Fill PAPER (⌘+Enter)
+                  Type confirmation below
                 </Button>
               </div>
               <div className="flex gap-2">
@@ -715,7 +706,6 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                   onKeyDown={(e) => {
                     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                       e.preventDefault();
-                      setPaperAck("PAPER");
                       handleSubmit();
                     }
                   }}
@@ -724,7 +714,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                   style={{ borderColor: paperAck === "PAPER" ? "var(--sh-signal)" : "var(--sh-border-1)" }}
                 />
                 <span className="text-xs flex items-center" style={{ color: "var(--sh-fg-muted)" }}>
-                  Safe simulation: this paper order stages on your desk. No real money is at risk. Press ⌘+Enter to instant-stage.
+                  Staging creates a practice ticket, not a fill. Approval and broker submission remain separate.
                 </span>
               </div>
             </div>
@@ -773,13 +763,14 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
           )}
         </div>
 
+        {stagingBlocker && <p role="status" className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{stagingBlocker}</p>}
         <DialogFooter className="flex flex-wrap items-center justify-between gap-2 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button
             size="sm"
-            disabled={createOrder.isPending || paperAck !== "PAPER" || !hasBuyingPower}
+            disabled={createOrder.isPending || Boolean(stagingBlocker)}
             onClick={handleSubmit}
             className="min-h-10 px-4 font-semibold"
           >

@@ -349,7 +349,7 @@ export default function ThesisEngine() {
   const notes: string[] = compilationResult?.confidenceNotes ?? [];
 
   if (resolveThesisEntryWorkspace(requestedScope, requestedUatCase) === "capital") {
-    return <CapitalThesisWorkspace />;
+    return <EditorialTopNav><CapitalThesisWorkspace /></EditorialTopNav>;
   }
 
   return (

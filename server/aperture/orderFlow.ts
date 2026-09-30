@@ -180,7 +180,18 @@ export interface OrderEvaluation {
   decisionAuthorization: DecisionAuthorizationSnapshot | null;
 }
 
+/** Legacy manual tickets encoded multi-leg intent in a single-leg reason prefix.
+ * Reject that exact wire marker, not ordinary discussion of spreads in prose.
+ * Also applies when stored proposals are re-evaluated for approval/submission.
+ */
+function assertSupportedManualExpression(reason: string | null | undefined): void {
+  if (/^\s*\[(?:bull_call_spread|bear_put_spread|bull_put_credit_spread|collar_hedge)\s+EXPR\]/i.test(reason ?? "")) {
+    throw new Error("Multi-leg manual expressions cannot be represented by a single-leg paper ticket. No order action was taken. Review the complete structure in a supported multi-leg workflow; do not submit a flattened leg.");
+  }
+}
+
 async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionAction): Promise<OrderEvaluation> {
+  assertSupportedManualExpression(input.reason);
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
 
@@ -505,6 +516,9 @@ async function findExistingActiveCandidateOrder(tx: any, input: Pick<CreateOrder
 }
 
 export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
+  // Before even the idempotent lookup: stale clients must not receive a prior
+  // single-leg proposal as successful acceptance of a multi-leg expression.
+  assertSupportedManualExpression(input.reason);
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
 
@@ -772,6 +786,7 @@ async function loadOrderAccountState(args: {
 // ── Approve ───────────────────────────────────────────────────────────────────
 
 export async function rerunStoredOrder(order: BrokerOrder, userId: number, action: Extract<PaperDecisionAction, "approve" | "submit">, nowOverride?: number) {
+  assertSupportedManualExpression(order.reason);
   const db = await getDb();
   if (!db) throw new Error("database unavailable");
   const [run] = await db.select({ maxSingleNamePct: apertureRuns.maxSingleNamePct, liquidityFloorAdvUsd: apertureRuns.liquidityFloorAdvUsd })
