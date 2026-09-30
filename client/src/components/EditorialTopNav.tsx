@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolatedUatIdentity";
 import { canOperateCapital } from "@shared/capitalOperatorAccess";
 import { prioritizesWingate } from "@shared/wingatePresentation";
+import "@/styles/hunter-harness.css";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -95,8 +96,7 @@ const MORE_NAV = [
 // data — it must never carry a "Sonar"/"Live" badge. Opportunity Radar IS
 // genuinely sonar-pro backed with citations (005 WP-DR2), so "Live" is honest there.
 const LABS_NAV = [
-  { label: "Market Scan", href: "/scan", icon: Scan, badge: "Sonar" },
-  { label: "Opportunity Radar", href: "/opportunity-radar", icon: Radar, badge: "Live" },
+  { label: "Market Scan", href: "/scan", icon: Scan, badge: "Experimental" },
 ];
 
 /* ── NavLink ────────────────────────────────────────────────────────────────── */
@@ -382,7 +382,7 @@ export default function EditorialTopNav({ children, workspaceId }: { children: R
     : profilePrimaryNav;
 
   return (
-    <div className="min-h-screen bg-[var(--bone)]">
+    <div className="hunter-workspace min-h-screen bg-[var(--bone)]">
       {workspaceId && <a href={`#${workspaceId}`}
         className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[100] focus:flex focus:min-h-11 focus:items-center focus:rounded-md focus:border focus:px-4 focus:py-2 focus:text-base focus:font-semibold focus:outline focus:outline-2 focus:outline-offset-2"
         style={{ background: "var(--sh-surface)", color: "var(--sh-text-primary)", borderColor: "var(--sh-border-1)" }}
@@ -760,7 +760,7 @@ export default function EditorialTopNav({ children, workspaceId }: { children: R
       <GlobalSearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       {/* ── Page Content ────────────────────────────────────────────────────── */}
-      <PageContainer style={{ paddingTop: "56px" }}>
+      <PageContainer className={workspaceId ? undefined : "hunter-workspace-content"} style={{ paddingTop: "56px" }}>
         {children}
       </PageContainer>
     </div>

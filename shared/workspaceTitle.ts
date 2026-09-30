@@ -2,6 +2,9 @@
 export function workspaceTitle(location: string): string {
   const path = location.split(/[?#]/, 1)[0].replace(/\/$/, "");
   const base = "Capital Aperture";
+  if (path === "/walkthrough") return "Work through a case · Signal Hunter";
+  if (path === "/scout") return "Discover opportunities · Signal Hunter";
+  if (path === "/admin") return "Operator desk · Signal Hunter";
   if (path === "/aperture") return `Today · ${base}`;
   if (path === "/aperture/mission") return `Mission · ${base}`;
   if (path === "/aperture/plays") return `Play Desk · ${base}`;

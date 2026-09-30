@@ -1,6 +1,7 @@
 import React from "react";
 import { modelAcquisitionFinancing, ACQUISITION_FINANCING_ASSUMPTIONS } from "@shared/acquisitionFinancing";
 import { AcquisitionSourceBrief } from "@/components/AcquisitionSourceBrief";
+import { AlignmentPortrait } from "@/components/AlignmentPortrait";
 import LOIGeneration from "./LOIGeneration";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -209,19 +210,15 @@ export default function DealDetail() {
               </button>
             </div>
           </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-y border-rule py-4 my-4">
-                {[
-                  { label: "CASH FLOW", value: fmt(deal.cashFlow) },
-                  { label: "ASKING PRICE", value: fmt(deal.askingPrice) },
-                  { label: "REVENUE", value: fmt(deal.revenue) },
-                  { label: "SCREENING SCORE", value: score != null ? score.toFixed(3) : "—" },
-                ].map((item, i) => (
-                  <div key={i}>
-                    <p className="font-eyebrow text-eyebrow text-muted-foreground mb-2 uppercase tracking-widest">{item.label}</p>
-                    <p className="font-data-mono text-2xl sm:text-3xl text-ink leading-tight">{item.value}</p>
-                  </div>
-                ))}
-              </div>
+          <div className="my-5 grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] items-center">
+            <AlignmentPortrait title="The economics. The open questions." subtitle={deal.isSynthetic ? "Illustrative — composite deal, not a real customer" : "Saved deal figures · independent verification not established here"} measures={[
+              { id: "asking", label: "Asking price", value: toNum(deal.askingPrice), unit: "usd", basis: "reported", wanted: "An asking price", explanation: "Saved asking price. This detail record does not include the search's thesis bounds; no target band is invented." },
+              { id: "cash", label: "Annual cash flow", value: toNum(deal.cashFlow), unit: "usd", basis: "reported", wanted: "Reconciled cash flow", explanation: "Saved reported cash flow. Reconcile add-backs, owner replacement costs and recurring expenses; this is not independently verified earnings." },
+              { id: "revenue", label: "Annual revenue", value: toNum(deal.revenue), unit: "usd", basis: "reported", wanted: "Revenue records", explanation: "Saved revenue figure. Inspect the listing and research below for its basis and period." },
+              { id: "coverage", label: "Debt coverage", value: financing?.cashCoverage ?? null, unit: "multiple", basis: "modeled", wanted: "Financing terms", explanation: "Calculated using the illustrative financing assumptions disclosed below. This is not a lender quote or approval; fees, reserves and taxes may change the result." },
+            ]} />
+            <div><p className="hunter-eyebrow">Your investigation starts here</p><h2 className="font-serif text-3xl">A price is an opening.<br />Evidence makes the case.</h2><p className="mt-4 text-sm leading-6 text-muted-foreground">Tap a measure to inspect its basis. Then follow the original listing, recorded risks and financing assumptions below. Screening score: {score != null ? score.toFixed(3) : "not available"}—not thesis fit or verified quality.</p></div>
+          </div>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-start">
             <AcquisitionSourceBrief listingUrl={deal.listingUrl} description={deal.description} isSynthetic={deal.isSynthetic} />
             <aside aria-label="Next decision" className="border-l-2 border-amber pl-4 py-1 space-y-2">

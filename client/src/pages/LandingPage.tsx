@@ -1,77 +1,17 @@
-import { useState, useEffect, useRef } from "react";
-import { getLoginUrl } from "@/const";
+import { useState } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { AlignmentPortrait } from "@/components/AlignmentPortrait";
+import { HunterPublicShell } from "@/components/HunterPublicShell";
+import { HUNTER_EXAMPLE, walkthroughMeasures } from "@shared/hunterWalkthrough";
 import {
-  BarChart3,
-  TrendingUp,
-  Vote,
-  Brain,
-  Bot,
-  Radar,
   ArrowRight,
-  ArrowRightLeft,
-  LockOpen,
   Search,
   CheckCircle2,
-  Timer,
-  Lock,
   ShieldCheck,
-  AlertTriangle,
   FileSearch,
-  Layers,
-  Zap,
-  Building2,
 } from "lucide-react";
 
-// ─── Static data ─────────────────────────────────────────────────────────────
-const STATS = [
-  { value: "4 Pillars", label: "Private Companies · Commercial Real Estate · Macro Aperture · Deep Research" },
-  { value: "3 Agents", label: "Parallel IC Consensus: Structuralist · Restructurer · Market Analyst" },
-  { value: "100%", label: "Zero-API deterministic demo safety & tamper-resistant memo verification" },
-  { value: "48h", label: "Intake to cited Red Team verdict, debt modeling, and LP memo generation" },
-];
-
-const FEATURES = [
-  {
-    eyebrow: "PILLAR I — PRIVATE ACQUISITIONS",
-    title: "The Red Team and IC panel that kills bad deals on purpose.",
-    body: "Parallel reviews by The Structuralist, The Restructurer, and The Market Analyst. A mandatory devil's advocate pass strips out fictitious add-backs, tests customer concentration, and flags contract cliffs before you spend $25k on a QoE report.",
-    Icon: ShieldCheck,
-  },
-  {
-    eyebrow: "PILLAR II — COMMERCIAL REAL ESTATE",
-    title: "Deep property asset dossiers. Zero blind spots on lease roll or zoning.",
-    body: "Forensic verification across tenant lease expirations, municipal zoning encumbrances, environmental registries, and debt coverage ratios. Audit commercial assets before earnest money goes hard.",
-    Icon: Building2,
-  },
-  {
-    eyebrow: "PILLAR III — CAPITAL APERTURE",
-    title: "Macro thesis modeling with fail-closed decision runway.",
-    body: "Translate rates, duration shocks, and commodity cycles into systematic candidate boards. Practice paper execution rails with zero-hype risk bounds ensure capital preservation is treated as an explicit, measured outcome.",
-    Icon: Layers,
-  },
-  {
-    eyebrow: "PILLAR IV — DEEP RESEARCH & RADAR",
-    title: "Live Perplexity Sonar Pro radar with verifiable citations.",
-    body: "Continuously scan off-market regulatory moves, distressed assets, and emerging catalysts backed by verified web citations. RippleEffect monitors secondary supply-chain shocks across your active watchlists.",
-    Icon: Radar,
-  },
-  {
-    eyebrow: "TIDE CAPITAL FLOW INTELLIGENCE",
-    title: "Track federal disbursements 60–90 days ahead of the market.",
-    body: "TIDE ingests USASpending disbursements, Federal Register rulemakings, and municipal allocations to identify public capital convergence long before it surfaces on commercial listing exchanges.",
-    Icon: TrendingUp,
-  },
-  {
-    eyebrow: "INVESTOR ECOSYSTEM & MEMO VAULT",
-    title: "LP-ready deal rooms and verified Investor DNA profiling.",
-    body: "Generate institutional investment memos, capital stack models, and LOIs in minutes. Distribute diligence through curated deal rooms matched precisely to syndicate LP criteria and mandate profiles.",
-    Icon: Vote,
-  },
-];
-
-// TESTIMONIALS removed — no fabricated endorsements on public routes (A-1)
 
 const CAPITAL_OPTIONS = [
   "Under $250K",
@@ -82,72 +22,6 @@ const CAPITAL_OPTIONS = [
   "$5M+",
 ];
 
-const FAILURE_MODES = [
-  {
-    stat: "3.1×",
-    label: "average add-back inflation in broker-presented SDE before independent forensic verification",
-    icon: BarChart3,
-  },
-  {
-    stat: "68%",
-    label: "of commercial property underperformance traces to unverified lease roll cliffs or deferred capex",
-    icon: Building2,
-  },
-  {
-    stat: "82%",
-    label: "of macro allocation drawdowns stem from unmeasured decision runway and unhedged duration shocks",
-    icon: AlertTriangle,
-  },
-  {
-    stat: "48h",
-    label: "to surface off-market regulatory, zoning, and federal capital flow signals with Sonar Pro citations",
-    icon: Timer,
-  },
-];
-
-// ─── Animated counter ────────────────────────────────────────────────────────
-function AnimatedStat({ value, label }: { value: string; label: string }) {
-  const [visible, setVisible] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true); }, { threshold: 0.3 });
-    if (ref.current) obs.observe(ref.current);
-    return () => obs.disconnect();
-  }, []);
-  return (
-    <div ref={ref} className={`transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-      <div className="font-['Fraunces',_serif] text-5xl lg:text-6xl font-black text-[#ffba20] leading-none mb-2">{value}</div>
-      <div className="text-[#8b7355] text-sm uppercase tracking-widest font-medium">{label}</div>
-    </div>
-  );
-}
-
-// ─── Feature card ────────────────────────────────────────────────────────────
-function FeatureCard({ eyebrow, title, body, Icon, index }: { eyebrow: string; title: string; body: string; Icon: React.ComponentType<{ className?: string }>; index: number }) {
-  const [visible, setVisible] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true); }, { threshold: 0.2 });
-    if (ref.current) obs.observe(ref.current);
-    return () => obs.disconnect();
-  }, []);
-  return (
-    <div
-      ref={ref}
-      className="group border border-[#e8e0d4] bg-[#faf8f5] p-8 transition-all duration-700 hover:border-[#ffba20] hover:shadow-[0_4px_32px_rgba(255,186,32,0.08)]"
-      style={{ transitionDelay: `${index * 80}ms`, opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(20px)" }}
-    >
-      <div className="flex items-start gap-4 mb-5">
-        <Icon className="text-[#ffba20] w-5 h-5 mt-0.5 shrink-0" />
-        <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase pt-0.5">{eyebrow}</span>
-      </div>
-      <h3 className="font-['Fraunces',_serif] text-xl font-bold text-[#1a1208] mb-3 leading-snug group-hover:text-[#3d2e1e] transition-colors">{title}</h3>
-      <p className="text-[#5c4a32] text-sm leading-relaxed">{body}</p>
-    </div>
-  );
-}
-
-// ─── Access Request Form ──────────────────────────────────────────────────────
 function AccessRequestForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -171,341 +45,31 @@ function AccessRequestForm() {
     requestAccess.mutate({ name: name.trim(), email: email.trim(), dealThesis: dealThesis.trim() || undefined, capitalAccess: capitalAccess || undefined });
   };
 
-  if (submitted) {
-    return (
-      <div className="bg-[#1a1208] border border-[#ffba20]/30 p-10 text-center">
-        <CheckCircle2 className="text-[#ffba20] w-10 h-10 mb-4 mx-auto" />
-        <h3 className="font-['Fraunces',_serif] text-2xl font-black text-[#faf8f5] mb-3">Request received.</h3>
-        <p className="text-[#8b7355] text-sm max-w-sm mx-auto">
-          We review every request manually. If your thesis and capital access align with the platform's operator profile, you'll hear from us within 48 hours.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="bg-[#0f0c08] border border-[#3d2e1e] p-8 lg:p-10">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="h-px w-8 bg-[#ffba20]" />
-        <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Request Operator Access</span>
-      </div>
-      <div className="grid sm:grid-cols-2 gap-5 mb-5">
-        <div>
-          <label className="block text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase mb-2">Full Name *</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Your name"
-            className="w-full bg-[#1a1208] border border-[#3d2e1e] text-[#faf8f5] placeholder-[#5c4a32] px-4 py-3 text-sm focus:outline-none focus:border-[#ffba20] transition-colors"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase mb-2">Email Address *</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            className="w-full bg-[#1a1208] border border-[#3d2e1e] text-[#faf8f5] placeholder-[#5c4a32] px-4 py-3 text-sm focus:outline-none focus:border-[#ffba20] transition-colors"
-            required
-          />
-        </div>
-      </div>
-      <div className="mb-5">
-        <label className="block text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase mb-2">Capital Access</label>
-        <select
-          value={capitalAccess}
-          onChange={(e) => setCapitalAccess(e.target.value)}
-          className="w-full bg-[#1a1208] border border-[#3d2e1e] text-[#faf8f5] px-4 py-3 text-sm focus:outline-none focus:border-[#ffba20] transition-colors appearance-none"
-        >
-          <option value="">Select range...</option>
-          {CAPITAL_OPTIONS.map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-      </div>
-      <div className="mb-7">
-        <label className="block text-[10px] font-bold tracking-[0.15em] text-[#8b7355] uppercase mb-2">
-          Investment Mandate & Deal Thesis <span className="text-[#5c4a32] normal-case tracking-normal font-normal">(optional — increases approval odds)</span>
-        </label>
-        <textarea
-          value={dealThesis}
-          onChange={(e) => setDealThesis(e.target.value)}
-          placeholder="Describe your investment mandate: lower-middle market operating companies, commercial real estate portfolios, macro/liquid theses, or special situations? What are your target asset parameters?"
-          rows={3}
-          className="w-full bg-[#1a1208] border border-[#3d2e1e] text-[#faf8f5] placeholder-[#5c4a32] px-4 py-3 text-sm focus:outline-none focus:border-[#ffba20] transition-colors resize-none"
-        />
-      </div>
-      {error && (
-        <p className="text-red-400 text-sm mb-4">{error}</p>
-      )}
-      <button
-        type="submit"
-        disabled={requestAccess.isPending}
-        className="w-full bg-[#ffba20] text-[#1a1208] font-bold text-sm py-4 hover:bg-[#ffd060] transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-      >
-        {requestAccess.isPending ? (
-          <>
-            <Zap className="w-4 h-4 animate-spin" />
-            Submitting...
-          </>
-        ) : (
-          <>
-            <LockOpen className="w-4 h-4" />
-            Submit Access Request
-          </>
-        )}
-      </button>
-      <p className="text-[#5c4a32] text-xs text-center mt-4">
-        Access is reviewed manually. We approve operators with a defined thesis and verified capital access.
-      </p>
-    </form>
-  );
+  if (submitted) return <div className="hunter-access-form" role="status"><CheckCircle2 aria-hidden="true" /><h3 className="font-serif text-2xl my-3">Request received.</h3><p>Your request is queued for manual review. Submission does not grant access; we will contact you about the next step.</p></div>;
+  return <form onSubmit={handleSubmit} className="hunter-access-form">
+    <p className="hunter-eyebrow">Request operator access</p>
+    <div className="grid sm:grid-cols-2 gap-5 mb-5">
+      <div><label htmlFor="access-name">Full name *</label><input id="access-name" autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" required /></div>
+      <div><label htmlFor="access-email">Email *</label><input id="access-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required /></div>
+    </div>
+    <div className="mb-5"><label htmlFor="access-capital">Capital access · optional</label><select id="access-capital" value={capitalAccess} onChange={e => setCapitalAccess(e.target.value)}><option value="">Choose a range</option>{CAPITAL_OPTIONS.map(opt => <option key={opt}>{opt}</option>)}</select></div>
+    <div className="mb-5"><label htmlFor="access-thesis">Your investment thesis · optional</label><textarea id="access-thesis" value={dealThesis} onChange={e => setDealThesis(e.target.value)} placeholder="What are you looking for, and what must be true?" rows={3} /></div>
+    {error && <p role="alert" className="mb-3 text-sm">{error}</p>}
+    <button type="submit" className="hunter-cta w-full" disabled={requestAccess.isPending}>{requestAccess.isPending ? "Submitting…" : "Submit access request"}</button>
+    <p className="mt-3 text-xs text-muted-foreground">Your details are sent only when you submit. Access is reviewed manually.</p>
+  </form>;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function LandingPage() {
-  const [scrolled, setScrolled] = useState(false);
-  const loginUrl = getLoginUrl();
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  return (
-    <div className="min-h-screen bg-[#faf8f5] text-[#1a1208]" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* ── Top nav ── */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-[#faf8f5]/95 backdrop-blur-sm border-b border-[#e8e0d4] shadow-sm" : "bg-transparent"}`}>
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 bg-[#1a1208] rounded-sm flex items-center justify-center">
-              <Radar className="text-[#ffba20] w-4 h-4" />
-            </div>
-            <div>
-              <div className="font-['Fraunces',_serif] font-black text-[#1a1208] text-sm leading-none">SIGNAL HUNTER OS</div>
-              <div className="text-[9px] tracking-[0.2em] text-[#8b7355] uppercase leading-none mt-0.5">DECISION & DILIGENCE SUITE</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/explore" className="text-sm text-[#5c4a32] hover:text-[#1a1208] transition-colors hidden sm:block">
-              Explore Pipeline
-            </Link>
-            <a
-              href={loginUrl}
-              className="bg-[#1a1208] text-[#faf8f5] text-sm font-medium px-5 py-2 hover:bg-[#3d2e1e] transition-colors"
-            >
-              Sign In
-            </a>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Hero ── */}
-      <section className="pt-32 pb-24 px-6 max-w-7xl mx-auto">
-        <div className="max-w-4xl">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="h-px w-12 bg-[#ffba20]" />
-            <span className="text-[10px] font-bold tracking-[0.25em] text-[#8b7355] uppercase">Multi-Asset Diligence & Decision Suite</span>
-          </div>
-          <h1
-            className="font-['Fraunces',_serif] font-black text-[#1a1208] leading-[0.92] mb-8"
-            style={{ fontSize: "clamp(3.2rem, 8vw, 6.5rem)" }}
-          >
-            Most capital allocations fail<br />
-            <span className="text-[#ffba20]">before they close.</span>
-          </h1>
-          <p className="text-[#5c4a32] text-xl leading-relaxed max-w-2xl mb-4">
-            Whether acquiring an operating business, auditing commercial property, or sizing macro capital exposure, 70–90% of capital allocations fail to achieve their mandate. The failure modes are predictable. The signals exist before capital is committed.
-          </p>
-          <p className="text-[#8b7355] text-base leading-relaxed max-w-xl mb-10">
-            Add-back inflation. Tenant roll cliffs. Unhedged duration shocks. Undisclosed key-person risk. The Red Team exposes them. Independent IC agents vote on them. Live cited research verifies them. You allocate with institutional conviction.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <a
-              href="#request-access"
-              onClick={(e) => { e.preventDefault(); document.getElementById("request-access")?.scrollIntoView({ behavior: "smooth" }); }}
-              className="inline-flex items-center justify-center gap-2 bg-[#1a1208] text-[#faf8f5] text-base font-semibold px-8 py-4 hover:bg-[#3d2e1e] transition-colors"
-            >
-              <LockOpen className="text-[#ffba20] w-5 h-5" />
-              Request Operator Access
-            </a>
-            <Link
-              href="/walkthrough"
-              className="inline-flex items-center justify-center gap-2 border border-[#1a1208] text-[#1a1208] text-base font-medium px-8 py-4 hover:bg-[#1a1208] hover:text-[#faf8f5] transition-colors"
-            >
-              <Search className="w-5 h-5" />
-              Inspect solo walkthrough
-            </Link>
-            <Link
-              href="/explore"
-              className="inline-flex items-center justify-center gap-2 text-[#5c4a32] text-base font-medium px-4 py-4 hover:text-[#1a1208] transition-colors underline underline-offset-4 decoration-[#ffba20]"
-            >
-              Explore multi-asset pipeline
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-
-        {/* Decorative rule */}
-        <div className="mt-20 border-t border-[#e8e0d4]" />
-      </section>
-
-      {/* ── Failure mode stats strip ── */}
-      <section className="py-16 px-6 bg-[#1a1208]">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-3 mb-10">
-            <div className="h-px w-8 bg-[#ffba20]" />
-            <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">The Failure Modes Are Knowable</span>
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-            {FAILURE_MODES.map((f) => (
-              <div key={f.stat} className="border-l-2 border-[#ffba20]/30 pl-5">
-                <div className="font-['Fraunces',_serif] text-4xl lg:text-5xl font-black text-[#ffba20] leading-none mb-3">{f.stat}</div>
-                <p className="text-[#8b7355] text-xs leading-relaxed">{f.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Stats strip ── */}
-      <section className="py-16 px-6 bg-[#f2ede6]">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-12">
-          {STATS.map((s) => (
-            <AnimatedStat key={s.label} value={s.value} label={s.label} />
-          ))}
-        </div>
-      </section>
-
-      {/* ── "How it works" editorial section ── */}
-      <section className="py-24 px-6 max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-12 gap-16 items-start">
-          <div className="lg:col-span-4 lg:sticky lg:top-24">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="h-px w-8 bg-[#ffba20]" />
-              <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">The Decision Suite</span>
-            </div>
-            <h2 className="font-['Fraunces',_serif] text-4xl lg:text-5xl font-black text-[#1a1208] leading-tight mb-6">
-              One institutional suite. Upstream of expensive mistakes.
-            </h2>
-            <p className="text-[#5c4a32] leading-relaxed mb-8">
-              Signal Hunter OS replaces fragmented spreadsheets and broker decks with a multi-asset intelligence engine. From operating companies to commercial real estate, macro candidate boards, and cited research, every asset passes through adversarial scrutiny before you wire a retainer or commit capital.
-            </p>
-            <a
-              href="#request-access"
-              onClick={(e) => { e.preventDefault(); document.getElementById("request-access")?.scrollIntoView({ behavior: "smooth" }); }}
-              className="inline-flex items-center gap-2 text-sm font-semibold text-[#1a1208] border-b-2 border-[#ffba20] pb-0.5 hover:text-[#ffba20] transition-colors"
-            >
-              Get operator access
-              <ArrowRight className="w-4 h-4" />
-            </a>
-          </div>
-          <div className="lg:col-span-8 grid sm:grid-cols-2 gap-4">
-            {FEATURES.map((f, i) => (
-              <FeatureCard key={f.eyebrow} {...f} index={i} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Demo CTA strip ── */}
-      <section className="py-16 px-6 bg-[#1a1208]">
-        <div className="max-w-5xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-8">
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="h-px w-8 bg-[#ffba20]" />
-              <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Deterministic Demo Rails</span>
-            </div>
-            <h2 className="font-['Fraunces',_serif] text-3xl lg:text-4xl font-black text-[#faf8f5] leading-tight mb-3">
-              Watch the engine stress-test an asset in seconds.<br />
-              <span className="text-[#ffba20]">See exactly why.</span>
-            </h2>
-            <p className="text-[#8b7355] text-base max-w-xl">
-              Inspect an unvarnished audit across debt service, tenant concentration, and adversarial stress tests. Zero live API calls, zero login wall, zero hype. See how institutional agents expose what brokers and decks bury.
-            </p>
-          </div>
-          <Link
-            href="/demo-tour"
-            className="shrink-0 inline-flex items-center gap-2 bg-[#ffba20] text-[#1a1208] font-bold text-sm px-8 py-4 hover:bg-[#ffd060] transition-colors whitespace-nowrap"
-          >
-            <ArrowRightLeft className="w-4 h-4" />
-            Run demo diligence
-          </Link>
-        </div>
-      </section>
-
-      {/* Testimonials section removed — A-1: no fabricated endorsements on public routes */}
-
-      {/* ── Access Request Form Section ── */}
-      <section id="request-access" className="py-28 px-6 bg-[#1a1208]">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-16 items-start">
-            {/* Left — editorial copy */}
-            <div>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-px w-8 bg-[#ffba20]" />
-                <span className="text-[10px] font-bold tracking-[0.2em] text-[#8b7355] uppercase">Access</span>
-              </div>
-              <h2 className="font-['Fraunces',_serif] text-5xl lg:text-6xl font-black text-[#faf8f5] leading-tight mb-6">
-                The diligence<br />
-                <span className="text-[#ffba20]">that protects you.</span>
-              </h2>
-              <p className="text-[#8b7355] text-lg mb-8 leading-relaxed">
-                Signal Hunter OS is invite-only. We grant access to independent sponsors, real estate syndicators, family office allocators, and systematic capital operators who deploy with high conviction.
-              </p>
-              <div className="space-y-4">
-                {[
-                  { Icon: ShieldCheck, text: "Manual review — every request is read by a human" },
-                  { Icon: Timer, text: "48-hour response for qualified operators" },
-                  { Icon: Lock, text: "No credit card required to request access" },
-                ].map((item) => (
-                  <div key={item.text} className="flex items-center gap-3">
-                    <item.Icon className="text-[#ffba20] w-4 h-4 shrink-0" />
-                    <span className="text-[#8b7355] text-sm">{item.text}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-10 pt-8 border-t border-[#3d2e1e]">
-                <p className="text-[#5c4a32] text-sm mb-4">Already have access?</p>
-                <a
-                  href={loginUrl}
-                  className="inline-flex items-center gap-2 text-[#faf8f5] text-sm font-medium border-b border-[#8b7355] pb-0.5 hover:border-[#ffba20] hover:text-[#ffba20] transition-colors"
-                >
-                  Sign in to your account
-                  <ArrowRight className="w-4 h-4" />
-                </a>
-              </div>
-            </div>
-
-            {/* Right — form */}
-            <AccessRequestForm />
-          </div>
-        </div>
-      </section>
-
-      {/* ── Footer ── */}
-      <footer className="py-10 px-6 border-t border-[#e8e0d4] bg-[#faf8f5]">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-[#1a1208] rounded-sm flex items-center justify-center">
-              <Radar className="text-[#ffba20] w-3 h-3" />
-            </div>
-            <span className="font-['Fraunces',_serif] font-black text-[#1a1208] text-xs">SIGNAL HUNTER OS</span>
-          </div>
-          <div className="text-[#8b7355] text-xs">
-            A Third Signal Lab product. Multi-asset diligence & decision intelligence for high-conviction operators and allocators.
-          </div>
-          <div className="flex items-center gap-6 text-xs text-[#8b7355]">
-            <Link href="/explore" className="hover:text-[#1a1208] transition-colors">Explore Pipeline</Link>
-            <Link href="/demo-tour" className="hover:text-[#1a1208] transition-colors">Demo</Link>
-            <a href={loginUrl} className="hover:text-[#1a1208] transition-colors">Sign In</a>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
+  return <HunterPublicShell><main className="hunter-public-main">
+    <section className="hunter-spread"><div><p className="hunter-eyebrow">Your thesis. The evidence. The gap.</p><h1>See where the opportunity meets your thesis.</h1><p className="hunter-lead">Explore the business, follow the numbers, and see what still needs evidence before you move forward.</p><Link className="hunter-cta" href="/walkthrough">Work through a case <ArrowRight size={17} /></Link><p className="text-xs text-muted-foreground mt-3">No login. Illustrative data. No live agent calls.</p></div><AlignmentPortrait title={HUNTER_EXAMPLE.name} subtitle="Illustrative — composite deal, not a real customer" measures={walkthroughMeasures("asset", 0)} /></section>
+    <section className="hunter-public-section"><p className="hunter-eyebrow">A working story, not another dashboard</p><h2>From interesting to investigated.</h2><div className="hunter-jobs">{[
+      { Icon: Search, title: "Find the candidate", body: "Start from a thesis. Browse businesses and properties as entities, with their numbers, history and unanswered questions together." },
+      { Icon: FileSearch, title: "Test the case", body: "Reveal the basis of an assessment. Change an assumption. See the modeled consequence without confusing it with verified evidence." },
+      { Icon: ShieldCheck, title: "Prepare the decision", body: "Bring the case, the counterargument and the outstanding evidence into a review. Research informs the decision; you authorize the next action." },
+    ].map(({ Icon, title, body }) => <article key={title}><Icon aria-hidden="true" size={23} /><h3>{title}</h3><p>{body}</p></article>)}</div></section>
+    <section className="hunter-public-section hunter-spread"><div><p className="hunter-eyebrow">One visual language. Different decisions.</p><h2>Assets to investigate.<br />Capital ideas to pressure-test.</h2><p className="mt-4">Business acquisition, property diligence and capital research keep their own measures and evidence. Capital execution remains practice trading only—not a route to live orders.</p><Link href="/walkthrough" className="inline-flex items-center gap-2 underline mt-4">Explore both workflows <ArrowRight size={16} /></Link></div><div className="border-l-2 border-amber pl-6"><h3 className="font-serif text-2xl">A claim is not a conclusion.</h3><p className="mt-3">Reported, modeled, corroborated and unknown are different states. The portrait keeps them separate. A source link does not independently verify a seller's claim.</p></div></section>
+    <section id="request-access" className="hunter-public-section hunter-spread"><div><p className="hunter-eyebrow">Your next case</p><h2>Bring a thesis worth testing.</h2><p className="mt-4">Request access with the kinds of opportunities you are investigating. This sends an access request—not a deal search, broker message or investment instruction.</p></div><AccessRequestForm /></section>
+  </main></HunterPublicShell>;
 }

@@ -14,6 +14,7 @@ import {
   DollarSign, Clock, Star
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AlignmentPortrait } from "@/components/AlignmentPortrait";
 
 const DEAL_TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string; label: string }> = {
   sba_business: { icon: Building2, color: "text-[var(--sh-primary)]", bg: "bg-[var(--sh-primary-10)] border-[var(--sh-border-1)]", label: "SBA Business" },
@@ -94,8 +95,7 @@ export default function FreedomMap() {
               <span style={{ color: "var(--sh-signal)" }}>want to be.</span>
             </h1>
             <p className="text-lg max-w-2xl leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>
-              Tell the system your target. It engineers the exact deal blend — business, rentals, flips,
-              land plays — to get you there. Not passive. Not generic. <strong style={{ color: "var(--sh-text-primary)" }}>Your recipe.</strong>
+              Set a target and the constraints around it. Explore a proposed asset mix, then test its assumptions. A generated plan is not a promise of income.
             </p>
           </div>
         </motion.div>
@@ -113,7 +113,7 @@ export default function FreedomMap() {
               <div className="lg:col-span-2 space-y-6">
                 {/* Preset Profiles */}
                 <div>
-                  <p className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: "var(--sh-fg-muted)" }}>Quick Start Profiles</p>
+                  <p className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: "var(--sh-fg-muted)" }}>Illustrative starting profiles · replace with your own inputs</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {PRESET_PROFILES.map((preset) => (
                       <button
@@ -252,13 +252,19 @@ export default function FreedomMap() {
                   style={{ background: "var(--sh-primary)", color: "var(--sh-primary-fg)" }}
                 >
                   <Sparkles className="mr-2 w-5 h-5" />
-                  Engineer My Freedom Path
+                  Generate a planning scenario
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </div>
 
               {/* Side Panel */}
               <div className="space-y-4">
+                <AlignmentPortrait compact title="The distance to your target" subtitle="Entered assumptions · not a financial forecast" measures={[
+                  { id: "current", label: "Current monthly income", value: form.currentIncome, unit: "usd", basis: "reported", wanted: "Enter your current income", explanation: "Your entered starting income, not independently verified." },
+                  { id: "gap", label: "Additional monthly target", value: Math.max(0, form.targetMonthlyIncome - form.currentIncome), unit: "usd", basis: "modeled", wanted: "Set an income target", explanation: "Target monthly income minus current income, floored at zero. This is a planning gap, not an expected return." },
+                  { id: "capital", label: "Available capital", value: form.investmentCapital, unit: "usd", basis: "reported", wanted: "Enter a capital constraint", explanation: "Entered investment capital. Liquidity, financing and reserves still need separate review." },
+                  { id: "timeline", label: "Target years", value: form.timelineYears, unit: "number", basis: "reported", wanted: "Choose a horizon", explanation: "Your preferred timeline; not a predicted completion date." },
+                ]} />
                 <Card className="border-[var(--sh-border-1)]" style={{ background: "var(--sh-surface-1)" }}>
                   <CardContent className="p-6 space-y-4">
                     <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>

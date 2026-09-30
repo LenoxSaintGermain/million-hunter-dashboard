@@ -15,8 +15,10 @@ const snapshotSchema = z.object({
   version: z.literal(1), userId: z.number().int().positive(), jobId: z.number().int().positive(),
   thesisId: z.number().int().positive(), thesisText: z.string(),
   weights: z.array(z.object({ dimension: z.string(), weight: z.number() })),
+  financialBounds: z.object({ askingPriceMin: z.number().finite().optional(), askingPriceMax: z.number().finite().optional(), cashFlowMin: z.number().finite().optional(), cashFlowMax: z.number().finite().optional() }).optional(),
   sources: z.array(z.object({ url: z.string().url(), excerpt: z.string(), asOf: z.number().finite() })),
   items: z.array(z.object({ dealId: z.number().int().positive(), name: z.string(), listingUrl: z.string().url(),
+    financials: z.object({ askingPrice: z.number().finite().nullable(), cashFlow: z.number().finite().nullable() }).optional(),
     assessments: assessmentSchema, assessmentFailed: z.boolean() })),
 });
 export type ThesisReviewSnapshot = z.infer<typeof snapshotSchema>;
@@ -70,5 +72,5 @@ export async function readThesisReview(userId: number, jobId: number) {
     weights: snapshot.weights, assessments: item.assessments,
     sources: snapshot.sources.filter(source => source.url === item.listingUrl),
   }) })).sort((a, b) => b.comparison.supportedPoints - a.comparison.supportedPoints || a.dealId - b.dealId);
-  return { thesisId: snapshot.thesisId, jobId, createdAt: row.createdAt, stale: row.expiresAt <= Date.now(), items };
+  return { thesisId: snapshot.thesisId, jobId, financialBounds: snapshot.financialBounds, createdAt: row.createdAt, stale: row.expiresAt <= Date.now(), items };
 }

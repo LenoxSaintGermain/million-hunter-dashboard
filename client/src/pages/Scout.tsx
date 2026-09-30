@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import EditorialTopNav from "@/components/EditorialTopNav";
+import { AlignmentPortrait } from "@/components/AlignmentPortrait";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -539,19 +540,12 @@ function AssetCard({ asset, onStatusChange, isAutoScoring = false }: { asset: an
         </div>
       </div>
       <div className="px-4 pb-4 space-y-3">
-        {/* Financials grid */}
-        <div className="grid grid-cols-3 gap-2 text-center">
-          {[
-            { label: "Asking", value: formatAskingPrice(asset.askingPrice).display },
-            { label: "Cap Rate", value: asset.capRate ? `${(asset.capRate * 100).toFixed(1)}%` : "—" },
-            { label: "NOI", value: fmt(asset.noi) },
-          ].map((f) => (
-            <div key={f.label} className="rounded-lg p-2" style={{ background: "var(--sh-surface-2)" }}>
-              <p className="text-[10px] text-muted-foreground">{f.label}</p>
-              <p className="text-xs font-semibold text-foreground mt-0.5">{f.value}</p>
-            </div>
-          ))}
-        </div>
+        <AlignmentPortrait compact title={asset.name} subtitle={`${PROPERTY_TYPE_LABELS[pt] ?? pt} · property record, not an appraisal`} measures={[
+          { id: "price", label: "Asking price", value: asset.askingPrice != null && Number(asset.askingPrice) > 0 ? Number(asset.askingPrice) : null, unit: "usd", basis: "reported", wanted: "An asking price", explanation: "Price from the saved asset record. No thesis price band is attached to this card. Unpriced assets are not treated as zero-price opportunities." },
+          { id: "noi", label: "Annual NOI", value: asset.noi == null ? null : Number(asset.noi), unit: "usd", basis: "reported", wanted: "Documented net income", explanation: "Saved net operating income. Reconcile the rent roll, operating expenses and period before relying on it. No independent verification is implied." },
+          { id: "cap", label: "Cap rate", value: asset.capRate == null ? null : Number(asset.capRate) * 100, unit: "percent", basis: "reported", wanted: "Income against price", explanation: "Cap rate recorded for this asset, not a comparable-market valuation. Check which income period and price were used." },
+          { id: "zoning", label: "Use & constraints", value: null, unit: "number", basis: "unknown", wanted: asset.zoning ? `Check ${asset.zoning} use` : "Permitted use evidence", explanation: asset.zoning ? `The record lists zoning ${asset.zoning}. A code alone does not establish that your intended use is permitted. Inspect the property dossier and municipal evidence.` : "No zoning code is recorded. Resolve permitted use, restrictions and any historic requirements in the property dossier." },
+        ]} />
 
         {/* Size + zoning */}
         <div className="flex items-center gap-3 text-xs text-muted-foreground">

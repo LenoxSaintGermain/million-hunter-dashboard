@@ -45,7 +45,7 @@ import DemoScenario from "./pages/DemoScenario";
 import DemoTour from "./pages/DemoTour";
 import RippleEffect from "./pages/RippleEffect";
 import InvestorBrief from "./pages/InvestorBrief";
-import Walkthrough from "./pages/Walkthrough";
+import Walkthrough from "./pages/HunterWalkthrough";
 import Pricing from "./pages/Pricing";
 import Wingate from "./pages/Wingate";
 import AssetDossier from "./pages/AssetDossier";
@@ -124,7 +124,8 @@ function RootRoute() {
 // 3. Role-based redirect: investor role users land on /investor, not /
 function OnboardingGuard() {
   const [location, navigate] = useLocation();
-  const { data: authData } = trpc.auth.me.useQuery();
+  // Deterministic public walkthrough must work without any API or login dependency.
+  const { data: authData } = trpc.auth.me.useQuery(undefined, { enabled: location !== "/walkthrough" });
   const userRole = (authData as any)?.role as string | undefined;
 
   const alreadyChecked = typeof window !== "undefined" &&
@@ -207,7 +208,7 @@ function Router() {
   useEffect(() => { document.title = workspaceTitle(location); }, [location]);
   return (
     <>
-      <OnboardingGuard />
+      {location !== "/walkthrough" && <OnboardingGuard />}
       <Switch>
         {/* Lobby — cinematic first-login onboarding */}
         <Route path="/lobby" component={Lobby} />

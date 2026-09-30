@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { isModuleGrantable } from "@shared/adminOnlyModules";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import {
   Users, Shield, TrendingUp, Building2, BarChart3,
   RefreshCw, ChevronDown, Lock, UserCheck, Activity,
@@ -53,23 +54,21 @@ interface UserRow {
   loginMethod: string | null;
 }
 
-function UserTableRow({ user, onRoleChange }: {
+function UserTableRow({ user, onRoleChange, pending }: {
   user: UserRow;
   onRoleChange: (userId: number, role: string) => void;
+  pending: boolean;
 }) {
-  const [isChanging, setIsChanging] = useState(false);
   const roleClass = ROLE_COLORS[user.role] ?? ROLE_COLORS.user;
 
   const handleRoleChange = async (newRole: string) => {
     if (newRole === user.role) return;
-    setIsChanging(true);
     onRoleChange(user.id, newRole);
-    setTimeout(() => setIsChanging(false), 1000);
   };
 
   return (
     <div
-      className="flex items-center gap-4 py-3 px-4 rounded-lg border transition-colors hover:border-primary/20"
+      className="flex flex-wrap sm:flex-nowrap items-center gap-3 py-3 px-4 rounded-sm border transition-colors hover:border-primary/20"
       style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border)" }}
     >
       {/* Avatar */}
@@ -81,7 +80,7 @@ function UserTableRow({ user, onRoleChange }: {
       </div>
 
       {/* Info */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-[120px]">
         <p className="text-sm font-medium text-foreground truncate">{user.name ?? "Unnamed User"}</p>
         <p className="text-[11px] text-muted-foreground truncate">{user.email ?? "No email"}</p>
       </div>
@@ -102,7 +101,7 @@ function UserTableRow({ user, onRoleChange }: {
       </div>
 
       {/* Role Badge + Selector */}
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto flex-shrink-0">
         <span className={`text-[10px] px-2 py-0.5 rounded border font-medium ${roleClass}`}>
           {ROLE_LABELS[user.role] ?? user.role}
         </span>
@@ -110,7 +109,8 @@ function UserTableRow({ user, onRoleChange }: {
           <select
             value={user.role}
             onChange={(e) => handleRoleChange(e.target.value)}
-            disabled={isChanging}
+            disabled={pending}
+            aria-label={`Propose role for ${user.name ?? user.email ?? user.id}`}
             className="h-7 text-xs rounded border border-[var(--sh-border)] bg-transparent text-muted-foreground pl-2 pr-6 cursor-pointer hover:border-primary/40 transition-colors appearance-none"
           >
             <option value="user">User</option>
@@ -203,7 +203,7 @@ function ModulePermissionsMatrix() {
             size="sm"
             variant="outline"
             className="h-7 text-xs border-[var(--sh-border)] gap-1"
-            onClick={() => resetToDefaults.mutate({ role: activeRole })}
+            onClick={() => { if (window.confirm(`Reset module permissions for all ${ROLE_LABELS_PERM[activeRole]} users to defaults? Current overrides will be replaced.`)) resetToDefaults.mutate({ role: activeRole }); }}
             disabled={resetToDefaults.isPending}
           >
             <RotateCcw className="w-3 h-3" />
@@ -253,7 +253,7 @@ function ModulePermissionsMatrix() {
                   title={locked ? "Admin-only module — cannot be granted to this role." : undefined}
                   onClick={() => {
                     if (locked) return;
-                    setPermission.mutate({ role: activeRole, moduleKey: mod.key, enabled: !enabled });
+                    if (window.confirm(`${enabled ? "Disable" : "Enable"} ${mod.key} for all ${ROLE_LABELS_PERM[activeRole]} users?`)) setPermission.mutate({ role: activeRole, moduleKey: mod.key, enabled: !enabled });
                   }}
                 >
                   <div className="flex items-center gap-3">
@@ -519,7 +519,7 @@ function InviteManager() {
                         size="sm"
                         variant="ghost"
                         className="h-7 w-7 p-0 text-red-400 hover:text-red-500"
-                        onClick={() => revokeInvite.mutate({ id: inv.id })}
+                        onClick={() => { if (window.confirm(`Revoke invitation #${inv.id}? Its link will no longer grant access. Existing user roles are unchanged.`)) revokeInvite.mutate({ id: inv.id }); }}
                         title="Revoke invite"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -540,13 +540,17 @@ function InviteManager() {
 export default function AdminPanel() {
   const { user: currentUser } = useAuth();
   const utils = trpc.useUtils();
+  const [roleDraft, setRoleDraft] = useState<{ userId: number; name: string; before: string; role: "user" | "admin" | "investor" | "insurance" | "capital_operator" } | null>(null);
+  const [section, setSection] = useState<"people" | "invitations" | "permissions">("people");
 
-  const { data: users, isLoading: usersLoading } = trpc.admin.listUsers.useQuery(undefined, {
+  const { data: users, isLoading: usersLoading, error: usersError } = trpc.admin.listUsers.useQuery(undefined, {
     refetchOnWindowFocus: false,
+    enabled: currentUser?.role === "admin",
   });
 
-  const { data: stats } = trpc.admin.platformStats.useQuery(undefined, {
+  const { data: stats, isLoading: statsLoading, error: statsError } = trpc.admin.platformStats.useQuery(undefined, {
     refetchOnWindowFocus: false,
+    enabled: currentUser?.role === "admin",
   });
 
   const updateRole = trpc.admin.updateRole.useMutation({
@@ -554,12 +558,13 @@ export default function AdminPanel() {
       utils.admin.listUsers.invalidate();
       utils.admin.platformStats.invalidate();
       toast.success("Role updated");
+      setRoleDraft(null);
     },
     onError: (e) => toast.error(`Failed: ${e.message}`),
   });
 
   // Guard: non-admin users see a locked state
-  if (currentUser && currentUser.role !== "admin") {
+  if (!currentUser || currentUser.role !== "admin") {
     return (
       <EditorialTopNav>
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
@@ -591,10 +596,10 @@ export default function AdminPanel() {
         <div>
           <p className="eyebrow text-muted-foreground mb-1">Platform Administration</p>
           <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
-            Admin Panel
+            The operator desk.
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            User management, role assignment, and platform health overview.
+            People, access and permissions. Review the exact change before it takes effect.
           </p>
         </div>
 
@@ -632,15 +637,15 @@ export default function AdminPanel() {
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{stat.label}</p>
                   <stat.icon className="w-3.5 h-3.5 text-muted-foreground" />
                 </div>
-                <p className="text-xl font-bold tabular-nums font-mono text-foreground">{stat.value}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{stat.sub}</p>
+                <p className="text-xl font-bold tabular-nums font-mono text-foreground">{statsLoading || statsError || !stats ? "Not available" : stat.value}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{statsError ? "Statistics could not load" : statsLoading || !stats ? "Awaiting authoritative data" : stat.sub}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* Role Distribution */}
-        {roleStats.length > 0 && (
+        <nav className="hunter-step-nav" aria-label="Administration sections">{(["people", "invitations", "permissions"] as const).map(s => <button key={s} aria-current={section === s ? "step" : undefined} onClick={() => setSection(s)}>{s === "people" ? "People & roles" : s === "invitations" ? "Invitations" : "Module permissions"}</button>)}</nav>
+        {section === "people" && roleStats.length > 0 && (
           <Card style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border)" }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -667,6 +672,7 @@ export default function AdminPanel() {
           </Card>
         )}
 
+        <div hidden={section !== "people"}>
         {/* User Management Table */}
         <Card style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border)" }}>
           <CardHeader className="pb-3">
@@ -702,7 +708,7 @@ export default function AdminPanel() {
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold w-40 text-right">Role</div>
             </div>
 
-            {usersLoading ? (
+            {usersError ? <p role="alert">User records could not load. This is not an empty directory.</p> : usersLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3, 4].map((i) => (
                   <Skeleton key={i} className="h-14 w-full rounded-lg" />
@@ -716,8 +722,9 @@ export default function AdminPanel() {
                   <UserTableRow
                     key={user.id}
                     user={user}
+                    pending={updateRole.isPending}
                     onRoleChange={(userId, role) =>
-                      updateRole.mutate({ userId, role: role as "user" | "admin" | "investor" | "insurance" })
+                      setRoleDraft({ userId, name: user.email ?? user.name ?? `User ${userId}`, before: user.role, role: role as NonNullable<typeof roleDraft>["role"] })
                     }
                   />
                 ))}
@@ -726,11 +733,12 @@ export default function AdminPanel() {
           </CardContent>
         </Card>
 
-        {/* Invite Manager */}
-        <InviteManager />
+        </div>
+        <Dialog open={roleDraft !== null} onOpenChange={open => { if (!open && !updateRole.isPending) setRoleDraft(null); }}><DialogContent><DialogHeader><DialogTitle>Review role change</DialogTitle><DialogDescription>{roleDraft?.name} · user #{roleDraft?.userId}</DialogDescription></DialogHeader><p>Current: <strong>{roleDraft?.before}</strong> → proposed: <strong>{roleDraft?.role}</strong></p><p className="text-sm">This changes platform access immediately. Server authorization still applies. No invitation or email is sent.</p>{updateRole.error && <p role="alert" className="text-sm">Change not confirmed: {updateRole.error.message}. Refresh the user record before retrying an uncertain outcome.</p>}<DialogFooter><Button variant="outline" disabled={updateRole.isPending} onClick={() => setRoleDraft(null)}>Cancel</Button><Button disabled={updateRole.isPending} onClick={() => { if (roleDraft) updateRole.mutate({ userId: roleDraft.userId, role: roleDraft.role }); }}>{updateRole.isPending ? "Applying…" : "Apply role change"}</Button></DialogFooter></DialogContent></Dialog>
+        {section === "invitations" && <InviteManager />}
 
         {/* Module Permissions Matrix */}
-        <ModulePermissionsMatrix />
+        {section === "permissions" && <ModulePermissionsMatrix />}
       </div>
     </EditorialTopNav>
   );

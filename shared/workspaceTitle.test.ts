@@ -14,7 +14,14 @@ describe("workspace tab identity", () => {
   it("ignores query/hash identity and handles trailing slash", () => {
     expect(workspaceTitle("/aperture/mission/?account=private#finding")).toBe("Mission · Capital Aperture");
   });
-  it("does not relabel acquisition work or a similarly named route", () => {
-    for (const path of ["/", "/scout", "/aperture-other"]) expect(workspaceTitle(path)).toBe("Signal Hunter OS — Acquisition Command Center");
+  it.each([
+    ["/scout", "Discover opportunities"],
+    ["/admin", "Operator desk"],
+    ["/walkthrough", "Work through a case"],
+  ])("gives %s its own identity without account details", (path, title) => {
+    expect(workspaceTitle(path)).toBe(`${title} · Signal Hunter`);
+  });
+  it("does not relabel the acquisition home or a similarly named route", () => {
+    for (const path of ["/", "/aperture-other"]) expect(workspaceTitle(path)).toBe("Signal Hunter OS — Acquisition Command Center");
   });
 });

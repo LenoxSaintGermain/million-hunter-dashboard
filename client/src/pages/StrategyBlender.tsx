@@ -16,6 +16,7 @@ import {
   ChevronRight, RefreshCw, Shield, AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AlignmentPortrait } from "@/components/AlignmentPortrait";
 
 const DEAL_TYPES = [
   { type: "sba_business", label: "SBA Business", icon: Building2, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", defaultMonthly: 8000, defaultInvestment: 300000 },
@@ -62,13 +63,16 @@ export default function StrategyBlender() {
     { id: "2", type: "rental", label: "Cash-Flow Rental", investment: 80000, expectedMonthly: 1200, leverage: "heloc" },
   ]);
   const [scenario, setScenario] = useState<"conservative" | "base" | "aggressive">("base");
-  const [analysis, setAnalysis] = useState<any>(null);
+  const [savedAnalysis, setSavedAnalysis] = useState<{ key: string; data: any } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [activeLevers, setActiveLevers] = useState<Set<string>>(new Set());
+  const inputKey = JSON.stringify({ recipe, scenario });
+  const analysis = savedAnalysis?.key === inputKey ? savedAnalysis.data : null;
 
   const analyzeMutation = trpc.strategyBlender.analyze.useMutation({
-    onSuccess: (data) => {
-      setAnalysis(data);
+    onSuccess: (data, variables) => {
+      setSavedAnalysis({ key: JSON.stringify({ recipe: variables.recipe, scenario: variables.scenario }), data });
+      setActiveLevers(new Set());
       setIsAnalyzing(false);
     },
     onError: (err) => {
@@ -147,7 +151,7 @@ export default function StrategyBlender() {
                 Engineer your{" "}
                 <span style={{ color: "var(--sh-signal)" }}>deal stack.</span>
               </h1>
-              <p className="mt-2 text-sm" style={{ color: "var(--sh-text-secondary)" }}>Mix asset types. Toggle capital levers. Move like Blackrock — on Mainstreet.</p>
+              <p className="mt-2 text-sm" style={{ color: "var(--sh-text-secondary)" }}>Compare a working mix of assets. Change the assumptions, then investigate what supports them.</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right">
@@ -158,6 +162,8 @@ export default function StrategyBlender() {
           </div>
         </motion.div>
 
+        <p className="text-sm text-muted-foreground">Illustrative starting assumptions, not researched opportunities or a return forecast. Editing the recipe recalculates the local model; Analyze Stack requests a new analysis.</p>
+        {savedAnalysis && !analysis && <p role="status" className="border-l-2 border-amber pl-3 text-sm">Your inputs changed. The previous analysis is withheld; analyze this recipe to refresh it.</p>}
         <div className="grid gap-6 lg:grid-cols-5">
           {/* Left: Recipe Builder */}
           <div className="lg:col-span-3 space-y-4">
@@ -167,6 +173,7 @@ export default function StrategyBlender() {
                 <button
                   key={key}
                   onClick={() => setScenario(key as any)}
+                  aria-pressed={scenario === key}
                   className={cn(
                     "flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border",
                     scenario === key ? `${cfg.bg} ${cfg.color}` : "border-[var(--sh-border-1)] text-[var(--sh-fg-muted)]"
@@ -200,12 +207,14 @@ export default function StrategyBlender() {
                             <div className="flex-1 min-w-0 space-y-3">
                               <div className="flex items-center justify-between gap-2">
                                 <Input
+                                  aria-label="Asset label"
                                   value={item.label}
                                   onChange={(e) => updateItem(item.id, "label", e.target.value)}
                                   className="border-[var(--sh-border-1)] font-semibold text-sm h-8 px-2"
                                   style={{ background: "var(--sh-surface-2)", color: "var(--sh-text-primary)" }}
                                 />
                                 <button
+                                  aria-label={`Remove ${item.label}`}
                                   onClick={() => removeItem(item.id)}
                                   className="hover:text-rose-400 transition-colors shrink-0" style={{ color: "var(--sh-fg-muted)" }}
                                 >
@@ -218,6 +227,7 @@ export default function StrategyBlender() {
                                   <div className="flex items-center gap-1 mt-1">
                                     <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>$</span>
                                     <Input
+                                      aria-label={`Investment for ${item.label}`}
                                       type="number"
                                       value={item.investment}
                                       onChange={(e) => updateItem(item.id, "investment", Number(e.target.value))}
@@ -231,6 +241,7 @@ export default function StrategyBlender() {
                                   <div className="flex items-center gap-1 mt-1">
                                     <span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>$</span>
                                     <Input
+                                      aria-label={`Monthly assumption for ${item.label}`}
                                       type="number"
                                       value={item.expectedMonthly}
                                       onChange={(e) => updateItem(item.id, "expectedMonthly", Number(e.target.value))}
@@ -242,6 +253,7 @@ export default function StrategyBlender() {
                                 <div>
                                   <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Leverage</label>
                                   <select
+                                    aria-label={`Financing assumption for ${item.label}`}
                                     value={item.leverage}
                                     onChange={(e) => updateItem(item.id, "leverage", e.target.value)}
                                     className="mt-1 w-full h-7 text-xs rounded px-1 border"
@@ -317,7 +329,10 @@ export default function StrategyBlender() {
             {/* Live Totals */}
             <Card className="bg-card/50 border-[var(--rule)]" style={{ background: "var(--sh-surface-1)" }}>
               <CardContent className="p-5 space-y-3">
-                <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Live Stack Summary</div>
+                <AlignmentPortrait compact title="Your working mix" subtitle="Modeled from your inputs · not verified returns" measures={[
+                  { id: "investment", label: "Capital assumption", value: totalInvestment, unit: "usd", basis: "modeled", wanted: "Set a capital budget", explanation: "Sum of the investment amounts in this recipe. No approved budget or funding commitment is supplied." },
+                  { id: "monthly", label: "Monthly scenario", value: adjustedMonthly, unit: "usd", basis: "modeled", wanted: "Evidence for cash flow", explanation: analysis ? "Returned by the analysis for these exact recipe and scenario inputs. Not independently verified." : `Sum of monthly assumptions multiplied by ${scenarioMultiplier}. Financing costs and asset-specific expenses are not independently reconciled here.` },
+                ]} />
                 <div className="space-y-2">
                   {[
                     { label: "Total Investment", value: formatCurrency(totalInvestment), color: "var(--sh-text-primary)" },
@@ -338,7 +353,7 @@ export default function StrategyBlender() {
                       <span className={cn("text-sm font-bold", analysis.dscr >= 1.25 ? "text-[var(--sage)]" : analysis.dscr >= 1.15 ? "text-[var(--amber)]" : "text-rose-400")}>
                         {analysis.dscr.toFixed(2)}x
                         <span className="text-xs font-normal ml-1 text-muted-foreground">
-                          {analysis.dscr >= 1.25 ? "✓ SBA Ready" : analysis.dscr >= 1.15 ? "PLP Eligible" : "Below Min"}
+                          Modeled · not lender approval
                         </span>
                       </span>
                     </div>

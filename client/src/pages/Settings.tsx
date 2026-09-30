@@ -94,7 +94,7 @@ function ConsensusModelConfig() {
           <Button
             size="sm"
             className="h-7 text-xs"
-            onClick={() => updateConsensus.mutate({ model1: m1, model2: m2, model3: m3 })}
+            onClick={() => { if (window.confirm(`Apply consensus routing?\nStructuralist: ${consensusData?.consensus_model_1} → ${m1}\nRestructurer: ${consensusData?.consensus_model_2} → ${m2}\nMarket Analyst: ${consensusData?.consensus_model_3} → ${m3}\nThis changes future runs; it does not rerun existing analyses.`)) updateConsensus.mutate({ model1: m1, model2: m2, model3: m3 }); }}
             disabled={updateConsensus.isPending || isLoading}
           >
             {saved ? <CheckCircle2 className="w-3 h-3 mr-1 text-[var(--sage)]" /> : null}
@@ -379,7 +379,7 @@ export default function Settings() {
                   variant="outline"
                   size="sm"
                   className="h-8 text-xs border-[var(--sh-border)] shrink-0"
-                  onClick={() => resetDefaults.mutate()}
+                  onClick={() => { if (window.confirm("Reset all analysis model routes and consensus settings to registry defaults? Existing configuration overrides will be replaced.")) resetDefaults.mutate(); }}
                   disabled={resetDefaults.isPending}
                 >
                   <RotateCcw className={`w-3 h-3 mr-1.5 ${resetDefaults.isPending ? "animate-spin" : ""}`} />

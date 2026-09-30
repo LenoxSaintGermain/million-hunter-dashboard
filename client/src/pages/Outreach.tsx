@@ -83,6 +83,7 @@ function AddOutreachDialog({ deals, onSuccess }: { deals: { id: number; name: st
             Log Outreach Contact
           </DialogTitle>
         </DialogHeader>
+        <p className="text-sm text-muted-foreground">This creates a contact record only. It does not send an email, message or invitation.</p>
         <form onSubmit={handleSubmit} className="space-y-3 mt-2">
           <div className="space-y-1.5">
             <Label className="text-xs" style={{ color: "var(--sh-fg-3)" }}>Deal *</Label>
@@ -218,11 +219,14 @@ export default function Outreach() {
             return (
               <div
                 key={contact.id}
-                className="rounded-xl border transition-colors overflow-hidden"
+                className="hunter-record overflow-hidden"
                 style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border)" }}
               >
                 <div
                   className="flex items-center gap-3 p-3 cursor-pointer"
+                  role="button" tabIndex={0} aria-expanded={isExpanded}
+                  aria-label={`Review contact ${contact.contactName ?? "Unknown Contact"}`}
+                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedId(isExpanded ? null : contact.id); } }}
                   onClick={() => setExpandedId(isExpanded ? null : contact.id)}
                 >
                   <div

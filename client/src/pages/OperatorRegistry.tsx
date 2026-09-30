@@ -57,9 +57,7 @@ function initials(name: string | null) {
   if (!name) return "?";
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
-function dnaScore(user: UserRow) {
-  return ((user.id * 7919) % 30) + 65;
-}
+
 function timeAgo(date: Date | string | null | undefined) {
   if (!date) return "—";
   // MySQL returns timestamps as "2026-05-22 15:30:00" (no timezone suffix)
@@ -98,7 +96,6 @@ function OperatorCard({ user, onRoleChange }: {
   user: UserRow;
   onRoleChange: (id: number, role: string) => void;
 }) {
-  const score = dnaScore(user);
   const roleLabel = ROLE_LABELS[user.role] ?? user.role.toUpperCase();
   const roleClass = ROLE_COLORS[user.role] ?? ROLE_COLORS.user;
 
@@ -137,30 +134,10 @@ function OperatorCard({ user, onRoleChange }: {
         </span>
       </div>
 
-      {/* DNA Match Bar */}
-      <div className="mb-4">
-        <div className="flex justify-between items-center mb-1.5">
-          <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>DNA MATCH</span>
-          <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>ALGO v1.1</span>
-        </div>
-        <div className="h-1 rounded-full overflow-hidden" style={{ background: "var(--sh-primary-8)" }}>
-          <div
-            className="h-full rounded-full transition-all duration-700"
-            style={{
-              width: `${score}%`,
-              background: score >= 85 ? "var(--signal-gold)" : score >= 75 ? "var(--amber)" : "var(--clay)",
-            }}
-          />
-        </div>
-        <div className="flex justify-end mt-1">
-          <span
-            className="text-[11px] font-bold tabular-nums"
-            style={{ color: "var(--sh-fg-2)", fontFamily: "var(--font-mono)" }}
-          >
-            {score}%
-          </span>
-        </div>
-      </div>
+      {/* Profile evidence, not an invented match score */}
+      <p className="border-y border-rule py-3 mb-3 text-sm">
+        {user.onboardingCompleted ? "Onboarding recorded complete" : "Onboarding incomplete"} · no deal-match assessment supplied.
+      </p>
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: "var(--rule)" }}>
@@ -170,6 +147,7 @@ function OperatorCard({ user, onRoleChange }: {
         <div className="relative">
           <select
             value={user.role}
+            aria-label={`Role for ${user.name ?? user.email ?? user.id}`}
             onChange={e => onRoleChange(user.id, e.target.value)}
             className="text-[11px] rounded border px-2 py-1 pr-6 appearance-none cursor-pointer focus:outline-none"
             style={{
@@ -266,19 +244,7 @@ function AccessRequestRow({ req, onAction }: {
 }
 
 // ─── Access Protocol Table ────────────────────────────────────────────────────
-const PROTOCOL_ROWS = [
-  { level: "L-LEVEL-00", name: "ADMIN OVERRIDE", access: "UNRESTRICTED", status: "ACTIVE" },
-  { level: "L-LEVEL-01", name: "DEAL ROOM ENCRYPTION", access: "FULL READ/WRITE", status: "ACTIVE" },
-  { level: "L-LEVEL-02", name: "PORTFOLIO SNAPSHOT", access: "RESTRICTED READ", status: "ACTIVE" },
-  { level: "L-LEVEL-03", name: "MARKET SCAN ACCESS", access: "STANDARD", status: "ACTIVE" },
-  { level: "L-LEVEL-04", name: "AGENT OVERRIDE AUTHORITY", access: "ADMIN ONLY", status: "DISABLED" },
-];
 
-const LIVE_FEED = [
-  { time: "NOW", text: "Protocol \"Cerberus\" initiated by Agent Claude — Registry integrity verified, ALPHA-DNA access operational", type: "alert" },
-  { time: "YESTERDAY", text: "New Operator uploaded — system identified 7 high-match targets in Tech sector", type: "info" },
-  { time: "46 MIN", text: "Axiom Audit Complete — no anomalies detected in last 24-hour cycle", type: "success" },
-];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function OperatorRegistry() {
@@ -286,10 +252,10 @@ export default function OperatorRegistry() {
   const utils = trpc.useUtils();
   const [activeTab, setActiveTab] = useState<"operators" | "requests" | "protocol">("operators");
 
-  const { data: users = [] } = trpc.admin.listUsers.useQuery(undefined, {
+  const { data: users = [], isLoading: usersLoading, error: usersError, refetch: refetchUsers } = trpc.admin.listUsers.useQuery(undefined, {
     enabled: (currentUser as any)?.role === "admin",
   });
-  const { data: accessRequests = [] } = trpc.admin.listAccessRequests.useQuery(undefined, {
+  const { data: accessRequests = [], isLoading: requestsLoading, error: requestsError, refetch: refetchRequests } = trpc.admin.listAccessRequests.useQuery(undefined, {
     enabled: (currentUser as any)?.role === "admin",
   });
 
@@ -302,10 +268,18 @@ export default function OperatorRegistry() {
     onError: () => toast.error("Failed to update request"),
   });
 
-  const handleRoleChange = (id: number, role: string) =>
-    updateRole.mutate({ userId: id, role: role as "user" | "admin" | "investor" | "insurance" });
-  const handleRequestAction = (id: number, status: "approved" | "rejected") =>
-    updateRequest.mutate({ id, status });
+  const handleRoleChange = (id: number, role: string) => {
+    const person = users.find(u => u.id === id);
+    if (!person || updateRole.isPending || role === person.role) return;
+    if (window.confirm(`Change role for ${person.email ?? person.name ?? id} from ${person.role} to ${role}? This changes workspace access.`))
+      updateRole.mutate({ userId: id, role: role as "user" | "admin" | "capital_operator" | "investor" | "insurance" });
+  };
+  const handleRequestAction = (id: number, status: "approved" | "rejected") => {
+    const request = accessRequests.find(r => r.id === id);
+    if (!request || updateRequest.isPending) return;
+    if (window.confirm(`Mark the access request for ${request.email} as ${status}? This records a request decision; it does not assign a role.`))
+      updateRequest.mutate({ id, status });
+  };
 
   if ((currentUser as any)?.role !== "admin") {
     return (
@@ -318,6 +292,12 @@ export default function OperatorRegistry() {
     );
   }
 
+  if (usersLoading || requestsLoading || usersError || requestsError) {
+    return <EditorialTopNav><section className="hunter-record" aria-live="polite">
+      <h1 className="font-serif text-3xl mb-3">Operator Registry</h1>
+      {usersError || requestsError ? <><p role="alert">Registry records could not be loaded. Counts and access states are unavailable, not zero.</p><button className="underline py-3" onClick={() => { void refetchUsers(); void refetchRequests(); }}>Retry records</button></> : <p>Loading recorded identities and access requests…</p>}
+    </section></EditorialTopNav>;
+  }
   const userList = users as unknown as UserRow[];
   const reqList = accessRequests as unknown as AccessRequest[];
   const totalOperators = userList.length;
@@ -346,55 +326,15 @@ export default function OperatorRegistry() {
               Operator<br />Registry
             </h1>
             <p className="text-sm max-w-md" style={{ color: "var(--sh-fg-3)" }}>
-              Comprehensive DNA management and matching protocol for institutional operators.
-              High-precision pairing of human capital with transactional intent.
+              Review operator identities, access requests and assigned roles. No inferred matching score or agent status.
             </p>
           </div>
 
-          {/* Agent Monitoring Panel */}
-          <div
-            className="rounded-lg border p-4 min-w-[220px]"
-            style={{ background: "var(--paper)", borderColor: "var(--rule)" }}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--sage)" }} />
-              <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>AGENT MONITORING</span>
-            </div>
-            <div className="text-sm font-semibold mb-3" style={{ color: "var(--sh-fg-1)" }}>Active Orchestration</div>
-            <div className="space-y-2">
-              {[
-                { name: "Claude Orchestrator", status: "Active Orchestration", active: true },
-                { name: "Perplexity Research", status: "Standby", active: false },
-                { name: "Gemini Analysis", status: "Standby", active: false },
-              ].map(agent => (
-                <div key={agent.name} className="flex items-center gap-2.5">
-                  <div
-                    className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold shrink-0"
-                    style={{
-                      background: agent.active ? "var(--sh-primary-15)" : "var(--sh-primary-8)",
-                      color: agent.active ? "var(--sh-fg-1)" : "var(--sh-fg-4)",
-                    }}
-                  >
-                    {agent.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <div
-                      className="text-[11px] font-medium truncate"
-                      style={{ color: agent.active ? "var(--sh-fg-1)" : "var(--sh-fg-3)" }}
-                    >
-                      {agent.name}
-                    </div>
-                    <div
-                      className="text-[10px]"
-                      style={{ color: agent.active ? "var(--sage)" : "var(--sh-fg-4)" }}
-                    >
-                      {agent.status}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <aside className="hunter-record max-w-sm">
+            <p className="hunter-eyebrow">Access is a decision</p>
+            <p>Review the named person and requested scope. Request status and role assignment are separate actions.</p>
+            <p className="text-xs text-muted-foreground mt-3">No agent-health telemetry is supplied by this page.</p>
+          </aside>
         </div>
 
         {/* ── Stats Bar ──────────────────────────────────────────────────── */}
@@ -403,14 +343,13 @@ export default function OperatorRegistry() {
           style={{ background: "var(--paper)", borderColor: "var(--rule)" }}
         >
           <div className="flex items-center justify-between mb-4">
-            <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>ALGORITHM V1.1</span>
-            <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>DNA Matching Intelligence</span>
+            <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>REGISTRY SNAPSHOT</span>
+            <span className="label-caps" style={{ color: "var(--sh-fg-4)" }}>Recorded access and roles</span>
           </div>
           <div className="flex flex-wrap gap-8">
-            <StatCard value={String(totalOperators)} label="VERIFIED OPERATORS" />
-            <StatCard value="98.4%" label="MATCHING ACCURACY" />
+            <StatCard value={String(totalOperators)} label="REGISTERED OPERATORS" />
             <StatCard value={String(pendingProtocols)} label="PENDING PROTOCOLS" sub="access requests" />
-            <StatCard value={String(activeOperators)} label="ACTIVE OPERATORS" />
+            <StatCard value={String(activeOperators)} label="OPERATOR ROLES" />
             <StatCard value={String(investors)} label="INVESTORS" />
           </div>
         </div>
@@ -467,107 +406,12 @@ export default function OperatorRegistry() {
 
         {/* ── Access Protocol ────────────────────────────────────────────── */}
         {activeTab === "protocol" && (
-          <div>
-            <div className="mb-6">
-              <h2
-                className="text-xl font-semibold mb-1"
-                style={{ color: "var(--sh-fg-1)", fontFamily: "var(--font-display)" }}
-              >
-                Access Protocol
-              </h2>
-              <p className="text-sm" style={{ color: "var(--sh-fg-3)" }}>
-                Agentic RBAC system — context-aware permissions managed by ParallelAgent.
-                Restricted IC Use protocols maintained across all platform state.
-              </p>
-            </div>
-
-            <div className="rounded-lg border overflow-hidden mb-8" style={{ borderColor: "var(--rule)" }}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr style={{ background: "var(--bone)", borderBottom: "1px solid var(--rule)" }}>
-                    {["CLEARANCE", "PROTOCOL NAME", "ACCESS LEVEL", "STATUS"].map(h => (
-                      <th
-                        key={h}
-                        className="text-left px-5 py-3 label-caps"
-                        style={{ color: "var(--sh-fg-4)" }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {PROTOCOL_ROWS.map((row, i) => (
-                    <tr
-                      key={row.level}
-                      className="border-t"
-                      style={{
-                        background: i % 2 === 0 ? "var(--paper)" : "var(--bone)",
-                        borderColor: "var(--rule)",
-                      }}
-                    >
-                      <td className="px-5 py-3">
-                        <span className="label-caps" style={{ color: "var(--sh-fg-3)" }}>{row.level}</span>
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <Lock className="w-3 h-3 shrink-0" style={{ color: "var(--sh-fg-4)" }} />
-                          <span className="text-[12px] font-medium" style={{ color: "var(--sh-fg-1)" }}>
-                            {row.name}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3">
-                        <span
-                          className="text-[11px]"
-                          style={{ color: "var(--sh-fg-3)", fontFamily: "var(--font-mono)" }}
-                        >
-                          {row.access}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3">
-                        <span
-                          className={cn(
-                            "text-[9px] font-bold tracking-[0.12em] px-2 py-0.5 rounded border",
-                            row.status === "ACTIVE"
-                              ? "text-emerald-700 border-emerald-600/40 bg-emerald-600/10"
-                              : "text-red-700 border-red-600/40 bg-red-600/10"
-                          )}
-                          style={{ fontFamily: "var(--font-mono)" }}
-                        >
-                          {row.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Live Stream */}
-            <div>
-              <div className="label-caps mb-4" style={{ color: "var(--sh-fg-4)" }}>LIVE STREAM ACTIVITY</div>
-              <div className="space-y-2">
-                {LIVE_FEED.map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3 py-3 px-4 rounded-lg border"
-                    style={{ background: "var(--paper)", borderColor: "var(--rule)" }}
-                  >
-                    <div
-                      className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
-                      style={{
-                        background: item.type === "alert" ? "var(--amber)" :
-                          item.type === "success" ? "var(--sage)" : "var(--sh-fg-4)",
-                      }}
-                    />
-                    <p className="flex-1 text-[12px]" style={{ color: "var(--sh-fg-2)" }}>{item.text}</p>
-                    <span className="label-caps shrink-0" style={{ color: "var(--sh-fg-4)" }}>{item.time}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <section className="hunter-record">
+            <h2 className="font-serif text-2xl mb-3">Review permissions at their source.</h2>
+            <p>Role assignments and module permissions are managed in the Operator Desk. This registry does not supply an audit-event stream or agent-health telemetry.</p>
+            <a className="inline-block underline py-3" href="/admin">Open roles and permissions →</a>
+            <p className="text-sm text-muted-foreground">Approving an access request does not itself assign a role. Review the account separately before granting access.</p>
+          </section>
         )}
       </div>
     </EditorialTopNav>

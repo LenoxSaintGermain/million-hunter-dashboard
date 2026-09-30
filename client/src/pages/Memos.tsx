@@ -17,7 +17,7 @@ import {
 
 function MemoDialog({ dealId, dealName }: { dealId: number; dealName: string }) {
   const [open, setOpen] = useState(false);
-  const { data: memo, isLoading } = trpc.memos.getByDealId.useQuery(
+  const { data: memo, isLoading, error } = trpc.memos.getByDealId.useQuery(
     { dealId },
     { enabled: open }
   );
@@ -44,12 +44,12 @@ function MemoDialog({ dealId, dealName }: { dealId: number; dealName: string }) 
             {dealName} — Investment Memo
           </DialogTitle>
         </DialogHeader>
-        {isLoading ? (
+        {error ? <p role="alert">The memo could not load. Close and reopen to retry; no new analysis was run.</p> : isLoading ? (
           <div className="space-y-3 mt-4">
             {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-4 w-full" />)}
           </div>
         ) : memo ? (
-          <div className="prose prose-sm prose-invert max-w-none mt-4">
+          <div className="prose prose-sm max-w-none mt-4 text-[var(--ink)]">
             <Streamdown>{memo.content ?? ""}</Streamdown>
           </div>
         ) : (
@@ -61,7 +61,7 @@ function MemoDialog({ dealId, dealName }: { dealId: number; dealName: string }) 
 }
 
 export default function Memos() {
-  const { data: memos, isLoading, refetch } = trpc.memos.list.useQuery();
+  const { data: memos, isLoading, error, refetch } = trpc.memos.list.useQuery();
   const { data: deals } = trpc.deals.list.useQuery({ limit: 100 });
   const generateMemo = trpc.memos.generate.useMutation({
     onSuccess: () => { toast.success("Memo generated"); refetch(); },
@@ -69,7 +69,7 @@ export default function Memos() {
   });
 
   const dealMap = new Map(deals?.map((d) => [d.id, d]) ?? []);
-  const dealsWithoutMemo = (deals ?? []).filter(
+  const dealsWithoutMemo = (isLoading || error ? [] : deals ?? []).filter(
     (d) => !(memos ?? []).some((m) => m.dealId === d.id)
   );
 
@@ -78,9 +78,9 @@ export default function Memos() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="sh-heading-2" style={{ color: "var(--sh-fg-1)" }}>Investment Memos</h1>
+          <p className="hunter-eyebrow">The decision desk / investment memos</p><h1 className="font-serif text-4xl" style={{ color: "var(--sh-fg-1)" }}>The case, ready to question.</h1>
           <p className="text-xs mt-0.5" style={{ color: "var(--sh-fg-3)" }}>
-            {memos?.length ?? 0} memo{(memos?.length ?? 0) !== 1 ? "s" : ""} generated · Authored by The Architect
+            {error ? "Memo index unavailable" : isLoading ? "Loading saved briefs…" : `${memos?.length ?? 0} saved briefs`} · Generated analysis, not independent verification
           </p>
         </div>
       </div>
@@ -125,7 +125,7 @@ export default function Memos() {
       )}
 
       {/* ── Memos grid ── */}
-      {isLoading ? (
+      {error ? <div role="alert">Saved briefs could not load. <button className="underline min-h-11" onClick={() => refetch()}>Retry</button></div> : isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-xl" />)}
         </div>
@@ -153,7 +153,7 @@ export default function Memos() {
             return (
               <div
                 key={memo.id}
-                className="rounded-xl border transition-colors group"
+                className="hunter-record group"
                 style={{ background: "var(--sh-surface-1)", borderColor: "var(--sh-border)" }}
                 onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--sh-primary)")}
                 onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--sh-border)")}
@@ -174,7 +174,7 @@ export default function Memos() {
                       v{memo.version ?? 1}
                     </span>
                   </div>
-                  <p className="text-sm font-semibold line-clamp-2 mb-1" style={{ color: "var(--sh-fg-1)" }}>
+                  <p className="hunter-record-title mb-2" style={{ color: "var(--sh-fg-1)" }}>
                     {memo.title ?? deal?.name ?? "Investment Memo"}
                   </p>
                   {deal && (

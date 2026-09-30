@@ -7,6 +7,16 @@ const snapshot: ThesisReviewSnapshot = { version: 1, userId: 1, jobId: 2, thesis
   weights: [{ dimension: "Recurring revenue", weight: 100 }], sources: [{ url: "https://example.com/listing", excerpt: "Revenue details are not disclosed.", asOf: 1000 }],
   items: [{ dealId: 4, name: "Fixture", listingUrl: "https://example.com/listing", assessments: [], assessmentFailed: false }] };
 afterEach(() => { vi.resetAllMocks(); vi.unstubAllEnvs(); });
+it("preserves financial bounds and reported values in the same saved receipt", async () => {
+  const enriched = { ...snapshot, financialBounds: { askingPriceMin: 1000000, askingPriceMax: 5000000 }, items: snapshot.items.map(item => ({ ...item, financials: { askingPrice: 1770000, cashFlow: null } })) };
+  await saveThesisReview(enriched);
+  const stored = mocks.values.mock.calls[0][0];
+  mocks.limit.mockResolvedValue([{ ...stored, expiresAt: Date.now() + 1000 }]);
+  const result = await readThesisReview(1, 2);
+  expect(result?.financialBounds).toEqual(enriched.financialBounds);
+  expect(result?.items[0].financials).toEqual({ askingPrice: 1770000, cashFlow: null });
+  expect(mocks.generateContent).not.toHaveBeenCalled();
+});
 it("stores a user/search-scoped immutable snapshot without changing deal scores", async () => {
   await saveThesisReview(snapshot);
   expect(mocks.values).toHaveBeenCalledOnce();
@@ -20,6 +30,8 @@ it("reads old snapshots without rerunning analysis or inventing a fit score", as
   mocks.limit.mockResolvedValue([{ content: JSON.stringify(snapshot), createdAt: 1000, expiresAt: 2000 }]);
   const result = await readThesisReview(1, 2);
   expect(result?.stale).toBe(true);
+  expect(result?.financialBounds).toBeUndefined();
+  expect(result?.items[0].financials).toBeUndefined();
   expect(result?.items[0].comparison.score).toBeNull();
   expect(mocks.generateContent).not.toHaveBeenCalled(); expect(mocks.values).not.toHaveBeenCalled();
 });

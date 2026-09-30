@@ -4258,7 +4258,7 @@ async function runScanPipeline(
         try { assessments = await assessThesisCriteria({ thesisText, weights: thesisReview.weights, source }); }
         catch { assessmentFailed = true; }
       }
-      comparisonItems.push({ dealId, name: listing.name, listingUrl: listing.listingUrl, assessments, assessmentFailed });
+      comparisonItems.push({ dealId, name: listing.name, listingUrl: listing.listingUrl, financials: { askingPrice: listing.askingPrice ?? null, cashFlow: listing.cashFlow ?? null }, assessments, assessmentFailed });
     }
 
     // The shared catalog score is separate from this user's thesis comparison.
@@ -4327,6 +4327,7 @@ async function runScanPipeline(
   // ── Phase 4: Log and complete ─────────────────────────────────────────────
   await phase("Finalizing results", `${scored} listings scored; existing records are reused`, 92);
   if (thesisReview) await saveThesisReview({ ...thesisReview, version: 1, jobId, thesisText,
+    financialBounds: financials,
     sources: comparisonSources.filter(source => comparisonItems.some(item => item.listingUrl === source.url)), items: comparisonItems });
   await logActivity({
     type: "scan_completed",
