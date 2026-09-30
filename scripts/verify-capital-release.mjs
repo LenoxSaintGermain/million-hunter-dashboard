@@ -28,6 +28,8 @@ try {
   check('Public Capital UAT preview is included', bundle.body.includes('/walkthrough/capital-desk') && bundle.body.includes('illustrative composite records'));
   check('Deal Senior reading desk is included', bundle.body.includes('Follow the sources') && bundle.body.includes('Challenge the cash'));
   check('Scan story harness is included', bundle.body.includes('Find the next question.'));
+  check('Thesis requirements reading desk is included', bundle.body.includes('Conviction needs a boundary.') && bundle.body.includes('What must be true?'));
+  check('Deployment and scenario reading desks are included', bundle.body.includes('Give your capital a clear job.') && bundle.body.includes('Where the example holds—or breaks') && bundle.body.includes('Small allocation. Same discipline.'));
   const health = await read('/api/trpc/system.health?input='+encodeURIComponent(JSON.stringify({ json: { timestamp: Date.now() } })));
   check('API health returns JSON, not hosting fallback HTML', health.response.status === 200 && (health.response.headers.get('content-type') ?? '').includes('application/json') && JSON.parse(health.body)?.result?.data?.json?.ok === true);
   const protectedRead = await read('/api/trpc/aperture.account.list');
