@@ -18,13 +18,14 @@ export function QuickPlayWorkspace() {
   const current = selection && check.data?.selection.candidateId === selection.candidateId
     && check.data?.selection.budgetCents === budget ? check.data : null;
   const choose = (value: Selection) => { setSelection(value); setAcknowledged(false); prepare.reset(); };
-  return <section aria-label="Quick Plays" className="space-y-4">
+  return <section aria-label="Quick Plays" className="micro-reading-desk space-y-4">
     <header>
-      <h1 className="font-serif text-3xl">Quick Plays</h1>
+      <p className="eyebrow">Micro Plays / $25–$100 / paper only</p>
+      <h1 className="font-serif text-3xl">Small allocation. Same discipline.</h1>
       <p className="mt-2 text-sm">Short route, same checks. Start with reviewed research, then check current prices and your limits.</p>
       <p className="mt-2 text-sm text-[var(--sh-fg-muted)]">Practice trading · Intraday long shares. Other strategies remain in Research. No automatic orders.</p>
     </header>
-    <fieldset disabled={prepare.isPending} className="space-y-2">
+    <fieldset disabled={prepare.isPending} className="micro-budget space-y-2">
       <legend className="text-sm font-semibold">Budget for this trade</legend>
       <div className="flex flex-wrap gap-2">{[2500, 5000, 10000].map(value => <Button key={value} type="button" variant={budget === value ? "default" : "outline"}
         aria-pressed={budget === value} className="min-h-11" onClick={() => { setBudget(value); setSelection(null); setAcknowledged(false); prepare.reset(); }}>{money(value)}</Button>)}</div>
@@ -40,7 +41,7 @@ export function QuickPlayWorkspace() {
         <p className="text-sm">We need a current intraday plan, a matching practice account and completed evidence reviews. Existing orders and positions are unchanged.</p>
         <Button variant="outline" className="min-h-11" onClick={() => navigate(`/aperture/mission?objective=1&capital=${budget / 100}`)}>Research an idea with {money(budget)}</Button>
       </div>}
-      <div className="space-y-3">{ideas.data.items.map(item => <article key={`${item.selection.runId}:${item.selection.candidateId}`} className="rounded-xl border p-4 space-y-2">
+      <div className="micro-idea-feed">{ideas.data.items.map(item => <article key={`${item.selection.runId}:${item.selection.candidateId}`} className="micro-idea border p-4 space-y-2">
         <h2 className="font-semibold">{item.symbol} · Long shares</h2>
         <p className="text-sm">Practice account: {item.accountLabel}</p>
         <p className="text-sm text-[var(--sh-fg-muted)]">{item.sourceCount} research sources · Saved {new Date(item.researchAt).toLocaleString()}</p>

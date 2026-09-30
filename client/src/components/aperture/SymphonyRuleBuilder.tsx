@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { trpc } from "../../lib/trpc";
+import { trpc } from "@/lib/trpc";
 import {
   type SymphonyRecipe,
   DEFAULT_SYMPHONY_RECIPES,

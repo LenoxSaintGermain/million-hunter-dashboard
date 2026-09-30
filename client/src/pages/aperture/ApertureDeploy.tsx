@@ -109,12 +109,13 @@ export default function ApertureDeploy() {
   };
 
   return <DashboardLayout>
-    <section className={`mx-auto ${deployMode === "quick_hits" ? "max-w-5xl" : "max-w-4xl"} space-y-6 pb-16`}>
+    <section className="deployment-reading-desk space-y-6 pb-16">
       {/* Strategy Mode Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--sh-border-1)] pb-4">
+      <div className="deployment-mode-bar flex flex-wrap items-center justify-between gap-3 border-b border-[var(--sh-border-1)] pb-4">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            aria-pressed={deployMode === "standard"}
             onClick={() => handleSwitchToMode("standard")}
             className={`min-h-10 px-4 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
               deployMode === "standard"
@@ -127,6 +128,7 @@ export default function ApertureDeploy() {
           </button>
           <button
             type="button"
+            aria-pressed={deployMode === "quick_hits"}
             onClick={() => handleSwitchToMode("quick_hits")}
             className={`min-h-10 px-4 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
               deployMode === "quick_hits"
@@ -139,6 +141,7 @@ export default function ApertureDeploy() {
           </button>
           <button
             type="button"
+            aria-pressed={deployMode === "quick_play"}
             onClick={() => handleSwitchToMode("quick_play")}
             className={`min-h-10 px-4 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
               deployMode === "quick_play"
@@ -153,23 +156,23 @@ export default function ApertureDeploy() {
 
         {paperAccount && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-mono" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+            <span className="eyebrow">Saved account</span>
             <span style={{ color: "var(--sh-fg-muted)" }}>{paperAccount.label}:</span>
             <span className="font-bold tabular-nums" style={{ color: "var(--sh-text-primary)" }}>
-              {money(paperAccount.buyingPowerCents ?? paperAccount.cashCents ?? 0)} BP
+              {paperAccount.buyingPowerCents != null ? `${money(paperAccount.buyingPowerCents)} BP` : "Buying power not recorded"}
             </span>
           </div>
         )}
       </div>
 
       {deployMode === "quick_play" ? <QuickPlayWorkspace /> : deployMode === "quick_hits" ? (
-        <div className="space-y-8 animate-in fade-in duration-150">
+        <div className="deployment-sandbox space-y-8 animate-in fade-in duration-150">
           <header>
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>
-              Event-Driven Quick Hits
+              The strategy notebook / illustrative only
             </p>
             <h1 className="mt-1 font-serif text-3xl leading-tight">
-              Explore short-term strategies
+              Change the premise. See the trade-off.
             </h1>
             <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
               Illustrative examples only. Prices, catalysts, and sample returns below are not verified current market evidence. Examples cannot create orders; use researched trades for the normal review and approval flow.
@@ -177,7 +180,7 @@ export default function ApertureDeploy() {
           </header>
 
           {/* Symphony Modular Rule Engine */}
-          <SymphonyRuleBuilder />
+          <details className="deployment-rule-reveal"><summary>Inside the rulebook <span>Trigger → filter → structure</span></summary><SymphonyRuleBuilder /></details>
 
           {/* Curated Opportunities Feed */}
           <div className="space-y-4">
@@ -198,6 +201,7 @@ export default function ApertureDeploy() {
                   <button
                     key={amt}
                     type="button"
+                    aria-pressed={quickHitBudget === amt}
                     onClick={() => setQuickHitBudget(amt)}
                     className={`px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
                       quickHitBudget === amt
@@ -217,7 +221,7 @@ export default function ApertureDeploy() {
                 Loading curated catalyst plays...
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="deployment-example-feed">
                 {(quickHitCatalog.data ?? []).map((play) => (
                   <QuickHitCard
                     key={play.id}
@@ -236,18 +240,20 @@ export default function ApertureDeploy() {
         <>
         <header>
           <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Capital Aperture</p>
-          <h1 className="mt-1 font-serif text-3xl leading-tight">Quick Deploy</h1>
+          <h1 className="mt-1 font-serif text-3xl leading-tight">Give your capital a clear job.</h1>
           <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
-            Instant lookup over your completed research inventory. Stage risk-bounded paper execution or launch deep scans.
+            Set a budget. Read the evidence. Review a paper ticket only when the boundaries hold. This page reads saved research; it does not place an order.
           </p>
         </header>
 
         {/* Path A Controls: Capital Allocation & Horizon Filter */}
-        <div className="rounded-xl border p-5 space-y-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <div className="deployment-reading-spread">
+        <aside className="deployment-mandate space-y-4">
+          <p className="eyebrow">Your working mandate / paper only</p>
           <div>
             <div className="flex items-center justify-between gap-2">
               <label className="text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>
-                1. Capital Allocation
+                01 / Budget to test
               </label>
               {amountValid && (
                 <span className="text-xs font-mono" style={{ color: "var(--sh-fg-muted)" }}>
@@ -263,6 +269,7 @@ export default function ApertureDeploy() {
                   <button
                     key={preset}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => handleSelectPreset(preset)}
                     className={`min-h-10 px-4 py-1.5 rounded-lg text-sm font-mono font-medium transition-all cursor-pointer ${
                       isSelected
@@ -308,7 +315,7 @@ export default function ApertureDeploy() {
 
           <fieldset className="border-t pt-4" style={{ borderColor: "var(--sh-border-1)" }}>
             <legend className="text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>
-              2. Target Horizon
+              02 / Time to prove the premise
             </legend>
             <div className="mt-2.5 flex flex-wrap gap-2">
               {HORIZONS.map((option) => {
@@ -331,7 +338,9 @@ export default function ApertureDeploy() {
               })}
             </div>
           </fieldset>
-        </div>
+          <div className="deployment-boundary-note"><span className="eyebrow">The boundary</span><h2>A budget is not permission.</h2><p>Saved evidence gets an idea onto this page. Current prices, portfolio limits and human approval still stand between a draft and an order.</p></div>
+        </aside>
+        <div className="deployment-results space-y-5" aria-live="polite">
 
         {ready.isError && (
           <p role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)" }}>
@@ -343,7 +352,7 @@ export default function ApertureDeploy() {
         {ready.isFetching && (
           <div className="rounded-xl border p-6 text-center space-y-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
             <Loader2 className="w-5 h-5 animate-spin mx-auto text-[var(--sh-signal)]" />
-            <p className="text-xs font-mono" style={{ color: "var(--sh-fg-muted)" }}>Filtering verified candidates in your completed research…</p>
+            <p className="text-xs font-mono" style={{ color: "var(--sh-fg-muted)" }}>Reading recorded reviews in your completed research…</p>
           </div>
         )}
 
@@ -353,10 +362,10 @@ export default function ApertureDeploy() {
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div>
                 <h2 className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>
-                  Matching Candidates ({matchingCandidates.length} Ready)
+                  Research to review ({matchingCandidates.length})
                 </h2>
                 <p className="text-xs mt-0.5" style={{ color: "var(--sh-fg-muted)" }}>
-                  Filtered from completed thesis inventory · Instant ticket staging
+                  Saved evidence reviews · Current execution checks still required
                 </p>
               </div>
               {amountValid && (
@@ -386,18 +395,18 @@ export default function ApertureDeploy() {
               />
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="deployment-candidate-feed">
               {matchingCandidates.map((candidate, idx) => {
                 const cRecovery = recipeHorizonRecovery(candidate);
                 const isLead = idx === 0;
                 const horizonLabel = cRecovery?.horizonLabel ?? (candidate.holdingPeriod === "swing" ? "This week" : candidate.holdingPeriod === "position" ? "Long term" : "Today");
                 const isShort = candidate.playSide === "short";
-                const directionLabel = isShort ? "Short / Put" : "Long / Shares";
+                const directionLabel = candidate.playSide == null ? "Direction not recorded" : isShort ? "Short / Put" : "Long / Shares";
 
                 return (
                   <div
                     key={`${candidate.runId}:${candidate.candidateId}`}
-                    className="rounded-xl border p-4 space-y-3.5 flex flex-col justify-between"
+                    className="deployment-candidate-story border p-4 space-y-3.5 flex flex-col justify-between"
                     style={{
                       borderColor: isLead ? "var(--sh-signal)" : "var(--sh-border-1)",
                       background: "var(--sh-surface)",
@@ -421,8 +430,8 @@ export default function ApertureDeploy() {
                           </p>
                         </div>
                         <div className="text-right font-mono">
-                          <span className="text-[10px] block" style={{ color: "var(--sh-fg-muted)" }}>Allocation</span>
-                          <span className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{money(amountCents)}</span>
+                              <span className="text-[10px] block" style={{ color: "var(--sh-fg-muted)" }}>Budget to test</span>
+                          <span className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{amountValid ? money(amountCents) : "Set a budget"}</span>
                         </div>
                       </div>
 
@@ -435,12 +444,12 @@ export default function ApertureDeploy() {
 
                       <div className="mt-3 space-y-1.5 text-xs font-mono">
                         <div className="flex justify-between py-1 border-t border-[var(--sh-border-1)]">
-                          <span style={{ color: "var(--sh-fg-muted)" }}>Evidence Verification:</span>
-                          <span className="text-emerald-500 font-semibold">100% Confirmed ({candidate.checks?.length ?? 0}/{candidate.checks?.length ?? 0})</span>
+                          <span style={{ color: "var(--sh-fg-muted)" }}>Recorded reviews</span>
+                          <span className="font-semibold">{candidate.checks?.length ? `${candidate.checks.filter(check => candidate.reviews?.[check] === "confirmed" || candidate.reviews?.[check] === "not_applicable").length} / ${candidate.checks.length} cleared` : "Review record unavailable"}</span>
                         </div>
                         <div className="flex justify-between py-1 border-t border-[var(--sh-border-1)]">
-                          <span style={{ color: "var(--sh-fg-muted)" }}>Risk Ceiling:</span>
-                          <span style={{ color: "var(--sh-text-primary)" }}>Broker & Single-Order Bounds Pass</span>
+                          <span style={{ color: "var(--sh-fg-muted)" }}>Prices & risk limits</span>
+                          <span style={{ color: "var(--sh-text-primary)" }}>Checked during order review</span>
                         </div>
                       </div>
                     </div>
@@ -448,13 +457,14 @@ export default function ApertureDeploy() {
                     <div className="pt-2 flex flex-wrap gap-2 border-t border-[var(--sh-border-1)]">
                       <Button
                         type="button"
+                        disabled={!amountValid}
                         className="flex-1 min-h-10 text-xs font-semibold"
                         onClick={() => {
                           setSelectedCandidate(candidate);
                           setTicketModalOpen(true);
                         }}
                       >
-                        Stage Paper Ticket
+                        Review paper ticket
                       </Button>
                       <Button
                         type="button"
@@ -538,29 +548,32 @@ export default function ApertureDeploy() {
         )}
 
         {/* Path B (Deep / Background): Scan Market for a Fresh Opportunity (Friction Point 2) */}
-        <div className="rounded-xl border p-5 space-y-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        <div className="deployment-next-question border-t p-5 space-y-3" style={{ borderColor: "var(--sh-border-1)" }}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-[var(--sh-text-primary)]">
                 Don't see what you want?
               </h2>
               <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>
-                Scan the market for a fresh opportunity sized for {money(amountCents)}.
+                Define the next research question{amountValid ? ` with a ${money(amountCents)} sizing target` : " after setting a budget"}.
               </p>
             </div>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono border self-start sm:self-auto" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}>
-              ⚡ Takes ~2 mins to aggregate live sentiment, catalysts & pricing
+              Opens mission setup · no scan runs on this page
             </span>
           </div>
           <div className="pt-1">
             <Button
               variant="outline"
+              disabled={!amountValid}
               className="min-h-11 font-semibold"
               onClick={() => navigate(`/aperture/mission?objective=1&capital=${Math.round(amountCents / 100)}`)}
             >
-              ⚡ Run New Market Scan with {money(amountCents)} <ArrowRight className="ml-2 h-4 w-4" />
+              Set up new research <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
+        </div>
+        </div>
         </div>
         </>
       )}
@@ -580,4 +593,3 @@ export default function ApertureDeploy() {
     />
   </DashboardLayout>;
 }
-

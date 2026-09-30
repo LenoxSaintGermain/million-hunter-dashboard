@@ -1,3 +1,104 @@
+/* Thesis and deployment: the same paper, ink, evidence and margin-note grammar. */
+.thesis-mobile-focus{display:none}
+.scenario-order-unavailable{font-size:11px;border-top:1px solid var(--rule);width:100%;padding-top:12px;margin-top:14px;color:var(--sh-fg-muted);cursor:not-allowed;text-align:left;min-height:44px}
+@media(max-width:767px){.thesis-mobile-focus{display:flex;gap:20px;border-bottom:1px solid var(--rule)}.thesis-mobile-focus button{min-height:44px;font-size:13px;border-bottom:2px solid transparent}.thesis-mobile-focus button[aria-pressed=true]{border-color:var(--ink);font-weight:600}.thesis-reading-desk[data-mobile-pane=write] .thesis-review-pane,.thesis-reading-desk[data-mobile-pane=review] .thesis-writing-pane{display:none}}
+.thesis-reading-desk,.deployment-reading-desk{max-width:1440px;margin-inline:auto;min-width:0}
+.thesis-reading-desk h1,.deployment-reading-desk header h1{font:clamp(30px,3.8vw,48px)/1.08 var(--font-display);letter-spacing:-.035em;max-width:30ch}
+.thesis-reading-desk>div:first-child{border-bottom:1px solid var(--rule);padding-bottom:22px}
+.thesis-reading-spread{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(300px,1fr);gap:clamp(24px,4vw,64px);align-items:start}
+.thesis-writing-pane,.thesis-review-pane{min-width:0}
+.thesis-scope-nav{display:flex;border-bottom:1px solid var(--rule);gap:8px}
+.thesis-scope-nav button{flex:1;min-width:0;padding:12px 8px;border:0;border-bottom:3px solid transparent;border-radius:0;box-shadow:none;outline:0;background:transparent}
+.thesis-scope-nav button[aria-pressed=true]{border-bottom-color:var(--ink);background:var(--paper)}
+.thesis-scope-nav button>span:last-child{font-size:11px;line-height:1.5}
+.thesis-starters{border-block:1px solid var(--rule)}
+.thesis-starters>summary,.deployment-rule-reveal>summary{cursor:pointer;font:18px var(--font-display);padding:12px 0}
+.thesis-starters>summary span,.deployment-rule-reveal>summary span{float:right;font:11px var(--font-mono);color:var(--sh-fg-muted);margin-top:5px}
+.thesis-template-strip{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;padding:4px 0 14px}
+.thesis-template-strip>button{flex:0 0 72%;scroll-snap-align:start;border-radius:0;background:var(--paper);padding:16px}
+.thesis-template-number{font:11px var(--font-mono);color:var(--sh-fg-muted)}
+.thesis-writing-pane textarea{min-height:215px;padding:18px;font:20px/1.55 var(--font-display);background:var(--paper)}
+.thesis-writing-pane textarea::placeholder{color:var(--sh-fg-muted);opacity:.8}
+.thesis-writing-pane>button{background:var(--ink)!important;color:var(--paper)!important;border-radius:0}
+.thesis-requirement-portrait{border:1px solid var(--rule);border-top:3px solid var(--ink);background:var(--paper);padding:24px;box-shadow:3px 3px 0 var(--rule)}
+.thesis-requirement-portrait h2{font:clamp(28px,3vw,38px)/1.15 var(--font-display);letter-spacing:-.03em;margin:12px 0}
+.thesis-requirement-portrait header p,.thesis-requirement-portrait footer p{font-size:12px;line-height:1.6;color:var(--sh-fg-muted)}
+.thesis-portrait-key{display:flex;justify-content:space-between;gap:12px;font:9px var(--font-mono);letter-spacing:.08em;margin:24px 0 8px;color:var(--sh-fg-muted)}
+.thesis-requirement-row{border-top:1px solid var(--rule)}
+.thesis-requirement-row summary{display:grid;grid-template-columns:26px 1fr 30px;gap:12px;align-items:center;padding:18px 0;cursor:pointer;list-style:none}
+.thesis-requirement-row summary::-webkit-details-marker{display:none}
+.thesis-requirement-number{font:10px var(--font-mono);color:var(--sh-fg-muted)}
+.thesis-requirement-row strong{font:22px var(--font-display)}
+.thesis-requirement-row em{display:block;font:italic 13px/1.5 var(--font-display);color:var(--sh-fg-muted);border-bottom:1px dashed var(--rule);padding:8px 0 4px}
+.thesis-open-marker{font:30px var(--font-display);color:var(--sh-fg-muted)}
+.thesis-requirement-row[open] .thesis-open-marker{color:var(--amber)}
+.thesis-requirement-row>p{font-size:12px;line-height:1.7;border-left:2px solid var(--amber);padding-left:12px;margin-bottom:16px}
+.thesis-requirement-row>p strong{font:inherit;font-weight:600}
+.thesis-requirement-portrait footer{border-top:1px solid var(--ink);padding-top:16px;margin-top:8px}
+.thesis-requirement-portrait footer>strong{font:17px/1.4 var(--font-display)}
+.thesis-review-pane .rounded-lg,.thesis-review-pane .rounded-xl{border-radius:0;box-shadow:none}
+.deployment-mode-bar>div:first-child{gap:0;flex-wrap:nowrap;overflow-x:auto;max-width:100%}
+.deployment-mode-bar>div:first-child>button{background:transparent;color:var(--ink);border:0;border-bottom:3px solid transparent;border-radius:0;box-shadow:none;min-height:48px;white-space:nowrap;letter-spacing:0;font:13px var(--font-sans)}
+.deployment-mode-bar>div:first-child>button[aria-pressed=true]{border-color:var(--ink);background:var(--paper)}
+.deployment-mode-bar>div:last-child{background:transparent!important;border:0;border-radius:0;padding:0;font-size:10px}
+.deployment-reading-spread{display:grid;grid-template-columns:minmax(280px,.72fr) minmax(0,1.5fr);gap:32px;align-items:start;border-top:3px solid var(--ink);padding-top:24px}
+.deployment-mandate{min-width:0;padding:22px;background:var(--paper);border:1px solid var(--rule)}
+.deployment-mandate #deploy-amount{font:38px var(--font-display);border:0;border-bottom:1px solid var(--ink);border-radius:0;padding-block:10px;min-height:64px}
+.deployment-mandate button{border-radius:0!important;padding:8px 12px;min-height:44px;font-size:12px}
+.deployment-mandate button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+.deployment-boundary-note{border-top:1px solid var(--rule);padding-top:20px}
+.deployment-boundary-note h2{font:25px/1.15 var(--font-display);margin:12px 0}
+.deployment-boundary-note p{font-size:12px;line-height:1.7;color:var(--sh-fg-muted)}
+.deployment-results{min-width:0}
+.deployment-results>section{border-radius:0;background:transparent!important}
+.deployment-results>section[aria-label="Cross-horizon alternatives"],.deployment-results>section[aria-label="No play available"]{border:0;border-left:3px solid var(--amber);padding:16px 24px;background:var(--paper)!important}
+.deployment-results>section[aria-label="Cross-horizon alternatives"] h3,.deployment-results>section[aria-label="No play available"] h2{font:30px/1.15 var(--font-display)}
+.deployment-candidate-feed{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.deployment-candidate-story{border:1px solid var(--rule);border-top:3px solid var(--ink);background:var(--paper)!important;min-width:0}
+.deployment-candidate-story h3{font:32px var(--font-display)}
+.deployment-candidate-story>div:last-child{gap:6px}
+.deployment-candidate-story>div:last-child>button{flex:auto;font-size:11px;border-radius:0}
+.deployment-next-question{padding-inline:0}
+.deployment-example-feed{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start}
+.scenario-story{min-width:0;padding:22px;border:1px solid var(--rule);border-top:3px solid var(--ink);background:var(--paper);transition:border-color .18s;box-shadow:3px 3px 0 var(--rule)}
+.scenario-story:hover,.scenario-story:focus-within{border-top-color:var(--amber)}
+.scenario-story header h3{font:42px/1 var(--font-display);letter-spacing:-.035em;margin:14px 0 8px}
+.scenario-story header p{font-size:12px;color:var(--sh-fg-muted)}
+.scenario-premise{padding:18px 0;border-bottom:1px solid var(--rule);min-height:128px}
+.scenario-premise h4{font:21px/1.25 var(--font-display);margin-top:8px}
+.scenario-price-portrait{padding-block:16px;border-bottom:1px solid var(--rule);background:repeating-linear-gradient(130deg,transparent 0 18px,color-mix(in srgb,var(--sage) 6%,transparent) 19px 20px)}
+.scenario-price-portrait figcaption{font:italic 14px var(--font-display)}
+.scenario-price-portrait svg{width:100%;height:72px;color:var(--ink)}
+.scenario-price-labels,.scenario-outcomes{display:flex;justify-content:space-between;gap:12px}
+.scenario-price-labels>div{display:flex;flex-direction:column;gap:6px}
+.scenario-price-labels span,.scenario-outcomes span{font:9px/1.4 var(--font-mono);text-transform:uppercase;color:var(--sh-fg-muted)}
+.scenario-price-labels strong{font:22px var(--font-display)}
+.scenario-price-portrait>p,.scenario-sizing{font-size:10px;line-height:1.6;color:var(--sh-fg-muted);margin-top:12px}
+.scenario-budget{padding-block:16px}
+.scenario-budget legend{float:left;width:100%;font-size:12px;margin-bottom:10px}
+.scenario-budget button{min-width:56px;min-height:44px;border:1px solid var(--rule);font:13px var(--font-mono)}
+.scenario-budget button+button{border-left:0}
+.scenario-budget button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+.scenario-outcomes{padding:14px 0;border-block:1px solid var(--rule)}
+.scenario-outcomes>div{flex:1}
+.scenario-outcomes>div+div{border-left:1px solid var(--rule);padding-left:12px}
+.scenario-outcomes strong{display:block;font:30px/1.2 var(--font-display);margin-top:8px}
+.scenario-story details{border-top:1px solid var(--rule);margin-top:12px}
+.scenario-story summary{cursor:pointer;font-size:12px;line-height:1.5;padding-block:10px}
+.scenario-story details p{font-size:12px;line-height:1.6;padding-bottom:10px;color:var(--sh-fg-muted)}
+.scenario-story footer{font:10px/1.6 var(--font-mono);margin-top:14px;border-left:2px solid var(--amber);padding-left:12px}
+.deployment-rule-reveal{border-block:1px solid var(--rule)}
+.deployment-rule-reveal .rounded-xl,.deployment-rule-reveal .rounded-lg{border-radius:0;box-shadow:none}
+.micro-reading-desk{border-top:3px solid var(--ink);padding-top:24px}
+.micro-budget{padding:20px 0;border-block:1px solid var(--rule)}
+.micro-idea-feed{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.micro-idea{background:var(--paper);border-top:3px solid var(--ink)}
+.micro-idea h2{font:26px var(--font-display)}
+.micro-reading-desk .rounded-xl{border-radius:0;background:var(--paper)}
+.thesis-reading-desk button:focus-visible,.deployment-reading-desk button:focus-visible,.thesis-reading-desk summary:focus-visible,.deployment-reading-desk summary:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+@media(max-width:1100px){.deployment-candidate-feed{grid-template-columns:1fr}.deployment-reading-spread{gap:24px;grid-template-columns:minmax(260px,.8fr) minmax(0,1.2fr)}.deployment-example-feed{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 4px 14px 0}.scenario-story{flex:0 0 46%;scroll-snap-align:start}.micro-idea-feed{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:767px){.thesis-reading-spread,.deployment-reading-spread{grid-template-columns:1fr;gap:24px}.thesis-review-pane{grid-row:1}.thesis-requirement-portrait{padding:16px}.thesis-requirement-portrait header p,.thesis-portrait-key{display:none}.thesis-requirement-portrait h2{font-size:26px;margin-block:8px}.thesis-requirement-row summary{padding:10px 0}.thesis-requirement-row strong{font-size:19px}.thesis-requirement-row em{padding-top:4px;font-size:12px}.thesis-requirement-portrait footer{padding-top:10px}.thesis-requirement-portrait footer p{font-size:10px}.thesis-scope-nav button>span:last-child{display:none}.thesis-starters>summary span{float:none;display:block}.deployment-mandate{padding:16px}.deployment-boundary-note{display:none}.deployment-example-feed .scenario-story{flex-basis:87%}.scenario-premise{min-height:0}.deployment-mode-bar>div:first-child>button{padding-inline:12px}.deployment-mode-bar>div:first-child>button svg{display:none}.deployment-rule-reveal>summary span{float:none;display:block}.micro-idea-feed{display:flex;overflow-x:auto;scroll-snap-type:x mandatory}.micro-idea{flex:0 0 88%;scroll-snap-align:start}.thesis-writing-pane textarea{min-height:190px}}
+@media(prefers-reduced-motion:reduce){.scenario-story{transition:none}}
 .alignment-portrait{position:relative;isolation:isolate;overflow:hidden;margin:0;border:1px solid var(--rule);border-top:3px solid var(--ink);background:var(--paper);color:var(--ink);padding:clamp(16px,2.5vw,28px);box-shadow:3px 3px 0 var(--rule)}
 .alignment-portrait::before{content:"";position:absolute;z-index:-1;inset:0;background:repeating-linear-gradient(130deg,transparent 0 18px,color-mix(in srgb,var(--sage) 6%,transparent) 19px 20px);pointer-events:none}
 .portrait-masthead{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--rule);padding-bottom:12px;font:10px var(--font-mono);letter-spacing:.1em;text-transform:uppercase}

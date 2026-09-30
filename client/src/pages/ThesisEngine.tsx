@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { SetAsideHistory } from "@/components/aperture/SetAsideHistory";
 import { CapitalThesisWorkspace } from "@/components/aperture/CapitalThesisWorkspace";
+import { ThesisRequirementPortrait } from "@/components/ThesisRequirementPortrait";
 import { canOperateCapital } from "@shared/capitalOperatorAccess";
 import { resolveThesisEntryWorkspace } from "@shared/thesisEntryRoute";
 import {
@@ -155,6 +156,8 @@ export default function ThesisEngine() {
   const [compilationResult, setCompilationResult] = useState<any>(null);
   const [compilationId, setCompilationId] = useState<number | null>(null);
   const [isCompiling, setIsCompiling] = useState(false);
+  const [mobilePane, setMobilePane] = useState<"write" | "review">("write");
+  useEffect(() => { if (compilationResult || isCompiling) setMobilePane("review"); }, [compilationResult, isCompiling]);
   useEffect(() => {
     if (requestedScope === "acquisition" || requestedScope === "property") {
       setScope(requestedScope);
@@ -337,19 +340,19 @@ export default function ThesisEngine() {
 
   return (
     <EditorialTopNav>
-      <div className="space-y-6">
+      <div className="thesis-reading-desk space-y-6" data-mobile-pane={mobilePane}>
         {/* ── Header ── */}
         <motion.div variants={fadeIn} initial="hidden" animate="visible">
           <div className="flex items-start justify-between">
             <div>
               <p className="eyebrow text-muted-foreground mb-1">Thesis workspace</p>
               <h1 className="font-display text-3xl font-bold tracking-tight">
-                {isCapitalOperator ? "Start with the thesis." : "One thesis. The right execution path."}
+                {isCapitalOperator ? "Start with the thesis." : "Conviction needs a boundary."}
               </h1>
               <p className="text-muted-foreground mt-1 text-sm max-w-xl">
                 {isCapitalOperator
                   ? "Define the market view once. Capital Aperture turns it into a paper-only decision run with evidence, risk boundaries, and human approval."
-                  : "Define a conviction once, then choose whether it drives acquisition search, property criteria, or a Capital Aperture paper-research run."}
+                  : "Describe what you want to own—and what would make you walk away. Turn that conviction into criteria the evidence can challenge."}
               </p>
             </div>
             <Badge variant="outline" className="border-amber-500/40 text-[var(--amber)] bg-amber-500/5 text-xs">
@@ -360,15 +363,17 @@ export default function ThesisEngine() {
         </motion.div>
 
         {/* ── Two-column layout ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <nav className="thesis-mobile-focus" aria-label="Thesis view"><button type="button" aria-pressed={mobilePane === "write"} onClick={() => setMobilePane("write")}>Write the thesis</button><button type="button" aria-pressed={mobilePane === "review"} onClick={() => setMobilePane("review")}>{compilationResult ? "Review requirements" : "What must be true?"}</button></nav>
+        <div className="thesis-reading-spread">
           {/* ── Left: Input ── */}
           <motion.div variants={fadeIn} initial="hidden" animate="visible" transition={{ delay: 0.1 }}
-            className="space-y-4">
+            className="thesis-writing-pane space-y-4">
 
-            {!isCapitalOperator && <div className="rounded-xl border border-border bg-muted/10 p-2 grid grid-cols-1 sm:grid-cols-3 gap-1" aria-label="Choose what this thesis should do">
+            {!isCapitalOperator && <div className="thesis-scope-nav" aria-label="Choose what this thesis should do">
               {(Object.keys(SCOPE_COPY) as ThesisScope[]).map((scopeId) => (
                 <button
                   key={scopeId}
+                  aria-pressed={scope === scopeId}
                   onClick={() => {
                     if (scopeId === "capital") {
                       navigate("/thesis?scope=capital");
@@ -390,6 +395,8 @@ export default function ThesisEngine() {
             </div>}
 
             {/* Template Gallery */}
+            <details className="thesis-starters">
+              <summary>Borrow a starting point <span>{activeTemplate ? "Selected · edit below" : `${templatesForScope.length} editable lenses`}</span></summary>
             <div>
               <div className="mb-3 flex items-end justify-between gap-3">
                 <div>
@@ -398,10 +405,11 @@ export default function ThesisEngine() {
                 </div>
                 <Badge variant="outline" className="shrink-0 text-[10px]">{SCOPE_COPY[scope].label}</Badge>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {templatesForScope.map((t) => (
+              <div className="thesis-template-strip">
+                {templatesForScope.map((t, index) => (
                   <button
                     key={t.id}
+                    aria-pressed={activeTemplate === t.id}
                     onClick={() => handleTemplate(t)}
                     className={cn(
                       "text-left p-3 rounded-lg border transition-all group",
@@ -411,7 +419,7 @@ export default function ThesisEngine() {
                     )}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-base">{t.icon}</span>
+                      <span className="thesis-template-number">0{index + 1}</span>
                       <span className={cn(
                         "text-sm font-medium transition-colors",
                         activeTemplate === t.id ? "text-[var(--amber)]" : "text-foreground group-hover:text-foreground"
@@ -429,6 +437,7 @@ export default function ThesisEngine() {
                 ))}
               </div>
             </div>
+            </details>
 
             {scope === "capital" && (
               <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
@@ -451,12 +460,14 @@ export default function ThesisEngine() {
                 thesisText.length > 0 ? "border-amber-500/40" : "border-border"
               )}>
                 <Textarea
+                  aria-label="Thesis criteria"
+                  maxLength={4000}
                   value={thesisText}
                   onChange={(e) => {
                     setThesisText(e.target.value);
                     if (activeTemplate) setActiveTemplate(null);
                   }}
-                  placeholder={scope === "capital" ? CAPITAL_TRADE_STARTER : `"Businesses with products needed 40 years ago and 40 years from now, $20–40M revenue, founder-led, in the Sunbelt."\n\n"Specialty manufacturers serving aerospace primes, $5–15M EBITDA, second-generation ownership, Midwest."\n\n"Regional service businesses with recurring contract revenue >60%, owner age 60+, sub-$10M EBITDA, no PE ownership."`}
+                  placeholder={scope === "capital" ? CAPITAL_TRADE_STARTER : "I want to own…\n\nThe economics must…\n\nI would walk away if…"}
                   className="min-h-[220px] resize-none border-0 bg-transparent font-sans text-sm leading-relaxed focus-visible:ring-0 placeholder:text-muted-foreground/40"
                 />
                 <div className="absolute bottom-3 right-3 text-xs text-muted-foreground/40 tabular-nums">
@@ -620,7 +631,7 @@ export default function ThesisEngine() {
           </motion.div>
 
           {/* ── Right: STRATEGIST Output ── */}
-          <div className="space-y-4">
+          <div className="thesis-review-pane space-y-4">
             <AnimatePresence mode="wait">
               {isCompiling && (
                 <motion.div
@@ -645,15 +656,9 @@ export default function ThesisEngine() {
                 <motion.div
                   key="empty"
                   variants={fadeIn} initial="hidden" animate="visible" exit="hidden"
-                  className="flex flex-col items-center justify-center h-64 rounded-xl border border-dashed border-border bg-muted/5 gap-3"
+                  className="thesis-uncompiled"
                 >
-                  <Target className="h-8 w-8 text-muted-foreground/30" />
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground">STRATEGIST output will appear here</p>
-                    <p className="text-xs text-muted-foreground/60 mt-1">
-                      Enter a thesis and click Compile Thesis
-                    </p>
-                  </div>
+                  <ThesisRequirementPortrait scope={scope} hasDraft={thesisText.trim().length > 0} />
                 </motion.div>
               )}
 
