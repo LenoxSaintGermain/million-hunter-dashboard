@@ -6,7 +6,8 @@
  *   Left  — thesis input (large textarea + template gallery)
  *   Right — STRATEGIST output review (editable structured form + Approve & Run)
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { StrategistApproval } from "@shared/strategistReview";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { SetAsideHistory } from "@/components/aperture/SetAsideHistory";
 import { CapitalThesisWorkspace } from "@/components/aperture/CapitalThesisWorkspace";
 import { ThesisRequirementPortrait } from "@/components/ThesisRequirementPortrait";
+import { StrategistWorkshop } from "@/components/StrategistWorkshop";
 import { canOperateCapital } from "@shared/capitalOperatorAccess";
 import { resolveThesisEntryWorkspace } from "@shared/thesisEntryRoute";
 import {
@@ -157,6 +159,12 @@ export default function ThesisEngine() {
   const [compilationId, setCompilationId] = useState<number | null>(null);
   const [isCompiling, setIsCompiling] = useState(false);
   const [mobilePane, setMobilePane] = useState<"write" | "review">("write");
+  const [reviewRequest, setReviewRequest] = useState(0);
+  const [librarySearch, setLibrarySearch] = useState("");
+  const [libraryLimit, setLibraryLimit] = useState(6);
+  const currentDraft = useRef(thesisText); currentDraft.current = thesisText;
+  const compilationDraft = useRef("");
+  function editThesis(text: string) { setThesisText(text); setCompilationResult(null); setCompilationId(null); }
   useEffect(() => { if (compilationResult || isCompiling) setMobilePane("review"); }, [compilationResult, isCompiling]);
   useEffect(() => {
     if (requestedScope === "acquisition" || requestedScope === "property") {
@@ -181,7 +189,10 @@ export default function ThesisEngine() {
   const { data: savedTheses, refetch: refetchList } = trpc.thesis.list.useQuery();
   const visibleSavedTheses = isCapitalOperator
     ? savedTheses?.filter((thesis: any) => thesis.templateUsed === "capital_trade")
-    : savedTheses;
+    : savedTheses?.filter((thesis: any) => scope === "property"
+      ? thesis.templateUsed === "wingate" || thesis.compiledFilters?.yearBuiltMax != null
+      : thesis.templateUsed !== "capital_trade" && thesis.templateUsed !== "wingate" && thesis.compiledFilters?.yearBuiltMax == null);
+  const matchingTheses = visibleSavedTheses?.filter((t: any) => `${t.name ?? ""} ${t.thesisText ?? ""}`.toLowerCase().includes(librarySearch.toLowerCase()));
   const setActiveCapital = trpc.thesis.setActiveCapital.useMutation({
     onSuccess: ({ name }) => {
       toast.success(`${name} now drives your Capital Decision Center.`);
@@ -191,6 +202,7 @@ export default function ThesisEngine() {
   });
   const compileMutation = trpc.thesis.compile.useMutation({
     onSuccess: (data) => {
+      if (currentDraft.current !== compilationDraft.current) { setIsCompiling(false); refetchList(); toast.info("Saved the approved version. Your newer edits still need review."); return; }
       setCompilationResult(data.compiled);
       setCompilationId(data.compilationId);
       setIsCompiling(false);
@@ -310,20 +322,22 @@ export default function ThesisEngine() {
     setCompilationId(null);
   }
 
-  function handleCompile() {
+  function handleCompile(reviewedText = thesisText, strategistApproval?: StrategistApproval) {
     if (!thesisText.trim() || thesisText.length < 20) {
       toast.error("Please enter a thesis of at least 20 characters");
       return;
     }
     setIsCompiling(true);
+    compilationDraft.current = reviewedText;
     setCompilationResult(null);
     if (scope === "capital") {
       createCapitalThesis.mutate({ thesisText, name: capitalName.trim() || undefined });
       return;
     }
     compileMutation.mutate({
-      thesisText,
+      thesisText: reviewedText,
       templateUsed: activeTemplate ?? undefined,
+      strategistApproval,
     });
   }
 
@@ -464,7 +478,7 @@ export default function ThesisEngine() {
                   maxLength={4000}
                   value={thesisText}
                   onChange={(e) => {
-                    setThesisText(e.target.value);
+                    editThesis(e.target.value);
                     if (activeTemplate) setActiveTemplate(null);
                   }}
                   placeholder={scope === "capital" ? CAPITAL_TRADE_STARTER : "I want to own…\n\nThe economics must…\n\nI would walk away if…"}
@@ -478,7 +492,7 @@ export default function ThesisEngine() {
 
             {/* Compile Button */}
             <Button
-              onClick={handleCompile}
+              onClick={() => { setReviewRequest(n => n + 1); setMobilePane("review"); }}
               disabled={isCompiling || thesisText.length < 20}
               className={cn(
                 "w-full h-11 font-medium transition-all",
@@ -495,7 +509,7 @@ export default function ThesisEngine() {
               ) : (
                 <>
                   <Sparkles className="h-4 w-4 mr-2" />
-                  {scope === "capital" ? "Create paper research brief" : scope === "property" ? "Create property criteria" : "Create acquisition search"}
+                  Refine my thesis
                 </>
               )}
             </Button>
@@ -504,8 +518,10 @@ export default function ThesisEngine() {
             {visibleSavedTheses && visibleSavedTheses.length > 0 && (
               <div className="space-y-2">
                 <p className="eyebrow text-muted-foreground">Saved theses</p>
+                <input aria-label="Search saved theses" placeholder="Find a thesis in this scope…" value={librarySearch} onChange={e => { setLibrarySearch(e.target.value); setLibraryLimit(6); }} className="w-full border border-border bg-transparent p-3" />
+                <p className="text-xs text-muted-foreground">{matchingTheses?.length ?? 0} in this scope · other asset paths have separate libraries</p>
                 <div className="space-y-1">
-                  {visibleSavedTheses.map((t: any) => {
+                  {matchingTheses?.slice(0, libraryLimit).map((t: any) => {
                     const expanded = expandedThesisId === t.id;
                     const deadline = t.latestCatalystDeadlineAt ? new Date(Number(t.latestCatalystDeadlineAt)) : null;
                     return <div key={t.id} className="rounded-md border border-border transition-colors group">
@@ -533,7 +549,7 @@ export default function ThesisEngine() {
                           <button type="button"
                             aria-expanded={expanded}
                             aria-controls={`thesis-recipes-${t.id}`}
-                            className="text-sm text-foreground hover:text-primary truncate text-left flex-1"
+                            className="text-sm text-foreground hover:text-primary whitespace-normal text-left flex-1"
                             onClick={() => {
                               setExpandedThesisId(expanded ? null : t.id);
                               setScope(isHistoricThesisRow(t) ? "property" : t.templateUsed === "capital_trade" ? "capital" : "acquisition");
@@ -584,7 +600,7 @@ export default function ThesisEngine() {
                             <Play className="h-3 w-3" />
                             {isHistoricThesisRow(t) ? "Wingate" : t.templateUsed === "capital_trade" ? "Research" : "Search"}
                           </button>
-                          {canUseAperture && t.templateUsed !== "capital_trade" && (
+                          {canUseAperture && t.templateUsed === "capital_trade" && (
                             <button
                               title="Use this saved thesis in Capital Aperture"
                               onClick={() => openInAperture(t.id)}
@@ -619,19 +635,21 @@ export default function ThesisEngine() {
                     </div>;
                   })}
                 </div>
+                {(matchingTheses?.length ?? 0) > libraryLimit && <Button variant="outline" onClick={() => setLibraryLimit(n => n + 6)}>Show six more theses</Button>}
               </div>
             )}
             {visibleSavedTheses && visibleSavedTheses.length === 0 && (
               <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
                 {isCapitalOperator
                   ? "No personal or shared Capital theses yet. Choose a starting point above and create the first paper-research thesis."
-                  : "No personal or shared theses yet. Choose a scope above and create your first one—Capital / Trade opens Aperture automatically after it is saved."}
+                  : "No saved theses in this scope. Refine your idea, review the assumptions, then approve the brief to save criteria."}
               </div>
             )}
           </motion.div>
 
           {/* ── Right: STRATEGIST Output ── */}
           <div className="thesis-review-pane space-y-4">
+            {reviewRequest > 0 && scope !== "capital" && <StrategistWorkshop text={thesisText} scope={scope} requestVersion={reviewRequest} onChange={editThesis} onApprove={handleCompile} busy={isCompiling} />}
             <AnimatePresence mode="wait">
               {isCompiling && (
                 <motion.div
@@ -652,7 +670,7 @@ export default function ThesisEngine() {
                 </motion.div>
               )}
 
-              {!isCompiling && !compilationResult && (
+              {!isCompiling && !compilationResult && reviewRequest === 0 && (
                 <motion.div
                   key="empty"
                   variants={fadeIn} initial="hidden" animate="visible" exit="hidden"
@@ -683,7 +701,7 @@ export default function ThesisEngine() {
                   </div>
 
                   {/* Universe estimate */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <details><summary>Unverified planning estimates · not market evidence</summary><div className="grid grid-cols-2 gap-3">
                     <div className="rounded-lg border border-border bg-muted/10 p-3">
                       <p className="eyebrow text-muted-foreground mb-1">Estimated Targets</p>
                       <p className="text-xl font-bold text-foreground tabular-nums">
@@ -700,6 +718,7 @@ export default function ThesisEngine() {
                     </div>
                   </div>
 
+                  </details>
                   {/* Filters */}
                   {Object.keys(filters).length > 0 && (
                     <div className="rounded-lg border border-border bg-muted/5 p-4 space-y-2">
@@ -794,7 +813,7 @@ export default function ThesisEngine() {
                       </div>
                       {evidence.map((e, i) => (
                         <div key={i} className="flex items-start gap-2 text-xs">
-                          <CheckCircle2 className="h-3 w-3 text-emerald-500 mt-0.5 shrink-0" />
+                          <span aria-label="Not verified">○</span>
                           <span className="text-muted-foreground">{e}</span>
                         </div>
                       ))}
@@ -846,7 +865,7 @@ export default function ThesisEngine() {
                         <><TrendingUp className="h-4 w-4 mr-2" />{scope === "property" ? "Open Wingate command" : scope === "capital" ? "Open paper research" : "Launch acquisition search"}</>
                       )}
                     </Button>
-                    {canUseAperture && compilationId != null && scope !== "capital" && (
+                    {canUseAperture && compilationId != null && scope === "capital" && (
                       <Button
                         variant="outline"
                         className="border-emerald-500/30 text-emerald-700 hover:text-emerald-800"

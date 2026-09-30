@@ -29,6 +29,7 @@ try {
   check('Deal Senior reading desk is included', bundle.body.includes('Follow the sources') && bundle.body.includes('Challenge the cash'));
   check('Scan story harness is included', bundle.body.includes('Find the next question.'));
   check('Thesis requirements reading desk is included', bundle.body.includes('Conviction needs a boundary.') && bundle.body.includes('What must be true?'));
+  check('Editable Strategist and approval gate are included', bundle.body.includes('Make the idea hold up.') && bundle.body.includes('Approve brief & save search criteria') && bundle.body.includes('evaluation and approvals are out of date'));
   check('Deployment and scenario reading desks are included', bundle.body.includes('Give your capital a clear job.') && bundle.body.includes('Where the example holds—or breaks') && bundle.body.includes('Small allocation. Same discipline.'));
   const health = await read('/api/trpc/system.health?input='+encodeURIComponent(JSON.stringify({ json: { timestamp: Date.now() } })));
   check('API health returns JSON, not hosting fallback HTML', health.response.status === 200 && (health.response.headers.get('content-type') ?? '').includes('application/json') && JSON.parse(health.body)?.result?.data?.json?.ok === true);

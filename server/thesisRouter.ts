@@ -7,6 +7,8 @@
  */
 import { z } from "zod";
 import { GoogleGenAI } from "@google/genai";
+import { strategistInput, strategistApprovalSchema, strategistReceipt } from "../shared/strategistReview";
+import { refineWithStrategist } from "./strategistReview";
 import { validateAcquisitionCompilation } from "./acquisitionCompilation";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "./db";
@@ -212,6 +214,13 @@ const COMPILATION_SCHEMA = {
 
 // ── Router ────────────────────────────────────────────────────────────────────
 export const thesisRouter = router({
+  refine: protectedProcedure.input(strategistInput).mutation(async ({ input }) => {
+    try {
+      return await refineWithStrategist(input);
+    } catch {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The Strategist could not complete a validated review. Your draft is unchanged. Retry; nothing was saved or launched." });
+    }
+  }),
   /**
    * Compile a free-text investment thesis into structured pipeline config.
    * Calls the configured provider with schema enforcement and local validation.
@@ -220,8 +229,12 @@ export const thesisRouter = router({
     .input(z.object({
       thesisText: z.string().min(20).max(4000),
       templateUsed: z.string().optional(),
+      strategistApproval: strategistApprovalSchema.optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+      let reviewReceipt: string[] = [];
+      try { if (input.strategistApproval) reviewReceipt = strategistReceipt(input.strategistApproval, input.thesisText); }
+      catch { throw new TRPCError({ code: "BAD_REQUEST", message: "The approved review does not match this draft. Refresh and approve the current brief." }); }
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
@@ -265,6 +278,8 @@ export const thesisRouter = router({
         });
       }
 
+      // Human dispositions are audit notes only, never executable search filters.
+      compiled.confidenceNotes.push(...reviewReceipt);
       // Persist the compiled output
       await db.execute(
         sql`UPDATE thesis_compilations SET
