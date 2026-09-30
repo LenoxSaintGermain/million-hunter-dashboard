@@ -86,7 +86,7 @@ export function StrategistWorkshop({ text, scope, requestVersion, onChange, onAp
       <footer><p>Saving preserves your brief and angle decisions as review notes. It does not create angle tasks, change filters to match an alternative, or authorize execution.</p>
         {unresolved && <button type="button" onClick={() => setLens("angles")}>Review {review.angles.filter((_,i) => !choices[i] || choices[i] === "pending").length} undecided angle(s) →</button>}
         <label><input type="checkbox" checked={approved && !stale} disabled={stale || refine.isPending || unresolved} onChange={e => setApproved(e.target.checked)} /> I approve this brief for compilation, acknowledging its unanswered questions.</label>
-        <Button onClick={() => { if (approved && !stale && !unresolved && !refine.isPending) onApprove(text, { review: { ...review, brief: text }, dispositions: review.angles.map((_, i) => choices[i] as "investigate" | "park" | "reject") }); }} disabled={!approved || stale || unresolved || refine.isPending || busy}>Approve brief & save search criteria</Button>
+        <Button onClick={() => { if (approved && !stale && !unresolved && !refine.isPending) onApprove(text, { originalText: original, review: { ...review, brief: text }, dispositions: review.angles.map((_, i) => choices[i] as "investigate" | "park" | "reject") }); }} disabled={!approved || stale || unresolved || refine.isPending || busy}>Approve brief & save search criteria</Button>
         <p>Compilation saves criteria. Launching research remains a separate action.</p>
       </footer>
     </>}

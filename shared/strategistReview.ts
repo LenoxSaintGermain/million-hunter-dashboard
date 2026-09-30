@@ -32,6 +32,7 @@ export const strategistReviewSchema = z.object({
 export type StrategistReview = z.infer<typeof strategistReviewSchema>;
 export type AngleDisposition = "pending" | "investigate" | "park" | "reject";
 export const strategistApprovalSchema = z.object({
+  originalText: z.string().max(4000).optional(),
   review: strategistReviewSchema,
   dispositions: z.array(z.enum(["investigate", "park", "reject"])).max(4),
 }).refine(value => value.dispositions.length === value.review.angles.length, "Decide each strategic angle before approval");
@@ -41,6 +42,7 @@ export function strategistReceipt(approval: StrategistApproval, thesisText: stri
   const value = strategistApprovalSchema.parse(approval);
   return [
     "Operator approved this brief for compilation only. Preliminary Strategist reasoning is unverified; no investment or tax qualification is established.",
+    ...(value.originalText ? [`Original operator starting point: ${value.originalText}`] : []),
     `Preliminary evaluation (not diligence): ${value.review.feasibility.summary} Capital: ${value.review.feasibility.capital} Operations: ${value.review.feasibility.operations}`,
     ...value.review.feasibility.failureModes.map(v => `Failure mode to investigate: ${v}`),
     ...value.review.feasibility.nextEvidence.map(v => `Evidence to request: ${v}`),

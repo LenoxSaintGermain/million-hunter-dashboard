@@ -162,7 +162,7 @@ export default function ThesisEngine() {
   const [reviewRequest, setReviewRequest] = useState(0);
   const [librarySearch, setLibrarySearch] = useState("");
   const [libraryLimit, setLibraryLimit] = useState(6);
-  const currentDraft = useRef(thesisText); currentDraft.current = thesisText;
+  const currentDraft = useRef(`${scope}:${thesisText}`); currentDraft.current = `${scope}:${thesisText}`;
   const compilationDraft = useRef("");
   function editThesis(text: string) { setThesisText(text); setCompilationResult(null); setCompilationId(null); }
   useEffect(() => { if (compilationResult || isCompiling) setMobilePane("review"); }, [compilationResult, isCompiling]);
@@ -328,7 +328,7 @@ export default function ThesisEngine() {
       return;
     }
     setIsCompiling(true);
-    compilationDraft.current = reviewedText;
+    compilationDraft.current = `${scope}:${reviewedText}`;
     setCompilationResult(null);
     if (scope === "capital") {
       createCapitalThesis.mutate({ thesisText, name: capitalName.trim() || undefined });
