@@ -42,6 +42,7 @@ export function TodayAttentionBriefing({
   onOpen,
   onRetry,
   onNewMission,
+  previewOnly = false,
 }: {
   attention: ApertureAttentionBriefing | null;
   accountLabel: string;
@@ -54,6 +55,8 @@ export function TodayAttentionBriefing({
   onOpen: (href: string) => void;
   onRetry: () => void;
   onNewMission: () => void;
+  /** Frozen public UAT: no persistence, storage changes, or inline API-backed reviews. */
+  previewOnly?: boolean;
 }) {
   const markSeen = trpc.aperture.desk.markSeen.useMutation();
   const root = useRef<HTMLElement>(null);
@@ -64,14 +67,17 @@ export function TodayAttentionBriefing({
   const [changesOpen, setChangesOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [allMotion, setAllMotion] = useState(false);
+  const [mobileFocus, setMobileFocus] = useState<"briefing" | "positions">("briefing");
   const [allCritical, setAllCritical] = useState(false);
   const [showDismissed, setShowDismissed] = useState(false);
   // A view preference on this device. It resolves nothing and writes no record.
   const [dismissals, setDismissals] = useState<AttentionDismissal[]>(() => {
+    if (previewOnly) return [];
     try { return parseDismissals(window.localStorage.getItem(DISMISSAL_STORAGE_KEY)); } catch { return []; }
   });
   const persistDismissals = (next: AttentionDismissal[]) => {
     setDismissals(next);
+    if (previewOnly) return;
     try { window.localStorage.setItem(DISMISSAL_STORAGE_KEY, JSON.stringify(next)); } catch { /* view preference only */ }
   };
   const [primaryKey, setPrimaryKey] = useState<string | null>(null);
@@ -97,7 +103,7 @@ export function TodayAttentionBriefing({
   // Mounted below the fold or inside collapsed details is not Seen. Without
   // viewport observation, navigation works but no automatic Seen write is made.
   useEffect(() => {
-    if (!read.canRecordSeen || !attention || !root.current || typeof IntersectionObserver === "undefined") return;
+    if (previewOnly || !read.canRecordSeen || !attention || !root.current || typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver((entries) => {
       if (document.visibilityState !== "visible") return;
       const displayed = entries.filter(entry => entry.isIntersecting && entry.intersectionRatio >= 0.5);
@@ -120,11 +126,11 @@ export function TodayAttentionBriefing({
     observe();
     document.addEventListener("visibilitychange", observe);
     return () => { observer.disconnect(); document.removeEventListener("visibilitychange", observe); };
-  }, [attention, changesOpen, tasksOpen, allMotion, primary?.key, read.canRecordSeen]);
+  }, [attention, changesOpen, tasksOpen, allMotion, primary?.key, read.canRecordSeen, previewOnly]);
 
   const displayedBaseline = useMemo(() => attention ? displayedAttentionBaseline(attention, observed) : null, [attention, observed]);
   useEffect(() => {
-    if (!read.canRecordSeen || !displayedBaseline?.snapshot.items.length || inFlight.current || seenError) return;
+    if (previewOnly || !read.canRecordSeen || !displayedBaseline?.snapshot.items.length || inFlight.current || seenError) return;
     if (displayedBaseline.snapshot.items.every(item => sent.current.get(item.key) === item.fingerprint)) return;
     inFlight.current = true;
     markSeen.mutate(displayedBaseline, {
@@ -132,9 +138,10 @@ export function TodayAttentionBriefing({
       onError: () => setSeenError(true),
       onSettled: () => { inFlight.current = false; setSeenRetry(value => value + 1); },
     });
-  }, [displayedBaseline, markSeen, seenError, seenRetry, read.canRecordSeen]);
+  }, [displayedBaseline, markSeen, seenError, seenRetry, read.canRecordSeen, previewOnly]);
 
   const openTask = (item: ApertureAttentionItem) => {
+    if (previewOnly) { onOpen(item.href); return; }
     if (inlineTask?.key === item.key) setInlineTask(null);
     else if (item.kind === "status_unavailable") onRetry();
     else if ((item.evidence && inlineMonitoringTarget(item.href)) || inlineGateTarget(item)) setInlineTask(item);
@@ -168,13 +175,17 @@ export function TodayAttentionBriefing({
   const failedDetail = failed && read.state !== "refreshing" && read.state !== "loading"
     ? (failedSources?.length ? failedSources : ["status" as const]).map(safeStatusError).join(" ") : null;
 
-  return <section ref={root} aria-labelledby="today-briefing-title" aria-busy={read.busy} data-read-state={read.state} className="overflow-hidden rounded-2xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+  return <section ref={root} aria-labelledby="today-briefing-title" aria-busy={read.busy} data-read-state={read.state} data-mobile-focus={mobileFocus} className="capital-briefing" >
     <header className="border-b p-4" style={{ borderColor: "var(--sh-border-1)" }}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0"><h1 id="today-briefing-title" className="font-serif text-2xl leading-tight sm:text-3xl">At a glance</h1><p className="mt-1 text-xs leading-5"><span className="font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Today · {modeLabel}</span><span style={{ color: "var(--sh-fg-muted)" }}> · {accountLabel}</span></p></div>
+        <div className="min-w-0"><h1 id="today-briefing-title" className="font-serif text-2xl leading-tight sm:text-3xl">Your thesis. The world as it stands.</h1><p className="mt-1 text-xs leading-5"><span className="font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Today · {modeLabel}</span><span style={{ color: "var(--sh-fg-muted)" }}> · {accountLabel}</span></p></div>
         <Button variant="ghost" size="sm" className="min-h-11 min-w-11 shrink-0 aria-disabled:opacity-50" aria-label={read.busy ? "Refreshing status" : read.state === "failed" ? "Retry status refresh" : "Refresh status"} aria-disabled={read.busy} onClick={() => { if (!read.busy) onRetry(); }}><RefreshCw aria-hidden="true" className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">{read.busy ? "Refreshing status…" : read.state === "failed" ? "Retry status refresh" : "Refresh status"}</span></Button>
       </div>
     </header>
+    {visibleMotion.length > 0 && <nav className="capital-mobile-focus" aria-label="Capital reading focus">
+      <button aria-pressed={mobileFocus === "briefing"} onClick={() => setMobileFocus("briefing")}>Briefing{(primary?.critical || criticalSplit.visible.length > 0) ? " · review needed" : ""}</button>
+      <button aria-pressed={mobileFocus === "positions"} onClick={() => setMobileFocus("positions")}>Positions · {layout!.inMotion.length}</button>
+    </nav>}
 
     {notice && <div data-status-notice role={read.state === "failed" ? "alert" : "status"} className="flex items-start sm:items-center gap-2.5 border-b px-4 py-2.5 text-xs" style={{ borderColor: "var(--sh-border-1)", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" }}>
       {!read.busy && <ShieldAlert aria-hidden="true" className="mt-0.5 sm:mt-0 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} />}
@@ -186,11 +197,17 @@ export function TodayAttentionBriefing({
       </div>
     </div>}
 
+    <div className="capital-briefing-spread">
+    <div className="capital-lead-story">
     {attention && <>
       {primary ? <AttentionDecisionCard item={primary} prominent fingerprint={fingerprints.get(primary.key)} busy={primary.kind === "status_unavailable" && loading} onOpen={() => openTask(primary)} reviewOpen={inlineTask?.key === primary.key} /> : quiet ? <div data-quiet-status className="flex gap-3 p-4"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div><p className="font-semibold">No new action identified.</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.quietMessage}</p></div></div> : null}
       {primary && inlineReview(primary)}
     </>}
-    {!attention && (execution !== undefined || executionFailed !== undefined) && <TodayExecutionSnapshot data={execution} failed={!!executionFailed} loading={loading} />}
+    </div>
+    <aside className="capital-account-strip" aria-label="Recorded account context">
+      {(execution !== undefined || executionFailed !== undefined) && <TodayExecutionSnapshot data={execution} failed={!!executionFailed} loading={loading} />}
+    </aside>
+    </div>
     {attention && <>
       {(layout?.otherCritical.length ?? 0) > 0 && <section aria-label="Other critical issues" className="border-t" style={{ borderColor: "var(--sh-border-1)" }}>
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4">
@@ -209,8 +226,7 @@ export function TodayAttentionBriefing({
 
       <AttentionSourceRecovery issues={attention.sourceIssues ?? []} onOpen={onOpen} onRetry={onRetry} busy={read.busy} />
 
-      {visibleMotion.length > 0 && <section className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-3"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2></div>{execution ? <TodayOrderRows items={visibleMotion} data={execution} fingerprints={fingerprints} changedKeys={changedKeys} onOpen={onOpen} /> : visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
-      {(execution !== undefined || executionFailed !== undefined) && <TodayExecutionSnapshot data={execution} failed={!!executionFailed} loading={loading} />}
+      {visibleMotion.length > 0 && <section className="capital-motion border-t" style={{ borderColor: "var(--sh-border-1)" }}><div className="px-4 pt-3"><h2 className="text-sm font-semibold">In motion · {layout!.inMotion.length}</h2><p className="capital-swipe-hint">Swipe across positions · open a record for the full basis.</p></div>{execution ? <TodayOrderRows items={visibleMotion} data={execution} fingerprints={fingerprints} changedKeys={changedKeys} onOpen={onOpen} /> : visibleMotion.map(row)}{layout!.inMotion.length > 4 && <Button variant="ghost" className="m-2 min-h-11" onClick={() => setAllMotion(value => !value)}>{allMotion ? "Show fewer statuses" : `Show ${layout!.inMotion.length - 4} more statuses`}</Button>}</section>}
 
       {(layout?.otherAttention.length ?? 0) > 0 && <details open={tasksOpen} onToggle={event => setTasksOpen(event.currentTarget.open)} className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Other pending decisions · {attentionSplit.visible.length}</summary>{tasksOpen && attentionSplit.visible.map(row)}</details>}
 

@@ -6,8 +6,8 @@ export function AttentionSourceRecovery({ issues, onOpen, onRetry, busy = false 
 }) {
   if (!issues.length) return null;
   const impacts = Array.from(new Set(issues.map(issue => issue.impact)));
-  return <section aria-label="Source gaps and recovery" className="border-t px-4 py-3" style={{ borderColor: "var(--sh-border-1)" }}>
-    <h2 className="text-sm font-semibold">Checks needing attention · {issues.length}</h2>
+  return <section aria-label="Source gaps and recovery" className="capital-source-recovery border-t px-4 py-3" style={{ borderColor: "var(--sh-border-1)" }}>
+    <details><summary className="min-h-11 cursor-pointer text-sm font-semibold">Checks needing attention · {issues.length}<span className="capital-summary-hint">Inspect gaps & refresh paths</span></summary>
     {impacts.map(impact => <p key={impact} className="mt-1 text-sm leading-5">{impact}</p>)}
     {issues.some(issue => issue.recovery === "review_checks") && <p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>Review a play to request fresh checks. Refresh reads saved status only.</p>}
     {issues.map((issue, index) => <div key={`${issue.source}:${issue.href}:${index}`} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b py-2 last:border-0 last:pb-0" style={{ borderColor: "var(--sh-border-1)" }}>
@@ -20,5 +20,7 @@ export function AttentionSourceRecovery({ issues, onOpen, onRetry, busy = false 
         else if (issue.href) onOpen(issue.href);
       }}>{busy && issue.recovery === "refresh_status" ? "Refreshing status…" : issue.actionLabel}</Button>
     </div>)}
+    </details>
+    <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Saved checks are stale or unverified. They do not establish current monitoring eligibility.</p>
   </section>;
 }

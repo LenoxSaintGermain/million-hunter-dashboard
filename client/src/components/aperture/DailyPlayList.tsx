@@ -243,7 +243,7 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
     return () => window.removeEventListener("keydown", openPrimaryStep);
   }, [expandedId, onOpenRun, ranked]);
 
-  return <section className="space-y-5">
+  return <section className="capital-story-desk space-y-5">
     <TodayAttentionBriefing
       execution={desk.data}
       executionFailed={!!desk.error}
@@ -259,7 +259,7 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
     />
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
-        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>Decision depth</p>
+        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--sh-signal)" }}>The opportunity edition</p>
         <div className="flex items-center gap-1"><h2 className="mt-1 font-serif text-2xl leading-tight" style={{ color: "var(--sh-text-primary)" }}>Research queue</h2><ContextHelp title="What is shown here?" what="Research candidates that still need a choice. Work already in motion remains summarized in the briefing above." next="Open only the play whose evidence or action you need to inspect." align="start" /></div>
         <p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>Validate a setup, record a skip, or preserve cash without replaying the full research history.</p>
       </div>
@@ -274,23 +274,24 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
     </div></details>
 
     {(() => {
+      const measured = correlation?.usedCents != null && Number.isFinite(correlation.usedCents) && correlation.ceilingCents != null && Number.isFinite(correlation.ceilingCents) && correlation.ceilingCents > 0;
       const usedCents = correlation?.usedCents ?? 0;
       const ceilingCents = correlation?.ceilingCents ?? 0;
       const percentUsed = ceilingCents > 0 ? Math.min(100, Math.round((usedCents / ceilingCents) * 100)) : 0;
-      return <div className="rounded-xl border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+      return <div className="capital-risk-measure" data-measured={measured}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <span className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Dynamic Risk Guardrail</span>
+            <span className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Thesis → reality / risk boundary</span>
             <p className="mt-0.5 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>
               Cluster Risk Capacity {correlation?.subject ? `· ${correlation.subject}` : ""}
             </p>
           </div>
           <div className="text-right">
             <span className="font-mono text-sm font-bold tabular-nums" style={{ color: percentUsed > 85 ? "var(--sh-red)" : "var(--sh-text-primary)" }}>
-              {correlation?.usedCents != null && correlation.ceilingCents != null ? `${money(usedCents)} / ${money(ceilingCents)}` : "0% committed"}
+              {measured ? `${money(usedCents)} / ${money(ceilingCents)}` : "Boundary not measured"}
             </span>
             <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-mono font-medium" style={{ background: percentUsed > 85 ? "color-mix(in srgb, var(--sh-red) 15%, transparent)" : "var(--sh-surface-2)", color: percentUsed > 85 ? "var(--sh-red)" : "var(--sh-fg-muted)" }}>
-              {percentUsed}% capacity
+              {measured ? `${percentUsed}% of limit` : "Needs a verified limit"}
             </span>
           </div>
         </div>
@@ -298,13 +299,13 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
           <div
             className="h-full rounded-full transition-all duration-300"
             style={{
-              width: `${Math.max(2, percentUsed)}%`,
+              width: measured ? `${percentUsed}%` : "0%",
               background: percentUsed > 85 ? "var(--sh-red)" : percentUsed > 50 ? "var(--sh-signal)" : "var(--sh-emerald)",
             }}
           />
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[11px]" style={{ color: "var(--sh-fg-muted)" }}>
-          <span><strong style={{ color: "var(--sh-text-primary)" }}>Correlated planned-loss budget:</strong> {correlation?.usedCents != null && correlation.ceilingCents != null ? `${money(correlation.usedCents)} committed${correlation.subject ? ` in ${correlation.subject}` : ""} of ${money(correlation.ceilingCents)}.` : correlation?.reason ?? "No planned loss is committed in any cluster today."}</span>
+          <span><strong style={{ color: "var(--sh-text-primary)" }}>Correlated planned-loss budget:</strong> {measured ? `${money(correlation!.usedCents)} committed${correlation!.subject ? ` in ${correlation!.subject}` : ""} of ${money(correlation!.ceilingCents)}.` : correlation?.reason ?? "Verify the recorded commitment and cluster limit before sizing a proposal."}</span>
           <span>Theme overlap is not assigned until factual preflight.</span>
         </div>
       </div>;
@@ -384,7 +385,7 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider" style={{ background: "color-mix(in srgb, var(--sh-signal) 15%, transparent)", color: "var(--sh-signal)" }}>
-                Live Screen Active
+                Saved research filter
               </span>
               <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setActiveScreening(null)}>
                 <X className="mr-1 h-3.5 w-3.5" /> Clear
@@ -457,12 +458,17 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
         const mainBlocker = play.blockingReasons[0] ?? "No research blocker was generated; approval is still separate.";
         const reviewedChecks = new Set(item.reviews.filter((review) => review.status === "reviewed").map((review) => review.checkLabel));
         const openChecks = play.requiredChecks.filter((check) => !reviewedChecks.has(check)).length;
-        return <article key={item.candidate.id} className="overflow-hidden rounded-xl border" style={{ borderColor: expanded ? "var(--sh-signal)" : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+        return <article key={item.candidate.id} className="capital-research-story overflow-hidden border" style={{ borderColor: expanded ? "var(--sh-signal)" : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
           <button type="button" aria-controls={`daily-play-detail-${item.candidate.id}`} className="grid min-h-11 w-full gap-3 p-4 text-left sm:grid-cols-[8rem_1fr_auto] sm:items-center sm:p-5" onClick={() => setExpandedId(expanded ? null : item.candidate.id)} aria-expanded={expanded}>
             <div><p className="font-serif text-xl" translate="no" style={{ color: "var(--sh-text-primary)" }}>{item.candidate.symbol}</p><p className="text-[11px] uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>{item.run.holdingPeriod ?? "research"}</p></div>
             <div className="min-w-0"><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{item.thesisName ?? "Capital research play"}</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{play.readiness === "ready_to_prepare" ? "Ready to prepare for human approval." : mainBlocker}</p></div>
             <div className="flex items-center gap-2 sm:text-right"><span className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{researchCoverageLabel(item.candidate.confidenceScore, openChecks)}</span><ChevronDown className={`h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} /></div>
           </button>
+          <div className="capital-thesis-receipt" aria-label={`${item.candidate.symbol} thesis to reality`}>
+            <div><span>01 / Thesis</span><p>{item.thesisName ?? "Thesis not recorded"}</p></div>
+            <div><span>02 / Reality check</span><p>{item.evidenceSummary || "Evidence still needed"}</p></div>
+            <div data-unresolved={openChecks > 0}><span>03 / To establish</span><p>{openChecks > 0 ? `${openChecks} required check${openChecks === 1 ? "" : "s"} still open` : "Recorded checks reviewed"}</p><small>Review coverage, not a quality score or trade approval.</small></div>
+          </div>
           {expanded && <div id={`daily-play-detail-${item.candidate.id}`} className="border-t p-4 sm:p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
             {proposalBlockedReason && <div className="mb-3 flex gap-3 rounded-lg border px-3 py-3 text-xs leading-5" style={{ borderColor: "color-mix(in srgb, var(--sh-signal) 42%, var(--sh-border-1))", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))", color: "var(--sh-fg-muted)" }}><CircleSlash2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><strong style={{ color: "var(--sh-text-primary)" }}>{item.decisionAuthority !== "authoritative" ? "Research-only · no authoritative receipt" : item.decisionBranch === "cash" ? "Cash · $0 planned risk" : "Conditional · proposal held"}</strong><p className="mt-0.5">{proposalBlockedReason}</p></div></div>}
             <PlayRecipeCard candidate={item.candidate} run={item.run} reviewedChecks={item.reviews.filter((review) => review.status === "reviewed").map((review) => review.checkLabel)} alreadyHeld={false} thesisContext={{ name: item.thesisName, rawText: item.thesisRawText }} proposalBlockedReason={proposalBlockedReason} onReviewEvidence={() => onOpenRun(item.run.id, item.candidate.id, "evidence")} onPrepareProposal={() => onOpenRun(item.run.id, item.candidate.id, "execute")} onOpenResearch={() => onOpenRun(item.run.id, item.candidate.id, "research")} />

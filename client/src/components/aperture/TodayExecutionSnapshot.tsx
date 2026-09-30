@@ -40,9 +40,9 @@ export function TodayExecutionSnapshot({ data, loading, failed, now = Date.now()
   const { unrealized, atRisk, deployable } = summary;
   const partialFills = orders.filter(order => order.status !== "filled" && (order.filledQty ?? 0) > 0).length;
   const partial = unrealized.marked < unrealized.openPositions || partialFills > 0;
-  return <section aria-label="Broker snapshot" className="border-b px-4 py-3" style={border}>
+  return <section aria-label="Broker snapshot" className="capital-snapshot border-b px-4 py-3" style={border}>
     <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Broker snapshots · not streaming{failed ? " · Refresh failed; last saved data" : loading ? " · Refreshing saved data" : ""}</p>
-    <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-3">
+    <dl className="capital-snapshot-measures">
       <div><dt className="text-sm">Unrealized{partial ? " · partial" : ""}</dt><dd className="mt-1 text-xl font-semibold tabular-nums">{scoped && unrealized.measured ? formatSignedCents(unrealized.pnlCents!) : "Not measured"}</dd>
         <dd className="mt-1 text-xs leading-5">{!scoped ? "Account scope unavailable." : `${unrealized.marked}/${unrealized.openPositions} fully filled positions marked${partialFills ? `; ${partialFills} partial fill(s) excluded` : ""}.`}{unrealized.measured && <> {unrealized.stale ? "Stale · " : "As of "}{stamp(unrealized.asOf)}</>}</dd>
       </div>
@@ -68,16 +68,16 @@ export function TodayOrderRows({ items, data, fingerprints, changedKeys, onOpen,
   onOpen: (href: string) => void;
   now?: number;
 }) {
-  return <div aria-label="Recorded positions and orders">
+  return <div aria-label="Recorded positions and orders" className="capital-position-stories" tabIndex={0}>
     {items.map(item => {
       const order = data.orders.find(order => item.key === `order:${order.id}`);
       const parsed = parseOccOptionSymbol(item.symbol);
       const label = parsed ? paperInstrumentDisplayLabel({ symbol: item.symbol, instrumentType: parsed.instrumentType }) : item.symbol;
       const quantities = order ? deskOrderQuantities(order) : null;
       const result = order ? deskOrderReturn(order, now) : null;
-      return <article key={item.key} data-attention-key={item.key} data-attention-fingerprint={fingerprints.get(item.key)} className="grid min-w-0 grid-cols-1 gap-2 border-t px-4 py-3 first:border-t-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center" style={border}>
+      return <article key={item.key} data-attention-key={item.key} data-attention-fingerprint={fingerprints.get(item.key)} className="capital-position-story" data-changed={changedKeys.has(item.key)} style={border}>
         <div className="min-w-0"><h3 className="break-words text-sm font-semibold">{label}</h3><p className="text-sm" style={{ color: "var(--sh-signal)" }}>{item.stateLabel}{changedKeys.has(item.key) ? " · Changed" : ""}</p><p className="text-sm leading-5">{order ? `${quantities!.filled} filled · ${quantities!.remaining} remaining` : "Order details unavailable. Open status to reconcile."}</p></div>
-        <div className="min-w-0 break-words text-sm leading-5 tabular-nums">{result?.measured ? <><p>Unrealized {formatSignedCents(result.pnlCents)}</p><p>{result.stale ? "Stale · " : "As of "}{stamp(result.markAsOf)}</p></> : <p>{order?.status === "filled" ? "Unrealized not measured" : (order?.filledQty ?? 0) > 0 ? "Partial-fill return not measured" : "No position mark shown"}</p>}<p style={{ color: "var(--sh-fg-muted)" }}>{order?.accountLabel ?? "Account label unavailable"}</p></div>
+        <div className="capital-position-mark min-w-0 break-words text-sm leading-5 tabular-nums">{result?.measured ? <><p><span>Unrealized </span><strong>{formatSignedCents(result.pnlCents)}</strong></p><p>{result.stale ? "Stale · " : "As of "}{stamp(result.markAsOf)}</p></> : <p>{order?.status === "filled" ? "Unrealized not measured" : (order?.filledQty ?? 0) > 0 ? "Partial-fill return not measured" : "No position mark shown"}</p>}<p style={{ color: "var(--sh-fg-muted)" }}>{order?.accountLabel ?? "Account label unavailable"}</p></div>
         <Button variant="outline" size="sm" className="min-h-11 justify-self-start sm:justify-self-end" onClick={() => onOpen(item.href)}>View status</Button>
         <details className="sm:col-span-3"><summary className="min-h-11 cursor-pointer py-3 text-sm">Order details</summary><div className="space-y-1 text-sm leading-5">
           <p>{item.detail}</p>

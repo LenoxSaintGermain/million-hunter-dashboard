@@ -34,5 +34,6 @@ export default function HunterWalkthrough() {
     </section>
     <div className="hunter-stage-footer"><button className="inline-flex items-center gap-2" disabled={step === 0} onClick={() => go(step - 1)}><ArrowLeft size={16} />Back</button><button className="inline-flex items-center gap-2 text-sm" onClick={() => { setChanges({ asset: -20, capital: -10 }); go(0); }}><RotateCcw size={14} />Reset</button><button className="hunter-cta" disabled={step === 3} onClick={() => go(step + 1)}>Next <ArrowRight size={16} /></button></div>
     <p className="text-xs mt-5 text-muted-foreground">Illustrative — composite example, not a real customer. Local calculations only. Nothing sent, saved, approved or ordered.</p>
+    <Link href="/walkthrough/capital-desk" className="hunter-cta mt-5">Preview the Capital reading desk <ArrowRight size={16} /></Link>
   </main></HunterPublicShell>;
 }

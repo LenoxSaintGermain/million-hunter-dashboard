@@ -46,6 +46,7 @@ import DemoTour from "./pages/DemoTour";
 import RippleEffect from "./pages/RippleEffect";
 import InvestorBrief from "./pages/InvestorBrief";
 import Walkthrough from "./pages/HunterWalkthrough";
+import CapitalDeskPreview from "./pages/aperture/CapitalDeskPreview";
 import Pricing from "./pages/Pricing";
 import Wingate from "./pages/Wingate";
 import AssetDossier from "./pages/AssetDossier";
@@ -208,7 +209,7 @@ function Router() {
   useEffect(() => { document.title = workspaceTitle(location); }, [location]);
   return (
     <>
-      {location !== "/walkthrough" && <OnboardingGuard />}
+      {location !== "/walkthrough" && location !== "/walkthrough/capital-desk" && <OnboardingGuard />}
       <Switch>
         {/* Lobby — cinematic first-login onboarding */}
         <Route path="/lobby" component={Lobby} />
@@ -229,6 +230,7 @@ function Router() {
         <Route path="/demo-tour" component={DemoTour} />
         <Route path="/brief" component={InvestorBrief} />
         <Route path="/walkthrough" component={Walkthrough} />
+        <Route path="/walkthrough/capital-desk" component={CapitalDeskPreview} />
         <Route path="/pricing" component={Pricing} />
         <Route path="/sign-in" component={FirebaseSignIn} />
         <Route path="/auth-unavailable" component={AuthUnavailable} />
