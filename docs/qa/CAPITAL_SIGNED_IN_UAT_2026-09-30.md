@@ -63,3 +63,27 @@ Pre-fix local baseline: 2,940 unit tests passed; 18 skipped. This does not estab
 - Provider-backed test run requested asynchronously from operator, not authorized/started as of this receipt. Broker submit/cancel and final immutable review save remain unexecuted production cases. Unit/storage-contract coverage is not a substitute for those cases.
 
 The testing-strategy skill shaped the split between regression checks, production read UAT, and gated mutations. Approval and evidence boundaries remain intact. Acquisition V2 and document uploads did not ship in this release.
+
+## Approved bounded test — September 30, 22:28 EDT
+
+Operator approved one labeled Mission and one research analysis without changing existing orders or limits. Saved “UAT — Sept 30 approved research test” as an objective Mission draft: Explore an opportunity, broad search, swing horizon, no canonical thesis, Execution Rail account, $50 declared capital/$5 planned loss, shares. Prompt explicitly requires dated primary sources, contrary evidence, an invalidation condition, and no order actions. These declarations do not change account limits.
+
+UI confirmed Saved. Server risk preview at `2026-10-01T02:28:00.532Z` returned $0 headroom because $5 open risk exhausts the account limit; Analyze my plan remained disabled. No provider analysis was initiated. The review-step draft was saved again and confirmed Saved, with the block retained. This verifies draft persistence and the risk gate, not end-to-end provider execution. Existing orders, limits, and canonical thesis were unchanged. Do not switch accounts or loosen limits merely to force acceptance.
+
+## Approved research-only recovery — September 30
+
+- Source `8bb01a170f7ba2ed428544a6e85a8e8976cbd969`, pushed to main. Explicit optional `strategyContext.researchOnly` records operator intent in the saved fingerprint without changing legacy fingerprint bytes.
+- The research-only start no longer requires current balances or trading headroom. It still requires the exact saved draft, owned named paper account, valid scenario amounts, source/scope checks, capability availability and request reconciliation. Acceptance records zero planned risk and unverified capital; downstream proposal, approval and submission gates are unchanged.
+- Zero-headroom review offers **Continue as research only**; toggling does not start work. **Start research only** saves exact assumptions then starts the explicitly requested discovery. Stale trading preview is hidden in that mode, not relabeled current.
+- Incomplete receipts offer **Start fresh research** and tuck binding diagnostics into a disclosure. Original records remain unchanged and unresolved; this is not archive, deletion or fabricated clearance.
+- Clean committed source: TypeScript, build and 2,888 unit tests passed; 18 integration/provider cases skipped. Existing bundle-size warning remains. Focused UI tests cover stale-account/no-preview start and explicit zero-headroom recovery. Server storage doubles cover immutable intent, ownership and no order/allocation writes; these are not production database integration tests.
+- Cloud build `a7860d9c-180b-4130-9caa-8de6fadd7488` launched from clean committed runtime files. Deployment and signed-in provider execution are not yet verified at this entry.
+
+### Release and bounded signed-in result
+
+- Build succeeded; digest `sha256:be83dba737c0924213a19ef83c9661f51ee13a3aa9253243ae8e722d62a32535`. Revision `capital-aperture-00272-quf` serves 100%; rollback `capital-aperture-00270-koz` retained. Runtime fingerprint unchanged, no migration. Candidate and production each passed all 15 release checks; production at `2026-10-01T03:09:07.099Z`.
+- Existing approved draft loaded as Saved. Explicit research-only toggle removed the trading-preview blocker and enabled Start research only. One click saved version 17 and ran one analysis; no duplicate/retry invoked.
+- Accepted Mission `990001`, revision `1380001`, job `270001`, discovery record `60001`, attempt 1. UI reports **Failed**, research as of `2026-10-01T03:10:02.801Z`; no allocation/order created. Existing account limits and orders were not changed by this workflow.
+- Provider retrieval returned citations and classifier was available, but the contract rejected `reviewedUniverse` as outside the permitted universe, causing `invalid discovery lineage`. Rejected hypotheses `hyp-capc-financing-margin-pressure` and `hyp-universal-financing-squeeze-reject` remain in the record. This is an honest failure, not an empty successful search. The classifier prompt refers to reviewed “names” while the validator requires exact ticker syntax; that is a potential cause, not a confirmed payload diagnosis.
+- The headroom/UI recovery is verified live. End-to-end useful discovery remains blocked on this separate classifier-contract failure. No automatic retry, false clearance, record deletion or closure. Existing Close out this mission is visible and preserves evidence; it was not invoked.
+- Screenshot: `/tmp/capital-research-release.c1gk0P/research-only-uat.png` (local UAT evidence, not a public fixture).
