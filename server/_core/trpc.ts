@@ -3,13 +3,18 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { canOperateCapital } from "@shared/capitalOperatorAccess";
+import { assertLegacyCatalogAccess } from "./legacyCatalogAccess";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
 });
 
 export const router = t.router;
-export const publicProcedure = t.procedure;
+const baseProcedure = t.procedure.use(async ({ path, ctx, next }) => {
+  assertLegacyCatalogAccess(path, ctx.user);
+  return next();
+});
+export const publicProcedure = baseProcedure;
 
 const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;
@@ -26,14 +31,14 @@ const requireUser = t.middleware(async opts => {
   });
 });
 
-export const protectedProcedure = t.procedure.use(requireUser);
+export const protectedProcedure = baseProcedure.use(requireUser);
 
 /**
  * Operator-only. Clients (role "investor" / "insurance") get READ access to the
  * pipeline but must never mutate it — the UI hides the controls, and this is the
  * gate that actually enforces it.
  */
-export const operatorProcedure = t.procedure.use(
+export const operatorProcedure = baseProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
@@ -48,7 +53,7 @@ export const operatorProcedure = t.procedure.use(
   }),
 );
 
-export const adminProcedure = t.procedure.use(
+export const adminProcedure = baseProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
@@ -69,7 +74,7 @@ export const adminProcedure = t.procedure.use(
  * Capital workspace access. Admins retain support access, while the dedicated
  * Capital Operator role cannot inherit unrelated admin capabilities.
  */
-export const capitalOperatorProcedure = t.procedure.use(
+export const capitalOperatorProcedure = baseProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 

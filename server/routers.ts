@@ -179,11 +179,11 @@ export const appRouter = router({
   }),
 
   deals: router({
-    list: publicProcedure
+    list: protectedProcedure
       .input(z.object({ limit: z.number().optional(), offset: z.number().optional() }).optional())
       .query(async ({ input }) => getDeals(input ?? {})),
 
-    getById: publicProcedure
+    getById: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         const deal = await getDealById(input.id);
@@ -336,48 +336,8 @@ export const appRouter = router({
           auditFlag: opp.auditFlag,
         }));
 
-        let dbResults: typeof curated = [];
-        try {
-          const db = await getDb();
-          if (db) {
-            const rows = await db.execute(
-              q
-                ? sql`SELECT id, name, industry, location, stage, score FROM deals
-                      WHERE (name LIKE ${`%${q}%`} OR industry LIKE ${`%${q}%`} OR location LIKE ${`%${q}%`})
-                      AND (isArchived = 0 OR isArchived IS NULL)
-                      ORDER BY score DESC LIMIT 12`
-                : sql`SELECT id, name, industry, location, stage, score FROM deals
-                      WHERE (isArchived = 0 OR isArchived IS NULL)
-                      ORDER BY score DESC LIMIT 12`
-            );
-            const rowsArr = Array.isArray((rows as any)[0]) ? (rows as any)[0] : (rows as any);
-            dbResults = (rowsArr as any[]).map((r: any) => ({
-              id: Number(r.id),
-              name: String(r.name ?? ""),
-              industry: String(r.industry ?? "Operating Business"),
-              category: String(r.industry ?? "Operating Business"),
-              location: String(r.location ?? "US Market"),
-              stage: (r.stage ?? "new") as "qualified" | "new" | "high_priority" | "in_diligence" | "active_scan",
-              stageLabel: String(r.stage ?? "new").replace("_", " ").toUpperCase(),
-              assetClass: "private_mna" as const,
-              assetClassLabel: "Private Buyout",
-              scoreBlurred: r.score != null ? Math.round(Number(r.score) * 10) / 10 : 0.7,
-              metric1Label: "Revenue",
-              metric1Value: "Audited Financials",
-              metric2Label: "Cash Flow",
-              metric2Value: "Normalized SDE",
-              metric3Label: "Multiple",
-              metric3Value: "Broker Asking",
-              adversarialInsight: "Subject to 3-agent IC consensus & Red Team add-back audit.",
-              auditFlag: "Operator access required for forensic verification dossier.",
-            }));
-          }
-        } catch (err: any) {
-          console.warn("[publicDeals.search] DB query fallback:", err?.message || err);
-        }
-
-        // Merge curated multi-asset fixtures + DB deals
-        let all = [...curated, ...dbResults];
+        // Public discovery is deterministic: private catalog rows never enter it.
+        let all = [...curated];
 
         // Deduplicate by name if identical
         const seen = new Set<string>();
@@ -3271,12 +3231,15 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
   thesisVariant: router({
     list: protectedProcedure
       .input(z.object({ assetClass: z.string().optional() }).optional())
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
         const db = await getDb();
         if (!db) return [];
         const { thesisVariants } = await import("../drizzle/schema");
-        const { and } = await import("drizzle-orm");
+        const { and, or } = await import("drizzle-orm");
         const conds = [eq(thesisVariants.isActive, true)];
+        if (ctx.user.role !== "admin") {
+          conds.push(or(eq(thesisVariants.ownerUserId, ctx.user.id), eq(thesisVariants.assignedUserId, ctx.user.id))!);
+        }
         if (input?.assetClass) conds.push(eq(thesisVariants.assetClass, input.assetClass));
         return db.select().from(thesisVariants).where(and(...conds)).orderBy(desc(thesisVariants.isPrimary));
       }),
@@ -3308,7 +3271,7 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
         const { thesisVariants } = await import("../drizzle/schema");
         const now = Date.now();
-        const isOperator = ctx.user.role === "admin" || ctx.user.role === "user";
+        const isOperator = ctx.user.role === "admin";
 
         if (input.id) {
           // A client may edit only the theses they own; operators edit anything.
@@ -3320,7 +3283,6 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
           await db.update(thesisVariants).set({
             name: input.name, description: input.description ?? null,
             assetClass: input.assetClass, clientLabel: input.clientLabel ?? null,
-            assignedUserId: input.assignedUserId ?? null,
             // Only operators may promote a thesis to primary or reassign it.
             ...(isOperator ? { isPrimary: input.isPrimary, assignedUserId: input.assignedUserId ?? null } : {}),
             overrides: input.overrides as any, updatedAt: now,
@@ -3345,7 +3307,7 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
         const { thesisVariants } = await import("../drizzle/schema");
-        const isOperator = ctx.user.role === "admin" || ctx.user.role === "user";
+        const isOperator = ctx.user.role === "admin";
         const [existing] = await db.select().from(thesisVariants).where(eq(thesisVariants.id, input.id)).limit(1);
         if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Thesis not found" });
         if (!isOperator && (existing as any).ownerUserId !== ctx.user.id) {
@@ -3404,7 +3366,7 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
         activeThesisId: z.number().int().nullable().default(null),
         mode: z.enum(["fits", "variants", "all"]).default("fits"),
       }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
         const { getCommercialAssets } = await import("./db");
         const { evaluateAcrossTheses, crossThesisSummary } = await import("./scoring/crossThesis");
         type ThesisDef = import("./scoring/crossThesis").ThesisDef;
@@ -3414,11 +3376,15 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
 
         const db = await getDb();
         const { thesisVariants } = await import("../drizzle/schema");
-        const { and } = await import("drizzle-orm");
+        const { and, or } = await import("drizzle-orm");
         const rows = db
           ? await db.select().from(thesisVariants).where(and(
               eq(thesisVariants.isActive, true),
               eq(thesisVariants.assetClass, input.assetClass),
+              ctx.user.role === "admin" ? undefined : or(
+                eq(thesisVariants.ownerUserId, ctx.user.id),
+                eq(thesisVariants.assignedUserId, ctx.user.id),
+              ),
             ))
           : [];
 

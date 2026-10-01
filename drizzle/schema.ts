@@ -75,6 +75,8 @@ export type InsertUser = typeof users.$inferInsert;
 // ─── Deals (core acquisition opportunities) ───────────────────────────────────
 export const deals = mysqlTable("deals", {
   id: int("id").autoincrement().primaryKey(),
+  /** Explicit owner; legacy/unassigned rows must not be treated as shared personal data. */
+  ownerUserId: int("owner_user_id"),
   externalId: varchar("externalId", { length: 128 }),
   source: varchar("source", { length: 64 }),
   name: varchar("name", { length: 256 }).notNull(),

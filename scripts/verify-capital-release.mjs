@@ -38,6 +38,19 @@ try {
   check('API health returns JSON, not hosting fallback HTML', health.response.status === 200 && (health.response.headers.get('content-type') ?? '').includes('application/json') && JSON.parse(health.body)?.result?.data?.json?.ok === true);
   const protectedRead = await read('/api/trpc/aperture.account.list');
   check('Unauthenticated account access remains denied', protectedRead.response.status === 401 && (protectedRead.response.headers.get('content-type') ?? '').includes('application/json'));
+  for (const [path, input] of [
+    ['deals.list', null], ['deals.getById', { id: 2880003 }],
+    ['signals.getByDealId', { dealId: 2880003 }], ['memos.list', null],
+    ['memos.getByDealId', { dealId: 2880003 }], ['outreach.list', null],
+    ['outreach.getByDealId', { dealId: 2880003 }], ['dashboard.stats', null],
+    ['activity.list', null],
+  ]) {
+    const result = await read('/api/trpc/' + path + (input ? '?input=' + encodeURIComponent(JSON.stringify({ json: input })) : ''));
+    check('Anonymous legacy access denied: ' + path,
+      result.response.status === 401 &&
+      (result.response.headers.get('content-type') ?? '').includes('application/json') &&
+      JSON.parse(result.body)?.error?.json?.data?.code === 'UNAUTHORIZED');
+  }
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'Release verification failed');
   process.exitCode = 1;
