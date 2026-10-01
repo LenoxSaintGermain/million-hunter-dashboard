@@ -44,6 +44,8 @@ try {
     ['memos.getByDealId', { dealId: 2880003 }], ['outreach.list', null],
     ['outreach.getByDealId', { dealId: 2880003 }], ['dashboard.stats', null],
     ['activity.list', null],
+    ['scan.getLatest', null], ['scan.getStatus', { jobId: 1 }],
+    ['scan.getThesisComparison', { jobId: 1 }],
   ]) {
     const result = await read('/api/trpc/' + path + (input ? '?input=' + encodeURIComponent(JSON.stringify({ json: input })) : ''));
     check('Anonymous legacy access denied: ' + path,
