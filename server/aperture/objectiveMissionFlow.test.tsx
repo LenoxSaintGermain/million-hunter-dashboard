@@ -140,6 +140,22 @@ beforeEach(() => {
 afterEach(() => { fixture.cleanups.forEach(cleanup => cleanup?.()); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("connected Objective Mission", () => {
+  it("starts explicitly saved research only with stale balances and no risk preview", async () => {
+    const research = values();
+    research.strategyContext = { ...research.strategyContext!, researchOnly: true };
+    fixture.queries.draft = query(record(research));
+    fixture.queries.accounts.data[0].lastSyncedAt = now - STALE_ACCOUNT_MS - 1;
+    fixture.mutations.start.mutateAsync.mockResolvedValue({ ...snapshot(), acceptedValues: research });
+    const view = harness(); view.render();
+    expect(view.workspace().blockedReason).toBeNull();
+    expect(fixture.mutations.start.mutateAsync).not.toHaveBeenCalled();
+    await view.workspace().onUnderwrite();
+    expect(fixture.mutations.start.mutateAsync).toHaveBeenCalledOnce();
+    expect(fixture.mutations.start.mutateAsync).toHaveBeenCalledWith({ requestId, expectedVersion: 4 });
+    expect(fixture.reads.preview).not.toHaveBeenCalled();
+    expect(fixture.mutations.run.mutateAsync).not.toHaveBeenCalled();
+  });
+
   it("points stale-account recovery to the named account in Accounts instead of another risk inspection", async () => {
     fixture.queries.accounts.data[0].lastSyncedAt = now - STALE_ACCOUNT_MS - 1;
     const view = harness(); view.render();

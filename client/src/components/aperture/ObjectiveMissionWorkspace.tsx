@@ -135,6 +135,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
   const [attempted, setAttempted] = useState<ReadonlyArray<1 | 2>>([]);
   const strategy = values.strategyContext;
   const issues = inputIssues(props);
+  const researchOnly = strategy?.researchOnly === true;
   const selectedAccount = accounts.find(account => account.id === values.accountId);
   const selectedThesis = canonicalTheses.find(thesis => thesis.id === values.canonicalThesisId);
   const locked = busy || loading || saveState === "loading" || saveState === "saving";
@@ -179,7 +180,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
     || (busy ? "Underwriting is in progress." : null)
     || (saveState === "saving" ? "Saving your draft. Wait for confirmation." : null);
   const actionBlock = unavailable || activityMessage
-    || failureText || blockedReason || headroomMessage || previewWarning || issues[0]?.message
+    || failureText || blockedReason || (!researchOnly && (headroomMessage || previewWarning)) || issues[0]?.message
     || (saveState !== "saved" && !props.saveBeforeUnderwriting ? "Save this draft before underwriting." : null);
   const effectiveSaveState = failureText ? "failed" : loading ? "loading" : saveState;
   const saveLabel = { loading: "Loading draft", saving: "Saving…", saved: "Saved", unsaved: "Unsaved changes", failed: "Save or action failed" }[effectiveSaveState];
@@ -208,9 +209,16 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
         <Button type="button" variant="outline" className="min-h-11" disabled={locked || receiptPresent} onClick={() => { if (!locked && !receiptPresent) onSave(); }}>{saveState === "saving" ? "Saving…" : saveState === "failed" ? "Retry save" : "Save draft"}</Button>
       </div>
     </header>
+    {strategy && <div className="border-y py-3" style={{ borderColor: "var(--sh-border-1)" }}>
+      <label htmlFor={`${prefix}-research-only`} className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium">
+        <input id={`${prefix}-research-only`} className="min-h-11" type="checkbox" checked={researchOnly} disabled={locked || receiptPresent} onChange={event => changeStrategy({ researchOnly: event.target.checked })} />
+        Research only · leave trading capacity unchanged
+      </label>
+      <p className="text-sm" style={muted}>{researchOnly ? "Build evidence now. No capital is allocated; fresh risk checks are still required before any paper proposal." : "Risk limit full? You can still research. Switch on research only to continue without changing limits or orders."}</p>
+    </div>}
     {failureText && <p role="alert" className="text-sm" style={{ color: "var(--sh-red)" }}>{failureText}</p>}
     {unavailable && <p role="alert" className="text-sm" style={{ color: "var(--sh-signal)" }}>{unavailable}</p>}
-    {values.activeSection !== 3 && previewWarning && <p role="alert" className="text-sm" style={{ color: "var(--sh-signal)" }}>{previewWarning}</p>}
+    {values.activeSection !== 3 && !researchOnly && previewWarning && <p role="alert" className="text-sm" style={{ color: "var(--sh-signal)" }}>{previewWarning}</p>}
     {values.activeSection !== 3 && (blockedReason || locked) && <p role="status" className="text-sm" style={{ color: "var(--sh-signal)" }}>{activityMessage || blockedReason}</p>}
     <section aria-labelledby={`${prefix}-heading-1`} className="rounded-xl border p-4" style={surface}>
       {sectionHeader(1, "Question & scope")}
@@ -290,10 +298,10 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
           <p className="text-sm" style={muted}>Last synced: {timestamp(selectedAccount?.lastSyncedAt)}. Account balances are not allocated capital.</p>
         </FieldRow>
         <div className="grid gap-4 sm:grid-cols-2">
-          <FieldRow id={`${prefix}-capital`} label="Declared capital (USD)" error={errors("capital")}>
+          <FieldRow id={`${prefix}-capital`} label={researchOnly ? "Scenario capital (USD)" : "Declared capital (USD)"} error={errors("capital")}>
             <Input {...fieldProps("capital")} className="min-h-11" inputMode="decimal" value={values.capital} disabled={locked} onChange={event => change({ capital: event.target.value })} />
           </FieldRow>
-          <FieldRow id={`${prefix}-maxLoss`} label="Maximum planned loss (USD)" error={errors("maxLoss")}>
+          <FieldRow id={`${prefix}-maxLoss`} label={researchOnly ? "Scenario loss ceiling (USD)" : "Maximum planned loss (USD)"} error={errors("maxLoss")}>
             <Input {...fieldProps("maxLoss")} className="min-h-11" inputMode="decimal" value={values.maxLoss} disabled={locked} onChange={event => change({ maxLoss: event.target.value })} />
           </FieldRow>
         </div>
@@ -315,7 +323,8 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
       <div id={`${prefix}-section-3`} hidden={values.activeSection !== 3} className="mt-4 space-y-3">
         <p className="break-words text-sm">{values.mission || "Question not entered."}</p>
         <p className="text-sm" style={muted}>{strategy ? intentLabels[strategy.intent] : "Intent not initialized"} · {instrumentLabels[values.instrument]}{values.targetProfit ? ` · Target $${values.targetProfit} / ${values.targetPeriod}` : " · No profit target"}</p>
-        <div aria-label="Server risk preview" className="space-y-2 rounded-lg border p-3" style={{ ...surface, background: "var(--sh-surface-2)" }}>
+        {researchOnly && <p className="border-l-2 pl-3 text-sm" style={{ borderColor: "var(--sh-signal)" }}>Research only. These amounts describe a scenario, not available trading capacity. Existing limits and orders stay unchanged.</p>}
+        <div hidden={researchOnly} aria-label="Server risk preview" className="space-y-2 rounded-lg border p-3" style={{ ...surface, background: "var(--sh-surface-2)" }}>
           <h4 className="text-sm font-semibold">{matchingPreview && !previewCurrent ? "Recorded effective constraint" : "Effective constraint"} <span className="mt-1 block font-serif text-2xl tabular-nums">{matchingPreview ? money(matchingPreview.feasibility.riskBudgetCents) : "Not measured"}</span></h4>
           {matchingPreview ? <>
             {previewWarning && <p role="alert" className="text-sm" style={{ color: "var(--sh-signal)" }}>{previewWarning}</p>}
@@ -343,7 +352,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
           {props.accountRefreshRequired && selectedAccount && <MissionAccountRefreshLink accountLabel={selectedAccount.label} />}
         </div>
         {issues.length > 0 && <Button type="button" variant="outline" className="min-h-11" disabled={locked} onClick={() => { setAttempted([1, 2]); change({ activeSection: issues[0].section }); }}>Review missing values</Button>}
-        {isHeadroomExhausted && (
+        {isHeadroomExhausted && !researchOnly && (
           <div data-testid="risk-limit-exhausted-card" className="rounded-lg border p-3.5 text-sm space-y-2.5" style={{ borderColor: "var(--sh-signal)", background: "rgba(245, 158, 11, 0.08)" }}>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-amber-500">
@@ -354,6 +363,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
               Your account has liquid buying power, but your paper account's daily loss limit {openRiskText ? `(${openRiskText} open risk)` : ""} is full. Downside risk capacity—not nominal broker cash—is the binding constraint.
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button type="button" disabled={locked} onClick={() => changeStrategy({ researchOnly: true })}>Continue as research only</Button>
               <a
                 href="/aperture/plays"
                 className="inline-flex items-center justify-center rounded-md text-xs font-medium min-h-9 px-3 border border-amber-500/40 hover:bg-amber-500/10 transition-colors"
@@ -428,7 +438,7 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
           </div>
         )}
         <div className="flex flex-wrap gap-2">
-          <Button type="button" className="min-h-11" disabled={!!actionBlock} aria-describedby={`${prefix}-effect ${prefix}-blocked`} onClick={() => { if (!actionBlock) onUnderwrite(); }}>{busy ? apertureLanguage.analyzingPlan : saveState === "saving" ? "Saving draft…" : apertureLanguage.analyzePlan}</Button>
+          <Button type="button" className="min-h-11" disabled={!!actionBlock} aria-describedby={`${prefix}-effect ${prefix}-blocked`} onClick={() => { if (!actionBlock) onUnderwrite(); }}>{busy ? apertureLanguage.analyzingPlan : saveState === "saving" ? "Saving draft…" : researchOnly ? "Start research only" : apertureLanguage.analyzePlan}</Button>
         </div>
         <p id={`${prefix}-effect`} className="text-sm" style={muted}>{props.saveBeforeUnderwriting && saveState !== "saved" ? "Saves these assumptions and builds research. No order is created or submitted." : "Builds research. No order is created or submitted."}</p>
         <p id={`${prefix}-blocked`} role="status" className="text-sm" style={{ color: actionBlock ? "var(--sh-signal)" : "var(--sh-fg-muted)" }}>{actionBlock ?? "Ready for your explicit request."}</p>

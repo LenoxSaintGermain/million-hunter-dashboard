@@ -548,6 +548,21 @@ describe("risk limit exhausted contextual resolver", () => {
     },
   };
 
+  it("offers explicit research-only recovery without clearing risk or starting work", () => {
+    const view = harness(completeValues(), { saveState: "saved", riskPreview: zeroHeadroomPreview });
+    view.click("Continue as research only");
+    expect(view.props.values.strategyContext?.researchOnly).toBe(true);
+    expect(view.props.values.capital).toBe("10,000");
+    expect(view.props.values.maxLoss).toBe("500");
+    expect(view.onUnderwrite).not.toHaveBeenCalled();
+    expect(view.button("Start research only").props.disabled).toBe(true);
+    view.props.saveState = "saved";
+    view.props.riskPreview = { ...zeroHeadroomPreview, status: "stale" };
+    expect(view.render().visible("[aria-label='Server risk preview']")).toHaveLength(0);
+    view.click("Start research only");
+    expect(view.onUnderwrite).toHaveBeenCalledOnce();
+  });
+
   it("renders the contextual resolver card when risk headroom is exhausted", () => {
     const view = harness(completeValues(), { saveState: "saved", riskPreview: zeroHeadroomPreview });
     const { $ } = view.render();

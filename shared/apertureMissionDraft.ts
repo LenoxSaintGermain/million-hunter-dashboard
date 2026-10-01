@@ -17,6 +17,9 @@ export const missionStrategyDraftSchema = z.object({
   declarationId: z.string().uuid().nullable(),
   sourceOrder: z.object({ accountId: sourceId, runId: sourceId, candidateId: sourceId, orderId: sourceId }).strict().nullable(),
   profitReserve: z.string().max(80),
+  // Explicit research intent, never capital availability or order authority.
+  // No default: legacy receipts must retain their original fingerprint bytes.
+  researchOnly: z.boolean().optional(),
 }).strict();
 export type MissionStrategyDraft = z.infer<typeof missionStrategyDraftSchema>;
 
@@ -120,6 +123,7 @@ export function missionDraftFingerprint(values: MissionDraftValues) {
       accountId: strategy.sourceOrder.accountId, runId: strategy.sourceOrder.runId,
       candidateId: strategy.sourceOrder.candidateId, orderId: strategy.sourceOrder.orderId,
     }, profitReserve: strategy.profitReserve,
+    ...(strategy.researchOnly === undefined ? {} : { researchOnly: strategy.researchOnly }),
   };
   return JSON.stringify({ ...Object.fromEntries((Object.keys(emptyMissionDraftValues()) as (keyof MissionDraftValues)[]).map((key) => [key, values[key]])), strategyContext });
 }

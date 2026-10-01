@@ -110,9 +110,9 @@ it("explains a rejected receipt binding without hydrating or approving it", () =
   fixture.queries.latest = { ...query(undefined), isError: true,
     error: Object.assign(new Error("Decision binding unavailable"), { data: { code: "PRECONDITION_FAILED" } }) };
   const { $ } = render();
-  expect($.text()).toContain("This saved plan needs recovery.");
-  expect($.text()).toContain("Start from a sentence");
-  expect($.text()).toContain("does not repair or replace this record");
+  expect($.text()).toContain("Keep the record. Start fresh.");
+  expect($('a[href="/aperture/mission?objective=1"]').text()).toContain("Start fresh research");
+  expect($.text()).toContain("does not repair or close it");
   expect(fixture.mutations.begin.mutateAsync).not.toHaveBeenCalled();
   expect(fixture.mutations.run.mutateAsync).not.toHaveBeenCalled();
 });

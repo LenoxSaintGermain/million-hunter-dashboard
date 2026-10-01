@@ -71,6 +71,23 @@ function branchState(branch: Branch | string | null | undefined): WorkflowState 
   return "researchable";
 }
 
+/** Recovery navigates to a separate draft; it never mutates an unbound receipt. */
+export function MissionReceiptRecovery({ onCheck }: { onCheck?: () => void }) {
+  const fixture = readIsolatedUatIdentity();
+  return <section aria-label="Saved plan recovery" className="mx-auto max-w-3xl border-t-2 p-5 sm:p-7" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}>
+    <p role="status" className="text-xs uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Saved plan · incomplete record</p>
+    <h2 className="mt-3 font-serif text-2xl sm:text-3xl">Keep the record. Start fresh.</h2>
+    <p className="mt-3 max-w-prose text-sm leading-6">We can’t safely continue this saved plan. Open a separate research draft to move forward.</p>
+    <a className="mt-5 inline-flex min-h-11 items-center gap-3 px-4 py-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4" style={{ background: "var(--sh-text-primary)", color: "var(--sh-surface)" }} href={aperturePathForFixture("/aperture/mission?objective=1", fixture)}>Start fresh research<ArrowRight aria-hidden="true" className="h-4 w-4" /></a>
+    <p className="mt-3 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Opens the editor only. No analysis or order starts.</p>
+    <details className="mt-5 border-t text-sm" style={{ borderColor: "var(--sh-border-1)" }}>
+      <summary className="min-h-11 cursor-pointer py-3">Why this plan is blocked</summary>
+      <p className="max-w-prose leading-6">Its saved account, thesis, or revision binding could not be verified. The original record stays unchanged and unresolved; starting fresh does not repair or close it. Current approval and order-risk checks still apply.</p>
+      {onCheck && <Button variant="outline" className="mt-3 min-h-11" onClick={onCheck}>Check recovery status</Button>}
+    </details>
+  </section>;
+}
+
 export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget = null, missionHandoff = null, onMissionRecorded }: Props) {
   const utils = trpc.useUtils();
   const handoff = receiptTarget ? null : missionHandoff;
@@ -887,16 +904,9 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
 
   if (!receiptTarget && !draftInitialized && missionContextError) {
     if (handoffError) return <section role="alert" className="mx-auto max-w-3xl rounded-2xl border p-5" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-serif text-2xl">We couldn’t load your saved thesis.</h2><p className="mt-2 text-sm leading-6">{handoffError}</p><Button className="mt-4 min-h-11" onClick={() => void refreshMissionContext()}>Try again</Button></section>;
-    // A rejected binding is not a transient account-refresh failure. Preserve
-    // the receipt guard; the page's capability-gated sentence entry remains
-    // available for a separately reviewed plan, never an inferred repair.
+    // Preserve the failed binding. A separate draft is not an inferred repair.
     if (receiptError?.data?.code === "PRECONDITION_FAILED" && receiptError.message === "Decision binding unavailable") {
-      return <section role="alert" className="mx-auto max-w-3xl rounded-2xl border p-5" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}>
-        <h2 className="font-serif text-2xl">This saved plan needs recovery.</h2>
-        <p className="mt-2 text-sm leading-6">Its saved account and thesis binding could not be verified. Analysis from this record remains blocked; retrying alone will not repair it.</p>
-        <p className="mt-2 text-sm leading-6">If available above, choose “Start from a sentence” to review a separate plan. This does not repair or replace this record. Current account and risk checks still apply.</p>
-        <Button variant="outline" className="mt-4 min-h-11" onClick={() => void refreshMissionContext()}>Check recovery status</Button>
-      </section>;
+      return <MissionReceiptRecovery onCheck={() => void refreshMissionContext()} />;
     }
     return <section role="alert" className="mx-auto max-w-3xl rounded-2xl border p-5" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-serif text-2xl">We couldn’t load your saved plan.</h2><p className="mt-2 text-sm leading-6">Your saved plan or account details are unavailable. Try again before making changes.</p><Button className="mt-4 min-h-11" onClick={() => void refreshMissionContext()}>Try again</Button></section>;
   }
@@ -936,8 +946,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
       : null} />;
   }
   if (receiptTarget && (receiptError || !immutableReceipt || !immutableReceipt.binding)) {
-    const fixture = readIsolatedUatIdentity();
-    return <section className="mx-auto max-w-3xl rounded-2xl border p-6" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>Decision binding unavailable</p><p className="mt-2 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>This receipt cannot be safely reconstructed from its stored owner, thesis, account, mandate, and revision binding. No proposal or research continuation is available.</p><div className="mt-4 flex flex-wrap gap-2"><Button onClick={() => window.location.assign(aperturePathForFixture("/aperture/runs", fixture))}>Return to Research Journeys</Button><Button variant="outline" onClick={() => window.location.assign(aperturePathForFixture("/aperture", fixture))}>Return to Decision Center</Button></div>{import.meta.env.DEV && receiptError ? <details className="mt-4 text-xs" style={{ color: "var(--sh-fg-muted)" }}><summary>Development diagnostic</summary><pre className="mt-2 whitespace-pre-wrap">{receiptError.message}</pre></details> : null}</section>;
+    return <MissionReceiptRecovery onCheck={() => void refreshMissionContext()} />;
   }
   if (immutableReceipt && !revisingReceipt && (latestBranch === "cash" || latestBranch === "conditional")) {
     return <section className="mx-auto max-w-4xl space-y-5 pb-24"><div className="grid gap-px overflow-hidden rounded-xl border sm:grid-cols-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}><ReceiptFact label="Owner" value="Owner scoped" /><ReceiptFact label="Thesis snapshot" value={immutableReceipt.binding.canonicalThesisName} /><ReceiptFact label="Paper account" value={immutableReceipt.binding.accountLabel} /><ReceiptFact label="Mandate / revision" value={`${immutableReceipt.binding.mandateVersion} · v${immutableReceipt.binding.decisionVersion}`} /></div><article className="overflow-hidden rounded-2xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><DecisionReceipt branch={latestBranch as "cash" | "conditional"} reason={latestReason} blocker={latestBlocker} reopen={latestReopen} gateLabel={latestGate} reviewAt={latestReviewAt} revision={latestRevision} recordedAt={latestRecordedAt} binding={immutableReceipt.binding} pendingCashOutcome={currentCashOutcome} recordedCashOutcome={authoritativeLatest?.cashOutcome} onRecordCashOutcome={recordCashOutcome} resolvingCashOutcome={resolveCashOutcome.isPending} onGateReview={reviseReceipt} onRevise={reviseReceipt} /></article></section>;

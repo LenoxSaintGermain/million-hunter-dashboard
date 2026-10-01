@@ -256,6 +256,7 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
   }, [resultQuery.data, resultQuery.error, target?.decisionRunId, target?.decisionRevisionId]);
 
   const loading = !initialized || draftQuery.isLoading || accountQuery.isLoading || canonicalQuery.isLoading;
+  const researchOnly = values.strategyContext?.researchOnly === true;
   const contextFailure = draftQuery.error || accountQuery.error || canonicalQuery.error;
   const capabilityBlock = capabilities.isLoading || capabilities.isFetching ? "Checking discovery availability."
     : capabilityReadFailed || capabilities.error || capabilities.data?.enabled !== true || capabilities.data?.mode !== "paper"
@@ -265,8 +266,8 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
     : conflict ? "Compare the saved draft before adopting or replacing it."
       : contextFailure ? message(contextFailure) : capabilityBlock
         || (uncertain ? "Reconcile the original start before another action." : null)
-        || (accountRefreshRequired ? `The account snapshot for ${account!.label} is stale or unavailable. Open Accounts and choose Refresh balances, then return and inspect the effective constraint.` : null)
-        || (!riskCurrent ? "Inspect the effective constraint for these assumptions before underwriting." : null);
+        || (!researchOnly && accountRefreshRequired ? `The account snapshot for ${account!.label} is stale or unavailable. Open Accounts and choose Refresh balances, then return and inspect the effective constraint.` : null)
+        || (!researchOnly && !riskCurrent ? "Inspect the effective constraint for these assumptions before underwriting." : null);
 
   async function refreshDraft() {
     if (operation.current) return;
@@ -349,7 +350,7 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
     }
   }
   async function saveAndStart() {
-    if (operation.current || target || conflict || uncertain || loading || contextFailure || capabilityBlock || !riskCurrent) return;
+    if (operation.current || target || conflict || uncertain || loading || contextFailure || capabilityBlock || (!researchOnly && !riskCurrent)) return;
     const local = current.current;
     if (local.saved && local.saved.completedAt == null && sameValues(local.values, local.saved.values)) return start();
     const confirmed = await save();
@@ -360,7 +361,8 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
     if (operation.current || target || conflict || loading || contextFailure || capabilityBlock) return;
     const local = confirmedSave ? { ...current.current, saved: confirmedSave } : current.current;
     if (!local.saved || local.saved.completedAt != null || !local.values.strategyContext || !sameValues(local.values, local.saved.values)) return;
-    if (!riskCurrent || !risk || !freshRisk(risk.data) || !freshAt(account?.lastSyncedAt) || !input || !account) return;
+    const savedResearchOnly = local.saved.values.strategyContext?.researchOnly === true;
+    if (!input || !account || (!savedResearchOnly && (!riskCurrent || !risk || !freshRisk(risk.data) || !freshAt(account.lastSyncedAt)))) return;
     if (retry ? local.uncertain?.state !== "safe" || local.uncertain.fingerprint !== missionDraftFingerprint(local.values) : !!local.uncertain) return;
     const attempt: UncertainStart = retry ? local.uncertain! : {
       request: { requestId: local.saved.values.strategyContext!.requestId, expectedVersion: local.saved.version },
@@ -379,7 +381,7 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
         if (found) { await reconcile(attempt); return; }
         if (!remote || remote.completedAt != null || remote.version !== attempt.request.expectedVersion || missionDraftFingerprint(remote.values) !== attempt.fingerprint) { await reconcile(attempt); return; }
       }
-      if (!mounted.current || bindingRef.current !== binding || !freshRisk(risk.data) || !freshAt(account.lastSyncedAt)) return;
+      if (!mounted.current || bindingRef.current !== binding || (!savedResearchOnly && (!risk || !freshRisk(risk.data) || !freshAt(account.lastSyncedAt)))) return;
       // The server's start transaction accepts AND executes discovery. A
       // second client run here would duplicate the deliberately requested work.
       const result = await startMutation.mutateAsync(attempt.request);
@@ -492,7 +494,7 @@ export function ObjectiveMissionFlow({ initialDraft, receiptTarget, newObjective
     {uncertain && <section aria-label="Start reconciliation" className="space-y-3 rounded-xl border p-4" style={surface}>
       <p className="break-all text-sm">Original request {uncertain.request.requestId} · saved version {uncertain.request.expectedVersion}. No identity was reset.</p>
       <Button type="button" variant="outline" className="min-h-11" disabled={busy || uncertain.state === "checking"} onClick={() => reconcile(uncertain)}>Check saved start</Button>
-      {uncertain.state === "safe" && <Button type="button" className="min-h-11" disabled={busy || !!capabilityBlock || !!conflict || !riskCurrent || uncertain.fingerprint !== missionDraftFingerprint(values)} onClick={() => start(true)}>Retry original start</Button>}
+      {uncertain.state === "safe" && <Button type="button" className="min-h-11" disabled={busy || !!capabilityBlock || !!conflict || (!researchOnly && !riskCurrent) || uncertain.fingerprint !== missionDraftFingerprint(values)} onClick={() => start(true)}>Retry original start</Button>}
     </section>}
     {conflict && !target && <section aria-label="Draft recovery" className="space-y-3 rounded-xl border p-4" style={surface}>
       <h3 className="text-base font-semibold">Saved draft needs review</h3>
