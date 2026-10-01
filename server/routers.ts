@@ -52,6 +52,7 @@ import { rolePermissionsRouter } from "./rolePermissionsRouter";
 import { researchRouter } from "./routers/research";
 import { apertureRouter } from "./apertureRouter";
 import { PUBLIC_OPPORTUNITIES } from "../shared/publicOpportunities";
+import * as privateWorkspace from "./privateDealWorkspace";
 
 export const appRouter = router({
   system: systemRouter,
@@ -131,11 +132,13 @@ export const appRouter = router({
   }),
 
   dashboard: router({
-    stats: publicProcedure.query(async () => {
-      const [dealStats, outreachStats, recentActivity, latestScan] = await Promise.all([
-        getDealStats(), getOutreachStats(), getActivityLog(8), getLatestScanJob(),
+    stats: protectedProcedure.query(async ({ ctx }) => {
+      const principal = { ownerUserId: ctx.user.id };
+      const [dealStats, outreachStats, recentActivity] = await Promise.all([
+        privateWorkspace.getPrivateDealStats(principal), privateWorkspace.getPrivateOutreachStats(principal), privateWorkspace.listPrivateDealActivity(principal, { limit: 8 }),
       ]);
-      return { dealStats, outreachStats, recentActivity, latestScan };
+      // Legacy jobs have no owner. Do not turn global job state into a private receipt.
+      return { dealStats, outreachStats, recentActivity, latestScan: undefined };
     }),
     macroPosture: publicProcedure.query(async () => {
       const { getMacroSignals } = await import('./db');
@@ -181,19 +184,19 @@ export const appRouter = router({
   deals: router({
     list: protectedProcedure
       .input(z.object({ limit: z.number().optional(), offset: z.number().optional() }).optional())
-      .query(async ({ input }) => getDeals(input ?? {})),
+      .query(async ({ input, ctx }) => privateWorkspace.listPrivateDeals({ ownerUserId: ctx.user.id }, input ?? {})),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        const deal = await getDealById(input.id);
-        if (!deal) return null;
-        const [signal, memo, contacts] = await Promise.all([
-          getSignalByDealId(input.id),
-          getMemoByDealId(input.id),
-          getOutreachByDealId(input.id),
+      .query(async ({ input, ctx }) => {
+        const principal = { ownerUserId: ctx.user.id };
+        const deal = await privateWorkspace.getPrivateDeal(principal, input.id);
+        const [signals, memos, contacts] = await Promise.all([
+          privateWorkspace.listPrivateDealSignals(principal, input.id),
+          privateWorkspace.listPrivateDealMemos(principal, input.id),
+          privateWorkspace.listPrivateDealOutreach(principal, input.id),
         ]);
-        return { deal, signal, memo, contacts };
+        return { deal, signal: signals[0], memo: memos[0], contacts };
       }),
 
     create: protectedProcedure
@@ -212,9 +215,9 @@ export const appRouter = router({
         yearEstablished: z.number().optional(),
         listingUrl: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
-        await createDeal({ ...input, stage: "new" });
-        await logActivity({ type: "deal_added", title: `New deal added: ${input.name}`, detail: input.location });
+      .mutation(async ({ input, ctx }) => {
+        const { id } = await privateWorkspace.createPrivateDeal({ ownerUserId: ctx.user.id }, input);
+        await logActivity({ dealId: id, type: "deal_added", title: `New deal added: ${input.name}`, detail: input.location });
         return { success: true };
       }),
 
@@ -223,31 +226,25 @@ export const appRouter = router({
         id: z.number(),
         stage: z.enum(["new","scanning","qualified","high_priority","in_diligence","loi_sent","under_contract","closed","passed"]),
       }))
-      .mutation(async ({ input }) => {
-        await updateDealStage(input.id, input.stage);
-        const deal = await getDealById(input.id);
+      .mutation(async ({ input, ctx }) => {
+        const deal = await privateWorkspace.updatePrivateDealStage({ ownerUserId: ctx.user.id }, input.id, input.stage);
         await logActivity({ dealId: input.id, type: "stage_changed", title: `${deal?.name ?? "Deal"} moved to ${input.stage.replace(/_/g, " ")}` });
         return { success: true };
       }),
 
     score: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        const deal = await getDealById(input.id);
-        if (!deal) throw new Error("Deal not found");
+      .mutation(async ({ input, ctx }) => {
+        const deal = await privateWorkspace.getPrivateDeal({ ownerUserId: ctx.user.id }, input.id);
         const { score, redFlagCount } = await scoreDeal(deal);
-        await updateDealScore(input.id, score, redFlagCount);
+        await privateWorkspace.updatePrivateDealScore({ ownerUserId: ctx.user.id }, input.id, score, redFlagCount);
         await logActivity({ dealId: input.id, type: "deal_scored", title: `${deal.name} scored: ${score.toFixed(3)}` });
         return { score, redFlagCount };
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-        const { deals: dealsTable } = await import("../drizzle/schema");
-        await db.delete(dealsTable).where(eq(dealsTable.id, input.id));
-        await logActivity({ type: "deal_added", title: `Deal #${input.id} deleted by operator` });
+      .mutation(async ({ input, ctx }) => {
+        await privateWorkspace.archivePrivateDeal({ ownerUserId: ctx.user.id }, input.id);
         return { success: true };
       }),
     // Bulk-clear deals: purge synthetic Market Scan rows, specific ids, or all.
@@ -508,9 +505,9 @@ export const appRouter = router({
   }),
 
   signals: router({
-    getByDealId: publicProcedure
+    getByDealId: protectedProcedure
       .input(z.object({ dealId: z.number() }))
-      .query(async ({ input }) => getSignalByDealId(input.dealId)),
+      .query(async ({ input, ctx }) => (await privateWorkspace.listPrivateDealSignals({ ownerUserId: ctx.user.id }, input.dealId))[0]),
 
     analyze: protectedProcedure
       .input(z.object({
@@ -518,9 +515,8 @@ export const appRouter = router({
         modules: z.array(z.enum(["psychology","digital","redteam","capital"])).optional(),
         force: z.boolean().optional(), // force=true bypasses cache and re-generates
       }))
-      .mutation(async ({ input }) => {
-        const deal = await getDealById(input.dealId);
-        if (!deal) throw new Error("Deal not found");
+      .mutation(async ({ input, ctx }) => {
+        const deal = await privateWorkspace.getPrivateDeal({ ownerUserId: ctx.user.id }, input.dealId);
 
         // Cache-first: if signal exists and force is not set, return cached result
         if (!input.force) {
@@ -585,17 +581,16 @@ export const appRouter = router({
   }),
 
   memos: router({
-    list: publicProcedure.query(async () => getMemos()),
+    list: protectedProcedure.query(async ({ ctx }) => privateWorkspace.listPrivateDealMemos({ ownerUserId: ctx.user.id })),
 
-    getByDealId: publicProcedure
+    getByDealId: protectedProcedure
       .input(z.object({ dealId: z.number() }))
-      .query(async ({ input }) => getMemoByDealId(input.dealId)),
+      .query(async ({ input, ctx }) => (await privateWorkspace.listPrivateDealMemos({ ownerUserId: ctx.user.id }, input.dealId))[0]),
 
     generate: protectedProcedure
       .input(z.object({ dealId: z.number(), force: z.boolean().optional() }))
-      .mutation(async ({ input }) => {
-        const deal = await getDealById(input.dealId);
-        if (!deal) throw new Error("Deal not found");
+      .mutation(async ({ input, ctx }) => {
+        const deal = await privateWorkspace.getPrivateDeal({ ownerUserId: ctx.user.id }, input.dealId);
 
         // Cache-first: return existing memo unless force=true.
         // A previous bug persisted failed generations as memos ("Generation
@@ -635,11 +630,11 @@ export const appRouter = router({
   }),
 
   outreach: router({
-    list: publicProcedure.query(async () => getOutreach()),
+    list: protectedProcedure.query(async ({ ctx }) => privateWorkspace.listPrivateDealOutreach({ ownerUserId: ctx.user.id })),
 
-    getByDealId: publicProcedure
+    getByDealId: protectedProcedure
       .input(z.object({ dealId: z.number() }))
-      .query(async ({ input }) => getOutreachByDealId(input.dealId)),
+      .query(async ({ input, ctx }) => privateWorkspace.listPrivateDealOutreach({ ownerUserId: ctx.user.id }, input.dealId)),
 
     create: protectedProcedure
       .input(z.object({
@@ -652,7 +647,8 @@ export const appRouter = router({
         subject: z.string().optional(),
         body: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        await privateWorkspace.getPrivateDeal({ ownerUserId: ctx.user.id }, input.dealId);
         await createOutreach({ ...input, channel: (input.channel ?? "email") as "email"|"phone"|"linkedin"|"sms", status: "pending" });
         return { success: true };
       }),
@@ -663,8 +659,8 @@ export const appRouter = router({
         status: z.enum(["pending","sent","opened","replied","meeting_scheduled","no_response","not_interested","closed"]),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
-        await updateOutreachStatus(input.id, input.status, input.notes);
+      .mutation(async ({ input, ctx }) => {
+        await privateWorkspace.updatePrivateOutreachStatus({ ownerUserId: ctx.user.id }, input.id, input.status, input.notes);
         if (input.status === "sent") {
           await logActivity({ type: "outreach_sent", title: "Outreach email sent" });
         }
@@ -673,9 +669,9 @@ export const appRouter = router({
   }),
 
   activity: router({
-    list: publicProcedure
+    list: protectedProcedure
       .input(z.object({ limit: z.number().optional() }).optional())
-      .query(async ({ input }) => getActivityLog(input?.limit ?? 20)),
+      .query(async ({ input, ctx }) => privateWorkspace.listPrivateDealActivity({ ownerUserId: ctx.user.id }, { limit: input?.limit ?? 20 })),
   }),
 
   scan: router({

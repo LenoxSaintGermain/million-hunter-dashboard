@@ -5,6 +5,24 @@ const mocks = vi.hoisted(() => ({
   existing: { id: 7, ownerUserId: 20, assignedUserId: 30 },
   where: vi.fn(), set: vi.fn(), values: vi.fn(),
 }));
+const workspace = vi.hoisted(() => ({
+  list: vi.fn(async () => []), create: vi.fn(async () => ({ id: 9 })),
+  deny: vi.fn(async () => { throw Object.assign(new Error("Deal not found"), { code: "NOT_FOUND" }); }),
+}));
+vi.mock("./privateDealWorkspace", () => ({
+  listPrivateDeals: workspace.list,
+  createPrivateDeal: workspace.create,
+  getPrivateDeal: workspace.deny,
+  listPrivateDealSignals: workspace.deny,
+  listPrivateDealMemos: workspace.list,
+  listPrivateDealOutreach: workspace.list,
+  listPrivateDealActivity: workspace.list,
+  getPrivateDealStats: workspace.list,
+  getPrivateOutreachStats: workspace.list,
+  archivePrivateDeal: workspace.deny,
+  updatePrivateDealStage: workspace.deny,
+  getPrivateOutreach: workspace.deny,
+}));
 vi.mock("./db", async importOriginal => {
   const original = await importOriginal<typeof import("./db")>();
   return { ...original, getDb: async () => ({
@@ -29,18 +47,37 @@ const caller = (id = 10, role = "user") => appRouter.createCaller({ user: { id, 
 
 beforeEach(() => vi.clearAllMocks());
 describe("new account boundaries", () => {
-  it("denies actual root-router private reads and mutations for another account", async () => {
+  it("keeps unaudited destructive operations closed", async () => {
     const other = caller();
     const calls = [
-      () => other.deals.list(), () => other.deals.getById({ id: 7 }),
-      () => other.deals.delete({ id: 7 }), () => other.deals.bulkDelete({ all: true, confirm: true }),
-      () => other.signals.getByDealId({ dealId: 7 }), () => other.memos.list(),
-      () => other.outreach.list(), () => other.dashboard.stats(), () => other.activity.list(),
-      () => other.memos.generate({ dealId: 7 }),
+      () => other.deals.bulkDelete({ all: true, confirm: true }),
     ];
     for (const call of calls) await expect(call()).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(mocks.where).not.toHaveBeenCalled();
     expect(mocks.set).not.toHaveBeenCalled();
+    expect(mocks.values).not.toHaveBeenCalled();
+  });
+  it("routes private collections through the authenticated owner, including admins", async () => {
+    for (const [id, role] of [[10, "user"], [1, "admin"]] as const) {
+      await caller(id, role).deals.list();
+      expect(workspace.list).toHaveBeenLastCalledWith({ ownerUserId: id }, {});
+      await caller(id, role).memos.list();
+      expect(workspace.list).toHaveBeenLastCalledWith({ ownerUserId: id });
+    }
+  });
+  it("passes server identity to creation, never a client owner", async () => {
+    await caller().deals.create({ name: "Private target", ownerUserId: 1 } as any);
+    expect(workspace.create).toHaveBeenCalledWith({ ownerUserId: 10 }, { name: "Private target" });
+  });
+  it("checks ownership before detail, archive, scoring or generation", async () => {
+    for (const call of [
+      () => caller().deals.getById({ id: 7 }),
+      () => caller().deals.delete({ id: 7 }),
+      () => caller().deals.score({ id: 7 }),
+      () => caller().signals.analyze({ dealId: 7 }),
+      () => caller().memos.generate({ dealId: 7 }),
+    ]) await expect(call()).rejects.toThrow("Deal not found");
+    expect(workspace.deny).toHaveBeenCalledWith({ ownerUserId: 10 }, 7);
     expect(mocks.values).not.toHaveBeenCalled();
   });
   it("rejects anonymous deal list and detail before reading data", async () => {

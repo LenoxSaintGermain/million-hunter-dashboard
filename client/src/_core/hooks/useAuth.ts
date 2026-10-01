@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
 import { signOutFirebaseIdentity } from "@/lib/firebaseAuth";
+import { useQueryClient } from "@tanstack/react-query";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -15,6 +16,7 @@ export function useAuth(options?: UseAuthOptions) {
   const { redirectOnUnauthenticated = false } = options ?? {};
   const redirectPath = options?.redirectPath ?? (redirectOnUnauthenticated ? getLoginUrl() : "");
   const utils = trpc.useUtils();
+  const queryClient = useQueryClient();
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
@@ -40,10 +42,13 @@ export function useAuth(options?: UseAuthOptions) {
       throw error;
     } finally {
       await signOutFirebaseIdentity().catch(() => undefined);
+      // Private records must not survive an account switch in the same tab.
+      await queryClient.cancelQueries();
+      queryClient.clear();
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
     }
-  }, [logoutMutation, utils]);
+  }, [logoutMutation, utils, queryClient]);
 
   const state = useMemo(() => {
     localStorage.setItem(

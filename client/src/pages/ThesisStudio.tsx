@@ -1,9 +1,7 @@
 /**
  * Property Criteria — /theses
  *
- * From the Wingate call: criteria editing was admin-only, buried in per-agent
- * system prompts. Chad needs the dials himself — his own thesis, plus one per
- * client type ("Wingate 2" = his criteria minus the storey cap).
+ * Owner-scoped property criteria, with optional client-specific variations.
  *
  * Every dial previews live against the real pipeline, so turning a knob shows
  * "17 of 56 match" and the top reasons the rest fail, before anything is saved.
@@ -28,7 +26,7 @@ import {
 
 /** The dials, with the defaults the scorer uses when a thesis says nothing. */
 const DIALS = [
-  { key: "maxYearBuilt", label: "Built no later than", help: "Vintage ceiling. Chad's core thesis is 1945.", def: 1945, min: 1800, max: 2025, unit: "" },
+  { key: "maxYearBuilt", label: "Built no later than", help: "Latest construction year permitted by these criteria.", def: 1945, min: 1800, max: 2025, unit: "" },
   { key: "minYearBuilt", label: "Built no earlier than", help: "Leave blank for no floor.", def: null, min: 1600, max: 2025, unit: "" },
   { key: "maxStories", label: "Max stories", help: "Above grade. Buildings taller than this are hard-stopped.", def: 4, min: 1, max: 20, unit: "" },
   { key: "gateA", label: "Gate A — historic qualification", help: "Minimum score of 20 to clear Tier 1.", def: 12, min: 0, max: 20, unit: "/20" },
@@ -148,9 +146,14 @@ export default function ThesisStudio() {
               <div className="flex items-center gap-3 py-8">
                 <Loader2 className="w-4 h-4 animate-spin text-amber" />
               </div>
+            ) : variants.isError ? (
+              <div className="border-l-2 border-amber pl-4 text-sm">
+                <p>Saved criteria could not be loaded.</p>
+                <button className="mt-2 min-h-11 text-amber underline" onClick={() => variants.refetch()}>Try loading again</button>
+              </div>
             ) : !(variants.data ?? []).length ? (
               <p className="font-body-base text-[13px] text-muted-foreground">
-                No theses yet. Create one, or start from the class defaults.
+                No saved property criteria yet. Choose New thesis to start from the class defaults and make them your own.
               </p>
             ) : (
               (variants.data ?? []).map((t: any) => {
@@ -214,8 +217,8 @@ export default function ThesisStudio() {
               <div className="border border-rule bg-paper p-8">
                 <p className="font-card-title text-[18px] text-ink mb-2">Pick a thesis to edit</p>
                 <p className="font-body-base text-[13px] text-muted-foreground leading-relaxed">
-                  Or create a new one. Every dial previews against your live pipeline before you save,
-                  so you can see exactly what widening a criterion would let through.
+                  Or create a new one from the class defaults. Where pipeline preview is available,
+                  it compares your criteria with saved property records—not freshly verified listings.
                 </p>
               </div>
             ) : (
@@ -224,13 +227,13 @@ export default function ThesisStudio() {
                   <div>
                     <Label className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">Name</Label>
                     <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                      placeholder="Wingate 2 — Relaxed Envelope"
+                      placeholder="Adaptive reuse — broader envelope"
                       className="h-9 mt-1 border-rule bg-transparent" />
                   </div>
                   <div>
                     <Label className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest">Who it's for</Label>
                     <Input value={draft.clientLabel} onChange={(e) => setDraft({ ...draft, clientLabel: e.target.value })}
-                      placeholder="Cincinnati restoration client"
+                      placeholder="Client or investment strategy"
                       className="h-9 mt-1 border-rule bg-transparent" />
                   </div>
                 </div>
@@ -317,13 +320,15 @@ export default function ThesisStudio() {
                 {/* Live preview against the real pipeline */}
                 <div className="border-t border-rule pt-5">
                   <p className="font-eyebrow text-eyebrow text-muted-foreground uppercase tracking-widest mb-3">
-                    Against your pipeline right now
+                    Preview against saved property records
                   </p>
                   {preview.isFetching ? (
                     <div className="flex items-center gap-2 py-2">
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-amber" />
                       <span className="font-body-base text-[12px] text-muted-foreground">Scoring…</span>
                     </div>
+                  ) : preview.isError ? (
+                    <p className="text-sm text-muted-foreground">Pipeline preview is unavailable. You can still edit your criteria; no match count has been verified.</p>
                   ) : preview.data ? (
                     <>
                       <p className="font-data-mono text-[26px] text-amber leading-none mb-1">

@@ -14,9 +14,18 @@ export const LEGACY_CATALOG_ROUTERS = new Set([
   "insurance", "assetShare", "stack", "freedomMap", "strategyBlender",
 ]);
 
+// Exact operations only: newly added routes remain closed until audited.
+export const PRIVATE_WORKSPACE_PATHS = new Set([
+  "dashboard.stats", "deals.list", "deals.getById", "deals.create",
+  "deals.updateStage", "deals.score", "deals.delete",
+  "signals.getByDealId", "signals.analyze", "memos.list", "memos.getByDealId", "memos.generate",
+  "outreach.list", "outreach.getByDealId", "outreach.create", "outreach.updateStatus", "activity.list",
+]);
+
 export function assertLegacyCatalogAccess(path: string, user: { role: string } | null) {
   if (!LEGACY_CATALOG_ROUTERS.has(path.split(".")[0]) && !["thesisVariant.preview", "thesisVariant.match"].includes(path)) return;
   if (!user) throw new TRPCError({ code: "UNAUTHORIZED", message: "Sign in to access this workspace." });
+  if (PRIVATE_WORKSPACE_PATHS.has(path)) return;
   if (user.role !== "admin") throw new TRPCError({
     code: "FORBIDDEN",
     message: "The legacy acquisition catalog is restricted to administrators while private workspaces are being enabled. Your Capital workspace is unchanged.",

@@ -52,17 +52,18 @@ function SignalCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
+    <details className="self-start border-t border-rule bg-paper">
+      <summary className="cursor-pointer px-4 py-5 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+        <span className="inline-flex items-center gap-2">
           <div className="w-7 h-7 border border-rule flex items-center justify-center text-ink">
             <Icon className="w-3.5 h-3.5" />
           </div>
-          <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
+          <span className="font-card-title text-lg">{title}</span>
+        </span>
+        <span className="block mt-2 text-xs text-muted-foreground">Historical output · open to inspect</span>
+      </summary>
+      <div className="px-4 pb-5">{children}</div>
+    </details>
   );
 }
 
@@ -230,7 +231,7 @@ export default function DealDetail() {
           <header><span className="hunter-eyebrow">Your margin partner</span><h2>The Senior.</h2><p>Read the evidence.<br />Question the assumptions.</p></header>
           <p className="deal-rail-disclosure">Reading guide · saved outputs, not a new agent verdict. Opening a section does not run an analysis.</p>
           <div aria-label="Next decision" className="deal-margin-note"><h3>{signal?.redTeamSummary ? "Read the recorded risks." : "The cash needs a second look."}</h3><p>{signal?.redTeamSummary ? "Review the saved analysis and its evidence; it is not approval." : "Risk analysis has not been run; risk is still unknown."}</p></div>
-          {typeof signal?.redTeamSummary === "string" && <div className="deal-margin-note"><span className="hunter-eyebrow">Red Team / saved analysis</span><p>{signal.redTeamSummary.slice(0, 240)}{signal.redTeamSummary.length > 240 ? "…" : ""}</p><button className="scan-rescore" onClick={() => selectWork("signals")}>Read the full challenge ↗</button></div>}
+          {typeof signal?.redTeamSummary === "string" && <div className="deal-margin-note"><span className="hunter-eyebrow">Red Team / historical output</span><p>Its inputs have not been verified against this deal record. Reconcile the figures before relying on the conclusion.</p><button className="scan-rescore" onClick={() => selectWork("signals")}>Inspect the saved challenge ↗</button></div>}
           <TabsList aria-label="Senior reading desk" className="deal-rail-nav">
             {[
               ["research", "Follow the sources", "Listing & research dossier"],
@@ -266,6 +267,16 @@ export default function DealDetail() {
               { id: "coverage", label: "Debt coverage", value: financing?.cashCoverage ?? null, unit: "multiple", basis: "modeled", wanted: "Financing terms", explanation: "Calculated using the illustrative financing assumptions disclosed below. This is not a lender quote or approval; fees, reserves and taxes may change the result." },
             ]} />
 
+          {(signal || memo || consensusData || sellerData) && (
+            <section aria-label="Saved analysis provenance" className="my-6 border-l-2 border-amber bg-paper px-4 py-3">
+              <p className="font-eyebrow text-xs uppercase tracking-widest text-amber">Historical analysis · current inputs unverified</p>
+              <p className="mt-2 text-sm text-ink">Saved findings may use different figures or assumptions from the deal above.</p>
+              <details className="mt-2 text-sm text-muted-foreground">
+                <summary className="cursor-pointer min-h-8">What needs checking?</summary>
+                <p className="mt-2 max-w-prose leading-relaxed">There is no verified input fingerprint linking these outputs to the current deal. Reconcile revenue, cash flow, financing assumptions and source dates before using them. Recorded scores and eligibility claims are not verified probabilities or lender approval. Opening a section does not run analysis; a new run is also not independent verification.</p>
+              </details>
+            </section>
+          )}
           <div id="deal-workspace" className="deal-chapter" tabIndex={-1}><span className="hunter-eyebrow">The reading desk / {workPane === "research" ? "Sources" : workPane}</span></div>
           <TabsContent value="research">
             <section id="deal-research" aria-label="Opportunity research" className="scroll-mt-24">
@@ -292,11 +303,11 @@ export default function DealDetail() {
             </Card>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">Analysis cached — re-run to refresh with latest data</p>
-                <Button size="sm" variant="outline" className="h-7 text-xs border-border" onClick={() => analyzeSignals.mutate({ dealId, force: true })} disabled={analyzeSignals.isPending}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">Inspect a saved specialist view, or explicitly request a new provider analysis.</p>
+                <Button size="sm" variant="outline" className="min-h-11 text-xs border-border" onClick={() => analyzeSignals.mutate({ dealId, force: true })} disabled={analyzeSignals.isPending}>
                   <Brain className="w-3 h-3 mr-1.5" />
-                  {analyzeSignals.isPending ? "Re-analyzing..." : "Re-analyze"}
+                  {analyzeSignals.isPending ? "Re-analyzing..." : "Run new analysis"}
                 </Button>
               </div>
               <div className="grid gap-4 lg:grid-cols-2">

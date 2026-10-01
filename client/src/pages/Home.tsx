@@ -386,9 +386,9 @@ export default function Home() {
   const { isAuthenticated, user } = useAuth();
   const { data: investorProfile } = trpc.investor.getDnaStatus.useQuery(undefined, { enabled: user?.role === "investor" });
   const showWingate = prioritizesWingate(user?.role, investorProfile);
-  const { data, isLoading } = trpc.dashboard.stats.useQuery();
-  const { data: macroPosture } = trpc.dashboard.macroPosture.useQuery();
-  const { data: topDealsData } = trpc.deals.list.useQuery({ limit: 10 });
+  const { data, isLoading, isError, refetch } = trpc.dashboard.stats.useQuery(undefined, { enabled: isAuthenticated });
+  const { data: macroPosture } = trpc.dashboard.macroPosture.useQuery(undefined, { enabled: user?.role === "admin" });
+  const { data: topDealsData, isError: dealsError } = trpc.deals.list.useQuery({ limit: 10 }, { enabled: isAuthenticated });
   const { data: savedTheses } = trpc.thesis.list.useQuery(undefined, { enabled: isAuthenticated });
   const deleteDeal = trpc.deals.delete.useMutation({
     onSuccess: () => { toast.success("Deal removed"); utils.deals.list.invalidate(); utils.dashboard.stats.invalidate(); },
@@ -430,21 +430,21 @@ export default function Home() {
               </div>
               <h1 className="font-card-title text-[clamp(1.75rem,4vw,2.5rem)] leading-none text-ink">Your acquisition workspace</h1>
               <p className="mt-2 max-w-2xl font-body-base text-body-base text-ink/70">
-                {isLoading ? "Loading the work that needs review…" : stats?.highPriority
+                {isError || dealsError ? "Your workspace could not be loaded. No portfolio totals are confirmed." : isLoading ? "Loading the work that needs review…" : stats?.highPriority
                   ? `${stats.highPriority} high-priority target${stats.highPriority === 1 ? " needs" : "s need"} human review before outreach.`
-                  : `${stats?.total ?? 0} active targets · ${macroPosture?.tailwindCount ?? 0} current tailwind signal${(macroPosture?.tailwindCount ?? 0) === 1 ? "" : "s"} · choose the next research action below.`}
+                  : stats?.total ? `${stats.total} saved targets · choose the next evidence review below.` : "A private workspace for your next acquisition. Start with a target, then test the case."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2 sm:justify-end">
               <Link href="/thesis?scope=acquisition"><span className="inline-flex min-h-11 items-center gap-1.5 border border-rule bg-paper px-3 py-2 font-eyebrow text-eyebrow text-ink hover:border-amber hover:text-amber cursor-pointer">Your acquisition thesis <ArrowRight className="w-3 h-3" /></span></Link>
-              <button onClick={() => triggerScan.mutate({})} disabled={triggerScan.isPending}
+              {user?.role === "admin" ? <button onClick={() => triggerScan.mutate({})} disabled={triggerScan.isPending}
                 className="flex items-center gap-2 bg-ink text-bone font-eyebrow text-eyebrow px-4 py-2 hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-50">
                 {triggerScan.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ScanLine className="w-3 h-3" />}
                 {triggerScan.isPending ? "SCANNING…" : "RUN SCAN"}
-              </button>
+              </button> : <Link href="/scan?add=1"><span className="inline-flex min-h-11 items-center gap-2 bg-ink text-bone px-4 py-2">Add a target <ArrowRight className="w-4 h-4" /></span></Link>}
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-5 border-t border-rule pt-5 mt-5">
+          {!isError && !dealsError && !!stats?.total && <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-5 border-t border-rule pt-5 mt-5">
             {[
               { label: "PIPELINE VALUE", value: fmt(stats?.totalPipelineValue) },
               { label: "ACTIVE DEALS",   value: isLoading ? "—" : String(stats?.total ?? 0) },
@@ -456,7 +456,7 @@ export default function Home() {
                 <p className="font-data-mono text-[clamp(1.45rem,3vw,2rem)] text-ink leading-none">{item.value}</p>
               </div>
             ))}
-          </div>
+          </div>}
         </header>
 
         {showWingate && <HistoricPipeline />}
@@ -494,7 +494,7 @@ export default function Home() {
                 </div>
               </Link>
             </div>
-            {isLoading ? (
+            {isError || dealsError ? <div className="border-l-2 border-amber pl-4 py-4"><p>We couldn’t load your private targets.</p><button className="min-h-11 underline" onClick={() => { refetch(); utils.deals.list.invalidate(); }}>Try again</button></div> : isLoading ? (
               <div className="space-y-6">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="border-b border-rule py-8 animate-pulse">
@@ -506,10 +506,9 @@ export default function Home() {
               </div>
             ) : !deals || deals.length === 0 ? (
               <div className="border border-rule bg-paper p-12 text-center">
-                <p className="font-eyebrow text-eyebrow text-muted-foreground mb-4">NO TARGETS IN VALIDATION QUEUE</p>
-                <button onClick={() => triggerScan.mutate({})} disabled={triggerScan.isPending} className="font-eyebrow text-eyebrow text-amber hover:underline uppercase tracking-widest">
-                  {triggerScan.isPending ? "Scanning…" : "Run Target Scan"}
-                </button>
+                <p className="font-card-title text-2xl text-ink mb-3">Your first target starts here.</p>
+                <p className="text-sm text-muted-foreground mb-5">Add a business you’re considering. Other accounts’ deals are not part of your workspace.</p>
+                <Link href="/scan?add=1"><span className="inline-flex min-h-11 items-center bg-ink text-bone px-4 py-2">Add a target →</span></Link>
               </div>
             ) : (
               <div>

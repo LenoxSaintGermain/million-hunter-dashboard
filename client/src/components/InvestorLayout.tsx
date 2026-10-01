@@ -117,7 +117,7 @@ function InvestorMobileSheet({
         <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg overflow-hidden shrink-0">
-              <img src="/manus-storage/sh-icon-final_9231defd.png" alt="Signal Hunter" className="w-7 h-7 object-cover" />
+              <img src="/signal-hunter-mark.svg" alt="Signal Hunter" className="w-7 h-7 object-cover" />
             </div>
             <div>
               <p className="text-[13px] font-bold" style={{ color: "var(--sh-fg-1)" }}>Investor Portal</p>
@@ -239,7 +239,7 @@ export default function InvestorLayout({ children }: InvestorLayoutProps) {
         {/* Logo */}
         <div className="flex items-center h-16 border-b border-border gap-3 px-5 shrink-0">
           <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
-            <img src="/manus-storage/sh-icon-final_9231defd.png" alt="Signal Hunter" className="w-8 h-8 object-cover" />
+            <img src="/signal-hunter-mark.svg" alt="Signal Hunter" className="w-8 h-8 object-cover" />
           </div>
           <div>
             <p className="text-[13px] font-bold" style={{ color: "var(--sh-fg-1)" }}>Investor Portal</p>
@@ -348,7 +348,7 @@ export default function InvestorLayout({ children }: InvestorLayoutProps) {
             {/* Mobile: logo */}
             <div className="flex items-center gap-2 lg:hidden">
               <div className="w-7 h-7 rounded-lg overflow-hidden shrink-0">
-                <img src="/manus-storage/sh-icon-final_9231defd.png" alt="Signal Hunter" className="w-7 h-7 object-cover" />
+                <img src="/signal-hunter-mark.svg" alt="Signal Hunter" className="w-7 h-7 object-cover" />
               </div>
               <div>
                 <p className="text-[12px] font-bold leading-none" style={{ color: "var(--sh-fg-1)" }}>Investor Portal</p>

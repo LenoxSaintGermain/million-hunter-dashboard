@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
+import { useAuth } from "@/_core/hooks/useAuth";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,9 +78,15 @@ const stageColor: Record<string, string> = {
 };
 
 export default function Scan() {
+  const { user } = useAuth();
+  const canSource = user?.role === "admin";
+  const queryString = useSearch();
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(queryString).get("add") === "1") setAddOpen(true);
+  }, [queryString]);
   const [showConfig, setShowConfig] = useState(false);
   const [form, setForm] = useState({ name: "", industry: "", location: "", askingPrice: "", revenue: "", cashFlow: "" });
 
@@ -92,6 +99,7 @@ export default function Scan() {
   const [activePreset, setActivePreset] = useState("Miami / FLL");
   const [activeScanJobId, setActiveScanJobId] = useState<number | null>(null);
   const locationInputRef = useRef<HTMLInputElement>(null);
+
   // Off-Market Scout state
   const [showOffMarket, setShowOffMarket] = useState(false);
   const [offMarketResults, setOffMarketResults] = useState<Array<{
@@ -116,6 +124,7 @@ export default function Scan() {
   });
 
   const createDeal = trpc.deals.create.useMutation({
+    onError: (e) => toast.error(`Could not add deal: ${e.message}`),
     onSuccess: () => {
       toast.success("Deal added");
       setAddOpen(false);
@@ -145,6 +154,7 @@ export default function Scan() {
   };
 
   const handleScan = () => {
+    if (!canSource) return;
     if (selectedSources.length === 0) {
       toast.error("Select at least one marketplace source");
       return;
@@ -176,7 +186,7 @@ export default function Scan() {
       {/* ── Page Header ──────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="hunter-eyebrow">Market Scan / Experimental sourcing desk</p>
+          <p className="hunter-eyebrow">{canSource ? "Market Scan / Experimental sourcing desk" : "Your private deal pipeline"}</p>
           <h1 className="scan-edition-title">
             Find the next question.
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
@@ -193,7 +203,7 @@ export default function Scan() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
+          {canSource && <Button
             variant="outline"
             size="sm"
             className="h-9 text-xs border-border gap-1.5"
@@ -202,7 +212,7 @@ export default function Scan() {
             <SlidersHorizontal className="w-3.5 h-3.5" />
             Scan Config
             {showConfig ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </Button>
+          </Button>}
           <Button variant="outline" size="sm" className="h-9 text-xs border-border" onClick={() => setAddOpen(true)}>
             <Plus className="w-3 h-3 mr-1.5" />
             Add Deal
@@ -211,7 +221,8 @@ export default function Scan() {
       </div>
 
       {/* ── Scan Configuration Panel ──────────────────────────────────────── */}
-      {showConfig && (
+      {!canSource && <p className="border-l-2 border-amber px-4 py-3 text-sm text-muted-foreground">Automatic sourcing is unavailable for this account while private sourcing jobs are being enabled. Use Add Deal to build your own pipeline.</p>}
+      {canSource && showConfig && (
         <Card className="bg-card border-border border-primary/20 shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -387,7 +398,7 @@ export default function Scan() {
       <div className="scan-discovery-link"><div><span className="hunter-eyebrow">Beyond the listing</span><p>Looking off-market?</p></div><Link href="/off-market">Open the discovery desk <ArrowUpRight size={16}/></Link></div>
 
       {/* ── Scan Progress ─────────────────────────────────────────────────── */}
-      {activeScanJobId && (
+      {canSource && activeScanJobId && (
         <ScanProgress
           jobId={activeScanJobId}
           onComplete={() => { refetch(); }}
@@ -430,12 +441,12 @@ export default function Scan() {
                 {search ? "No targets match your filter" : "Validation queue is empty"}
               </p>
               <p className="text-xs text-muted-foreground/60 mt-1">
-                {search ? "Try a different search term" : "Configure your target markets above and run a scan to populate the queue"}
+                {search ? "Try a different search term" : canSource ? "Configure your target markets above and run a scan to populate the queue" : "Add a business you are considering. Its details stay in your private pipeline."}
               </p>
               {!search && (
-                <Button size="sm" className="mt-4 h-8 text-xs gap-1.5" onClick={() => setShowConfig(true)}>
+                <Button size="sm" className="mt-4 h-8 text-xs gap-1.5" onClick={() => canSource ? setShowConfig(true) : setAddOpen(true)}>
                   <Target className="w-3 h-3" />
-                  Configure Scan
+                  {canSource ? "Configure Scan" : "Add Deal"}
                 </Button>
               )}
             </CardContent>
