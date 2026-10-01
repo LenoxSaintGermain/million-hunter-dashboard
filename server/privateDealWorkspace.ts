@@ -42,6 +42,12 @@ export async function getPrivateDeal(principal: PrivateDealPrincipal, dealId: nu
   if (!deal) throw notFound();
   return coerceRows([deal])[0]!;
 }
+export async function findPrivateDealByNameSource(principal: PrivateDealPrincipal, name: string, source: string) {
+  const predicate = and(scope(owner(principal)), eq(deals.name, z.string().min(1).max(255).parse(name)), eq(deals.source, z.string().min(1).max(64).parse(source)));
+  const db = await database();
+  const [deal] = await db.select().from(deals).where(predicate).limit(1);
+  return deal ? coerceRows([deal])[0] : undefined;
+}
 function duplicate(error: unknown): boolean {
   const seen = new Set<unknown>();
   while (error && typeof error === "object" && !seen.has(error)) {

@@ -166,6 +166,7 @@ export async function getDealById(id: number) {
 }
 
 export async function createDeal(data: InsertDeal) {
+  if (!Number.isSafeInteger(data.ownerUserId) || Number(data.ownerUserId) <= 0) throw new Error("An explicit deal owner is required before ingestion");
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   // ON DUPLICATE KEY UPDATE: if (name, source) already exists, update financials + stage

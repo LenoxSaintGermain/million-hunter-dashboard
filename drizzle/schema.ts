@@ -118,9 +118,7 @@ export const deals = mysqlTable("deals", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => ({
-  // Existing global catalog index, verified by main's read-only metadata audit.
-  // Production also has a redundant second index; do not drop or recreate it.
-  nameSourceUnique: uniqueIndex("uq_deals_name_source").on(table.name, table.source),
+  nameSourceUnique: uniqueIndex("uq_deals_owner_name_source").on(table.ownerUserId, table.name, table.source),
 }));
 
 export type Deal = typeof deals.$inferSelect;
@@ -231,6 +229,8 @@ export type InsertActivityLog = typeof activityLog.$inferInsert;
 // ─── Scan Jobs ────────────────────────────────────────────────────────────────
 export const scanJobs = mysqlTable("scan_jobs", {
   id: int("id").autoincrement().primaryKey(),
+  // Null is an unassigned legacy job, never a public/private-user default.
+  ownerUserId: int("owner_user_id"),
   status: mysqlEnum("status", ["pending", "running", "completed", "failed"]).default("pending").notNull(),
   sources: json("sources"),
   listingsFound: int("listingsFound").default(0),

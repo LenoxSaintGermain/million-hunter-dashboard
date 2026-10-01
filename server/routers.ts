@@ -2,7 +2,7 @@ import { z } from "zod";
 import { parseAcquisitionListings, type AcquisitionFinancials } from "./acquisitionListing";
 import { researchAcquisitionListings } from "./acquisitionResearch";
 import { assessAcquisitionListings } from "./acquisitionSourceCheck";
-import { updateAcquisitionScreeningStage } from "./acquisitionStage";
+import { createPrivateScanJob, getPrivateScanJob, getLatestPrivateScanJob, updatePrivateScanJob } from "./privateScanJobs";
 import { assessThesisCriteria, saveThesisReview, readThesisReview, type ThesisReviewSnapshot } from "./acquisitionThesisReview";
 import { compareAcquisitionToThesis, type ComparisonSource } from "../shared/acquisitionThesisComparison";
 import { eq, desc, sql } from "drizzle-orm";
@@ -20,9 +20,7 @@ import {
   getMemos, getMemoByDealId, createMemo,
   getOutreach, getOutreachByDealId, createOutreach, updateOutreachStatus, getOutreachStats,
   getActivityLog, logActivity,
-  getLatestScanJob, createScanJob, updateScanJob,
   getModelConfig, getAllModelConfigs, upsertModelConfig,
-  getDealIdByNameSource,
 } from "./db";
 import {
   MODEL_CATALOG,
@@ -677,18 +675,13 @@ export const appRouter = router({
   scan: router({
     getThesisComparison: protectedProcedure.input(z.object({ jobId: z.number().int().positive() }))
       .query(({ ctx, input }) => readThesisReview(ctx.user.id, input.jobId)),
-    getLatest: publicProcedure.query(async () => getLatestScanJob()),
+    getLatest: protectedProcedure.query(({ ctx }) => getLatestPrivateScanJob(ctx.user.id)),
 
     // Poll a specific scan job for real-time progress
-    getStatus: publicProcedure
+    getStatus: protectedProcedure
       .input(z.object({ jobId: z.number() }))
-      .query(async ({ input }) => {
-        const db = await import("./db").then((m) => m.getDb());
-        if (!db) return null;
-        const { scanJobs } = await import("../drizzle/schema");
-        const { eq } = await import("drizzle-orm");
-        const result = await db.select().from(scanJobs).where(eq(scanJobs.id, input.jobId)).limit(1);
-        return result[0] ?? null;
+      .query(async ({ input, ctx }) => {
+        return getPrivateScanJob(ctx.user.id, input.jobId);
       }),
 
 
@@ -727,7 +720,7 @@ export const appRouter = router({
         }
 
         // Create the scan job record immediately so the UI can poll it
-        const insertResult = await createScanJob({
+        const insertResult = await createPrivateScanJob(ctx.user.id, {
           status: "running",
           sources,
           startedAt: new Date(),
@@ -735,7 +728,7 @@ export const appRouter = router({
           phaseDetail: `Connecting to ${sources.length} marketplace${sources.length > 1 ? "s" : ""}`,
           progressPct: 2,
         });
-        const jobId = (insertResult as any)[0].insertId as number;
+        const jobId = insertResult.id;
 
         if (thesisId) {
           const db = await getDb();
@@ -748,22 +741,22 @@ export const appRouter = router({
           }
           await db!.update(thesisCompilations)
             .set({ status: "running", scanJobId: jobId })
-            .where(eq(thesisCompilations.id, thesisId));
+            .where(sql`${thesisCompilations.id} = ${thesisId} AND ${thesisCompilations.userId} = ${ctx.user.id}`);
         }
 
         // Run the full pipeline asynchronously — don't await, return immediately
-        runScanPipeline(jobId, sources, minCashFlow, maxMultiple, targetLocations, thesisText, financials, thesisReview)
+        runScanPipeline(jobId, sources, minCashFlow, maxMultiple, targetLocations, thesisText, financials, thesisReview, ctx.user.id)
           .then(async () => {
             if (!thesisId) return;
             const db = await getDb();
             const { thesisCompilations } = await import("../drizzle/schema");
             await db!.update(thesisCompilations)
               .set({ status: "completed" })
-              .where(eq(thesisCompilations.id, thesisId));
+              .where(sql`${thesisCompilations.id} = ${thesisId} AND ${thesisCompilations.userId} = ${ctx.user.id} AND ${thesisCompilations.scanJobId} = ${jobId}`);
           })
           .catch((err) => {
             console.error("[Scan] Pipeline failed:", err);
-            updateScanJob(jobId, {
+            updatePrivateScanJob(ctx.user.id, jobId, {
               status: "failed",
               errorMessage: "Search could not finish. Results may be incomplete; do not treat this as no opportunities. Review the saved criteria before starting another search.",
               completedAt: new Date(),
@@ -776,7 +769,7 @@ export const appRouter = router({
                 const { thesisCompilations } = await import("../drizzle/schema");
                 await db.update(thesisCompilations)
                   .set({ status: "review" })
-                  .where(eq(thesisCompilations.id, thesisId));
+                  .where(sql`${thesisCompilations.id} = ${thesisId} AND ${thesisCompilations.userId} = ${ctx.user.id} AND ${thesisCompilations.scanJobId} = ${jobId}`);
               }).catch(() => {});
             }
           });
@@ -2925,7 +2918,7 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
     // Convert a qualified Scout asset into a Deal record and route to War Room
     convertToDeal: operatorProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { getCommercialAssetById, createDeal, upsertSignal } = await import("./db");
         const { getAssetClass } = await import("../shared/assetClasses");
         const asset = await getCommercialAssetById(input.id);
@@ -2952,6 +2945,7 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
         const estimatedRevenue = null;
         const estimatedCashFlow = asset.noi ?? null;
         const res = await createDeal({
+          ownerUserId: ctx.user.id,
           name: dealName,
           source: "scout",
           listingUrl: asset.sourceUrl ?? "",
@@ -4149,12 +4143,16 @@ async function runScanPipeline(
   targetLocations: string[] = [],
   thesisText = "",
   financials: AcquisitionFinancials = { cashFlowMin: minCashFlow, multipleMax: maxMultiple },
-  thesisReview?: Pick<ThesisReviewSnapshot, "userId" | "thesisId" | "weights">,
+  thesisReview: Pick<ThesisReviewSnapshot, "userId" | "thesisId" | "weights"> | undefined,
+  ownerUserId: number,
 ) {
+  await getPrivateScanJob(ownerUserId, jobId);
+  if (thesisReview && thesisReview.userId !== ownerUserId) throw new TRPCError({ code: "FORBIDDEN", message: "Search owner mismatch." });
+  const principal = { ownerUserId };
   let comparisonSources: ComparisonSource[] = [];
   const comparisonItems: ThesisReviewSnapshot["items"] = [];
   const phase = async (label: string, detail: string, pct: number) =>
-    updateScanJob(jobId, { currentPhase: label, phaseDetail: detail, progressPct: pct });
+    updatePrivateScanJob(ownerUserId, jobId, { currentPhase: label, phaseDetail: detail, progressPct: pct });
 
   // ── Phase 1: sourced listing research; broker claims are not audited facts ──
   await phase("Scanning marketplaces", `Fetching listings from ${sources.join(", ")}`, 10);
@@ -4176,7 +4174,7 @@ async function runScanPipeline(
   }
 
   await phase("Extracting deal data", `Parsing ${listings.length} source listings; criteria not yet applied`, 25);
-  await updateScanJob(jobId, { listingsFound: listings.length });
+  await updatePrivateScanJob(ownerUserId, jobId, { listingsFound: listings.length });
 
   // ── Phase 2: Filter by criteria ───────────────────────────────────────────
   await phase("Applying filters", "Checking disclosed figures against the saved search criteria", 35);
@@ -4189,27 +4187,23 @@ async function runScanPipeline(
   await logActivity({ type: "system", title: `Search #${jobId}: listing screening record`, detail: assessments.map(({ listing, eligible, sourceCheck, reason }) =>
     `${listing.name}\n${listing.listingUrl}\n${eligible ? "Research candidate" : "Not promoted"}: ${reason}\n${sourceCheck ? `Checked: ${sourceCheck.checkedAt}` : "Source check not requested: financial screen did not pass."}`
   ).join("\n\n") });
-  await updateScanJob(jobId, { listingsQualified: qualified.length });
+  await updatePrivateScanJob(ownerUserId, jobId, { listingsQualified: qualified.length });
 
   // ── Phase 3: Score each deal ──────────────────────────────────────────────
   await phase("Scoring candidates", `Applying the recorded screening model to ${qualified.length} listings`, 45);
   let scored = 0;
   for (const listing of qualified) {
-    // Upsert deal — ON DUPLICATE KEY UPDATE handles re-scan deduplication
-    // getDealIdByNameSource checks if the deal already exists first
-    let dealId: number;
-    const existingId = await getDealIdByNameSource(listing.name, listing.source ?? null);
-    if (existingId) {
-      dealId = existingId;
-    } else {
-      // Market Scan now pulls REAL sonar-sourced listings with real listingUrls —
-      // no longer synthetic.
-      const res = await createDeal({ ...listing, stage: "new", isSynthetic: false,
-        description: `Discovered by search #${jobId} on ${new Date().toISOString()}. Indexed source listing. ${assessments.find(result => result.listing.listingUrl === listing.listingUrl)?.reason ?? "Source check unresolved."} Financial figures are source-reported claims, not audited facts. Confirm the original listing is still available before relying on it. Search thesis: ${thesisText || "General acquisition search"}`,
-      }) as any;
-      // ON DUPLICATE KEY UPDATE returns insertId=0 for updates — re-fetch if needed
-      dealId = res[0].insertId || (await getDealIdByNameSource(listing.name, listing.source ?? null)) || 0;
-    }
+    // Reuse only this owner's active record; never consult the shared catalog.
+    // A conflicting plain insert fails safely rather than overwriting a row.
+    const existingDeal = await privateWorkspace.findPrivateDealByNameSource(principal, listing.name, listing.source);
+    const { id: dealId } = existingDeal ?? await privateWorkspace.createPrivateDeal(principal, {
+      name: listing.name, source: listing.source, listingUrl: listing.listingUrl,
+      industry: listing.industry, location: listing.location,
+      revenue: listing.revenue ?? undefined, cashFlow: listing.cashFlow ?? undefined,
+      askingPrice: listing.askingPrice ?? undefined, multiple: listing.multiple ?? undefined,
+      employees: listing.employees ?? undefined, yearEstablished: listing.yearEstablished ?? undefined,
+      description: `Discovered by search #${jobId} on ${new Date().toISOString()}. Indexed source listing. ${assessments.find(result => result.listing.listingUrl === listing.listingUrl)?.reason ?? "Source check unresolved."} Financial figures are source-reported claims, not audited facts. Confirm the original listing is still available before relying on it. Search thesis: ${thesisText || "General acquisition search"}`,
+    });
 
     if (thesisReview) {
       await phase("Scoring candidates", `Checking saved thesis criteria for ${listing.name}`, 45 + Math.round((scored / qualified.length) * 35));
@@ -4223,17 +4217,20 @@ async function runScanPipeline(
       comparisonItems.push({ dealId, name: listing.name, listingUrl: listing.listingUrl, financials: { askingPrice: listing.askingPrice ?? null, cashFlow: listing.cashFlow ?? null }, assessments, assessmentFailed });
     }
 
-    // The shared catalog score is separate from this user's thesis comparison.
+    // Only this owner's record is scored; thesis comparison remains separate.
     try {
-      const deal = await getDealById(dealId);
+      const deal = await privateWorkspace.getPrivateDeal(principal, dealId);
       if (!deal) throw new Error("Saved listing could not be read back");
       if (deal) {
         const { score, redFlagCount } = await scoreDeal(deal);
-        await updateDealScore(dealId, score, redFlagCount);
+        await privateWorkspace.updatePrivateDealScore(principal, dealId, score, redFlagCount);
         const stage = score >= 0.75 ? "high_priority" : score >= 0.60 ? "qualified" : "new";
         const screeningDb = await getDb();
         if (!screeningDb) throw new Error("Database unavailable for screening update");
-        await updateAcquisitionScreeningStage(screeningDb, dealId, stage);
+        // Preserve lifecycle protection and enforce ownership atomically.
+        await screeningDb.execute(sql`UPDATE deals SET stage = ${stage}, updatedAt = NOW()
+          WHERE id = ${dealId} AND owner_user_id = ${ownerUserId} AND isArchived = 0
+          AND stage IN ('new', 'scanning', 'qualified', 'high_priority')`);
 
         // OZ/TAD enrichment — runs async after scoring
         if (deal.askingPrice != null && deal.cashFlow != null) enrichDealWithOZTAD(deal.location, deal.askingPrice, deal.cashFlow)
@@ -4250,7 +4247,7 @@ async function runScanPipeline(
                   event_proximity_miles = ${enrichment.eventProximityMiles ?? null},
                   event_revenue_low = ${enrichment.eventRevenueLow ?? null},
                   event_revenue_high = ${enrichment.eventRevenueHigh ?? null}
-                WHERE id = ${dealId}`
+                WHERE id = ${dealId} AND owner_user_id = ${ownerUserId} AND isArchived = 0`
               );
               if (enrichment.opportunityZone) {
                 await logActivity({
@@ -4278,7 +4275,7 @@ async function runScanPipeline(
     }
 
     scored++;
-    await updateScanJob(jobId, {
+    await updatePrivateScanJob(ownerUserId, jobId, {
       dealsScored: scored,
       progressPct: 45 + Math.round((scored / qualified.length) * 35),
       phaseDetail: `Scored ${scored}/${qualified.length}: ${listing.name}`,
@@ -4287,7 +4284,7 @@ async function runScanPipeline(
   }
 
   // ── Phase 4: Log and complete ─────────────────────────────────────────────
-  await phase("Finalizing results", `${scored} listings scored; existing records are reused`, 92);
+  await phase("Finalizing results", `${scored} private listings scored; only your active records may be reused`, 92);
   if (thesisReview) await saveThesisReview({ ...thesisReview, version: 1, jobId, thesisText,
     financialBounds: financials,
     sources: comparisonSources.filter(source => comparisonItems.some(item => item.listingUrl === source.url)), items: comparisonItems });
@@ -4297,7 +4294,7 @@ async function runScanPipeline(
   });
   await new Promise((r) => setTimeout(r, 600));
 
-  await updateScanJob(jobId, {
+  await updatePrivateScanJob(ownerUserId, jobId, {
     status: "completed",
     currentPhase: "Scan complete",
     phaseDetail: `${qualified.length} scored. ${screeningReceipt}`,

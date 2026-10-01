@@ -79,7 +79,7 @@ const stageColor: Record<string, string> = {
 
 export default function Scan() {
   const { user } = useAuth();
-  const canSource = user?.role === "admin";
+  const canSource = Boolean(user);
   const queryString = useSearch();
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");

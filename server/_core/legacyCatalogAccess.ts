@@ -20,6 +20,7 @@ export const PRIVATE_WORKSPACE_PATHS = new Set([
   "deals.updateStage", "deals.score", "deals.delete",
   "signals.getByDealId", "signals.analyze", "memos.list", "memos.getByDealId", "memos.generate",
   "outreach.list", "outreach.getByDealId", "outreach.create", "outreach.updateStatus", "activity.list",
+  "scan.getLatest", "scan.getStatus", "scan.trigger", "scan.getThesisComparison",
 ]);
 
 export function assertLegacyCatalogAccess(path: string, user: { role: string } | null) {

@@ -35,6 +35,12 @@ function scoped(q: any, dealId?: number) {
 }
 
 describe("private deal workspace boundary", () => {
+  it("deduplicates only within the active owner's catalog", async () => {
+    expect(await workspace.findPrivateDealByNameSource(principal, "Target", "manual")).toBeUndefined();
+    const compiled = dialect.sqlToQuery(queries[0].whereArgs[0]);
+    expect(compiled.sql).toContain('`deals`.`owner_user_id` = ?');
+    expect(compiled.params).toEqual([1, false, "Target", "manual"]);
+  });
   it("scopes lists before pagination, without an administrator exemption", async () => {
     responses.push([{ id: 7 }]);
     expect(await workspace.listPrivateDeals({ ...principal, role: "admin" } as any, { limit: 3, offset: 2 })).toEqual([{ id: 7 }]);
