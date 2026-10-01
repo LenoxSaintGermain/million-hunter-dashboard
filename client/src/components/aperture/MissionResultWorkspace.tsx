@@ -2,8 +2,9 @@ import type { ReactNode } from "react";
 import type { PlayUnderwritingResult } from "@shared/playUnderwriting";
 import { Button } from "@/components/ui/button";
 import { PlayUnderwritingBrief } from "./PlayUnderwritingBrief";
+import { MissionRiskPortrait, riskMoney } from "./MandateRiskPortrait";
 
-const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
+const money = riskMoney;
 const horizons = { intraday: "Today", overnight: "Next close", swing: "This week", catalyst_window: "Catalyst window", position: "Long term" };
 
 /** Presentation of a persisted, completed revision. Opening it runs no analysis. */
@@ -14,7 +15,6 @@ export function MissionResultWorkspace({ result, accountLabel, accountAsOf, thes
 }) {
   const limit = result.objective.maxPlannedLossCents;
   const effective = result.feasibility.riskBudgetCents;
-  const riskShare = limit > 0 ? Math.min(100, Math.max(0, effective / limit * 100)) : null;
   return <section className="mission-result-edition mx-auto max-w-5xl space-y-4 pb-12" aria-label="Completed mission">
     <header>
       <div className="flex items-center justify-between gap-3"><h2 className="font-serif text-2xl">Mission result</h2><Button variant="outline" className="min-h-11" onClick={onEdit}>Edit mission</Button></div>
@@ -22,10 +22,11 @@ export function MissionResultWorkspace({ result, accountLabel, accountAsOf, thes
     </header>
     {notice}
     <dl className="mission-result-facts" aria-label="Saved analysis boundaries">
-      <div><dt>Declared allocation</dt><dd>{money(result.objective.deployableCapitalCents)}</dd><small>Not account value or buying power</small></div>
-      <div><dt>Effective planned-loss allowance</dt><dd>{money(effective)}</dd><div className="mission-risk-track" aria-hidden="true"><span style={{ width: `${riskShare ?? 0}%` }} /></div><small>{money(limit)} operator limit · saved at analysis</small></div>
+      <div><dt>Declared allocation</dt><dd>{riskMoney(result.objective.deployableCapitalCents)}</dd><small>Not account value or buying power</small></div>
+      <div><dt>Portfolio risk headroom</dt><dd>{riskMoney(result.portfolioRisk.remainingHeadroomCents)}</dd><small>Saved at analysis · not cash or buying power</small></div>
       <div><dt>Research horizon</dt><dd>{result.objective.holdingPeriods.map(h => horizons[h]).join(", ")}</dd><small>{result.objective.instrumentPreference === "either" ? "Shares or options" : result.objective.instrumentPreference === "options" ? "Options" : "Shares"} · paper only</small></div>
     </dl>
+    <MissionRiskPortrait limitCents={limit} effectiveCents={effective} />
     <section id="mission-underwriting-result" aria-label="Analysis result" className="scroll-mt-24 space-y-3">
       <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Analysis saved <time dateTime={new Date(result.asOf).toISOString()}>{new Date(result.asOf).toLocaleString()}</time> · not a current eligibility check</p>
       <PlayUnderwritingBrief result={result} selectedPlayId={selectedPlayId} busy={busy} onValidate={onValidate} onAdjustRisk={onEdit} />

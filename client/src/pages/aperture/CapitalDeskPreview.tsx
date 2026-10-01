@@ -4,6 +4,10 @@ import { HunterPublicShell } from "@/components/HunterPublicShell";
 import { TodayAttentionBriefing } from "@/components/aperture/TodayAttentionBriefing";
 import type { TodayExecutionData } from "@/components/aperture/TodayExecutionSnapshot";
 import type { ApertureAttentionBriefing } from "@shared/apertureAttention";
+import { PortfolioPortrait } from "@/components/aperture/PortfolioPortrait";
+import { DealCashBridge } from "@/components/DealCashBridge";
+import { MissionRiskPortrait, ThesisRiskComparison } from "@/components/aperture/MandateRiskPortrait";
+import { CapitalDecisionAtlas, capitalDecisionAtlasFixture } from "@/components/aperture/CapitalDecisionAtlas";
 
 // Frozen, synthetic fixtures. This route never reads an account or runs an agent.
 const recordedAt = Date.UTC(2026, 8, 28, 16);
@@ -25,6 +29,7 @@ const attention: ApertureAttentionBriefing = {
 export default function CapitalDeskPreview() {
   const [selected, setSelected] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [lane, setLane] = useState("choose");
   const panel = useRef<HTMLElement>(null);
   const open = (href: string) => {
     setSelected(href);
@@ -33,8 +38,19 @@ export default function CapitalDeskPreview() {
   const selectedSymbol = selected?.startsWith("#sample-DEMO") ? selected.slice(8) : "DEMO-A";
   return <HunterPublicShell><main className="hunter-public-main capital-story-desk">
     <div className="capital-preview-banner"><strong>UAT preview / illustrative composite records</strong><span>No login, live APIs or orders. Same briefing components as the signed-in workspace.</span><Link href="/aperture">Open your actual Capital workspace →</Link></div>
+    <PortfolioPortrait previewOnly holdings={execution.orders.map(o => ({ symbol: o.symbol, marketValueCents: o.latestMark!.marketValueCents, priceAsOf: recordedAt }))} loading={false} failed={false} account={{ label: "Illustrative paper account", equityValueCents: 2797000, cashCents: 2500000, buyingPowerCents: 2500000, lastSyncedAt: recordedAt, isPaper: true }} thesis="Illustrative demand thesis" binding={null} now={recordedAt + 86400000} />
     <TodayAttentionBriefing previewOnly attention={attention} execution={execution} accountLabel="Illustrative paper account" modeLabel="Paper example" loading={false} failed={null} onOpen={open} onRetry={() => setNotice("This preview is frozen. No checks ran and no account was refreshed.")} onNewMission={() => open("#sample-mission")} />
     {notice && <p role="status" className="capital-preview-banner">{notice}</p>}
+    <CapitalDecisionAtlas title="Where your attention goes." caption="Illustrative workflow counts · selection previews a lane, never approves a ticket." lanes={capitalDecisionAtlasFixture} selected={lane} onSelect={setLane} />
+    <section className="capital-preview-investigation" aria-label="Illustrative mandate comparisons"><p className="hunter-eyebrow">Synthetic examples / no account changes</p>
+      <MissionRiskPortrait limitCents={50000} effectiveCents={12500} />
+      <ThesisRiskComparison activeCompilationId={101} theses={[
+        { id: 1, name: "Illustrative infrastructure thesis", sourceCompilationId: 101, missionDefaults: { holdingPeriod: "position", maxPlannedLossCents: 50000 } },
+        { id: 2, name: "Illustrative catalyst thesis", missionDefaults: { holdingPeriod: "catalyst_window", maxPlannedLossCents: 15000 } },
+        { id: 3, name: "Illustrative incomplete mandate", missionDefaults: { holdingPeriod: null, maxPlannedLossCents: null } },
+      ]} onReview={() => setNotice("Illustrative thesis selected. No real thesis activated or changed.")} />
+    </section>
+    <section className="capital-preview-investigation" aria-label="Illustrative acquisition cash scenario"><p className="hunter-eyebrow">Acquisition companion / synthetic arithmetic example</p><DealCashBridge asking={1000000} cash={400000} composite /></section>
     <section className="capital-preview-investigation" ref={panel} tabIndex={-1} aria-label="Sample decision review">
       <header><p className="hunter-eyebrow">{selected ? `${selectedSymbol} / the focused read` : "The opportunity edition"}</p><h2>{selected === "/aperture/deploy" ? "Review comes before a paper order." : selected === "#sample-mission" ? "Start with the condition that must hold." : "What would make this idea hold?"}</h2><p>Illustrative thesis: demand must persist without exceeding the operator’s recorded loss boundary.</p></header>
       <div className="capital-thesis-receipt">

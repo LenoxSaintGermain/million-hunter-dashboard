@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { HoldingsComposition } from "./HoldingsComposition";
 import type { CockpitHeadroomLine } from "@shared/cockpitRailSummary";
 import "@/styles/portfolio-portrait.css";
 
@@ -44,6 +45,7 @@ export function PortfolioPortrait({
   account,
   thesis,
   binding,
+  previewOnly = false,
   now = Date.now(),
 }: {
   holdings?: PortraitHolding[];
@@ -61,6 +63,7 @@ export function PortfolioPortrait({
   thesis: string | null;
   binding: CockpitHeadroomLine | null;
   now?: number;
+  previewOnly?: boolean;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [all, setAll] = useState(false);
@@ -105,7 +108,7 @@ export function PortfolioPortrait({
             {stale ? "Stale or unsynced · " : "Saved · "}
             {stamp(account.lastSyncedAt)}
           </p>
-          <dl>
+          <details className="portrait-cash-detail"><summary>Cash & buying power</summary><dl>
             <div>
               <dt>Cash</dt>
               <dd>{money(account.cashCents)}</dd>
@@ -119,6 +122,7 @@ export function PortfolioPortrait({
             Buying power may include leverage. It is not cash or permission to
             deploy.
           </small>
+          </details>
         </div>
         <div className="portrait-holdings">
           <div className="portrait-section-head">
@@ -126,7 +130,7 @@ export function PortfolioPortrait({
               <span className="portrait-label">01 / Exposure</span>
               <h2>Where capital sits.</h2>
             </div>
-            <a href="/aperture/accounts">Portfolio ↗</a>
+            {!previewOnly && <a href="/aperture/accounts">Portfolio ↗</a>}
           </div>
           <p className="portrait-caption">
             Share of measured gross holdings · cash excluded
@@ -147,6 +151,8 @@ export function PortfolioPortrait({
               an empty brokerage account.
             </p>
           )}
+          {!!holdings?.length && <HoldingsComposition holdings={holdings} />}
+          <details><summary className="cursor-pointer min-h-11 py-3 text-sm">Inspect individual marks & source times</summary>
           <div className="portrait-exposures">
             {rows.map((h, i) => {
               const measured =
@@ -208,6 +214,7 @@ export function PortfolioPortrait({
               risk contribution.
             </p>
           )}
+          </details>
         </div>
       </div>
       <div className="portrait-outlook">
@@ -218,7 +225,7 @@ export function PortfolioPortrait({
             Selected research lens—not a forecast or a claim that these holdings
             match it.
           </p>
-          <a href="/thesis?scope=capital">Review the thesis →</a>
+          {!previewOnly && <a href="/thesis?scope=capital">Review the thesis →</a>}
         </section>
         <section data-constrained={usage != null && usage >= 85}>
           <span className="portrait-label">03 / Room for the next move</span>
@@ -246,7 +253,7 @@ export function PortfolioPortrait({
               ? "Missing measurements are not available capacity."
               : "Saved constraint, not portfolio allocation. Existing positions are unchanged; fresh checks still apply."}
           </p>
-          <a href="/aperture/accounts">Inspect limits →</a>
+          {!previewOnly && <a href="/aperture/accounts">Inspect limits →</a>}
         </section>
       </div>
     </section>

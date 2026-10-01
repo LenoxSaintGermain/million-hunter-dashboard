@@ -122,7 +122,8 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
     const html = render();
     expect(html).toContain("Loading remaining records: research");
     expect(html).toContain("MGM · $40 Call · Nov 20, 2026");
-    expect(html).toContain("—</p>");
+    expect(html).toContain("Choose<strong>Unknown</strong>");
+    expect(html).not.toContain("Choose<strong>0</strong>");
     expect(html).not.toContain("No new action identified");
   });
 

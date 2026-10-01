@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ArrowRight, Clock3, X } from "lucide-react";
 import "@/styles/research-library.css";
+import { CapitalDecisionAtlas, researchAtlasCounts } from "@/components/aperture/CapitalDecisionAtlas";
 import DashboardLayout from "@/components/DashboardLayout";
 import { buildResearchJourneys, type ResearchJourney } from "@shared/runWorkspace";
 import { formatDistanceToNow } from "date-fns";
@@ -117,6 +118,7 @@ export default function ApertureRuns() {
   }, [journeys, filter]);
 
   const visibleJourneys = filteredJourneys.filter(j => (state === "all" || state === j.state) && j.thesisName.toLowerCase().includes(query.trim().toLowerCase()));
+  const coverage = researchAtlasCounts(visibleJourneys.flatMap(journey => journey.runs));
 
   return <DashboardLayout><div className="research-library mx-auto max-w-6xl space-y-5 pb-12">
     <div className="flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium" style={{ background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)", borderColor: "var(--sh-border-1)" }}><AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-signal)" }} />Internal research tool — not investment advice. Research journeys never create or submit an order.</div>
@@ -163,10 +165,14 @@ export default function ApertureRuns() {
       </select></label>
     </div>
     {error && <section className="desk-empty" role="alert"><h2>Research could not be refreshed.</h2><p>{runs ? "Previously loaded journeys remain below; their state may be out of date." : "No research state has been substituted."}</p><Button variant="outline" onClick={() => refetch()}>Retry research read</Button></section>}
+    <CapitalDecisionAtlas title="The evidence footprint." caption={`${error ? "Last known records" : "Saved records"} · current filters · independent counts, not a completion rate.`} lanes={[
+      { id: "symbols", label: "Universe entries", count: runs == null ? null : coverage.symbols, detail: "Recorded universe counts across chapters; repeats included" },
+      { id: "candidates", label: "Candidates", count: runs == null ? null : coverage.candidates, detail: "Recorded candidates across chapters; not approvals" },
+    ]} />
     {!isLoading && filteredJourneys.length > 0 && !visibleJourneys.length && <section className="desk-empty"><h2>No questions match this view.</h2><button className="desk-link" onClick={() => { setState("all"); setQuery(""); }}>Clear search and state</button></section>}
     {!isLoading && visibleJourneys.length > 0 && <section aria-label="Research journeys">
       <p className="desk-label" role="status">{visibleJourneys.length} matching journey{visibleJourneys.length === 1 ? "" : "s"} · Recorded evidence, not approval</p>
-      <p className="desk-caption">Counts span recorded chapters, not unique holdings. Select a question to inspect its evidence trail.</p>
+      <details className="desk-caption"><summary className="min-h-11 cursor-pointer">How to read these records</summary>Counts span recorded chapters, not unique holdings. Select a question to inspect its evidence trail. Missing chapter counts remain unknown in the chart.</details>
       {visibleJourneys.map(journey => {
         const action = actionFor(journey);
         return <article key={journey.rootId} data-journey-row data-state={journey.state} className="desk-journey">

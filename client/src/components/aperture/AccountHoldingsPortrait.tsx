@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { portraitExposure, type PortraitHolding } from "./PortfolioPortrait";
+import { HoldingsComposition } from "./HoldingsComposition";
 
 export const accountMoney = (value: number | null | undefined) =>
   value == null || !Number.isFinite(value)
@@ -56,6 +57,7 @@ export function AccountExposure({
       )}
       {!!holdings?.length && (
         <>
+          <HoldingsComposition holdings={holdings} />
           <p className="account-annotation">
             Measured gross{" "}
             {exposure.missing === holdings.length

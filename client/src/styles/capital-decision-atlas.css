@@ -1,0 +1,19 @@
+.capital-decision-atlas { border-block: 1px solid var(--sh-border-1); padding-block: 20px; color: var(--sh-text-primary); min-width: 0; }
+.capital-decision-atlas header h2 { font-family: Georgia, serif; font-size: clamp(21px, 3vw, 28px); font-weight: 400; margin: 0; text-wrap: balance; }
+.capital-decision-atlas header p { font-size: 12px; color: var(--sh-fg-muted); margin: 6px 0 16px; }
+.capital-decision-atlas-rows { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.capital-decision-atlas-rows[data-lanes="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.capital-decision-atlas-rows > button, .capital-decision-atlas-row { min-width: 0; text-align: left; padding: 12px; border: 1px solid transparent; background: var(--sh-surface); }
+.capital-decision-atlas-rows > button { cursor: pointer; min-height: 44px; transition: background 180ms ease, border-color 180ms ease; }
+.capital-decision-atlas-rows > button:hover, .capital-decision-atlas-rows > button[aria-pressed="true"] { border-color: var(--sh-signal); background: var(--sh-surface-2); }
+.capital-decision-atlas-rows > button:focus-visible { outline: 2px solid var(--sh-signal); outline-offset: 3px; }
+.capital-decision-atlas-label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 14px; }
+.capital-decision-atlas-label strong { font-size: 21px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.capital-decision-atlas svg { display: block; width: 100%; height: 20px; margin-block: 10px; overflow: visible; }
+.capital-decision-atlas .atlas-track { fill: var(--sh-border-1); }
+.capital-decision-atlas .atlas-measure { fill: var(--sh-text-primary); }
+.capital-decision-atlas [aria-pressed="true"] .atlas-measure { fill: var(--sh-signal); }
+.capital-decision-atlas .atlas-unknown { stroke: var(--sh-fg-muted); stroke-width: 2; stroke-dasharray: 5 5; }
+.capital-decision-atlas-detail { display: block; font-size: 11px; line-height: 1.5; color: var(--sh-fg-muted); overflow-wrap: anywhere; }
+@media(max-width: 600px) { .capital-decision-atlas-rows, .capital-decision-atlas-rows[data-lanes="2"] { grid-template-columns: 1fr; gap: 3px; } .capital-decision-atlas-rows > button, .capital-decision-atlas-row { padding: 8px; } .capital-decision-atlas svg { margin-block: 5px; height: 14px; } }
+@media(prefers-reduced-motion: reduce) { .capital-decision-atlas-rows > button { transition: none; } }

@@ -16,6 +16,7 @@ import { MonitoringFindingReview } from "@/components/aperture/MonitoringFinding
 import { inlineMonitoringTarget } from "@shared/monitoringFinding";
 import { PlayDeskEvidence } from "@/components/aperture/PlayDeskEvidence";
 import "@/styles/play-desk-editorial.css";
+import { CapitalDecisionAtlas } from "@/components/aperture/CapitalDecisionAtlas";
 import { AttentionSourceRecovery } from "@/components/aperture/AttentionSourceRecovery";
 import { buildResearchJourneys } from "@shared/runWorkspace";
 import { playDeskJourneyLane } from "@shared/playDeskState";
@@ -333,7 +334,19 @@ export default function AperturePlayDesk() {
 
     <AttentionSourceRecovery issues={briefing?.sourceIssues ?? []} onOpen={navigate} onRetry={refresh} busy={isRefreshing} />
 
-    {desk.data && <PlayDeskEvidence orders={desk.data.orders ?? []} account={desk.data.account ?? null} accountUnavailable={desk.data.accountUnavailable} />}
+    <section aria-label="Filter by workflow stage">
+      <CapitalDecisionAtlas title="Where your attention goes." caption="Saved workflow counts · select a lane to filter, not approve." selected={stageFilter}
+        onSelect={id => selectStage(id as Exclude<StageFilter, "all">)} lanes={[
+          { id: "choose", label: "Choose", count: runs.data == null || playList.data == null ? null : decisionReady.length, detail: `Research journeys · all instruments${runs.error || playList.error ? " · last known" : ""}` },
+          { id: "approve", label: "Approve / send", count: desk.data == null ? null : visibleOrderActions.length, detail: `Paper tickets · selected instrument${desk.error ? " · last known" : ""}` },
+          { id: "monitor", label: "Monitor", count: desk.data == null ? null : visibleOrders.length + visibleActivePlays.length, detail: `${outcomes.data == null ? "Scheduled reviews unknown" : `${visiblePendingOutcomes.length} scheduled reviews (separate)`}${desk.error || outcomes.error ? " · last known" : ""}` },
+        ]} />
+    </section>
+
+    {desk.data && <details data-desk-snapshot-disclosure>
+      <summary className="min-h-11 cursor-pointer py-3 text-sm">Saved risk, return &amp; buying power · not current clearance</summary>
+      <PlayDeskEvidence orders={desk.data.orders ?? []} account={desk.data.account ?? null} accountUnavailable={desk.data.accountUnavailable} />
+    </details>}
     <Button variant="outline" className="min-h-11" onClick={() => navigate("/aperture/deploy")}>Find my best play · saved research<ArrowRight className="ml-2 h-4 w-4" /></Button>
 
     {selectedPlayId != null && <section id={`play-${selectedPlayId}`} tabIndex={-1} aria-label={`Selected play ${selectedPlayId}`} className="scroll-mt-24 rounded-xl border-2 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}>
@@ -347,11 +360,6 @@ export default function AperturePlayDesk() {
       </> : <div role="status" className="mt-3 text-sm leading-6">{desk.isLoading ? "Loading this play's saved record…" : desk.error ? "The selected play could not be loaded. Retry status; this does not mean the play is closed." : "This play is not in the returned active records. It may be outside this account's active view; closure is not confirmed."}<div className="mt-2 flex flex-wrap gap-2"><Button type="button" className="min-h-11 aria-disabled:opacity-50" variant="outline" onClick={refresh} aria-disabled={isRefreshing} aria-describedby="desk-refresh-scope">Retry selected play</Button><Button className="min-h-11" variant="outline" onClick={() => navigate("/aperture/accounts")}>Inspect account records</Button></div></div>}
     </section>}
 
-    <section className="grid grid-cols-3 overflow-hidden rounded-xl border" aria-label="Filter by workflow stage" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-      <StageMetric label="Choose" value={runs.data == null ? null : decisionReady.length} detail="research journeys · all instruments" active={stageFilter === "choose"} onSelect={() => selectStage("choose")} />
-      <StageMetric label="Approve / send" value={desk.data == null ? null : visibleOrderActions.length} detail="tickets to move" active={stageFilter === "approve"} onSelect={() => selectStage("approve")} />
-      <StageMetric label="Monitor" value={desk.data == null ? null : visibleOrders.length + visibleActivePlays.length} detail={outcomes.data == null ? "reviews unavailable" : `${visiblePendingOutcomes.length} scheduled reviews`} active={stageFilter === "monitor"} onSelect={() => selectStage("monitor")} />
-    </section>
 
     {stageFilter !== "all" && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 7%, var(--sh-surface))", color: "var(--sh-text-primary)" }}><span>Showing {stageFilter === "choose" ? "plays to choose" : stageFilter === "approve" ? "tickets to approve or send" : "plays and reviews to monitor"}.</span><button type="button" className="min-h-11 shrink-0 font-semibold underline underline-offset-4" onClick={() => setStageFilter("all")}>Show all stages</button></div>}
 

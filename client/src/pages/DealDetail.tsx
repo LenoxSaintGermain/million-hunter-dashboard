@@ -2,6 +2,7 @@ import React from "react";
 import { modelAcquisitionFinancing, ACQUISITION_FINANCING_ASSUMPTIONS } from "@shared/acquisitionFinancing";
 import { AcquisitionSourceBrief } from "@/components/AcquisitionSourceBrief";
 import { AlignmentPortrait } from "@/components/AlignmentPortrait";
+import { DealCashBridge } from "@/components/DealCashBridge";
 import LOIGeneration from "./LOIGeneration";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -260,12 +261,15 @@ export default function DealDetail() {
         </aside>
 
         <div className="deal-work-pane">
+          <DealCashBridge asking={toNum(deal.askingPrice)} cash={toNum(deal.cashFlow)} composite={deal.isSynthetic} />
+          <details><summary className="cursor-pointer min-h-11 py-3 text-sm">Inspect the recorded figures & evidence gaps</summary>
             <AlignmentPortrait title="The economics. The open questions." subtitle={deal.isSynthetic ? "Illustrative — composite deal, not a real customer" : "Saved deal figures · independent verification not established here"} measures={[
               { id: "asking", label: "Asking price", value: toNum(deal.askingPrice), unit: "usd", basis: "reported", wanted: "An asking price", explanation: "Saved asking price. This detail record does not include the search's thesis bounds; no target band is invented." },
               { id: "cash", label: "Annual cash flow", value: toNum(deal.cashFlow), unit: "usd", basis: "reported", wanted: "Reconciled cash flow", explanation: "Saved reported cash flow. Reconcile add-backs, owner replacement costs and recurring expenses; this is not independently verified earnings." },
               { id: "revenue", label: "Annual revenue", value: toNum(deal.revenue), unit: "usd", basis: "reported", wanted: "Revenue records", explanation: "Saved revenue figure. Inspect the listing and research below for its basis and period." },
               { id: "coverage", label: "Debt coverage", value: financing?.cashCoverage ?? null, unit: "multiple", basis: "modeled", wanted: "Financing terms", explanation: "Calculated using the illustrative financing assumptions disclosed below. This is not a lender quote or approval; fees, reserves and taxes may change the result." },
             ]} />
+          </details>
 
           {(signal || memo || consensusData || sellerData) && (
             <section aria-label="Saved analysis provenance" className="my-6 border-l-2 border-amber bg-paper px-4 py-3">

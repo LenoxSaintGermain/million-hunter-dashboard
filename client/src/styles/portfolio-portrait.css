@@ -62,6 +62,8 @@
   line-height: 1.6;
   opacity: 0.8;
 }
+.portrait-cash-detail { margin-top: 16px; border-top: 1px solid color-mix(in srgb, var(--paper) 30%, transparent); }
+.portrait-cash-detail summary { cursor: pointer; min-height: 44px; padding-top: 14px; font-size: 12px; }
 .portrait-holdings {
   padding: 26px 28px;
   min-width: 0;
@@ -202,8 +204,12 @@
     border-left: 0;
   }
   .portrait-value .portrait-equity {
-    font-size: 44px;
+    font-size: 36px;
+    margin: 8px 0 4px;
   }
+  .portrait-value { padding: 16px; }
+  .portrait-holdings { padding: 16px; }
+  .portrait-cash-detail { margin-top: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .portrait-holding,

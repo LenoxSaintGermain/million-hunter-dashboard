@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import "@/styles/research-library.css";
+import { ThesisRiskComparison } from "@/components/aperture/MandateRiskPortrait";
 
 function formatUpdated(value: number | null | undefined) {
   return value ? new Date(value).toLocaleString() : "Not measured";
@@ -139,6 +140,8 @@ export default function ApertureTheses() {
             Archived
           </Button>
         </div>
+
+        {!error && !isLoading && !!theses?.length && <ThesisRiskComparison theses={filteredTheses} activeCompilationId={activeCompilationId} onReview={id => navigate(`/aperture/thesis/${id}`)} />}
 
         {error ? (
           <Card>
