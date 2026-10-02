@@ -66,6 +66,7 @@ const PRIMARY_NAV = [
 
 // Analyze dropdown items
 const ANALYZE_NAV = [
+  { label: "Deal Documents", href: "/deal-documents", icon: FileText },
   { label: "Off-Market Discovery", href: "/off-market", icon: Radar },
   { label: "Theses", href: "/thesis", icon: BookOpen },
   { label: "Property Criteria", href: "/theses", icon: SlidersHorizontal },

@@ -1,27 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_FAST } from "../shared/models";
+import { acquisitionUnavailableSpan } from "../shared/acquisitionV2";
 import { z } from "zod";
 import { parseAcquisitionListings } from "./acquisitionListing";
+import { captureAcquisitionListing, type ListingCapture } from "./acquisitionCapture";
 
 const sources = z.object({ results: z.array(z.object({ title: z.string(), url: z.string().url(), snippet: z.string() })).max(100) });
 const marketplace: Record<string, string> = {
   bizbuysell: "bizbuysell.com/business-opportunity/", dealstream: "dealstream.com/d/biz-sale/",
   flippa: "flippa.com", quietlight: "quietlight.com", empireflippers: "empireflippers.com",
 };
-function primaryExcerpt(text: string) {
-  return text.split(/Ad#\s*:|Similar Listings|Featured Listing/i)[0].slice(0,12000);
-}
-function amountInSource(text: string, field: "askingPrice" | "cashFlow" | "revenue", proposed: number | null) {
-  if (proposed == null) return null;
-  const label = { askingPrice: "Asking Price", cashFlow: "Cash Flow(?:\\s*\\(SDE\\))?", revenue: "(?:Gross )?Revenue" }[field];
-  const matches = Array.from(text.matchAll(new RegExp(label + "\\s*:?\\s*\\$\\s*([\\d,]+(?:\\.\\d+)?)", "gi")))
-    .map(match => Number(match[1].replace(/,/g, "")));
-  // Conflicting or unquoted values are unknown, never inferred from a neighbor.
-  return matches.length && new Set(matches).size === 1 && matches[0] === proposed ? proposed : null;
-}
 
 /** Retrieve sources first; synthesis cannot invent a source or a financial value. */
-export async function researchAcquisitionListings(input: { thesisText: string; sources: string[]; onSources?: (sources: Array<{ url: string; excerpt: string; asOf: number }>) => void }) {
+export async function researchAcquisitionListings(input: { thesisText: string; sources: string[]; captureOnly?: boolean; onSources?: (sources: Array<{ url: string; excerpt: string; asOf: number }>) => void | Promise<void>; onCaptures?: (captures: ListingCapture[]) => void | Promise<void> }) {
   if (!process.env.SONAR_API_KEY || !process.env.GEMINI_API_KEY) throw new Error("Research provider unavailable");
   const domains = input.sources.map(source => marketplace[source]).filter(Boolean).slice(0,5);
   if (!domains.length) throw new Error("No supported listing source selected");
@@ -40,14 +31,25 @@ export async function researchAcquisitionListings(input: { thesisText: string; s
   });
   if (!response.ok) throw new Error("Listing source retrieval failed");
   const raw = sources.parse(await response.json()).results;
-  const records = Array.from(new Map(raw.map(record => [record.url, record])).values()).filter(record => {
+  const discovered = Array.from(new Map(raw.map(record => [record.url, record])).values()).filter(record => {
     const host = new URL(record.url).hostname.replace(/^www\./, "");
     if (!domains.some(domain => host === domain.split("/")[0] || host.endsWith(`.${domain.split("/")[0]}`))) return false;
-    if (/is no longer available|this listing has expired/i.test(record.snippet)) return false;
     try { parseAcquisitionListings([{ name: record.title.slice(0,200), listingUrl: record.url }]); return true; }
     catch { return false; }
-  }).slice(0,12).map(record => ({ ...record, snippet: primaryExcerpt(record.snippet) }));
-  input.onSources?.(records.map(record => ({ url: record.url, excerpt: `${record.title}\n${record.snippet}`, asOf: Date.now() })));
+  }).slice(0,12);
+  const captures: ListingCapture[] = [];
+  // Bound concurrent public-source requests. Every failed capture remains in the receipt.
+  for (let i = 0; i < discovered.length; i += 3) captures.push(...await Promise.all(discovered.slice(i,i+3).map(row => captureAcquisitionListing(row.url))));
+  await input.onCaptures?.(captures);
+  const records = captures.flatMap(capture => capture.state === "captured" ? [{
+    title: discovered.find(row => row.url === capture.url)!.title, url: capture.url,
+    snippet: capture.evidence.text, evidence: capture.evidence,
+  }] : []);
+  await input.onSources?.(records.map(record => ({ url: record.url, excerpt: record.snippet, asOf: Date.parse(record.evidence.source.fetchedAt) })));
+  if (discovered.length && !records.length) throw new Error("Individual listing captures unavailable; no search conclusion can be drawn.");
+  // V2 consumes the preserved typed captures, not model-authored catalog rows.
+  // A second synthesis call must not veto or alter deterministic screening.
+  if (input.captureOnly) return [];
   if (!records.length) return [];
   const result = await model.models.generateContent({
     model: GEMINI_FAST,
@@ -55,21 +57,22 @@ export async function researchAcquisitionListings(input: { thesisText: string; s
     config: { responseMimeType: "application/json", temperature: 0, maxOutputTokens: 8192, httpOptions: { timeout: 60000 } },
   });
   const extracted = parseAcquisitionListings(JSON.parse(result.text ?? ""));
-  const grounded = extracted.map(row => {
+  const grounded = extracted.flatMap(row => {
     const source = records.find(record => record.url === row.listingUrl);
     if (!source) throw new Error("Extraction introduced an unsupported source");
+    if (acquisitionUnavailableSpan(source.evidence.text)) return [];
     const evidence = `${source.title}\n${source.snippet}`;
-    return { ...row, name: source.title.slice(0,200),
+    const exact = (key: "ask" | "sde" | "revenue") => source.evidence.fields[key].state === "value" ? source.evidence.fields[key].value : null;
+    return [{ ...row, name: source.title.slice(0,200),
       location: evidence.toLowerCase().includes(row.location.toLowerCase()) ? row.location : "Not disclosed in retrieved source",
       employees: row.employees != null && new RegExp(`(?:Employees\\s*:?\\s*${row.employees}\\b|\\b${row.employees}\\s+employees)`, "i").test(source.snippet) ? row.employees : null,
       yearEstablished: row.yearEstablished != null && new RegExp(`(?:Established|Founded)\\s*:?\\s*${row.yearEstablished}\\b`, "i").test(source.snippet) ? row.yearEstablished : null,
-      askingPrice: amountInSource(source.snippet, "askingPrice", row.askingPrice),
-      cashFlow: amountInSource(source.snippet, "cashFlow", row.cashFlow),
-      revenue: amountInSource(source.snippet, "revenue", row.revenue),
+      askingPrice: exact("ask"),
+      cashFlow: exact("sde"),
+      revenue: exact("revenue"),
       // No valuation multiple survives an unsupported input.
-      multiple: amountInSource(source.snippet, "askingPrice", row.askingPrice) != null && amountInSource(source.snippet, "cashFlow", row.cashFlow)
-        ? row.askingPrice! / row.cashFlow! : null,
-    };
+      multiple: exact("ask") != null && exact("sde") ? exact("ask")! / exact("sde")! : null,
+    }];
   });
   // One originating listing is one opportunity, even if extraction repeats it.
   return Array.from(new Map(grounded.map(row => [row.listingUrl, row])).values());

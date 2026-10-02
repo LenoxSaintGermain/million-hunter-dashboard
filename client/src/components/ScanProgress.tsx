@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AcquisitionThesisComparison } from "./AcquisitionThesisComparison";
+import { AcquisitionV2Report } from "./AcquisitionV2Report";
 
 // ─── Phase definitions ────────────────────────────────────────────────────────
 const PHASES = [
@@ -73,6 +74,9 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
 
   const isFailed = job.status === "failed";
   const isComplete = job.status === "completed";
+  // This persisted marker identifies V2 jobs even after screening completes.
+  // dealsScored belongs to the legacy shared catalog, not the V2 receipt.
+  const isV2 = Array.isArray(job.sources) && job.sources.includes("__acquisition_v2_pending__");
   const isRunning = job.status === "running" || job.status === "pending";
   const phaseIdx = getPhaseIndex(job.currentPhase);
   const pct = job.progressPct ?? 0;
@@ -104,7 +108,9 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
               {isFailed
                 ? "Search could not finish. Any saved results are incomplete; this is not a no-opportunity conclusion."
                 : isComplete
-                ? `${job.listingsFound ?? 0} listings found · ${job.listingsQualified ?? 0} qualified · ${job.dealsScored ?? 0} scored`
+                ? isV2
+                  ? `${job.listingsFound ?? "Not recorded"} source records · ${job.listingsQualified ?? "Not recorded"} screening candidates · V2 receipt`
+                  : `${job.listingsFound ?? 0} listings found · ${job.listingsQualified ?? 0} qualified · ${job.dealsScored ?? 0} scored`
                 : job.phaseDetail ?? "Initializing…"}
             </p>
           </div>
@@ -187,24 +193,26 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
       {/* Results summary (shown on complete) */}
       {isComplete && (
         <details className="px-4 py-2">
-          <summary className="min-h-11 cursor-pointer py-3 text-sm">Search receipt · {job.listingsFound ?? 0} found / {job.dealsScored ?? 0} scored</summary>
-          <div className="rounded-lg bg-muted/20 border border-border/40 p-3 grid grid-cols-3 gap-3">
+          <summary className="min-h-11 cursor-pointer py-3 text-sm">{isV2 ? `Source-screening receipt · ${job.listingsFound ?? "Not recorded"} source records / ${job.listingsQualified ?? "Not recorded"} screening candidates` : `Search receipt · ${job.listingsFound ?? 0} found / ${job.dealsScored ?? 0} scored`}</summary>
+          <div className={cn("rounded-lg bg-muted/20 border border-border/40 p-3 grid gap-3", isV2 ? "grid-cols-2" : "grid-cols-3")}>
             <div className="text-center">
-              <p className="text-lg font-bold text-foreground tabular-nums">{job.listingsFound ?? 0}</p>
-              <p className="text-[10px] text-muted-foreground">Listings Found</p>
+              <p className="text-lg font-bold text-foreground tabular-nums">{job.listingsFound ?? (isV2 ? "Not recorded" : 0)}</p>
+              <p className="text-[10px] text-muted-foreground">{isV2 ? "Source records" : "Listings Found"}</p>
             </div>
             <div className="text-center border-x border-border/30">
-              <p className="text-lg font-bold text-[var(--amber)] tabular-nums">{job.listingsQualified ?? 0}</p>
-              <p className="text-[10px] text-muted-foreground">Qualified</p>
+              <p className="text-lg font-bold text-[var(--amber)] tabular-nums">{job.listingsQualified ?? (isV2 ? "Not recorded" : 0)}</p>
+              <p className="text-[10px] text-muted-foreground">{isV2 ? "Screening candidates" : "Qualified"}</p>
             </div>
-            <div className="text-center">
+            {!isV2 && <div className="text-center">
               <p className="text-lg font-bold text-[var(--sage)] tabular-nums">{job.dealsScored ?? 0}</p>
               <p className="text-[10px] text-muted-foreground">Scored</p>
-            </div>
+            </div>}
           </div>
           <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
             <TrendingUp className="w-3 h-3 text-[var(--sage)]" />
-            {(job.dealsScored ?? 0) > 0
+            {isV2
+              ? "Source screening is complete. Review the V2 receipt for candidate outcomes, unavailable checks and unverified source claims. No shared catalog scores changed."
+              : (job.dealsScored ?? 0) > 0
               ? "Scored listings are available in the validation queue. Verify source claims before proceeding."
               : "No candidates were added in this search. Review the saved criteria and any screening reasons before searching again."}
           </p>
@@ -213,6 +221,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
       )}
 
       {isComplete && <AcquisitionThesisComparison jobId={jobId} />}
+      {isFailed && <AcquisitionV2Report jobId={jobId} />}
 
       {/* Error detail */}
       {isFailed && (

@@ -32,8 +32,9 @@ export default function InvestorScout() {
     onError: (e) => toast.error(`Failed to submit interest: ${e.message}`),
   });
 
+  const normType = (s: string) => String(s ?? "").toLowerCase().replace(/[\s_-]+/g, "");
   const filtered = (assets ?? []).filter((a: any) => {
-    if (typeFilter.length > 0 && !typeFilter.includes(a.propertyType)) return false;
+    if (typeFilter.length > 0 && !typeFilter.some((t) => normType(t) === normType(a.propertyType))) return false;
     if (ozOnly && !a.opportunityZone) return false;
     return true;
   });

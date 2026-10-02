@@ -15,7 +15,7 @@ const server = await createServer({ configFile: false, root: path.join(root, "cl
     res.setHeader("Content-Type", "text/html"); res.end(await app.transformIndexHtml(req.url, '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shortlist UAT</title></head><body><div id="root"></div><script type="module" src="/src/__shortlist-fixture.tsx"></script></body></html>'));
   }); }, resolveId(id) { if (id === "\0shortlist-trpc") return id; if (id === "/src/__shortlist-fixture.tsx") return "\0shortlist-fixture.tsx"; }, async load(id) {
     if (id === "\0shortlist-fixture.tsx") return (await transformWithEsbuild(entry, "shortlist-fixture.tsx", { loader: "tsx", jsx: "transform" })).code;
-    if (id === "\0shortlist-trpc") return `export const trpc={scan:{getThesisComparison:{useQuery:()=>({data:${JSON.stringify(data)},refetch:()=>{throw Error('No API in fixture')}})}}};`;
+    if (id === "\0shortlist-trpc") return `export const trpc={scan:{getV2Report:{useQuery:()=>({data:[]})},getThesisComparison:{useQuery:()=>({data:${JSON.stringify(data)},refetch:()=>{throw Error('No API in fixture')}})}}};`;
   } }], resolve: { alias: { "@/lib/trpc": "\0shortlist-trpc", "@": path.join(root, "client/src"), "@shared": path.join(root, "shared") } }, server: { host: "127.0.0.1", port: 3116, strictPort: true, fs: { allow: [root] } } });
 await server.listen(); console.log("SHORTLIST_UAT_READY http://localhost:3116/__shortlist-uat");
 for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, async () => { await server.close(); process.exit(0); });

@@ -3,6 +3,7 @@ import { modelAcquisitionFinancing, ACQUISITION_FINANCING_ASSUMPTIONS } from "@s
 import { AcquisitionSourceBrief } from "@/components/AcquisitionSourceBrief";
 import { AlignmentPortrait } from "@/components/AlignmentPortrait";
 import { DealCashBridge } from "@/components/DealCashBridge";
+import { DealDocumentReviewDesk } from "@/components/DealDocumentReviewDesk";
 import LOIGeneration from "./LOIGeneration";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -236,6 +237,7 @@ export default function DealDetail() {
           <TabsList aria-label="Senior reading desk" className="deal-rail-nav">
             {[
               ["research", "Follow the sources", "Listing & research dossier"],
+              ["documents", "Deal Document Desk", "Upload & reconcile verified filings"],
               ["signals", "Challenge the cash", signal ? "Recorded specialist analysis" : "Analysis not yet run"],
               ["capital", "Test the financing", "Assumptions & capital structure"],
               ["consensus", "Hear the committee", consensusData ? "Saved panel view" : "Panel has not reported"],
@@ -289,6 +291,11 @@ export default function DealDetail() {
               <dl className="deal-record-facts"><div><dt>Employees · recorded</dt><dd>{(deal as any).employeeCount ?? "Not disclosed"}</dd></div><div><dt>Operating years · recorded</dt><dd>{(deal as any).yearsInOperation ?? "Not disclosed"}</dd></div></dl>
               <DealDossierModule dealId={dealId} />
             </section>
+          </TabsContent>
+
+          {/* Deal Document Intake & Verification Desk */}
+          <TabsContent value="documents" className="mt-4">
+            <DealDocumentReviewDesk dealId={dealId} />
           </TabsContent>
 
         {/* Third Signal Tab */}

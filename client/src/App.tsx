@@ -57,6 +57,7 @@ import ThesisStudio from "./pages/ThesisStudio";
 import CsvImport from "./pages/CsvImport";
 import SourcingSchedules from "./pages/SourcingSchedules";
 import OffMarketDiscovery from "./pages/OffMarketDiscovery";
+import DealDocuments from "./pages/DealDocuments";
 import ApertureHome from "./pages/aperture/ApertureHome";
 import ApertureMission from "./pages/aperture/ApertureMission";
 import ApertureDeploy from "./pages/aperture/ApertureDeploy";
@@ -272,6 +273,8 @@ function Router() {
         <Route path="/schedules">{() => <ProtectedRoute component={SourcingSchedules} />}</Route>
         <Route path="/import">{() => <ProtectedRoute component={CsvImport} />}</Route>
         <Route path="/verify">{() => <ProtectedRoute component={VerificationQueue} />}</Route>
+        <Route path="/deal-documents">{() => <ProtectedRoute component={DealDocuments} />}</Route>
+        <Route path="/deal-documents/:id">{() => <ProtectedRoute component={DealDocuments} />}</Route>
         <Route path="/wingate/asset/:id">{() => <ProtectedRoute component={AssetDossier} />}</Route>
 
         {/* ── Capital Aperture — liquid securities engine ── */}

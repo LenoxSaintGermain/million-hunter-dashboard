@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { AcquisitionMandateReview } from "@/components/AcquisitionMandateReview";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -97,16 +98,9 @@ export default function Scan() {
   const [minCashFlow, setMinCashFlow] = useState(500000);
   const [maxMultiple, setMaxMultiple] = useState(5);
   const [activePreset, setActivePreset] = useState("Miami / FLL");
-  const [activeScanJobId, setActiveScanJobId] = useState<number | null>(null);
+  const [activeScanJobId, setActiveScanJobId] = useState<number | null>(() => { const id = Number(new URLSearchParams(window.location.search).get("v2job")); return Number.isSafeInteger(id) && id > 0 ? id : null; });
+  const [reviewMandate, setReviewMandate] = useState(false);
   const locationInputRef = useRef<HTMLInputElement>(null);
-
-  // Off-Market Scout state
-  const [showOffMarket, setShowOffMarket] = useState(false);
-  const [offMarketResults, setOffMarketResults] = useState<Array<{
-    name: string; industry: string; location: string;
-    estimatedRevenue: number; estimatedCashFlow: number; estimatedAskingPrice: number;
-    offMarketSignal: string; acquisitionAngle: string; urgencyScore: number; contactStrategy: string;
-  }>>([]);
 
   const { data: deals, isLoading, isError, refetch } = trpc.deals.list.useQuery({ limit: 100 });
   const triggerScan = trpc.scan.trigger.useMutation({
@@ -159,12 +153,7 @@ export default function Scan() {
       toast.error("Select at least one marketplace source");
       return;
     }
-    triggerScan.mutate({
-      sources: selectedSources,
-      minCashFlow,
-      maxMultiple,
-      targetLocations: targetLocations.length > 0 ? targetLocations : undefined,
-    });
+    setReviewMandate(true);
   };
 
   const filtered = (deals ?? []).filter(d =>
@@ -183,6 +172,7 @@ export default function Scan() {
   return (
     <EditorialTopNav>
       <div className="scan-edition">
+      {canSource && reviewMandate && <AcquisitionMandateReview initial={{ geographies: targetLocations, ...(minCashFlow > 0 ? { sdeMin: minCashFlow, watchlistMin: Math.min(400000,minCashFlow) } : {}) }} onClose={() => setReviewMandate(false)} onConfirm={v2Mandate => { setReviewMandate(false); triggerScan.mutate({ sources: selectedSources, minCashFlow, maxMultiple, targetLocations, v2Mandate, v2Approved: true }); }} />}
       {/* ── Page Header ──────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

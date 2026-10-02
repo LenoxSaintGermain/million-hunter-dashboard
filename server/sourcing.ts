@@ -209,6 +209,28 @@ Return ONLY a JSON array — no prose, no explanation. Each object: "name", "add
   const existing = await getCommercialAssets({ limit: 1000, assetClass: cls.id });
   const seen = new Set(existing.map((a: any) => `${String(a.name).toLowerCase().trim()}|${String(a.city).toLowerCase().trim()}`));
 
+  const FIELD_SYNONYMS: Record<string, string[]> = {
+    askingPrice: ["price", "asking_price", "listPrice", "list_price", "cost"],
+    squareFootage: ["sqft", "size", "square_footage", "sq_ft", "buildingSize", "building_size", "footage"],
+    yearBuilt: ["year_built", "built", "constructionYear", "constructed"],
+    capRate: ["cap_rate", "capitalization_rate"],
+    occupancyRate: ["occupancy", "occupancy_rate", "leased"],
+    sourceUrl: ["url", "source_url", "listingUrl", "listing_url", "link", "source"],
+    lotSqFt: ["lot_sq_ft", "lotSize", "lot_size"],
+    noi: ["net_operating_income", "annual_noi"],
+  };
+
+  const resolveCandidateValue = (p: Record<string, any>, key: string): any => {
+    if (p[key] !== undefined && p[key] !== null && p[key] !== "") return p[key];
+    const synonyms = FIELD_SYNONYMS[key];
+    if (synonyms) {
+      for (const alt of synonyms) {
+        if (p[alt] !== undefined && p[alt] !== null && p[alt] !== "") return p[alt];
+      }
+    }
+    return undefined;
+  };
+
   const nativeKeys = new Set(["yearBuilt","stories","squareFootage","lotSqFt","occupancyRate","capRate","askingPrice","isHistoric","historicRegisterEligible","isStabilized","hasAirRights","higherAndBetterUseNotes","noi"]);
   let created = 0;
   const candidates = found.slice(0, input.limit);
@@ -220,7 +242,7 @@ Return ONLY a JSON array — no prose, no explanation. Each object: "name", "add
     const native: Record<string, any> = {};
     const meta: Record<string, any> = {};
     for (const f of cls.fields) {
-      const v = p[f.key];
+      const v = resolveCandidateValue(p, f.key);
       if (v === undefined || v === null || v === "") continue;
       // Sources report "$2,700,000" / "26,136 SF" / "92%" — strip to a number.
       const toNum = (x: any) => { const n = parseFloat(String(x).replace(/[^0-9.\-]/g, "")); return Number.isFinite(n) ? n : NaN; };
@@ -243,7 +265,7 @@ Return ONLY a JSON array — no prose, no explanation. Each object: "name", "add
       classMetadata: Object.keys(meta).length ? meta : undefined,
       ...native,
       source: "sonar-research",
-      sourceUrl: String(p.sourceUrl ?? citations[i] ?? citations[0] ?? ""),
+      sourceUrl: String(resolveCandidateValue(p, "sourceUrl") ?? citations[i] ?? citations[0] ?? ""),
       createdAt: now, updatedAt: now,
     } as any);
     seen.add(`${name.toLowerCase()}|${city.toLowerCase()}`);

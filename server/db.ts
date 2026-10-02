@@ -166,19 +166,28 @@ export async function getDealById(id: number) {
 }
 
 export async function createDeal(data: InsertDeal) {
-  if (!Number.isSafeInteger(data.ownerUserId) || Number(data.ownerUserId) <= 0) throw new Error("An explicit deal owner is required before ingestion");
+  if (!Number.isSafeInteger(data.ownerUserId) || Number(data.ownerUserId) <= 0) {
+    throw new Error("An explicit deal owner is required before ingestion");
+  }
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   // ON DUPLICATE KEY UPDATE: if (name, source) already exists, update financials + stage
   // This prevents re-scans from creating duplicate deal rows
-  return db.insert(deals).values(data).onDuplicateKeyUpdate({
+  const sanitized: InsertDeal = {
+    ...data,
+    name: String(data.name).slice(0, 255),
+    source: data.source ? String(data.source).slice(0, 64) : "manual",
+    location: data.location ? String(data.location).slice(0, 255) : undefined,
+    industry: data.industry ? String(data.industry).slice(0, 100) : undefined,
+  };
+  return db.insert(deals).values(sanitized).onDuplicateKeyUpdate({
     set: {
-      revenue: data.revenue,
-      cashFlow: data.cashFlow,
-      askingPrice: data.askingPrice,
-      multiple: data.multiple,
-      employees: data.employees,
-      description: data.description,
+      revenue: sanitized.revenue,
+      cashFlow: sanitized.cashFlow,
+      askingPrice: sanitized.askingPrice,
+      multiple: sanitized.multiple,
+      employees: sanitized.employees,
+      description: sanitized.description,
       updatedAt: new Date(),
     },
   });
@@ -485,7 +494,15 @@ export async function createCommercialAsset(data: InsertCommercialAsset) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const now = Date.now();
-  return db.insert(commercialAssets).values({ ...data, createdAt: now, updatedAt: now });
+  const sanitized: InsertCommercialAsset = {
+    ...data,
+    name: String(data.name).slice(0, 255),
+    address: String(data.address || "Address unlisted").slice(0, 500),
+    city: String(data.city || "Unknown").slice(0, 100),
+    state: String(data.state || "US").slice(0, 50),
+    source: data.source ? String(data.source).slice(0, 100) : "manual",
+  };
+  return db.insert(commercialAssets).values({ ...sanitized, createdAt: now, updatedAt: now });
 }
 
 export async function updateCommercialAssetStatus(id: number, status: typeof commercialAssets.$inferSelect["status"]) {

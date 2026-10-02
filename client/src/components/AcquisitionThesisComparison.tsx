@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import type { compareAcquisitionToThesis } from "@shared/acquisitionThesisComparison";
 import { AlignmentPortrait } from "./AlignmentPortrait";
+import { AcquisitionV2Report } from "./AcquisitionV2Report";
 import type { AlignmentMeasure } from "@shared/alignmentPortrait";
 
 type Comparison = ReturnType<typeof compareAcquisitionToThesis>;
@@ -35,8 +36,9 @@ export function AcquisitionThesisComparison({ jobId }: { jobId: number }) {
   const { data, isLoading, isError, refetch } = trpc.scan.getThesisComparison.useQuery({ jobId });
   if (isLoading) return <p role="status" className="p-4 text-sm">Loading shortlist…</p>;
   if (isError) return <div role="alert" className="p-4 text-sm">Thesis comparison could not load. This is not a no-opportunity result. <button className="underline min-h-11" onClick={() => refetch()}>Retry comparison</button></div>;
-  if (!data) return null;
+  if (!data) return <AcquisitionV2Report jobId={jobId} />;
   return <section aria-label="Thesis comparison" className="border-t border-border p-4 sm:p-5">
+    <AcquisitionV2Report jobId={jobId} />
     <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div><p className="text-xs uppercase tracking-widest text-muted-foreground">Thesis match</p><h3 className="mt-1 text-2xl font-serif">Your shortlist <span className="text-muted-foreground">/ {data.items.length}</span></h3></div>
       <p className="text-sm text-muted-foreground">Saved {new Date(data.createdAt).toLocaleDateString()}</p>

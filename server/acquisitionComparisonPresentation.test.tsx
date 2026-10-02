@@ -2,7 +2,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ query: {} as any, refetch: vi.fn() }));
-vi.mock("@/lib/trpc", () => ({ trpc: { scan: { getThesisComparison: { useQuery: () => ({ ...state.query, refetch: state.refetch }) } } } }));
+vi.mock("@/lib/trpc", () => ({ trpc: { scan: { getV2State: { useQuery: () => ({ data: null }) }, getV2Report: { useQuery: () => ({ data: [] }) }, getThesisComparison: { useQuery: () => ({ ...state.query, refetch: state.refetch }) } } } }));
 vi.mock("wouter", () => ({ Link: ({ children, href }: any) => <a href={href}>{children}</a> }));
 import { AcquisitionThesisComparison, AcquisitionCriterionDetail } from "../client/src/components/AcquisitionThesisComparison";
 afterEach(() => vi.unstubAllGlobals());

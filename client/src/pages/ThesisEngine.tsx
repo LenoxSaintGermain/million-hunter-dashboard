@@ -22,6 +22,7 @@ import { SetAsideHistory } from "@/components/aperture/SetAsideHistory";
 import { CapitalThesisWorkspace } from "@/components/aperture/CapitalThesisWorkspace";
 import { ThesisRequirementPortrait } from "@/components/ThesisRequirementPortrait";
 import { StrategistWorkshop } from "@/components/StrategistWorkshop";
+import { AcquisitionMandateReview } from "@/components/AcquisitionMandateReview";
 import { canOperateCapital } from "@shared/capitalOperatorAccess";
 import { resolveThesisEntryWorkspace } from "@shared/thesisEntryRoute";
 import {
@@ -230,15 +231,16 @@ export default function ThesisEngine() {
     t.templateUsed === "wingate" || t.compiledFilters?.yearBuiltMax != null ||
     t.compiledFilters?.requireHistoricRegister != null || t.compiledFilters?.maxStories != null;
   const utils = trpc.useUtils();
+  const [pendingV2Search, setPendingV2Search] = useState<{ targetLocations: string[]; minCashFlow: number; maxMultiple: number; thesisId?: number; askingPriceMin?: number; askingPriceMax?: number } | null>(null);
   const triggerScan = trpc.scan.trigger.useMutation({
     onSuccess: (d) => {
       toast.success("Pipeline running", {
-        description: `Scan job #${d.jobId} started with thesis parameters. Redirecting to Command Center…`,
+        description: `Search #${d.jobId} started with your confirmed mandate. Opening the sourcing desk…`,
         duration: 4000,
       });
       utils.dashboard.stats.invalidate();
       utils.deals.list.invalidate();
-      setTimeout(() => navigate("/"), 1800);
+      setTimeout(() => navigate(`/scan?v2job=${d.jobId}`), 500);
     },
     onError: (e) => toast.error(`Scan failed: ${e.message}`),
   });
@@ -296,11 +298,7 @@ export default function ThesisEngine() {
     const geoLabel = targetLocations.length > 0
       ? targetLocations.slice(0, 3).join(", ") + (targetLocations.length > 3 ? ` +${targetLocations.length - 3}` : "")
       : "National";
-    toast.info("Thesis approved — launching scan", {
-      description: `Geography: ${geoLabel} · Using the financial criteria in your saved thesis.`,
-      duration: 3000,
-    });
-    triggerScan.mutate({ targetLocations, minCashFlow, maxMultiple, thesisId: compilationId ?? undefined });
+    setPendingV2Search({ targetLocations, minCashFlow, maxMultiple, thesisId: compilationId ?? undefined, askingPriceMin: f.askingPriceMin, askingPriceMax: f.askingPriceMax });
   }
 
   function launchSavedAcquisitionSearch(thesis: any) {
@@ -308,10 +306,7 @@ export default function ThesisEngine() {
     const targetLocations: string[] = filters.geographies ?? [];
     const minCashFlow = filters.cashFlowMin ?? 0;
     const maxMultiple = filters.multipleMax ?? 5;
-    toast.info("Launching acquisition search", {
-      description: "Your thesis is now linked to this discovery run. Progress and results will appear in Command Center.",
-    });
-    triggerScan.mutate({ targetLocations, minCashFlow, maxMultiple, thesisId: thesis.id });
+    setPendingV2Search({ targetLocations, minCashFlow, maxMultiple, thesisId: thesis.id, askingPriceMin: filters.askingPriceMin, askingPriceMax: filters.askingPriceMax });
   }
 
   function handleTemplate(t: { id: string; text: string }) {
@@ -354,6 +349,12 @@ export default function ThesisEngine() {
 
   return (
     <EditorialTopNav>
+      {pendingV2Search && <AcquisitionMandateReview
+        initial={{ geographies: pendingV2Search.targetLocations, ...(pendingV2Search.askingPriceMin != null ? { priceMin: pendingV2Search.askingPriceMin } : {}),
+          ...(pendingV2Search.askingPriceMax != null ? { priceMax: pendingV2Search.askingPriceMax } : {}),
+          ...(pendingV2Search.minCashFlow > 0 ? { sdeMin: pendingV2Search.minCashFlow, watchlistMin: Math.min(400000, pendingV2Search.minCashFlow) } : {}) }}
+        onClose={() => setPendingV2Search(null)}
+        onConfirm={v2Mandate => { const { askingPriceMin, askingPriceMax, ...request } = pendingV2Search; setPendingV2Search(null); triggerScan.mutate({ ...request, v2Mandate, v2Approved: true }); }} />}
       <div className="thesis-reading-desk space-y-6" data-mobile-pane={mobilePane}>
         {/* ── Header ── */}
         <motion.div variants={fadeIn} initial="hidden" animate="visible">

@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { parseAcquisitionListings, type AcquisitionFinancials } from "./acquisitionListing";
 import { researchAcquisitionListings } from "./acquisitionResearch";
+import { acquisitionMandateSchema, evaluateAcquisitionV2, type AcquisitionMandate } from "../shared/acquisitionV2";
+import { saveAcquisitionV2Run, readAcquisitionV2Run, beginAcquisitionV2Run, updateAcquisitionV2RunState, readAcquisitionV2RunState, assertAcquisitionV2JobAccess, ACQUISITION_V2_PENDING_SOURCE, saveAcquisitionV2Scenario } from "./acquisitionV2Runs";
+import type { ListingCapture } from "./acquisitionCapture";
 import { assessAcquisitionListings } from "./acquisitionSourceCheck";
 import { createPrivateScanJob, getPrivateScanJob, getLatestPrivateScanJob, updatePrivateScanJob } from "./privateScanJobs";
 import { assessThesisCriteria, saveThesisReview, readThesisReview, type ThesisReviewSnapshot } from "./acquisitionThesisReview";
@@ -49,6 +52,7 @@ import { agentRouter } from "./routers/agentRouter";
 import { rolePermissionsRouter } from "./rolePermissionsRouter";
 import { researchRouter } from "./routers/research";
 import { apertureRouter } from "./apertureRouter";
+import { dealDocumentRouter } from "./dealDocumentRouter";
 import { PUBLIC_OPPORTUNITIES } from "../shared/publicOpportunities";
 import * as privateWorkspace from "./privateDealWorkspace";
 
@@ -56,6 +60,7 @@ export const appRouter = router({
   system: systemRouter,
   agent: agentRouter,
   aperture: apertureRouter,
+  dealDocument: dealDocumentRouter,
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
@@ -673,15 +678,43 @@ export const appRouter = router({
   }),
 
   scan: router({
+    getV2State: protectedProcedure.input(z.object({ jobId: z.number().int().positive() }))
+      .query(({ ctx, input }) => readAcquisitionV2RunState(ctx.user.id, input.jobId)),
+    getV2Report: protectedProcedure.input(z.object({ jobId: z.number().int().positive() }))
+      .query(({ ctx, input }) => readAcquisitionV2Run(ctx.user.id, input.jobId)),
+    saveV2Scenario: protectedProcedure.input(z.object({
+      jobId: z.number().int().positive(),
+      costs: z.object({
+        ownerReplacement: z.number().finite().nonnegative(),
+        marketRent: z.number().finite().nonnegative(),
+        capexReserve: z.number().finite().nonnegative(),
+        qualifierFee: z.number().finite().nonnegative(),
+        investorReturn: z.number().finite().nonnegative(),
+      }),
+      refusedMoveId: z.string().optional(),
+    }))
+      .mutation(async ({ ctx, input }) => {
+        return saveAcquisitionV2Scenario(ctx.user.id, input.jobId, {
+          costs: input.costs,
+          refusedMoveId: input.refusedMoveId,
+        });
+      }),
     getThesisComparison: protectedProcedure.input(z.object({ jobId: z.number().int().positive() }))
       .query(({ ctx, input }) => readThesisReview(ctx.user.id, input.jobId)),
-    getLatest: protectedProcedure.query(({ ctx }) => getLatestPrivateScanJob(ctx.user.id)),
+    getLatest: protectedProcedure.query(async ({ ctx }) => {
+      const job = await getLatestPrivateScanJob(ctx.user.id);
+      if (!job) return null;
+      await assertAcquisitionV2JobAccess(ctx.user?.id ?? null, job.id);
+      return job;
+    }),
 
     // Poll a specific scan job for real-time progress
     getStatus: protectedProcedure
       .input(z.object({ jobId: z.number() }))
       .query(async ({ input, ctx }) => {
-        return getPrivateScanJob(ctx.user.id, input.jobId);
+        const job = await getPrivateScanJob(ctx.user.id, input.jobId);
+        await assertAcquisitionV2JobAccess(ctx.user?.id ?? null, input.jobId);
+        return job;
       }),
 
 
@@ -692,8 +725,11 @@ export const appRouter = router({
         maxMultiple: z.number().optional(),
         targetLocations: z.array(z.string()).optional(),
         thesisId: z.number().optional(),
+        v2Mandate: acquisitionMandateSchema.optional(),
+        v2Approved: z.literal(true).optional(),
       }).optional())
       .mutation(async ({ input, ctx }) => {
+        if (input?.v2Mandate && !input.v2Approved) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Review and approve the complete V2 mandate before starting research." });
         const sources = input?.sources ?? ["bizbuysell","dealstream","flippa","quietlight","empireflippers"];
         const minCashFlow = input?.minCashFlow ?? 500000;
         const maxMultiple = input?.maxMultiple ?? 6;
@@ -722,13 +758,20 @@ export const appRouter = router({
         // Create the scan job record immediately so the UI can poll it
         const insertResult = await createPrivateScanJob(ctx.user.id, {
           status: "running",
-          sources,
+          sources: input?.v2Mandate ? [...sources, ACQUISITION_V2_PENDING_SOURCE] : sources,
           startedAt: new Date(),
           currentPhase: "Initializing scan engine",
           phaseDetail: `Connecting to ${sources.length} marketplace${sources.length > 1 ? "s" : ""}`,
           progressPct: 2,
         });
         const jobId = insertResult.id;
+        if (input?.v2Mandate) {
+          try { await beginAcquisitionV2Run(ctx.user.id, jobId, input.v2Mandate); }
+          catch (error) {
+            await updatePrivateScanJob(ctx.user.id, jobId, { status: "failed", currentPhase: "Failed", errorMessage: "The approved mandate could not be preserved. No research started.", completedAt: new Date() });
+            throw error;
+          }
+        }
 
         if (thesisId) {
           const db = await getDb();
@@ -745,8 +788,9 @@ export const appRouter = router({
         }
 
         // Run the full pipeline asynchronously — don't await, return immediately
-        runScanPipeline(jobId, sources, minCashFlow, maxMultiple, targetLocations, thesisText, financials, thesisReview, ctx.user.id)
+        runScanPipeline(jobId, sources, minCashFlow, maxMultiple, targetLocations, thesisText, financials, thesisReview, input?.v2Mandate ? { userId: ctx.user.id, mandate: input.v2Mandate } : undefined, ctx.user.id)
           .then(async () => {
+            if (input?.v2Mandate) await updateAcquisitionV2RunState(ctx.user.id, jobId, "completed");
             if (!thesisId) return;
             const db = await getDb();
             const { thesisCompilations } = await import("../drizzle/schema");
@@ -754,7 +798,8 @@ export const appRouter = router({
               .set({ status: "completed" })
               .where(sql`${thesisCompilations.id} = ${thesisId} AND ${thesisCompilations.userId} = ${ctx.user.id} AND ${thesisCompilations.scanJobId} = ${jobId}`);
           })
-          .catch((err) => {
+          .catch(async (err) => {
+            if (input?.v2Mandate) await updateAcquisitionV2RunState(ctx.user.id, jobId, "failed", "Research did not finish. Preserved captures are incomplete; no search conclusion can be drawn.").catch(() => {});
             console.error("[Scan] Pipeline failed:", err);
             updatePrivateScanJob(ctx.user.id, jobId, {
               status: "failed",
@@ -3084,7 +3129,7 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
             impactedAssetClasses: [],
             recommendedAction: sig.recommendedAction ? String(sig.recommendedAction) : undefined,
             confidenceScore: typeof sig.confidenceScore === "number" ? Math.min(1, Math.max(0, sig.confidenceScore)) : 0.7,
-            sourceUrl: citations[0] ?? undefined,
+            sourceUrl: citations[i] ?? citations[0] ?? undefined,
             createdAt: Date.now(),
           });
           inserted++;
@@ -4144,11 +4189,15 @@ async function runScanPipeline(
   thesisText = "",
   financials: AcquisitionFinancials = { cashFlowMin: minCashFlow, multipleMax: maxMultiple },
   thesisReview: Pick<ThesisReviewSnapshot, "userId" | "thesisId" | "weights"> | undefined,
+  v2: { userId: number; mandate: AcquisitionMandate } | undefined,
   ownerUserId: number,
 ) {
   await getPrivateScanJob(ownerUserId, jobId);
-  if (thesisReview && thesisReview.userId !== ownerUserId) throw new TRPCError({ code: "FORBIDDEN", message: "Search owner mismatch." });
+  if ((v2 && v2.userId !== ownerUserId) || (thesisReview && thesisReview.userId !== ownerUserId)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Search owner mismatch." });
+  }
   const principal = { ownerUserId };
+  let captures: ListingCapture[] = [];
   let comparisonSources: ComparisonSource[] = [];
   const comparisonItems: ThesisReviewSnapshot["items"] = [];
   const phase = async (label: string, detail: string, pct: number) =>
@@ -4158,15 +4207,18 @@ async function runScanPipeline(
   await phase("Scanning marketplaces", `Fetching listings from ${sources.join(", ")}`, 10);
 
   // Retrieve individual source records before extracting financial claims.
-  const locationHint = targetLocations.length > 0
-    ? `Focus on these markets: ${targetLocations.join(", ")}.`
-    : "Focus on Southeast/Sun Belt US markets (Atlanta, Charlotte, Raleigh, Tampa, Nashville, Birmingham, Houston).";
+  const searchGeographies = v2 ? v2.mandate.geographies : targetLocations;
+  const locationHint = searchGeographies.length > 0
+    ? `Focus on these operator-confirmed markets: ${searchGeographies.join(", ")}.`
+    : "No additional geographic restriction is imposed by the search form; retain any explicit geography in the thesis.";
   let listings: ReturnType<typeof parseAcquisitionListings> = [];
   try {
     listings = await researchAcquisitionListings({
       thesisText: `${thesisText || "Recession-resistant service businesses"}. ${locationHint}`,
       sources,
+      captureOnly: !!v2,
       onSources: captured => { comparisonSources = captured; },
+      onCaptures: async value => { captures = value; if (v2) await saveAcquisitionV2Run(v2.userId, jobId, v2.mandate, value); },
     });
   } catch (e) {
     console.warn("[Scan] Listing research failed; no successful-empty result recorded");
@@ -4176,10 +4228,31 @@ async function runScanPipeline(
   await phase("Extracting deal data", `Parsing ${listings.length} source listings; criteria not yet applied`, 25);
   await updatePrivateScanJob(ownerUserId, jobId, { listingsFound: listings.length });
 
+  // V2 is an owner-scoped screening receipt, never a mutation of shared scores.
+  // Its approved mandate is the sole financial authority; legacy prefilters do
+  // not veto it. Captures were durably saved before model extraction above.
+  if (v2) {
+    await phase("Applying filters", "Evaluating captured claims against your approved V2 mandate", 70);
+    const reports = captures.flatMap(capture => capture.state === "captured" ? [evaluateAcquisitionV2(capture.evidence, v2.mandate)] : []);
+    const qualifiedCount = reports.filter(report => !report.excluded && ["PURSUE", "WATCHLIST"].includes(report.verdict.value)).length;
+    // Commit the outcome before terminal polling can mount the receipt view.
+    await updateAcquisitionV2RunState(v2.userId, jobId, "completed");
+    await updatePrivateScanJob(ownerUserId, jobId, { status: "completed", currentPhase: "Scan complete", listingsFound: captures.length, listingsQualified: qualifiedCount, dealsScored: 0,
+      phaseDetail: `${qualifiedCount} screening candidates in your V2 receipt. No shared catalog scores changed; unavailable checks and source claims still require review.`, progressPct: 100, completedAt: new Date() });
+    return;
+  }
+
   // ── Phase 2: Filter by criteria ───────────────────────────────────────────
   await phase("Applying filters", "Checking disclosed figures against the saved search criteria", 35);
   const assessments = await assessAcquisitionListings(listings, financials);
-  const qualified = assessments.filter(result => result.eligible).map(result => result.listing);
+  const qualified = assessments.filter(result => {
+    if (!result.eligible) return false;
+    const capture = captures.find(c => c.url === result.listing.listingUrl);
+    if (!capture || capture.state !== "captured") return false;
+    // Availability exclusions apply even to legacy searches after page capture.
+    if (/this listing (?:is )?no longer available|listing status\s*:\s*(sold|pending|under contract|delisted)|sale pending|under contract/i.test(capture.evidence.text)) return false;
+    return true;
+  }).map(result => result.listing);
   const financialRejected = assessments.filter(result => !result.sourceCheck).length;
   const unavailable = assessments.filter(result => result.sourceCheck?.state === "unavailable").length;
   const unchecked = assessments.filter(result => result.sourceCheck?.state === "unverified").length;
