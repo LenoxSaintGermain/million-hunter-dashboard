@@ -4,7 +4,8 @@ import { mkdtempSync, mkdirSync, readFileSync, copyFileSync, writeFileSync, lsta
 import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 const roots = new Set(['Dockerfile','.dockerignore','package.json','pnpm-lock.yaml',
-  'tsconfig.json','tsconfig.node.json','vite.config.ts','components.json','cloudbuild.capital-aperture.yaml']);
+  'tsconfig.json','tsconfig.node.json','vite.config.ts','components.json','cloudbuild.capital-aperture.yaml',
+  'scripts/isolated-integration-identity.mjs', 'scripts/isolated-integration-identity.d.mts']);
 const tracked=execFileSync('git',['ls-files','-z'],{encoding:'utf8'}).split('\0').filter(Boolean);
 const files=tracked.filter(f=>roots.has(f)||/^(client|server|shared|drizzle|patches|attached_assets)\//.test(f)).sort();
 const output=mkdtempSync('/tmp/aperture-release-source.');
