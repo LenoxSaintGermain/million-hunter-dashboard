@@ -3090,24 +3090,79 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
         const focus = (input?.thesis ?? "historic") === "historic"
           ? "historic adaptive-reuse real estate acquisition in US Midwest & Southeast secondary markets — federal/state Historic Tax Credit and Opportunity Zone policy changes, adaptive-reuse incentives, downtown multifamily demand, distressed/vacant historic building supply, capital-market conditions for HTC deals"
           : "small-business acquisition (HVAC, plumbing, cleaning, logistics, home services) in the US Sun Belt — SBA lending changes, seller financing conditions, labor markets, sector consolidation";
-        const res = await fetch("https://api.perplexity.ai/v1/sonar", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-          body: JSON.stringify({
-            model: "sonar-pro",
-            messages: [
-              { role: "system", content: "You are a market intelligence analyst. Report only real, currently-sourced developments with citations. Never fabricate. Output ONLY a JSON array, no prose." },
-              { role: "user", content: `As of ${today}, identify the 3 most important CURRENT market signals affecting ${focus}. Return ONLY a JSON array of exactly 3 objects, each: {"signalType":"institutional|government|seasonal|event|macro_momentum","title":"<=80 chars","summary":"2-3 sentences stating the concrete, recent, sourced fact","direction":"tailwind|headwind|neutral","recommendedAction":"1 sentence","confidenceScore":0.0-1.0}. No text outside the JSON array.` },
-            ],
-          }),
-        });
+        const callSonarSignals = async (url: string) => {
+          return fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+            body: JSON.stringify({
+              model: "sonar-pro",
+              messages: [
+                { role: "system", content: "You are a market intelligence analyst. Report only real, currently-sourced developments with citations. Never fabricate. Output ONLY a JSON array, no prose." },
+                { role: "user", content: `As of ${today}, identify the 3 most important CURRENT market signals affecting ${focus}. Return ONLY a JSON array of exactly 3 objects, each: {"signalType":"institutional|government|seasonal|event|macro_momentum","title":"<=80 chars","summary":"2-3 sentences stating the concrete, recent, sourced fact","direction":"tailwind|headwind|neutral","recommendedAction":"1 sentence","confidenceScore":0.0-1.0}. No text outside the JSON array.` },
+              ],
+            }),
+          });
+        };
+
+        let res = await callSonarSignals("https://api.perplexity.ai/v1/sonar").catch(() => null);
+        if (!res || !res.ok) {
+          res = await callSonarSignals("https://api.perplexity.ai/chat/completions");
+        }
         if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Sonar API error ${res.status}` });
+
         const data: any = await res.json();
         const content: string = data.choices?.[0]?.message?.content ?? "";
         const citations: string[] = Array.isArray(data.citations) ? data.citations : [];
-        const match = content.match(/\[[\s\S]*\]/);
+
+        const tryParse = (t: string) => { try { return JSON.parse(t); } catch { return null; } };
+        const cleaned = content.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+        let parsed = tryParse(cleaned);
+        if (!parsed) {
+          const a = cleaned.indexOf("["), b = cleaned.lastIndexOf("]");
+          if (a >= 0 && b > a) parsed = tryParse(cleaned.slice(a, b + 1));
+        }
+        if (!parsed) {
+          const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
+          if (a >= 0 && b > a) parsed = tryParse(cleaned.slice(a, b + 1));
+        }
+
         let signals: any[] = [];
-        try { signals = match ? JSON.parse(match[0]) : []; } catch { signals = []; }
+        if (Array.isArray(parsed)) {
+          signals = parsed;
+        } else if (parsed && typeof parsed === "object") {
+          const arr = Object.values(parsed).find((v) => Array.isArray(v));
+          if (Array.isArray(arr)) signals = arr as any[];
+          else if ((parsed as any).signalType && (parsed as any).title) signals = [parsed];
+        }
+
+        // Schema repair fallback: use GEMINI_FAST if Sonar returned prose or unparseable JSON
+        if (!signals.length && content.trim()) {
+          try {
+            const { invokeLLM } = await import("./_core/llm");
+            const repairPrompt = `Extract exactly 3 market intelligence signals from the text below.
+Schema: JSON array of objects with keys:
+- signalType: one of "institutional", "government", "seasonal", "event", "macro_momentum"
+- title: string (<= 80 chars)
+- summary: string (2-3 sentences)
+- direction: one of "tailwind", "headwind", "neutral"
+- recommendedAction: string (1 sentence)
+- confidenceScore: number (0.0 to 1.0)
+
+Output ONLY valid JSON array.
+
+Text:
+${content.slice(0, 4000)}`;
+            const fbRes = await invokeLLM({
+              messages: [{ role: "user", content: repairPrompt }],
+            });
+            const fbText = (fbRes.choices?.[0]?.message?.content as string ?? "").replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+            const fbParsed = tryParse(fbText) ?? (fbText.includes("[") ? tryParse(fbText.slice(fbText.indexOf("["), fbText.lastIndexOf("]") + 1)) : null);
+            if (Array.isArray(fbParsed)) signals = fbParsed;
+          } catch (repairErr) {
+            console.warn("[Sentinel] Schema repair fallback failed:", repairErr);
+          }
+        }
+
         if (!signals.length) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Sonar returned no parseable signals — try again" });
 
         // Retire the previous batch so the board reflects the latest research.
@@ -3120,7 +3175,9 @@ ${assetData.isHistoric || assetData.historicRegisterEligible ? 'SCORING NOTE: Fo
         const validTypes = ["institutional", "government", "seasonal", "event", "macro_momentum"] as const;
         const validDir = ["tailwind", "headwind", "neutral"] as const;
         let inserted = 0;
-        for (const sig of signals.slice(0, 3)) {
+        const topSignals = signals.slice(0, 3);
+        for (let i = 0; i < topSignals.length; i++) {
+          const sig = topSignals[i];
           await insertMacroSignal({
             signalType: (validTypes.includes(sig.signalType) ? sig.signalType : "macro_momentum") as typeof validTypes[number],
             title: String(sig.title ?? "").slice(0, 255),
