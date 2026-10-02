@@ -1,0 +1,24 @@
+/* A browsing edition, not a compressed desktop column. */
+@media(max-width:600px){
+ #overview .masthead{margin-bottom:16px;padding-bottom:8px;font-size:11px}
+ #overview .masthead .eyebrow{font-size:9px;letter-spacing:.04em}
+ #overview .lead{padding-bottom:16px;margin-bottom:16px}
+ #overview .lead>.eyebrow{font-size:9px}
+ #overview .lead h1{font-size:28px;max-width:26ch;margin:8px 0 12px}
+ #overview .lead-deck{font-size:14px;line-height:1.45;margin:10px 0}
+ #overview .lead-action{gap:10px;margin-top:12px}
+ #overview .lead-action p{font-size:12px;line-height:1.4;margin:0}
+ #overview .lead-action button{min-height:44px;font-size:13px}
+ #overview>.columns{margin-top:12px;gap:12px}
+ #overview .section-head{padding:8px 0}
+ #overview .section-head h2{font-size:23px}
+ #overview .list-caption{font-size:11px;line-height:1.4;margin:8px 0}
+ #overview-list{display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:88%;overflow-x:auto;scroll-snap-type:x proximity;gap:12px;padding:2px 2px 12px;overscroll-behavior-x:contain}
+ #overview-list .mini-profile{scroll-snap-align:start;gap:10px;padding:14px}
+ #overview-list .mini-profile h3{font-size:24px}
+ #overview-list .mini-profile .senior-row-hint{font-size:14px!important}
+ #overview-list:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+ #overview .compact{padding:12px 0}
+ #deal[hidden]{display:none!important}
+ #overview[hidden] .advisor-mobile-launch,#opportunities[hidden] .advisor-mobile-launch{display:none!important}
+}

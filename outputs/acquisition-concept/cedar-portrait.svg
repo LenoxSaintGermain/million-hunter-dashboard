@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 390" role="img" aria-label="Cedar HVAC thesis portrait: asking $1,770,000 against a one to five million dollar target; reported annual cash flow $506,000 against a three hundred thousand to one million dollar target. Recurring revenue and management continuity unresolved. Illustrative, not verified.">
+ <style>.portrait-kicker{font:11px monospace;letter-spacing:1.4px}.portrait-title{font:32px Georgia,serif}.portrait-label{font:12px monospace}.portrait-value{font:27px Georgia,serif}.portrait-band{fill:#faf8f1;stroke:#608570;stroke-width:1.5}.portrait-marker{fill:#faf8f1;stroke:#111c23;stroke-width:4}.portrait-gap{font:13px monospace}</style><rect width="760" height="390" fill="#e7ece7"/>
+ <circle cx="690" cy="40" r="160" fill="none" stroke="currentColor" opacity=".07"/><circle cx="690" cy="40" r="120" fill="none" stroke="currentColor" opacity=".07"/>
+ <text x="32" y="35" class="portrait-kicker">SIGNAL HUNTER / THESIS × REALITY</text><text x="728" y="35" text-anchor="end" class="portrait-kicker">COMPOSITE</text>
+ <text x="32" y="78" class="portrait-title">Cedar HVAC</text>
+ <text x="32" y="115" class="portrait-label">01 / ASKING PRICE</text><text x="728" y="115" text-anchor="end" class="portrait-value">$1,770,000</text>
+ <line x1="96" y1="151" x2="664" y2="151" stroke="currentColor" opacity=".3"/>
+ <rect x="190.67" y="129" width="378.66" height="44" class="portrait-band"/>
+ <circle cx="263.56" cy="151" r="13" class="portrait-marker"/><line x1="263.56" y1="170" x2="263.56" y2="183" stroke="currentColor"/>
+ <text x="96" y="198" class="portrait-label">$0</text><text x="380" y="198" text-anchor="middle" class="portrait-label">TARGET $1M–$5M</text><text x="664" y="198" text-anchor="end" class="portrait-label">$6M</text>
+ <text x="32" y="232" class="portrait-label">02 / ANNUAL CASH FLOW</text><text x="728" y="232" text-anchor="end" class="portrait-value">$506,000</text>
+ <line x1="96" y1="265" x2="664" y2="265" stroke="currentColor" opacity=".3"/>
+ <rect x="238" y="243" width="331.33" height="44" class="portrait-band"/><circle cx="335.50666666666666" cy="265" r="13" class="portrait-marker"/>
+ <text x="96" y="310" class="portrait-label">$0</text><text x="404" y="310" text-anchor="middle" class="portrait-label">TARGET $300K–$1M</text><text x="664" y="310" text-anchor="end" class="portrait-label">$1.2M</text>
+ <path d="M0 336H760V390H0Z" fill="#e4bf91"/><text x="32" y="369" class="portrait-gap">? RECURRING REVENUE</text><text x="420" y="369" class="portrait-gap">? MANAGEMENT CONTINUITY</text>
+ </svg>

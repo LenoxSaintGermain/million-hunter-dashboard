@@ -1,0 +1,24 @@
+/* Newspaper worksheet: native numeric controls, no simulated letter-entry boxes. */
+.financing-assist{margin:26px 0;border-block:3px double var(--ink);padding:0;background:var(--paper)}
+.financing-assist>details>summary{display:grid;grid-template-columns:1fr auto;gap:8px 20px;padding:20px;cursor:pointer;list-style:none}
+.financing-assist>details>summary::-webkit-details-marker{display:none}
+.finance-kicker{grid-column:1/-1;font:10px/1.5 monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.finance-title{font:30px/1.1 Georgia,serif;letter-spacing:-.03em}
+.finance-invite{align-self:end;font:italic 13px Georgia,serif;text-decoration:underline;text-underline-offset:4px}
+.financing-assist>details[open]>summary{border-bottom:1px solid var(--rule)}
+.financing-assist>details>p,.financing-assist>details>form,.financing-assist>details>details,.finance-result{margin:18px 20px}
+.finance-intro{font:17px/1.5 Georgia,serif;max-width:54ch}
+.financing-assist form>label{display:block;font:12px/1.5 system-ui;margin:16px 0;color:var(--muted)}
+.financing-assist input,.financing-assist select{box-sizing:border-box;max-width:100%;color:var(--ink);border-radius:0;background:transparent}
+.financing-assist form>label input,.financing-assist select{display:block;width:100%;min-height:44px;border:0;border-bottom:1px solid var(--ink);padding:8px 0;font:16px/1.4 Georgia,serif}
+.finance-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--ink);border-left:1px solid var(--ink);margin-top:24px}
+.finance-fields label{position:relative;display:flex;flex-direction:column;padding:14px 16px 10px 30px;border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);font:12px/1.4 system-ui;min-width:0;background:linear-gradient(transparent 31px,color-mix(in srgb,var(--rule) 35%,transparent) 32px);background-size:32px 32px}
+.clue-number{position:absolute;left:8px;top:8px;font:10px monospace}
+.finance-fields input{width:100%;min-width:0;min-height:56px;border:0;font:36px/1.2 Georgia,serif;font-variant-numeric:tabular-nums;padding:8px 0}
+.finance-fields label:focus-within{background-color:var(--bone);box-shadow:inset 3px 0 var(--amber)}
+.financing-assist :is(input,select,summary,button):focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.finance-clue{font:italic 13px/1.5 Georgia,serif;color:var(--muted)}
+.financing-assist .finance-check{min-height:44px;border:1px solid var(--ink);border-radius:0;background:var(--ink);color:var(--paper);padding:12px 18px;font:14px Georgia,serif}
+.finance-result:empty{display:none}.finance-result{border-top:1px solid var(--ink);padding-top:12px}.finance-result strong{font:40px Georgia,serif}.finance-result p{line-height:1.5}
+.financing-assist>details>details{border-top:1px solid var(--rule);padding-top:12px;font-size:14px;line-height:1.5}.financing-assist>details>details summary{min-height:44px;cursor:pointer}
+@media(max-width:500px){.financing-assist>details>summary{grid-template-columns:1fr;padding:16px}.finance-invite{justify-self:start}.finance-title{font-size:27px}.finance-fields label{padding-left:25px}.finance-fields input{font-size:29px}.financing-assist>details>p,.financing-assist>details>form,.financing-assist>details>details,.finance-result{margin:16px}}

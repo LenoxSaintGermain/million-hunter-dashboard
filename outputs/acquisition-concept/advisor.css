@@ -1,0 +1,54 @@
+/* The Senior: newspaper ink, one amber pencil. Candidate identity, not approved canon. */
+#advisor-widget{position:absolute;right:0;top:16px;width:240px;z-index:2;color:var(--ink)}
+.advisor-box{background:var(--bone);padding-bottom:12px;border-bottom:1px solid var(--ink)}
+.advisor-brand{display:grid;grid-template-columns:132px 1fr;align-items:center;gap:12px;position:sticky;top:12px;background:var(--bone);z-index:1}
+.advisor-home{width:132px;height:160px;border:1.5px solid var(--ink);background:var(--paper);overflow:visible}
+.advisor-art{display:block;width:100%;height:100%;overflow:visible;color:var(--ink)}
+.advisor-brand h2{font:bold 27px/.95 Georgia,serif;letter-spacing:-1px;margin:8px 0}
+.advisor-brand p{font:italic 12px/1.4 Georgia,serif}
+.advisor-brand .eyebrow{font-size:9px;letter-spacing:.04em}
+.advisor-label{font:11px/1.45 system-ui,sans-serif;color:var(--muted);margin:12px 0}
+.advisor-desktop-controls,.advisor-playback{display:flex;gap:10px;flex-wrap:wrap}
+#advisor-widget button,.advisor-sheet button{border-radius:0;min-height:44px;background:var(--paper);color:var(--ink);font:12px/1.4 system-ui,sans-serif}
+.advisor-desktop-controls button,.advisor-playback button{padding:6px 0;border:0;border-bottom:1px solid var(--ink);background:none!important}
+.advisor-status{font:11px/1.4 system-ui,sans-serif;color:var(--muted);margin:12px 0}
+.advisor-balloon{border:1px solid var(--ink);padding:12px;margin:10px 0;font:15px/1.4 Georgia,serif;background:var(--paper);clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
+.advisor-balloon .eyebrow{display:block;font-size:9px;margin-bottom:5px}
+.advisor-balloon.operator{margin-left:15px;background:var(--bone)}
+.advisor-choices{display:grid;gap:6px}.advisor-choices button{text-align:left;border:1px solid var(--ink)}
+.advisor-history{border-top:1px solid var(--rule);margin-top:12px;font-size:12px}
+.advisor-history summary{min-height:44px;padding:12px 0;cursor:pointer}
+.advisor-history ol{list-style:none;padding:0;margin:0;max-height:45vh;overflow-y:auto}
+.advisor-history li{border-bottom:1px solid var(--rule)}
+.advisor-history button{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;text-align:left;width:100%;padding:10px 0;border:0;background:none}
+.advisor-history .advisor-art{height:44px}.advisor-history small,.advisor-history em{display:block;font-size:10px;color:var(--muted);margin:4px 0}
+.advisor-tail{position:absolute;inset:0 auto auto 0;overflow:visible;pointer-events:none;z-index:-1}
+.advisor-tail path{fill:none;stroke:var(--ink);stroke-width:1;stroke-dasharray:1400;animation:tail-pencil .5s ease-out}
+.advisor-pointed{text-decoration:underline!important;text-decoration-thickness:2px!important;text-underline-offset:4px;background-color:var(--paper)}
+.advisor-mobile-launch{display:none}
+.advisor-sheet{inset:auto 0 0;margin:0;width:100%;height:auto;max-height:78dvh;border:1px solid var(--ink);padding:18px;background:var(--bone);color:var(--ink)}
+.advisor-sheet header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.advisor-sheet h2{font:22px Georgia,serif}.advisor-sheet .advisor-history ol{max-height:none}
+.advisor-sheet::backdrop{background:color-mix(in srgb,var(--ink) 25%,transparent)}
+.wanted-ad{border:3px double var(--ink);padding:24px;background:var(--bone);margin-top:16px}
+.wanted-ad .wanted-masthead{display:flex;justify-content:space-between;border-bottom:1px solid var(--ink);padding-bottom:8px;font:10px monospace;letter-spacing:.08em}
+.wanted-ad h3{font:bold clamp(32px,7vw,64px)/1 Georgia,serif;text-align:center;letter-spacing:.06em;margin:18px 0 8px}
+.wanted-ad .wanted-subtitle{text-align:center;font:italic 17px Georgia,serif;margin-bottom:18px}
+.wanted-ad #thesis-sentence{font:22px/1.5 Georgia,serif;text-align:left}
+.wanted-ad .draft-stamp{margin-top:12px}
+@keyframes tail-pencil{from{stroke-dashoffset:1400}to{stroke-dashoffset:0}}
+@media(min-width:701px) and (max-width:1099px){#advisor-widget{position:relative;top:0;width:100%;margin:18px 0}.advisor-brand{grid-template-columns:132px 1fr}.advisor-box{max-width:650px}.advisor-balloons{display:grid;grid-template-columns:1fr 1fr;gap:12px}.advisor-tail{display:none}}
+@media(max-width:700px){
+ #deal:not(.show-workbench)>#advisor-widget{display:block!important}
+ #deal:not(.show-workbench)>#advisor-sheet[open]{display:block!important}
+ #deal:has(#advisor-widget){padding-bottom:120px}
+ #advisor-widget{position:static;width:auto}
+ #advisor-widget>.advisor-box{display:none}
+ .advisor-mobile-launch{position:fixed;bottom:0;right:0;left:0;width:100%;display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:8px 16px max(8px,env(safe-area-inset-bottom));border:0;border-top:1px solid var(--ink);background:var(--paper)!important;z-index:8;text-align:left}
+ .advisor-mobile-launch .advisor-art{width:64px;height:64px;flex:none;border:1px solid var(--ink);order:2}
+ .advisor-mobile-launch>span{max-width:250px}.advisor-mobile-launch strong{font:18px Georgia,serif}.advisor-mobile-launch small{display:block;font-size:10px;margin-top:4px}
+ .advisor-tail{display:none}.advisor-sheet .advisor-label{margin:8px 0}
+ .wanted-ad{padding:16px}.wanted-ad #thesis-sentence{font-size:19px}
+}
+@media(prefers-reduced-motion:reduce){.advisor-tail path{animation:none!important}}
+.advisor-playback button:disabled{opacity:.45;cursor:default;text-decoration:none}
