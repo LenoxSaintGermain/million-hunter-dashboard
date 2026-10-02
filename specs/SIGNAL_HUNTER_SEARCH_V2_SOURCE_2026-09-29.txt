@@ -1,0 +1,471 @@
+﻿Signal Hunter: Business Search Module Update Spec (v2)
+Sep 29, 2026 · @Lenox Lucian
+Summary
+This update makes the business search module verify every number against its source, enforce the mandate as hard gates, and add a game theory layer that predicts how each deal can fail after close.
+Problem. In September 2026 three agents (Gemini, Muse, Grokbot) ran the same scout prompt. All three produced correct arithmetic on at least one wrong or incomplete input: a multiple computed on the wrong base, margins divided by asking price, values marked "not disclosed" that were on the page, invented licensing strategies, and off-mandate deals padded into the top five. An earlier codebase audit found sourcing modules running on fabricated data. For a product sold as "kill bad deals before you spend," one fabricated number is fatal.
+Goals
+1. Zero unverified numbers in any output: every figure carries a source URL and a verbatim capture.
+2. 100% of computed ratios recomputed by code, never by the model.
+3. Hard mandate gates applied before ranking, so no off-mandate deal reaches PURSUE.
+4. Every PURSUE deal ships with a game theory read: the players, the failure games, a protected vs. unprotected expected value, and a walk-away condition.
+Non-goals (this version)
+* New listing sources or scrapers beyond what the Sonar data layer (spec 005) already provides.
+* Broker outreach automation. Output stays read-only; no messages sent.
+* Full quality-of-earnings analysis from tax returns. That is a later diligence stage.
+* UI changes beyond rendering the new output schema.
+Failure modes this update must fix
+Every failure below happened in September 2026 runs; each maps to a requirement in the sections that follow.
+ID
+	Failure
+	Real example
+	Fixed by
+	F1
+	Ratio on the wrong base
+	HVAC "owner benefit margin" of 34.1% was SDE ÷ asking price; true margin was 21.6%
+	Ratios computed in code (V3)
+	F2
+	Disclosed value marked unknown
+	$1.85M septic revenue marked "not disclosed"; page showed $3,590,234. Brevard septic ask shown as "N/A"; page showed $1,150,000
+	Field completeness check (V4)
+	F3
+	Wrong multiple, over-cap deal ranked
+	Fire protection listed as "3.2x to 3.5x"; true 4.1x, and $3.5M ask exceeded the $3.0M cap
+	Hard gates (G1)
+	F4
+	Invented terms or strategies
+	"Qualifying Party Arbitrage" presented as a licensing strategy
+	No-invention rule (V6)
+	F5
+	PURSUE on a mandate violation
+	Collier manufacturer whose seller rejects passive buyers; Texas ice distributor with 94% of revenue in 3 customers; $3M septic with no SBA and no seller financing
+	Hard gates (G2 to G6)
+	F6
+	Padding the top five
+	Oilfield excavation contractor ranked to fill a slot
+	Return-fewer rule (G8)
+	F7
+	Watchlist floor breached
+	Deals at $300K and $280K SDE on the watchlist
+	Band gate (G7)
+	F8
+	Opposite verdicts on the same facts
+	Collier manufacturer: HARD FAIL in one run, PURSUE in the next
+	Deterministic verdict function (G9)
+	F9
+	Source link is a search page
+	Two Muse citations pointed to category pages
+	Listing-level URL required (V1)
+	F10
+	Same business, conflicting numbers
+	Winter Park and Winter Garden machine shops: same ask and equipment, SDE of $626K vs $430K
+	Cross-listing conflict detector (V7)
+	F11
+	Overstated "net"
+	$444K "net" ignored truck reserve, qualifier fee, and investor return; realistic figure was about $303K
+	Cash waterfall standard (V5)
+	F12
+	Numbers taken from search snippets
+	Search engines attached one featured listing's figures to unrelated results
+	Fetched page only (V1)
+	Mandate parameters and hard gates
+The mandate moves out of the prompt and into a versioned config file; gates run in code before any model ranks or writes.
+P0: mandate config (config/mandate.json, loaded per run, version stamped on every report)
+{
+ "mandate_version": "2026-09-29",
+ "price": { "min": 1200000, "max": 3000000 },
+ "sde": { "min": 600000, "watchlist_min": 400000 },
+ "sde_margin_min": 0.15,
+ "financing": {
+   "equity_injection_pct": 0.10,
+   "injection_base": "total_project",
+   "closing_costs_estimate": 100000,
+   "loan_rate_assumption": 0.10,
+   "loan_term_years": 10,
+   "dscr_min": 1.25
+ },
+ "management": { "required": true, "owner_hours_target_per_week": 5 },
+ "concentration": { "single_customer_max": 0.15, "top3_fail": 0.50 },
+ "geography": {
+   "primary": ["FL", "GA", "AL", "SC", "NC", "TN", "TX", "AZ"],
+   "remote_allowed_categories": ["manufacturing", "distribution"]
+ },
+ "output": { "max_ranked": 5, "allow_fewer": true }
+}
+P0: gates. Each returns pass, fail, cap (limits the best possible verdict), or unknown.
+Gate
+	Rule
+	On failure
+	G1 Price
+	Ask within price.min to price.max
+	FAIL
+	G2 Earnings
+	SDE at or above sde.min
+	WATCHLIST if in the watchlist band, else FAIL
+	G3 Margin
+	SDE ÷ revenue at or above 15%
+	FAIL; revenue truly absent → HOLD
+	G4 Financing
+	Not SBA-eligible AND no seller financing → FAIL. Modeled DSCR below 1.25 → FAIL
+	FAIL
+	G5 Management
+	Listing requires an owner-operator or rejects passive buyers → FAIL. No evidence of a management layer → cap at WATCHLIST
+	FAIL or cap
+	G6 Status
+	Under contract, sale pending, or delisted
+	Excluded from output
+	G7 Watchlist band
+	Watchlist requires SDE of $400K to $599K plus a named moat
+	Not listed
+	G8 Return fewer
+	Never fill ranked slots with deals that failed G1 to G5
+	Rank only what passes
+	G9 Determinism
+	Verdict = pure function of gate results and red-flag severities, computed in code
+	Model may explain a verdict, never set or override it
+	G10 Concentration
+	Disclosed top three customers above 50% of revenue → FAIL. One customer above 15% → cap at WATCHLIST
+	FAIL or cap
+	G11 Moat evidence
+	Listing text must show recurring or mandated revenue (maintenance contracts, required inspections, certifications, route density). None found → cap at WATCHLIST
+	Cap
+	G12 Approximate figures
+	Any core figure marked approximate (≈, "about", "roughly")
+	HOLD until exact figures are obtained
+	Verdict precedence: FAIL > HOLD > WATCHLIST > PURSUE. A deal reaches PURSUE only when every gate passes and no red flag is rated critical.
+Acceptance criteria
+* ☐ Changing a value in mandate.json changes gate outcomes with no prompt edits.
+* ☐ Every report prints the mandate_version it ran against.
+* ☐ Re-running the same listing snapshot twice yields the identical verdict.
+Extraction and verification rules
+The model finds the text; code parses it and does the math. No figure reaches output without a verbatim capture behind it.
+V1 Source of truth (P0). Numbers come only from a fetched, listing-level page, never from search snippets or category pages. Store per field: URL, fetch timestamp, and the verbatim text span. If the primary site blocks fetch, a mirror listing page is allowed and every figure from it is tagged source: mirror.
+V2 Typed extraction (P0). The model returns text spans; a deterministic parser converts them to values. Fields:
+Field
+	Type
+	Notes
+	ask, revenue, sde, ebitda
+	integer USD
+	Parser tolerates typos such as "$180,00"; flags them instead of guessing
+	real_estate
+	{status, value, included}
+	status: owned, leased, home-based, on request
+	inventory, ffe
+	{value, included}
+	
+
+	employees
+	{full_time, part_time}
+	
+
+	lease
+	{expiration, monthly_rent}
+	
+
+	financing
+	{sba_eligible, seller_financing, terms_text}
+	terms_text kept verbatim
+	reason_for_selling, established, listing_date
+	string / year / date
+	
+
+	licensing_text, management_text
+	verbatim
+	Feeds gates G5 and red flags
+	V3 Ratios in code (P0). The model never computes. Code computes and prints each formula with its inputs:
+* multiple = ask ÷ sde
+* sde_margin = sde ÷ revenue (never ÷ ask)
+* inventory_pct = inventory ÷ revenue
+* hard_asset_share = (inventory + ffe + real estate if included) ÷ ask; goodwill = ask − hard assets
+* debt_service from the standard amortization formula at config rate and term
+* implied_rate solved from any seller-stated payment terms (for example, 204 payments of $9,452.61 on $970K implies about 9.25%)
+* dscr = sde ÷ annual debt service
+V4 Field completeness (P0). After extraction, a second pass scans the page for each empty field's labels. If a label has a value, extraction failed: retry, then fail the run for that listing. Allowed states are value, not_disclosed (label absent), and on_request (label present, value gated).
+V5 Cash waterfall (P0). Every PURSUE and WATCHLIST deal shows: SDE → owner replacement (if the owner works in the business) → market rent (if seller-owned real estate is excluded) → debt service → capex reserve → license qualifier fee → investor preferred return → distributable cash, pre-tax. The word "net" is banned. Defaults live in config and are labeled as assumptions.
+V6 No invention (P0). Licensing, legal, and tax claims must cite a source or be written as a verify: item. Customer names appear only if they are on the page. Maintain a banned-terms list, starting with "Qualifying Party Arbitrage."
+V7 Cross-listing conflict detector (P1). Fingerprint each listing on category, city or county, ask, FF&E, and year established. When two listings match and SDE or revenue differs by more than 10%, raise financial_year_conflict and generate the broker question: "Which fiscal year does each figure reflect?"
+Red-flag detectors
+Each detector is a rule on extracted fields or verbatim text, returns a severity, and emits one broker question. A critical flag forces FAIL; three or more high flags cap the verdict at WATCHLIST.
+ID
+	Flag
+	Trigger
+	Severity
+	Broker question it generates
+	R1
+	License holder at risk
+	Licensing required and holder is the owner, undisclosed, or "will consider" staying
+	High
+	Who holds each license, are they staying, and on what written terms?
+	R2
+	Family as management
+	Management text names relatives (brother, father, spouse, son)
+	High
+	Are family members on payroll at market rates, and will they sign retention agreements?
+	R3
+	Union pension
+	Text mentions a union or collective bargaining
+	High
+	Is the pension a multiemployer plan, and what is the estimated withdrawal liability?
+	R4
+	Short or expired lease
+	Lease ends before the loan term, or the stated expiration has passed
+	High
+	What are the current lease status, renewal options, and assignability?
+	R5
+	Rent missing from SDE
+	Seller owns real estate that is excluded from the sale
+	Medium
+	Is market rent already deducted in SDE?
+	R6
+	Heavy inventory
+	Inventory above 15% of revenue
+	Medium
+	Will inventory be counted at close with a price adjustment?
+	R7
+	SDE equals EBITDA
+	Identical figures
+	Medium
+	Does the owner draw a salary on the books?
+	R8
+	Margin outlier
+	SDE margin above the category's 90th percentile (config table)
+	Medium
+	Please itemize every add-back.
+	R9
+	Stale or reduced
+	Listed more than 9 months, or "price reduced" in text
+	Medium
+	Why hasn't it sold, and what offers were declined?
+	R10
+	Seller moving on
+	"Other business interests" or "motivated seller"
+	Medium
+	Is the new venture competitive, and will the seller sign a non-compete?
+	R11
+	Financing refusal
+	"Will not qualify for SBA" or "cash only"
+	Critical when seller financing is also absent; otherwise High
+	Why is SBA unavailable?
+	R12
+	Customer concentration
+	Disclosed share above config limits
+	Per gate G10
+	Top-five customers by revenue share?
+	R13
+	Platform dependency
+	One counterparty sets price, dispatch, or access (a ride network, a single general contractor, a franchisor)
+	Critical if one counterparty exceeds 50% of revenue
+	Can the counterparty change terms unilaterally?
+	R14
+	Revenue per employee outlier
+	Above the category's 90th percentile
+	Medium
+	What share of revenue is pass-through equipment or subcontracting?
+	R15
+	Thin transition
+	Under 30 days of training where the owner works in the business
+	Medium
+	Will the seller commit to 90 days of paid transition?
+	Acceptance criteria
+* ☐ Each detector has a unit test with a positive and a negative fixture drawn from the golden deals in the acceptance tests section.
+* ☐ Broker questions are generated from templates, never free-written by the model.
+Game theory analysis logic
+For every deal that clears the gates, the module identifies who can hurt the buyer after close, which strategic game each creates, the countermove, and how much the countermoves are worth in expected cash. Probabilities and shifts come from a config table, never from the model.
+flowchart LR
+ A[Verified fields + red flags] --> B[1. Players]
+ B --> C[2. Game detectors]
+ C --> D[3. Scenario simulation]
+ D --> E[4. Moves + walk-away]
+ E --> F[Deal report]
+Step 1: Players (P0)
+Build a player record for each party found in the listing text, plus defaults (seller, broker, lender, competing buyers). Fields: role, source_span, leverage_pre_close and leverage_post_close (0 to 3), and outside_option.
+Seller outside option is computed, not guessed: seller_hourly = sde ÷ (owner_hours_per_week × 52). Above $1,000 an hour means a strong fallback: the seller loses little by not selling.
+Step 2: Game detectors (P0)
+Game
+	Detects
+	Trigger
+	Countermove emitted
+	Hold-up
+	A party gains leverage after close
+	Any player with post-close leverage above pre-close; terms "to be agreed" after closing (R1); short lease (R4)
+	Fix price and term in the LOI as a closing condition; add vesting profit share
+	Lemons
+	Seller knows something the buyer does not
+	Multiple below the category's 25th percentile, R9, or R10
+	Screening menu: Option A at full ask with a 10% to 15% seller note; Option B at 92% of ask with less seller financing. The seller's choice is the signal
+	Defection
+	A key person can compete after close
+	A player holds a license, customer relationships, or the lead engine (R1, R2)
+	Non-compete and non-solicit per named person, not just the seller
+	Auction
+	Other buyers will bid
+	Multiple below category median, or listing under 60 days old
+	Compete on certainty: SBA pre-qualification, proof of equity, short diligence window
+	Bargaining
+	Who can wait longer
+	Seller outside option (Step 1)
+	Strong fallback: hold price, negotiate terms. Weak fallback (retiring, stale, reduced): negotiate price
+	Platform
+	One counterparty controls price or access
+	R13
+	Critical flag; recommend no investment until terms are contractual
+	Step 3: Scenario simulation (P0)
+Four scenarios, with cash from the V5 waterfall:
+Scenario
+	Cash rule
+	Base probability
+	Clean
+	Distributable as modeled
+	60%
+	SDE haircut
+	Distributable minus 15% of SDE
+	20%
+	Hold-up or key-person exit
+	Distributable minus 25% of SDE
+	12%
+	Defection or collapse
+	Zero distributable
+	8%
+	Shifts from triggered flags, applied before normalizing (clean absorbs the difference):
+Flag
+	Shift
+	R1 license holder at risk
+	Hold-up +5
+	R2 family as management
+	Hold-up +5, defection +3
+	R7, R8, or R14
+	Haircut +5
+	R9 or R10
+	Haircut +3, defection +2
+	R3 union
+	Collapse +3
+	Protected case: apply the emitted countermoves, then halve hold-up and defection probabilities, and move half the haircut probability to a repriced state (cash = modeled distributable after a price reduction equal to the haircut times the multiple). Report expected value unprotected, expected value protected, and the difference.
+P1: Monte Carlo band. 10,000 draws over interest rate (±1.5 points), SDE haircut (0% to 25%), and capex (±30%). Report P10, P50, P90 distributable cash and the probability that DSCR falls below 1.25.
+Step 4: Moves and walk-away (P0)
+Rank countermoves by expected-value gain. The walk-away condition is the countermove with the largest gain: if the seller refuses it, the verdict drops to WATCHLIST with reason walk_away_triggered.
+Worked check (the $1.85M septic deal): R1 and R2 fire. With clean distributable cash of $330K (before investor returns), the tables above give about $234K expected unprotected and $276K protected, and the walk-away is retention agreements for the brother and father.
+Acceptance criteria
+* ☐ Probabilities, shifts, and haircuts load from config/game_theory.json; the report prints its version.
+* ☐ Output is labeled "judgment-based priors, not a statistical forecast."
+* ☐ The septic worked check reproduces within ±$5K.
+* ☐ A platform-dependent deal (Cybercab fixture) returns FAIL via R13.
+Output schema per deal
+Every deal renders from this record; the narrative layer may only explain fields that exist in it.
+{
+ "deal_id": "sha1(listing_url)",
+ "mandate_version": "2026-09-29",
+ "game_theory_version": "2026-09-29",
+ "source": { "url": "...", "fetched_at": "ISO-8601", "type": "primary | mirror" },
+ "fields": { "ask": { "value": 1850000, "state": "value", "span": "Asking Price $1,850,000" } },
+ "ratios": { "multiple": { "value": 2.63, "formula": "1850000 / 702537" } },
+ "gates": [{ "id": "G3", "result": "pass", "detail": "0.196 >= 0.15" }],
+ "red_flags": [{ "id": "R2", "severity": "high", "span": "He has a brother and father...", "broker_question": "..." }],
+ "waterfall": { "sde": 702537, "debt_service": -280000, "capex_reserve": -70000, "distributable_pretax": 303000, "assumptions": ["rate 10%", "10-year term"] },
+ "game_theory": {
+   "players": [],
+   "games_triggered": ["hold_up", "defection"],
+   "ev_unprotected": 234000,
+   "ev_protected": 276000,
+   "moves": ["Retention agreements as a closing condition"],
+   "walk_away": "Brother and father decline retention agreements",
+   "label": "judgment-based priors, not a statistical forecast"
+ },
+ "verdict": { "value": "PURSUE", "reason": "All gates pass; 2 high flags", "computed_by": "code" },
+ "cross_listing": { "matches": [], "conflict": false }
+}
+The run-level report keeps the existing format: discovery notes, ranked deals (fewer than five when fewer qualify), watchlist, and one broker question per PURSUE. It adds a header line with both config versions and a footer listing any listings dropped for extraction failure.
+Acceptance tests: golden deals
+The build ships when all ten fixtures return the expected verdict and flags from frozen listing snapshots. Fixture inputs are the figures verified in September 2026 conversations; snapshot each page into tests/fixtures/ so the tests never hit the network.
+#
+	Fixture
+	Key inputs
+	Expected verdict
+	Must fire
+	1
+	Brevard County septic
+	Ask $1,150,000; SDE $311,424; revenue $1,179,803
+	FAIL
+	G1 (below min), G2
+	2
+	Fire protection, 50+ years
+	Ask $3,500,000; SDE $850,000; revenue $5,000,000; union; $1M real estate excluded
+	FAIL
+	G1 (over cap), R3, R5, R1
+	3
+	SWFL HVAC and gas, Collier
+	SDE $852,172; revenue $3,938,866; inventory $1,000,000; lease expired 09/30/2025; "other business interests"
+	WATCHLIST
+	G5 cap, R4, R6, R9, R10; margin must compute as 21.6%, not 34.1%
+	4
+	Central FL septic, 5 counties
+	Ask $3,000,000; SDE $825,943; revenue $3,444,764; no SBA; no seller financing; lease to 12/2027
+	FAIL
+	G4, R11 critical, R4
+	5
+	Absentee FL septic
+	Ask $1,850,000; SDE $702,537; revenue $3,590,234; brother and father run it; qualifier "will consider"
+	PURSUE
+	R1, R2; game theory worked check within ±$5K
+	6
+	Winter Park precision machining
+	Ask $1,600,000; SDE and EBITDA both $626,530; revenue $1,505,916
+	WATCHLIST
+	G5 cap, R7, V7 conflict with #7
+	7
+	Winter Garden machine shop
+	Ask $1,600,000; SDE $429,803; revenue $1,140,265; FF&E $450,000
+	WATCHLIST
+	G2 band, V7 conflict with #6
+	8
+	Texas industrial ice distributor
+	Ask $3,000,000; SDE $762,000; top 3 customers 94%; home-based; owner holds license
+	FAIL
+	G10, R1, R5
+	9
+	Union fire protection, Illinois
+	Ask $2,000,000; SDE $650,857; revenue $6,343,979
+	FAIL
+	G3 (10.3%), R3
+	10
+	Five-Cybercab fleet
+	$150,000; one network sets price, dispatch, and fee
+	FAIL
+	R13 critical (detector unit test runs with G1 bypassed)
+	Regression rules
+* ☐ Fixture 2 must report the multiple as 4.12x, never a range.
+* ☐ Fixture 5 must report revenue as a value, never "not disclosed."
+* ☐ No fixture output contains the word "net" or any banned term.
+* ☐ Running the full suite twice produces byte-identical verdict records.
+Open questions
+Two are blocking; the rest can resolve during the build.
+#
+	Question
+	Owner
+	Blocking?
+	1
+	Category benchmark tables (SDE margin 90th percentile, multiple 25th percentile and median, revenue per employee) power R8, R14, and the lemons and auction detectors. Source them from BizBuySell comps or set manual values? Until then those detectors stay off.
+	Lenox + data
+	Yes
+	2
+	Fixture 3 needs the SWFL HVAC asking price; the screenshot cut it off and the Gemini memo's $2.5M is unverified.
+	Lenox
+	Yes, for fixture 3
+	3
+	Confirm thresholds: 15% single customer, 50% top three, three high flags to cap at WATCHLIST.
+	Lenox
+	No
+	4
+	Defaults for owner replacement ($120K proposed) and capex reserve by category (fleet trades vs. machine shops).
+	Lenox
+	No
+	5
+	Should AZ stay in the primary geography, or shift to remote status given the southeast focus?
+	Lenox
+	No
+	6
+	Spec number: next in sequence after 007 (proposed 008).
+	Engineering
+	No
+	7
+	P2: log broker answers against each flag so the game theory priors can be recalibrated from real outcomes after 20+ deals.
+	Engineering
+	No
