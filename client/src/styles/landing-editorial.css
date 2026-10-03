@@ -1,0 +1,1086 @@
+/* ─── Signal Hunter Editorial Landing Styles ──────────────────────────────────
+   Tokens: --bone, --paper, --ink, --amber, --sage, --clay, --rule
+   Typography: var(--font-display), var(--font-mono), var(--font-sans)
+───────────────────────────────────────────────────────────────────────────── */
+
+.sh-landing {
+  background-color: var(--bone);
+  color: var(--ink);
+  min-height: 100dvh;
+  font-family: var(--font-sans);
+}
+
+.sh-landing-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem clamp(1.25rem, 4vw, 3.5rem);
+  border-bottom: 1px solid var(--rule);
+  background-color: var(--paper);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.sh-brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-size: 1.125rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.sh-brand-badge {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.2rem 0.5rem;
+  background-color: var(--bone);
+  border: 1px solid var(--rule);
+  color: var(--sh-fg-3);
+  font-weight: 500;
+}
+
+.sh-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  font-size: 0.875rem;
+}
+
+.sh-nav-link {
+  color: var(--sh-fg-2);
+  text-decoration: none;
+  transition: color 0.15s ease;
+  font-weight: 500;
+}
+
+.sh-nav-link:hover {
+  color: var(--ink);
+}
+
+.sh-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--ink);
+  color: var(--paper);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.sh-nav-btn:hover {
+  opacity: 0.9;
+}
+
+/* ─── Hero Section ─────────────────────────────────────────────────────────── */
+.sh-hero-section {
+  padding: clamp(2.5rem, 5vw, 4.5rem) clamp(1.25rem, 4vw, 3.5rem);
+  max-width: 1380px;
+  margin: 0 auto;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sh-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 1.15fr);
+  gap: clamp(2rem, 4.5vw, 4rem);
+  align-items: start;
+}
+
+.sh-hero-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.sh-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--sh-fg-3);
+  margin-bottom: 1.25rem;
+}
+
+.sh-hero-eyebrow span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: var(--amber);
+  border-radius: 50%;
+}
+
+.sh-hero-h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 4.2vw, 4.25rem);
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  font-weight: 400;
+  color: var(--ink);
+  margin: 0 0 1.5rem 0;
+}
+
+.sh-hero-lead {
+  font-size: clamp(1.05rem, 1.4vw, 1.2rem);
+  line-height: 1.6;
+  color: var(--sh-fg-2);
+  margin: 0 0 2rem 0;
+  max-width: 52ch;
+}
+
+.sh-hero-cta-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.sh-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 0.85rem 1.75rem;
+  background-color: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  border: 1px solid var(--ink);
+  cursor: pointer;
+  transition: transform 0.12s ease, background-color 0.15s ease;
+}
+
+.sh-btn-primary:hover {
+  background-color: oklch(0.12 0.018 250);
+}
+
+.sh-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.5rem;
+  background-color: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  border: 1px solid var(--rule);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.sh-btn-secondary:hover {
+  background-color: var(--paper);
+  border-color: var(--ink);
+}
+
+.sh-hero-trust-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding-top: 1.5rem;
+  border-top: 1px dashed var(--rule);
+  font-size: 0.78rem;
+  color: var(--sh-fg-3);
+  font-family: var(--font-mono);
+}
+
+.sh-trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* ─── Hero Visual & Toggle Switcher ────────────────────────────────────────── */
+.sh-hero-visual-card {
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--rule);
+  position: relative;
+}
+
+.sh-hero-tabs-header {
+  display: flex;
+  border-bottom: 1px solid var(--rule);
+  background-color: var(--bone);
+}
+
+.sh-hero-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sh-fg-3);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 48px;
+}
+
+.sh-hero-tab-btn[aria-selected="true"] {
+  background-color: var(--paper);
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+  font-weight: 600;
+}
+
+.sh-hero-tab-btn:hover:not([aria-selected="true"]) {
+  background-color: oklch(0.95 0.01 85);
+  color: var(--ink);
+}
+
+.sh-hero-tab-panel {
+  padding: 1.5rem;
+}
+
+/* ─── Desk A: Cash Flow Bridge Visual ──────────────────────────────────────── */
+.sh-bridge-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.sh-artifact-masthead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sh-artifact-title {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sh-fg-3);
+  margin: 0;
+}
+
+.sh-artifact-subtitle {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0.25rem 0 0 0;
+}
+
+.sh-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  padding: 0.25rem 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sh-status-pill--neutral {
+  background-color: var(--bone);
+  border: 1px solid var(--rule);
+  color: var(--sh-fg-2);
+}
+
+.sh-status-pill--pass {
+  background-color: oklch(0.55 0.06 155 / 0.14);
+  border: 1px solid var(--sage);
+  color: oklch(0.35 0.08 155);
+}
+
+.sh-status-pill--fail {
+  background-color: oklch(0.55 0.14 28 / 0.14);
+  border: 1px solid var(--clay);
+  color: oklch(0.40 0.16 28);
+}
+
+.sh-status-pill--warn {
+  background-color: oklch(0.66 0.14 55 / 0.14);
+  border: 1px solid var(--amber);
+  color: oklch(0.45 0.14 55);
+}
+
+.sh-waterfall-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sh-waterfall-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background-color: var(--bone);
+  border: 1px solid var(--rule);
+  transition: all 0.15s ease;
+}
+
+.sh-waterfall-row--deduction {
+  border-left: 3px solid var(--clay);
+}
+
+.sh-waterfall-row--neutral {
+  border-left: 3px solid var(--ink);
+  background-color: var(--paper);
+}
+
+.sh-waterfall-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sh-waterfall-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.sh-waterfall-subtext {
+  font-size: 0.72rem;
+  color: var(--sh-fg-3);
+  font-family: var(--font-mono);
+}
+
+.sh-waterfall-val {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sh-waterfall-val--pos {
+  color: var(--ink);
+}
+
+.sh-waterfall-val--neg {
+  color: var(--clay);
+}
+
+.sh-toggle-item-btn {
+  background: transparent;
+  border: 0;
+  padding: 0.2rem;
+  cursor: pointer;
+  color: var(--sh-fg-3);
+  display: flex;
+  align-items: center;
+  transition: color 0.12s ease;
+}
+
+.sh-toggle-item-btn:hover {
+  color: var(--ink);
+}
+
+.sh-result-box {
+  padding: 1rem 1.15rem;
+  background-color: oklch(0.97 0.008 85);
+  border: 1px solid var(--rule);
+  border-top: 2px solid var(--ink);
+}
+
+.sh-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.sh-result-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sh-result-val {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sh-result-delta {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--clay);
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.sh-covenant-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--rule);
+  font-size: 0.8rem;
+}
+
+.sh-covenant-metric {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+}
+
+.sh-covenant-val {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.sh-stress-slider-box {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background-color: var(--bone);
+  border: 1px solid var(--rule);
+  font-size: 0.78rem;
+}
+
+.sh-stress-slider-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+  font-family: var(--font-mono);
+  color: var(--sh-fg-2);
+}
+
+.sh-stress-range-input {
+  width: 100%;
+  accent-color: var(--ink);
+  cursor: pointer;
+  height: 6px;
+}
+
+/* ─── Desk B: Capital Aperture Position Boundary Visual ─────────────────────── */
+.sh-gauge-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.sh-metrics-triad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: var(--bone);
+  border: 1px solid var(--rule);
+}
+
+.sh-triad-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sh-triad-cell dt {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sh-fg-3);
+}
+
+.sh-triad-cell dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sh-triad-cell small {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--sh-fg-3);
+}
+
+/* The Bounded Allocation Axis */
+.sh-axis-track-wrapper {
+  padding: 1rem 0.5rem 0.5rem 0.5rem;
+}
+
+.sh-axis-track {
+  position: relative;
+  height: 28px;
+  background-color: var(--bone);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+
+.sh-axis-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background-color: oklch(0.55 0.06 155 / 0.16);
+  border-left: 2px solid var(--sage);
+  border-right: 2px solid var(--sage);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sh-axis-band-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: oklch(0.35 0.08 155);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sh-axis-point {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  background-color: var(--paper);
+  z-index: 2;
+  box-shadow: 0 0 0 3px oklch(0.18 0.018 250 / 0.15);
+  transition: left 0.2s ease;
+}
+
+.sh-axis-point--corroborated {
+  background-color: var(--ink);
+}
+
+.sh-axis-tick-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--sh-fg-3);
+}
+
+.sh-trigger-box {
+  padding: 1rem 1.15rem;
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--amber);
+}
+
+.sh-trigger-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.sh-trigger-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.sh-trigger-condition {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--sh-fg-2);
+  margin: 0 0 0.75rem 0;
+}
+
+.sh-trigger-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed var(--rule);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.sh-trigger-stat strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.sh-interactive-mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  background-color: var(--bone);
+  border: 1px solid var(--rule);
+}
+
+.sh-mode-btn {
+  flex: 1;
+  padding: 0.45rem 0.6rem;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--sh-fg-3);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.sh-mode-btn[aria-pressed="true"] {
+  background-color: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+/* ─── Two Desks Section ────────────────────────────────────────────────────── */
+.sh-section-wrap {
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: clamp(3rem, 6vw, 6rem) clamp(1.25rem, 4vw, 3.5rem);
+}
+
+.sh-section-header {
+  margin-bottom: clamp(2rem, 4vw, 3.5rem);
+}
+
+.sh-section-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 3.2vw, 3.25rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  font-weight: 400;
+  margin: 0.5rem 0 1rem 0;
+  color: var(--ink);
+}
+
+.sh-section-desc {
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: var(--sh-fg-2);
+  max-width: 68ch;
+  margin: 0;
+}
+
+.sh-desks-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.sh-desk-portal-card {
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  padding: clamp(1.5rem, 2.5vw, 2.25rem);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 3px 3px 0 var(--rule);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.sh-desk-portal-card:hover {
+  border-color: var(--ink);
+}
+
+.sh-desk-portal-card--acquisitions {
+  border-top: 3px solid var(--ink);
+}
+
+.sh-desk-portal-card--aperture {
+  border-top: 3px solid var(--amber);
+}
+
+.sh-desk-audience-tag {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-fg-3);
+  margin-bottom: 0.75rem;
+}
+
+.sh-desk-title {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0 0 0.75rem 0;
+}
+
+.sh-desk-summary {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--sh-fg-2);
+  margin: 0 0 1.5rem 0;
+}
+
+.sh-desk-feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+  border-top: 1px solid var(--rule);
+  padding-top: 1.25rem;
+}
+
+.sh-desk-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  line-height: 1.45;
+}
+
+.sh-desk-feature-icon {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--ink);
+}
+
+.sh-desk-card-footer {
+  margin-top: auto;
+  padding-top: 1.5rem;
+  border-top: 1px dashed var(--rule);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ─── Shared DNA: Epistemic Rigor ─────────────────────────────────────────── */
+.sh-dna-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+
+.sh-epistemic-card {
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  border-top: 2px solid var(--rule);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sh-epistemic-card[data-state="reported"] {
+  border-top-color: var(--sh-fg-3);
+}
+
+.sh-epistemic-card[data-state="modeled"] {
+  border-top-color: var(--amber);
+}
+
+.sh-epistemic-card[data-state="corroborated"] {
+  border-top-color: var(--ink);
+}
+
+.sh-epistemic-card[data-state="unknown"] {
+  border-top-color: var(--clay);
+  background-color: oklch(0.97 0.012 28 / 0.2);
+}
+
+.sh-epistemic-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sh-epistemic-name {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sh-epistemic-def {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--sh-fg-2);
+  margin: 0;
+}
+
+.sh-epistemic-app {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--rule);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--sh-fg-3);
+  line-height: 1.4;
+}
+
+/* ─── Document Engine Highlight ───────────────────────────────────────────── */
+.sh-doc-engine-banner {
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--ink);
+  padding: clamp(2rem, 4vw, 3.5rem);
+  box-shadow: 4px 4px 0 var(--rule);
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.9fr);
+  gap: clamp(2rem, 4vw, 3.5rem);
+  align-items: center;
+}
+
+.sh-doc-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.sh-doc-step-item {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.sh-doc-step-num {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.sh-doc-step-text h4 {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+  color: var(--ink);
+}
+
+.sh-doc-step-text p {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--sh-fg-2);
+  margin: 0;
+}
+
+/* ─── Institutional Access Request Form ───────────────────────────────────── */
+.sh-access-section {
+  background-color: var(--paper);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.sh-access-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 1.2fr);
+  gap: clamp(2rem, 4vw, 4rem);
+  align-items: start;
+}
+
+.sh-access-form-box {
+  background-color: var(--bone);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--ink);
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.sh-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1.25rem;
+}
+
+.sh-form-field label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sh-fg-3);
+  font-weight: 600;
+}
+
+.sh-form-input,
+.sh-form-select,
+.sh-form-textarea {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-size: 0.95rem;
+  border-radius: 0;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.sh-form-input:focus,
+.sh-form-select:focus,
+.sh-form-textarea:focus {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+  border-color: var(--ink);
+}
+
+.sh-form-submit-btn {
+  width: 100%;
+  padding: 0.9rem;
+  background-color: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+  font-size: 1rem;
+  border: 0;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.sh-form-submit-btn:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.sh-form-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Institutional Footer ────────────────────────────────────────────────── */
+.sh-footer {
+  background-color: var(--bone);
+  border-top: 1px solid var(--rule);
+  padding: clamp(2.5rem, 4vw, 4rem) clamp(1.25rem, 4vw, 3.5rem) 2rem clamp(1.25rem, 4vw, 3.5rem);
+  font-size: 0.82rem;
+}
+
+.sh-footer-inner {
+  max-width: 1380px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.sh-footer-disclosure {
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--sh-fg-3);
+  max-width: 90ch;
+  border-left: 2px solid var(--amber);
+  padding-left: 1rem;
+}
+
+.sh-footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--sh-fg-3);
+}
+
+.sh-footer-links {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.sh-footer-link {
+  color: var(--sh-fg-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sh-footer-link:hover {
+  color: var(--ink);
+}
+
+/* ─── Responsive Adjustments ──────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .sh-hero-grid,
+  .sh-desks-grid,
+  .sh-doc-engine-banner,
+  .sh-access-grid {
+    grid-template-columns: 1fr;
+  }
+  .sh-dna-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .sh-landing-nav-bar {
+    padding: 1rem;
+  }
+  .sh-nav-links {
+    gap: 0.75rem;
+  }
+  .sh-nav-link {
+    display: none;
+  }
+  .sh-dna-grid {
+    grid-template-columns: 1fr;
+  }
+  .sh-metrics-triad {
+    grid-template-columns: 1fr;
+  }
+  .sh-hero-cta-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sh-btn-primary,
+  .sh-btn-secondary {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-landing * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
