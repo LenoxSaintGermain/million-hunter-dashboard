@@ -11,7 +11,7 @@
  * - No fabricated testimonials, metrics, or logos
  */
 
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";

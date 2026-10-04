@@ -128,13 +128,13 @@ function RootRoute() {
 function OnboardingGuard() {
   const [location, navigate] = useLocation();
   // Deterministic public walkthrough must work without any API or login dependency.
-  const { data: authData } = trpc.auth.me.useQuery(undefined, { enabled: location !== "/walkthrough" });
+  const { data: authData } = trpc.auth.me.useQuery(undefined, { enabled: !location.startsWith("/walkthrough") });
   const userRole = (authData as any)?.role as string | undefined;
 
   const alreadyChecked = typeof window !== "undefined" &&
     sessionStorage.getItem("onboarding_checked") === "done";
 
-  const isPublicPage = location === "/lobby" || location === "/404" || location === "/sign-in" || location === "/auth-unavailable" || location.startsWith("/deal-share") || location.startsWith("/asset-share") || location.startsWith("/invite") || location === "/brief" || location === "/explore" || location === "/demo" || location === "/demo-tour" || location === "/walkthrough" || location === "/pricing";
+  const isPublicPage = location === "/lobby" || location === "/404" || location === "/sign-in" || location === "/auth-unavailable" || location.startsWith("/deal-share") || location.startsWith("/asset-share") || location.startsWith("/invite") || location === "/brief" || location === "/explore" || location === "/demo" || location === "/demo-tour" || location.startsWith("/walkthrough") || location === "/pricing";
   const isInvestorArea = location.startsWith("/investor");
 
   // Operator onboarding check
