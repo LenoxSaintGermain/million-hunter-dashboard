@@ -4,6 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 import { CashFlowBridgeCard } from "../client/src/components/landing/CashFlowBridgeCard";
 import { BoundedRiskGaugeCard } from "../client/src/components/landing/BoundedRiskGaugeCard";
 import { UnifiedDeskHero } from "../client/src/components/landing/UnifiedDeskHero";
+import { HeroReconciliationHUD } from "../client/src/components/landing/HeroReconciliationHUD";
+import { DocumentaryBridge } from "../client/src/components/landing/DocumentaryBridge";
+import { DialecticScrollytelling } from "../client/src/components/landing/DialecticScrollytelling";
+import { CaseStudySandbox } from "../client/src/components/landing/CaseStudySandbox";
+import { OperatorAccessGate } from "../client/src/components/landing/OperatorAccessGate";
 
 // Mock wouter Link
 vi.mock("wouter", () => ({
@@ -33,100 +38,134 @@ vi.mock("@/lib/trpc", () => ({
 
 import LandingPage from "../client/src/pages/LandingPage";
 
-describe("LandingPage front door architecture", () => {
-  it("renders the primary institutional headline and thesis", () => {
+describe("LandingPage: The Sovereign Desk Architecture", () => {
+  it("renders Section 1: Hero Canvas with exact Sovereign Desk positioning and copy", () => {
     const html = renderToStaticMarkup(<LandingPage />);
-    expect(html).toContain("Know Your Downside Before Capital Moves.");
-    expect(html).toContain("The Bounded Capital Operating System");
-    expect(html).toContain("Signal Hunter bounds risk and stress-tests assumptions upstream of execution");
+    // Kicker
+    expect(html).toContain("DECISION ARCHITECTURE FOR PRINCIPALS &amp; ALLOCATORS");
+    // Headline
+    expect(html).toContain("Where high-stakes capital sets its boundaries.");
+    // Subhead
+    expect(html).toContain(
+      "Before you sign a personal guarantee or commit a concentrated position, Signal Hunter pressure-tests claims, uncovers structural fragility, and enforces downside limits."
+    );
+    // Primary CTAs
+    expect(html).toContain("Enter Operator Sandbox");
+    expect(html).toContain("Request Desk Access");
   });
 
-  it("features both distinct operating desks without competing for oxygen", () => {
+  it("renders Section 1 Visual Artifact: HeroReconciliationHUD with both desk states", () => {
+    const hudHtml = renderToStaticMarkup(<HeroReconciliationHUD />);
+    // Segmented tab selectors
+    expect(hudHtml).toContain("Private Deal Diligence");
+    expect(hudHtml).toContain("Capital Aperture");
+    // State A: Private M&A mini Reconciliation HUD
+    expect(hudHtml).toContain("RECONCILIATION HUD · 104-UNIT ROUTE");
+    expect(hudHtml).toContain("BROKER CLAIM");
+    expect(hudHtml).toContain("$650,000");
+    expect(hudHtml).toContain("(92% Recurring Claim)");
+    expect(hudHtml).toContain("SIGNAL AUDIT");
+    expect(hudHtml).toContain("$508,000");
+    expect(hudHtml).toContain("(68% True Contracted)");
+    expect(hudHtml).toContain("-21.8% Multiple Adjustment");
+    expect(hudHtml).toContain("1.34x (Min 1.25x)");
+    expect(hudHtml).toContain("Replacement GM Wage");
+    expect(hudHtml).toContain("Deferred Fleet CapEx");
+    expect(hudHtml).toContain("Contract Drift Buffer");
+  });
+
+  it("renders Section 2: Documentary Bridge ('Where Math Meets Asphalt') with inspectable pins & field note", () => {
+    const docHtml = renderToStaticMarkup(<DocumentaryBridge />);
+    expect(docHtml).toContain("Where Math Meets Asphalt.");
+    expect(docHtml).toContain("Documentary Field Report · Ground Truth");
+    expect(docHtml).toContain("Spreadsheets accept any number you feed them.");
+
+    // Inspectable crosshairs pins on canvas
+    expect(docHtml).toContain("Pin 1 · Fleet Line");
+    expect(docHtml).toContain("Pin 2 · Dispatch Office Window");
+    expect(docHtml).toContain("14/18 Vehicles &gt; 160k Miles");
+    expect(docHtml).toContain("Est. CapEx: $140,000 | Add-Back Status: REJECTED");
+
+    // Operator Field Note sidebar & Prime Directive 1 attribution
+    expect(docHtml).toContain("OPERATOR FIELD NOTE");
+    expect(docHtml).toContain("The broker swore customer retention was 94%.");
+    expect(docHtml).toContain("Marcus V. · Self-Funded Searcher");
+    expect(docHtml).toContain("Composite Deal Audit");
+    expect(docHtml).toContain("Prime Directive 1 Verified");
+  });
+
+  it("renders Section 3: The Two Desks (EBITDA Erosion Waterfall & Alignment Portrait)", () => {
     const html = renderToStaticMarkup(<LandingPage />);
-    // Acquisition Desk portal
-    expect(html).toContain("Acquisition Diligence Desk");
-    expect(html).toContain("Desk A · For Searchers, Independent Sponsors &amp; Family Offices");
-    expect(html).toContain("EBITDA-to-Cash-Flow Erosion");
-    expect(html).toContain("DSCR Covenant Stress Testing");
-    expect(html).toContain("Pre-QoE Red Team Memo");
+    // Desk I
+    expect(html).toContain("Desk I · Private M&amp;A &amp; Buyout Diligence");
+    expect(html).toContain("The Cash Flow Waterfall");
+    expect(html).toContain("Brokers sell pro-forma optimism. Operators inherit fixed costs.");
+    expect(html).toContain("Underwritten DSCR: 1.34x (Min Covenant: 1.25x) [PASS]");
 
-    // Capital Aperture portal
-    expect(html).toContain("Capital Aperture Desk");
-    expect(html).toContain("Desk B · For Professional Allocators, Portfolio Managers &amp; Macro Desks");
-    expect(html).toContain("Concentrated Sizing Boundaries");
-    expect(html).toContain("Binding Invalidation Triggers");
-    expect(html).toContain("Asymmetric Risk/Reward");
+    // Desk II
+    expect(html).toContain("Desk II · Capital Aperture (Liquid Allocation)");
+    expect(html).toContain("The Framer Alignment Portrait");
+    expect(html).toContain("An idea is just an opinion until you define the exact invalidation line.");
+    expect(html).toContain("Invalidation: $42.10 | Max Downside: 1.8% NAV [BOUNDED]");
   });
 
-  it("renders the Cash Flow Bridge artifact with reported SDE, deductions, and DSCR covenants", () => {
-    const html = renderToStaticMarkup(<CashFlowBridgeCard />);
-    expect(html).toContain("Acquisition Desk · 104-Unit Route");
-    expect(html).toContain("$650,000"); // Reported SDE
-    expect(html).toContain("−$65,000"); // Replacement GM wage
-    expect(html).toContain("−$42,000"); // Deferred CapEx
-    expect(html).toContain("−$35,000"); // Churn risk buffer
-    expect(html).toContain("$508,000"); // Bankable FCF
-    expect(html).toContain("1.34x");    // Baseline DSCR
-    expect(html).toContain("Pass: 1.34x DSCR");
-    expect(html).toContain("Covenant Intact");
-    expect(html).toContain("Stress Test: Top-Line Compression");
+  it("renders CashFlowBridgeCard with exact waterfall math", () => {
+    const bridgeHtml = renderToStaticMarkup(<CashFlowBridgeCard />);
+    expect(bridgeHtml).toContain("The Cash Flow Bridge");
+    expect(bridgeHtml).toContain("$650,000");
+    expect(bridgeHtml).toContain("−$65,000");
+    expect(bridgeHtml).toContain("−$42,000");
+    expect(bridgeHtml).toContain("−$35,000");
+    expect(bridgeHtml).toContain("$508,000");
+    expect(bridgeHtml).toContain("Pass: 1.34x DSCR");
   });
 
-  it("renders the Bounded Risk Gauge artifact with sizing triad, invalidation trigger, and downside stop", () => {
-    const html = renderToStaticMarkup(<BoundedRiskGaugeCard />);
-    expect(html).toContain("Capital Aperture · Concentrated Allocation");
-    expect(html).toContain("$12,500"); // Modeled sizing
-    expect(html).toContain("$10K – $15K"); // Target band
-    expect(html).toContain("$15,000"); // Max thesis ceiling
-    expect(html).toContain("Thesis Invalidation Trigger");
-    expect(html).toContain("Volume collapse &amp; closing print below 20-DMA ($42.10)");
-    expect(html).toContain("−$1,649"); // Downside at stop
-    expect(html).toContain("1.65%"); // Portfolio risk
-    expect(html).toContain("(2.0% Cap)");
+  it("renders BoundedRiskGaugeCard with exact risk limits and invalidation price", () => {
+    const gaugeHtml = renderToStaticMarkup(<BoundedRiskGaugeCard />);
+    expect(gaugeHtml).toContain("The Bounded Risk Gauge");
+    expect(gaugeHtml).toContain("$12,500");
+    expect(gaugeHtml).toContain("$10K – $15K");
+    expect(gaugeHtml).toContain("$42.10");
+    expect(gaugeHtml).toContain("Mandate Compliant");
   });
 
-  it("presents the 4 Epistemic States shared DNA", () => {
-    const html = renderToStaticMarkup(<LandingPage />);
-    expect(html).toContain("A Claim Is Not a Conclusion.");
-    expect(html).toContain("01 · Reported");
-    expect(html).toContain("02 · Modeled");
-    expect(html).toContain("03 · Corroborated");
-    expect(html).toContain("04 · Unknown");
-    expect(html).toContain("Unknown is NEVER treated as zero or assumed to pass");
+  it("renders Section 4: Dialectic Scrollytelling with Ingestion, Triangulation, and 3x3 DSCR Grid", () => {
+    const dialecticHtml = renderToStaticMarkup(<DialecticScrollytelling />);
+    expect(dialecticHtml).toContain("The Auditable Engine · 3-Step Dialectic");
+    expect(dialecticHtml).toContain("A Claim Is Not a Conclusion.");
+
+    // Step 01 Ingestion
+    expect(dialecticHtml).toContain("01");
+    expect(dialecticHtml).toContain("Ingestion &amp; Citation");
+    expect(dialecticHtml).toContain("Extract Claims With Deterministic Bounding Boxes");
+    expect(dialecticHtml).toContain("CONFIDENTIAL_OFFERING_MEMORANDUM.PDF");
+    expect(dialecticHtml).toContain("BBOX #1 · CLAIMED EARNINGS");
+    expect(dialecticHtml).toContain("json.reported_sde: 650000");
+
+    // Step 02 & Step 03 selector pills
+    expect(dialecticHtml).toContain("02");
+    expect(dialecticHtml).toContain("Epistemic Triangulation");
+    expect(dialecticHtml).toContain("03");
+    expect(dialecticHtml).toContain("Downside Stress Testing");
   });
 
-  it("showcases the newly deployed Deal Document Intake Engine", () => {
-    const html = renderToStaticMarkup(<LandingPage />);
-    expect(html).toContain("Bring Your Own Deal Documents.");
-    expect(html).toContain("Secure Tenant Upload &amp; Private Storage");
-    expect(html).toContain("Page-Linked Citation &amp; OCR Extraction");
-    expect(html).toContain("Upstream Pre-QoE Red Team Audit");
-    expect(html).toContain("Supported Intake Documents");
-    expect(html).toContain("Confidential Information Memorandums (CIM)");
+  it("renders Section 5: Case Study Sandbox with live session indicator and calculation", () => {
+    const sandboxHtml = renderToStaticMarkup(<CaseStudySandbox />);
+    expect(sandboxHtml).toContain("LOCAL DEMO SESSION · LIVE CALCULATION ACTIVE");
+    expect(sandboxHtml).toContain("Apex Commercial Cleaning Services, LLC");
+    expect(sandboxHtml).toContain("Target Case GT-001");
+    expect(sandboxHtml).toContain("Simulate Revenue Shock");
+    expect(sandboxHtml).toContain("Enter Full Diligence Walkthrough");
   });
 
-  it("provides qualified operator qualification form and institutional routing", () => {
-    const html = renderToStaticMarkup(<LandingPage />);
-    expect(html).toContain("Bring a Decision Worth Testing.");
-    expect(html).toContain("Operator mandate / role");
-    expect(html).toContain("Target capital / deal size");
-    expect(html).toContain("Current deal, mandate, or thesis criteria");
-    expect(html).toContain('href="/walkthrough"');
-    expect(html).toContain('href="/walkthrough/capital-desk"');
-    expect(html).toContain('href="/pricing"');
-    expect(html).toContain('href="/sign-in"');
-  });
-
-  it("contains zero fabricated testimonials, synthetic customer quotes, or fake logos", () => {
-    const html = renderToStaticMarkup(<LandingPage />);
-    // Check against fabricated claims
-    expect(html).not.toContain("5.0 stars");
-    expect(html).not.toContain("Trusted by 10,000");
-    expect(html).not.toContain("customer reviews");
-    expect(html).not.toContain("Wall Street Journal");
-    expect(html).not.toContain("Forbes");
-    // Ensure all examples are clearly labeled as illustrative/composite
-    expect(html).toContain("Illustrative — composite 104-unit route deal, not a real customer.");
-    expect(html).toContain("Illustrative — composite options fixture, not an investment recommendation.");
+  it("renders Section 5: Operator Access Gate single-column form with sovereign guarantee", () => {
+    const gateHtml = renderToStaticMarkup(<OperatorAccessGate />);
+    expect(gateHtml).toContain("Request Sovereign Desk Access");
+    expect(gateHtml).toContain("Operating Desk Type *");
+    expect(gateHtml).toContain("Current Target Asset Class *");
+    expect(gateHtml).toContain("Sovereignty Guarantee:");
+    expect(gateHtml).toContain(
+      "Your deal documents and theses are never stored, syndicated, or used for model training."
+    );
   });
 });

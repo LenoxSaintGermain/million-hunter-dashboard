@@ -986,6 +986,630 @@
   cursor: not-allowed;
 }
 
+/* ─── Sovereign Desk: Framer Architecture & Layout Rules ──────────────────────
+   Ensures auto-layout stacks, explicit gaps, fit-content heights, and no text collisions.
+───────────────────────────────────────────────────────────────────────────── */
+.sh-section-frame {
+  padding: clamp(3.5rem, 6vw, 6rem) clamp(1.25rem, 4vw, 3.5rem);
+  width: 100%;
+  max-width: 1380px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.sh-narrative-stack {
+  width: 100%;
+  max-width: 680px;
+  height: fit-content;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.sh-narrative-stack .sh-section-h2,
+.sh-narrative-stack .sh-section-desc {
+  height: fit-content;
+  white-space: normal;
+  margin: 0;
+}
+
+/* ─── Hero Reconciliation HUD ─────────────────────────────────────────────── */
+.sh-hero-hud-card {
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sh-hud-segmented-nav {
+  display: flex;
+  border-bottom: 1px solid var(--rule);
+  background-color: var(--bone);
+}
+
+.sh-hud-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--sh-fg-3);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.sh-hud-tab:hover {
+  color: var(--ink);
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.sh-hud-tab--active {
+  color: var(--ink);
+  background-color: var(--paper);
+  border-bottom-color: var(--amber);
+}
+
+.sh-hud-body {
+  padding: clamp(1.25rem, 2.5vw, 1.75rem);
+}
+
+.sh-hud-state-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.sh-hud-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.sh-hud-pill {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+}
+
+.sh-hud-pill--amber {
+  background-color: oklch(0.95 0.03 85);
+  color: oklch(0.45 0.12 75);
+  border-left: 2px solid var(--amber);
+}
+
+.sh-hud-pill--slate {
+  background-color: var(--bone);
+  color: var(--sh-fg-2);
+  border-left: 2px solid var(--ink);
+}
+
+.sh-hud-label-tag {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--sh-fg-3);
+}
+
+.sh-hud-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--rule);
+}
+
+.sh-hud-metric-row--claim {
+  background-color: var(--bone);
+}
+
+.sh-hud-metric-row--audit {
+  background-color: var(--paper);
+  border-left: 3px solid var(--amber);
+}
+
+.sh-hud-metric-head {
+  display: flex;
+  flex-direction: column;
+}
+
+.sh-hud-role {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sh-hud-context {
+  font-size: 0.72rem;
+  color: var(--sh-fg-3);
+}
+
+.sh-hud-metric-value {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+}
+
+.sh-hud-deductions-list {
+  background-color: var(--paper);
+  border: 1px dashed var(--rule);
+  padding: 0.75rem 0.85rem;
+  margin: 0.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.sh-hud-deduction-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sh-hud-deduction-bullet {
+  font-weight: bold;
+}
+
+.sh-hud-deduction-name {
+  color: var(--sh-fg-2);
+  flex: 1;
+}
+
+.sh-hud-deduction-tag {
+  color: var(--clay);
+  font-weight: 600;
+}
+
+.sh-hud-verdict-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background-color: var(--bone);
+  border: 1px solid var(--rule);
+  margin-top: 0.5rem;
+}
+
+.sh-hud-verdict-title {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--sh-fg-3);
+  display: block;
+}
+
+.sh-hud-verdict-stat {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+/* ─── Section 2: Documentary Bridge ───────────────────────────────────────── */
+.sh-doc-bridge-section {
+  padding: clamp(3.5rem, 6vw, 6rem) clamp(1.25rem, 4vw, 3.5rem);
+  background-color: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+
+.sh-doc-bridge-container {
+  max-width: 1380px;
+  margin: 0 auto;
+}
+
+.sh-bridge-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(340px, 1fr);
+  gap: clamp(1.5rem, 3.5vw, 3rem);
+  align-items: start;
+}
+
+.sh-bridge-viewport-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sh-bridge-viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid #E5E0D8; /* Hairline slate border specified in blueprint */
+  background-color: #1a1d20;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.sh-bridge-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Crosshairs Pins */
+.sh-crosshair-pin-anchor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+}
+
+.sh-crosshair-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sh-crosshair-dot {
+  width: 12px;
+  height: 12px;
+  background-color: var(--amber);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+  position: relative;
+  z-index: 2;
+  transition: transform 0.15s ease;
+}
+
+.sh-crosshair-pulse {
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  background-color: rgba(212, 163, 115, 0.4);
+  border-radius: 50%;
+  animation: sh-pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  z-index: 1;
+}
+
+@keyframes sh-pulse-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.6);
+    opacity: 0;
+  }
+}
+
+.sh-crosshair-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  background-color: rgba(16, 21, 31, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.2rem 0.5rem;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.sh-crosshair-trigger:hover .sh-crosshair-dot,
+.sh-crosshair-trigger--active .sh-crosshair-dot {
+  transform: scale(1.3);
+  background-color: #fff;
+  border-color: var(--amber);
+}
+
+.sh-pin-inspection-card {
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  padding: 1.25rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+/* Sidebar Field Note */
+.sh-field-note-card {
+  background-color: var(--bone);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--ink);
+  padding: clamp(1.25rem, 2.5vw, 1.75rem);
+}
+
+.sh-field-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.sh-field-note-pill {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  padding: 0.2rem 0.6rem;
+}
+
+.sh-field-note-quote {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 0 0 1.25rem 0;
+  font-style: italic;
+  position: relative;
+}
+
+.sh-field-note-author {
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sh-field-note-audit-box {
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  padding: 1rem;
+}
+
+/* ─── Section 4: Dialectic Scrollytelling ──────────────────────────────────── */
+.sh-dialectic-step-selector {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.sh-step-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 1.25rem;
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  transition: all 0.15s ease;
+}
+
+.sh-step-pill-btn:hover {
+  background-color: var(--bone);
+  color: var(--ink);
+}
+
+.sh-step-pill-btn--active {
+  background-color: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.sh-step-num {
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--amber);
+}
+
+.sh-step-pill-btn--active .sh-step-num {
+  color: var(--amber);
+}
+
+.sh-step-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.sh-dialectic-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 1.25fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: start;
+}
+
+.sh-annotated-doc-mockup,
+.sh-confidence-gauge-card,
+.sh-dscr-matrix-card {
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.sh-doc-mockup-header {
+  padding: 0.75rem 1rem;
+  background-color: var(--bone);
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sh-doc-mockup-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sh-bbox-container {
+  padding: 0.75rem;
+  background-color: var(--bone);
+  border: 1px solid var(--rule);
+  position: relative;
+}
+
+.sh-bbox-container--highlight {
+  border-left: 3px solid var(--amber);
+  background-color: oklch(0.97 0.02 85);
+}
+
+.sh-bbox-tag {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--sh-fg-3);
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.sh-bbox-connector {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--rule);
+}
+
+.sh-doc-mockup-footer {
+  padding: 0.75rem 1rem;
+  background-color: var(--bone);
+  border-top: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ─── Section 5: Sandbox & Single-Col Gate ─────────────────────────────────── */
+.sh-case-sandbox-wrapper {
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+  margin-top: 2rem;
+  overflow: hidden;
+}
+
+.sh-sandbox-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background-color: var(--bone);
+  border-bottom: 1px solid var(--rule);
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.sh-live-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: oklch(0.55 0.18 145);
+  box-shadow: 0 0 6px oklch(0.55 0.18 145);
+  display: inline-block;
+  animation: sh-pulse-ring 2s infinite;
+}
+
+.sh-live-status-text {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+
+.sh-sandbox-tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sh-sandbox-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--sh-fg-3);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.sh-sandbox-tab--active {
+  background-color: var(--paper);
+  border-color: var(--rule);
+  color: var(--ink);
+}
+
+.sh-sandbox-viewport {
+  padding: clamp(1.25rem, 2.5vw, 2rem);
+}
+
+/* Single-Column Operator Gate */
+.sh-single-col-gate {
+  max-width: 640px;
+  margin: 4rem auto 0 auto;
+  width: 100%;
+}
+
+.sh-gate-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.sh-single-col-form {
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  padding: clamp(1.5rem, 3.5vw, 2.5rem);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.sh-form-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--sh-fg-2);
+  margin-bottom: 0.35rem;
+}
+
+.sh-sovereign-guarantee {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  background-color: var(--bone);
+  border: 1px solid var(--rule);
+  border-left: 3px solid oklch(0.35 0.08 155);
+}
+
+.sh-gate-success-box {
+  background-color: var(--paper);
+  border: 1px solid var(--rule);
+  border-top: 3px solid oklch(0.35 0.08 155);
+  padding: 2rem;
+}
+
 /* ─── Institutional Footer ────────────────────────────────────────────────── */
 .sh-footer {
   background-color: var(--bone);
@@ -1044,7 +1668,9 @@
   .sh-hero-grid,
   .sh-desks-grid,
   .sh-doc-engine-banner,
-  .sh-access-grid {
+  .sh-access-grid,
+  .sh-bridge-grid,
+  .sh-dialectic-content-grid {
     grid-template-columns: 1fr;
   }
   .sh-dna-grid {
@@ -1084,3 +1710,4 @@
     animation: none !important;
   }
 }
+
