@@ -1,10 +1,10 @@
 import React from "react";
 import { Link } from "wouter";
 import { ArrowUpRight, ArrowRight } from "lucide-react";
-import { UnifiedDeskHero } from "@/components/landing/UnifiedDeskHero";
-import { DocumentaryBridge } from "@/components/landing/DocumentaryBridge";
+import { CenturionHeroHeader } from "@/components/landing/CenturionHeroHeader";
 import { CashFlowBridgeCard } from "@/components/landing/CashFlowBridgeCard";
 import { BoundedRiskGaugeCard } from "@/components/landing/BoundedRiskGaugeCard";
+import { HeroReconciliationHUD } from "@/components/landing/HeroReconciliationHUD";
 import { DialecticScrollytelling } from "@/components/landing/DialecticScrollytelling";
 import { CaseStudySandbox } from "@/components/landing/CaseStudySandbox";
 import { OperatorAccessGate } from "@/components/landing/OperatorAccessGate";
@@ -22,9 +22,6 @@ export default function LandingPage() {
         </Link>
 
         <nav className="sh-nav-links" aria-label="Main Navigation">
-          <a href="#field-report" className="sh-nav-link">
-            Field Report
-          </a>
           <a href="#the-two-desks" className="sh-nav-link">
             Operating Desks
           </a>
@@ -48,20 +45,15 @@ export default function LandingPage() {
       </header>
 
       <main>
-        {/* ─── 1. HERO: DUAL-DESK POSITIONING ───────────────────────────────── */}
-        <UnifiedDeskHero />
+        {/* ─── 1. CENTURION HERO: 21:9 LETTERBOX & MONOSPACED HUD ───────────── */}
+        <CenturionHeroHeader />
 
-        {/* ─── 2. DOCUMENTARY FIELD REPORT: REALITY VS. SPREADSHEET ─────────── */}
-        <div id="field-report">
-          <DocumentaryBridge />
-        </div>
-
-        {/* ─── 3. THE TWO OPERATING DESKS: DEEP-DIVE CARDS ──────────────────── */}
+        {/* ─── 2. THE TWO OPERATING DESKS: DEEP-DIVE CARDS ──────────────────── */}
         <section id="the-two-desks" className="sh-section-frame">
           <div className="sh-narrative-stack mb-8">
             <p className="sh-hero-eyebrow">
-              <span aria-hidden="true" />
-              <span>Two Operating Desks · One Methodology</span>
+              <span aria-hidden="true" className="sh-eyebrow-dot" />
+              <span className="sh-eyebrow-text">Two Operating Desks · One Methodology</span>
             </p>
             <h2 className="sh-section-h2">
               Bounded Capital Allocation: Define the Boundary First.
@@ -140,17 +132,29 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+
+          {/* Interactive Dual-Desk Reconciliation HUD */}
+          <div className="mt-12">
+            <div className="mb-4">
+              <span className="font-mono text-xs uppercase tracking-wider text-[var(--sh-fg-3)]">
+                Interactive Model HUD · Cross-Desk Comparison
+              </span>
+            </div>
+            <HeroReconciliationHUD />
+          </div>
         </section>
 
-        {/* ─── 4. METHODOLOGY: THE AUDITABLE ENGINE ─────────────────────────── */}
-        <DialecticScrollytelling />
+        {/* ─── 3. METHODOLOGY: THE AUDITABLE ENGINE ─────────────────────────── */}
+        <div id="methodology">
+          <DialecticScrollytelling />
+        </div>
 
-        {/* ─── 5. CASE STUDY SANDBOX & ACCESS GATE ─────────────────────────── */}
-        <section className="sh-section-frame border-t border-[var(--rule)]">
+        {/* ─── 4. CASE STUDY SANDBOX & ACCESS GATE ─────────────────────────── */}
+        <section id="case-sandbox" className="sh-section-frame border-t border-[var(--rule)]">
           <div className="sh-narrative-stack mb-4">
             <p className="sh-hero-eyebrow">
-              <span aria-hidden="true" />
-              <span>Live Case Preview · Deterministic Verification</span>
+              <span aria-hidden="true" className="sh-eyebrow-dot" />
+              <span className="sh-eyebrow-text">Live Case Preview · Deterministic Verification</span>
             </p>
             <h2 className="sh-section-h2">Test The Decision Engine Live.</h2>
             <p className="sh-section-desc">
@@ -163,7 +167,9 @@ export default function LandingPage() {
           <CaseStudySandbox />
 
           {/* Single-Column Access Gate */}
-          <OperatorAccessGate />
+          <div id="request-access">
+            <OperatorAccessGate />
+          </div>
         </section>
       </main>
 

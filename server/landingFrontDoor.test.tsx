@@ -3,9 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { CashFlowBridgeCard } from "../client/src/components/landing/CashFlowBridgeCard";
 import { BoundedRiskGaugeCard } from "../client/src/components/landing/BoundedRiskGaugeCard";
-import { UnifiedDeskHero } from "../client/src/components/landing/UnifiedDeskHero";
+import { CenturionHeroHeader } from "../client/src/components/landing/CenturionHeroHeader";
 import { HeroReconciliationHUD } from "../client/src/components/landing/HeroReconciliationHUD";
-import { DocumentaryBridge } from "../client/src/components/landing/DocumentaryBridge";
 import { DialecticScrollytelling } from "../client/src/components/landing/DialecticScrollytelling";
 import { CaseStudySandbox } from "../client/src/components/landing/CaseStudySandbox";
 import { OperatorAccessGate } from "../client/src/components/landing/OperatorAccessGate";
@@ -38,63 +37,44 @@ vi.mock("@/lib/trpc", () => ({
 
 import LandingPage from "../client/src/pages/LandingPage";
 
-describe("LandingPage: The Sovereign Desk Architecture", () => {
-  it("renders Section 1: Hero Canvas with exact Sovereign Desk positioning and copy", () => {
+describe("LandingPage: Centurion Hero & Sovereign Desk Architecture", () => {
+  it("renders Section 1: Centurion Hero Header with exact pairing and manifesto hook", () => {
     const html = renderToStaticMarkup(<LandingPage />);
     // Kicker
     expect(html).toContain("DECISION ARCHITECTURE FOR PRINCIPALS &amp; ALLOCATORS");
-    // Headline
-    expect(html).toContain("Where high-stakes capital sets its boundaries.");
-    // Subhead
+    // Headline Pairing
+    expect(html).toContain("Brokers sell EBITDA. Operators inherit the floor.");
+    // Hook / One-Line Manifesto
     expect(html).toContain(
-      "Before you sign a personal guarantee or commit a concentrated position, Signal Hunter pressure-tests claims, uncovers structural fragility, and enforces downside limits."
+      "Signal Hunter is the sovereign due diligence operating system that stress-tests assumptions, reconciles broker claims against bankable cash, and bounds your downside before you sign."
     );
     // Primary CTAs
     expect(html).toContain("Enter Operator Sandbox");
+    expect(html).toContain("Explore Diligence Desk");
     expect(html).toContain("Request Desk Access");
   });
 
-  it("renders Section 1 Visual Artifact: HeroReconciliationHUD with both desk states", () => {
-    const hudHtml = renderToStaticMarkup(<HeroReconciliationHUD />);
-    // Segmented tab selectors
-    expect(hudHtml).toContain("Private Deal Diligence");
-    expect(hudHtml).toContain("Capital Aperture");
-    // State A: Private M&A mini Reconciliation HUD
-    expect(hudHtml).toContain("RECONCILIATION HUD · 104-UNIT ROUTE");
-    expect(hudHtml).toContain("BROKER CLAIM");
-    expect(hudHtml).toContain("$650,000");
-    expect(hudHtml).toContain("(92% Recurring Claim)");
-    expect(hudHtml).toContain("SIGNAL AUDIT");
-    expect(hudHtml).toContain("$508,000");
-    expect(hudHtml).toContain("(68% True Contracted)");
-    expect(hudHtml).toContain("-21.8% Multiple Adjustment");
-    expect(hudHtml).toContain("1.34x (Min 1.25x)");
-    expect(hudHtml).toContain("Replacement GM Wage");
-    expect(hudHtml).toContain("Deferred Fleet CapEx");
-    expect(hudHtml).toContain("Contract Drift Buffer");
+  it("renders CenturionHeroHeader 21:9 letterbox frame with glowing crosshair HUD and failure points", () => {
+    const heroHtml = renderToStaticMarkup(<CenturionHeroHeader />);
+    // Image source
+    expect(heroHtml).toContain('src="/industrial-depot-yard.png"');
+    // HUD Telemetry
+    expect(heroHtml).toContain("SYS.HUD // REV 2.4.8");
+    expect(heroHtml).toContain("DILIGENCE SCAN: ACTIVE");
+    // Three Failure Points on canvas and switcher
+    expect(heroHtml).toContain("Fleet Line CapEx");
+    expect(heroHtml).toContain("Key-Person Dispatch Desk");
+    expect(heroHtml).toContain("Depot Lease Escalation");
+    // Initial active failure point inspection contents
+    expect(heroHtml).toContain("Add-Back: REJECTED");
+    expect(heroHtml).toContain("14 of 18 Service Vans Exceed 160,000 Miles");
+    // Telemetry bottom bar
+    expect(heroHtml).toContain("VERIFIED DOWNSIDE FLOOR");
+    expect(heroHtml).toContain("$508,000 FCF");
+    expect(heroHtml).toContain("1.34x Coverage");
   });
 
-  it("renders Section 2: Documentary Bridge ('Where Math Meets Asphalt') with inspectable pins & field note", () => {
-    const docHtml = renderToStaticMarkup(<DocumentaryBridge />);
-    expect(docHtml).toContain("Where Math Meets Asphalt.");
-    expect(docHtml).toContain("Documentary Field Report · Ground Truth");
-    expect(docHtml).toContain("Spreadsheets accept any number you feed them.");
-
-    // Inspectable crosshairs pins on canvas
-    expect(docHtml).toContain("Pin 1 · Fleet Line");
-    expect(docHtml).toContain("Pin 2 · Dispatch Office Window");
-    expect(docHtml).toContain("14/18 Vehicles &gt; 160k Miles");
-    expect(docHtml).toContain("Est. CapEx: $140,000 | Add-Back Status: REJECTED");
-
-    // Operator Field Note sidebar & Prime Directive 1 attribution
-    expect(docHtml).toContain("OPERATOR FIELD NOTE");
-    expect(docHtml).toContain("The broker swore customer retention was 94%.");
-    expect(docHtml).toContain("Marcus V. · Self-Funded Searcher");
-    expect(docHtml).toContain("Composite Deal Audit");
-    expect(docHtml).toContain("Prime Directive 1 Verified");
-  });
-
-  it("renders Section 3: The Two Desks (EBITDA Erosion Waterfall & Alignment Portrait)", () => {
+  it("renders Section 2: The Two Desks (EBITDA Erosion Waterfall & Alignment Portrait)", () => {
     const html = renderToStaticMarkup(<LandingPage />);
     // Desk I
     expect(html).toContain("Desk I · Private M&amp;A &amp; Buyout Diligence");
@@ -129,7 +109,7 @@ describe("LandingPage: The Sovereign Desk Architecture", () => {
     expect(gaugeHtml).toContain("Mandate Compliant");
   });
 
-  it("renders Section 4: Dialectic Scrollytelling with Ingestion, Triangulation, and 3x3 DSCR Grid", () => {
+  it("renders Section 3: Dialectic Scrollytelling with Ingestion, Triangulation, and 3x3 DSCR Grid", () => {
     const dialecticHtml = renderToStaticMarkup(<DialecticScrollytelling />);
     expect(dialecticHtml).toContain("The Auditable Engine · 3-Step Dialectic");
     expect(dialecticHtml).toContain("A Claim Is Not a Conclusion.");
@@ -149,7 +129,7 @@ describe("LandingPage: The Sovereign Desk Architecture", () => {
     expect(dialecticHtml).toContain("Downside Stress Testing");
   });
 
-  it("renders Section 5: Case Study Sandbox with live session indicator and calculation", () => {
+  it("renders Section 4: Case Study Sandbox with live session indicator and calculation", () => {
     const sandboxHtml = renderToStaticMarkup(<CaseStudySandbox />);
     expect(sandboxHtml).toContain("LOCAL DEMO SESSION · LIVE CALCULATION ACTIVE");
     expect(sandboxHtml).toContain("Apex Commercial Cleaning Services, LLC");
@@ -158,7 +138,7 @@ describe("LandingPage: The Sovereign Desk Architecture", () => {
     expect(sandboxHtml).toContain("Enter Full Diligence Walkthrough");
   });
 
-  it("renders Section 5: Operator Access Gate single-column form with sovereign guarantee", () => {
+  it("renders Section 4: Operator Access Gate single-column form with sovereign guarantee", () => {
     const gateHtml = renderToStaticMarkup(<OperatorAccessGate />);
     expect(gateHtml).toContain("Request Sovereign Desk Access");
     expect(gateHtml).toContain("Operating Desk Type *");
