@@ -9,6 +9,9 @@ import { buildCockpitRailSummary, type CockpitHeadroomLine } from "@shared/cockp
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { BasisMark, StateMark } from "./DecisionVisualLanguage";
 import { PortfolioPortrait } from "./PortfolioPortrait";
+import { useExperienceMode } from "@/contexts/ExperienceModeContext";
+import { MicroTooltip } from "./MicroTooltip";
+import { ConstraintResolverCard } from "./ConstraintResolverCard";
 
 type HeadroomLine = CockpitHeadroomLine;
 
@@ -55,6 +58,7 @@ function ConnectedPortfolioPortrait({ accountId, ...props }: Omit<React.Componen
 }
 
 export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = false, editorialContext = false }: { runId?: number; compactOnly?: boolean; visualHero?: boolean; editorialContext?: boolean }) {
+  const { isGuided } = useExperienceMode();
   const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false });
   const accounts = accountQuery.data;
   const preferredAccountId = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")?.id
@@ -269,11 +273,11 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
 
         {/* Live Capital & Risk Metrics Glance */}
         <div className="flex items-center gap-4 text-[11px] tabular-nums font-mono">
-          <div><span style={{ color: "var(--sh-fg-muted)" }}>Account value: </span><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{money(equityCents) ?? "Not available"}</span></div>
-          <div><span style={{ color: "var(--sh-fg-muted)" }}>{accountFundsLabel(data.account.buyingPowerCents)}: </span><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{money(buyingPowerCents) ?? "Not available"}</span></div>
+          <div><MicroTooltip termKey="cash"><span style={{ color: "var(--sh-fg-muted)" }}>Account value: </span></MicroTooltip><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{money(equityCents) ?? "Not available"}</span></div>
+          <div><MicroTooltip termKey="buying_power"><span style={{ color: "var(--sh-fg-muted)" }}>{accountFundsLabel(data.account.buyingPowerCents)}: </span></MicroTooltip><span className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>{money(buyingPowerCents) ?? "Not available"}</span></div>
           {unrealizedCents != null && (
             <div>
-              <span style={{ color: "var(--sh-fg-muted)" }}>Unrealized: </span>
+              <MicroTooltip termKey="unrealized_pnl"><span style={{ color: "var(--sh-fg-muted)" }}>Unrealized: </span></MicroTooltip>
               <span className="font-semibold" style={{ color: unrealizedCents >= 0 ? "var(--sh-emerald)" : "var(--sh-red)" }}>
                 {unrealizedCents >= 0 ? "+" : ""}{money(unrealizedCents)}
               </span>
@@ -343,31 +347,42 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
       </div>
     </div>
 
-    {/* Subtle Portfolio Constraint Status Note */}
+    {/* Portfolio Constraint Note & Guided Resolver */}
     {summary.severity === "critical" && (
-      <div className="flex items-center justify-between border-t px-3 py-1 text-[11px] leading-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}>
-        <div className="flex items-center gap-1.5 truncate">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-          <span className="font-mono font-medium text-[10px] text-amber-500 uppercase shrink-0">Portfolio Note:</span>
-          <span className="truncate text-[11px]">
-            {bindingSubject} uses {bindingUtilization.toFixed(0)}% of its ceiling, leaving {bindingHeadroom.toFixed(0)}%. New exposure that relies on {bindingSubject} is blocked; existing positions are unchanged.
-          </span>
+      <>
+        <div className="flex items-center justify-between border-t px-3 py-1 text-[11px] leading-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)", color: "var(--sh-fg-muted)" }}>
+          <div className="flex items-center gap-1.5 truncate">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+            <span className="font-mono font-medium text-[10px] text-amber-500 uppercase shrink-0">Portfolio Note:</span>
+            <span className="truncate text-[11px]">
+              {bindingSubject} uses {bindingUtilization.toFixed(0)}% of its ceiling, leaving {bindingHeadroom.toFixed(0)}%. New exposure that relies on {bindingSubject} is blocked; existing positions are unchanged.
+            </span>
+          </div>
+          <button type="button" onClick={changeExpanded} className="ml-2 shrink-0 font-mono text-[10px] underline hover:text-[var(--sh-text-primary)]" style={{ color: "var(--sh-fg-muted)" }}>
+            {expanded ? "Hide" : "Limits"}
+          </button>
         </div>
-        <button type="button" onClick={changeExpanded} className="ml-2 shrink-0 font-mono text-[10px] underline hover:text-[var(--sh-text-primary)]" style={{ color: "var(--sh-fg-muted)" }}>
-          {expanded ? "Hide" : "Limits"}
-        </button>
-      </div>
+        {isGuided && (
+          <div className="border-t p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+            <ConstraintResolverCard
+              symbol={bindingSubject}
+              currentValueCents={summary.binding?.usedCents}
+              ceilingValueCents={summary.binding?.ceilingCents}
+            />
+          </div>
+        )}
+      </>
     )}
     {expanded && !compactOnly && <div id="cockpit-rail-detail">
     <div className="grid gap-px lg:grid-cols-3" style={{ background: "var(--sh-border-1)" }}>
       <div className="space-y-2 p-4" style={{ background: "var(--sh-surface)" }}><RailHead>Market clock</RailHead><div className="flex items-center gap-2"><Clock3 className="h-4 w-4" style={{ color: data.session.session === "unknown" ? "var(--sh-red)" : "var(--sh-signal)" }} /><p className="text-sm font-semibold capitalize" style={{ color: "var(--sh-text-primary)" }}>{data.session.session.replaceAll("_", " ")}</p></div>{data.session.unavailableReason ? <p className="text-xs leading-5" style={{ color: "var(--sh-red)" }}>{data.session.unavailableReason}</p> : <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.session.nextBoundary?.label ?? "No next boundary recorded"}{boundaryMs != null ? ` in ${duration(boundaryMs)}` : ""}{data.session.halfDay ? " · half day" : ""}</p>}</div>
       <div className="space-y-2 p-4" style={{ background: "var(--sh-surface)" }}><RailHead>Paper account</RailHead><div className="flex min-w-0 items-center gap-2"><Landmark className="h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><p className="min-w-0 truncate text-sm font-semibold" title={data.account.label || "No account selected"} style={{ color: "var(--sh-text-primary)" }}>{data.account.label || "No account selected"}</p></div>{data.account.unavailableReason ? <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.account.unavailableReason}</p> : <div className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}><p style={{ color: summary.accountStale ? "var(--sh-signal)" : undefined }}>{data.account.isPaper ? "Paper account" : "Account type not stated"} · {staleText}{summary.accountStale ? " — play ceilings may be stale" : ""}</p><p className="tabular-nums">Equity {money(data.account.equityValueCents) ?? "not measured"} · cash {money(data.account.cashCents) ?? "not measured"}</p>{data.account.syncError && <p style={{ color: "var(--sh-red)" }}>Sync issue: {data.account.syncError}</p>}</div>}</div>
-      <div className="space-y-2 p-4" style={{ background: "var(--sh-surface)" }}><RailHead>Account limits · {data.mandate.version}</RailHead><p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>These account limits also apply when an order is checked.</p><p className="text-xs" style={{ color: "var(--sh-text-primary)" }}>Single order {money(data.mandate.maxOrderNotionalCents) ?? "not measured"} · planned loss / play {formatMandatePercentPoints(data.mandate.maxPlannedRiskPctPerPlay)} · daily {formatMandatePercentPoints(data.mandate.maxDailyPlannedRiskPct)}</p></div>
+      <div className="space-y-2 p-4" style={{ background: "var(--sh-surface)" }}><RailHead><MicroTooltip termKey="single_order_ceiling">Account limits · {data.mandate.version}</MicroTooltip></RailHead><p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>These account limits also apply when an order is checked.</p><p className="text-xs" style={{ color: "var(--sh-text-primary)" }}>Single order {money(data.mandate.maxOrderNotionalCents) ?? "not measured"} · planned loss / play {formatMandatePercentPoints(data.mandate.maxPlannedRiskPctPerPlay)} · daily {formatMandatePercentPoints(data.mandate.maxDailyPlannedRiskPct)}</p></div>
     </div>
     <div className="flex items-center justify-between gap-3 border-t px-4 py-2" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><RailHead>Constraint detail</RailHead><div className="flex items-center gap-1 text-[11px]" aria-label="Constraint ordering"><span style={{ color: "var(--sh-fg-muted)" }}>Order</span><button type="button" aria-pressed={sortMode === "severity"} onClick={() => setSortMode("severity")} className="rounded px-1.5 py-1" style={{ background: sortMode === "severity" ? "var(--sh-surface-3)" : undefined, color: "var(--sh-text-primary)" }}>severity</button><button type="button" aria-pressed={sortMode === "impact"} onClick={() => setSortMode("impact")} className="rounded px-1.5 py-1" style={{ background: sortMode === "impact" ? "var(--sh-surface-3)" : undefined, color: "var(--sh-text-primary)" }}>impact</button></div></div>
     <div className="grid gap-px lg:grid-cols-2" style={{ background: "var(--sh-border-1)" }}>
-      <div className="space-y-3 p-4" style={{ background: "var(--sh-surface-2)" }}><RailHead>Notional headroom · capital committed</RailHead>{notionalLines.map((line) => <MeasureLine key={line.key} line={line} />)}</div>
-      <div className="space-y-3 p-4" style={{ background: "var(--sh-surface-2)" }}><RailHead>Planned-loss headroom · capital at risk</RailHead>{riskLines.map((line) => <MeasureLine key={line.key} line={line} />)}</div>
+      <div className="space-y-3 p-4" style={{ background: "var(--sh-surface-2)" }}><RailHead><MicroTooltip termKey="notional_exposure">Notional headroom · capital committed</MicroTooltip></RailHead>{notionalLines.map((line) => <MeasureLine key={line.key} line={line} />)}</div>
+      <div className="space-y-3 p-4" style={{ background: "var(--sh-surface-2)" }}><RailHead><MicroTooltip termKey="planned_loss_limit">Planned-loss headroom · capital at risk</MicroTooltip></RailHead>{riskLines.map((line) => <MeasureLine key={line.key} line={line} />)}</div>
     </div>
     {summary.duplicatedUnclassifiedCluster && <p className="border-t px-4 py-2 text-[11px]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>The largest correlated cluster equals the largest name because no sector fact is recorded; it is shown once above rather than double-counted.</p>}
     {data.run && <div className="border-t px-4 py-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><RailHead>Run preset · #{data.run.runId}</RailHead>{data.run.unavailableReason ? <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{data.run.unavailableReason}</p> : <div className="mt-1 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4" style={{ color: "var(--sh-fg-muted)" }}><p>{data.run.holdingPeriodLabel || "holding period not measured"}</p><p>{deadlineMs == null ? "catalyst deadline not measured" : deadlineMs < 0 ? `catalyst window expired ${duration(-deadlineMs)} ago` : `catalyst deadline in ${duration(deadlineMs)}`}</p><p className="tabular-nums">Liquidity floor {data.run.liquidityFloorAdvUsd == null ? "not measured" : `$${Math.round(data.run.liquidityFloorAdvUsd).toLocaleString()}`}</p><p className="tabular-nums">Single-name cap {data.run.maxSingleNamePct == null ? "not measured" : `${data.run.maxSingleNamePct.toFixed(1)}%`}</p><p className="sm:col-span-2 lg:col-span-4">Invalidation: {data.run.invalidationRule || "not measured"}</p>{data.run.providerGaps === null ? <p className="sm:col-span-2 lg:col-span-4">Provider availability was not recorded for this run.</p> : data.run.providerGaps.length ? <p className="sm:col-span-2 lg:col-span-4">Provider gaps: {data.run.providerGaps.join(", ")}</p> : <p className="sm:col-span-2 lg:col-span-4">Every provider recorded for this run was live.</p>}</div>}</div>}

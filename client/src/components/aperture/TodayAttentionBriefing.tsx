@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "@/styles/capital-today-edition.css";
-import { ArrowRight, CheckCircle2, Clock3, RefreshCw, ShieldAlert } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, RefreshCw, ShieldAlert, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+import { useExperienceMode } from "@/contexts/ExperienceModeContext";
+import { GuidedDecisionQueue } from "./GuidedDecisionQueue";
+import { GuidedOnboardingTour } from "./GuidedOnboardingTour";
 import { AttentionDecisionCard, FindingEvidence } from "./AttentionDecisionCard";
 import { MonitoringFindingReview } from "./MonitoringFindingReview";
 import { InlineGateReview, inlineGateTarget } from "./InlineGateReview";
@@ -59,6 +62,8 @@ export function TodayAttentionBriefing({
   /** Frozen public UAT: no persistence, storage changes, or inline API-backed reviews. */
   previewOnly?: boolean;
 }) {
+  const { isGuided } = useExperienceMode();
+  const [showTour, setShowTour] = useState(false);
   const markSeen = trpc.aperture.desk.markSeen.useMutation();
   const root = useRef<HTMLElement>(null);
   const sent = useRef(new Map<string, string>());
@@ -180,7 +185,12 @@ export function TodayAttentionBriefing({
     <header className="border-b p-4" style={{ borderColor: "var(--sh-border-1)" }}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0"><p className="capital-edition-kicker">The decision desk / Today</p><h1 id="today-briefing-title" className="font-serif text-2xl leading-tight sm:text-3xl">What needs your judgment.</h1><p className="mt-1 text-xs leading-5"><span className="font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Today · {modeLabel}</span><span style={{ color: "var(--sh-fg-muted)" }}> · {accountLabel}</span></p></div>
-        <Button variant="ghost" size="sm" className="min-h-11 min-w-11 shrink-0 aria-disabled:opacity-50" aria-label={read.busy ? "Refreshing status" : read.state === "failed" ? "Retry status refresh" : "Refresh status"} aria-disabled={read.busy} onClick={() => { if (!read.busy) onRetry(); }}><RefreshCw aria-hidden="true" className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">{read.busy ? "Refreshing status…" : read.state === "failed" ? "Retry status refresh" : "Refresh status"}</span></Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowTour(true)} className="min-h-11 gap-1.5 text-xs font-medium border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10">
+            <Sparkles className="h-3.5 w-3.5 text-emerald-500" />Guided Tour
+          </Button>
+          <Button variant="ghost" size="sm" className="min-h-11 min-w-11 shrink-0 aria-disabled:opacity-50" aria-label={read.busy ? "Refreshing status" : read.state === "failed" ? "Retry status refresh" : "Refresh status"} aria-disabled={read.busy} onClick={() => { if (!read.busy) onRetry(); }}><RefreshCw aria-hidden="true" className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">{read.busy ? "Refreshing status…" : read.state === "failed" ? "Retry status refresh" : "Refresh status"}</span></Button>
+        </div>
       </div>
     </header>
     {visibleMotion.length > 0 && <nav className="capital-mobile-focus" aria-label="Capital reading focus">
@@ -197,6 +207,17 @@ export function TodayAttentionBriefing({
         {failedDetail && <p className="mt-1 sm:mt-0" style={{ color: "var(--sh-signal)" }}>{failedDetail}</p>}
       </div>
     </div>}
+
+    {isGuided && (
+      <div className="p-4 border-b" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+        <GuidedDecisionQueue
+          attention={attention}
+          execution={execution}
+          onOpen={onOpen}
+          onRefresh={onRetry}
+        />
+      </div>
+    )}
 
     <div className="capital-briefing-spread">
     <div className="capital-lead-story">
@@ -261,5 +282,10 @@ export function TodayAttentionBriefing({
         </div>
       </div>
     </>}
+    <GuidedOnboardingTour
+      open={showTour}
+      onClose={() => setShowTour(false)}
+      onComplete={() => setShowTour(false)}
+    />
   </section>;
 }

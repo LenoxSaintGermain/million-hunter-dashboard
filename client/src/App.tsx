@@ -315,14 +315,18 @@ function Router() {
   );
 }
 
+import { ExperienceModeProvider } from "./contexts/ExperienceModeContext";
+
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
-        <TooltipProvider>
-          <Toaster theme="light" />
-          <Router />
-        </TooltipProvider>
+        <ExperienceModeProvider>
+          <TooltipProvider>
+            <Toaster theme="light" />
+            <Router />
+          </TooltipProvider>
+        </ExperienceModeProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

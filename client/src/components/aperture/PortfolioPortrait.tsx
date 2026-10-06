@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import { HoldingsComposition } from "./HoldingsComposition";
 import type { CockpitHeadroomLine } from "@shared/cockpitRailSummary";
 import "@/styles/portfolio-portrait.css";
+import { useExperienceMode } from "@/contexts/ExperienceModeContext";
+import { MicroTooltip } from "./MicroTooltip";
+import { ConstraintResolverCard } from "./ConstraintResolverCard";
 
 export type PortraitHolding = {
   symbol: string;
@@ -65,6 +68,7 @@ export function PortfolioPortrait({
   now?: number;
   previewOnly?: boolean;
 }) {
+  const { isGuided } = useExperienceMode();
   const [selected, setSelected] = useState<string | null>(null);
   const [all, setAll] = useState(false);
   const exposure = portraitExposure(holdings ?? []);
@@ -110,11 +114,11 @@ export function PortfolioPortrait({
           </p>
           <details className="portrait-cash-detail"><summary>Cash & buying power</summary><dl>
             <div>
-              <dt>Cash</dt>
+              <dt><MicroTooltip termKey="cash">Cash</MicroTooltip></dt>
               <dd>{money(account.cashCents)}</dd>
             </div>
             <div>
-              <dt>Broker buying power</dt>
+              <dt><MicroTooltip termKey="buying_power">Broker buying power</MicroTooltip></dt>
               <dd>{money(account.buyingPowerCents)}</dd>
             </div>
           </dl>
@@ -248,11 +252,21 @@ export function PortfolioPortrait({
               </p>
             </>
           )}
-          <p>
-            {usage == null
-              ? "Missing measurements are not available capacity."
-              : "Saved constraint, not portfolio allocation. Existing positions are unchanged; fresh checks still apply."}
-          </p>
+          {isGuided && usage != null && usage >= 85 ? (
+            <div className="mt-3">
+              <ConstraintResolverCard
+                symbol={binding?.subject || "Exposure"}
+                currentValueCents={binding?.usedCents}
+                ceilingValueCents={binding?.ceilingCents}
+              />
+            </div>
+          ) : (
+            <p>
+              {usage == null
+                ? "Missing measurements are not available capacity."
+                : "Saved constraint, not portfolio allocation. Existing positions are unchanged; fresh checks still apply."}
+            </p>
+          )}
           {!previewOnly && <a href="/aperture/accounts">Inspect limits →</a>}
         </section>
       </div>

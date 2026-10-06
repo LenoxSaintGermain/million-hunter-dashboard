@@ -29,6 +29,8 @@ const TRADER_NAV = [
   { href: "/aperture/record", label: "Record", icon: FileText },
 ] as const;
 
+import { ExperienceModeToggle } from "@/contexts/ExperienceModeContext";
+
 export default function ApertureShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { user } = useAuth();
@@ -37,7 +39,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
 
   return (
     <EditorialTopNav workspaceId="aperture-workspace">
-      {/* One banded row: identity, the paper-only boundary and the menu. A second
+      {/* One banded row: identity, the paper-only boundary, mode toggle, and the menu. A second
           stacked band cost 211px before any decision text on every route.
 
           The operating invariant does NOT belong in that row. Measured on
@@ -50,7 +52,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
           cost of a line of text, not a second identity band. */}
       <section data-workspace-bar className="border-b border-rule bg-paper">
         <div className="w-full min-w-0 max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-10">
-          <div data-workspace-row className="capital-workspace-navigation flex items-center gap-4">
+          <div data-workspace-row className="capital-workspace-navigation flex flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-2 py-2">
               <div className="w-6 h-6 flex items-center justify-center rounded-sm bg-ink text-bone">
                 <Landmark className="w-3.5 h-3.5" />
@@ -60,6 +62,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
                 <span className="w-1.5 h-1.5 rounded-full bg-amber" />
                 <span className="font-eyebrow text-eyebrow text-amber uppercase tracking-widest whitespace-nowrap">Practice trading only</span>
               </span>
+              <ExperienceModeToggle className="ml-1 shrink-0" />
             </div>
             <nav data-workspace-menu className="flex min-w-0 gap-5 sm:ml-auto" aria-label="Capital Aperture workspace menu">
               {nav.map((item) => {

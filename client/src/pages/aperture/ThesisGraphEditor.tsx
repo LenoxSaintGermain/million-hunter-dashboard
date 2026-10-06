@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Loader2, Sparkles, CheckCircle2, ArrowLeft, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
+import { useExperienceMode } from "@/contexts/ExperienceModeContext";
+import { GuidedThesisWizard } from "@/components/aperture/GuidedThesisWizard";
 
 const PLACEHOLDER = `Example thesis:
 
@@ -27,6 +29,7 @@ I'm avoiding: pure-play software, consumer AI, and anything with >60% revenue fr
 Horizon: 3–5 years. I want concentrated positions, max 8 names, no single name above 20%.`;
 
 export default function ThesisGraphEditor() {
+  const { isGuided } = useExperienceMode();
   const [, params] = useRoute("/aperture/thesis/:id");
   const [, navigate] = useLocation();
   const isNew = !params?.id || params.id === "new";
@@ -101,6 +104,36 @@ export default function ThesisGraphEditor() {
   const graph = thesis?.graph;
 
   if (isNew) {
+    if (isGuided) {
+      return (
+        <DashboardLayout>
+          <div className="max-w-2xl mx-auto space-y-6">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={() => navigate("/aperture")}><ArrowLeft className="h-4 w-4" /></Button>
+              <div>
+                <p className="eyebrow text-emerald-500 font-semibold text-xs tracking-wider uppercase">Guided Mode · 3-Step Wizard</p>
+                <h1 className="font-serif text-2xl font-bold">New Bounded Risk Thesis</h1>
+              </div>
+            </div>
+            <GuidedThesisWizard
+              onComplete={async ({ name: thesisName, rawText: generatedText }) => {
+                try {
+                  const created = await createThesis.mutateAsync({
+                    name: thesisName,
+                    rawText: generatedText,
+                  });
+                  toast.success("Thesis created successfully!");
+                  navigate(`/aperture/thesis/${created.id}`);
+                } catch (e: any) {
+                  toast.error(e?.message || "Failed to save thesis");
+                }
+              }}
+              onCancel={() => navigate("/aperture")}
+            />
+          </div>
+        </DashboardLayout>
+      );
+    }
     return (
       <DashboardLayout>
         <div className="max-w-2xl space-y-6">
