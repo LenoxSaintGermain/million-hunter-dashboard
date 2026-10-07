@@ -7,11 +7,22 @@ export function missionReceiptReadEnabled(hasHandoff: boolean, exactReceipt: { d
   return !hasHandoff || exactReceipt != null;
 }
 
+/**
+ * `?newMission=1` with no thesis ids: an explicit request for a fresh Mission
+ * setup (Play Desk "New research run"). It must never reopen the latest saved
+ * Mission or its result; the bare `/aperture/mission` route still resumes.
+ */
+export function isFreshMissionRequest(search: string): boolean {
+  const params = new URLSearchParams(search);
+  return params.getAll("newMission").length === 1 && params.get("newMission") === "1"
+    && !params.has("canonicalThesisId") && !params.has("capitalThesisId");
+}
+
 /** Syntax only. Ownership and source linkage must be checked against reads. */
 export function parseCanonicalMissionHandoff(search: string): CanonicalMissionHandoff | "invalid" | null {
   const params = new URLSearchParams(search);
   const keys = ["canonicalThesisId", "capitalThesisId", "newMission"];
-  if (!keys.some(key => params.has(key))) return null;
+  if (!keys.some(key => params.has(key)) || isFreshMissionRequest(search)) return null;
   if (keys.some(key => params.getAll(key).length !== 1) || params.get("newMission") !== "1") return "invalid";
   const id = (key: string) => {
     const raw = params.get(key)!;

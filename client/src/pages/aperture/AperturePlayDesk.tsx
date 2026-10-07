@@ -298,7 +298,7 @@ export default function AperturePlayDesk() {
           <Sparkles className="mr-2 h-4 w-4" />
           + Draft Paper Ticket
         </Button>
-        <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => navigate("/aperture/mission")}>
+        <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => navigate("/aperture/mission?newMission=1")}>
           New research run
         </Button>
       </div>
