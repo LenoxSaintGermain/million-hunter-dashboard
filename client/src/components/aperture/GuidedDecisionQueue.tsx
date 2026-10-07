@@ -16,7 +16,7 @@ interface GuidedDecisionQueueProps {
 
 interface DecisionCardItem {
   id: string;
-  type: "order_ready" | "gate_review" | "quote_stale" | "safe_all_clear";
+  type: "order_ready" | "order_blocked" | "gate_review" | "quote_stale" | "safe_all_clear";
   title: string;
   badge: string;
   badgeTone: "green" | "amber" | "blue" | "gray";
@@ -31,36 +31,41 @@ interface DecisionCardItem {
 
 export function GuidedDecisionQueue({
   attention,
-  execution,
   onOpen,
   onRefresh,
   className = "",
 }: GuidedDecisionQueueProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Synthesize bite-sized decision cards from raw attention & execution items
+  // Synthesize bite-sized decision cards from the server's attention items
   const cards: DecisionCardItem[] = [];
 
-  // 1. Check for Approved Orders Ready to Execute
-  const approvedOrders = execution?.orders?.filter((o) => o.status === "approved") ?? [];
-  const approvedAttention = attention?.otherCritical?.find(
-    (item) => item.kind === "approved_not_submitted"
-  ) ?? attention?.primary?.kind === "approved_not_submitted" ? attention?.primary : null;
+  // 1. Approved orders. Driven only by the server's attention items, which carry
+  // the submit-time gate verdict. One card per approved order, never a guessed
+  // symbol, and never "Send Order" unless every final check passes right now.
+  // The order that is already the primary decision card below is not repeated.
+  const approvedItems = [attention?.primary, ...(attention?.otherCritical ?? []), ...(attention?.otherAttention ?? [])]
+    .filter((item): item is ApertureAttentionItem => item?.kind === "approved_not_submitted")
+    .filter((item) => item.key !== attention?.primary?.key);
 
-  if (approvedOrders.length > 0 || approvedAttention) {
-    const symbol = approvedOrders[0]?.symbol ?? approvedAttention?.symbol ?? "NVDA";
-    const orderId = approvedOrders[0]?.id;
+  for (const item of approvedItems) {
+    const symbol = item.symbol ?? "This order";
+    const ready = item.submitState === "ready";
+    const blocker = item.submitBlockers?.[0];
     cards.push({
-      id: `order_ready_${symbol}`,
-      type: "order_ready",
-      title: `${symbol} Order Ready`,
-      badge: "Ready to Execute",
-      badgeTone: "green",
-      summary: `You approved this practice trade earlier. Ready to send to paper broker?`,
-      detail: `Risk is bounded to planned-loss limits. No live capital is touched.`,
-      primaryActionLabel: "Send Order",
-      secondaryActionLabel: "Review Ticket",
-      href: orderId ? `/aperture/plays?stage=approve&inspect=${orderId}` : "/aperture/plays?stage=approve",
+      id: `order_${item.key}`,
+      type: ready ? "order_ready" : "order_blocked",
+      title: ready ? `${symbol} order: final checks pass` : `${symbol} order: ${blocker?.title ?? "final checks not verified"}`,
+      badge: ready ? "Approved" : "Blocked",
+      badgeTone: ready ? "green" : "amber",
+      summary: ready
+        ? "You approved this practice trade earlier. Review the final checks, then confirm to send it to the paper broker."
+        : blocker?.remedy ?? "Refresh status. Send stays off until the final checks run and pass.",
+      detail: ready
+        ? "Checks rerun when you send. Nothing is sent until you confirm."
+        : "Send stays off while a final check fails. No order was sent.",
+      primaryActionLabel: item.actionLabel,
+      href: item.href,
     });
   }
 
@@ -103,8 +108,9 @@ export function GuidedDecisionQueue({
     });
   }
 
-  // 4. Default Safe State if no urgent actions
-  if (cards.length === 0) {
+  // 4. Default Safe State only when nothing critical needs a decision. A critical
+  // primary decision card shown elsewhere on the page is not an all-clear.
+  if (cards.length === 0 && !attention?.primary?.critical && !(attention?.otherCritical?.length)) {
     cards.push({
       id: "all_clear",
       type: "safe_all_clear",
@@ -119,6 +125,7 @@ export function GuidedDecisionQueue({
     });
   }
 
+  if (cards.length === 0) return null;
   const activeCard = cards[currentIndex] || cards[0];
 
   return (
@@ -202,6 +209,7 @@ export function GuidedDecisionQueue({
             className="text-xs font-semibold bg-ink text-bone hover:bg-ink/90 min-h-9"
           >
             {activeCard.type === "order_ready" && <Send className="mr-1.5 h-3.5 w-3.5" />}
+            {activeCard.type === "order_blocked" && <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />}
             {activeCard.type === "quote_stale" && <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
             {activeCard.type === "safe_all_clear" && <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
             {activeCard.primaryActionLabel}

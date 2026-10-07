@@ -82,7 +82,8 @@ import { generateMemo } from "./aperture/memo";
 import { belongsInMemoLibrary } from "./aperture/memoLibrary";
 import { brokerFor, listBrokers, alpacaPaperBroker } from "./aperture/brokers/index";
 import { normSymbol } from "./aperture/facts";
-import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills, preflightOrder, OrderGateError, LIVE_ORDER_STATUSES } from "./aperture/orderFlow";
+import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills, preflightOrder, submitReadiness, OrderGateError, LIVE_ORDER_STATUSES } from "./aperture/orderFlow";
+import { unverifiedReadiness, type OrderSubmitReadiness } from "../shared/orderSubmitReadiness";
 import { evaluateRunPreset, singleOrderCeilingCents } from "./aperture/gates";
 import { buildSingleOrderCeilingPreview, describeSingleOrderCeiling } from "../shared/singleOrderCeiling";
 import { assessMissionClosure } from "../shared/missionClosure";
@@ -151,6 +152,39 @@ async function requireAccount(db: Awaited<ReturnType<typeof getDb>>, accountId: 
     .limit(1);
   if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Account not found" });
   return rows[0];
+}
+
+/** Above this many approved tickets, the rest are shown as unverified (Send stays off). */
+const MAX_READINESS_CHECKS = 10;
+
+/**
+ * Read-only submit readiness for approved orders (see `submitReadiness`).
+ * Orders beyond the cap, or that cannot be evaluated, are "unverified" and
+ * therefore not sendable from the UI. The server still reruns every gate on
+ * the actual submit, so this can only make the UI stricter, never looser.
+ */
+async function approvedOrderReadiness(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  userId: number,
+  orderIds: number[],
+): Promise<Map<number, OrderSubmitReadiness>> {
+  const result = new Map<number, OrderSubmitReadiness>();
+  if (!orderIds.length) return result;
+  const now = Date.now();
+  const checked = orderIds.slice(0, MAX_READINESS_CHECKS);
+  for (const id of orderIds.slice(MAX_READINESS_CHECKS)) {
+    result.set(id, unverifiedReadiness(now, "Too many approved tickets to check at once. Open this ticket to run its final checks."));
+  }
+  try {
+    const rows = await db.select().from(brokerOrders)
+      .where(and(eq(brokerOrders.userId, userId), inArray(brokerOrders.id, checked)));
+    const verdicts = await Promise.all(rows.map(async (row) => [row.id, await submitReadiness(row, userId)] as const));
+    for (const [id, verdict] of verdicts) result.set(id, verdict);
+  } catch {
+    // Fall through: anything not set below stays unverified.
+  }
+  for (const id of checked) if (!result.has(id)) result.set(id, unverifiedReadiness(now));
+  return result;
 }
 
 function receiptBindingUnavailable(): never {
@@ -3036,6 +3070,11 @@ export const apertureRouter = router({
         return Boolean(state && state.netQty > 0 && state.latestOpenId === order.id);
       });
 
+      // Submit readiness for approved tickets: the exact submit-time gates,
+      // evaluated read-only, so Today and Play Desk never invite a Send the
+      // server would refuse (stale broker snapshot, exposure ceiling, ...).
+      const readinessByOrderId = await approvedOrderReadiness(db!, ctx.user.id, orders.filter((order) => order.status === "approved").map((order) => order.id));
+
       const activePlays = await db!.select({
         id: apertureActivePlayContexts.id,
         accountId: apertureActivePlayContexts.accountId,
@@ -3292,6 +3331,7 @@ export const apertureRouter = router({
           brokerOrderId: order.brokerOrderId,
           dispatchError: order.dispatchError,
           updatedAt: order.updatedAt,
+          submitReadiness: readinessByOrderId.get(order.id) ?? null,
         })),
         activePlays: activePlays.map((play) => ({
           id: play.id,
@@ -3355,6 +3395,7 @@ export const apertureRouter = router({
         accountUnavailable: deskAccountRead.unavailable,
         orders: orders.map((order) => ({
           ...order,
+          submitReadiness: readinessByOrderId.get(order.id) ?? null,
           monitoring: order.candidateId == null ? [] : monitoringByCandidate.get(order.candidateId) ?? [],
           latestSnapshot: snapshotByOrderKey.get(`${order.accountId}:${order.runId}:${normSymbol(order.symbol)}`) ?? null,
           latestMark: markByOrderKey.get(`${order.accountId}:${normSymbol(order.symbol)}`) ?? null,
@@ -5022,8 +5063,10 @@ export const apertureRouter = router({
           ? await db!.select().from(portfolioAccounts).where(and(eq(portfolioAccounts.userId, ctx.user.id), inArray(portfolioAccounts.id, accountIds)))
           : [];
         const byId = new Map(accounts.map((account) => [account.id, account]));
+        const readinessByOrderId = await approvedOrderReadiness(db!, ctx.user.id, rows.filter((row) => row.status === "approved").map((row) => row.id));
         return rows.map((row) => ({
           ...row,
+          submitReadiness: readinessByOrderId.get(row.id) ?? null,
           destinationAccount: byId.get(row.accountId) ?? null,
           portfolioContextAccount: row.portfolioContextAccountId ? byId.get(row.portfolioContextAccountId) ?? null : byId.get(row.accountId) ?? null,
         }));

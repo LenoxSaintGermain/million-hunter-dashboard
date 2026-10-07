@@ -59,6 +59,12 @@ import {
 import { resolveEffectiveRiskCeilingPct } from "../../shared/effectiveRiskLimit";
 import { objectiveDiscoveryEnabled } from "./strategyDiscoveryWorkflow";
 import { withCapitalLedgerTransaction, withPaperOrderClaimTransaction, type CapitalLedgerTransaction } from "./capitalLedger";
+import {
+  describeSubmitBlocker,
+  readinessFromGateResults,
+  unverifiedReadiness,
+  type OrderSubmitReadiness,
+} from "../../shared/orderSubmitReadiness";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -829,6 +835,33 @@ export async function rerunStoredOrder(order: BrokerOrder, userId: number, actio
     excludeOrderId: order.id,
     now: nowOverride,
   }, action);
+}
+
+/**
+ * Would `submitOrder` accept this approved order right now?
+ *
+ * Read-only: runs the same submit-time evaluation `submitOrder` runs
+ * (`rerunStoredOrder(order, userId, "submit")`), but persists no preflight
+ * snapshot, changes no status, and never calls the broker's order endpoint.
+ * The UI renders this verdict so Send is disabled whenever a gate fails,
+ * instead of inviting an action the server would refuse.
+ *
+ * Fails closed: anything other than a passing evaluation is not "ready".
+ */
+export async function submitReadiness(order: BrokerOrder, userId: number, nowOverride?: number): Promise<OrderSubmitReadiness> {
+  const checkedAt = nowOverride ?? Date.now();
+  if (order.status !== "approved") {
+    return { state: "blocked", checkedAt, blockers: [describeSubmitBlocker("order_status", `Only approved orders can be sent (current: ${order.status}).`)] };
+  }
+  try {
+    const rerun = await rerunStoredOrder(order, userId, "submit", nowOverride);
+    return readinessFromGateResults(rerun.evaluation.results, rerun.evaluation.passed, rerun.now);
+  } catch (error) {
+    if (error instanceof DecisionRunwayBlockedError) {
+      return { state: "blocked", checkedAt, blockers: [describeSubmitBlocker("decision_binding", error.message)] };
+    }
+    return unverifiedReadiness(checkedAt);
+  }
 }
 
 async function persistRerun(orderId: number, evaluation: GateEvaluation, now: number) {

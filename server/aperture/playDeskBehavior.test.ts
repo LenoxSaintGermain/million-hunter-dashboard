@@ -51,7 +51,7 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
   });
 
   it("shows every critical issue above instrument and stage filters", () => {
-    const orders = [order({ dispatchError: "No dispatch receipt" }), order({ id: 13, symbol: "NU", instrumentType: "shares", status: "approved" })];
+    const orders = [order({ dispatchError: "No dispatch receipt" }), order({ id: 13, symbol: "NU", instrumentType: "shares", status: "approved", submitReadiness: { state: "ready", checkedAt: now, blockers: [] } })];
     fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }) });
     fixture.search = "instrument=puts&stage=choose";
     const html = render();
@@ -59,6 +59,19 @@ describe("Play Desk operator journeys (rendered page, no APIs)", () => {
     expect(html).toContain("Submit NU to the named paper broker");
     expect(html).toContain("2 critical issues outside these filters");
     expect(html.indexOf("Submit NU to the named paper broker")).toBeLessThan(html.indexOf('aria-label="Filter by workflow stage"'));
+  });
+
+  it("does not offer Send for an approved ticket the server's final checks block (issue #3)", () => {
+    const orders = [order({ id: 14, symbol: "NVDA", instrumentType: "shares", status: "approved", submitReadiness: { state: "blocked", checkedAt: now, blockers: [
+      { key: "execution_account_freshness", title: "Broker snapshot is stale", detail: "Refresh the execution paper account within 15 minutes", remedy: "Sync broker snapshot first, then reopen this ticket. Final checks rerun at send time." },
+    ] } })];
+    fixture.queries.desk = query({ orders, activePlays: [], attention: attention({ orders: orders as any }) });
+    const html = render();
+    expect(html).toContain("NVDA can&#x27;t be sent yet: Broker snapshot is stale");
+    expect(html).toContain("Sync broker snapshot first");
+    expect(html).toContain("Review blocker");
+    expect(html).not.toContain("Send Order");
+    expect(html).not.toContain("Review checks and send");
   });
 
   it("opens the exact active play despite filters and same-symbol order deduplication", () => {
