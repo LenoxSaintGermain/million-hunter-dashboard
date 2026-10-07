@@ -158,6 +158,13 @@ export default function ApertureHome() {
     if (preferred) setSelectedAccountId(preferred.id);
   }, [accounts, selectedAccountId]);
 
+  useEffect(() => {
+    if (selectedThesisId || !theses?.length) return;
+    const active = theses.find((t) => (activeCapitalContext?.thesis?.id != null && t.sourceCompilationId === activeCapitalContext.thesis.id) || t.isPrimary)
+      ?? theses[0];
+    if (active) setSelectedThesisId(active.id);
+  }, [theses, activeCapitalContext, selectedThesisId]);
+
   const startRun = trpc.aperture.run.start.useMutation({
     onSuccess: ({ runId }) => {
       toast.success("Run started — polling for results");
@@ -343,7 +350,6 @@ export default function ApertureHome() {
                         {theses?.map((t) => (
                           <SelectItem key={t.id} value={t.id.toString()}>
                             {t.name ?? `Thesis #${t.id}`}
-                            {t.sourceCompilationId ? ` · canonical v${t.sourceCompilationId}` : ` · legacy v${t.id}`}
                             {t.status !== "active" && (
                               <span className="ml-2 text-xs opacity-50">({t.status})</span>
                             )}

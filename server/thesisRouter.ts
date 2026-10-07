@@ -497,6 +497,33 @@ export const thesisRouter = router({
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The thesis was not saved under the complete name. Review the saved record before continuing." });
       }
       await db.update(users).set({ activeCapitalThesisId: compilationId }).where(eq(users.id, ctx.user.id));
+
+      // Project into capitalTheses so it immediately appears in Aperture Theses, Search, and Runs
+      try {
+        const now = Date.now();
+        const operatorProjection = operatorDeclaredProjectionIfReady({
+          thesisText: input.thesisText,
+          name: requestedName,
+          compiledFilters: fields.compiledFilters,
+          evidenceRequirements: fields.evidenceRequirements,
+          autoDisqualifiers: fields.autoDisqualifiers,
+        });
+        const declared = operatorProjection?.declared ?? normalizeCapitalThesisDetails(input.details);
+        const graph = operatorProjection?.graph ?? manualThesisProjection(input.thesisText, requestedName, declared);
+        const projValues = projectionValues({ id: compilationId, name: requestedName, thesisText: input.thesisText }, graph, true, now);
+
+        await db.update(capitalTheses).set({ isPrimary: false }).where(eq(capitalTheses.userId, ctx.user.id));
+        await db.insert(capitalTheses).values({
+          userId: ctx.user.id,
+          ...projValues,
+          status: "active",
+          isPrimary: true,
+          createdAt: now,
+        });
+      } catch (err) {
+        console.error("Failed to synchronously project new thesis to capitalTheses:", err);
+      }
+
       return receipt;
     }),
 

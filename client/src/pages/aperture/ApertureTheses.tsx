@@ -31,6 +31,7 @@ export default function ApertureTheses() {
   const utils = trpc.useUtils();
   const [filter, setFilter] = useState<"all" | "active" | "review" | "archived">("all");
   const { data: theses, isLoading, error, refetch } = trpc.aperture.thesis.list.useQuery();
+  const { data: canonicalTheses } = trpc.thesis.list.useQuery();
   const { data: activeContext, isLoading: contextLoading, error: contextError } = trpc.thesis.activeCapital.useQuery();
   const activate = trpc.aperture.thesis.activate.useMutation({
     onSuccess: async (data) => {
@@ -46,15 +47,47 @@ export default function ApertureTheses() {
   const [query, setQuery] = useState("");
   const activeCompilationId = activeContext?.thesis?.id;
 
+  const mergedTheses = useMemo(() => {
+    const list: any[] = theses ? [...theses] : [];
+    if (canonicalTheses && Array.isArray(canonicalTheses)) {
+      for (const c of canonicalTheses as any[]) {
+        const alreadyIncluded = list.some(
+          (t) => t.sourceCompilationId === c.id || (t.name && t.name.toLowerCase() === c.name?.toLowerCase())
+        );
+        if (!alreadyIncluded) {
+          list.push({
+            id: c.id,
+            name: c.name ?? `Thesis #${c.id}`,
+            rawText: c.thesisText ?? "",
+            sourceCompilationId: c.id,
+            status: (c.status as any) ?? "active",
+            isPrimary: activeCompilationId === c.id,
+            updatedAt: c.createdAt ? new Date(c.createdAt).getTime() : Date.now(),
+            confidenceNotes: [],
+            missionDefaults: {
+              holdingPeriod: null,
+              instrumentPreference: null,
+              maxPlannedLossCents: null,
+            },
+            readDiagnostics: {
+              confidenceNotes: { status: "valid", code: "CANONICAL_SOURCE" },
+            },
+            isCanonicalOnly: true,
+          });
+        }
+      }
+    }
+    return list;
+  }, [theses, canonicalTheses, activeCompilationId]);
+
   const filteredTheses = useMemo(() => {
-    if (!theses) return [];
-    const matching = theses.filter(t => `${t.name ?? ""} ${t.rawText ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()));
+    const matching = mergedTheses.filter(t => `${t.name ?? ""} ${t.rawText ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()));
     if (filter === "all") return matching;
     if (filter === "active") return matching.filter((t) => (activeCompilationId != null && t.sourceCompilationId === activeCompilationId) || t.isPrimary || t.status === "active");
     if (filter === "review") return matching.filter((t) => t.status === "review" || t.status === "compiling");
     if (filter === "archived") return matching.filter((t) => t.status === "archived");
     return matching;
-  }, [theses, filter, activeCompilationId, query]);
+  }, [mergedTheses, filter, activeCompilationId, query]);
 
   return (
     <DashboardLayout>
@@ -223,7 +256,9 @@ export default function ApertureTheses() {
                       <div><dt>Planned loss / play</dt><dd>{money(thesis.missionDefaults?.maxPlannedLossCents)}</dd></div>
                       <div><dt>Holding period</dt><dd>{thesis.missionDefaults?.holdingPeriod?.replace(/_/g, " ") ?? "Not set"}</dd></div>
                     </dl>
-                    <Button className="desk-action" onClick={() => navigate(`/aperture/thesis/${thesis.id}`)}>Review context →</Button>
+                    <Button className="desk-action" onClick={() => navigate((thesis as any).isCanonicalOnly ? `/thesis?inspect=${thesis.id}` : `/aperture/thesis/${thesis.id}`)}>
+                      {(thesis as any).isCanonicalOnly ? "Open in Thesis Engine →" : "Review context →"}
+                    </Button>
                     <details className="desk-detail"><summary>Mandate, source &amp; focus</summary>
                       <p>Instrument: {thesis.missionDefaults?.instrumentPreference?.replace(/_/g, " ") ?? "Not set"}</p>
                       <p className="desk-caption">Canonical compilation: {thesis.sourceCompilationId ?? "Not linked"}. Saved mandate values are not measured exposure or available risk capacity.</p>

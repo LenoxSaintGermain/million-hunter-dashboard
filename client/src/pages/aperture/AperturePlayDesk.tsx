@@ -303,6 +303,9 @@ export default function AperturePlayDesk() {
         <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => navigate("/aperture/mission?newMission=1")}>
           New research run
         </Button>
+        <Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={() => navigate("/aperture/mission?objective=1")}>
+          New mission
+        </Button>
       </div>
     </div>
 

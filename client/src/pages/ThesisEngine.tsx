@@ -265,8 +265,14 @@ export default function ThesisEngine() {
   });
   const openInAperture = (id: number) => apertureProjection.mutate({ compilationId: id });
   const createCapitalThesis = trpc.thesis.createCapital.useMutation({
-    onSuccess: ({ compilationId: newCompilationId }) => {
+    onSuccess: async ({ compilationId: newCompilationId }) => {
       refetchList();
+      await Promise.all([
+        utils.aperture.thesis.list.invalidate(),
+        utils.thesis.list.invalidate(),
+        utils.aperture.invalidate(),
+        utils.thesis.invalidate(),
+      ]);
       setCompilationId(newCompilationId);
       toast.success("Capital / Trade thesis saved — building its paper-research projection.");
       openInAperture(newCompilationId);

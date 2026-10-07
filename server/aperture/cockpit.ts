@@ -29,7 +29,7 @@
 import { and, eq, gte, inArray } from "drizzle-orm";
 import { getDb } from "../db";
 import {
-  apertureRuns, brokerOrders, portfolioAccounts, positions as positionsTable,
+  apertureRuns, brokerOrders, capitalTheses, portfolioAccounts, positions as positionsTable,
   thesisCompilations, users,
   type ApertureRun, type PortfolioAccount,
 } from "../../drizzle/schema";
@@ -299,6 +299,8 @@ export function accountRail(account: PortfolioAccount | null, now: number): Acco
 
 export interface RunRail {
   runId: number;
+  thesisId: number | null;
+  thesisName: string | null;
   status: string;
   holdingPeriod: HoldingPeriod | null;
   holdingPeriodLabel: string | null;
@@ -325,7 +327,7 @@ export interface RunRail {
 }
 
 /** Pure. `run` is an aperture_runs row. */
-export function runRail(run: ApertureRun, now: number): RunRail {
+export function runRail(run: ApertureRun, now: number, thesisName?: string | null): RunRail {
   const hp = isHoldingPeriod(run.holdingPeriod) ? (run.holdingPeriod as HoldingPeriod) : null;
   const rule = hp ? HOLDING_PERIODS[hp] : null;
   const deadline = run.catalystDeadlineAt ?? null;
@@ -333,6 +335,8 @@ export function runRail(run: ApertureRun, now: number): RunRail {
 
   return {
     runId: run.id,
+    thesisId: run.thesisId ?? null,
+    thesisName: thesisName ?? null,
     status: run.status,
     holdingPeriod: hp,
     holdingPeriodLabel: rule?.label ?? null,
@@ -590,6 +594,13 @@ export async function buildCockpit(args: BuildCockpitArgs): Promise<Cockpit> {
     }
   }
 
+  let runThesisName: string | null = null;
+  if (run?.thesisId) {
+    const [t] = await db.select({ name: capitalTheses.name })
+      .from(capitalTheses).where(eq(capitalTheses.id, run.thesisId)).limit(1);
+    runThesisName = t?.name ?? null;
+  }
+
   return {
     generatedAt: now,
     liveTrading: false,
@@ -606,6 +617,6 @@ export async function buildCockpit(args: BuildCockpitArgs): Promise<Cockpit> {
       runGrossDeployedCents: runRows ? sumBuys(runRows) : null,
       newNotionalTodayCents: todayRows ? sumBuys(todayRows) : null,
     }, CURRENT_MANDATE),
-    run: run ? runRail(run, now) : null,
+    run: run ? runRail(run, now, runThesisName) : null,
   };
 }

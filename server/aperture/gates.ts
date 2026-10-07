@@ -35,6 +35,7 @@ import {
   validatePaperInstrument,
   type PaperInstrumentType,
 } from "../../shared/paperInstrument";
+import { STALE_ACCOUNT_MS } from "../../shared/cockpitRailSummary";
 
 // ── Result shape ──────────────────────────────────────────────────────────────
 
@@ -90,6 +91,7 @@ export const ORDER_GATE_INTENT_APPLICABILITY: Record<string, GateIntentApplicabi
   // Integrity & Session (Universal)
   order_intent: "universal",
   paper_account: "universal",
+  account_snapshot_fresh: "universal",
   instrument_identity: "universal",
   option_limit_day_only: "universal",
   paper_acknowledgement: "universal",
@@ -410,6 +412,8 @@ export interface OrderAccountState {
   spreadPct?: number | null;
   /** Current daily volume in shares. Null when unavailable. */
   dailyVolumeShares?: number | null;
+  /** Timestamp when account snapshot was last synced. Stale (>4h) or null blocks execution. */
+  lastSyncedAt?: number | null;
 }
 
 export interface EvaluateOrderArgs {
@@ -475,6 +479,20 @@ export function evaluateOrderGates(args: EvaluateOrderArgs): GateEvaluation {
     "paper_account",
     account.isPaper === true,
     account.isPaper ? "account is a paper account" : "account is not flagged paper — there is no live-execution path",
+  );
+
+  const isSnapshotFresh = account.lastSyncedAt === undefined
+    ? true
+    : account.lastSyncedAt != null && (now - account.lastSyncedAt) <= STALE_ACCOUNT_MS;
+  const snapshotAgeHours = account.lastSyncedAt != null ? ((now - account.lastSyncedAt) / (60 * 60 * 1000)).toFixed(1) : null;
+  g.add(
+    "account_snapshot_fresh",
+    isSnapshotFresh,
+    isSnapshotFresh
+      ? `broker account snapshot is fresh (${snapshotAgeHours ?? "0.0"}h old, ceiling ${STALE_ACCOUNT_MS / (60 * 60 * 1000)}h)`
+      : account.lastSyncedAt == null
+      ? "broker account has never been synced; cannot confirm balances or headroom"
+      : `broker account snapshot is stale (${snapshotAgeHours}h old, exceeds ${STALE_ACCOUNT_MS / (60 * 60 * 1000)}h threshold). Sync broker snapshot before proceeding.`,
   );
 
   g.add(

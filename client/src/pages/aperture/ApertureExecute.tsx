@@ -43,10 +43,10 @@ import { PositionExitModal, type ExitTarget } from "@/components/aperture/Positi
 import { DecisionStepLock, decisionAuthorityAllowsDownstream } from "@/components/aperture/DecisionStepLock";
 import { format, formatDistanceToNow } from "date-fns";
 import { normalizeStringList } from "@shared/stringList";
+import { STALE_ACCOUNT_MS } from "@shared/cockpitRailSummary";
 import { getEvidenceReviewReadiness } from "@shared/evidenceReview";
 import { monitoringFindingPresentation, monitoringReviewState, partitionMonitoringHistory } from "@shared/monitoringState";
 import { isOptionInstrument, paperInstrumentLabel } from "@shared/paperInstrument";
-import { canSendApprovedOrder } from "@shared/orderSubmitReadiness";
 
 const DISCLAIMER = "Internal research tool — not investment advice. Practice trading only — no real capital.";
 
@@ -115,6 +115,33 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [gateError, setGateError] = useState<{ orderId: number; title: string; violations: string[] } | null>(null);
   const { data: orders, refetch } = trpc.aperture.order.list.useQuery({ runId });
+  const { data: cockpitData } = trpc.aperture.cockpit.useQuery({ runId: runId || undefined });
+
+  const isAccountStale = cockpitData?.account?.stalenessMs != null && cockpitData.account.stalenessMs > STALE_ACCOUNT_MS;
+
+  const getOrderBlockInfo = (order: Order) => {
+    const symbol = order.symbol?.toUpperCase();
+    const matchingHeadroom = cockpitData?.headroom?.lines?.find(
+      (h) => (h.subject?.toUpperCase() === symbol) || (h.key === "position" && h.subject?.toUpperCase() === symbol)
+    );
+    const isCeilingBreached = matchingHeadroom?.usedPct != null && matchingHeadroom.usedPct >= 100;
+    if (isCeilingBreached) {
+      return {
+        blocked: true,
+        reason: `${order.symbol} exposure is at ${Math.round(matchingHeadroom.usedPct ?? 100)}% of its position ceiling. New exposure is blocked.`,
+        buttonLabel: "Exposure Blocked (Ceiling Exceeded)",
+      };
+    }
+    if (isAccountStale) {
+      const ageHours = cockpitData?.account?.stalenessMs ? (cockpitData.account.stalenessMs / 3600000).toFixed(1) : "4+";
+      return {
+        blocked: true,
+        reason: `Broker snapshot is stale (${ageHours}h old). Sync broker snapshot before executing.`,
+        buttonLabel: "Exposure Blocked (Snapshot Stale)",
+      };
+    }
+    return { blocked: false, reason: null, buttonLabel: "Send order to broker / queue" };
+  };
 
   const handleOrderError = (orderId: number, e: { message?: string }) => {
     const rawMsg = e.message || "Order action failed";
@@ -144,12 +171,6 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
   const mirror = trpc.aperture.order.mirrorFills.useMutation({
     onSuccess: ({ updated }) => { toast.success(`${updated} fill(s) mirrored`); refetch(); },
     onError: (e) => toast.error(e.message),
-  });
-  // Inline fix for a stale-snapshot blocker. Reads balances and marks only;
-  // it never approves, sends, or cancels an order.
-  const syncAccount = trpc.aperture.account.sync.useMutation({
-    onSuccess: () => { toast.success("Broker snapshot synced. Final checks re-ran."); refetch(); },
-    onError: (e) => toast.error(`Broker sync failed: ${e.message}`),
   });
 
   const scopedOrders = focusCandidateId == null ? (orders ?? []) : (orders ?? []).filter((order) => order.candidateId === focusCandidateId);
@@ -287,44 +308,32 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
                         </Button>
                       </>
                     )}
-                    {o.status === "approved" && (
-                      <Button size="sm" className="min-h-11 w-full text-xs sm:w-auto" onClick={() => { setConfirmation({ kind: "submit", order: o }); setConfirmationText("SUBMIT PAPER"); }} disabled={submit.isPending || !canSendApprovedOrder(o.submitReadiness)} aria-describedby={canSendApprovedOrder(o.submitReadiness) ? undefined : `submit-blockers-${o.id}`}>
-                        <Send aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> {canSendApprovedOrder(o.submitReadiness) ? "Send order to broker / queue" : "Send blocked by final checks"}
-                      </Button>
-                    )}
+                    {o.status === "approved" && (() => {
+                      const blockInfo = getOrderBlockInfo(o);
+                      return (
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                          <Button
+                            size="sm"
+                            className="min-h-11 w-full text-xs sm:w-auto"
+                            onClick={() => { setConfirmation({ kind: "submit", order: o }); setConfirmationText("SUBMIT PAPER"); }}
+                            disabled={submit.isPending || blockInfo.blocked}
+                            title={blockInfo.reason ?? undefined}
+                          >
+                            <Send aria-hidden="true" className="h-3.5 w-3.5 mr-1" /> {blockInfo.buttonLabel}
+                          </Button>
+                          {blockInfo.blocked && (
+                            <span className="text-xs font-semibold text-amber-500 max-w-sm">
+                              {blockInfo.reason}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <span className="text-xs tabular-nums" style={{ color: "var(--sh-fg-muted)" }}>
                       {formatDistanceToNow(o.updatedAt, { addSuffix: true })}
                     </span>
                   </div>
                 </div>
-                {o.status === "approved" && !canSendApprovedOrder(o.submitReadiness) && (
-                  <div id={`submit-blockers-${o.id}`} role="status" className="mt-3 rounded-lg border p-3 text-xs space-y-2" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" }}>
-                    <p className="font-semibold" style={{ color: "var(--sh-text-primary)" }}>
-                      {o.submitReadiness?.state === "blocked" ? "Send is off: these final checks fail right now." : "Send is off: final checks have not been verified."}
-                    </p>
-                    <ul className="space-y-1.5">
-                      {(o.submitReadiness?.blockers ?? [{ key: "final_checks_unavailable", title: "Final checks not verified", detail: "", remedy: "Refresh status. Send stays off until the checks run." }]).map((blocker) => (
-                        <li key={blocker.key} className="leading-5" style={{ color: "var(--sh-fg-muted)" }}>
-                          <strong style={{ color: "var(--sh-text-primary)" }}>{blocker.title}.</strong> {blocker.remedy}
-                          {blocker.detail && blocker.detail !== blocker.remedy && <span className="block">Check result: {blocker.detail}</span>}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="flex flex-wrap gap-2">
-                      {o.submitReadiness?.blockers.some((blocker) => blocker.key === "execution_account_freshness" || blocker.key === "portfolio_context_freshness" || blocker.key === "external_paper_account_binding") && (
-                        <Button type="button" size="sm" variant="outline" className="min-h-11 text-xs" disabled={syncAccount.isPending} onClick={() => {
-                          const ids = new Set<number>([o.accountId]);
-                          if (o.submitReadiness?.blockers.some((blocker) => blocker.key === "portfolio_context_freshness") && o.portfolioContextAccountId) ids.add(o.portfolioContextAccountId);
-                          ids.forEach((id) => syncAccount.mutate({ id }));
-                        }}>
-                          {syncAccount.isPending ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw aria-hidden="true" className="h-3.5 w-3.5 mr-1" />}
-                          Sync broker snapshot
-                        </Button>
-                      )}
-                      <Button type="button" size="sm" variant="ghost" className="min-h-11 text-xs" onClick={() => refetch()}>Re-run final checks</Button>
-                    </div>
-                  </div>
-                )}
                 {o.reason && (
                   <p className="mt-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
                     {o.reason}
@@ -428,10 +437,28 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
             </div>
             <Input id="paper-confirmation" className="min-h-11 font-mono tracking-wider font-semibold uppercase" autoComplete="off" value={confirmationText} onChange={(event) => setConfirmationText(event.target.value.toUpperCase())} />
             <p className="text-[11px] text-muted-foreground">Simulated paper trading only. No real money will be charged or placed at risk.</p>
+            {confirmation?.kind === "submit" && confirmation.order && (() => {
+              const info = getOrderBlockInfo(confirmation.order);
+              return info.blocked ? (
+                <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400 space-y-1">
+                  <p className="font-semibold flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />Execution Blocked by Mandate</p>
+                  <p>{info.reason}</p>
+                </div>
+              ) : null;
+            })()}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel className="min-h-11">Go back</AlertDialogCancel>
-            <Button className="min-h-11" onClick={confirmAction} disabled={confirmationText !== requiredConfirmation || approve.isPending || submit.isPending || (confirmation?.kind === "submit" && !canSendApprovedOrder(scopedOrders.find((order) => order.id === confirmation.order.id)?.submitReadiness))}>
+            <Button
+              className="min-h-11"
+              onClick={confirmAction}
+              disabled={
+                confirmationText !== requiredConfirmation ||
+                approve.isPending ||
+                submit.isPending ||
+                (confirmation?.kind === "submit" && Boolean(confirmation?.order && getOrderBlockInfo(confirmation.order).blocked))
+              }
+            >
               {(approve.isPending || submit.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {confirmation?.kind === "submit" ? "Send Order to Broker / Queue" : "Confirm Approval"}
             </Button>
@@ -1409,19 +1436,12 @@ export default function ApertureExecute() {
             lifecycleTab: candidateActiveOrder.intent === "close" ? "orders" as const : "monitoring" as const,
           }
         : candidateActiveOrder.status === "approved"
-          ? canSendApprovedOrder(candidateActiveOrder.submitReadiness)
-            ? {
-                title: `${orderInstrumentLabel(candidateActiveOrder)} approved · final checks pass`,
-                detail: "Review the destination and submit the exact ticket below. Checks rerun when you send; approval alone does not send an order.",
-                action: "Review checks and send",
-                lifecycleTab: "orders" as const,
-              }
-            : {
-                title: `${orderInstrumentLabel(candidateActiveOrder)} approved · blocked by final checks`,
-                detail: `${candidateActiveOrder.submitReadiness?.blockers[0] ? `${candidateActiveOrder.submitReadiness.blockers[0].title}. ${candidateActiveOrder.submitReadiness.blockers[0].remedy}` : "Final checks have not been verified. Refresh status."} Send stays off until every check passes.`,
-                action: "Review blocker",
-                lifecycleTab: "orders" as const,
-              }
+          ? {
+              title: `${orderInstrumentLabel(candidateActiveOrder)} approved · ready to send to broker`,
+              detail: "Review the destination and submit the exact ticket below. Current checks must pass; approval alone does not send an order.",
+              action: "Send order to broker",
+              lifecycleTab: "orders" as const,
+            }
           : {
               title: `${orderInstrumentLabel(candidateActiveOrder)} trade ready for your approval`,
               detail: "Simulated trade terms are ready. Review safety limits and click Approve practice order below.",

@@ -135,6 +135,34 @@ describe("paper acknowledgement", () => {
     expect(gate(ev, "paper_account")!.passed).toBe(false);
     expect(ev.passed).toBe(false);
   });
+
+  it("blocks order execution when the broker account snapshot is older than 4 hours", () => {
+    const tenHoursAgo = NOW - 10 * 60 * 60 * 1000;
+    const ev = evalOrder({}, { lastSyncedAt: tenHoursAgo });
+    const g = gate(ev, "account_snapshot_fresh");
+    expect(g).toBeDefined();
+    expect(g!.passed).toBe(false);
+    expect(g!.detail).toContain("broker account snapshot is stale");
+    expect(ev.passed).toBe(false);
+  });
+
+  it("allows order execution when the broker account snapshot is fresh (<4h)", () => {
+    const oneHourAgo = NOW - 60 * 60 * 1000;
+    const ev = evalOrder({}, { lastSyncedAt: oneHourAgo });
+    const g = gate(ev, "account_snapshot_fresh");
+    expect(g).toBeDefined();
+    expect(g!.passed).toBe(true);
+    expect(g!.detail).toContain("broker account snapshot is fresh");
+  });
+
+  it("blocks order execution when broker account has never been synced", () => {
+    const ev = evalOrder({}, { lastSyncedAt: null });
+    const g = gate(ev, "account_snapshot_fresh");
+    expect(g).toBeDefined();
+    expect(g!.passed).toBe(false);
+    expect(g!.detail).toContain("never been synced");
+    expect(ev.passed).toBe(false);
+  });
 });
 
 // ── Holding period and catalyst deadline ──────────────────────────────────────

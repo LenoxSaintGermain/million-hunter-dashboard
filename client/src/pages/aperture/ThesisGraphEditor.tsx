@@ -38,6 +38,7 @@ export default function ThesisGraphEditor() {
   const [name, setName] = useState("");
   const [rawText, setRawText] = useState("");
   const [saving, setSaving] = useState(false);
+  const utils = trpc.useUtils ? trpc.useUtils() : null;
 
   const { data: thesis, isLoading: thesisLoading, error: thesisError, refetch: refetchThesis } = trpc.aperture.thesis.get.useQuery(
     { id: thesisId! },
@@ -45,7 +46,11 @@ export default function ThesisGraphEditor() {
   );
 
   const createThesis = trpc.aperture.thesis.create.useMutation({
-    onSuccess: ({ id }) => {
+    onSuccess: async ({ id }) => {
+      await Promise.all([
+        utils?.aperture?.thesis?.list?.invalidate?.(),
+        utils?.thesis?.list?.invalidate?.(),
+      ]);
       toast.success("Thesis saved");
       navigate(`/aperture/thesis/${id}`);
     },
@@ -53,7 +58,13 @@ export default function ThesisGraphEditor() {
   });
 
   const updateThesis = trpc.aperture.thesis.update.useMutation({
-    onSuccess: () => toast.success("Legacy thesis updated — recompile to refresh the graph."),
+    onSuccess: async () => {
+      await Promise.all([
+        utils?.aperture?.thesis?.list?.invalidate?.(),
+        utils?.thesis?.list?.invalidate?.(),
+      ]);
+      toast.success("Legacy thesis updated — recompile to refresh the graph.");
+    },
     onError: (e) => toast.error(e.message),
   });
 

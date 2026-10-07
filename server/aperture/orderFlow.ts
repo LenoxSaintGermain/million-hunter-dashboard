@@ -686,7 +686,7 @@ async function lastPriceCents(symbol: string): Promise<number | null> {
  */
 async function loadOrderAccountState(args: {
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>;
-  account: { id: number; isPaper: boolean; equityValueCents: number | null; cashCents: number | null };
+  account: { id: number; isPaper: boolean; equityValueCents: number | null; cashCents: number | null; lastSyncedAt?: number | null };
   symbol: string;
   exposureSymbol: string;
   runId: number;
@@ -786,6 +786,7 @@ async function loadOrderAccountState(args: {
     newNotionalTodayCents: sumBuys(currentTodayRows),
     runGrossDeployedCents: sumBuys(currentRunRows),
     advUsd: advRow?.valueNum ?? null,
+    lastSyncedAt: account.lastSyncedAt ?? null,
   };
 }
 
