@@ -95,7 +95,7 @@ export type PlayScores = {
 export type TradePlayBlueprint = {
   id: string;
   title: string;
-  playClass: "momentum_continuation" | "pullback" | "event_volatility" | "catalyst_swing" | "mean_reversion" | "hedge" | "no_trade";
+  playClass: "momentum_continuation" | "pullback" | "event_volatility" | "catalyst_swing" | "mean_reversion" | "hedge" | "no_trade" | "unclassified";
   tacticalThesisId: string;
   symbol: string;
   underlyingSymbol: string;
@@ -125,6 +125,10 @@ export type TradePlayBlueprint = {
   killAt: number | null;
   warnings: string[];
   sourceUrls: string[];
+  /** "thesis_examples": tickers named in the thesis text; no universe screen ran (#21). */
+  universe?: "thesis_examples";
+  /** "fixed_percent_template": stop/targets are a fixed % of entry, not ticker structure (#21). */
+  levelsBasis?: "fixed_percent_template";
 };
 
 export type NoTradeDecision = {
@@ -149,6 +153,10 @@ export type CandidateSeed = {
   liquidityScore: number;
   portfolioFitScore: number;
   correlationPenalty?: number;
+  /** Set when the candidate came from the thesis text rather than a screen. */
+  universe?: "thesis_examples";
+  /** Horizon-derived expiry (e.g. today's close for intraday) when no catalyst date exists. */
+  expiresAt?: number | null;
 };
 
 export type PlayUnderwritingResult = {
@@ -351,19 +359,20 @@ export function underwritePlayCandidates(input: {
       id: thesisId,
       direction: candidate.direction,
       title: candidate.title,
-      statement: `${candidate.title} is only actionable if the modeled confirmation is supported by fresh research and market data.`,
+      statement: `${candidate.title.trim().replace(/[\s.;:!?]+$/, "")} is only actionable if the modeled confirmation is supported by fresh research and market data.`,
       horizon,
       evidence: candidate.evidence.map((fact, evidenceIndex) => ({ fact, sourceUrl: candidate.sourceUrls[evidenceIndex] ?? candidate.sourceUrls[0] ?? null, asOf: candidate.lastPriceAsOf ?? input.market.asOf })),
       catalyst: candidate.catalyst ?? null,
       confirmation: candidate.confirmationDescription ?? (entry == null ? "Obtain a fresh underlying price and validate the setup." : `Confirm ${candidate.symbol} holds the modeled entry zone after evidence review.`),
       invalidation: candidate.invalidationDescription ?? (stop == null ? "Record a sourced invalidation before activation." : `${candidate.symbol} crosses the modeled invalidation level near ${stop}.`),
-      expiresAt: candidate.catalystAt ?? null,
+      expiresAt: candidate.catalystAt ?? candidate.expiresAt ?? null,
       confidence: scoring.conviction,
     });
     return {
       id: `play-${candidate.symbol.toLowerCase()}-${index + 1}`,
       title: `${candidate.symbol} · ${candidate.title}`,
-      playClass: candidate.catalyst ? "catalyst_swing" : "pullback",
+      // No setup classifier exists yet; never label an unclassified idea as a pullback.
+      playClass: candidate.catalyst ? "catalyst_swing" : "unclassified",
       tacticalThesisId: thesisId,
       symbol: candidate.symbol,
       underlyingSymbol: candidate.symbol,
@@ -389,13 +398,15 @@ export function underwritePlayCandidates(input: {
         : { downsideCents: -shareOutcome.maxLossCents, expectedLowCents: shareOutcome.targetOutcomesCents[0], expectedBaseCents: shareOutcome.targetOutcomesCents[1], expectedHighCents: shareOutcome.targetOutcomesCents[2], expectedR: shareOutcome.rMultiples[1], expectedValueCents: null, basis: "scenario_modeled" },
       scoring,
       status: exactOptionContractUnavailable || unsupportedShareDirection || !priceFresh ? "research_required" : eventWindow ? "waiting_for_trigger" : "eligible_for_research",
-      killAt: candidate.catalystAt ?? null,
-      warnings: exactOptionContractUnavailable
+      killAt: candidate.catalystAt ?? candidate.expiresAt ?? null,
+      warnings: [...(candidate.universe === "thesis_examples" ? ["Example ticker from the thesis text, not screened. No universe screen or signal engine ran for this idea."] : []), ...(exactOptionContractUnavailable
         ? ["Exact option contract, premium, Greeks, IV, and liquidity require a fresh option chain."]
         : unsupportedShareDirection
           ? ["A bearish share blueprint is research-only because the current order builder has no short-share execution path."]
-          : ["Entry, stop, and targets are modeled scenarios; research must validate them before any ticket exists."],
+          : ["Entry is the last recorded price; the stop and targets are a fixed 2% / 2-4-6% template, not this ticker's structure. Research must validate them before any ticket exists."])],
       sourceUrls: candidate.sourceUrls,
+      ...(candidate.universe ? { universe: candidate.universe } : {}),
+      ...(entry != null ? { levelsBasis: "fixed_percent_template" as const } : {}),
     };
   }).sort((left, right) => right.scoring.overall - left.scoring.overall);
 

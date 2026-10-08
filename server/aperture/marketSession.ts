@@ -168,6 +168,19 @@ export function startOfEtDay(nowMs: number): number | null {
 }
 
 /**
+ * Close of the regular session in progress at `nowMs`, otherwise of the next
+ * regular session. Used to expire intraday ("flat by close") ideas.
+ */
+export function regularSessionCloseAt(nowMs: number): number | null {
+  const state = marketSession(nowMs);
+  const day = state.session === "regular" ? nowMs : nextRegularSessionOpen(nowMs);
+  if (day == null) return null;
+  const start = startOfEtDay(day);
+  const clock = etClock(day);
+  return start == null || !clock ? null : start + closeMinutesFor(clock.dateEt) * 60_000;
+}
+
+/**
  * First regular-session open after `nowMs`, using the same holiday calendar the
  * order gate uses. A trader defer is a next-session pause, not a permanent
  * retirement; weekends and closures are skipped rather than treated as 24 hours.
