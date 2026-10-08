@@ -204,8 +204,8 @@ export function TodayAttentionBriefing({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0"><p className="capital-edition-kicker">The decision desk / Today</p><h1 id="today-briefing-title" className="font-serif text-2xl leading-tight sm:text-3xl">What needs your judgment.</h1><p className="mt-1 text-xs leading-5"><span className="font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Today · {modeLabel}</span><span style={{ color: "var(--sh-fg-muted)" }}> · {accountLabel}</span></p></div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowTour(true)} className="min-h-11 gap-1.5 text-xs font-medium border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10">
-            <Sparkles className="h-3.5 w-3.5 text-emerald-500" />Guided Tour
+          <Button variant="outline" size="sm" onClick={() => setShowTour(true)} className="min-h-11 gap-1.5 text-xs font-medium border-[var(--sh-signal)] text-[var(--sh-signal)] hover:bg-[var(--sh-burnt-amber-10)]">
+            <Sparkles className="h-3.5 w-3.5" />Take the tour
           </Button>
           <Button variant="ghost" size="sm" className="min-h-11 min-w-11 shrink-0 aria-disabled:opacity-50" aria-label={read.busy ? "Refreshing status" : read.state === "failed" ? "Retry status refresh" : "Refresh status"} aria-disabled={read.busy} onClick={() => { if (!read.busy) onRetry(); }}><RefreshCw aria-hidden="true" className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">{read.busy ? "Refreshing status…" : read.state === "failed" ? "Retry status refresh" : "Refresh status"}</span></Button>
         </div>

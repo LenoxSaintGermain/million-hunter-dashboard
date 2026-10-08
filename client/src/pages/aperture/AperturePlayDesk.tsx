@@ -439,8 +439,8 @@ export default function AperturePlayDesk() {
                       </span>
                     )}
                     {order.reason?.startsWith("[QUICK_HIT]") && (
-                      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold" style={{ background: "var(--sh-purple-20)", color: "var(--sh-purple)", border: "1px solid var(--sh-purple)" }}>
-                        ⚡ QUICK HIT
+                      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider" style={{ background: "var(--sh-purple-20)", color: "var(--sh-purple)", border: "1px solid var(--sh-purple)" }}>
+                        Quick hit
                       </span>
                     )}
                   </div>

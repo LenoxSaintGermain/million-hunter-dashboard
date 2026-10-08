@@ -90,7 +90,7 @@ export function MonitoringFindingReview({
       <div className="flex items-center justify-between">
         <p role="status" className="text-sm font-semibold">Review saved · {latest.decision === "needs_fresh_evidence" ? "Needs fresh evidence" : latest.decision === "resolved" ? "Closed" : "Concern kept open"}</p>
         {latest.decision === "resolved" && (
-          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-[var(--sh-emerald)] bg-[var(--sh-emerald-15)] text-[var(--sh-fg-1)]">
             Review closed
           </span>
         )}

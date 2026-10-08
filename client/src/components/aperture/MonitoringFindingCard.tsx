@@ -34,7 +34,7 @@ export function MonitoringFindingCard({ check, instrument, rationale, now, onRef
     <div className="flex items-center justify-between">
       <p className="text-xs font-semibold" style={{ color: statusColor }}>{statusLabel}</p>
       {isResolved && (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--sh-emerald-15)] text-[var(--sh-fg-1)] border border-[var(--sh-emerald)]">
           ✓ SIGNED OFF
         </span>
       )}

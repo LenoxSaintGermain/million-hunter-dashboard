@@ -1,4 +1,4 @@
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { AlertTriangle, ArrowRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ApertureAttentionItem } from "@shared/apertureAttention";
 import { coveredByInvariant } from "@shared/operatingInvariant";
@@ -102,7 +102,8 @@ export function FindingEvidence({ evidence, label = "Evidence", expanded = false
         <div data-catalyst-summary className="rounded-lg border p-3 text-xs" style={{ background: "var(--sh-surface-2)", borderColor: "color-mix(in srgb, var(--sh-signal) 30%, var(--sh-border-1))" }}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: "color-mix(in srgb, var(--sh-signal) 15%, transparent)", color: "var(--sh-signal)" }}>
-              ⚠️ {catalyst.headline}
+              <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />
+              {catalyst.headline}
             </span>
             {catalyst.date && <span className="font-mono text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>{catalyst.date}</span>}
           </div>

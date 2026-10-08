@@ -91,7 +91,7 @@ export function MicroTooltip({
         <TooltipContent
           side="top"
           align="start"
-          className="max-w-[280px] rounded-lg border border-rule bg-surface p-2.5 text-xs text-ink shadow-md"
+          className="max-w-[280px] rounded-lg border border-rule bg-[var(--sh-surface-1)] p-2.5 text-xs text-ink shadow-md"
         >
           <p className="font-semibold text-ink tracking-tight">
             {meta?.term ?? (typeof displayTerm === "string" ? displayTerm : "Why this matters")}

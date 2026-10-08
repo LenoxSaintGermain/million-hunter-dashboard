@@ -381,7 +381,7 @@ export default function ApertureHome() {
                           type="button"
                           size="sm"
                           disabled={compileAndStage.isPending}
-                          className="font-semibold text-white border-emerald-500/40"
+                          className="font-semibold text-white"
                           style={{ background: "var(--sh-signal)" }}
                           onClick={() => {
                             if (selectedThesisId) {
@@ -390,7 +390,7 @@ export default function ApertureHome() {
                           }}
                         >
                           {compileAndStage.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-                          ⚡ Compile &amp; Stage Best Fit
+                          Compile &amp; Stage Best Fit
                         </Button>
                       </div>
                     </div>

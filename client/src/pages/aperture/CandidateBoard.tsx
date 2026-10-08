@@ -63,7 +63,7 @@ export function EvidenceQuestionReview({ symbol, checkLabel, draft, pending, now
           onClick={() => answer("confirmed")}
           disabled={pending}
         >
-          ⚡ Accept AI Evidence &amp; Clear Gate
+          Accept this evidence and clear the check
         </Button>
       </div>
     )}
@@ -582,9 +582,9 @@ export default function CandidateBoard() {
                       variant="outline"
                       disabled={batchClearStandardGates.isPending}
                       onClick={() => focusCandidate && batchClearStandardGates.mutate({ runId, candidateId: focusCandidate.id })}
-                      className="h-8 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                      className="h-8 border-[var(--sh-signal)] text-[var(--sh-signal)] hover:bg-[var(--sh-burnt-amber-10)]"
                     >
-                      <Sparkles className="mr-1.5 h-3.5 w-3.5 text-emerald-400" />
+                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
                       {batchClearStandardGates.isPending ? "Clearing standard gates…" : `Clear all standard thesis gates (${unreviewedChecks.length})`}
                     </Button>
                   )}

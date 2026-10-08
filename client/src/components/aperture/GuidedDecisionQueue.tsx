@@ -187,14 +187,14 @@ export function GuidedDecisionQueue({
           <h3 className="text-base font-bold text-ink tracking-tight">{activeCard.title}</h3>
           <Badge
             variant="outline"
-            className={`text-[11px] font-semibold ${
+            className={`text-[11px] font-semibold uppercase tracking-wider ${
               activeCard.badgeTone === "green"
-                ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                ? "border-[var(--sh-emerald)] bg-[var(--sh-emerald-15)] text-[var(--sh-fg-1)]"
                 : activeCard.badgeTone === "amber"
-                ? "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                ? "border-[var(--sh-signal)] bg-[var(--sh-burnt-amber-10)] text-[var(--sh-signal)]"
                 : activeCard.badgeTone === "blue"
-                ? "border-sky-300 bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300"
-                : "border-slate-300 bg-slate-50 text-slate-800"
+                ? "border-[var(--sh-fg-1)] bg-[var(--sh-surface-1)] text-[var(--sh-fg-1)]"
+                : "border-[var(--sh-border-1)] bg-[var(--sh-surface-1)] text-[var(--sh-fg-2)]"
             }`}
           >
             {activeCard.badge}
