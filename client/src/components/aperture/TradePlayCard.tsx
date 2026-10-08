@@ -11,15 +11,15 @@ export function TradePlayCard({ rank, play, thesis, portfolioRiskBeforeCents, ma
   const remainingHeadroomCents = Math.max(0, maxOpenRiskCents - portfolioRiskAfterCents);
   const isShareScenario = play.instrument.kind === "shares";
   const termHelp = play.instrument.kind === "long_call" || play.instrument.kind === "long_put" ? tradingTermHelp[play.instrument.kind] : null;
-  const sizingUnmeasured = play.outcome.basis === "insufficient_data";
-  const riskValue = sizingUnmeasured && play.sizing.plannedRiskCents <= 0 ? "Not measured" : money(play.sizing.plannedRiskCents);
-  const riskLabel = isShareScenario ? "Planned loss at the modeled stop" : play.outcome.basis === "market_derived" ? "Bounded contract loss" : "Planned risk ceiling";
   // Honest labels until the screener and signal engine exist (#21): an example
   // ticker is not a ranked result, and a fixed % template is not a measured level.
   const exampleTicker = play.universe === "thesis_examples";
   const templateLevels = play.levelsBasis === "fixed_percent_template";
   const setupLabel = play.playClass === "unclassified" ? "setup not classified" : play.playClass.replaceAll("_", " ");
   const directionLabel = thesis?.direction === "conditional" ? " · direction not determined" : "";
+  const sizingUnmeasured = play.outcome.basis === "insufficient_data";
+  const riskValue = sizingUnmeasured && play.sizing.plannedRiskCents <= 0 ? "Not measured" : money(play.sizing.plannedRiskCents);
+  const riskLabel = isShareScenario ? "Planned loss at the modeled stop" : play.outcome.basis === "market_derived" ? "Bounded contract loss" : "Planned risk ceiling";
   return <article className="overflow-hidden rounded-xl border" style={{ borderColor: selected ? "var(--sh-signal)" : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
     <div className="flex flex-wrap items-start justify-between gap-3 border-b p-4" style={{ borderColor: "var(--sh-border-1)" }}><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>{exampleTicker ? `Example ${rank} · from thesis, not screened` : `Play ${rank} · score ${play.scoring.overall}`}</p><h3 className="mt-1 font-serif text-xl">{play.title}</h3><p className="mt-1 text-xs capitalize" style={{ color: "var(--sh-fg-muted)" }}>{setupLabel} · {play.horizon.replaceAll("_", " ")}{directionLabel}</p></div><StateMark state={play.status === "eligible_for_research" ? "researchable" : "conditional"} label={play.status.replaceAll("_", " ")} compact /></div>
     <div className="grid gap-px sm:grid-cols-2" style={{ background: "var(--sh-border-1)" }}>
