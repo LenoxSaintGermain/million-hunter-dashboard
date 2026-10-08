@@ -77,6 +77,16 @@ export function unknownFact(factKey: string, providerId: string, sourceName?: st
 }
 
 /** fetch with a timeout, returning null rather than throwing into a run. */
+/**
+ * #41: provider URLs may carry a key in the query string (FRED `api_key`,
+ * Benzinga `token`; Polygon and FMP keys now travel in headers). Anything that
+ * logs a provider URL must log this redacted form.
+ */
+const SECRET_QUERY_PARAM = /([?&](?:api[_-]?key|apikey|access[_-]?token|token|key|secret|client[_-]?secret|password)=)[^&#]*/gi;
+export function redactUrlSecrets(url: string): string {
+  return url.replace(SECRET_QUERY_PARAM, "$1REDACTED");
+}
+
 export async function httpJson<T = any>(
   url: string,
   opts: { timeoutMs?: number; headers?: Record<string, string> } = {},
@@ -93,9 +103,13 @@ export async function httpJson<T = any>(
         ...(opts.headers ?? {}),
       },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[provider] GET ${redactUrlSecrets(url)} failed: HTTP ${res.status}`);
+      return null;
+    }
     return (await res.json()) as T;
-  } catch {
+  } catch (error) {
+    console.warn(`[provider] GET ${redactUrlSecrets(url)} failed: ${error instanceof Error ? error.name : "error"}`);
     return null;
   } finally {
     clearTimeout(timer);

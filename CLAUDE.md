@@ -74,6 +74,7 @@ Note: the previous version of this section claimed only `gemini-3.1-pro-preview`
 - **Server:** Node/Express, entry `server/_core/index.ts`. Agents in `server/agents/` — the IC consensus scorer runs three Gemini calls in parallel and is surfaced in the UI via **persona labels** ("The Structuralist," "The Restructurer," "The Market Analyst"), NOT vendor names. Keep it that way (persona labels are the honest relabel). `server/poe.ts` = Poe gateway (Claude/Gemini). Real web research uses Perplexity Sonar (`server/deepResearch.ts`, RippleEffect Scanner, TIDE) — the pattern to reuse for any real cited data.
 - **Data:** Drizzle ORM. Runtime deal data in DB; model selection in `model_configs` table (`server/db.ts`). **Ground-truth fixtures:** `server/fixtures/ground-truth-deals.json` — 3 anonymized composite deals (e.g. "Apex Commercial Cleaning," $2.1M — customer concentration + add-back inflation) + a `rigor_gate_test` block. These composites are the sanctioned demo/test deals; keep them labeled composite.
 - **Run/build:** pnpm. `pnpm dev` (tsx watch), `pnpm check` (tsc), `pnpm test` (vitest, last known 99/99), `pnpm build`, `pnpm db:push`.
+- **Credentials lane:** `pnpm test:credentials` (not part of `pnpm test`) checks that the deploy secrets `GEMINI_API_KEY`, `OPENAI_API_KEY`, `Poe_api_key` and `ANTHROPIC_API_KEY` are set; run it only in an environment that should have them.
 
 ---
 

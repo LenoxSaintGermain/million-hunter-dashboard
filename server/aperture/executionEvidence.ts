@@ -6,6 +6,7 @@ import { apertureCandidates, apertureRuns, brokerOrders, portfolioAccounts, aper
 import { parsePersistedJson } from "../../shared/persistedJson";
 import type { getDb } from "../db";
 import { brokerFor } from "./brokers";
+import { assertEnvBrokerAccessForUser } from "./brokers/envBrokerOwner";
 import { orderExecutionReceiptSchema, type OrderExecutionReceipt } from "./brokers/orderExecutions";
 import { reconcileClosingExecutions } from "./executionReconciliation";
 
@@ -112,6 +113,8 @@ export async function abandonExecutionEvidence(db: Db, userId: number, raw: z.in
  * Provider I/O stays outside transactions. Finalization cannot alter an order. */
 export async function refreshExecutionEvidence(db: Db, userId: number, raw: z.infer<typeof refreshExecutionEvidenceInput>, provider?: Provider) {
   const { requestId, ...selection } = refreshExecutionEvidenceInput.parse(raw);
+  // #41: execution reads go through the owner's env-backed Alpaca key.
+  if (!provider) await assertEnvBrokerAccessForUser(db, userId, "alpaca_paper", "refreshExecutionEvidence");
   const initial = await db.transaction(async tx => {
     await tx.select().from(portfolioAccounts).where(and(eq(portfolioAccounts.id, selection.accountId), eq(portfolioAccounts.userId, userId))).for("update");
     const binding = await source(tx, userId, selection);

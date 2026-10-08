@@ -5,6 +5,7 @@ import { getDb } from "../db";
 import { sdk } from "../_core/sdk";
 import { marketSession } from "./marketSession";
 import { syncPaperAccount } from "./paperAccountSync";
+import { envBrokerAccessForUser, OWNER_ONLY_BROKER_MESSAGE } from "./brokers/envBrokerOwner";
 
 /** Every 15 minutes; the callback performs no broker call outside an active US market session. */
 export const PAPER_ACCOUNT_SYNC_CRON = "0 */15 * * * *";
@@ -30,6 +31,14 @@ export async function handlePaperAccountSync(req: Request, res: Response) {
     accountId = account.id;
     if (!account.isPaper || account.brokerId !== "alpaca_paper") {
       return res.json({ ok: true, skipped: "paper_alpaca_only" });
+    }
+    // #41: a schedule on a non-owner's row never reads the owner's account.
+    if (!(await envBrokerAccessForUser(db!, account.userId, account.brokerId, "scheduled paperAccountSync")).allowed) {
+      await db!.update(portfolioAccounts).set({
+        syncScheduleLastRunAt: timestamp,
+        syncScheduleLastResult: `Refused: ${OWNER_ONLY_BROKER_MESSAGE}`,
+      }).where(eq(portfolioAccounts.id, account.id));
+      return res.json({ ok: true, skipped: "owner_only", summary: OWNER_ONLY_BROKER_MESSAGE, timestamp });
     }
     const gate = sessionAllowsPaperAccountSync(timestamp);
     if (!gate.allowed) {

@@ -28,8 +28,9 @@ export const fmpProvider: ProviderAdapter = {
     const out: Fact[] = [];
 
     const profile = await httpJson<any[]>(
-      `https://financialmodelingprep.com/api/v3/profile/${encodeURIComponent(symbol)}?apikey=${key}`,
-      { timeoutMs: ctx.timeoutMs },
+      `https://financialmodelingprep.com/api/v3/profile/${encodeURIComponent(symbol)}`,
+      // #41: FMP documents header authorization (`apikey: <key>`), so the key stays out of the URL.
+      { timeoutMs: ctx.timeoutMs, headers: { apikey: key ?? "" } },
     );
     const p = Array.isArray(profile) ? profile[0] : null;
 
@@ -76,8 +77,8 @@ export const fmpProvider: ProviderAdapter = {
     }
 
     const ratios = await httpJson<any[]>(
-      `https://financialmodelingprep.com/api/v3/ratios-ttm/${encodeURIComponent(symbol)}?apikey=${key}`,
-      { timeoutMs: ctx.timeoutMs },
+      `https://financialmodelingprep.com/api/v3/ratios-ttm/${encodeURIComponent(symbol)}`,
+      { timeoutMs: ctx.timeoutMs, headers: { apikey: key ?? "" } },
     );
     const r = Array.isArray(ratios) ? ratios[0] : null;
     push("pe_ratio", r ? num(r.peRatioTTM) : null, "x");

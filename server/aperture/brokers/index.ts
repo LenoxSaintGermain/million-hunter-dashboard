@@ -264,7 +264,7 @@ export const alpacaPaperBroker: BrokerAdapter = {
     longOptions: true,
     constraints: [
       "Paper account only — fills are simulated and no real capital moves.",
-      "Free market data is the delayed IEX feed, so paper fills are not a fair test of execution quality.",
+      "Paper fills are simulated by Alpaca's matching engine, so they are not a fair test of execution quality, whichever market-data feed is configured.",
     ],
   },
   available() {

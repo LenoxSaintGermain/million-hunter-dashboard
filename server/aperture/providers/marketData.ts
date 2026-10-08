@@ -20,20 +20,16 @@ import { DAY, httpJson, num, unknownFact, type FetchCtx, type ProviderAdapter } 
 // ── Intraday tape ─────────────────────────────────────────────────────────────
 
 /**
- * Which Alpaca feed the intraday endpoints read. Measured 2026-08-18 on the
- * production key, XHB at 10:24 ET:
+ * Which Alpaca feed the intraday endpoints read. Default is `sip`, the
+ * consolidated tape: a VWAP or opening range built from IEX prints alone (about
+ * 5% of volume) is not the number any other participant is looking at.
  *
- *   iex   12,317 shares on the day, ~1 min behind  — real-time, 4.8% of the tape
- *   sip  255,439 shares on the day, 15 min behind  — consolidated, delayed
- *
- * Default is `sip`: for VWAP and an opening range, the whole tape fifteen
- * minutes late beats a twentieth of the tape live. A VWAP built from IEX prints
- * alone is not the number any other participant is looking at.
- *
- * When the account is upgraded to real-time SIP, this changes nothing — the same
- * feed string starts arriving with a sub-minute lag, and every figure already
- * carries its measured `lagMs`, so the surfaces relabel themselves. Set
- * ALPACA_DATA_FEED=iex only to deliberately trade completeness for latency.
+ * The configured key's SIP entitlement was verified 2026-08-25 (see
+ * ALPACA_ENHANCED_DATA_ENTITLEMENT_REPORT_2026-08-25.md) and re-measured
+ * real-time on 2026-09-11 (SPY: SIP and IEX both ~1 min behind; see
+ * intraday.ts). Nothing here assumes a delay: every figure carries its measured
+ * `lagMs`, so a downgrade would show up as lag, not be hidden. Set
+ * ALPACA_DATA_FEED=iex only as an explicit fallback (e.g. a key without SIP).
  */
 export function intradayFeed(): TapeFeed {
   const raw = (process.env.ALPACA_DATA_FEED ?? "sip").trim().toLowerCase();
@@ -302,8 +298,12 @@ export const polygonProvider: ProviderAdapter = {
     const to = new Date(ctx.now).toISOString().slice(0, 10);
     const url =
       `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/1/day/${from}/${to}` +
-      `?adjusted=true&sort=asc&limit=120&apiKey=${process.env.POLYGON_API_KEY}`;
-    const data = await httpJson<{ results?: Array<{ c: number; v: number; t: number }> }>(url, { timeoutMs: ctx.timeoutMs });
+      `?adjusted=true&sort=asc&limit=120`;
+    // #41: Polygon documents `Authorization: Bearer <key>`, so the key stays out of the URL.
+    const data = await httpJson<{ results?: Array<{ c: number; v: number; t: number }> }>(url, {
+      timeoutMs: ctx.timeoutMs,
+      headers: { Authorization: `Bearer ${process.env.POLYGON_API_KEY ?? ""}` },
+    });
     const bars = (data?.results ?? [])
       .map((b) => ({ c: num(b.c) ?? 0, v: num(b.v) ?? 0, t: b.t }))
       .filter((b) => b.c > 0);

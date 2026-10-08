@@ -81,6 +81,7 @@ import { assembleRun } from "./aperture/run";
 import { generateMemo } from "./aperture/memo";
 import { belongsInMemoLibrary } from "./aperture/memoLibrary";
 import { brokerFor, listBrokers, alpacaPaperBroker } from "./aperture/brokers/index";
+import { assertEnvBrokerAccess, envBrokerAccess, OWNER_ONLY_BROKER_MESSAGE } from "./aperture/brokers/envBrokerOwner";
 import { normSymbol } from "./aperture/facts";
 import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills, preflightOrder, submitReadiness, OrderGateError, LIVE_ORDER_STATUSES } from "./aperture/orderFlow";
 import { unverifiedReadiness, type OrderSubmitReadiness } from "../shared/orderSubmitReadiness";
@@ -1328,6 +1329,8 @@ export const apertureRouter = router({
         startingCashCents: z.number().int().nonnegative().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        // #41: the env-backed Alpaca paper rail is the owner's account.
+        assertEnvBrokerAccess(ctx.user, input.brokerId, "account.create");
         const db = await getDb();
         const now = Date.now();
         const [result] = await db!.insert(portfolioAccounts).values({
@@ -1375,6 +1378,8 @@ export const apertureRouter = router({
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
         const account = await requireAccount(db, input.id, ctx.user.id);
+        // #41: refuse before any broker read; the env key reaches the owner's account.
+        assertEnvBrokerAccess(ctx.user, account.brokerId, "account.sync");
         const broker = brokerFor(account.brokerId, account.id);
 
         if (!broker.available()) {
@@ -1413,8 +1418,17 @@ export const apertureRouter = router({
               eq(portfolioAccounts.brokerId, "alpaca_paper"),
               eq(portfolioAccounts.externalAccountId, acctData.externalAccountId),
             ));
-          if (bound.some((row) => row.id !== account.id && row.userId === ctx.user.id)) {
+          // #41: a broker account binds to exactly one account row, across all users.
+          const others = bound.filter((row) => row.id !== account.id);
+          if (others.some((row) => row.userId === ctx.user.id)) {
             throw new TRPCError({ code: "CONFLICT", message: "This external Alpaca Paper account is already bound to another account in your workspace. Submission remains blocked." });
+          }
+          if (others.length && account.externalAccountId !== acctData.externalAccountId) {
+            throw new TRPCError({ code: "CONFLICT", message: "This external Alpaca Paper account is already bound by another user. No destination binding was changed." });
+          }
+          if (others.length) {
+            // An existing binding (made before #41) keeps syncing; the other rows need cleanup.
+            console.warn(`[security] Alpaca Paper account ${acctData.externalAccountId.slice(-4).padStart(8, "*")} is also bound by account row(s) ${others.map((row) => row.id).join(", ")}; only account ${account.id} may use it.`);
           }
         }
 
@@ -1462,6 +1476,7 @@ export const apertureRouter = router({
         if (!account.isPaper || account.brokerId !== "alpaca_paper") {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Scheduled freshness is available only for configured Alpaca Paper accounts." });
         }
+        assertEnvBrokerAccess(ctx.user, account.brokerId, "account.configureSyncSchedule");
         const rawCookie = typeof ctx.req.headers.cookie === "string" ? ctx.req.headers.cookie : "";
         const sessionToken = readSessionCookie(rawCookie) ?? "";
         if (!sessionToken) throw new TRPCError({ code: "UNAUTHORIZED", message: "Your session could not be verified for the paper-account sync schedule." });
@@ -1659,14 +1674,18 @@ export const apertureRouter = router({
 
   // ── Broker availability ────────────────────────────────────────────────────
 
-  brokers: capitalOperatorProcedure.query(() => {
-    return listBrokers().map((b) => ({
-      id: b.id,
-      label: b.label,
-      available: b.available(),
-      unavailableReason: b.unavailableReason?.() ?? null,
-      capabilities: b.capabilities,
-    }));
+  brokers: capitalOperatorProcedure.query(({ ctx }) => {
+    return listBrokers().map((b) => {
+      // #41: the env-backed rail is the owner's account; others see it as not theirs to use.
+      const ownerOnly = !envBrokerAccess(ctx.user.openId, b.id).allowed;
+      return {
+        id: b.id,
+        label: b.label,
+        available: !ownerOnly && b.available(),
+        unavailableReason: ownerOnly ? OWNER_ONLY_BROKER_MESSAGE : b.unavailableReason?.() ?? null,
+        capabilities: b.capabilities,
+      };
+    });
   }),
 
   // ── Provider availability ──────────────────────────────────────────────────
@@ -5749,11 +5768,21 @@ export const apertureRouter = router({
         }
 
         // Execution destination must be a server-side paper rail (e.g. alpaca_paper)
+        // #41: only the owner may bind or refresh the env-backed Alpaca paper rail.
+        const envAlpacaAllowed = envBrokerAccess(ctx.user.openId, "alpaca_paper").allowed;
         let executionAccount = allUserAccounts.find(a => a.brokerId === "alpaca_paper" && a.isPaper);
         const now = Date.now();
-        if (!executionAccount && alpacaPaperBroker.available()) {
+        if (!executionAccount && envAlpacaAllowed && alpacaPaperBroker.available()) {
           try {
             const alpacaAcct = await alpacaPaperBroker.getAccount();
+            // #41: never create a second binding of an external account another row already holds.
+            const [alreadyBound] = alpacaAcct.externalAccountId
+              ? await db!.select({ id: portfolioAccounts.id }).from(portfolioAccounts).where(and(
+                eq(portfolioAccounts.brokerId, "alpaca_paper"),
+                eq(portfolioAccounts.externalAccountId, alpacaAcct.externalAccountId),
+              )).limit(1)
+              : [];
+            if (!alpacaAcct.externalAccountId || alreadyBound) throw new Error("Alpaca Paper account is unidentified or already bound");
             const [inserted] = await db!.insert(portfolioAccounts).values({
               userId: ctx.user.id,
               label: "Alpaca Paper — Execution Rail",
@@ -5794,7 +5823,7 @@ export const apertureRouter = router({
         const targetAccount = portfolioContextAccount;
 
         // Freshen accounts so mandate freshness checks pass cleanly
-        if (executionAccount && executionAccount.brokerId === "alpaca_paper") {
+        if (executionAccount && executionAccount.brokerId === "alpaca_paper" && envAlpacaAllowed) {
           try {
             const alpacaAcct = await alpacaPaperBroker.getAccount();
             await db!.update(portfolioAccounts).set({
