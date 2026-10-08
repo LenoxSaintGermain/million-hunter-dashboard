@@ -77,6 +77,7 @@ function riskInput(values: MissionDraftValues) {
 }
 const constraintText: Record<RiskResponse["portfolioRisk"]["bindingConstraint"], string> = {
   portfolio_headroom_exhausted: "The server reports no remaining portfolio risk headroom.",
+  account_equity_not_measured: "Account equity is not measured (no broker snapshot from the last 4 hours), so the account-wide risk ceiling — a share of account equity — is not measured. New planned risk is blocked until the account is synced.",
   risk_policy_or_portfolio_headroom: "Server risk policy or portfolio headroom is below your declared maximum loss.",
   mission_max_loss: "The server reports that your declared maximum loss is the binding constraint.",
 };
@@ -87,7 +88,9 @@ function previewView(data: RiskResponse, status: ObjectiveMissionRiskPreview["st
     singleOrderCeilingCents: data.singleOrderCeiling?.ceilingCents ?? null,
     measuredLimits: [
       { label: "Portfolio open risk", valueCents: data.portfolioRisk.beforeCents, context: "Server-measured open risk for this Paper account." },
-      { label: "Remaining portfolio headroom", valueCents: data.portfolioRisk.remainingHeadroomCents, context: "Server-returned headroom, not an allocation." },
+      { label: "Remaining portfolio headroom", valueCents: data.portfolioRisk.remainingHeadroomCents, context: data.feasibility.aggregateCeilingStatus === "not_measured"
+        ? "Not measured: the account-wide ceiling is a share of account equity, and equity is unknown or stale. New planned risk is blocked."
+        : `Server-returned headroom: ${data.feasibility.aggregatePolicyPct ?? "a fixed share"}${data.feasibility.aggregatePolicyPct != null ? "%" : ""} of account equity minus open risk. Not an allocation.` },
     ] };
 }
 

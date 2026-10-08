@@ -27,7 +27,8 @@ describe("one Mission capacity number", () => {
       ["Account open-risk room", 24_900, true],
     ]);
     const lines = missionCapacityLines(breakdown);
-    expect(lines[1]).toBe("Sets it · Account open-risk room: $249 (3% open-risk ceiling $600 − $351 already at risk)");
+    // Saved before #19 (no ceiling status): its ceiling used declared capital, and says so.
+    expect(lines[1]).toBe("Sets it · Account open-risk room: $249 (3% of declared capital = $600 ceiling − $351 already at risk; saved before the ceiling moved to account equity)");
     expect(lines[2]).toContain("After the top play ($246.18 planned loss), $2.82 of account room is left.");
     expect(lines[2]).toContain("alternatives, not all fundable together");
   });
@@ -50,7 +51,7 @@ describe("one Mission capacity number", () => {
       maxPlannedLossCents: 50_000, holdingPeriods: ["swing"], instrumentPreference: "either",
     }, risk: { normalPlayRiskPct: .75, highConvictionRiskPct: 1.25, maxAggregateOpenRiskPct: 3,
       weeklyLossLimitPct: 4, eventRiskAllocationPct: 1.5, perPlayHeadroomCents: 74_246,
-      aggregateOpenRiskBeforeCents: 18_000, weeklyLossUsedCents: 0 } });
+      aggregateOpenRiskBeforeCents: 18_000, accountEquityCents: 800_000, weeklyLossUsedCents: 0 } });
     const $ = load(renderToStaticMarkup(React.createElement(MissionResultWorkspace, {
       result, accountLabel: "Illustrative Paper", accountAsOf: now, thesisLabel: "PW", revisionLabel: "v3",
       selectedPlayId: null, busy: false, onEdit: () => {}, onValidate: () => {}, riskDetails: null,
@@ -60,7 +61,7 @@ describe("one Mission capacity number", () => {
     const cell = facts.find("dt").filter((_, el) => $(el).text() === "Room for new planned loss").parent();
     expect(cell.find("dd").text()).toBe("$60");
     expect(cell.find("small").text()).toContain("candidates share it");
-    expect(cell.find("#mission-capacity-breakdown").text()).toContain("Sets it · Account open-risk room: $60 (3% open-risk ceiling $240 − $180 already at risk)");
+    expect(cell.find("#mission-capacity-breakdown").text()).toContain("Sets it · Account open-risk room: $60 (3% of $8,000 account equity = $240 ceiling − $180 already at risk)");
     expect($("[aria-label='How the room for new planned loss is set'] li").first().text()).toBe("Mission planned-loss limit: $500");
     expect($("button").text()).toBe("Edit mission");
   });

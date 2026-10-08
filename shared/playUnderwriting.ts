@@ -23,6 +23,13 @@ export type UnderwritingRiskPolicy = {
   perPlayHeadroomCents: number | null;
   aggregateOpenRiskBeforeCents: number | null;
   weeklyLossUsedCents: number | null;
+  /**
+   * Account equity from the latest broker/account snapshot, or null when it is
+   * unknown or stale. The account-wide open-risk ceiling is
+   * maxAggregateOpenRiskPct of this figure (#19). Declared mission capital is
+   * never a substitute: null means the ceiling is not measured and blocks.
+   */
+  accountEquityCents: number | null;
 };
 
 export type TargetFeasibility = {
@@ -43,7 +50,21 @@ export type TargetFeasibility = {
   clarification?: string;
   aggregatePolicyPct?: number;
   aggregateOpenRiskBeforeCents?: number;
+  /** Equity the account-wide ceiling was measured against; null when not measured. */
+  accountEquityCents?: number | null;
+  /** "not_measured" when equity is unknown or stale; new risk is then blocked. Absent on results saved before #19. */
+  aggregateCeilingStatus?: "measured" | "not_measured";
 };
+
+/** Fresh, positive account equity, or null. Stale or missing equity is not measured. */
+export function measuredAccountEquityCents(account: { equityValueCents: number | null | undefined; stalenessMs: number | null | undefined }, staleAfterMs: number): number | null {
+  const equity = account.equityValueCents;
+  if (equity == null || !Number.isFinite(equity) || equity <= 0) return null;
+  if (account.stalenessMs == null || account.stalenessMs > staleAfterMs) return null;
+  return equity;
+}
+
+export const ACCOUNT_EQUITY_NOT_MEASURED = "Account equity is not measured: it is unknown or there is no broker snapshot from the last 4 hours. The account-wide risk ceiling is a percentage of account equity, so it is not measured and new planned risk is blocked. Declared mission capital does not substitute for it. Sync the paper account, then re-check.";
 
 export type RegimeMetric = {
   value: number | null;
@@ -184,9 +205,14 @@ export function calculateTargetFeasibility(objective: CapitalObjective, risk: Un
     : requiredReturnPct <= 1 ? "conservative"
       : requiredReturnPct <= 3 ? "stretch"
         : requiredReturnPct <= 8 ? "aggressive" : "extreme";
-  const aggregatePolicyCents = pctOf(objective.deployableCapitalCents, risk.maxAggregateOpenRiskPct);
-  const maxOpenRiskCents = Math.min(...finiteLimits(objective.maxPortfolioOpenRiskCents, aggregatePolicyCents));
-  const aggregateRemaining = Math.max(0, maxOpenRiskCents - Math.max(0, risk.aggregateOpenRiskBeforeCents ?? 0));
+  // #19: the account-wide ceiling is a share of measured account equity, never
+  // of declared mission capital. Unknown or stale equity leaves it unmeasured,
+  // and an unmeasured ceiling blocks new planned risk (no fallback).
+  const accountEquityCents = risk.accountEquityCents != null && Number.isFinite(risk.accountEquityCents) && risk.accountEquityCents > 0 ? risk.accountEquityCents : null;
+  const ceilingMeasured = accountEquityCents != null;
+  const aggregatePolicyCents = ceilingMeasured ? pctOf(accountEquityCents, risk.maxAggregateOpenRiskPct) : null;
+  const maxOpenRiskCents = ceilingMeasured ? Math.min(...finiteLimits(objective.maxPortfolioOpenRiskCents, aggregatePolicyCents)) : 0;
+  const aggregateRemaining = ceilingMeasured ? Math.max(0, maxOpenRiskCents - Math.max(0, risk.aggregateOpenRiskBeforeCents ?? 0)) : 0;
   const weeklyPolicyCents = pctOf(objective.deployableCapitalCents, risk.weeklyLossLimitPct);
   const lossLimitCents = Math.min(...finiteLimits(objective.weeklyLossLimitCents, weeklyPolicyCents));
   const weeklyRemaining = Math.max(0, lossLimitCents - Math.max(0, risk.weeklyLossUsedCents ?? 0));
@@ -219,9 +245,11 @@ export function calculateTargetFeasibility(objective: CapitalObjective, risk: Un
     : normalPlayRiskCents <= 0
       ? "mission_limit"
       : undefined;
-  const clarification = aggregateRemaining <= 0
-    ? `Mandate planned-loss ceiling (${risk.maxAggregateOpenRiskPct}% of capital = $${Math.round(maxOpenRiskCents / 100).toLocaleString()}) is 100% committed by active positions ($${Math.round(aggregateOpenRiskBeforeCents / 100).toLocaleString()} open risk). Broker cash is liquid, but downside loss capacity is binding.`
-    : undefined;
+  const clarification = !ceilingMeasured
+    ? ACCOUNT_EQUITY_NOT_MEASURED
+    : aggregateRemaining <= 0
+      ? `Account-wide planned-loss ceiling (${risk.maxAggregateOpenRiskPct}% of $${Math.round(accountEquityCents / 100).toLocaleString()} account equity = $${Math.round(maxOpenRiskCents / 100).toLocaleString()}) is 100% committed by active positions ($${Math.round(aggregateOpenRiskBeforeCents / 100).toLocaleString()} open risk). Broker cash is liquid, but downside loss capacity is binding.`
+      : undefined;
   return {
     capitalBaseCents: objective.deployableCapitalCents,
     targetProfitCents: objective.targetProfitCents,
@@ -240,6 +268,8 @@ export function calculateTargetFeasibility(objective: CapitalObjective, risk: Un
     clarification,
     aggregatePolicyPct: risk.maxAggregateOpenRiskPct,
     aggregateOpenRiskBeforeCents,
+    accountEquityCents,
+    aggregateCeilingStatus: ceilingMeasured ? "measured" : "not_measured",
   };
 }
 
@@ -294,13 +324,14 @@ export function underwritePlayCandidates(input: {
 }): PlayUnderwritingResult {
   const feasibility = calculateTargetFeasibility(input.objective, input.risk);
   const beforeCents = Math.max(0, input.risk.aggregateOpenRiskBeforeCents ?? 0);
+  const ceilingMeasured = feasibility.aggregateCeilingStatus !== "not_measured";
   const remaining = Math.max(0, feasibility.maxOpenRiskCents - beforeCents);
   const base = {
     asOf: input.now,
     objective: input.objective,
     feasibility,
     market: input.market,
-    portfolioRisk: { beforeCents, hypotheticalAfterCents: beforeCents, bindingConstraint: null as string | null, remainingHeadroomCents: remaining },
+    portfolioRisk: { beforeCents, hypotheticalAfterCents: beforeCents, bindingConstraint: null as string | null, remainingHeadroomCents: ceilingMeasured ? remaining as number | null : null },
   };
   const refuse = (reason: NoTradeDecision["reason"], explanation: string, reopenCondition: string | null): PlayUnderwritingResult => ({
     ...base,
@@ -309,6 +340,9 @@ export function underwritePlayCandidates(input: {
     noTrade: { reason, explanation, reopenCondition, reviewAt: null },
     portfolioRisk: { ...base.portfolioRisk, bindingConstraint: reason },
   });
+  if (!ceilingMeasured) {
+    return refuse("other", ACCOUNT_EQUITY_NOT_MEASURED, "Sync the paper account so its equity is measured from a broker snapshot under 4 hours old, then re-underwrite.");
+  }
   if (remaining <= 0 || feasibility.riskBudgetCents <= 0) {
     return refuse("portfolio_headroom_exhausted", "No measured risk capacity remains inside the current portfolio and mission limits. While broker cash is liquid, the Mandate Planned-Loss Envelope is 100% committed by active positions.", "Reduce existing open risk or revise the mandate before re-underwriting.");
   }

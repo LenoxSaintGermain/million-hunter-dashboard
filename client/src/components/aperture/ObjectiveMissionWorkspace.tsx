@@ -171,7 +171,11 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
   const openRiskText = openRiskLimit?.valueCents != null ? money(openRiskLimit.valueCents) : null;
   const headroomLimit = matchingPreview?.measuredLimits?.find(limit => limit.label.toLowerCase().includes("headroom"));
   const headroomText = headroomLimit?.valueCents != null ? money(headroomLimit.valueCents) : "$0.00";
-  const headroomMessage = isHeadroomExhausted
+  // #19: equity unknown/stale leaves the account-wide ceiling unmeasured; that blocks too.
+  const equityUnmeasured = matchingPreview?.feasibility.aggregateCeilingStatus === "not_measured";
+  const headroomMessage = equityUnmeasured
+    ? "Cannot analyze: account equity is not measured, so the account-wide risk ceiling is not measured. Sync the paper account first."
+    : isHeadroomExhausted
     ? `Cannot analyze: Risk limit reached (${headroomText} headroom remaining).`
     : null;
   const previewWarning = matchingPreview && !previewCurrent
@@ -356,21 +360,25 @@ export function ObjectiveMissionWorkspace(props: ObjectiveMissionWorkspaceProps)
           <div data-testid="risk-limit-exhausted-card" className="rounded-lg border p-3.5 text-sm space-y-2.5" style={{ borderColor: "var(--sh-signal)", background: "rgba(245, 158, 11, 0.08)" }}>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-amber-500">
-                Cannot analyze: Risk limit reached ({headroomText} headroom remaining)
+                {equityUnmeasured ? "Cannot analyze: account equity not measured" : <>Cannot analyze: Risk limit reached ({headroomText} headroom remaining)</>}
               </span>
             </div>
             <p className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>
-              Your account has liquid buying power, but your paper account's daily loss limit {openRiskText ? `(${openRiskText} open risk)` : ""} is full. Downside risk capacity—not nominal broker cash—is the binding constraint.
+              {equityUnmeasured
+                ? "The account-wide risk ceiling is a share of account equity from a broker snapshot under 4 hours old. Equity is unknown or stale, so the ceiling is not measured and new planned risk is blocked. Declared mission capital does not substitute for it."
+                : <>Your account has liquid buying power, but your paper account's daily loss limit {openRiskText ? `(${openRiskText} open risk)` : ""} is full. Downside risk capacity—not nominal broker cash—is the binding constraint.</>}
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <Button type="button" disabled={locked} onClick={() => changeStrategy({ researchOnly: true })}>Continue as research only</Button>
-              <a
-                href="/aperture/plays"
-                className="inline-flex items-center justify-center rounded-md text-xs font-medium min-h-9 px-3 border border-amber-500/40 hover:bg-amber-500/10 transition-colors"
-                style={{ color: "var(--sh-text-primary)" }}
-              >
-                Review open orders
-              </a>
+              {!equityUnmeasured && (
+                <a
+                  href="/aperture/plays"
+                  className="inline-flex items-center justify-center rounded-md text-xs font-medium min-h-9 px-3 border border-amber-500/40 hover:bg-amber-500/10 transition-colors"
+                  style={{ color: "var(--sh-text-primary)" }}
+                >
+                  Review open orders
+                </a>
+              )}
               <Button
                 type="button"
                 size="sm"

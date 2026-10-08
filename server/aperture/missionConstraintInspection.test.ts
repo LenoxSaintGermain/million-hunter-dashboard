@@ -15,7 +15,7 @@ const feasibility = calculateTargetFeasibility({
 }, {
   normalPlayRiskPct: 0.75, highConvictionRiskPct: 1.25, maxAggregateOpenRiskPct: 3,
   weeklyLossLimitPct: 4, eventRiskAllocationPct: 1.5, perPlayHeadroomCents: 74_246,
-  aggregateOpenRiskBeforeCents: 30_000, weeklyLossUsedCents: 0,
+  aggregateOpenRiskBeforeCents: 30_000, accountEquityCents: 800_000, weeklyLossUsedCents: 0,
 });
 const inspection = {
   accountId: 42, accountLabel: "Illustrative Alpaca Paper", accountAsOf: asOf,
@@ -23,7 +23,7 @@ const inspection = {
   loading: false, failed: false, feasibility, headroomAsOf: asOf,
   risk: { normalPlayRiskPct: 0.75, highConvictionRiskPct: 1.25, maxAggregateOpenRiskPct: 3,
     weeklyLossLimitPct: 4, eventRiskAllocationPct: 1.5, perPlayHeadroomCents: 74_246,
-    aggregateOpenRiskBeforeCents: 30_000, weeklyLossUsedCents: 0 },
+    aggregateOpenRiskBeforeCents: 30_000, accountEquityCents: 800_000, weeklyLossUsedCents: 0 },
   lines: [{ key: "position", label: "Largest single name", subject: "NVDA", usedCents: 1_030_000,
     ceilingCents: 1_000_000, remainingCents: 0, usedPct: 103, ceilingPct: 10,
     basis: "market_value", reason: null }],

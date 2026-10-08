@@ -18,7 +18,7 @@ const result = underwritePlayCandidates({ now, market, candidates: [], objective
   maxPlannedLossCents: 50_000, holdingPeriods: ["swing"], instrumentPreference: "either",
 }, risk: { normalPlayRiskPct: .75, highConvictionRiskPct: 1.25, maxAggregateOpenRiskPct: 3,
   weeklyLossLimitPct: 4, eventRiskAllocationPct: 1.5, perPlayHeadroomCents: 74_246,
-  aggregateOpenRiskBeforeCents: 162_000, weeklyLossUsedCents: 0 } });
+  aggregateOpenRiskBeforeCents: 162_000, accountEquityCents: 800_000, weeklyLossUsedCents: 0 } });
 
 describe("completed Mission glance", () => {
   it("never labels a no-new-trade receipt as zero total portfolio risk", () => {

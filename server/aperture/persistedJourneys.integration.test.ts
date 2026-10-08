@@ -146,7 +146,7 @@ describe.skipIf(!local)("real-database interrupted and returning operator journe
     const metric = { value: null, direction: "unknown" as const, asOf: NOW, source: "illustrative_fixture", freshness: "unknown" as const };
     const market: MarketRegimeSnapshot = { asOf: NOW, marketSession: "unknown", indexTrend: { spy: metric, qqq: metric, iwm: metric }, keyThemes: [], catalysts: [], regime: "unknown", confidence: 0 };
     const result = underwritePlayCandidates({ objective: { ...objective, holdingPeriods: periods }, market,
-      risk: { normalPlayRiskPct: 0.75, highConvictionRiskPct: 1.25, maxAggregateOpenRiskPct: 3, weeklyLossLimitPct: 4, eventRiskAllocationPct: 1.5, perPlayHeadroomCents: 75_000, aggregateOpenRiskBeforeCents: 0, weeklyLossUsedCents: 0 },
+      risk: { normalPlayRiskPct: 0.75, highConvictionRiskPct: 1.25, maxAggregateOpenRiskPct: 3, weeklyLossLimitPct: 4, eventRiskAllocationPct: 1.5, perPlayHeadroomCents: 75_000, aggregateOpenRiskBeforeCents: 0, accountEquityCents: 2_500_000, weeklyLossUsedCents: 0 },
       candidates: [], now: NOW, requestedPlayCount: 3,
     });
     const headId = prior?.headId ?? Number((await db.insert(apertureUnderwritingRuns).values({ userId: mission.owner.id, decisionRunId: mission.decisionRunId, createdAt: NOW, updatedAt: NOW }))[0].insertId);

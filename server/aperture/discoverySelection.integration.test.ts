@@ -1005,7 +1005,7 @@ describe("discovery selection — isolated persisted adversarial handoff", () =>
           ...(fullCapital ? { lastPrice: 100, lastPriceAsOf: NOW } : {}),
           liquidityScore: 50, portfolioFitScore: 75 }] : [], risk: { normalPlayRiskPct: 0.75, highConvictionRiskPct: 1.25,
           maxAggregateOpenRiskPct: 3, weeklyLossLimitPct: 4, eventRiskAllocationPct: 1.5,
-          perPlayHeadroomCents: 75_000, aggregateOpenRiskBeforeCents: 0, weeklyLossUsedCents: 0 },
+          perPlayHeadroomCents: 75_000, aggregateOpenRiskBeforeCents: 0, accountEquityCents: 800_025, weeklyLossUsedCents: 0 },
       }), providerAvailability: { illustrative_no_setup: true, provider_network_invoked: false } };
     });
     const { apertureRouter } = await import("../apertureRouter");

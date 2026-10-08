@@ -2,10 +2,12 @@ import type { CapitalThesis } from "../../drizzle/schema";
 import type { Cockpit } from "./cockpit";
 import { collectMarketFacts } from "./providers/index";
 import { CURRENT_MANDATE } from "./mandate";
+import { STALE_ACCOUNT_MS } from "../../shared/cockpitRailSummary";
 import { buildMarketRegimeSnapshot } from "./marketRegime";
 import { regularSessionCloseAt } from "./marketSession";
 import {
   underwritePlayCandidates,
+  measuredAccountEquityCents,
   type CapitalObjective,
   type CandidateSeed,
   type PlayUnderwritingResult,
@@ -69,6 +71,8 @@ function illustrativeUatUnderwriting(input: {
       perPlayHeadroomCents: perPlay?.ceilingCents ?? null,
       aggregateOpenRiskBeforeCents: input.aggregateOpenRiskCents ?? daily?.usedCents ?? 0,
       weeklyLossUsedCents: daily?.usedCents ?? 0,
+      // #19: account-wide ceiling = mandate % of fresh snapshot equity; unmeasured blocks.
+      accountEquityCents: measuredAccountEquityCents(input.cockpit.account, STALE_ACCOUNT_MS),
     },
   });
 }
@@ -144,6 +148,8 @@ export async function underwriteCapitalMission(input: {
       // weekly stop and the result warns through its binding constraint.
       aggregateOpenRiskBeforeCents: input.aggregateOpenRiskCents ?? daily?.usedCents ?? 0,
       weeklyLossUsedCents: daily?.usedCents ?? 0,
+      // #19: account-wide ceiling = mandate % of fresh snapshot equity; unmeasured blocks.
+      accountEquityCents: measuredAccountEquityCents(input.cockpit.account, STALE_ACCOUNT_MS),
     },
   });
   const ran = new Set(collected.flatMap((row) => row.ranProviders));

@@ -24,7 +24,7 @@ const market: MarketRegimeSnapshot = { asOf: now, marketSession: "regular", inde
 const objective: CapitalObjective = { deployableCapitalCents: 5_000_000, targetProfitCents: null, targetPeriod: null, maxPlannedLossCents: 25_000,
   maxPortfolioOpenRiskCents: null, weeklyLossLimitCents: null, eventRiskLimitCents: null, holdingPeriods: ["intraday"], instrumentPreference: "shares" };
 const risk = { normalPlayRiskPct: 0.75, highConvictionRiskPct: 1.25, maxAggregateOpenRiskPct: 3, weeklyLossLimitPct: 4,
-  eventRiskAllocationPct: 1.5, perPlayHeadroomCents: 1_000_000, aggregateOpenRiskBeforeCents: 0, weeklyLossUsedCents: 0 };
+  eventRiskAllocationPct: 1.5, perPlayHeadroomCents: 1_000_000, aggregateOpenRiskBeforeCents: 0, accountEquityCents: 5_000_000, weeklyLossUsedCents: 0 };
 const belief = "Liquid US stocks 15%+ below their 52-week high produce tradeable intraday trend days, confirmed on a 5-minute close.";
 const seed = (symbol: string, lastPrice: number): CandidateSeed => ({ symbol, title: belief, direction: "conditional", universe: "thesis_examples",
   expiresAt: Date.UTC(2026, 9, 7, 20), evidence: ["last price: recorded (Illustrative)"], sourceUrls: ["https://example.com/illustrative"],
@@ -66,7 +66,7 @@ describe("issue #21: the thesis-example universe is not presented as a screen", 
     providers.collect.mockImplementation(async (symbol: string) => ({ symbol, facts: [
       { factKey: "last_price", valueNum: 100, basis: "verified", sourceUrl: "https://example.com/illustrative", sourceName: "Illustrative", providerId: "fixture", asOf: now },
     ], ranProviders: [], skippedProviders: [] }));
-    const cockpit = { headroom: { lines: [] } } as any;
+    const cockpit = { headroom: { lines: [] }, account: { equityValueCents: 5_000_000, stalenessMs: 0 } } as any;
     const { result } = await underwriteCapitalMission({ now, objective, cockpit, requestedPlayCount: 3,
       projection: { name: "Illustrative", graph: { researchSymbols: ["aaa", "BBB"], beliefs: [belief], seek: ["Long above session high; short below session low."], invalidationConditions: [] } } as any });
     expect(result.plays.map(play => play.universe)).toEqual(["thesis_examples", "thesis_examples"]);
