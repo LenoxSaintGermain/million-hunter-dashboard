@@ -41,6 +41,17 @@ const stamp = (value: number | null) =>
         timeStyle: "short",
       });
 
+/**
+ * One jump row to the existing places for positions, orders and limits. No new
+ * pages: positions and limits are sections of this portrait; orders and open
+ * plays live on the Play Desk.
+ */
+export const PORTRAIT_JUMPS = [
+  { label: "Positions", href: "#portrait-positions" },
+  { label: "Orders & open plays", href: "/aperture/plays" },
+  { label: "Limits", href: "#portrait-limits" },
+] as const;
+
 /** A saved account portrait, not an allocation recommendation or forecast. */
 export function PortfolioPortrait({
   holdings,
@@ -101,6 +112,16 @@ export function PortfolioPortrait({
           · saved snapshot
         </span>
       </header>
+      {!previewOnly && (
+        <nav className="portrait-jump" aria-label="Jump to positions, orders or limits">
+          {PORTRAIT_JUMPS.map((jump, index) => (
+            <React.Fragment key={jump.href}>
+              {index > 0 && <span aria-hidden="true">·</span>}
+              <a href={jump.href}>{jump.label}</a>
+            </React.Fragment>
+          ))}
+        </nav>
+      )}
       {account.syncError && (
         <p role="status" className="portrait-source">
           Account sync issue: {account.syncError}. Values below are saved
@@ -134,7 +155,7 @@ export function PortfolioPortrait({
           </small>
           </details>
         </div>
-        <div className="portrait-holdings">
+        <div className="portrait-holdings" id="portrait-positions">
           <div className="portrait-section-head">
             <div>
               <span className="portrait-label">01 / Exposure</span>
@@ -237,7 +258,7 @@ export function PortfolioPortrait({
           </p>
           {!previewOnly && <a href="/thesis?scope=capital">Review the thesis →</a>}
         </section>
-        <section data-constrained={usage != null && usage >= 85}>
+        <section id="portrait-limits" data-constrained={usage != null && usage >= 85}>
           <span className="portrait-label">03 / Room for the next move</span>
           <h3>
             {usage == null

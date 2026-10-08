@@ -12,6 +12,27 @@
   border-bottom: 1px solid var(--rule);
   font-size: 11px;
 }
+.portrait-jump {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 12px;
+  border-bottom: 1px solid var(--rule);
+  font: 10px var(--font-mono);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.portfolio-portrait .portrait-jump a {
+  font: inherit;
+  color: var(--sh-signal);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+}
+.portfolio-portrait [id^="portrait-"] {
+  scroll-margin-top: 96px;
+}
 .portfolio-portrait .portrait-label {
   font: 10px var(--font-mono);
   letter-spacing: 0.15em;
