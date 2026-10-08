@@ -364,11 +364,7 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
         </div>
         {isGuided && (
           <div className="border-t p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
-            <ConstraintResolverCard
-              symbol={bindingSubject}
-              currentValueCents={summary.binding?.usedCents}
-              ceilingValueCents={summary.binding?.ceilingCents}
-            />
+            <ConstraintResolverCard line={summary.binding} />
           </div>
         )}
       </>
