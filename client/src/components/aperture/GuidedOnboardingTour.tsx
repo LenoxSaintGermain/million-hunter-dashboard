@@ -12,42 +12,46 @@ interface GuidedOnboardingTourProps {
   onComplete?: () => void;
 }
 
-const TOUR_STEPS = [
+/**
+ * Guided tour copy. Plain language, and no promise the product can't keep:
+ * no guaranteed loss limits, no live-price claims, nothing automatic.
+ */
+export const TOUR_STEPS = [
   {
     step: 1,
-    title: "1. Start With an Idea (Not a Guess)",
-    badge: "Idea Phase",
+    title: "1. Start with a reason, not a hunch",
+    badge: "The idea",
     icon: Target,
-    lead: "Every trade begins with a dated catalyst — an earnings report, product cycle, or macro shift.",
-    description: "Instead of staring at a blank screen, Capital Aperture screens companies against real events so you always know why you are entering and when the premise expires.",
-    example: "Example: NVDA Q3 Earnings expected in 14 days with strong data-center demand.",
+    lead: "Every practice trade starts with a dated reason: an earnings report, a product launch or an economic report.",
+    description: "You write down why you think a stock will move and by when. If the date passes and nothing happened, the idea has expired. You don't hold on hoping.",
+    example: "Example only: a company reports earnings in 14 days and you expect strong demand.",
   },
   {
     step: 2,
-    title: "2. Set Your Downside Floor First",
-    badge: "Risk Governance",
+    title: "2. Decide the most you'll lose, first",
+    badge: "Your limit",
     icon: Shield,
-    lead: "Define the most you are willing to lose before risking a single dollar.",
-    description: "Institutional desks never buy without a predetermined exit price. Capital Aperture calculates your exact stop-loss boundary and enforces a maximum loss limit (e.g., $150 max risk).",
-    example: "Guardrail: If the stock drops 15%, the system marks the premise invalid. You never take catastrophic losses.",
+    lead: "Before any order, you set the most you're willing to lose on the trade.",
+    description: "The app works out a planned exit price and a share count that keep the planned loss inside your limit and the desk's limits. It checks your plan; it doesn't watch the market for you.",
+    example: "A planned exit price is a plan, not a promise. Prices can jump past it, so a real loss can be bigger than planned.",
   },
   {
     step: 3,
-    title: "3. Practice Execution With Zero Real Money",
-    badge: "Paper Simulation",
+    title: "3. Practice with pretend money",
+    badge: "Practice account",
     icon: Compass,
-    lead: "Send simulated orders to an isolated paper broker.",
-    description: "Every ticket goes through pre-flight checks: single-order ceilings, concentration limits, and margin safety. You experience the exact workflow of an institutional fund with zero financial risk.",
-    example: "Practice account: $100,000 in paper buying power with real-time quote feeds.",
+    lead: "Orders go to a practice (paper) account. No real money moves.",
+    description: "Before you can send, each order is checked against limits: how big one order can be, how much rides on one company and how much you can lose in a day. If a check fails, Send stays off.",
+    example: "Prices and balances are as of your last account sync. Sync before you decide.",
   },
   {
     step: 4,
-    title: "4. Scheduled Checkups (Prevent Bagholding)",
-    badge: "Gate Reviews",
+    title: "4. Check in on a schedule",
+    badge: "Reviews",
     icon: Eye,
-    lead: "Automated checkpoints review whether your thesis still holds.",
-    description: "Most retail traders lose money because they hold falling stocks hoping they recover. Scheduled 30-day reviews ask: 'Did the catalyst happen?' If no, exit with discipline.",
-    example: "Decision Desk: Actionable queues flag when a review is due or when an order is ready to send.",
+    lead: "Each trade gets a review date, and you decide whether your reason still holds.",
+    description: "Losses often grow when people hold a falling stock hoping it comes back. On the review date, ask yourself: did the event happen the way I expected? If not, you decide whether to get out.",
+    example: "Nothing checks, orders or exits automatically. Today shows you when a review is due or an order is ready.",
   },
 ];
 
@@ -64,16 +68,16 @@ export function GuidedOnboardingTour({ isOpen, open, onClose, onStartPractice, o
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Guided Onboarding Tour"
+      aria-label="How practice trading works"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-lg rounded-2xl border border-rule bg-surface p-6 shadow-2xl">
+      <div className="relative w-full max-w-lg rounded-2xl border border-rule bg-[var(--sh-surface-1)] p-6 shadow-2xl">
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
           aria-label="Close tour"
-          className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-ink transition-colors"
+          className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground hover:bg-[var(--sh-surface-2)] hover:text-ink transition-colors"
         >
           <X className="h-4 w-4" />
         </button>
@@ -90,7 +94,7 @@ export function GuidedOnboardingTour({ isOpen, open, onClose, onStartPractice, o
                   ? "bg-amber"
                   : idx < currentStepIndex
                   ? "bg-amber/40"
-                  : "bg-surface-2"
+                  : "bg-[var(--sh-surface-2)]"
               }`}
             />
           ))}
@@ -120,7 +124,7 @@ export function GuidedOnboardingTour({ isOpen, open, onClose, onStartPractice, o
             {currentStep.description}
           </p>
 
-          <div className="rounded-lg border border-rule bg-surface-2 p-3 text-xs font-mono text-ink/80">
+          <div className="rounded-lg border border-rule bg-[var(--sh-surface-2)] p-3 text-xs font-mono text-ink/80">
             {currentStep.example}
           </div>
         </div>
@@ -148,7 +152,7 @@ export function GuidedOnboardingTour({ isOpen, open, onClose, onStartPractice, o
                 onClick={() => setCurrentStepIndex((prev) => prev + 1)}
                 className="text-xs font-semibold bg-amber text-black hover:bg-amber-400"
               >
-                Next Step
+                Next
                 <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Button>
             ) : (
@@ -161,7 +165,7 @@ export function GuidedOnboardingTour({ isOpen, open, onClose, onStartPractice, o
                 className="text-xs font-semibold bg-ink text-bone hover:bg-ink/90"
               >
                 <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber" />
-                Start Paper Practice
+                Start practicing
               </Button>
             )}
           </div>

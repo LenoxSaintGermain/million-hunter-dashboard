@@ -15,6 +15,7 @@ import { TodayAccountMargin, TodayOrderRows, type TodayExecutionData } from "./T
 import { paperInstrumentDisplayLabel, parseOccOptionSymbol } from "@shared/paperInstrument";
 import { foldOverdueReviews, type OverdueReviewNudge } from "@shared/overdueReviewNudge";
 import { partitionDismissed, recordDismissal, restoreDismissal, parseDismissals, DISMISSAL_STORAGE_KEY, type AttentionDismissal } from "@shared/attentionDismissal";
+import type { GuidedAccountCheck } from "@shared/guidedAllClear";
 import { arbitrateTodayRead, displayedAttentionBaseline, safeStatusError, type AttentionStatusSource, type ApertureAttentionBriefing, type ApertureAttentionItem, type ApertureMotionItem } from "@shared/apertureAttention";
 
 function localTime(value: number | null) {
@@ -61,6 +62,7 @@ export function TodayAttentionBriefing({
   onRetry,
   onNewMission,
   previewOnly = false,
+  accountCheck = null,
 }: {
   attention: ApertureAttentionBriefing | null;
   accountLabel: string;
@@ -75,6 +77,8 @@ export function TodayAttentionBriefing({
   onNewMission: () => void;
   /** Frozen public UAT: no persistence, storage changes, or inline API-backed reviews. */
   previewOnly?: boolean;
+  /** Account freshness + limit room. Guided mode only says "All clear" when verified. */
+  accountCheck?: GuidedAccountCheck | null;
 }) {
   const { isGuided } = useExperienceMode();
   const [showTour, setShowTour] = useState(false);
@@ -234,6 +238,7 @@ export function TodayAttentionBriefing({
           onOpen={onOpen}
           onRefresh={onRetry}
           leadKey={primary?.key ?? null}
+          accountCheck={accountCheck}
         />
       </div>
     )}
