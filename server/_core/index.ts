@@ -12,6 +12,7 @@ import { serveStatic, setupVite } from "./vite";
 import { handleDailyOutcomeRefresh } from "../aperture/dailyOutcomeRefreshScheduled";
 import { handleOneTimeGlp1Research } from "../aperture/oneTimeGlp1ResearchScheduled";
 import { handlePaperAccountSync } from "../aperture/paperAccountSyncScheduled";
+import { logSharedAlpacaKeyMode } from "../aperture/brokers/envBrokerOwner";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -33,6 +34,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  logSharedAlpacaKeyMode();
   const app = express();
   const server = createServer(app);
   // Resolve the port BEFORE setting up Vite so the HMR server binding

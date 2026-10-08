@@ -28,6 +28,7 @@ import {
   type BrokerOrder,
 } from "../../drizzle/schema";
 import { brokerFor } from "./brokers/index";
+import { assertEnvBrokerAccessForUser, envBrokerAccessForUser } from "./brokers/envBrokerOwner";
 import type { OrderRequest } from "./brokers/types";
 import { getFacts, freshestPerKey, normSymbol } from "./facts";
 import { resolveLiquidityFact } from "./liquidityFactRefresh";
@@ -223,6 +224,8 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
     .where(and(eq(portfolioAccounts.id, input.accountId), eq(portfolioAccounts.userId, input.userId))).limit(1);
   const account = acctRows[0];
   if (!account) throw new Error("account not found");
+  // #41: before any broker read, refresh or order step on the owner's env-backed rail.
+  await assertEnvBrokerAccessForUser(db, input.userId, account.brokerId, `order ${action}`);
   const contextAccountId = input.portfolioContextAccountId ?? account.id;
   const contextRows = contextAccountId === account.id
     ? [account]
@@ -959,6 +962,7 @@ export async function submitOrder(orderId: number, userId: number, paperConfirma
   const decisionAuthorization = rerun.decisionAuthorization;
   const account = rerun.account;
 
+  await assertEnvBrokerAccessForUser(db, userId, account.brokerId, "order submit dispatch");
   const broker = brokerFor(account.brokerId, account.id);
   if (!broker.available()) {
     throw new Error(broker.unavailableReason() ?? `broker ${account.brokerId} is not configured`);
@@ -1083,6 +1087,7 @@ export async function mirrorFills(userId: number): Promise<number> {
     const account = acctRows[0];
     if (!account) continue;
 
+    if (!(await envBrokerAccessForUser(db, userId, account.brokerId, "mirrorFills")).allowed) continue;
     const broker = brokerFor(account.brokerId, account.id);
     if (!broker.available()) continue;
 

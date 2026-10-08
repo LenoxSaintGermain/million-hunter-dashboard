@@ -15,5 +15,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["server/**/*.test.ts", "server/**/*.spec.ts", "server/**/*.test.tsx", "shared/**/*.test.ts"],
+    // Deployment-secret presence checks run only via `pnpm test:credentials` (#41).
+    exclude: ["**/node_modules/**", "**/dist/**", "server/api-keys.test.ts"],
   },
 });

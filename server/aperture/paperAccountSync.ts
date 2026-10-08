@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { portfolioAccounts, positions, type PortfolioAccount } from "../../drizzle/schema";
 import type { getDb } from "../db";
 import { brokerFor } from "./brokers";
+import { assertEnvBrokerAccessForUser } from "./brokers/envBrokerOwner";
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
@@ -21,6 +22,8 @@ export async function syncPaperAccount(db: Db, account: PortfolioAccount, now = 
   if (!account.isPaper || account.brokerId !== "alpaca_paper") {
     throw new Error("Scheduled synchronization is limited to configured Alpaca Paper accounts.");
   }
+  // #41: the env-backed key reaches the owner's account; only the owner's rows sync.
+  await assertEnvBrokerAccessForUser(db, account.userId, account.brokerId, "paperAccountSync");
   const broker = brokerFor(account.brokerId, account.id);
   if (!broker.available()) throw new Error(broker.unavailableReason() ?? "Alpaca Paper broker is not configured.");
 

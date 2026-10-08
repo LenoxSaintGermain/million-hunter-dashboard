@@ -74,30 +74,33 @@ const HORIZON_GUIDANCE = {
   },
 } as const;
 
-const PROVIDER_GUIDANCE: Record<string, { enables: string; activation: string }> = {
+/** #41: there is no in-app key entry yet (SRC-E3), so nothing links to Settings for data keys. */
+export const NOT_CONNECTED_GUIDANCE = "Not connected · coming soon in Sources";
+
+export const PROVIDER_GUIDANCE: Record<string, { enables: string; activation: string }> = {
   edgar: {
     enables: "Company filings, revenue, margins, and balance-sheet facts.",
     activation: "Connected automatically — no key required.",
   },
   fred: {
     enables: "Macro series for rates, inflation, employment, and growth context.",
-    activation: "Add a free FRED API key in Settings to enable macro evidence.",
+    activation: NOT_CONNECTED_GUIDANCE,
   },
   alpaca: {
     enables: "SIP price, 30-day dollar liquidity, and modeled volatility for paper research when the verified entitlement is available.",
-    activation: "Uses your Alpaca Paper credentials. The recorded fact names its actual feed (SIP by default; IEX only as an explicit fallback) and is never presented as an execution instruction.",
+    activation: "Uses the deployment's Alpaca Paper data credentials. The recorded fact names its actual feed (SIP by default; IEX only as an explicit fallback) and is never presented as an execution instruction.",
   },
   polygon: {
     enables: "Consolidated daily price and volume evidence across the broader market.",
-    activation: "Add POLYGON_API_KEY in Settings when you need consolidated market coverage.",
+    activation: NOT_CONNECTED_GUIDANCE,
   },
   fmp: {
     enables: "Valuation, profile, sector, industry, and transcript-adjacent evidence.",
-    activation: "Add FMP_API_KEY in Settings when you need richer fundamental coverage.",
+    activation: NOT_CONNECTED_GUIDANCE,
   },
   benzinga: {
     enables: "Analyst actions, price targets, and earnings-calendar catalysts.",
-    activation: "Add BENZINGA_API_KEY in Settings when catalyst and analyst evidence matter to the thesis.",
+    activation: NOT_CONNECTED_GUIDANCE,
   },
 };
 
@@ -609,13 +612,10 @@ export default function ApertureHome() {
                   <div key={p.id} className="rounded-md border p-2.5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-xs font-medium" style={{ color: "var(--sh-text-primary)" }}>{p.label}</p>
-                      <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0"><KeyRound className="mr-1 h-2.5 w-2.5" />Needs key</Badge>
+                      <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0"><KeyRound className="mr-1 h-2.5 w-2.5" />Not connected</Badge>
                     </div>
                     <p className="mt-1 text-[11px] leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>{PROVIDER_GUIDANCE[p.id]?.enables ?? `Would cover: ${p.provides.join(", ")}`}</p>
-                    <p className="mt-1 text-[10px] leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>{PROVIDER_GUIDANCE[p.id]?.activation ?? p.reason}</p>
-                    <Button type="button" variant="ghost" size="sm" className="mt-1.5 h-7 px-0 text-[11px]" onClick={() => navigate("/settings")}>
-                      View activation settings <ArrowUpRight className="ml-1 h-3 w-3" />
-                    </Button>
+                    <p className="mt-1 text-[10px] leading-relaxed" style={{ color: "var(--sh-fg-muted)" }}>{PROVIDER_GUIDANCE[p.id]?.activation ?? NOT_CONNECTED_GUIDANCE}</p>
                   </div>
                 ))}
                     {!providers && <p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Loading…</p>}
