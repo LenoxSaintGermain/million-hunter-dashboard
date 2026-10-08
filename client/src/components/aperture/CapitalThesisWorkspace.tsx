@@ -9,6 +9,8 @@ import { isCapitalThesisEligible } from "@shared/capitalThesisEligibility";
 import { canonicalThesisLabel } from "@shared/canonicalThesisLabel";
 import type { ThesisSaveReceipt } from "@shared/thesisSaveReceipt";
 import { normalizeResearchSymbols } from "@shared/capitalThesisStructure";
+import { WEEKLY_INCOME_TEMPLATE_ID, WEEKLY_INCOME_THESIS_PREFILL, readStoredWeeklyIncomeTemplate, weeklyIncomeDefaults } from "@shared/strategyTemplates/weeklyIncome";
+import { WeeklyIncomeTemplatePanel, WeeklyIncomeTemplatePicker } from "./weeklyIncome/WeeklyIncomeTemplatePanel";
 
 type Purpose = "capital" | "acquisition" | "property";
 type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
@@ -54,6 +56,7 @@ export function CapitalThesisWorkspace() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showSavedRecords, setShowSavedRecords] = useState(false);
   const [detail, setDetail] = useState(EMPTY_DETAIL);
+  const [templateId, setTemplateId] = useState<typeof WEEKLY_INCOME_TEMPLATE_ID | null>(null);
 
   const capitalTheses = useMemo(
     () => (theses ?? []).filter(isCapitalThesisEligible),
@@ -88,6 +91,7 @@ export function CapitalThesisWorkspace() {
         researchUniverse: typeof filters.researchUniverse === "string" ? filters.researchUniverse : "",
         instrument: filters.instrumentPreference ?? "either",
       });
+      setTemplateId(readStoredWeeklyIncomeTemplate(selected.compiledFilters) ? WEEKLY_INCOME_TEMPLATE_ID : null);
     }
   }, [selected?.id]);
 
@@ -119,7 +123,9 @@ export function CapitalThesisWorkspace() {
     if (validationError || createCapital.isPending || activate.isPending || project.isPending) return;
     setSaveError(null);
     try {
-      const result = await createCapital.mutateAsync({ thesisText: detailedThesisText(), name: draftName.trim() || undefined, details: { ...detail } });
+      const savedTemplate = editing && selected ? readStoredWeeklyIncomeTemplate(selected.compiledFilters) : null;
+      const strategyTemplate = templateId ? { id: templateId, parameters: savedTemplate ? { ...savedTemplate.parameters } : {} } : undefined;
+      const result = await createCapital.mutateAsync({ thesisText: detailedThesisText(), name: draftName.trim() || undefined, details: { ...detail }, ...(strategyTemplate ? { strategyTemplate } : {}) });
       toast.success(`Saved exactly as “${result.persistedName}”`, { description: openMission ? "Opening Capital Mission." : `Canonical thesis #${result.compilationId}` });
       if (openMission) await openMissionFor(result.compilationId);
     } catch (error) {
@@ -166,16 +172,27 @@ export function CapitalThesisWorkspace() {
   const alternatives = capitalTheses.filter((thesis: any) => thesis.id !== selected?.id);
   const visibleAlternatives = showMore ? alternatives : alternatives.slice(0, 3);
   const deadline = selected?.latestCatalystDeadlineAt ? new Date(Number(selected.latestCatalystDeadlineAt)) : null;
+  const applyWeeklyIncomeTemplate = () => {
+    setTemplateId(WEEKLY_INCOME_TEMPLATE_ID);
+    setDraftName(WEEKLY_INCOME_THESIS_PREFILL.name);
+    setDraftText(WEEKLY_INCOME_THESIS_PREFILL.statement);
+    setDetail({ ...WEEKLY_INCOME_THESIS_PREFILL.details });
+    setShowDetails(true);
+    setSaveError(null);
+  };
+  const selectedTemplate = selected ? readStoredWeeklyIncomeTemplate(selected.compiledFilters) : null;
   // Render as part of this component: a nested component type remounts on every keystroke.
   const renderComposer = (versioning = false) => <section className="mt-4 space-y-3 rounded-md border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
     <div><p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>{versioning ? "New canonical version" : "New canonical thesis"}</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{versioning ? "The active source and every prior mission receipt remain unchanged." : "Save a source first. Starting a mission remains a separate choice."}</p></div>
+    {!versioning && !templateId && <WeeklyIncomeTemplatePicker onUse={applyWeeklyIncomeTemplate} />}
+    {templateId && <WeeklyIncomeTemplatePanel parameters={selectedTemplate && versioning ? selectedTemplate.parameters : weeklyIncomeDefaults()} mandate={versioning ? selectedTemplate?.mandateCeilings : null} onRemove={versioning ? undefined : () => setTemplateId(null)} />}
     <label className="block text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Thesis statement<textarea value={draftText} onChange={(event) => setDraftText(event.target.value)} aria-label="Thesis statement" aria-describedby="thesis-guidance thesis-validation" placeholder={THESIS_GUIDANCE} className="mt-2 min-h-32 w-full resize-y rounded border bg-transparent p-3 text-sm leading-6" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} /></label>
     <p id="thesis-guidance" className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{THESIS_GUIDANCE} Guidance is not saved as your belief.</p>
     <button type="button" onClick={() => setShowDetails((current) => !current)} aria-expanded={showDetails} className="inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}><ChevronDown className={showDetails ? "h-3.5 w-3.5 rotate-180" : "h-3.5 w-3.5"} />Add thesis detail</button>
     {showDetails && <div className="grid gap-2 sm:grid-cols-2">
       {[["belief", "Belief"], ["evidence", "Evidence basis"], ["seeks", "Seeks"], ["avoids", "Avoids"], ["horizon", "Horizon"], ["invalidation", "Invalidation"], ["risk", "Risk boundary"], ["researchUniverse", "Research scope (optional)"], ["symbols", "Ticker symbols (optional)"]].map(([key, label]) => <label key={key} className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{label}<input aria-label={label} value={detail[key as keyof typeof detail]} onChange={(event) => setDetail((current) => ({ ...current, [key]: event.target.value }))} className="mt-1 min-h-11 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} />{key === "researchUniverse" && <span className="mt-1 block">Describe companies or sectors to investigate. This is not a verified ticker list.</span>}{key === "symbols" && <span className="mt-1 block">Known tickers, separated by commas. Leave blank for discovery.</span>}</label>)}
-      <label className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Holding horizon<select value={detail.holdingPeriod} onChange={(event) => setDetail((current) => ({ ...current, holdingPeriod: event.target.value as HoldingPeriod }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><option value="intraday">Today</option><option value="overnight">Next close</option><option value="swing">2–10 sessions</option><option value="catalyst_window">Named catalyst window</option><option value="position">Multi-week / position</option></select></label>
-      <label className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Instrument<select value={detail.instrument} onChange={(event) => setDetail((current) => ({ ...current, instrument: event.target.value as Instrument }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><option value="shares">Shares only</option><option value="options">Defined-risk options</option><option value="either">Either; keep explicit at mission setup</option></select></label>
+      <label className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Holding horizon<select value={detail.holdingPeriod} disabled={Boolean(templateId)} title={templateId ? "Weekly Income is always 2–10 sessions" : undefined} onChange={(event) => setDetail((current) => ({ ...current, holdingPeriod: event.target.value as HoldingPeriod }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><option value="intraday">Today</option><option value="overnight">Next close</option><option value="swing">2–10 sessions</option><option value="catalyst_window">Named catalyst window</option><option value="position">Multi-week / position</option></select></label>
+      <label className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>Instrument<select value={detail.instrument} disabled={Boolean(templateId)} title={templateId ? "Weekly Income always uses defined-risk options" : undefined} onChange={(event) => setDetail((current) => ({ ...current, instrument: event.target.value as Instrument }))} className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><option value="shares">Shares only</option><option value="options">Defined-risk options</option><option value="either">Either; keep explicit at mission setup</option></select></label>
     </div>}
     <label className="block text-xs" style={{ color: "var(--sh-fg-muted)" }}>Version name<input value={draftName} onChange={(event) => setDraftName(event.target.value)} aria-label="Thesis name" placeholder="Name this thesis version" className="mt-1 min-h-10 w-full rounded border bg-transparent px-3 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} /></label>
     <p id="thesis-validation" aria-live="polite" className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{validationError ?? "Ready to save. This does not create an order."}</p>
@@ -221,7 +238,7 @@ export function CapitalThesisWorkspace() {
               <button type="button" onClick={() => setChoosing((current) => !current)} aria-expanded={choosing} className="inline-flex min-h-10 items-center gap-1.5 rounded border px-3 text-xs font-semibold" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><Pencil className="h-3.5 w-3.5" />Change thesis</button>
             </div>
             <div className="mt-3 flex flex-wrap gap-2 font-mono text-[0.65rem] uppercase tracking-[0.08em]" style={{ color: "var(--sh-fg-muted)" }}><span>Capital</span><span>·</span><span>{selected.status ?? "review"}</span><span>·</span><span>{deadline ? `freshness due ${deadline.toLocaleDateString()}` : "freshness not measured"}</span><span>·</span><span>version {selected.id}</span></div>
-            {choosing && <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Owner-scoped alternatives</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{alternatives.map((thesis: any) => <button type="button" key={thesis.id} onClick={() => { setSelectedId(thesis.id); setChoosing(false); setEditing(false); }} className="min-h-10 rounded border px-3 text-left text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}>{canonicalThesisLabel(thesis)}</button>)}</div><button type="button" onClick={() => { setCreating(true); setChoosing(false); setDraftName(""); setDraftText(""); setSaveError(null); setSaveReceipt(null); setDetail(EMPTY_DETAIL); }} className="mt-3 min-h-10 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Create a new thesis</button><button type="button" onClick={() => { setEditing(true); setChoosing(false); }} className="ml-4 min-h-10 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Edit as new version</button></div>}
+            {choosing && <div className="mt-4 rounded-md border p-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Owner-scoped alternatives</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{alternatives.map((thesis: any) => <button type="button" key={thesis.id} onClick={() => { setSelectedId(thesis.id); setChoosing(false); setEditing(false); }} className="min-h-10 rounded border px-3 text-left text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}>{canonicalThesisLabel(thesis)}</button>)}</div><button type="button" onClick={() => { setCreating(true); setChoosing(false); setDraftName(""); setDraftText(""); setSaveError(null); setSaveReceipt(null); setDetail(EMPTY_DETAIL); setTemplateId(null); }} className="mt-3 min-h-10 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Create a new thesis</button><button type="button" onClick={() => { setEditing(true); setChoosing(false); }} className="ml-4 min-h-10 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Edit as new version</button></div>}
             {editing ? renderComposer(true) : <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm leading-6" style={{ color: "var(--sh-text-primary)" }}>{selected.thesisText}</p>}
           </section>
 
@@ -231,10 +248,11 @@ export function CapitalThesisWorkspace() {
             <div className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" style={{ color: "var(--sh-signal)" }} /><p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Allowed next action</p></div><p className="mt-3 text-sm leading-6" style={{ color: "var(--sh-text-primary)" }}>Open one paper-only Capital Mission with this canonical thesis bound. Research and paper approval remain separate human gates.</p><p className="mt-3 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Paper research · no orders</p></div>
           </section>
 
+          {selectedTemplate && !editing && <WeeklyIncomeTemplatePanel parameters={selectedTemplate.parameters} mandate={selectedTemplate.mandateCeilings} parameterHash={selectedTemplate.parameterHash} />}
           <section className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-paper)" }}><div className="flex items-center justify-between gap-3"><div><p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Contextual Thesis Library</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Owner-scoped Capital alternatives. Ranking is descriptive, never approval.</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-3">{visibleAlternatives.map((thesis: any) => <button key={thesis.id} type="button" onClick={() => { setSelectedId(thesis.id); setEditing(false); }} className="min-h-16 rounded border p-3 text-left text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><span className="block font-semibold">{thesis.name ?? "Untitled thesis"}</span><span className="mt-1 block" style={{ color: "var(--sh-fg-muted)" }}>{thesis.status ?? "review"} · v{thesis.id}</span></button>)}</div>{alternatives.length > 3 && <button type="button" onClick={() => setShowMore((current) => !current)} className="mt-3 inline-flex min-h-10 items-center gap-1 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}><ChevronDown className="h-3.5 w-3.5" /> {showMore ? "Show less" : `Show ${alternatives.length - 3} more`}</button>}</section>
 
           {missionError && <p role="alert" className="rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-red)", color: "var(--sh-red)" }}>{missionError}</p>}
-          <div className="flex flex-col gap-2 sm:flex-row"><Button className="min-h-11 flex-1" onClick={() => void useInMission()} disabled={activate.isPending || project.isPending}>{activate.isPending || project.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}Use in Capital Mission</Button><Button variant="outline" className="min-h-11" onClick={() => { setMissionError(null); setCreating(true); setDraftName(""); setDraftText(""); setSaveError(null); setSaveReceipt(null); setDetail(EMPTY_DETAIL); setEditing(false); }}>Create new Capital thesis</Button></div>
+          <div className="flex flex-col gap-2 sm:flex-row"><Button className="min-h-11 flex-1" onClick={() => void useInMission()} disabled={activate.isPending || project.isPending}>{activate.isPending || project.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}Use in Capital Mission</Button><Button variant="outline" className="min-h-11" onClick={() => { setMissionError(null); setCreating(true); setDraftName(""); setDraftText(""); setSaveError(null); setSaveReceipt(null); setDetail(EMPTY_DETAIL); setTemplateId(null); setEditing(false); }}>Create new Capital thesis</Button></div>
         </>
       ) : <section className="rounded-lg border p-5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-paper)" }}><p className="font-mono text-[0.65rem] uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>New Capital thesis</p><h2 className="mt-2 font-serif text-2xl" style={{ color: "var(--sh-text-primary)" }}>Frame the decision in one statement.</h2>{renderComposer()}</section>}
     </div>

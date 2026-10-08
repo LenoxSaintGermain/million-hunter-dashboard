@@ -97,7 +97,7 @@ export function WeeklyIncomeIntro({ children }: { children?: ReactNode }) {
       <WiLabel>{WI_COPY["wi.guided.eyebrow"]}</WiLabel>
       <h3 className="mt-2 font-serif text-2xl leading-tight" style={{ color: "var(--ink)" }}>{WI_COPY["wi.guided.headline"]}</h3>
       <p className="mt-3 max-w-3xl text-[0.95rem] leading-6" style={{ color: "var(--ink)" }}>{WI_COPY["wi.guided.howItWorks"]}</p>
-      <p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--ink)" }}>{WI_COPY["wi.guided.closeEarly"]} {WI_COPY["wi.thesis.noTarget"]}</p>
+      <p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--ink)" }}>{WI_COPY["wi.guided.closeEarly"]} {WI_COPY["wi.guided.noTarget"]}</p>
       <p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{WI_COPY["wi.guided.spreadsOnly"]}</p>
       {children}
     </section>

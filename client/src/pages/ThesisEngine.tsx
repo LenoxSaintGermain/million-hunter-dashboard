@@ -7,6 +7,7 @@
  *   Right — STRATEGIST output review (editable structured form + Approve & Run)
  */
 import { useEffect, useRef, useState } from "react";
+import { isCapitalTemplateId } from "@shared/capitalThesisEligibility";
 import type { StrategistApproval } from "@shared/strategistReview";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -189,10 +190,10 @@ export default function ThesisEngine() {
 
   const { data: savedTheses, refetch: refetchList } = trpc.thesis.list.useQuery();
   const visibleSavedTheses = isCapitalOperator
-    ? savedTheses?.filter((thesis: any) => thesis.templateUsed === "capital_trade")
+    ? savedTheses?.filter((thesis: any) => isCapitalTemplateId(thesis.templateUsed))
     : savedTheses?.filter((thesis: any) => scope === "property"
       ? thesis.templateUsed === "wingate" || thesis.compiledFilters?.yearBuiltMax != null
-      : thesis.templateUsed !== "capital_trade" && thesis.templateUsed !== "wingate" && thesis.compiledFilters?.yearBuiltMax == null);
+      : !isCapitalTemplateId(thesis.templateUsed) && thesis.templateUsed !== "wingate" && thesis.compiledFilters?.yearBuiltMax == null);
   const matchingTheses = visibleSavedTheses?.filter((t: any) => `${t.name ?? ""} ${t.thesisText ?? ""}`.toLowerCase().includes(librarySearch.toLowerCase()));
   const setActiveCapital = trpc.thesis.setActiveCapital.useMutation({
     onSuccess: ({ name }) => {
@@ -559,7 +560,7 @@ export default function ThesisEngine() {
                             className="text-sm text-foreground hover:text-primary whitespace-normal text-left flex-1"
                             onClick={() => {
                               setExpandedThesisId(expanded ? null : t.id);
-                              setScope(isHistoricThesisRow(t) ? "property" : t.templateUsed === "capital_trade" ? "capital" : "acquisition");
+                              setScope(isHistoricThesisRow(t) ? "property" : isCapitalTemplateId(t.templateUsed) ? "capital" : "acquisition");
                               setThesisText(t.thesisText);
                               setCompilationResult({
                                 compiledFilters: t.compiledFilters,
@@ -577,12 +578,12 @@ export default function ThesisEngine() {
                           >
                             {t.name ?? "Untitled Thesis"}
                             {isHistoricThesisRow(t) && <span className="ml-1.5 text-[9px] text-amber-500 font-semibold">PROPERTY · WINGATE</span>}
-                            {t.templateUsed === "capital_trade" && <span className="ml-1.5 text-[9px] text-emerald-600 font-semibold">CAPITAL · PAPER RESEARCH</span>}
+                            {isCapitalTemplateId(t.templateUsed) && <span className="ml-1.5 text-[9px] text-emerald-600 font-semibold">CAPITAL · PAPER RESEARCH</span>}
                             {t.isActiveCapital && <span className="ml-1.5 text-[9px] text-emerald-700 font-semibold">DECISION CENTER</span>}
-                            {!isHistoricThesisRow(t) && t.templateUsed !== "capital_trade" && <span className="ml-1.5 text-[9px] text-sky-600 font-semibold">ACQUISITION · MARKET SEARCH</span>}
+                            {!isHistoricThesisRow(t) && !isCapitalTemplateId(t.templateUsed) && <span className="ml-1.5 text-[9px] text-sky-600 font-semibold">ACQUISITION · MARKET SEARCH</span>}
                             {t.access === "shared" && <span className="ml-1.5 text-[9px] text-sky-600 font-semibold">SHARED BY {t.ownerName ?? "OPERATOR"}</span>}
                           </button>
-                          {t.templateUsed === "capital_trade" && (
+                          {isCapitalTemplateId(t.templateUsed) && (
                             <div className="flex shrink-0 items-center gap-2">
                               <span className="text-[10px] text-muted-foreground">
                                 {deadline ? <time dateTime={deadline.toISOString()}>Catalyst deadline {deadline.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time> : "No paper brief yet"}
@@ -596,18 +597,18 @@ export default function ThesisEngine() {
                       {editingId !== t.id && (
                         <div className="flex items-center gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all ml-2 shrink-0">
                           <button
-                            title={isHistoricThesisRow(t) ? "Open property criteria in Wingate" : t.templateUsed === "capital_trade" ? "Open paper research in Capital Aperture" : "Launch acquisition search"}
+                            title={isHistoricThesisRow(t) ? "Open property criteria in Wingate" : isCapitalTemplateId(t.templateUsed) ? "Open paper research in Capital Aperture" : "Launch acquisition search"}
                             onClick={() => isHistoricThesisRow(t)
                               ? navigate(`/wingate?thesis=${t.id}`)
-                              : t.templateUsed === "capital_trade"
+                              : isCapitalTemplateId(t.templateUsed)
                                 ? openInAperture(t.id)
                                 : launchSavedAcquisitionSearch(t)}
                             className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[10px] font-medium text-muted-foreground hover:border-amber-500/40 hover:text-amber-600"
                           >
                             <Play className="h-3 w-3" />
-                            {isHistoricThesisRow(t) ? "Wingate" : t.templateUsed === "capital_trade" ? "Research" : "Search"}
+                            {isHistoricThesisRow(t) ? "Wingate" : isCapitalTemplateId(t.templateUsed) ? "Research" : "Search"}
                           </button>
-                          {canUseAperture && t.templateUsed === "capital_trade" && (
+                          {canUseAperture && isCapitalTemplateId(t.templateUsed) && (
                             <button
                               title="Use this saved thesis in Capital Aperture"
                               onClick={() => openInAperture(t.id)}
@@ -637,7 +638,7 @@ export default function ThesisEngine() {
                       )}
                       </div>
                       {expanded && <div id={`thesis-recipes-${t.id}`} role="region" aria-label={`${t.name ?? "Thesis"} associated play recipes`} className="border-t border-border bg-muted/10 px-3 py-3">
-                        {t.templateUsed !== "capital_trade" ? <p className="text-xs text-muted-foreground">This thesis uses the {isHistoricThesisRow(t) ? "Wingate property" : "acquisition search"} workspace; it has no Capital Aperture paper-play recipe.</p> : recipesLoading ? <p className="text-xs text-muted-foreground">Loading owner-authorized paper recipes…</p> : expandedRecipes?.runs.length ? <div className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Capital Aperture · plays this thesis produced</p><p className="mt-1 text-[11px] text-muted-foreground">Latest cohort first. Review the whole opportunity set, the recorded human decision, and any observed paper outcome in one place. No order can be created here.</p></div></div>{(showHistoricalThesisRuns[t.id] ? expandedRecipes.runs : expandedRecipes.runs.slice(0, 1)).map((run: any) => <div key={run.id} className="space-y-2 rounded border border-border bg-background p-2.5"><div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground"><span>Brief #{run.id} · {run.holdingPeriod} · {run.status}</span>{run.catalystDeadlineAt ? <time dateTime={new Date(Number(run.catalystDeadlineAt)).toISOString()}>Deadline {new Date(Number(run.catalystDeadlineAt)).toLocaleString()}</time> : <span>No catalyst deadline recorded</span>}</div><div className="grid gap-1.5 sm:grid-cols-2">{run.candidates.map((candidate: any) => <button type="button" key={candidate.id} translate="no" onClick={() => navigate(`/aperture/run/${run.id}?view=play&candidate=${candidate.id}`)} className="min-h-11 rounded border border-border px-2.5 py-2 text-left text-xs hover:border-emerald-500/50 hover:bg-emerald-500/5"><div className="flex items-center justify-between gap-2"><span className="font-semibold text-foreground">{candidate.symbol}</span><span className="text-[10px] text-muted-foreground">{candidate.outcome?.outcomeResult?.replaceAll("_", " ") ?? candidate.decision?.decision?.replaceAll("_", " ") ?? "not recorded"}</span></div><p className="mt-1 text-[11px] leading-4 text-muted-foreground">{candidate.decision?.reason ?? candidate.outcome?.outcomeExplanation ?? `${candidate.role ?? "research candidate"} · open modeled recipe`}</p></button>)}</div><SetAsideHistory records={run.setAside ?? []} note={null} /></div>)}{expandedRecipes.runs.length > 1 && <Button type="button" variant="outline" size="sm" className="min-h-10 text-xs" onClick={() => setShowHistoricalThesisRuns((current) => ({ ...current, [t.id]: !current[t.id] }))}>{showHistoricalThesisRuns[t.id] ? "Show latest brief only" : `Show ${expandedRecipes.runs.length - 1} earlier brief${expandedRecipes.runs.length === 2 ? "" : "s"}`}</Button>}</div> : <p className="text-xs text-muted-foreground">No completed paper-research recipes are associated with this thesis yet.</p>}
+                        {!isCapitalTemplateId(t.templateUsed) ? <p className="text-xs text-muted-foreground">This thesis uses the {isHistoricThesisRow(t) ? "Wingate property" : "acquisition search"} workspace; it has no Capital Aperture paper-play recipe.</p> : recipesLoading ? <p className="text-xs text-muted-foreground">Loading owner-authorized paper recipes…</p> : expandedRecipes?.runs.length ? <div className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Capital Aperture · plays this thesis produced</p><p className="mt-1 text-[11px] text-muted-foreground">Latest cohort first. Review the whole opportunity set, the recorded human decision, and any observed paper outcome in one place. No order can be created here.</p></div></div>{(showHistoricalThesisRuns[t.id] ? expandedRecipes.runs : expandedRecipes.runs.slice(0, 1)).map((run: any) => <div key={run.id} className="space-y-2 rounded border border-border bg-background p-2.5"><div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground"><span>Brief #{run.id} · {run.holdingPeriod} · {run.status}</span>{run.catalystDeadlineAt ? <time dateTime={new Date(Number(run.catalystDeadlineAt)).toISOString()}>Deadline {new Date(Number(run.catalystDeadlineAt)).toLocaleString()}</time> : <span>No catalyst deadline recorded</span>}</div><div className="grid gap-1.5 sm:grid-cols-2">{run.candidates.map((candidate: any) => <button type="button" key={candidate.id} translate="no" onClick={() => navigate(`/aperture/run/${run.id}?view=play&candidate=${candidate.id}`)} className="min-h-11 rounded border border-border px-2.5 py-2 text-left text-xs hover:border-emerald-500/50 hover:bg-emerald-500/5"><div className="flex items-center justify-between gap-2"><span className="font-semibold text-foreground">{candidate.symbol}</span><span className="text-[10px] text-muted-foreground">{candidate.outcome?.outcomeResult?.replaceAll("_", " ") ?? candidate.decision?.decision?.replaceAll("_", " ") ?? "not recorded"}</span></div><p className="mt-1 text-[11px] leading-4 text-muted-foreground">{candidate.decision?.reason ?? candidate.outcome?.outcomeExplanation ?? `${candidate.role ?? "research candidate"} · open modeled recipe`}</p></button>)}</div><SetAsideHistory records={run.setAside ?? []} note={null} /></div>)}{expandedRecipes.runs.length > 1 && <Button type="button" variant="outline" size="sm" className="min-h-10 text-xs" onClick={() => setShowHistoricalThesisRuns((current) => ({ ...current, [t.id]: !current[t.id] }))}>{showHistoricalThesisRuns[t.id] ? "Show latest brief only" : `Show ${expandedRecipes.runs.length - 1} earlier brief${expandedRecipes.runs.length === 2 ? "" : "s"}`}</Button>}</div> : <p className="text-xs text-muted-foreground">No completed paper-research recipes are associated with this thesis yet.</p>}
                       </div>}
                     </div>;
                   })}

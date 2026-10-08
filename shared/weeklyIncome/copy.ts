@@ -42,6 +42,7 @@ export const WI_COPY = {
   "wi.guided.headline": "Get paid up front for a promise about a stock's price, with a floor on what you can lose.",
   "wi.guided.howItWorks": "You get paid up front to agree to buy a stock you like at a lower price. You also buy a cheaper agreement a little lower down. That second agreement is the floor: it fixes the most you can lose before you start.",
   "wi.guided.p1": "You get paid {credit} now for agreeing to buy {symbol} at {shortStrike} if it falls that far by {expiration}. You also pay for a floor at {longStrike}, so the most you can lose is {maxLoss}.",
+  "wi.guided.noTarget": "This plan doesn't aim for a return. It measures what these up-front payments add up to against what they put at risk.",
   "wi.guided.closeEarly": "We plan to close every position before expiration day, so you aren't expected to end up owning the shares.",
   "wi.guided.keep": "If {symbol} stays above {shortStrike}, you keep the payment. The plan closes early once you've kept {keepAtTakeProfit}.",
   "wi.guided.maxLoss": "Most you can lose: {maxLoss}",
