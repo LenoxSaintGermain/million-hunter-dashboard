@@ -13,6 +13,7 @@ import { inlineMonitoringTarget } from "@shared/monitoringFinding";
 import { AttentionSourceRecovery } from "./AttentionSourceRecovery";
 import { TodayAccountMargin, TodayOrderRows, type TodayExecutionData } from "./TodayExecutionSnapshot";
 import { paperInstrumentDisplayLabel, parseOccOptionSymbol } from "@shared/paperInstrument";
+import { foldOverdueReviews, type OverdueReviewNudge } from "@shared/overdueReviewNudge";
 import { partitionDismissed, recordDismissal, restoreDismissal, parseDismissals, DISMISSAL_STORAGE_KEY, type AttentionDismissal } from "@shared/attentionDismissal";
 import { arbitrateTodayRead, displayedAttentionBaseline, safeStatusError, type AttentionStatusSource, type ApertureAttentionBriefing, type ApertureAttentionItem, type ApertureMotionItem } from "@shared/apertureAttention";
 
@@ -32,6 +33,19 @@ function BriefRow({ item, fingerprint, changed, onOpen, onDismiss, reviewOpen }:
     </div>
     <Button variant="outline" size="sm" className="min-h-11 shrink-0 whitespace-normal" onClick={() => onOpen(item.href)}>View status<ArrowRight className="ml-2 h-3.5 w-3.5 shrink-0" /></Button>
   </article>;
+}
+
+/** One quiet card for every overdue review; the oldest review's action is the only button. */
+export function OverdueReviewCard({ nudge, fingerprint, reviewOpen, onOpen }: { nudge: OverdueReviewNudge; fingerprint?: string; reviewOpen?: boolean; onOpen: () => void }) {
+  return <section aria-label="Overdue reviews" data-overdue-reviews data-attention-key={nudge.next.key} data-attention-fingerprint={fingerprint} className="flex gap-3 border-t p-4" style={{ borderColor: "var(--sh-border-1)" }}>
+    <Clock3 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-fg-muted)" }} />
+    <div className="min-w-0">
+      <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{nudge.title}</p>
+      <p className="mt-1 text-sm leading-5 break-words" style={{ color: "var(--sh-fg-muted)" }}>{nudge.summary}</p>
+      <Button type="button" variant="outline" size="sm" className="mt-2 min-h-11" aria-expanded={reviewOpen || undefined} onClick={onOpen}>{nudge.actionLabel}</Button>
+      <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>A human checkpoint. Nothing checks, orders or exits automatically.</p>
+    </div>
+  </section>;
 }
 
 export function TodayAttentionBriefing({
@@ -90,7 +104,11 @@ export function TodayAttentionBriefing({
   const [inlineTask, setInlineTask] = useState<ApertureAttentionItem | null>(null);
   const [observed, setObserved] = useState<Map<string, string>>(() => new Map());
   const read = useMemo(() => arbitrateTodayRead({ briefing: attention, refreshing: loading, failed: !!failed, failedSources, primaryKey }), [attention, loading, failed, failedSources, primaryKey]);
-  const layout = read.layout;
+  // Overdue checkpoint/outcome reviews read as one quiet nudge with one next
+  // action, not one critical card each. In Guided mode the queue above shows it.
+  const folded = useMemo(() => foldOverdueReviews(read.layout), [read.layout]);
+  const layout = folded.layout;
+  const overdue = folded.overdue;
   const primary = layout?.primary ?? null;
   const visibleChanged = layout?.changed ?? [];
   const visibleMotion = allMotion ? layout?.inMotion ?? [] : layout?.inMotion.slice(0, 4) ?? [];
@@ -224,6 +242,8 @@ export function TodayAttentionBriefing({
     {attention && <>
       {primary ? <AttentionDecisionCard item={primary} prominent fingerprint={fingerprints.get(primary.key)} busy={primary.kind === "status_unavailable" && loading} onOpen={() => openTask(primary)} reviewOpen={inlineTask?.key === primary.key} /> : quiet ? <div data-quiet-status className="flex gap-3 p-4"><CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--sh-emerald)" }} /><div><p className="font-semibold">No new action identified.</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.quietMessage}</p></div></div> : null}
       {primary && inlineReview(primary)}
+      {overdue && !isGuided && <OverdueReviewCard nudge={overdue} fingerprint={fingerprints.get(overdue.next.key)} reviewOpen={inlineTask?.key === overdue.next.key} onOpen={() => openTask(overdue.next)} />}
+      {overdue && !isGuided && inlineReview(overdue.next)}
     </>}
     </div>
     <aside className="capital-account-strip" aria-label="Recorded account context">
