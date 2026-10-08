@@ -70,6 +70,7 @@ import StrategyCompare from "./pages/aperture/StrategyCompare";
 import MemoDrawer from "./pages/aperture/MemoDrawer";
 import ApertureExecute from "./pages/aperture/ApertureExecute";
 import ApertureAccounts from "./pages/aperture/ApertureAccounts";
+import ApertureUatReconciliation from "./pages/aperture/ApertureUatReconciliation";
 import ApertureMemoLibrary from "./pages/aperture/ApertureMemoLibrary";
 import ApertureRuns from "./pages/aperture/ApertureRuns";
 import ApertureRecord from "./pages/aperture/ApertureRecord";
@@ -300,6 +301,7 @@ function Router() {
         <Route path="/aperture/memos/:candidateId">{() => <ApertureRoute component={MemoDrawer} />}</Route>
         <Route path="/aperture/run/:id/execute">{() => <ApertureRoute component={ApertureExecute} />}</Route>
         <Route path="/aperture/accounts">{() => <ApertureRoute component={ApertureAccounts} />}</Route>
+        <Route path="/aperture/uat">{() => <ApertureRoute component={ApertureUatReconciliation} />}</Route>
 
         {/* Invite accept — role assignment on first login */}
         <Route path="/invite/:token" component={InviteAccept} />

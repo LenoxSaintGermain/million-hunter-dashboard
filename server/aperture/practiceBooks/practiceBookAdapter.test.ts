@@ -60,8 +60,9 @@ async function twoBooks() {
   const row = (userId: number) => mem.seed(portfolioAccounts, { userId, label: "Alpaca Paper", brokerId: "alpaca_paper", isPaper: true, createdAt: NOW, updatedAt: NOW }).at(-1)!;
   const rowA = row(A.id);
   const rowB = row(B.id);
-  const { bookId: bookA } = await createPracticeBook(mem.db, { userId: A.id, portfolioAccountId: rowA.id, createdBy: A.id, now: NOW });
-  const { bookId: bookB } = await createPracticeBook(mem.db, { userId: B.id, portfolioAccountId: rowB.id, createdBy: B.id, now: NOW });
+  // Books that already traded were stamped with the house on their first read.
+  const { bookId: bookA } = await createPracticeBook(mem.db, { userId: A.id, portfolioAccountId: rowA.id, createdBy: A.id, now: NOW, houseExternalAccountId: HOUSE_ID });
+  const { bookId: bookB } = await createPracticeBook(mem.db, { userId: B.id, portfolioAccountId: rowB.id, createdBy: B.id, now: NOW, houseExternalAccountId: HOUSE_ID });
   const fill = (user: { id: number }, accountId: number, bookId: number, symbol: string, qty: number, price: number) => mem.seed(brokerOrders, baseOrder({
     userId: user.id, runId: 10 + user.id, accountId, practiceBookId: bookId, symbol, side: "buy", qty, limitPriceCents: price, status: "filled", filledQty: qty, filledAvgPriceCents: price,
   })).at(-1)!;
