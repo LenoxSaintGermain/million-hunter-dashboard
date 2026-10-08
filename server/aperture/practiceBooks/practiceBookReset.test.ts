@@ -12,6 +12,7 @@ vi.mock("../gates", async (original) => ({ ...await original<typeof import("../g
 
 import { apertureRuns, brokerOrders, portfolioAccounts, positions, uatBookAdjustments, uatHouseBaselines, uatPracticeBooks, users } from "../../../drizzle/schema";
 import { measuredAccountEquityCents } from "../../../shared/playUnderwriting";
+import { PROHIBITED_LANGUAGE } from "../../../shared/disclosure";
 import { bookAge, PRACTICE_BOOK_COPY } from "../../../client/src/pages/aperture/ApertureAccounts";
 import { appRouter } from "../../routers";
 import { alpacaPaperBroker, brokerFor } from "../brokers/index";
@@ -99,8 +100,6 @@ const HOUSE_NUMBERS = [HOUSE_ID, String(house.account.cashCents), String(house.a
 const leaks = (value: unknown) => HOUSE_NUMBERS.filter((needle) => JSON.stringify(value).includes(needle));
 // A's book after twoBooks(): $100k − $1,000 (NVDA) − $450 (AMD), marked 10 × $110 + 3 × $150.
 const EQUITY_A = 10_000_000 - 145_000 + 110_000 + 45_000;
-// Mirrors shared/disclosure.ts PROHIBITED_LANGUAGE (not exported).
-const PROHIBITED_LANGUAGE = /\b(copy\s*congress|follow\s+smart\s+money|insider|conflict|congressional\s+alpha)\b/i;
 
 describe("tester view of the shared house (UAT-E3)", () => {
   it("account.list carries the book summary and never the house cash, equity, buying power or full account number", async () => {
