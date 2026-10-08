@@ -83,7 +83,8 @@ describe("account editorial evidence", () => {
       "client/src/pages/aperture/ApertureAccounts.tsx",
       "utf8"
     );
-    expect(page.match(/window\.confirm/g)).toHaveLength(4);
+    // create, sync, schedule, CSV import, and the UAT-E3 practice-book reset.
+    expect(page.match(/window\.confirm/g)).toHaveLength(5);
     expect(page).toContain("csvAccountId !== accountId");
     expect(page).toContain(
       "invalidateAccountRefreshReads(utils.aperture, variables.accountId)"
