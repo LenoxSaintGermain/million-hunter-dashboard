@@ -86,7 +86,7 @@ export function TargetFeasibilityCard({ feasibility, noTrade, remainingHeadroomC
       <dl className="mt-3 grid gap-px overflow-hidden rounded-lg border text-xs sm:grid-cols-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
         <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><dt style={{ color: "var(--sh-fg-muted)" }}>Your planned-loss limit</dt><dd className="mt-1 font-semibold">{hasPlannedLossLimit ? money(operatorMaxLossCents ?? feasibility.lossLimitCents) : "Not configured"}</dd></div>
         <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><dt style={{ color: "var(--sh-fg-muted)" }}>Risk allowed for this trade</dt><dd className="mt-1 font-semibold">{money(feasibility.normalPlayRiskCents)}</dd></div>
-        <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><dt style={{ color: "var(--sh-fg-muted)" }}>Remaining portfolio risk allowance</dt><dd className="mt-1 font-semibold">{money(remainingHeadroomCents ?? feasibility.maxOpenRiskCents)}</dd></div>
+        <div className="p-3" style={{ background: "var(--sh-surface-2)" }}><dt style={{ color: "var(--sh-fg-muted)" }}>{noTrade ? "Account open-risk room left" : "Account room left after the top play"}</dt><dd className="mt-1 font-semibold">{money(remainingHeadroomCents ?? null)}</dd></div>
       </dl>
       <p className="mt-2 text-[10px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>The tightest measured constraint controls. Target pressure explains feasibility; it never increases allowed risk.</p>
     </div>
