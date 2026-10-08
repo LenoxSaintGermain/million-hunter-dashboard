@@ -46,9 +46,15 @@ export function logSharedAlpacaKeyMode(): void {
   if (!configuredOwnerOpenId()) console.error("[security] ALPACA_SHARED_KEY_OWNER_ONLY is on but OWNER_OPEN_ID is not set; every user is refused the shared Alpaca paper key.");
 }
 
-function configuredOwnerOpenId(): string | null {
+export function configuredOwnerOpenId(): string | null {
   const value = (process.env.OWNER_OPEN_ID ?? "").trim();
   return value || null;
+}
+
+/** The deployment owner is one identity (OWNER_OPEN_ID), not a role. False for everyone when it is unset. */
+export function isDeploymentOwner(openId: string | null | undefined): boolean {
+  const owner = configuredOwnerOpenId();
+  return Boolean(owner && openId && openId === owner);
 }
 
 /** Pure decision: may this signed-in identity use this broker rail? */

@@ -4,6 +4,7 @@ import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { canOperateCapital } from "@shared/capitalOperatorAccess";
 import { assertLegacyCatalogAccess } from "./legacyCatalogAccess";
+import { isDeploymentOwner } from "../aperture/brokers/envBrokerOwner";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -85,6 +86,21 @@ export const capitalOperatorProcedure = baseProcedure.use(
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
 
+    return next({ ctx: { ...ctx, user: ctx.user } });
+  }),
+);
+
+/**
+ * The deployment owner only: capital workspace access AND openId === OWNER_OPEN_ID.
+ * Not adminProcedure: admin is a role, the owner is one identity. Refuses
+ * everyone when OWNER_OPEN_ID is unset.
+ */
+export const ownerProcedure = capitalOperatorProcedure.use(
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+    if (!ctx.user || !isDeploymentOwner(ctx.user.openId)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Only the deployment owner can use this." });
+    }
     return next({ ctx: { ...ctx, user: ctx.user } });
   }),
 );
