@@ -180,7 +180,7 @@ describe("practiceBook.reset (UAT-E3)", () => {
     // The new book starts empty and is fresh in the card.
     const [card] = await caller(B).aperture.account.list();
     expect(card.practiceBook).toMatchObject({ generation: 2, equityValueCents: 10_000_000, pnlSinceStartCents: 0, heldSymbols: [], resetBlockedReason: null });
-    // A second reset of the same (now archived) book is refused; the current one may reset again.
+    // Another tester can't reset B's account.
     await expect(caller(A).aperture.practiceBook.reset({ accountId: rowB.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
