@@ -3,6 +3,7 @@ import type { Cockpit } from "./cockpit";
 import { collectMarketFacts } from "./providers/index";
 import { CURRENT_MANDATE } from "./mandate";
 import { buildMarketRegimeSnapshot } from "./marketRegime";
+import { regularSessionCloseAt } from "./marketSession";
 import {
   underwritePlayCandidates,
   type CapitalObjective,
@@ -92,6 +93,8 @@ export async function underwriteCapitalMission(input: {
   const symbols = Array.from(new Set((input.projection.graph?.researchSymbols ?? []).map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))).slice(0, 6);
   const collected = await Promise.all(symbols.map((symbol) => collectMarketFacts(symbol, { now, timeoutMs: 10_000 }, { persist: true })));
   const largestPosition = input.cockpit.headroom.lines.find((line) => line.key === "position")?.subject ?? null;
+  // An intraday ("flat by close") Mission expires at the regular-session close.
+  const horizonExpiresAt = input.objective.holdingPeriods[0] === "intraday" ? regularSessionCloseAt(now) : null;
   const candidates: CandidateSeed[] = collected.map((row) => {
     const verified = row.facts.filter((fact) => fact.basis === "verified" && truthyUrl(fact.sourceUrl));
     const price = verified.filter((fact) => fact.factKey === "last_price").sort((a, b) => (b.asOf ?? 0) - (a.asOf ?? 0))[0];
@@ -105,6 +108,9 @@ export async function underwriteCapitalMission(input: {
       symbol: row.symbol,
       title: input.projection.graph?.beliefs?.[0]?.trim() || input.projection.name?.trim() || "Canonical thesis expression",
       direction: "conditional",
+      // The universe is the tickers typed into the thesis; no screener exists yet (#10).
+      universe: "thesis_examples",
+      expiresAt: horizonExpiresAt,
       evidence,
       sourceUrls,
       lastPrice: price?.valueNum ?? null,

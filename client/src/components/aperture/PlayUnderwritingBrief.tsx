@@ -8,6 +8,10 @@ import { paperTicketReadiness } from "@shared/paperTicketPrefill";
 export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate, onAdjustRisk, researchRunId, onPrepareTicket }: { result: PlayUnderwritingResult; selectedPlayId: string | null; busy: boolean; onValidate: (playId: string) => void; onAdjustRisk?: () => void; researchRunId?: number | null; onPrepareTicket?: (playId: string) => void }) {
   const thesisById = new Map(result.tacticalTheses.map(thesis => [thesis.id, thesis]));
   const leadPlay = result.plays[0] ?? null;
+  // #21: the current engine underwrites tickers typed into the thesis with a
+  // shared template. Don't present that, or tied scores, as a ranked screen.
+  const exampleTickers = result.plays.some(play => play.universe === "thesis_examples");
+  const scoresTied = result.plays.length > 1 && new Set(result.plays.map(play => play.scoring.overall)).size < result.plays.length;
   const fresh = Object.values(result.market.indexTrend).every(metric => metric.freshness === "fresh" && metric.asOf != null);
   const isHeadroomExhausted = result.noTrade?.reason === "portfolio_headroom_exhausted"
     || result.feasibility.riskBudgetCents === 0
@@ -57,8 +61,9 @@ export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate
       </div>
     </section> : <section aria-label="Trade ideas">
       <div className="mb-4">
-        <h3 className="font-serif text-2xl">{result.plays.length} conditional {result.plays.length === 1 ? "play" : "plays"}</h3>
-        <p className="mt-2 text-sm leading-6">{result.market.regime === "unknown" ? "Market context is incomplete." : result.market.regime.replaceAll("_", " ") + " market context."} {leadPlay ? leadPlay.symbol + " ranks first; confirm its entry condition and evidence before a ticket." : "No play is actionable without evidence."}</p>
+        <h3 className="font-serif text-2xl">{exampleTickers ? `${result.plays.length} example ${result.plays.length === 1 ? "ticker" : "tickers"} from your thesis` : `${result.plays.length} conditional ${result.plays.length === 1 ? "play" : "plays"}`}</h3>
+        {exampleTickers && <div role="note" aria-label="Example tickers from thesis, not screened" className="mt-3 border-l-2 pl-3 text-sm leading-6" style={{ borderColor: "var(--sh-signal)" }}><p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Example tickers from thesis, not screened</p><p>These are the tickers named in your thesis text. No universe screen or signal engine ran, so they are not ranked, no score is shown, and their stop and targets are a fixed template. Check an idea to research it.</p></div>}
+        <p className="mt-2 text-sm leading-6">{result.market.regime === "unknown" ? "Market context is incomplete." : result.market.regime.replaceAll("_", " ") + " market context."} {!leadPlay ? "No play is actionable without evidence." : exampleTickers || scoresTied ? `${scoresTied && !exampleTickers ? `Scores are tied, so the order does not rank these ideas. ` : ""}None is ranked first; confirm each entry condition and its evidence before a ticket.` : leadPlay.symbol + " ranks first; confirm its entry condition and evidence before a ticket."}</p>
         <p className="mt-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}>Check an idea to review its supporting evidence. This does not create an order.</p>
       </div>
       <div className="space-y-4">{result.plays.map((play, index) => <TradePlayCard key={play.id} rank={index + 1} play={play} thesis={thesisById.get(play.tacticalThesisId) ?? null} portfolioRiskBeforeCents={result.portfolioRisk.beforeCents} maxOpenRiskCents={result.feasibility.maxOpenRiskCents} selected={selectedPlayId === play.id} busy={busy} onValidate={() => onValidate(play.id)}
