@@ -1,18 +1,30 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { PlayUnderwritingResult } from "@shared/playUnderwriting";
 import { Button } from "@/components/ui/button";
 import { PlayUnderwritingBrief } from "./PlayUnderwritingBrief";
 import { MissionRiskPortrait, riskMoney } from "./MandateRiskPortrait";
+import { ManualOrderTicketModal } from "./ManualOrderTicketModal";
+import { paperTicketReadiness, type PaperTicketPrefill } from "@shared/paperTicketPrefill";
 
 const money = riskMoney;
 const horizons = { intraday: "Today", overnight: "Next close", swing: "This week", catalyst_window: "Catalyst window", position: "Long term" };
 
 /** Presentation of a persisted, completed revision. Opening it runs no analysis. */
-export function MissionResultWorkspace({ result, accountLabel, accountAsOf, thesisLabel, revisionLabel, selectedPlayId, busy, notice, riskDetails, onEdit, onValidate }: {
+export function MissionResultWorkspace({ result, accountLabel, accountAsOf, thesisLabel, revisionLabel, selectedPlayId, busy, notice, riskDetails, onEdit, onValidate, researchRunId = null }: {
   result: PlayUnderwritingResult; accountLabel: string; accountAsOf: number | null;
   thesisLabel: string; revisionLabel: string; selectedPlayId: string | null; busy: boolean;
   notice?: ReactNode; riskDetails: ReactNode; onEdit: () => void; onValidate: (id: string) => void;
+  /** Research run bound to this Mission after a play was checked; required to stage a paper ticket. */
+  researchRunId?: number | null;
 }) {
+  // Opening the existing ticket builder creates nothing; staging needs PAPER and the server gates.
+  // The prefill is captured once on open so later re-renders never overwrite operator edits.
+  const [ticketPrefill, setTicketPrefill] = useState<PaperTicketPrefill | null>(null);
+  const prepareTicket = (playId: string) => {
+    const play = result.plays.find(candidate => candidate.id === playId);
+    const ticket = play ? paperTicketReadiness({ play, thesis: result.tacticalTheses.find(t => t.id === play.tacticalThesisId) ?? null, selectedPlayId, researchRunId }) : null;
+    if (ticket?.state === "ready") setTicketPrefill(ticket.prefill);
+  };
   const limit = result.objective.maxPlannedLossCents;
   const effective = result.feasibility.riskBudgetCents;
   return <section className="mission-result-edition mx-auto max-w-5xl space-y-4 pb-12" aria-label="Completed mission">
@@ -29,7 +41,7 @@ export function MissionResultWorkspace({ result, accountLabel, accountAsOf, thes
     <MissionRiskPortrait limitCents={limit} effectiveCents={effective} />
     <section id="mission-underwriting-result" aria-label="Analysis result" className="scroll-mt-24 space-y-3">
       <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Analysis saved <time dateTime={new Date(result.asOf).toISOString()}>{new Date(result.asOf).toLocaleString()}</time> · not a current eligibility check</p>
-      <PlayUnderwritingBrief result={result} selectedPlayId={selectedPlayId} busy={busy} onValidate={onValidate} onAdjustRisk={onEdit} />
+      <PlayUnderwritingBrief result={result} selectedPlayId={selectedPlayId} busy={busy} onValidate={onValidate} onAdjustRisk={onEdit} researchRunId={researchRunId} onPrepareTicket={prepareTicket} />
     </section>
     <details aria-label="Saved mission summary" className="border-y py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }}>
       <summary>Mission context & risk assumptions</summary>
@@ -40,6 +52,6 @@ export function MissionResultWorkspace({ result, accountLabel, accountAsOf, thes
       <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Saved {revisionLabel} · Account snapshot {accountAsOf == null ? "unavailable" : new Date(accountAsOf).toLocaleString()}. Declared allocation, not total account value.</p>
       {riskDetails}
     </details>
-
+    {ticketPrefill && <ManualOrderTicketModal open onOpenChange={open => { if (!open) setTicketPrefill(null); }} initialValues={ticketPrefill} />}
   </section>;
 }
