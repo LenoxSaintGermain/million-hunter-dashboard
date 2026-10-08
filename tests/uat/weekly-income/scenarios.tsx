@@ -6,6 +6,8 @@ import { weeklyIncomeDefaults } from "../../../shared/strategyTemplates/weeklyIn
 import { WeeklyIncomeSkipped } from "../../../client/src/components/aperture/weeklyIncome/WeeklyIncomeSkipped";
 import { WeeklyIncomeScreenResults, type WiScreenResult } from "../../../client/src/components/aperture/weeklyIncome/WeeklyIncomeCandidates";
 import { rankCandidates, screenUnderlying, type ChainRow } from "../../../server/aperture/weeklyIncomeScreen";
+import { WeeklyIncomeScorecardView } from "../../../client/src/components/aperture/weeklyIncome/WeeklyIncomeScorecardView";
+import { buildWeeklyIncomeScorecard, weeklyIncomeHistory, type WiPositionRecord, type WiWeekInput } from "../../../shared/weeklyIncomeScorecard";
 
 // Example data: hypothetical tickers and dates for the blackout states.
 const SKIPPED = [
@@ -34,6 +36,16 @@ function fixtureScreen(regularSession: boolean): WiScreenResult {
   const low = screenUnderlying({ symbol: "LMN", priceCents: 6_000, advUsd: 30_000_000 }, [], ctx);
   return { asOf: FIX_NOW, session: regularSession ? "regular" : "closed", refusal: null, candidates: rankCandidates([...xyz.candidates, ...abc.candidates], 10), skipped: [...xyz.skipped, ...abc.skipped, ...low.skipped, { symbol: "DEF", plain: "We don't know when DEF next reports results, so we skip it. Surprise moves around a report can be large.", detail: "Earnings source unavailable; next report date unknown.", source: null }] };
 }
+// Example data: hypothetical fixture week (3 take-profits, 1 stop, 1 time exit). Not real fills.
+const WK = Date.parse("2026-10-12T04:00:00Z");
+const HR = 3_600_000;
+const wpos = (id: string, credit: number, contracts: number, debit: number, maxLoss: number, open: number, close: number, exitReason: WiPositionRecord["exitReason"], basis: WiPositionRecord["basis"] = "paper_fill"): WiPositionRecord => ({ id, underlying: id, basis, openedAt: WK + open * HR, closedAt: WK + close * HR, contracts, openingCreditCents: credit, closingDebitCents: debit, markDebitCents: null, markAsOf: null, maxLossCents: maxLoss * 100, feesCents: 0, exitReason });
+const fixtureWeek = (basis: WiPositionRecord["basis"], over: Partial<WiWeekInput> = {}): WiWeekInput => ({
+  weekOf: "2026-10-12", weekStartMs: WK, weekEndMs: WK + 100 * HR, mondayEquityCents: 5_000_000, mondayEquityAsOf: WK, asOf: WK + 100 * HR, skippedReasons: ["earnings", "earnings", "liquidity", "delta"],
+  positions: [wpos("XYZ", 40, 2, 20, 440, 0, 50, "take_profit", basis), wpos("ABC", 50, 1, 25, 210, 0, 100, "take_profit", basis), wpos("DEF", 30, 3, 15, 240, 0, 25, "take_profit", basis), wpos("GHI", 40, 2, 80, 440, 50, 100, "stop", basis), wpos("JKL", 45, 1, 30, 215, 0, 100, "time_exit", basis)],
+  ...over,
+});
+const fixtureHistory = weeklyIncomeHistory([{ weekOf: "2026-10-05", returnOnAccount: 0.0009 }, { weekOf: "2026-10-12", returnOnAccount: -0.003 }, { weekOf: "2026-10-19", returnOnAccount: 0.002 }]).display;
 const refused = (code: "opra_not_entitled" | "options_level", plain: string, detail: string): WiScreenResult => ({ asOf: FIX_NOW, session: "regular", refusal: { code, plain, detail }, candidates: [], skipped: [] });
 
 /** Each scenario is one Guided-mode state. Later PRs append their states here. */
@@ -52,5 +64,9 @@ export const SCENARIOS: Record<string, { title: string; render: () => ReactNode 
   "screen-pro": { title: "Research screen (Pro, Example data)", render: () => <WeeklyIncomeScreenResults result={fixtureScreen(true)} isGuided={false} isExample /> },
   "screen-closed": { title: "Market closed preview (Guided, Example data)", render: () => <WeeklyIncomeScreenResults result={{ ...fixtureScreen(false), candidates: fixtureScreen(false).candidates.slice(0, 1) }} isGuided isExample /> },
   "screen-refused-opra": { title: "Refused: delayed prices only (Guided)", render: () => <WeeklyIncomeScreenResults result={refused("opra_not_entitled", "This account only sees delayed, indicative option prices. Weekly Income needs live OPRA prices, so nothing is shown.", "Option quotes are indicative; OPRA not entitled")} isGuided /> },
+  "scorecard-guided": { title: "Weekly scorecard (Guided, Example data)", render: () => <WeeklyIncomeScorecardView scorecard={buildWeeklyIncomeScorecard(fixtureWeek("paper_fill"), "paper_fill")} isGuided isExample /> },
+  "scorecard-pro": { title: "Weekly scorecard (Pro, Example data)", render: () => <WeeklyIncomeScorecardView scorecard={buildWeeklyIncomeScorecard(fixtureWeek("paper_fill"), "paper_fill")} isGuided={false} isExample history={fixtureHistory} /> },
+  "scorecard-counterfactual": { title: "Counterfactual scorecard (Guided, Example data)", render: () => <WeeklyIncomeScorecardView scorecard={buildWeeklyIncomeScorecard(fixtureWeek("counterfactual"), "counterfactual")} isGuided isExample /> },
+  "scorecard-not-measured": { title: "Scorecard without measured account value (Guided, Example data)", render: () => <WeeklyIncomeScorecardView scorecard={buildWeeklyIncomeScorecard(fixtureWeek("paper_fill", { mondayEquityCents: null }), "paper_fill")} isGuided isExample /> },
   "screen-refused-level": { title: "Refused: options level (Pro)", render: () => <WeeklyIncomeScreenResults result={refused("options_level", "This account isn't approved for floor-protected option trades (spreads) yet.", "Options level 2 < 3")} isGuided={false} /> },
 };
