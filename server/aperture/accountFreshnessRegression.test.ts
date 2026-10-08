@@ -25,7 +25,8 @@ async function exercise() {
   // quotes or order evaluation. No real DB, provider, or order mutation exists.
   await expect(preflightOrder({ runId: 1, accountId: 1, userId: 2, symbol: "TEST", side: "buy", qty: 1, orderType: "limit", limitPriceCents: 100, holdingPeriod: "swing", now } as any)).rejects.toThrow();
 }
-beforeEach(() => { vi.stubEnv("OWNER_OPEN_ID", "owner-open-id"); harness.accounts = []; harness.writes = []; harness.selects = 0; harness.getAccount.mockReset(); });
+// The owner path is exercised through the go-live gate (ALPACA_SHARED_KEY_OWNER_ONLY on).
+beforeEach(() => { vi.stubEnv("OWNER_OPEN_ID", "owner-open-id"); vi.stubEnv("ALPACA_SHARED_KEY_OWNER_ONLY", "true"); harness.accounts = []; harness.writes = []; harness.selects = 0; harness.getAccount.mockReset(); });
 afterEach(() => vi.unstubAllEnvs());
 describe("real preflight account freshness boundary", () => {
   it("never refreshes manual declarations merely because time passed", async () => {

@@ -81,7 +81,7 @@ import { assembleRun } from "./aperture/run";
 import { generateMemo } from "./aperture/memo";
 import { belongsInMemoLibrary } from "./aperture/memoLibrary";
 import { brokerFor, listBrokers, alpacaPaperBroker } from "./aperture/brokers/index";
-import { assertEnvBrokerAccess, envBrokerAccess, OWNER_ONLY_BROKER_MESSAGE } from "./aperture/brokers/envBrokerOwner";
+import { assertEnvBrokerAccess, envBrokerAccess, OWNER_ONLY_BROKER_MESSAGE, sharedAlpacaKeyOwnerOnly } from "./aperture/brokers/envBrokerOwner";
 import { normSymbol } from "./aperture/facts";
 import { createOrder, approveOrder, rejectOrder, submitOrder as submitBrokerOrder, mirrorFills, preflightOrder, submitReadiness, OrderGateError, LIVE_ORDER_STATUSES } from "./aperture/orderFlow";
 import { unverifiedReadiness, type OrderSubmitReadiness } from "../shared/orderSubmitReadiness";
@@ -1418,15 +1418,17 @@ export const apertureRouter = router({
               eq(portfolioAccounts.brokerId, "alpaca_paper"),
               eq(portfolioAccounts.externalAccountId, acctData.externalAccountId),
             ));
-          // #41: a broker account binds to exactly one account row, across all users.
+          // #41: with ALPACA_SHARED_KEY_OWNER_ONLY on, a broker account binds to one
+          // account row across all users. Off (UAT), testers share the paper account.
           const others = bound.filter((row) => row.id !== account.id);
           if (others.some((row) => row.userId === ctx.user.id)) {
             throw new TRPCError({ code: "CONFLICT", message: "This external Alpaca Paper account is already bound to another account in your workspace. Submission remains blocked." });
           }
-          if (others.length && account.externalAccountId !== acctData.externalAccountId) {
+          const globalBinding = sharedAlpacaKeyOwnerOnly();
+          if (globalBinding && others.length && account.externalAccountId !== acctData.externalAccountId) {
             throw new TRPCError({ code: "CONFLICT", message: "This external Alpaca Paper account is already bound by another user. No destination binding was changed." });
           }
-          if (others.length) {
+          if (globalBinding && others.length) {
             // An existing binding (made before #41) keeps syncing; the other rows need cleanup.
             console.warn(`[security] Alpaca Paper account ${acctData.externalAccountId.slice(-4).padStart(8, "*")} is also bound by account row(s) ${others.map((row) => row.id).join(", ")}; only account ${account.id} may use it.`);
           }
@@ -5775,14 +5777,16 @@ export const apertureRouter = router({
         if (!executionAccount && envAlpacaAllowed && alpacaPaperBroker.available()) {
           try {
             const alpacaAcct = await alpacaPaperBroker.getAccount();
-            // #41: never create a second binding of an external account another row already holds.
-            const [alreadyBound] = alpacaAcct.externalAccountId
-              ? await db!.select({ id: portfolioAccounts.id }).from(portfolioAccounts).where(and(
-                eq(portfolioAccounts.brokerId, "alpaca_paper"),
-                eq(portfolioAccounts.externalAccountId, alpacaAcct.externalAccountId),
-              )).limit(1)
-              : [];
-            if (!alpacaAcct.externalAccountId || alreadyBound) throw new Error("Alpaca Paper account is unidentified or already bound");
+            // #41 (owner-only mode): never create a second binding of an external account another row already holds.
+            if (sharedAlpacaKeyOwnerOnly()) {
+              const [alreadyBound] = alpacaAcct.externalAccountId
+                ? await db!.select({ id: portfolioAccounts.id }).from(portfolioAccounts).where(and(
+                  eq(portfolioAccounts.brokerId, "alpaca_paper"),
+                  eq(portfolioAccounts.externalAccountId, alpacaAcct.externalAccountId),
+                )).limit(1)
+                : [];
+              if (!alpacaAcct.externalAccountId || alreadyBound) throw new Error("Alpaca Paper account is unidentified or already bound");
+            }
             const [inserted] = await db!.insert(portfolioAccounts).values({
               userId: ctx.user.id,
               label: "Alpaca Paper — Execution Rail",

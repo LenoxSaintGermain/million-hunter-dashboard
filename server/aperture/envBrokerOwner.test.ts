@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apertureRuns, brokerOrders, portfolioAccounts, users } from "../../drizzle/schema";
 
-// #41: the env-backed Alpaca paper rail is the deployment owner's account.
+// #41: the env-backed Alpaca paper rail, open to all operators by default (UAT)
+// and owner-only when ALPACA_SHARED_KEY_OWNER_ONLY=true (go-live).
 // Two users, one fake DB, one fake broker: nothing here reaches a real broker.
 const h = vi.hoisted(() => ({
   account: null as any,
@@ -49,7 +50,7 @@ vi.mock("../_core/sdk", async (importOriginal) => {
 });
 
 import { appRouter } from "../routers";
-import { envBrokerAccess, OWNER_ONLY_BROKER_MESSAGE } from "./brokers/envBrokerOwner";
+import { envBrokerAccess, logSharedAlpacaKeyMode, OWNER_ONLY_BROKER_MESSAGE, sharedAlpacaKeyOwnerOnly } from "./brokers/envBrokerOwner";
 import { submitOrder, approveOrder, mirrorFills } from "./orderFlow";
 import { syncPaperAccount } from "./paperAccountSync";
 import { handlePaperAccountSync } from "./paperAccountSyncScheduled";
@@ -86,97 +87,145 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
-describe("owner-only env-backed Alpaca paper (#41)", () => {
-  it("decides on OWNER_OPEN_ID and leaves other rails alone", () => {
+// Both states of the go-live switch. Off (the default) is the UAT behaviour from
+// before #41; on is the owner-only behaviour.
+describe.each([
+  { mode: "off (default, UAT)", flag: undefined as string | undefined, ownerOnly: false },
+  { mode: "on (go-live)", flag: "true", ownerOnly: true },
+])("ALPACA_SHARED_KEY_OWNER_ONLY $mode", ({ flag, ownerOnly }) => {
+  beforeEach(() => {
+    if (flag === undefined) delete process.env.ALPACA_SHARED_KEY_OWNER_ONLY;
+    else vi.stubEnv("ALPACA_SHARED_KEY_OWNER_ONLY", flag);
+  });
+  afterEach(() => { delete process.env.ALPACA_SHARED_KEY_OWNER_ONLY; });
+  const refusal = { code: "PRECONDITION_FAILED", message: OWNER_ONLY_BROKER_MESSAGE };
+
+  it("decides on the flag and OWNER_OPEN_ID, and leaves other rails alone", () => {
+    expect(sharedAlpacaKeyOwnerOnly()).toBe(ownerOnly);
     expect(envBrokerAccess(OWNER.openId, "alpaca_paper")).toEqual({ allowed: true });
-    expect(envBrokerAccess(OTHER.openId, "alpaca_paper")).toEqual({ allowed: false, reason: "not_owner" });
-    expect(envBrokerAccess(null, "alpaca_paper")).toEqual({ allowed: false, reason: "unknown_user" });
+    expect(envBrokerAccess(OTHER.openId, "alpaca_paper")).toEqual(ownerOnly ? { allowed: false, reason: "not_owner" } : { allowed: true });
+    expect(envBrokerAccess(null, "alpaca_paper")).toEqual(ownerOnly ? { allowed: false, reason: "unknown_user" } : { allowed: true });
     expect(envBrokerAccess(OTHER.openId, "manual")).toEqual({ allowed: true });
     vi.stubEnv("OWNER_OPEN_ID", "");
-    expect(envBrokerAccess(OWNER.openId, "alpaca_paper")).toEqual({ allowed: false, reason: "owner_not_configured" });
+    expect(envBrokerAccess(OWNER.openId, "alpaca_paper")).toEqual(ownerOnly ? { allowed: false, reason: "owner_not_configured" } : { allowed: true });
   });
 
-  it("account.sync: the owner syncs; a second operator is refused before any broker read", async () => {
+  it("logs the mode once at startup", () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    logSharedAlpacaKeyMode();
+    expect(infoSpy).toHaveBeenCalledOnce();
+    expect(infoSpy.mock.calls[0][0]).toBe(ownerOnly
+      ? "[alpaca] shared paper key restricted to the deployment owner (ALPACA_SHARED_KEY_OWNER_ONLY on)"
+      : "[alpaca] shared paper key open to all operators (ALPACA_SHARED_KEY_OWNER_ONLY off)");
+  });
+
+  it(`account.sync: the owner syncs; a second operator is ${ownerOnly ? "refused before any broker read" : "allowed"}`, async () => {
     h.account = alpacaAccount(OWNER.id, "PA-OWNER-1");
     await expect(caller(OWNER).aperture.account.sync({ id: h.account.id })).resolves.toMatchObject({ synced: 0 });
     expect(h.broker.getAccount).toHaveBeenCalledOnce();
 
     h.broker.getAccount.mockClear(); h.writes = [];
     h.account = alpacaAccount(OTHER.id);
-    await expect(caller(OTHER).aperture.account.sync({ id: h.account.id })).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: OWNER_ONLY_BROKER_MESSAGE });
-    expect(h.broker.getAccount).not.toHaveBeenCalled();
-    expect(h.writes).toEqual([]);
-    expect(warnSpy.mock.calls.flat().join(" ")).toContain("Refused env-backed alpaca_paper for user 2 at account.sync");
+    const other = caller(OTHER).aperture.account.sync({ id: h.account.id });
+    if (ownerOnly) {
+      await expect(other).rejects.toMatchObject(refusal);
+      expect(h.broker.getAccount).not.toHaveBeenCalled();
+      expect(h.writes).toEqual([]);
+      expect(warnSpy.mock.calls.flat().join(" ")).toContain("Refused env-backed alpaca_paper for user 2 at account.sync");
+    } else {
+      await expect(other).resolves.toMatchObject({ synced: 0 });
+      expect(h.broker.getAccount).toHaveBeenCalledOnce();
+      expect(warnSpy.mock.calls.flat().join(" ")).not.toContain("[security]");
+    }
   });
 
-  it("configureSyncSchedule: a second operator is refused; the owner passes the gate", async () => {
+  it("configureSyncSchedule: the second operator meets the flag's gate; the owner always passes it", async () => {
     h.account = alpacaAccount(OTHER.id);
-    await expect(caller(OTHER).aperture.account.configureSyncSchedule({ id: h.account.id, enabled: true })).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: OWNER_ONLY_BROKER_MESSAGE });
+    // Past the owner gate, the next check is the caller's own session cookie (absent in this fixture).
+    await expect(caller(OTHER).aperture.account.configureSyncSchedule({ id: h.account.id, enabled: true }))
+      .rejects.toMatchObject(ownerOnly ? refusal : { code: "UNAUTHORIZED" });
     h.account = alpacaAccount(OWNER.id);
-    // Past the owner gate, the next check is the owner's own session cookie (absent in this fixture).
     await expect(caller(OWNER).aperture.account.configureSyncSchedule({ id: h.account.id, enabled: true })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(h.writes).toEqual([]);
   });
 
-  it("account.create and the broker list keep the rail away from a second operator", async () => {
-    await expect(caller(OTHER).aperture.account.create({ label: "Mine", brokerId: "alpaca_paper", isPaper: true })).rejects.toMatchObject({ message: OWNER_ONLY_BROKER_MESSAGE });
+  it("account.create and the broker list follow the flag for a second operator", async () => {
+    vi.stubEnv("ALPACA_PAPER_KEY", "test-key-id");
+    vi.stubEnv("ALPACA_PAPER_SECRET", "test-secret");
+    const create = caller(OTHER).aperture.account.create({ label: "Mine", brokerId: "alpaca_paper", isPaper: true });
+    if (ownerOnly) await expect(create).rejects.toMatchObject({ message: OWNER_ONLY_BROKER_MESSAGE });
+    else await expect(create).resolves.toMatchObject({ id: 99 });
     await expect(caller(OTHER).aperture.account.create({ label: "Ledger", brokerId: "manual", isPaper: true })).resolves.toMatchObject({ id: 99 });
     const otherRail = (await caller(OTHER).aperture.brokers()).find(broker => broker.id === "alpaca_paper");
-    expect(otherRail).toMatchObject({ available: false, unavailableReason: OWNER_ONLY_BROKER_MESSAGE });
+    expect(otherRail).toMatchObject(ownerOnly ? { available: false, unavailableReason: OWNER_ONLY_BROKER_MESSAGE } : { available: true, unavailableReason: null });
     const ownerRail = (await caller(OWNER).aperture.brokers()).find(broker => broker.id === "alpaca_paper");
-    expect(ownerRail?.unavailableReason).not.toBe(OWNER_ONLY_BROKER_MESSAGE);
+    expect(ownerRail).toMatchObject({ available: true, unavailableReason: null });
   });
 
-  it("order submit and approve: a second operator is refused before evaluation or dispatch", async () => {
+  it("order submit and approve: the gate applies to a second operator only when the flag is on", async () => {
     h.account = alpacaAccount(OTHER.id, "PA-OWNER-1");
     h.accountUserOpenId = OTHER.openId;
     const base = { id: 7, userId: OTHER.id, runId: 3, accountId: h.account.id, portfolioContextAccountId: null, candidateId: null,
       symbol: "AAPL", instrumentType: "shares", side: "buy", intent: "open", qty: 1, orderType: "limit", limitPriceCents: 10_000,
       timeInForce: "day", reason: "Paper test order.", entryPriceCents: 10_000, noTradeConditions: [] };
+    const message = (promise: Promise<unknown>) => promise.then(() => null, (error: Error) => error.message);
     h.order = { ...base, status: "approved" };
-    await expect(submitOrder(7, OTHER.id, "SUBMIT PAPER")).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: OWNER_ONLY_BROKER_MESSAGE });
+    const submitted = await message(submitOrder(7, OTHER.id, "SUBMIT PAPER"));
     h.order = { ...base, status: "pending_approval" };
-    await expect(approveOrder(7, OTHER.id, "APPROVE PAPER")).rejects.toMatchObject({ message: OWNER_ONLY_BROKER_MESSAGE });
-    expect(h.broker.submitOrder).not.toHaveBeenCalled();
-    expect(h.broker.getAccount).not.toHaveBeenCalled();
-    expect(h.writes).toEqual([]);
+    const approved = await message(approveOrder(7, OTHER.id, "APPROVE PAPER"));
+    if (ownerOnly) {
+      expect([submitted, approved]).toEqual([OWNER_ONLY_BROKER_MESSAGE, OWNER_ONLY_BROKER_MESSAGE]);
+      expect(h.broker.submitOrder).not.toHaveBeenCalled();
+      expect(h.broker.getAccount).not.toHaveBeenCalled();
+      expect(h.writes).toEqual([]);
+    } else {
+      // Not refused by the owner gate; it stops later at the ordinary gates in this fixture.
+      expect(submitted).not.toBe(OWNER_ONLY_BROKER_MESSAGE);
+      expect(approved).not.toBe(OWNER_ONLY_BROKER_MESSAGE);
+    }
 
-    // The owner's identical order passes the gate (and stops later at the ordinary gates in this fixture).
+    // The owner's identical order passes the gate in both modes.
     h.account = alpacaAccount(OWNER.id, "PA-OWNER-1");
     h.accountUserOpenId = OWNER.openId;
     h.order = { ...base, userId: OWNER.id, accountId: h.account.id, status: "approved" };
-    const ownerAttempt = await submitOrder(7, OWNER.id, "SUBMIT PAPER").then(() => null, (error: Error) => error.message);
-    expect(ownerAttempt).not.toBe(OWNER_ONLY_BROKER_MESSAGE);
+    expect(await message(submitOrder(7, OWNER.id, "SUBMIT PAPER"))).not.toBe(OWNER_ONLY_BROKER_MESSAGE);
   });
 
-  it("mirrorFills never polls the owner's account for a second operator", async () => {
+  it(`mirrorFills ${ownerOnly ? "never polls" : "polls"} the shared account for a second operator`, async () => {
     h.account = alpacaAccount(OTHER.id, "PA-OWNER-1");
     h.accountUserOpenId = OTHER.openId;
     h.order = { id: 8, userId: OTHER.id, accountId: h.account.id, status: "submitted", brokerOrderId: "b-1" };
+    h.broker.getOrder.mockResolvedValue(null);
     await expect(mirrorFills(OTHER.id)).resolves.toBe(0);
-    expect(h.broker.getOrder).not.toHaveBeenCalled();
-    // The owner's submitted order is polled as before.
+    if (ownerOnly) expect(h.broker.getOrder).not.toHaveBeenCalled();
+    else expect(h.broker.getOrder).toHaveBeenCalledWith("b-1");
+    // The owner's submitted order is polled in both modes.
+    h.broker.getOrder.mockClear();
     h.account = alpacaAccount(OWNER.id, "PA-OWNER-1");
     h.accountUserOpenId = OWNER.openId;
     h.order = { ...h.order, userId: OWNER.id, accountId: h.account.id };
-    h.broker.getOrder.mockResolvedValue(null);
     await mirrorFills(OWNER.id);
     expect(h.broker.getOrder).toHaveBeenCalledWith("b-1");
   });
 
-  it("scheduled paperAccountSync: a second operator's schedule is refused and recorded; the owner's is not", async () => {
-    h.account = alpacaAccount(OTHER.id, "PA-OWNER-1");
-    h.accountUserOpenId = OTHER.openId;
-    const refused = response();
-    await handlePaperAccountSync({ path: "/api/scheduled/capital-paper-account-sync", headers: {} } as any, refused);
-    expect(refused.body).toMatchObject({ ok: true, skipped: "owner_only", summary: OWNER_ONLY_BROKER_MESSAGE });
-    expect(h.writes).toEqual([expect.objectContaining({ syncScheduleLastResult: `Refused: ${OWNER_ONLY_BROKER_MESSAGE}` })]);
-    expect(h.broker.getAccount).not.toHaveBeenCalled();
-    await expect(syncPaperAccount(fakeDb as any, h.account)).rejects.toMatchObject({ message: OWNER_ONLY_BROKER_MESSAGE });
-    expect(h.broker.getAccount).not.toHaveBeenCalled();
-
+  it("scheduled paperAccountSync follows the flag for a second operator; the owner's schedule always passes", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-11T18:00:00Z")); // Sunday: past the owner gate, the market-session gate skips
+    h.account = alpacaAccount(OTHER.id, "PA-OWNER-1");
+    h.accountUserOpenId = OTHER.openId;
+    const other = response();
+    await handlePaperAccountSync({ path: "/api/scheduled/capital-paper-account-sync", headers: {} } as any, other);
+    if (ownerOnly) {
+      expect(other.body).toMatchObject({ ok: true, skipped: "owner_only", summary: OWNER_ONLY_BROKER_MESSAGE });
+      expect(h.writes).toEqual([expect.objectContaining({ syncScheduleLastResult: `Refused: ${OWNER_ONLY_BROKER_MESSAGE}` })]);
+      await expect(syncPaperAccount(fakeDb as any, h.account)).rejects.toMatchObject({ message: OWNER_ONLY_BROKER_MESSAGE });
+      expect(h.broker.getAccount).not.toHaveBeenCalled();
+    } else {
+      expect(other.body).toMatchObject({ ok: true, skipped: "market_closed" });
+      await expect(syncPaperAccount(fakeDb as any, h.account)).resolves.toMatchObject({ synced: 0, source: "alpaca_paper" });
+      expect(h.broker.getAccount).toHaveBeenCalledOnce();
+    }
+
     h.account = alpacaAccount(OWNER.id, "PA-OWNER-1");
     h.accountUserOpenId = OWNER.openId;
     h.writes = [];
@@ -185,29 +234,42 @@ describe("owner-only env-backed Alpaca paper (#41)", () => {
     expect(owner.body).toMatchObject({ ok: true, skipped: "market_closed" });
   });
 
-  it("fails closed for everyone, with a clear server log line, when OWNER_OPEN_ID is absent", async () => {
+  it(`without OWNER_OPEN_ID: ${ownerOnly ? "fails closed for everyone, with a clear server log line" : "the shared key stays open"}`, async () => {
     vi.stubEnv("OWNER_OPEN_ID", "");
     h.account = alpacaAccount(OWNER.id, "PA-OWNER-1");
-    await expect(caller(OWNER).aperture.account.sync({ id: h.account.id })).rejects.toMatchObject({ message: OWNER_ONLY_BROKER_MESSAGE });
-    expect(h.broker.getAccount).not.toHaveBeenCalled();
-    expect(errorSpy.mock.calls.flat().join(" ")).toContain("[security] OWNER_OPEN_ID is not set; refusing env-backed alpaca_paper for user 1 at account.sync");
+    const sync = caller(OWNER).aperture.account.sync({ id: h.account.id });
+    if (ownerOnly) {
+      await expect(sync).rejects.toMatchObject({ message: OWNER_ONLY_BROKER_MESSAGE });
+      expect(h.broker.getAccount).not.toHaveBeenCalled();
+      expect(errorSpy.mock.calls.flat().join(" ")).toContain("[security] OWNER_OPEN_ID is not set; refusing env-backed alpaca_paper for user 1 at account.sync");
+    } else {
+      await expect(sync).resolves.toMatchObject({ synced: 0 });
+      expect(errorSpy).not.toHaveBeenCalled();
+    }
   });
-});
 
-describe("global external-account binding (#41)", () => {
-  it("refuses to bind an Alpaca account another user already holds", async () => {
+  it(`${ownerOnly ? "refuses" : "allows"} binding an Alpaca account another user already holds`, async () => {
     h.account = alpacaAccount(OWNER.id, null);
     h.bound = [{ id: 12, userId: OTHER.id }];
-    await expect(caller(OWNER).aperture.account.sync({ id: h.account.id })).rejects.toMatchObject({ code: "CONFLICT", message: expect.stringContaining("already bound by another user") });
-    expect(h.writes).toEqual([]);
+    const sync = caller(OWNER).aperture.account.sync({ id: h.account.id });
+    if (ownerOnly) {
+      await expect(sync).rejects.toMatchObject({ code: "CONFLICT", message: expect.stringContaining("already bound by another user") });
+      expect(h.writes).toEqual([]);
+    } else {
+      // UAT testers share one paper account: the second binding is recorded.
+      await expect(sync).resolves.toMatchObject({ synced: 0 });
+      expect(h.writes).toContainEqual(expect.objectContaining({ externalAccountId: "PA-OWNER-1" }));
+    }
   });
 
-  it("keeps an existing (pre-#41) binding syncing and logs the other rows for cleanup", async () => {
+  it("keeps an existing binding syncing; only owner-only mode logs the other rows for cleanup", async () => {
     h.account = alpacaAccount(OWNER.id, "PA-OWNER-1");
     h.bound = [{ id: h.account.id, userId: OWNER.id }, { id: 12, userId: OTHER.id }];
     await expect(caller(OWNER).aperture.account.sync({ id: h.account.id })).resolves.toMatchObject({ synced: 0 });
-    expect(warnSpy.mock.calls.flat().join(" ")).toContain("is also bound by account row(s) 12");
-    expect(warnSpy.mock.calls.flat().join(" ")).not.toContain("PA-OWNER-1");
+    const logged = warnSpy.mock.calls.flat().join(" ");
+    if (ownerOnly) expect(logged).toContain("is also bound by account row(s) 12");
+    else expect(logged).not.toContain("is also bound");
+    expect(logged).not.toContain("PA-OWNER-1");
   });
 
   it("still refuses a duplicate binding inside the same workspace", async () => {
