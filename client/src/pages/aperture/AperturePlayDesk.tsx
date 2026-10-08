@@ -26,6 +26,7 @@ import { deskOrderReturn, formatMarkProvenance, formatReturnAmount, formatReturn
 import { PlayInspectionDrawer, type InspectableOrder } from "@/components/aperture/PlayInspectionDrawer";
 import { PositionExitModal, type ExitTarget } from "@/components/aperture/PositionExitModal";
 import { ManualOrderTicketModal } from "@/components/aperture/ManualOrderTicketModal";
+import { snapshotAgeLabel } from "@shared/snapshotAge";
 
 const money = (cents?: number | null) => cents == null
   ? "—"
@@ -241,7 +242,8 @@ export default function AperturePlayDesk() {
   };
 
   const accountLastSyncedAt = desk.data?.account?.lastSyncedAt;
-  const isAccountTelemetryStale = !accountLastSyncedAt || (Date.now() - accountLastSyncedAt > 15 * 60 * 1000);
+  // Same 4h threshold and wording as the Capital rail, so one snapshot reads the same everywhere.
+  const accountSnapshotAge = snapshotAgeLabel(accountLastSyncedAt ? Date.now() - accountLastSyncedAt : null);
 
   const refresh = async () => {
     // Keep the initiating control focusable while blocking repeated activation,
@@ -304,7 +306,7 @@ export default function AperturePlayDesk() {
       </div>
     </div>
 
-    <p className="desk-annotation" role="status">Broker snapshot: {accountLastSyncedAt ? `${isAccountTelemetryStale ? "stale" : "saved"} · ${new Date(accountLastSyncedAt).toLocaleString()}` : "sync time not recorded"}. Sync updates balances and marks, not research or approvals.</p>
+    <p className="desk-annotation" role="status">Broker snapshot · {accountSnapshotAge}{accountLastSyncedAt ? ` · ${new Date(accountLastSyncedAt).toLocaleString()}` : ""}. Sync broker snapshot (above) updates balances and marks, not research or approvals.</p>
     {unavailable.length > 0 && <section role="alert" className="rounded-xl border p-4" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}>
       {unavailable.map(({ label, query }) => <div key={label} className="mb-3 last:mb-0"><p className="font-semibold">{label} status unavailable</p><p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{query.data != null ? "Refresh failed. Last known records remain visible; they may be stale." : "This part of the desk could not be verified."}</p></div>)}
       <p className="text-sm">This is not an all-clear. Refresh status to retry; no order will be resubmitted.</p>

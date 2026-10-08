@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Clock3, Info, Landmark, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { snapshotSyncAvailability, snapshotAgeLabel } from "@shared/snapshotAge";
+import { SYNC_NOW_TITLE, SyncNowButton } from "./SnapshotSyncNow";
 import { invalidateAccountRefreshReads } from "@/lib/accountRefreshInvalidation";
 import { formatMandatePercentPoints } from "@shared/cockpitPresentation";
 import { apertureLanguage, practiceAccountLabel, accountFundsLabel } from "@shared/apertureLanguage";
@@ -28,10 +30,7 @@ function duration(ms: number | null | undefined) {
 }
 
 function syncedLabel(stalenessMs: number | null) {
-  if (stalenessMs == null) return "never synced";
-  if (stalenessMs < 60_000) return "synced just now";
-  if (stalenessMs < 3_600_000) return `synced ${Math.floor(stalenessMs / 60_000)}m ago`;
-  return `synced ${Math.floor(stalenessMs / 3_600_000)}h ago`;
+  return snapshotAgeLabel(stalenessMs);
 }
 
 function RailHead({ children }: { children: ReactNode }) {
@@ -70,6 +69,7 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
   // loading. That response can falsely claim no account on a cold device.
   const cockpitQuery = trpc.aperture.cockpit.useQuery(cockpitInput, { enabled: !!runId || (!accountQuery.isLoading && !accountQuery.error), retry: false, refetchInterval: 60_000, refetchIntervalInBackground: false });
   const { data, isLoading } = cockpitQuery;
+  const syncTarget = snapshotSyncAvailability({ accountId: data?.account.accountId, brokerId: data?.account.brokerId });
   const preference = trpc.aperture.cockpitPreference.get.useQuery();
   const setPreference = trpc.aperture.cockpitPreference.set.useMutation();
   const [clockNow, setClockNow] = useState(() => Date.now());
@@ -153,10 +153,11 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
   }, [activeThesisQuery.data, thesesListQuery.data]);
 
   const handleRapidSync = async () => {
-    if (syncing) return;
+    // Sync the account whose age is shown; never fall back to a guessed id.
+    const targetId = syncTarget.accountId;
+    if (syncing || targetId == null) return;
     setSyncing(true);
     const toastId = "rapid-broker-sync";
-    const targetId = preferredAccountId ?? 1;
     try {
       toast.loading("Synchronizing broker balances & marks...", { id: toastId });
       if (syncMutation?.mutateAsync) {
@@ -166,7 +167,7 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
         await invalidateAccountRefreshReads(utils.aperture, targetId);
       }
       await Promise.allSettled([cockpitQuery.refetch(), accountQuery.refetch()]);
-      toast.success("Broker telemetry synchronized", { id: toastId });
+      toast.success("Broker snapshot synced. No order was created or changed.", { id: toastId });
     } catch (err: any) {
       toast.error(`Broker sync failed: ${err?.message ?? "Network error"}`, { id: toastId });
     } finally {
@@ -226,16 +227,17 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
           {/* Ambient Staleness Pill with inline 1-click refresh */}
           <div className="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ background: summary.accountStale ? "color-mix(in srgb, var(--sh-signal) 12%, transparent)" : "color-mix(in srgb, var(--sh-emerald) 12%, transparent)", color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-emerald)" }}>
             <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: summary.accountStale ? "var(--sh-signal)" : "var(--sh-emerald)" }} />
-            <span>{staleText}</span>
-            <button
+            <span>Broker snapshot · {staleText}</span>
+            {syncTarget.canSync ? <button
               type="button"
               onClick={handleRapidSync}
               disabled={syncing}
-              title="Refresh marks & buying power snapshot"
-              className="ml-0.5 inline-flex items-center justify-center rounded p-0.5 hover:bg-black/10 focus-visible:outline-none"
+              title={SYNC_NOW_TITLE}
+              className="ml-0.5 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wider underline underline-offset-2 hover:bg-black/10 disabled:cursor-wait"
             >
-              <RefreshCw className={`h-2.5 w-2.5 ${syncing ? "animate-spin" : ""}`} />
-            </button>
+              <RefreshCw aria-hidden="true" className={`h-2.5 w-2.5 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing…" : "Sync now"}
+            </button> : syncTarget.reason && <span>· {syncTarget.reason}</span>}
           </div>
           {/* Rapid Inline Thesis Switcher */}
           {thesesListQuery.data && thesesListQuery.data.length > 0 && (
@@ -337,6 +339,7 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
       <div className="flex min-h-11 items-center gap-2 border-b px-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
         <StateMark state={data.account.isPaper === true ? "rule_qualified" : "unknown"} label={practiceAccountLabel(data.account.isPaper)} compact />
         <span className="min-w-0 flex-1 truncate text-[11px]" title={`${data.account.label || "Paper account"} · ${staleText}`} style={{ color: summary.accountStale ? "var(--sh-signal)" : "var(--sh-text-primary)" }}>{data.account.label || "Paper account"} · {staleText}</span>
+        {syncTarget.canSync && <SyncNowButton onSync={handleRapidSync} syncing={syncing} className="ml-0 shrink-0" />}
         <span className="max-w-[7rem] shrink-0 truncate text-[11px] font-semibold" title={data.activeThesis?.name ?? "No active thesis"} style={{ color: "var(--sh-text-primary)" }}>Thesis {data.activeThesis?.name ?? "—"}</span>
       </div>
       <div className="flex min-h-11 items-center gap-2 px-3" style={{ background: summary.severity === "critical" ? "color-mix(in srgb, var(--sh-red) 5%, var(--sh-surface))" : "var(--sh-surface)" }}>
@@ -386,11 +389,11 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
   </section>;
   if (editorialContext) return <section className="capital-context" aria-label="Account context">
     <div className="capital-context-strip">
-      <div><span className="capital-context-label">{practiceAccountLabel(data.account.isPaper)}</span><strong>{money(equityCents) ?? "Value unavailable"}</strong><small>{staleText} · saved snapshot</small></div>
+      <div><span className="capital-context-label">{practiceAccountLabel(data.account.isPaper)}</span><strong>{money(equityCents) ?? "Value unavailable"}</strong><small>Broker snapshot · {staleText}{syncTarget.canSync ? <SyncNowButton onSync={handleRapidSync} syncing={syncing} /> : syncTarget.reason ? ` · ${syncTarget.reason}` : null}</small></div>
       <div><span className="capital-context-label">Research lens</span><p>{data.activeThesis?.name ?? "No active thesis"}</p></div>
-      <div className="capital-context-limit" style={{ borderColor: severityColor }}><span className="capital-context-label">Recorded constraint</span><p>{summary.binding ? bindingSubject : "Not established"}</p><small>{summary.accountStale ? "Refresh before judging capacity" : "Saved limits · not trade clearance"}</small></div>
+      <div className="capital-context-limit" style={{ borderColor: severityColor }}><span className="capital-context-label">Recorded constraint</span><p>{summary.binding ? bindingSubject : "Not established"}</p><small>{summary.accountStale ? "Sync the snapshot before judging capacity" : "Saved limits · not trade clearance"}</small></div>
     </div>
     <details className="capital-context-controls"><summary>Account controls & evidence <span aria-hidden="true">↗</span></summary>{rail}</details>
   </section>;
-  return visualHero ? <><ConnectedPortfolioPortrait key={data.account.accountId ?? "unknown"} accountId={data.account.accountId} account={data.account} thesis={data.activeThesis?.name ?? null} binding={summary.binding} now={clockNow}/><details className="portrait-machinery"><summary>Account controls, market clock & all constraints</summary>{rail}</details></> : rail;
+  return visualHero ? <><ConnectedPortfolioPortrait key={data.account.accountId ?? "unknown"} accountId={data.account.accountId} account={data.account} thesis={data.activeThesis?.name ?? null} binding={summary.binding} now={clockNow} syncAction={syncTarget.canSync ? <SyncNowButton onSync={handleRapidSync} syncing={syncing} tone="inherit" /> : syncTarget.reason ? <span> · {syncTarget.reason}</span> : null}/><details className="portrait-machinery"><summary>Account controls, market clock & all constraints</summary>{rail}</details></> : rail;
 }
