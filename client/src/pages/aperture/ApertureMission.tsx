@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DecisionRunway } from "@/components/aperture/DecisionRunway";
 import { ObjectiveMissionFlow } from "@/components/aperture/ObjectiveMissionFlow";
 import { trpc } from "@/lib/trpc";
-import { parseCanonicalMissionHandoff } from "@/lib/canonicalMissionHandoff";
+import { isFreshMissionRequest, parseCanonicalMissionHandoff } from "@/lib/canonicalMissionHandoff";
 
 export default function ApertureMission() {
   const [, navigate] = useLocation();
@@ -20,6 +20,8 @@ export default function ApertureMission() {
     : null;
   const handoff = isReceiptRoute ? null : parseCanonicalMissionHandoff(search);
   const newObjective = !isReceiptRoute && !handoff && new URLSearchParams(search).get("objective") === "1";
+  // "New research run": a fresh setup that never reopens the latest saved Mission.
+  const freshMission = !isReceiptRoute && !handoff && !newObjective && isFreshMissionRequest(search);
   // Carried from the three-tap entry so the operator is not asked the amount twice.
   const seedCapital = Number(new URLSearchParams(search).get("capital"));
   const seedCapitalCents = Number.isFinite(seedCapital) && seedCapital > 0 ? Math.round(seedCapital * 100) : null;
@@ -45,9 +47,10 @@ export default function ApertureMission() {
       <p className="mt-2 text-sm">Open the saved Mission from Today. This link has not started or replaced a Mission.</p>
     </section> : newObjective ? <ObjectiveMissionFlow newObjective seedCapitalCents={seedCapitalCents} onAccepted={({ decisionRunId, revisionId }) =>
       navigate(`/aperture/decision/${decisionRunId}/revision/${revisionId}`, { replace: true })} /> : <DecisionRunway
-      key={receiptTarget ? `receipt:${receiptTarget.decisionRunId}:${receiptTarget.revisionId}` : handoff ? `canonical:${handoff.canonicalThesisId}:${handoff.capitalThesisId}` : "mission"}
+      key={receiptTarget ? `receipt:${receiptTarget.decisionRunId}:${receiptTarget.revisionId}` : handoff ? `canonical:${handoff.canonicalThesisId}:${handoff.capitalThesisId}` : freshMission ? "fresh" : "mission"}
       receiptTarget={receiptTarget}
       missionHandoff={handoff}
+      freshMission={freshMission}
       onMissionRecorded={({ decisionRunId, revisionId }) => navigate(`/aperture/decision/${decisionRunId}/revision/${revisionId}`, { replace: true })}
       onNewResearch={() => navigate("/aperture?setup=1&draft=1")}
       onOpenResearchRun={(runId) => navigate(`/aperture/run/${runId}`)}

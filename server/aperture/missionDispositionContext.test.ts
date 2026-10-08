@@ -203,37 +203,49 @@ describe("persisted Mission disposition context", () => {
     expect(fixture.mutations.run.mutateAsync).toHaveBeenCalledTimes(1);
   });
 
-  it.each(["running", "complete"])("recovers the old handoff URL through its completed draft's exact receipt while the job is %s", state => {
+  // Issue #2: `newMission=1` must open a fresh setup. A completed draft for the
+  // same thesis used to redirect this URL to that draft's old result.
+  it("does not reopen a completed draft's old result from a newMission=1 handoff for the same thesis", () => {
     canonicalHandoff();
     fixture.queries.draft.data.completedAt = now;
     Object.assign(fixture.queries.draft.data.values, { canonicalThesisId: 780001, baseDecisionRunId: 810001, baseDecisionRevisionId: 1140001 });
-    // The first query still contains the unrelated, older discovery receipt.
-    let view = render(true);
-    expect(fixture.queryCalls).toHaveBeenCalledWith("latest", { decisionRunId: 810001, revisionId: 1140001 });
-    expect(fixture.openResearch).not.toHaveBeenCalled();
-    expect(view.$("#mission-primary-action")).toHaveLength(0);
     fixture.queries.latest.data.latest = { ...fixture.queries.latest.data.latest, contextKind: "thesis", discoveryContext: undefined,
       decisionRunId: 810001, decisionRevisionId: 1140001, canonicalThesisId: 780001, capitalThesisId: 450001,
       missionText: "Illustrative saved completed diesel Mission", instrumentPreference: "shares", holdingPeriod: "swing", holdingPeriods: ["swing"] };
-    render(true);
-    expect(fixture.openResearch).toHaveBeenCalledWith("/aperture/decision/810001/revision/1140001", { replace: true });
-    // A fresh page mount from that durable URL reads the same saved job only.
-    fixture.cleanups.forEach(cleanup => cleanup?.()); fixture.cleanups = []; fixture.slots = []; fixture.deps = []; fixture.effects = [];
-    fixture.receiptParams = { decisionRunId: "810001", revisionId: "1140001" }; fixture.search = "";
-    fixture.queries.job = query({ state, message: "Illustrative saved job", decisionRunId: 810001, decisionRevisionId: 1140001 });
-    view = render(true);
-    expect(view.$.text()).toContain("Illustrative saved completed diesel Mission");
-    if (state === "running") expect(view.$.text()).toContain("Saved underwriting task");
+    const view = render(true);
+    expect(fixture.openResearch).not.toHaveBeenCalled();
+    expect(fixture.queryCalls).not.toHaveBeenCalledWith("latest", { decisionRunId: 810001, revisionId: 1140001 });
+    expect(view.$.text()).not.toContain("Illustrative saved completed diesel Mission");
+    expect(view.$.text()).toContain("New Mission assumptions");
+    expect(view.$("#mission-primary-action")).toHaveLength(1);
+    expect(view.$('input[aria-label="Capital"]').val()).toBe("");
     for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
   });
 
-  it.each(["canonicalThesisId", "capitalThesisId", "decisionRunId", "decisionRevisionId"])("rejects completed handoff recovery with mismatched %s", key => {
-    canonicalHandoff(); fixture.queries.draft.data.completedAt = now;
-    Object.assign(fixture.queries.draft.data.values, { canonicalThesisId: 780001, baseDecisionRunId: 810001, baseDecisionRevisionId: 1140001 });
-    Object.assign(fixture.queries.latest.data.latest, { canonicalThesisId: 780001, capitalThesisId: 450001, decisionRunId: 810001, decisionRevisionId: 1140001, [key]: 999 });
+  it("opens a fresh setup for Play Desk's New research run instead of the latest saved Mission", () => {
+    fixture.search = "newMission=1";
+    fixture.queries.draft.data.completedAt = now;
+    fixture.queries.latest.data.latest = { authority: "authoritative", contextKind: "thesis", decisionRunId: 1020001, decisionRevisionId: 1410001,
+      canonicalThesisId: 720001, capitalThesisId: 33, accountId: 3, branch: "research", version: 1, createdAt: now, runId: null,
+      missionText: "Illustrative stale 9/22 Mission", deployableCapitalCents: 5_000_000, maxPlannedLossCents: 50_000, instrumentPreference: "shares",
+      objective: "deploy_today", holdingPeriod: "intraday", holdingPeriods: ["intraday"], includeHeldResearch: false,
+      binding: { accountLabel: "Illustrative Paper", canonicalThesisName: "Illustrative PWR" } };
     const view = render(true);
     expect(fixture.openResearch).not.toHaveBeenCalled();
-    expect(view.$("#mission-primary-action")).toHaveLength(0);
+    expect(view.$('[aria-label="Completed mission"]')).toHaveLength(0);
+    expect(view.$.text()).not.toContain("Illustrative stale 9/22 Mission");
+    expect(view.$.text()).toContain("New research run — set up a fresh Mission");
+    expect(view.$('input[aria-label="Capital"]').val()).toBe("");
+    // The saved receipt is not used as the base of the new Mission.
+    expect(fixture.queryCalls).not.toHaveBeenCalledWith("underwriting", { decisionRunId: 1020001 });
+    for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("asks before continuing an unfinished draft on New research run, never resuming it silently", () => {
+    fixture.search = "newMission=1";
+    const view = render(true);
+    expect(view.$.text()).toContain("Choose which Mission draft to continue");
+    expect(view.$('input[aria-label="Capital"]').val()).toBe("");
     for (const mutation of Object.values(fixture.mutations)) expect(mutation.mutateAsync).not.toHaveBeenCalled();
   });
 

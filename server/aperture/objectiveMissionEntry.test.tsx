@@ -54,6 +54,16 @@ describe("Mission objective entry routing (isolated rendering, not browser UAT)"
     expect($('[role="alert"]').text()).toContain("Mission link is incomplete");
     expect(fixture.runway).not.toHaveBeenCalled(); expect(fixture.flow).not.toHaveBeenCalled();
   });
+  it("routes a bare newMission=1 (Play Desk New research run) to a fresh Mission, not the saved one", () => {
+    fixture.search = "newMission=1";
+    renderToStaticMarkup(ApertureMission());
+    expect(fixture.runway).toHaveBeenCalledWith(expect.objectContaining({ freshMission: true, missionHandoff: null, receiptTarget: null }));
+    expect(fixture.flow).not.toHaveBeenCalled();
+  });
+  it("keeps bare /aperture/mission as resume, not fresh", () => {
+    renderToStaticMarkup(ApertureMission());
+    expect(fixture.runway).toHaveBeenCalledWith(expect.objectContaining({ freshMission: false }));
+  });
   it("keeps the exact receipt route ahead of canonical handoff parameters", () => {
     fixture.search = "canonicalThesisId=780001&capitalThesisId=450001&newMission=1";
     fixture.receipt = true; fixture.params = { decisionRunId: "77", revisionId: "88" };

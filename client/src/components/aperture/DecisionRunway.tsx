@@ -30,6 +30,8 @@ type Props = {
   onOpenResearchRun: (runId: number) => void;
   receiptTarget?: { decisionRunId: number; revisionId: number } | null;
   missionHandoff?: CanonicalMissionHandoff | null;
+  /** `?newMission=1` without thesis ids: start a fresh setup, never the latest saved Mission. */
+  freshMission?: boolean;
   onMissionRecorded?: (receipt: { decisionRunId: number; revisionId: number }) => void;
 };
 
@@ -88,19 +90,18 @@ export function MissionReceiptRecovery({ onCheck }: { onCheck?: () => void }) {
   </section>;
 }
 
-export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget = null, missionHandoff = null, onMissionRecorded }: Props) {
+export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget = null, missionHandoff = null, freshMission = false, onMissionRecorded }: Props) {
   const utils = trpc.useUtils();
   const handoff = receiptTarget ? null : missionHandoff;
+  // Both `?newMission=1` forms ask for a NEW Mission. Neither may reopen an
+  // earlier receipt or result; only a receipt saved in this view is shown.
+  const fresh = !receiptTarget && !handoff && freshMission;
   const [handoffReceipt, setHandoffReceipt] = useState<{ decisionRunId: number; revisionId: number } | null>(null);
   const draftQuery = trpc.aperture.runway.draft.get.useQuery(undefined, { enabled: !receiptTarget, retry: false, refetchOnWindowFocus: false });
-  // Older handoff URLs predate durable receipt navigation. Only the completed,
-  // owner-scoped draft supplies a recovery candidate, never the latest receipt.
-  const completedValues = handoff && draftQuery.data?.completedAt != null
-    && draftQuery.data.values.canonicalThesisId === handoff.canonicalThesisId
-    && !draftQuery.data.values.strategyContext ? draftQuery.data.values : null;
-  const completedHandoffReceipt = completedValues?.baseDecisionRunId && completedValues.baseDecisionRevisionId
-    ? { decisionRunId: completedValues.baseDecisionRunId, revisionId: completedValues.baseDecisionRevisionId } : null;
-  const exactHandoffReceipt = handoffReceipt ?? completedHandoffReceipt;
+  // A completed draft for the same thesis is history, not a redirect target:
+  // `newMission=1` always opens a fresh setup (issue #2). Saving a Mission
+  // replaces this URL with its receipt, so a recorded Mission is not lost.
+  const exactHandoffReceipt = handoffReceipt;
   const receiptReadEnabled = missionReceiptReadEnabled(!!handoff, receiptTarget ?? exactHandoffReceipt);
   const receiptQuery = trpc.aperture.runway.latest.useQuery(receiptTarget ?? exactHandoffReceipt ?? undefined, { enabled: receiptReadEnabled, retry: false });
   // Disabled queries can retain cached errors/data for the unscoped latest key.
@@ -112,7 +113,11 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   const handoffReceiptMatches = exactHandoffReceipt && savedRunwayResponse?.latest?.authority === "authoritative"
     && savedRunwayResponse.latest.decisionRunId === exactHandoffReceipt.decisionRunId && savedRunwayResponse.latest.decisionRevisionId === exactHandoffReceipt.revisionId
     && savedRunwayResponse.latest.canonicalThesisId === handoff?.canonicalThesisId && savedRunwayResponse.latest.capitalThesisId === handoff?.capitalThesisId;
-  const runwayResponse = handoff && !handoffReceiptMatches && savedRunwayResponse ? { ...savedRunwayResponse, latest: null } : savedRunwayResponse;
+  // A fresh run keeps profile context (active thesis) but never the latest receipt,
+  // unless that receipt was recorded in this view.
+  const freshReceiptMatches = fresh && handoffReceipt != null && savedRunwayResponse?.latest?.authority === "authoritative"
+    && savedRunwayResponse.latest.decisionRunId === handoffReceipt.decisionRunId && savedRunwayResponse.latest.decisionRevisionId === handoffReceipt.revisionId;
+  const runwayResponse = ((handoff && !handoffReceiptMatches) || (fresh && !freshReceiptMatches)) && savedRunwayResponse ? { ...savedRunwayResponse, latest: null } : savedRunwayResponse;
   const receiptStructureInvalid = runwayResponse?.latest?.authority === "authoritative" && !validReceiptHorizonShape(runwayResponse.latest);
   const runway = receiptStructureInvalid ? undefined : runwayResponse;
   const { data: pendingOutcomes } = trpc.aperture.runway.pending.useQuery();
@@ -129,17 +134,12 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     || canonicalQuery.isFetching || capitalQuery.isFetching || draftQuery.isFetching);
   const handoffError = handoff && !handoffReadsLoading && (!handoffSource || !handoffProjection)
     ? "The requested thesis and projection could not be verified together in your saved library. No saved Mission or draft has been replaced." : null;
-  useEffect(() => {
-    if (completedHandoffReceipt && !handoffReceipt && !handoffReadsLoading && !handoffError
-      && !receiptError && !receiptStructureInvalid && handoffReceiptMatches) onMissionRecorded?.(completedHandoffReceipt);
-  }, [completedHandoffReceipt?.decisionRunId, completedHandoffReceipt?.revisionId, handoffReceipt, handoffReadsLoading,
-    handoffError, receiptError, receiptStructureInvalid, handoffReceiptMatches, onMissionRecorded]);
   // Never reinterpret an objective receipt as the profile's active thesis.
   // A newer unfinished draft still wins on Mission; an exact receipt link does not.
   const objectiveReceipt = runway?.latest?.authority === "authoritative" && runway.latest.contextKind === "objective" ? runway.latest : null;
   const hasUnfinishedDraft = draftQuery.data != null && draftQuery.data.completedAt == null;
   const acceptedObjective = objectiveReceipt?.objectiveContext && (receiptTarget || !hasUnfinishedDraft) ? objectiveReceipt : null;
-  const preservedStrategyDraft = !handoff && !receiptTarget && hasUnfinishedDraft && draftQuery.data?.values.strategyContext ? draftQuery.data
+  const preservedStrategyDraft = !handoff && !fresh && !receiptTarget && hasUnfinishedDraft && draftQuery.data?.values.strategyContext ? draftQuery.data
     : acceptedObjective?.objectiveContext ? { id: acceptedObjective.objectiveContext.sourceDraftId,
       version: acceptedObjective.objectiveContext.sourceDraftVersion, values: acceptedObjective.objectiveContext.values,
       updatedAt: acceptedObjective.createdAt, completedAt: acceptedObjective.createdAt } : null;
@@ -453,7 +453,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
       // A successful explicit Mission action retires only the exact draft that
       // was used. Another device's intervening edit remains intact.
       completedDraftRef.current = true;
-      if (handoff) setHandoffReceipt({ decisionRunId: receipt.decisionRunId, revisionId: receipt.revisionId });
+      if (handoff || fresh) setHandoffReceipt({ decisionRunId: receipt.decisionRunId, revisionId: receipt.revisionId });
       // Dispatch the already-authorized job before route replacement unmounts
       // this form. Attach a rejection handler immediately while draft retirement
       // finishes; neither navigation nor retirement may initiate a second run.
@@ -598,7 +598,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     // One hydration decision. Late receipt/projection queries must never replace
     // a resumed draft or edits the operator has already made in this view.
     const receiptAlreadyLoaded = receiptTarget != null && hydratedDecisionRevisionId.current === receiptTarget.revisionId;
-    if ((receiptTarget ? receiptAlreadyLoaded : draftInitialized) || completedHandoffReceipt || handoffReadsLoading || handoffError || receiptLoading || (!receiptTarget && draftQuery.isLoading)
+    if ((receiptTarget ? receiptAlreadyLoaded : draftInitialized) || handoffReadsLoading || handoffError || receiptLoading || (!receiptTarget && draftQuery.isLoading)
       || canonicalQuery.isLoading || capitalQuery.isLoading || accountQuery.isLoading
       || receiptStructureInvalid || receiptError || (!receiptTarget && draftQuery.isError) || canonicalQuery.isError || capitalQuery.isError || accountQuery.isError) return;
     if (receiptTarget && (runway?.latest?.authority !== "authoritative" || runway.latest.decisionRevisionId !== receiptTarget.revisionId)) return;
@@ -619,7 +619,11 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
       }
       return;
     }
-    if (persisted && persisted.completedAt == null) {
+    if (fresh && persisted && persisted.completedAt == null) {
+      // Never silently resume another Mission's draft on "New research run".
+      const message = "An unfinished Mission draft is already saved. Compare it with this new setup before choosing which draft to continue.";
+      setRemoteDraft(persisted); setDraftConflict(true); setDraftError(message); draftFailureRef.current = message;
+    } else if (persisted && persisted.completedAt == null) {
       applyDraftValues(persisted.values);
       return;
     }
@@ -677,7 +681,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     setMissionDirty(true); // Immutable receipt text must never be regenerated from parameter defaults.
     setUnderwritingDirty(false);
     setRevisingReceipt(false);
-  }, [receiptTarget, draftInitialized, receiptLoading, receiptError, draftQuery.data, draftQuery.isLoading, draftQuery.isError, canonicalQuery.isLoading, canonicalQuery.isError, capitalQuery.isLoading, capitalQuery.isError, accountQuery.isLoading, accountQuery.isError, runway?.latest, projection, handoffReadsLoading, handoffError, completedHandoffReceipt?.decisionRunId, completedHandoffReceipt?.revisionId]);
+  }, [receiptTarget, draftInitialized, receiptLoading, receiptError, draftQuery.data, draftQuery.isLoading, draftQuery.isError, canonicalQuery.isLoading, canonicalQuery.isError, capitalQuery.isLoading, capitalQuery.isError, accountQuery.isLoading, accountQuery.isError, runway?.latest, projection, handoffReadsLoading, handoffError]);
   const plannedRiskCeiling = cockpit.data?.headroom.lines.find((line) => line.key === "planned_risk_per_play")?.ceilingCents ?? null;
   const concentrationLine = cockpit.data?.headroom.lines.find((line) => /single name/i.test(line.label)) ?? null;
   const receiptActive = !receiptTarget && !revisingReceipt && currentBindingMatches && (latestBranch === "cash" || latestBranch === "conditional");
@@ -930,15 +934,8 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
       </details>
     </section>;
   }
-  if (completedHandoffReceipt && !handoffReceipt) {
-    const recovering = handoffReadsLoading || receiptLoading || (handoffReceiptMatches && !missionContextError);
-    return <section role={recovering ? "status" : "alert"} className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-border-1)" }}>
-      <h2 className="font-semibold">{recovering ? "Opening saved Mission receipt…" : "Saved Mission needs verification"}</h2>
-      <p>This draft already recorded a Mission. No new Mission or analysis will start. {recovering ? "Checking the exact saved revision." : "The saved revision could not be verified against this thesis and projection. Open the saved Mission from Today; do not create it again."}</p>
-    </section>;
-  }
   if (missionContextLoading || (receiptTarget && (receiptLoading || (!receiptError && immutableReceipt?.binding && hydratedDecisionRevisionId.current !== receiptTarget.revisionId)))) {
-    return <section role="status" aria-live="polite" className="mx-auto max-w-3xl rounded-2xl border p-6 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>{receiptTarget ? "Loading immutable decision receipt…" : "Loading saved Mission and draft… No new analysis is starting."}</section>;
+    return <section role="status" aria-live="polite" className="mx-auto max-w-3xl rounded-2xl border p-6 text-sm" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>{receiptTarget ? "Loading immutable decision receipt…" : fresh ? "Preparing a fresh Mission setup… No earlier Mission is reopened and no analysis is starting." : "Loading saved Mission and draft… No new analysis is starting."}</section>;
   }
   if (preservedStrategyDraft) {
     return <ObjectiveMissionFlow key={acceptedObjective ? `objective:${acceptedObjective.decisionRunId}:${acceptedObjective.decisionRevisionId}` : `objective-draft:${preservedStrategyDraft.id}`} initialDraft={preservedStrategyDraft} receiptTarget={acceptedObjective
@@ -962,11 +959,12 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
   }
 
   return <section className="mx-auto max-w-5xl space-y-5 pb-24" onChangeCapture={markDraftEdited} onClickCapture={(event) => { if (event.target instanceof Element && event.target.closest("[data-draft-edit]")) markDraftEdited(); }}>
+    {fresh && !handoffReceipt && <section aria-label="New Mission setup" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-border-1)" }}><p className="font-semibold">New research run — set up a fresh Mission</p><p>Previous Mission receipts and results remain unchanged and are not reopened here. No analysis has started.</p></section>}
     {handoff && !handoffReceipt && <section aria-label="Canonical Mission handoff" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-border-1)" }}><p className="font-semibold">{draftState === "saved" ? "Resumed thesis draft" : "New Mission assumptions — review before saving"}</p><p>Saved source #{handoff.canonicalThesisId} · projection #{handoff.capitalThesisId}. Previous Mission receipts remain unchanged. No analysis has started from this handoff.</p></section>}
     {underwritingComplete && editingCompletedMission && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-sm" style={{ borderColor: "var(--sh-border-1)" }}><p>Editing the saved plan. Changes require review before new analysis.</p><Button variant="outline" className="min-h-11" onClick={() => setEditingCompletedMission(false)}>Back to result</Button></div>}
-    {!receiptTarget && <div className="flex flex-wrap items-center justify-between gap-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}><p><strong style={{ color: "var(--sh-text-primary)" }}>{paperAccount?.label ?? "Select paper account"}</strong> · Paper</p><p role="status" aria-live="polite">{draftError ? "Draft not saved" : draftState === "saving" ? "Saving draft…" : draftState === "saved" ? `Saved · ${new Date(savedDraft!.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : draftTouched ? "Changes not yet saved" : handoff ? "New Mission draft · not saved" : savedDraft?.completedAt != null ? "From your saved Mission" : "Draft saves as you edit"}</p></div>}
+    {!receiptTarget && <div className="flex flex-wrap items-center justify-between gap-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}><p><strong style={{ color: "var(--sh-text-primary)" }}>{paperAccount?.label ?? "Select paper account"}</strong> · Paper</p><p role="status" aria-live="polite">{draftError ? "Draft not saved" : draftState === "saving" ? "Saving draft…" : draftState === "saved" ? `Saved · ${new Date(savedDraft!.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : draftTouched ? "Changes not yet saved" : handoff || fresh ? "New Mission draft · not saved" : savedDraft?.completedAt != null ? "From your saved Mission" : "Draft saves as you edit"}</p></div>}
     {missionContextError && draftInitialized && <div role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)" }}><p>Saved context could not be refreshed. Your last loaded values remain visible; underwriting is withheld.</p><Button variant="outline" className="mt-2 min-h-11" onClick={() => void refreshMissionContext()}>Refresh saved context</Button></div>}
-    {draftError && <section role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-semibold">{draftConflict ? (handoff ? "Choose which Mission draft to continue" : "Another device changed this draft") : "Draft save needs attention"}</h2><p className="mt-2 leading-6">{draftError}</p>{draftConflict ? <><p className="mt-2">Your edits are still here. Compare before choosing which version to keep.</p>{remoteDraft ? <><DraftDifference local={draftValues} remote={remoteDraft.values} /><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" className="min-h-11" onClick={useRemoteDraft}>Use saved draft</Button><Button className="min-h-11" onClick={() => void saveReviewedLocalDraft()}>Save these edits as a new revision</Button></div></> : <Button variant="outline" className="mt-3 min-h-11" onClick={() => void utils.aperture.runway.draft.get.fetch().then(setRemoteDraft).catch(() => toast.error("The saved draft could not be loaded. Your edits remain here."))}>Load saved draft for comparison</Button>}</> : !completedDraftRef.current ? <Button variant="outline" className="mt-3 min-h-11" onClick={() => void retryDraft()}>Retry saving draft</Button> : <Button variant="outline" className="mt-3 min-h-11" onClick={() => window.location.reload()}>Reload saved Mission</Button>}</section>}
+    {draftError && <section role="alert" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-red)", background: "var(--sh-surface)" }}><h2 className="font-semibold">{draftConflict ? (handoff || fresh ? "Choose which Mission draft to continue" : "Another device changed this draft") : "Draft save needs attention"}</h2><p className="mt-2 leading-6">{draftError}</p>{draftConflict ? <><p className="mt-2">Your edits are still here. Compare before choosing which version to keep.</p>{remoteDraft ? <><DraftDifference local={draftValues} remote={remoteDraft.values} /><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" className="min-h-11" onClick={useRemoteDraft}>Use saved draft</Button><Button className="min-h-11" onClick={() => void saveReviewedLocalDraft()}>Save these edits as a new revision</Button></div></> : <Button variant="outline" className="mt-3 min-h-11" onClick={() => void utils.aperture.runway.draft.get.fetch().then(setRemoteDraft).catch(() => toast.error("The saved draft could not be loaded. Your edits remain here."))}>Load saved draft for comparison</Button>}</> : !completedDraftRef.current ? <Button variant="outline" className="mt-3 min-h-11" onClick={() => void retryDraft()}>Retry saving draft</Button> : <Button variant="outline" className="mt-3 min-h-11" onClick={() => window.location.reload()}>Reload saved Mission</Button>}</section>}
     {(unchangedResearchReceipt || jobNeedsReconciliation || runUnderwriting.error || underwritingStructureInvalid) && underwritingTaskPath && <section role="status" aria-live="polite" className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface)" }}><h2 className="font-semibold">Saved underwriting task</h2><p className="mt-2 leading-6">{underwritingStructureInvalid ? "The saved result has malformed horizon data. Reload its corrected record; do not restart the completed job." : underwritingJob.data?.message ?? "Checking the saved analysis. No new analysis will start."}</p><Button className="mt-3 min-h-11" onClick={() => window.location.assign(underwritingTaskPath)}>{underwritingJob.data?.state === "running" ? "View analysis progress" : "Review underwriting task"}</Button><p className="mt-2">Leaving this view does not cancel the task. No practice order has been requested.</p></section>}
     <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}><summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm">Saved context & provenance</summary><div className="grid gap-px overflow-hidden rounded-b-xl border-t md:grid-cols-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-border-1)" }}>
       {[
