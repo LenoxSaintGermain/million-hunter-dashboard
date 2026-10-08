@@ -5,6 +5,7 @@ import "@/styles/portfolio-portrait.css";
 import { useExperienceMode } from "@/contexts/ExperienceModeContext";
 import { MicroTooltip } from "./MicroTooltip";
 import { ConstraintResolverCard } from "./ConstraintResolverCard";
+import { snapshotAgeAt } from "@shared/snapshotAge";
 
 export type PortraitHolding = {
   symbol: string;
@@ -50,6 +51,7 @@ export function PortfolioPortrait({
   binding,
   previewOnly = false,
   now = Date.now(),
+  syncAction,
 }: {
   holdings?: PortraitHolding[];
   loading: boolean;
@@ -67,6 +69,8 @@ export function PortfolioPortrait({
   binding: CockpitHeadroomLine | null;
   now?: number;
   previewOnly?: boolean;
+  /** Inline Sync now beside the snapshot age; the caller owns the sync. */
+  syncAction?: React.ReactNode;
 }) {
   const { isGuided } = useExperienceMode();
   const [selected, setSelected] = useState<string | null>(null);
@@ -111,6 +115,8 @@ export function PortfolioPortrait({
           <p className="portrait-time">
             {stale ? "Stale or unsynced · " : "Saved · "}
             {stamp(account.lastSyncedAt)}
+            {account.lastSyncedAt != null && ` · ${snapshotAgeAt(account.lastSyncedAt, now).text}`}
+            {!previewOnly && syncAction}
           </p>
           <details className="portrait-cash-detail"><summary>Cash & buying power</summary><dl>
             <div>
