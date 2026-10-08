@@ -254,11 +254,7 @@ export function PortfolioPortrait({
           )}
           {isGuided && usage != null && usage >= 85 ? (
             <div className="mt-3">
-              <ConstraintResolverCard
-                symbol={binding?.subject || "Exposure"}
-                currentValueCents={binding?.usedCents}
-                ceilingValueCents={binding?.ceilingCents}
-              />
+              <ConstraintResolverCard line={binding} />
             </div>
           ) : (
             <p>
