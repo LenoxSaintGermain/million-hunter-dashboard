@@ -26,6 +26,8 @@ import { monitoringReviewRouter } from "./aperture/monitoringReviewReceipt";
 import { playOutcomeRouter } from "./aperture/playOutcomeReview";
 import { strategyDiscoveryRouter } from "./aperture/strategyDiscoveryRouter";
 import { uatRouter } from "./aperture/practiceBooks/uatRouter";
+import { usesPracticeBooks } from "./aperture/practiceBooks/flags";
+import { createPracticeBook } from "./aperture/practiceBooks/repository";
 import { objectiveDiscoveryEnabled, readObjectiveDiscovery } from "./aperture/strategyDiscoveryWorkflow";
 import { assertNotDiscoveryProjection, discoverySelectionInput, readDiscoveryResearchBinding, readDiscoverySelections, selectDiscoveryForResearch } from "./aperture/discoverySelection";
 import { readOptionalStatusSource } from "./aperture/optionalStatusSource";
@@ -1347,7 +1349,13 @@ export const apertureRouter = router({
           createdAt: now,
           updatedAt: now,
         });
-        return { id: (result as any).insertId as number };
+        const id = (result as any).insertId as number;
+        // UAT Practice Books: a tester's Alpaca paper row trades its own book on the shared house.
+        if (input.brokerId === "alpaca_paper" && usesPracticeBooks(ctx.user.openId)) {
+          const { bookId } = await createPracticeBook(db!, { userId: ctx.user.id, portfolioAccountId: id, createdBy: ctx.user.id, now });
+          return { id, practiceBookId: bookId };
+        }
+        return { id };
       }),
 
     disconnect: capitalOperatorProcedure
@@ -1383,7 +1391,7 @@ export const apertureRouter = router({
         const account = await requireAccount(db, input.id, ctx.user.id);
         // #41: refuse before any broker read; the env key reaches the owner's account.
         assertEnvBrokerAccess(ctx.user, account.brokerId, "account.sync");
-        const broker = brokerFor(account.brokerId, account.id);
+        const broker = brokerFor(account.brokerId, account.id, account);
 
         if (!broker.available()) {
           throw new TRPCError({
@@ -5113,7 +5121,7 @@ export const apertureRouter = router({
       .query(async ({ ctx, input }) => {
         const db = await getDb();
         const account = await requireAccount(db, input.accountId, ctx.user.id);
-        const broker = brokerFor(account.brokerId, account.id);
+        const broker = brokerFor(account.brokerId, account.id, account);
         const now = Date.now();
         const session = marketSession(now);
         const sessionContext = {
@@ -5775,41 +5783,58 @@ export const apertureRouter = router({
         // Execution destination must be a server-side paper rail (e.g. alpaca_paper)
         // #41: only the owner may bind or refresh the env-backed Alpaca paper rail.
         const envAlpacaAllowed = envBrokerAccess(ctx.user.openId, "alpaca_paper").allowed;
+        // UAT Practice Books: a tester's execution rail is a book; every read goes through brokerFor.
+        const practiceBookMode = usesPracticeBooks(ctx.user.openId);
         let executionAccount = allUserAccounts.find(a => a.brokerId === "alpaca_paper" && a.isPaper);
         const now = Date.now();
         if (!executionAccount && envAlpacaAllowed && alpacaPaperBroker.available()) {
           try {
-            const alpacaAcct = await alpacaPaperBroker.getAccount();
-            // #41 (owner-only mode): never create a second binding of an external account another row already holds.
-            if (sharedAlpacaKeyOwnerOnly()) {
-              const [alreadyBound] = alpacaAcct.externalAccountId
-                ? await db!.select({ id: portfolioAccounts.id }).from(portfolioAccounts).where(and(
-                  eq(portfolioAccounts.brokerId, "alpaca_paper"),
-                  eq(portfolioAccounts.externalAccountId, alpacaAcct.externalAccountId),
-                )).limit(1)
-                : [];
-              if (!alpacaAcct.externalAccountId || alreadyBound) throw new Error("Alpaca Paper account is unidentified or already bound");
+            if (practiceBookMode) {
+              const [inserted] = await db!.insert(portfolioAccounts).values({
+                userId: ctx.user.id,
+                label: "Alpaca Paper — Execution Rail",
+                brokerId: "alpaca_paper",
+                isPaper: true,
+                createdAt: now,
+                updatedAt: now,
+              });
+              const insertedId = Number((inserted as any).insertId);
+              await createPracticeBook(db!, { userId: ctx.user.id, portfolioAccountId: insertedId, createdBy: ctx.user.id, now });
+              const [freshAcct] = await db!.select().from(portfolioAccounts).where(eq(portfolioAccounts.id, insertedId));
+              executionAccount = freshAcct;
+            } else {
+              const alpacaAcct = await brokerFor("alpaca_paper", 0, { practiceBookId: null }).getAccount();
+              // #41 (owner-only mode): never create a second binding of an external account another row already holds.
+              if (sharedAlpacaKeyOwnerOnly()) {
+                const [alreadyBound] = alpacaAcct.externalAccountId
+                  ? await db!.select({ id: portfolioAccounts.id }).from(portfolioAccounts).where(and(
+                    eq(portfolioAccounts.brokerId, "alpaca_paper"),
+                    eq(portfolioAccounts.externalAccountId, alpacaAcct.externalAccountId),
+                  )).limit(1)
+                  : [];
+                if (!alpacaAcct.externalAccountId || alreadyBound) throw new Error("Alpaca Paper account is unidentified or already bound");
+              }
+              const [inserted] = await db!.insert(portfolioAccounts).values({
+                userId: ctx.user.id,
+                label: "Alpaca Paper — Execution Rail",
+                brokerId: "alpaca_paper",
+                externalAccountId: alpacaAcct.externalAccountId,
+                isPaper: true,
+                cashCents: alpacaAcct.cashCents,
+                buyingPowerCents: alpacaAcct.buyingPowerCents,
+                equityValueCents: alpacaAcct.equityValueCents,
+                optionsApprovedLevel: alpacaAcct.optionsApprovedLevel,
+                optionsTradingLevel: alpacaAcct.optionsTradingLevel,
+                optionsBuyingPowerCents: alpacaAcct.optionsBuyingPowerCents,
+                lastSyncedAt: now,
+                syncSource: "alpaca_paper",
+                createdAt: now,
+                updatedAt: now,
+              });
+              const insertedId = Number((inserted as any).insertId);
+              const [freshAcct] = await db!.select().from(portfolioAccounts).where(eq(portfolioAccounts.id, insertedId));
+              executionAccount = freshAcct;
             }
-            const [inserted] = await db!.insert(portfolioAccounts).values({
-              userId: ctx.user.id,
-              label: "Alpaca Paper — Execution Rail",
-              brokerId: "alpaca_paper",
-              externalAccountId: alpacaAcct.externalAccountId,
-              isPaper: true,
-              cashCents: alpacaAcct.cashCents,
-              buyingPowerCents: alpacaAcct.buyingPowerCents,
-              equityValueCents: alpacaAcct.equityValueCents,
-              optionsApprovedLevel: alpacaAcct.optionsApprovedLevel,
-              optionsTradingLevel: alpacaAcct.optionsTradingLevel,
-              optionsBuyingPowerCents: alpacaAcct.optionsBuyingPowerCents,
-              lastSyncedAt: now,
-              syncSource: "alpaca_paper",
-              createdAt: now,
-              updatedAt: now,
-            });
-            const insertedId = Number((inserted as any).insertId);
-            const [freshAcct] = await db!.select().from(portfolioAccounts).where(eq(portfolioAccounts.id, insertedId));
-            executionAccount = freshAcct;
           } catch {
             // best-effort
           }
@@ -5832,7 +5857,8 @@ export const apertureRouter = router({
         // Freshen accounts so mandate freshness checks pass cleanly
         if (executionAccount && executionAccount.brokerId === "alpaca_paper" && envAlpacaAllowed) {
           try {
-            const alpacaAcct = await alpacaPaperBroker.getAccount();
+            // A book row gets its book's numbers; any other row gets the house, exactly as before.
+            const alpacaAcct = await brokerFor(executionAccount.brokerId, executionAccount.id, executionAccount).getAccount();
             await db!.update(portfolioAccounts).set({
               lastSyncedAt: now,
               cashCents: alpacaAcct.cashCents,
@@ -5841,6 +5867,7 @@ export const apertureRouter = router({
               optionsApprovedLevel: alpacaAcct.optionsApprovedLevel,
               optionsTradingLevel: alpacaAcct.optionsTradingLevel,
               optionsBuyingPowerCents: alpacaAcct.optionsBuyingPowerCents,
+              ...(executionAccount.practiceBookId != null && executionAccount.externalAccountId == null ? { externalAccountId: alpacaAcct.externalAccountId } : {}),
               updatedAt: now,
             }).where(eq(portfolioAccounts.id, executionAccount.id));
           } catch {

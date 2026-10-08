@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   portfolioAccounts, uatBookAdjustments, uatHouseBaselines, uatPracticeBooks,
   type InsertUatBookAdjustment, type UatBookAdjustment, type UatHouseBaseline, type UatPracticeBook,
@@ -130,4 +130,23 @@ export async function listHouseBaselines(db: Db): Promise<UatHouseBaseline[]> {
 export function maskAccountNumber(value: string | null | undefined): string | null {
   if (!value) return null;
   return `••••${value.slice(-4)}`;
+}
+
+/**
+ * Symbols whose sells are paused on a house (reconciliation, UAT-E4). Freezes and
+ * unfreezes are append-only adjustment rows; the latest row per symbol decides.
+ */
+export async function frozenSymbols(db: Db, houseExternalAccountId: string): Promise<Map<string, { since: number; note: string }>> {
+  const rows = await db.select().from(uatBookAdjustments).where(and(
+    eq(uatBookAdjustments.houseExternalAccountId, houseExternalAccountId),
+    inArray(uatBookAdjustments.kind, ["symbol_freeze", "symbol_unfreeze"]),
+  )).orderBy(asc(uatBookAdjustments.id));
+  const state = new Map<string, { since: number; note: string }>();
+  for (const row of rows) {
+    if (!row.symbol) continue;
+    const symbol = row.symbol.toUpperCase();
+    if (row.kind === "symbol_freeze") state.set(symbol, { since: row.createdAt, note: row.note });
+    else state.delete(symbol);
+  }
+  return state;
 }
