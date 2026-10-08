@@ -15,6 +15,7 @@ import { measuredAccountEquityCents } from "../../../shared/playUnderwriting";
 import { bookAge, PRACTICE_BOOK_COPY } from "../../../client/src/pages/aperture/ApertureAccounts";
 import { appRouter } from "../../routers";
 import { alpacaPaperBroker, brokerFor } from "../brokers/index";
+import { PRACTICE_ACCOUNT_OVERLAP } from "../brokers/practiceBook";
 import { createOrder } from "../orderFlow";
 import { resetHouseSnapshotCache } from "./houseSnapshot";
 import { createPracticeBook } from "./repository";
@@ -209,6 +210,7 @@ describe("practice book card copy", () => {
   it("uses the agreed copy, passes the prohibited-language check, and formats book age", () => {
     expect(PRACTICE_BOOK_COPY).toMatchObject({ title: "Your practice book", subtitle: "Alpaca paper fills · shared practice account", source: "Practice book (Alpaca paper fills)" });
     for (const text of Object.values(PRACTICE_BOOK_COPY)) expect(text).not.toMatch(PROHIBITED_LANGUAGE);
+    expect(PRACTICE_ACCOUNT_OVERLAP("NVDA")).not.toMatch(PROHIBITED_LANGUAGE);
     expect(bookAge(NOW, NOW + 3_600_000)).toBe("Opened today");
     expect(bookAge(NOW, NOW + 86_400_000)).toBe("1 day");
     expect(bookAge(NOW, NOW + 9 * 86_400_000)).toBe("9 days");

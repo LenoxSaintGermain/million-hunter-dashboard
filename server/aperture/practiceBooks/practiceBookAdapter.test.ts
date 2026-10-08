@@ -232,7 +232,7 @@ describe("two books on one house (mocked house)", () => {
     expect(broker.submitOrder).toHaveBeenCalledOnce();
   });
 
-  it("maps an Alpaca wash-trade 403 that slips through to the practice-account conflict copy", async () => {
+  it("maps an Alpaca wash-trade 403 that slips through to the practice-account overlap copy", async () => {
     const { rowA, bookA } = await twoBooks();
     broker.submitOrder.mockResolvedValue({ brokerOrderId: "", status: "rejected", filledQty: null, filledAvgPriceCents: null, submittedAt: NOW,
       raw: { code: 40310000, message: "potential wash trade detected. use complex orders" } });

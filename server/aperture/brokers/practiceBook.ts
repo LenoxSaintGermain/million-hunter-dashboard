@@ -19,7 +19,8 @@ import { assertPaperOnly, BrokerUnavailableError, type BrokerAccount, type Broke
  */
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
-export const PRACTICE_ACCOUNT_CONFLICT = (symbol: string) => `Practice-account conflict: another tester has an opposite open order on ${symbol}. Try again when it fills or expires.`;
+export const PRACTICE_ACCOUNT_CONFLICT = (symbol: string) => `Practice-account overlap: another tester has an opposite open order on ${symbol}. Try again when it fills or expires.`;
+export const PRACTICE_ACCOUNT_OVERLAP = PRACTICE_ACCOUNT_CONFLICT;
 
 export class PracticeBookRefusal extends TRPCError {
   constructor(message: string) {
