@@ -5,6 +5,7 @@
  * Modeled figures are labeled as such throughout.
  */
 import { useEffect, useMemo, useState } from "react";
+import { isTestThesisName } from "@shared/activeThesis";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -163,8 +164,10 @@ export default function ApertureHome() {
 
   useEffect(() => {
     if (selectedThesisId || !theses?.length) return;
-    const active = theses.find((t) => (activeCapitalContext?.thesis?.id != null && t.sourceCompilationId === activeCapitalContext.thesis.id) || t.isPrimary)
-      ?? theses[0];
+    // Preselect only the profile's active Capital thesis; never a stale isPrimary
+    // projection or a test thesis (#6).
+    const active = theses.find((t) => activeCapitalContext?.thesis?.id != null && t.sourceCompilationId === activeCapitalContext.thesis.id)
+      ?? theses.find((t) => !isTestThesisName(t.name));
     if (active) setSelectedThesisId(active.id);
   }, [theses, activeCapitalContext, selectedThesisId]);
 
@@ -350,7 +353,7 @@ export default function ApertureHome() {
                         <SelectValue placeholder="Choose a saved thesis…" />
                       </SelectTrigger>
                       <SelectContent>
-                        {theses?.map((t) => (
+                        {theses?.filter((t) => !isTestThesisName(t.name) || t.id === selectedThesisId).map((t) => (
                           <SelectItem key={t.id} value={t.id.toString()}>
                             {t.name ?? `Thesis #${t.id}`}
                             {t.status !== "active" && (

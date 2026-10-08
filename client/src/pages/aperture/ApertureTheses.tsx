@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import "@/styles/research-library.css";
 import { ThesisRiskComparison } from "@/components/aperture/MandateRiskPortrait";
+import { isTestThesisName } from "@shared/activeThesis";
 
 function formatUpdated(value: number | null | undefined) {
   return value ? new Date(value).toLocaleString() : "Not measured";
@@ -45,6 +46,7 @@ export default function ApertureTheses() {
   });
 
   const [query, setQuery] = useState("");
+  const [showTest, setShowTest] = useState(false);
   const activeCompilationId = activeContext?.thesis?.id;
 
   const mergedTheses = useMemo(() => {
@@ -61,7 +63,7 @@ export default function ApertureTheses() {
             rawText: c.thesisText ?? "",
             sourceCompilationId: c.id,
             status: (c.status as any) ?? "active",
-            isPrimary: activeCompilationId === c.id,
+            isPrimary: false,
             updatedAt: c.createdAt ? new Date(c.createdAt).getTime() : Date.now(),
             confidenceNotes: [],
             missionDefaults: {
@@ -80,14 +82,20 @@ export default function ApertureTheses() {
     return list;
   }, [theses, canonicalTheses, activeCompilationId]);
 
+  // Active comes only from thesis.activeCapital, never a projection's isPrimary flag (#6).
+  const isActiveThesis = (t: any) => activeCompilationId != null && t.sourceCompilationId === activeCompilationId;
+  // Test/UAT theses stay out of the library unless asked for; the active one is never hidden.
+  const testCount = mergedTheses.filter((t) => isTestThesisName(t.name) && !isActiveThesis(t)).length;
   const filteredTheses = useMemo(() => {
-    const matching = mergedTheses.filter(t => `${t.name ?? ""} ${t.rawText ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()));
+    const matching = mergedTheses
+      .filter((t) => showTest || !isTestThesisName(t.name) || isActiveThesis(t))
+      .filter(t => `${t.name ?? ""} ${t.rawText ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()));
     if (filter === "all") return matching;
-    if (filter === "active") return matching.filter((t) => (activeCompilationId != null && t.sourceCompilationId === activeCompilationId) || t.isPrimary || t.status === "active");
+    if (filter === "active") return matching.filter(isActiveThesis);
     if (filter === "review") return matching.filter((t) => t.status === "review" || t.status === "compiling");
     if (filter === "archived") return matching.filter((t) => t.status === "archived");
     return matching;
-  }, [mergedTheses, filter, activeCompilationId, query]);
+  }, [mergedTheses, filter, activeCompilationId, query, showTest]);
 
   return (
     <DashboardLayout>
@@ -172,6 +180,16 @@ export default function ApertureTheses() {
           >
             Archived
           </Button>
+          {(testCount > 0 || showTest) && <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-7 px-3 text-xs"
+            aria-pressed={showTest}
+            onClick={() => setShowTest((value) => !value)}
+          >
+            {showTest ? "Hide test theses" : `Show ${testCount} test ${testCount === 1 ? "thesis" : "theses"}`}
+          </Button>}
         </div>
 
         {!error && !isLoading && !!theses?.length && <ThesisRiskComparison theses={filteredTheses} activeCompilationId={activeCompilationId} onReview={id => navigate(`/aperture/thesis/${id}`)} />}
@@ -212,7 +230,7 @@ export default function ApertureTheses() {
           <div className="grid gap-4 md:grid-cols-2">
             {!filteredTheses.length && <section className="desk-empty"><h2>No theses match this view.</h2><button className="desk-link" onClick={() => { setFilter("all"); setQuery(""); }}>Clear library filters</button></section>}
             {filteredTheses.map((thesis) => {
-              const isActive = (activeCompilationId != null && thesis.sourceCompilationId === activeCompilationId) || thesis.isPrimary;
+              const isActive = isActiveThesis(thesis);
               const recovered = thesis.confidenceNotes?.some((note: string) => note.startsWith("Recovered verbatim"));
               return (
                 <Card
