@@ -233,6 +233,7 @@ export function TodayAttentionBriefing({
           execution={execution}
           onOpen={onOpen}
           onRefresh={onRetry}
+          leadKey={primary?.key ?? null}
         />
       </div>
     )}

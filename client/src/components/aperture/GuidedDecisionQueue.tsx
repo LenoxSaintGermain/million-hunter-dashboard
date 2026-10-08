@@ -13,6 +13,13 @@ interface GuidedDecisionQueueProps {
   onOpen: (href: string) => void;
   onRefresh?: () => void;
   className?: string;
+  /**
+   * Key of the decision the briefing actually shows as its lead card. It can
+   * differ from attention.primary: overdue reviews are folded out of the lead,
+   * so the next task (e.g. an approved order) is promoted. Null = no lead card.
+   * Omitted = fall back to attention.primary.
+   */
+  leadKey?: string | null;
 }
 
 interface DecisionCardItem {
@@ -35,6 +42,7 @@ export function GuidedDecisionQueue({
   onOpen,
   onRefresh,
   className = "",
+  leadKey,
 }: GuidedDecisionQueueProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -44,10 +52,11 @@ export function GuidedDecisionQueue({
   // 1. Approved orders. Driven only by the server's attention items, which carry
   // the submit-time gate verdict. One card per approved order, never a guessed
   // symbol, and never "Send Order" unless every final check passes right now.
-  // The order that is already the primary decision card below is not repeated.
+  // The order that is already the lead decision card below is not repeated.
+  const shownLeadKey = leadKey === undefined ? attention?.primary?.key : leadKey;
   const approvedItems = [attention?.primary, ...(attention?.otherCritical ?? []), ...(attention?.otherAttention ?? [])]
     .filter((item): item is ApertureAttentionItem => item?.kind === "approved_not_submitted")
-    .filter((item) => item.key !== attention?.primary?.key);
+    .filter((item) => item.key !== shownLeadKey);
 
   for (const item of approvedItems) {
     const symbol = item.symbol ?? "This order";
