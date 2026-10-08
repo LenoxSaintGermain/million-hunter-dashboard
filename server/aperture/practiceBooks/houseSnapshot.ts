@@ -1,5 +1,6 @@
 import { getDb } from "../../db";
 import { BrokerUnavailableError, type BrokerAdapter, type BrokerPosition } from "../brokers/types";
+import { reconcileHouse } from "./reconcile";
 import { ensureHouseBaseline } from "./repository";
 
 /**
@@ -44,6 +45,14 @@ async function readHouse(house: BrokerAdapter): Promise<HouseSnapshot> {
     if (db) await ensureHouseBaseline(db, { ...snapshot, positions }, null, snapshot.asOf);
   } catch (error) {
     console.warn(`[uat] could not record the house baseline: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  // UAT-E4: every fresh snapshot reconciles Σ books against it (positions and cash
+  // only, so no extra Alpaca request). A mismatch freezes that symbol's sells.
+  try {
+    const db = await getDb();
+    if (db) await reconcileHouse(db, snapshot, { now: snapshot.asOf });
+  } catch (error) {
+    console.error(`[uat-recon] reconciliation did not run: ${error instanceof Error ? error.message : String(error)}`);
   }
   return snapshot;
 }
