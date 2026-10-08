@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PriceRiskVisual } from "@/components/aperture/PriceRiskVisual";
+import { GuardrailChecklist } from "@/components/aperture/GuardrailChecklist";
 import { marketAvailabilityCopy } from "@shared/marketAvailability";
 import { recipeHorizonRecovery } from "@shared/intradayRecipeGuard";
 
@@ -455,6 +456,9 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
         {hardResolutionNeeded && <div className="mt-3 grid gap-2 sm:grid-cols-2"><Button type="button" variant="outline" className="min-h-11" onClick={onReturnToDecisionBrief}>Choose another play</Button><Button type="button" className="min-h-11" disabled={preserveCash.isPending} onClick={() => preserveCash.mutate({ runId, candidateId: candidate.id, decision: "skipped", reason: preserveHardBlockCashReason })}>{preserveCash.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CircleSlash2 className="mr-1.5 h-3.5 w-3.5" />}Pass on trade · Keep cash safe</Button></div>}
       </section>
 
+      {/* POC v3 QP-04: every server guardrail for this ticket, pass and fail. */}
+      {(!recipeRecovery || draftManualTicket) && <GuardrailChecklist evaluation={currentPreflightData?.evaluation} checking={preflightBusy} checkedAt={currentPreflightData?.evaluation.evaluatedAt ?? null} />}
+
       {/* Executive Preflight Impact Card */}
       <section aria-label="Preflight execution impact" className="rounded-xl border p-3.5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5" style={{ borderColor: "var(--sh-border-1)" }}>
@@ -608,10 +612,10 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 text-[11px] font-mono border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+              className="h-7 text-[11px] font-mono border-[var(--sh-signal)] text-[var(--sh-signal)] hover:bg-[var(--sh-burnt-amber-10)]"
               onClick={() => setPaperAcknowledgement("PAPER")}
             >
-              ⚡ Fast-Fill PAPER (⌘+Enter)
+              Fill in PAPER (⌘+Enter)
             </Button>
           </div>
           <input
