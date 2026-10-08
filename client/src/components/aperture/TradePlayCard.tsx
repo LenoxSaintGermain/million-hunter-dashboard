@@ -2,11 +2,12 @@ import { ArrowRight, ShieldAlert } from "lucide-react";
 import { apertureLanguage, tradingTermHelp } from "@shared/apertureLanguage";
 import { Button } from "@/components/ui/button";
 import type { TacticalMarketThesis, TradePlayBlueprint } from "@shared/playUnderwriting";
+import type { PaperTicketReadiness } from "@shared/paperTicketPrefill";
 import { BasisMark, StateMark } from "./DecisionVisualLanguage";
 
 const money = (value: number | null | undefined) => value == null ? "—" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value / 100);
 
-export function TradePlayCard({ rank, play, thesis, portfolioRiskBeforeCents, maxOpenRiskCents, selected, busy, onValidate }: { rank: number; play: TradePlayBlueprint; thesis: TacticalMarketThesis | null; portfolioRiskBeforeCents: number; maxOpenRiskCents: number; selected: boolean; busy: boolean; onValidate: () => void }) {
+export function TradePlayCard({ rank, play, thesis, portfolioRiskBeforeCents, maxOpenRiskCents, selected, busy, onValidate, ticket, onPrepareTicket }: { rank: number; play: TradePlayBlueprint; thesis: TacticalMarketThesis | null; portfolioRiskBeforeCents: number; maxOpenRiskCents: number; selected: boolean; busy: boolean; onValidate: () => void; ticket?: PaperTicketReadiness; onPrepareTicket?: () => void }) {
   const portfolioRiskAfterCents = portfolioRiskBeforeCents + play.sizing.plannedRiskCents;
   const remainingHeadroomCents = Math.max(0, maxOpenRiskCents - portfolioRiskAfterCents);
   const isShareScenario = play.instrument.kind === "shares";
@@ -14,6 +15,9 @@ export function TradePlayCard({ rank, play, thesis, portfolioRiskBeforeCents, ma
   const sizingUnmeasured = play.outcome.basis === "insufficient_data";
   const riskValue = sizingUnmeasured && play.sizing.plannedRiskCents <= 0 ? "Not measured" : money(play.sizing.plannedRiskCents);
   const riskLabel = isShareScenario ? "Planned loss at the modeled stop" : play.outcome.basis === "market_derived" ? "Bounded contract loss" : "Planned risk ceiling";
+  const ticketReady = ticket?.state === "ready";
+  const nextStep = ticketReady ? "Prepare a paper ticket. Nothing is staged until you type PAPER; approval and sending stay separate."
+    : "Review the remaining evidence checks. No order is created.";
   return <article className="overflow-hidden rounded-xl border" style={{ borderColor: selected ? "var(--sh-signal)" : "var(--sh-border-1)", background: "var(--sh-surface)" }}>
     <div className="flex flex-wrap items-start justify-between gap-3 border-b p-4" style={{ borderColor: "var(--sh-border-1)" }}><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Play {rank} · score {play.scoring.overall}</p><h3 className="mt-1 font-serif text-xl">{play.title}</h3><p className="mt-1 text-xs capitalize" style={{ color: "var(--sh-fg-muted)" }}>{play.playClass.replaceAll("_", " ")} · {play.horizon.replaceAll("_", " ")}</p></div><StateMark state={play.status === "eligible_for_research" ? "researchable" : "conditional"} label={play.status.replaceAll("_", " ")} compact /></div>
     <div className="grid gap-px sm:grid-cols-2" style={{ background: "var(--sh-border-1)" }}>
@@ -24,11 +28,16 @@ export function TradePlayCard({ rank, play, thesis, portfolioRiskBeforeCents, ma
     </div>
     {(play.warnings.length > 0 || thesis) && <details className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Details and sources</summary><div className="space-y-3 border-t px-4 py-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>{play.warnings.length > 0 && <div className="flex gap-2"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><p>{play.warnings.join(" ")}</p></div>}{thesis && <><p><strong style={{ color: "var(--sh-text-primary)" }}>Confirmation:</strong> {thesis.confirmation}</p><p><strong style={{ color: "var(--sh-text-primary)" }}>Thesis expires:</strong> {thesis.expiresAt ? new Date(thesis.expiresAt).toLocaleString() : "Not measured"}</p></>}</div></details>}
     <div className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)" }}>
-      <div className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{sizingUnmeasured ? <p>Portfolio impact not measured. Validate the entry and sizing first.</p> : <><p>{riskLabel} {money(play.sizing.maxLossCents)} · {play.sizing.percentCapitalAtRisk}% of declared capital</p><p>Portfolio open risk {money(portfolioRiskBeforeCents)} → {money(portfolioRiskAfterCents)} · {money(remainingHeadroomCents)} remaining</p></>}<p className="mt-1"><strong style={{ color: "var(--sh-text-primary)" }}>Next:</strong> Review the remaining evidence checks. No order is created.</p></div>
-      <Button className="h-auto min-h-11 max-w-full whitespace-normal py-3" disabled={busy || selected} onClick={onValidate}>
-        <span className="min-w-0 break-words">{selected ? "Selected for research" : apertureLanguage.checkIdea}</span>
-        <ArrowRight className="h-4 w-4 shrink-0" />
-      </Button>
+      <div className="text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{sizingUnmeasured ? <p>Portfolio impact not measured. Validate the entry and sizing first.</p> : <><p>{riskLabel} {money(play.sizing.maxLossCents)} · {play.sizing.percentCapitalAtRisk}% of declared capital</p><p>Portfolio open risk {money(portfolioRiskBeforeCents)} → {money(portfolioRiskAfterCents)} · {money(remainingHeadroomCents)} remaining</p></>}<p className="mt-1"><strong style={{ color: "var(--sh-text-primary)" }}>Next:</strong> {nextStep}</p>{ticket && <p aria-label="Path to a paper ticket" className="mt-1">1 Check idea · 2 Review research · 3 Prepare paper ticket</p>}{ticket?.state === "unavailable" && <p className="mt-1">{ticket.reason}</p>}</div>
+      <div className="flex flex-col gap-2 sm:items-end">
+        <Button className="h-auto min-h-11 max-w-full whitespace-normal py-3" disabled={busy || selected} onClick={onValidate}>
+          <span className="min-w-0 break-words">{selected ? "Selected for research" : apertureLanguage.checkIdea}</span>
+          <ArrowRight className="h-4 w-4 shrink-0" />
+        </Button>
+        {ticket && onPrepareTicket && <Button variant="outline" className="h-auto min-h-11 max-w-full whitespace-normal py-3" disabled={busy || !ticketReady} onClick={onPrepareTicket}>
+          <span className="min-w-0 break-words">Prepare paper ticket</span>
+        </Button>}
+      </div>
     </div>
     {termHelp && <details className="border-t px-4" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer py-3 text-sm">What is a {termHelp.label.toLowerCase()}?</summary><p className="pb-4 text-sm leading-6">{termHelp.explanation}</p></details>}
   </article>;

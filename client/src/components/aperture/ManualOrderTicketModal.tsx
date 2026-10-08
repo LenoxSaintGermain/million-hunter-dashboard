@@ -24,6 +24,11 @@ export interface ManualOrderTicketModalProps {
     limitPrice?: string;
     expression?: PlayExpression;
     strikePrice?: string;
+    /** Shares or contracts, depending on the expression. */
+    quantity?: number;
+    expirationDate?: string;
+    invalidationCondition?: string;
+    reason?: string;
   };
   onStaged?: (orderId: number, runId?: number) => void;
 }
@@ -104,14 +109,16 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
   );
 
   // Pricing & Strikes
-  const [shareCount, setShareCount] = useState<number>(4);
-  const [contracts, setContracts] = useState<number>(1);
+  const initialIsShares = (initialValues?.expression ?? "") === "shares";
+  const [shareCount, setShareCount] = useState<number>(initialIsShares && initialValues?.quantity ? initialValues.quantity : 4);
+  const [contracts, setContracts] = useState<number>(!initialIsShares && initialValues?.quantity ? initialValues.quantity : 1);
   const [limitPrice, setLimitPrice] = useState<string>(
     initialValues?.limitPrice ?? (initialValues?.expression === "shares" ? "25.00" : "4.50")
   );
   const [strikePrice, setStrikePrice] = useState<string>(initialValues?.strikePrice ?? "150.00");
   const [spreadUpperStrike, setSpreadUpperStrike] = useState<string>("160.00");
   const [expirationDate, setExpirationDate] = useState<string>(() => {
+    if (initialValues?.expirationDate) return initialValues.expirationDate;
     try {
       return nextStandardMonthlyOptionExpiration(Date.now(), 20);
     } catch {
@@ -121,10 +128,10 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
 
   const [catalystDays, setCatalystDays] = useState<number>(14);
   const [invalidationCondition, setInvalidationCondition] = useState<string>(
-    "Underlying closes below 20-day moving average or catalyst thesis fails to materialize."
+    initialValues?.invalidationCondition ?? "Underlying closes below 20-day moving average or catalyst thesis fails to materialize."
   );
   const [reason, setReason] = useState<string>(
-    "Ad-hoc manual play staged from Aperture Play Desk to express strategic conviction."
+    initialValues?.reason ?? "Ad-hoc manual play staged from Aperture Play Desk to express strategic conviction."
   );
   const [paperAck, setPaperAck] = useState<string>("");
 
@@ -143,14 +150,22 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
     if (initialValues?.holdingPeriod) {
       setHoldingPeriod(initialValues.holdingPeriod);
     }
-    if (initialValues?.limitPrice) {
+    // A blank prefill means "not measured": never replace it with a placeholder price.
+    if (initialValues?.limitPrice !== undefined) {
       setLimitPrice(initialValues.limitPrice);
     } else if (initialValues?.expression === "shares") {
       setLimitPrice("25.00");
     }
-    if (initialValues?.strikePrice) {
+    if (initialValues?.strikePrice !== undefined) {
       setStrikePrice(initialValues.strikePrice);
     }
+    if (initialValues?.quantity) {
+      if (initialValues.expression === "shares") setShareCount(initialValues.quantity);
+      else setContracts(initialValues.quantity);
+    }
+    if (initialValues?.expirationDate) setExpirationDate(initialValues.expirationDate);
+    if (initialValues?.invalidationCondition) setInvalidationCondition(initialValues.invalidationCondition);
+    if (initialValues?.reason) setReason(initialValues.reason);
   }, [initialValues, open]);
 
   // Sizing Math

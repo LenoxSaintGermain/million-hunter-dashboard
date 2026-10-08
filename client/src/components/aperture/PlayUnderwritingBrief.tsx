@@ -3,8 +3,9 @@ import type { PlayUnderwritingResult } from "@shared/playUnderwriting";
 import { TargetFeasibilityCard } from "./TargetFeasibilityCard";
 import { MarketRegimeBrief } from "./MarketRegimeBrief";
 import { TradePlayCard } from "./TradePlayCard";
+import { paperTicketReadiness } from "@shared/paperTicketPrefill";
 
-export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate, onAdjustRisk }: { result: PlayUnderwritingResult; selectedPlayId: string | null; busy: boolean; onValidate: (playId: string) => void; onAdjustRisk?: () => void }) {
+export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate, onAdjustRisk, researchRunId, onPrepareTicket }: { result: PlayUnderwritingResult; selectedPlayId: string | null; busy: boolean; onValidate: (playId: string) => void; onAdjustRisk?: () => void; researchRunId?: number | null; onPrepareTicket?: (playId: string) => void }) {
   const thesisById = new Map(result.tacticalTheses.map(thesis => [thesis.id, thesis]));
   const leadPlay = result.plays[0] ?? null;
   const fresh = Object.values(result.market.indexTrend).every(metric => metric.freshness === "fresh" && metric.asOf != null);
@@ -60,7 +61,9 @@ export function PlayUnderwritingBrief({ result, selectedPlayId, busy, onValidate
         <p className="mt-2 text-sm leading-6">{result.market.regime === "unknown" ? "Market context is incomplete." : result.market.regime.replaceAll("_", " ") + " market context."} {leadPlay ? leadPlay.symbol + " ranks first; confirm its entry condition and evidence before a ticket." : "No play is actionable without evidence."}</p>
         <p className="mt-2 text-sm" style={{ color: "var(--sh-fg-muted)" }}>Check an idea to review its supporting evidence. This does not create an order.</p>
       </div>
-      <div className="space-y-4">{result.plays.map((play, index) => <TradePlayCard key={play.id} rank={index + 1} play={play} thesis={thesisById.get(play.tacticalThesisId) ?? null} portfolioRiskBeforeCents={result.portfolioRisk.beforeCents} maxOpenRiskCents={result.feasibility.maxOpenRiskCents} selected={selectedPlayId === play.id} busy={busy} onValidate={() => onValidate(play.id)} />)}</div>
+      <div className="space-y-4">{result.plays.map((play, index) => <TradePlayCard key={play.id} rank={index + 1} play={play} thesis={thesisById.get(play.tacticalThesisId) ?? null} portfolioRiskBeforeCents={result.portfolioRisk.beforeCents} maxOpenRiskCents={result.feasibility.maxOpenRiskCents} selected={selectedPlayId === play.id} busy={busy} onValidate={() => onValidate(play.id)}
+        ticket={onPrepareTicket ? paperTicketReadiness({ play, thesis: thesisById.get(play.tacticalThesisId) ?? null, selectedPlayId, researchRunId: researchRunId ?? null }) : undefined}
+        onPrepareTicket={onPrepareTicket ? () => onPrepareTicket(play.id) : undefined} />)}</div>
     </section>}
     <p className="text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>Market snapshot: {new Date(result.market.asOf).toLocaleString()}{!fresh ? " · stale or incomplete; current entry conditions are unverified." : " · freshness at analysis time, not a live quote."}</p>
     <details className="rounded-xl border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
