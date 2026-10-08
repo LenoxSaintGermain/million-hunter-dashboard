@@ -143,6 +143,11 @@ export function toOptionMarketSnapshot(symbol: string, data: any, feed: "opra" |
     lastTradeAt: Number.isFinite(lastTradeAt) ? lastTradeAt : null,
     dailyVolume,
     impliedVolatility,
+    // #84: Alpaca snapshots carry greeks; keep them instead of dropping them.
+    delta: num(data?.greeks?.delta),
+    gamma: num(data?.greeks?.gamma),
+    theta: num(data?.greeks?.theta),
+    vega: num(data?.greeks?.vega),
     feed,
     asOf: Date.now(),
   };
