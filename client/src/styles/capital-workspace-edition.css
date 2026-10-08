@@ -4,7 +4,7 @@
 .capital-context-strip { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 1.5rem; padding: 1rem 0; }
 .capital-context-strip > div { min-width: 0; }
 .capital-context-label { display: block; font-family: var(--font-mono, monospace); font-size: .62rem; text-transform: uppercase; letter-spacing: .13em; color: var(--sh-fg-muted); margin-bottom: .4rem; }
-.capital-context strong { display: inline-block; font-family: Georgia, serif; font-size: 1.65rem; font-weight: 400; margin-right: .7rem; }
+.capital-context strong { display: inline-block; font-family: var(--font-display); font-size: 1.65rem; font-weight: 400; margin-right: .7rem; }
 .capital-context p { font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere; }
 .capital-context small { display: block; font-size: .7rem; color: var(--sh-fg-muted); line-height: 1.5; }
 .capital-context-limit { border-left: 2px solid; padding-left: 1rem; }
@@ -16,7 +16,7 @@
 .mission-result-facts > div { padding: 1rem; border-right: 1px solid var(--sh-border-1); min-width: 0; }
 .mission-result-facts > div:last-child { border-right: 0; }
 .mission-result-facts dt { font-family: var(--font-mono, monospace); text-transform: uppercase; font-size: .62rem; letter-spacing: .1em; color: var(--sh-fg-muted); }
-.mission-result-facts dd { font-family: Georgia, serif; font-size: clamp(1.35rem, 3vw, 2rem); margin-top: .5rem; }
+.mission-result-facts dd { font-family: var(--font-display); font-size: clamp(1.35rem, 3vw, 2rem); margin-top: .5rem; }
 .mission-result-facts small { font-size: .7rem; line-height: 1.5; color: var(--sh-fg-muted); }
 .mission-risk-track { height: 6px; background: var(--sh-surface-2); margin-block: .7rem; }
 .mission-risk-track > span { display: block; height: 100%; background: var(--sh-text-primary); }

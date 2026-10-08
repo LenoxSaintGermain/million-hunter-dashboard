@@ -774,3 +774,18 @@
 .aperture-editorial [data-slot="button"] {
   border-radius: 0;
 }
+/* POC v3 house style: square corners across the Capital workspace. Raw
+   Tailwind rounded-* utilities sit in @layer utilities, so this unlayered
+   rule wins without touching each component. Empty rounded-full elements
+   (status dots) stay round; pills, tracks and chips with content go square. */
+.aperture-editorial [class*="rounded"]:not(.rounded-full),
+.aperture-editorial .rounded-full:not(:empty),
+.aperture-editorial :is(input, select, textarea) {
+  border-radius: 0;
+}
+/* Shared editorial graphics hard-code Georgia; inside Capital, headlines
+   and figures use the house serif (IBM Plex Serif). */
+.aperture-editorial .decision-graphic header h3,
+.aperture-editorial .graphic-legend strong {
+  font-family: var(--font-display);
+}
