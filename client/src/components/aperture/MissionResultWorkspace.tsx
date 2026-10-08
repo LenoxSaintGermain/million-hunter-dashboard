@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import type { PlayUnderwritingResult } from "@shared/playUnderwriting";
 import { Button } from "@/components/ui/button";
-import { PlayUnderwritingBrief } from "./PlayUnderwritingBrief";
-import { MissionRiskPortrait, riskMoney } from "./MandateRiskPortrait";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { missionCapacityBreakdown, missionCapacityLines } from "@shared/missionCapacity";
+import { PlayUnderwritingBrief } from "./PlayUnderwritingBrief";
+import { MissionRiskPortrait, riskMoney } from "./MandateRiskPortrait";
 
 const money = riskMoney;
 const horizons = { intraday: "Today", overnight: "Next close", swing: "This week", catalyst_window: "Catalyst window", position: "Long term" };
