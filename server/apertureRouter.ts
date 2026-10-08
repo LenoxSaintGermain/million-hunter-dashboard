@@ -26,6 +26,7 @@ import { monitoringReviewRouter } from "./aperture/monitoringReviewReceipt";
 import { playOutcomeRouter } from "./aperture/playOutcomeReview";
 import { strategyDiscoveryRouter } from "./aperture/strategyDiscoveryRouter";
 import { uatRouter } from "./aperture/practiceBooks/uatRouter";
+import { practiceBookRouter, practiceBookSummary, presentAccountRow } from "./aperture/practiceBooks/bookRouter";
 import { usesPracticeBooks } from "./aperture/practiceBooks/flags";
 import { createPracticeBook } from "./aperture/practiceBooks/repository";
 import { objectiveDiscoveryEnabled, readObjectiveDiscovery } from "./aperture/strategyDiscoveryWorkflow";
@@ -1102,6 +1103,7 @@ export const apertureRouter = router({
   strategy: strategyDiscoveryRouter,
   /** UAT Practice Books: owner-only controls. */
   uat: uatRouter,
+  practiceBook: practiceBookRouter,
 
   // ── Thesis management ──────────────────────────────────────────────────────
 
@@ -1321,9 +1323,14 @@ export const apertureRouter = router({
   account: router({
     list: capitalOperatorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
-      return db!.select().from(portfolioAccounts)
+      const rows = await db!.select().from(portfolioAccounts)
         .where(eq(portfolioAccounts.userId, ctx.user.id))
         .orderBy(desc(portfolioAccounts.updatedAt));
+      // UAT-E3: book rows carry their practice-book summary; testers see the house account masked.
+      return Promise.all(rows.map(async (row) => ({
+        ...presentAccountRow(row, ctx.user.openId),
+        practiceBook: row.practiceBookId != null ? await practiceBookSummary(db!, row) : null,
+      })));
     }),
 
     create: capitalOperatorProcedure
@@ -5101,12 +5108,13 @@ export const apertureRouter = router({
           ? await db!.select().from(portfolioAccounts).where(and(eq(portfolioAccounts.userId, ctx.user.id), inArray(portfolioAccounts.id, accountIds)))
           : [];
         const byId = new Map(accounts.map((account) => [account.id, account]));
+        const maskedAccount = (account: (typeof accounts)[number] | undefined) => (account ? presentAccountRow(account, ctx.user.openId) : null);
         const readinessByOrderId = await approvedOrderReadiness(db!, ctx.user.id, rows.filter((row) => row.status === "approved").map((row) => row.id));
         return rows.map((row) => ({
           ...row,
           submitReadiness: readinessByOrderId.get(row.id) ?? null,
-          destinationAccount: byId.get(row.accountId) ?? null,
-          portfolioContextAccount: row.portfolioContextAccountId ? byId.get(row.portfolioContextAccountId) ?? null : byId.get(row.accountId) ?? null,
+          destinationAccount: maskedAccount(byId.get(row.accountId)),
+          portfolioContextAccount: maskedAccount(row.portfolioContextAccountId ? byId.get(row.portfolioContextAccountId) : byId.get(row.accountId)),
         }));
       }),
 

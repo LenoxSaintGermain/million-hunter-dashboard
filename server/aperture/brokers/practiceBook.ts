@@ -37,7 +37,7 @@ interface BookContext {
   mark: (symbol: string) => LedgerMark | null;
 }
 
-const toLedgerOrder = (order: typeof brokerOrders.$inferSelect): LedgerOrder => ({
+export const toLedgerOrder = (order: typeof brokerOrders.$inferSelect): LedgerOrder => ({
   id: order.id, symbol: order.symbol, side: order.side, instrumentType: order.instrumentType, contractMultiplier: order.contractMultiplier,
   qty: order.qty, notionalCents: order.notionalCents, orderType: order.orderType, limitPriceCents: order.limitPriceCents,
   gatedNotionalCents: order.gatedNotionalCents, status: order.status, filledQty: order.filledQty, filledAvgPriceCents: order.filledAvgPriceCents,
