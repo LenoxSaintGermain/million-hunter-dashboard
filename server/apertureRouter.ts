@@ -25,6 +25,7 @@ import { deskAttentionSourceIssues, deskMonitoringFindings } from "./aperture/de
 import { monitoringReviewRouter } from "./aperture/monitoringReviewReceipt";
 import { playOutcomeRouter } from "./aperture/playOutcomeReview";
 import { strategyDiscoveryRouter } from "./aperture/strategyDiscoveryRouter";
+import { uatRouter } from "./aperture/practiceBooks/uatRouter";
 import { objectiveDiscoveryEnabled, readObjectiveDiscovery } from "./aperture/strategyDiscoveryWorkflow";
 import { assertNotDiscoveryProjection, discoverySelectionInput, readDiscoveryResearchBinding, readDiscoverySelections, selectDiscoveryForResearch } from "./aperture/discoverySelection";
 import { readOptionalStatusSource } from "./aperture/optionalStatusSource";
@@ -1097,6 +1098,8 @@ export const apertureRouter = router({
   playOutcome: playOutcomeRouter,
   quickPlay: createQuickPlayRouter({ construct: constructPlayForUser, evidenceBlock: evidenceReviewBlock }),
   strategy: strategyDiscoveryRouter,
+  /** UAT Practice Books: owner-only controls. */
+  uat: uatRouter,
 
   // ── Thesis management ──────────────────────────────────────────────────────
 

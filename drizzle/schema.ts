@@ -9,6 +9,7 @@ import {
   json,
   boolean,
   bigint,
+  double,
   uniqueIndex,
   index,
 } from "drizzle-orm/mysql-core";
@@ -1150,6 +1151,8 @@ export const portfolioAccounts = mysqlTable("portfolio_accounts", {
   syncScheduleEnabled: boolean("sync_schedule_enabled").default(false).notNull(),
   syncScheduleLastRunAt: bigint("sync_schedule_last_run_at", { mode: "number" }),
   syncScheduleLastResult: text("sync_schedule_last_result"),
+  /** UAT Practice Books (0070): the row's active book. Null = broker mode (the raw account). */
+  practiceBookId: int("practice_book_id"),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
 }, (table) => ({
@@ -1158,6 +1161,81 @@ export const portfolioAccounts = mysqlTable("portfolio_accounts", {
 }));
 export type PortfolioAccount = typeof portfolioAccounts.$inferSelect;
 export type InsertPortfolioAccount = typeof portfolioAccounts.$inferInsert;
+
+/**
+ * UAT Practice Books (0070). A tester's virtual sub-ledger on the one shared
+ * "UAT house" Alpaca paper account: own cash, positions and limits, real paper
+ * fills. A reset archives the book and starts a new row (generation + 1), so old
+ * orders keep their book id and history stays intact. See
+ * server/aperture/practiceBooks/.
+ */
+export const uatPracticeBooks = mysqlTable("uat_practice_books", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  portfolioAccountId: int("portfolio_account_id").notNull(),
+  /** Alpaca account number of the house this book trades on; stamped on first house read. */
+  houseExternalAccountId: varchar("house_external_account_id", { length: 128 }),
+  label: varchar("label", { length: 120 }).notNull(),
+  scenarioPreset: varchar("scenario_preset", { length: 48 }).default("fresh_100k").notNull(),
+  startingCashCents: bigint("starting_cash_cents", { mode: "number" }).notNull(),
+  status: mysqlEnum("status", ["active", "frozen", "archived"]).default("active").notNull(),
+  frozenReason: text("frozen_reason"),
+  staleSnapshotUntil: bigint("stale_snapshot_until", { mode: "number" }),
+  generation: int("generation").default(1).notNull(),
+  createdBy: int("created_by").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+  archivedAt: bigint("archived_at", { mode: "number" }),
+}, (table) => ({
+  userStatusIdx: index("uat_books_user_status").on(table.userId, table.status),
+  accountIdx: index("uat_books_account").on(table.portfolioAccountId, table.status),
+}));
+export type UatPracticeBook = typeof uatPracticeBooks.$inferSelect;
+export type InsertUatPracticeBook = typeof uatPracticeBooks.$inferInsert;
+
+/**
+ * Append-only audit of every book-affecting owner or system action. The
+ * repository exposes insert and read only; nothing updates or deletes a row.
+ * House-wide entries (symbol freezes) have no book_id.
+ */
+export const uatBookAdjustments = mysqlTable("uat_book_adjustments", {
+  id: int("id").autoincrement().primaryKey(),
+  bookId: int("book_id"),
+  kind: mysqlEnum("kind", [
+    "starting_cash", "cash_adjustment", "scenario_seed", "corporate_action", "reconciliation_writeoff", "symbol_freeze", "symbol_unfreeze",
+  ]).notNull(),
+  symbol: varchar("symbol", { length: 24 }),
+  qty: double("qty"),
+  priceCents: bigint("price_cents", { mode: "number" }),
+  cashCents: bigint("cash_cents", { mode: "number" }),
+  /** Scenario seeds are virtual (false) and never sellable at the broker. */
+  brokerBacked: boolean("broker_backed").default(false).notNull(),
+  houseExternalAccountId: varchar("house_external_account_id", { length: 128 }),
+  note: text("note").notNull(),
+  createdBy: int("created_by").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  bookIdx: index("uat_book_adj_book").on(table.bookId),
+  houseKindIdx: index("uat_book_adj_house_kind").on(table.houseExternalAccountId, table.kind, table.symbol),
+}));
+export type UatBookAdjustment = typeof uatBookAdjustments.$inferSelect;
+export type InsertUatBookAdjustment = typeof uatBookAdjustments.$inferInsert;
+
+/** The UAT house account as first seen in practice-book mode (reconciliation baseline). */
+export const uatHouseBaselines = mysqlTable("uat_house_baselines", {
+  id: int("id").autoincrement().primaryKey(),
+  houseExternalAccountId: varchar("house_external_account_id", { length: 128 }).notNull(),
+  cashCents: bigint("cash_cents", { mode: "number" }),
+  buyingPowerCents: bigint("buying_power_cents", { mode: "number" }),
+  equityValueCents: bigint("equity_value_cents", { mode: "number" }),
+  positions: json("positions").$type<Array<{ symbol: string; qty: number; avgCostCents: number | null; lastPriceCents: number | null }>>().notNull(),
+  /** Null when captured automatically by the first house read. */
+  capturedBy: int("captured_by"),
+  capturedAt: bigint("captured_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  houseUnique: uniqueIndex("uat_house_baselines_house_uq").on(table.houseExternalAccountId),
+}));
+export type UatHouseBaseline = typeof uatHouseBaselines.$inferSelect;
 
 export const positions = mysqlTable("positions", {
   id: int("id").autoincrement().primaryKey(),
@@ -1945,9 +2023,13 @@ export const brokerOrders = mysqlTable("broker_orders", {
   approvedAt: bigint("approved_at", { mode: "number" }),
   submittedAt: bigint("submitted_at", { mode: "number" }),
   filledAt: bigint("filled_at", { mode: "number" }),
+  /** UAT Practice Books (0070): the book this order belongs to, stamped at creation; immutable. */
+  practiceBookId: int("practice_book_id"),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
-});
+}, (table) => ({
+  practiceBookIdx: index("broker_orders_book_idx").on(table.practiceBookId, table.status),
+}));
 export type BrokerOrder = typeof brokerOrders.$inferSelect;
 export type InsertBrokerOrder = typeof brokerOrders.$inferInsert;
 
