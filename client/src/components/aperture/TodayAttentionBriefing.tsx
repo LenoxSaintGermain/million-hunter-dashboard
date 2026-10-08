@@ -209,7 +209,7 @@ export function TodayAttentionBriefing({
     </div>}
 
     {isGuided && (
-      <div className="p-4 border-b" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+      <div className="p-4 border-b empty:hidden" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
         <GuidedDecisionQueue
           attention={attention}
           execution={execution}

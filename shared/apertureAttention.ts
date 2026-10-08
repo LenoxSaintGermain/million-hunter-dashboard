@@ -3,6 +3,7 @@ import { apertureLanguage } from "./apertureLanguage";
 import { outcomeReviewHref } from "./apertureLifecycleNavigation";
 import { monitoringFindingHref, monitoringFindingVersion, resolvedFindingVersions } from "./monitoringFinding";
 import { paperInstrumentDisplayLabel, parseOccOptionSymbol } from "./paperInstrument";
+import type { OrderSubmitReadiness } from "./orderSubmitReadiness";
 
 export type ApertureEntryState = "start" | "resume" | "check_in";
 export type AttentionReadState = "loading" | "empty" | "stale" | "partial" | "failed" | "complete";
@@ -56,6 +57,8 @@ export type AttentionOrder = MonitoringInstrumentContext & {
   brokerOrderId?: string | null;
   dispatchError: string | null;
   updatedAt: number;
+  /** Server verdict from the submit-time gates. Missing means not verified: never "Send". */
+  submitReadiness?: OrderSubmitReadiness | null;
 };
 
 export type AttentionActivePlay = {
@@ -153,6 +156,10 @@ export type ApertureAttentionItem = {
   critical: boolean;
   deadlineAt?: number | null;
   evidence?: { finding: string; citations: string[]; checkedAt: number; rationale: string | null };
+  /** Approved orders only: whether the server's submit-time gates pass now. */
+  submitState?: "ready" | "blocked" | "unverified";
+  /** Approved orders only: every failed gate, named, with how to clear it. */
+  submitBlockers?: Array<{ key: string; title: string; remedy: string }>;
 };
 
 export type ApertureMotionItem = {
@@ -637,16 +644,37 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
         updatedAt: order.updatedAt,
       }));
     } else if (order.status === "approved") {
+      const readiness = order.submitReadiness;
+      const submitState = readiness?.state ?? "unverified";
+      const submitBlockers = (readiness?.blockers ?? []).map(({ key, title, remedy }) => ({ key, title, remedy }));
+      const firstBlocker = submitBlockers[0];
+      const moreBlockers = submitBlockers.length > 1 ? ` ${submitBlockers.length - 1} more check${submitBlockers.length === 2 ? "" : "s"} also failed.` : "";
       attention.push(item({
         key: `order:${order.id}`,
         kind: "approved_not_submitted",
         priority: 90,
         symbol: order.symbol,
-        stateLabel: "Ready to Execute",
-        title: `Submit ${order.symbol} to the named paper broker`,
-        reason: "You approved this trade earlier. Ready to send to paper broker?",
-        consequence: "Final order checks must pass before you send a practice order.",
-        actionLabel: "Send Order",
+        ...(submitState === "ready" ? {
+          stateLabel: "Approved · final checks pass",
+          title: `Submit ${order.symbol} to the named paper broker`,
+          reason: "You approved this trade earlier. The final order checks pass right now.",
+          consequence: "Checks rerun when you send. Nothing is sent until you confirm.",
+          actionLabel: "Review checks and send",
+        } : submitState === "blocked" ? {
+          stateLabel: "Approved · blocked by final checks",
+          title: `${order.symbol} can't be sent yet: ${firstBlocker?.title ?? "a final check failed"}`,
+          reason: `${firstBlocker?.remedy ?? "Review the failed check on the ticket."}${moreBlockers}`,
+          consequence: "Send stays off until every final check passes. No order was sent.",
+          actionLabel: "Review blocker",
+        } : {
+          stateLabel: "Approved · final checks not verified",
+          title: `Re-check ${order.symbol} before sending`,
+          reason: firstBlocker?.remedy ?? "Final order checks could not be run. Refresh status.",
+          consequence: "Send stays off until the final checks run and pass. No order was sent.",
+          actionLabel: "Review blocker",
+        }),
+        submitState,
+        submitBlockers,
         href: orderHref(order),
         updatedAt: order.updatedAt,
       }));
