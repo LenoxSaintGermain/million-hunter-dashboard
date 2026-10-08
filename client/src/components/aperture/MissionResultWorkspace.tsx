@@ -32,6 +32,10 @@ export function MissionResultWorkspace({ result, accountLabel, accountAsOf, thes
   // One capacity number: the effective allowance. Headroom after the top play is part of its breakdown.
   const capacity = missionCapacityBreakdown(result);
   const capacityLines = missionCapacityLines(capacity);
+  // #19: the account-wide ceiling is a share of account equity (results saved earlier used declared capital).
+  const ceilingBasis = result.feasibility.aggregateCeilingStatus == null
+    ? "saved before the account ceiling moved to account equity"
+    : `the account ceiling is ${result.feasibility.aggregatePolicyPct != null ? `${result.feasibility.aggregatePolicyPct}%` : "a fixed share"} of account equity`;
   return <section className="mission-result-edition mx-auto max-w-5xl space-y-4 pb-12" aria-label="Completed mission">
     <header>
       <div className="flex items-center justify-between gap-3"><h2 className="font-serif text-2xl">Mission result</h2><Button variant="outline" className="min-h-11" onClick={onEdit}>Edit mission</Button></div>
@@ -40,7 +44,7 @@ export function MissionResultWorkspace({ result, accountLabel, accountAsOf, thes
     {notice}
     <dl className="mission-result-facts" aria-label="Saved analysis boundaries">
       <div><dt>Declared allocation</dt><dd>{riskMoney(result.objective.deployableCapitalCents)}</dd><small>Not account value or buying power</small></div>
-      <div><dt>Room for new planned loss</dt><dd><TooltipProvider delayDuration={120}><Tooltip><TooltipTrigger asChild><span tabIndex={0} aria-describedby="mission-capacity-breakdown" className="cursor-help underline decoration-dotted decoration-1 underline-offset-4">{riskMoney(capacity.roomCents)}</span></TooltipTrigger><TooltipContent className="max-w-[320px]"><ul className="space-y-1 text-xs leading-5">{capacityLines.map(line => <li key={line}>{line}</li>)}</ul></TooltipContent></Tooltip></TooltipProvider></dd><small>Smallest limit at analysis · candidates share it · not cash or buying power</small><span id="mission-capacity-breakdown" className="sr-only">{capacityLines.join(" ")}</span></div>
+      <div><dt>Room for new planned loss</dt><dd><TooltipProvider delayDuration={120}><Tooltip><TooltipTrigger asChild><span tabIndex={0} aria-describedby="mission-capacity-breakdown" className="cursor-help underline decoration-dotted decoration-1 underline-offset-4">{capacity.notMeasured ? "Not measured" : riskMoney(capacity.roomCents)}</span></TooltipTrigger><TooltipContent className="max-w-[320px]"><ul className="space-y-1 text-xs leading-5">{capacityLines.map(line => <li key={line}>{line}</li>)}</ul></TooltipContent></Tooltip></TooltipProvider></dd><small>{capacity.notMeasured ? "Blocked: account equity not measured" : "Smallest limit at analysis"} · {ceilingBasis} · candidates share it · not cash or buying power</small><span id="mission-capacity-breakdown" className="sr-only">{capacityLines.join(" ")}</span></div>
       <div><dt>Research horizon</dt><dd>{result.objective.holdingPeriods.map(h => horizons[h]).join(", ")}</dd><small>{result.objective.instrumentPreference === "either" ? "Shares or options" : result.objective.instrumentPreference === "options" ? "Options" : "Shares"} · paper only</small></div>
     </dl>
     <MissionRiskPortrait limitCents={limit} effectiveCents={effective} />

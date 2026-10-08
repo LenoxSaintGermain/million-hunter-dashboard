@@ -13,7 +13,7 @@ const objective: CapitalObjective = {
 const policy: UnderwritingRiskPolicy = {
   normalPlayRiskPct: 0.75, highConvictionRiskPct: 1.25, maxAggregateOpenRiskPct: 3,
   weeklyLossLimitPct: 4, eventRiskAllocationPct: 1.5, perPlayHeadroomCents: 74_200,
-  aggregateOpenRiskBeforeCents: 0, weeklyLossUsedCents: 0,
+  aggregateOpenRiskBeforeCents: 0, accountEquityCents: 2_500_000, weeklyLossUsedCents: 0,
 };
 
 describe("final Mission review decision context", () => {

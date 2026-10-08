@@ -134,7 +134,8 @@ import { classifyDeskCandidate, summarizeDeskCandidates } from "../shared/playDe
 import { underwriteCapitalMission } from "./aperture/underwriter";
 import { attentionBaselineToken, mergeAttentionBaseline, deriveApertureAttention, type ApertureAttentionBaseline } from "../shared/apertureAttention";
 import { monitoringReviewState } from "../shared/monitoringState";
-import { calculateTargetFeasibility, type CapitalObjective, type PlayUnderwritingResult, type UnderwritingRiskPolicy } from "../shared/playUnderwriting";
+import { calculateTargetFeasibility, measuredAccountEquityCents, type CapitalObjective, type PlayUnderwritingResult, type UnderwritingRiskPolicy } from "../shared/playUnderwriting";
+import { STALE_ACCOUNT_MS } from "../shared/cockpitRailSummary";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -630,6 +631,8 @@ function underwritingRiskFromCockpit(
     perPlayHeadroomCents: perPlay?.ceilingCents ?? null,
     aggregateOpenRiskBeforeCents: aggregateOpenRiskCents,
     weeklyLossUsedCents: daily?.usedCents ?? null,
+    // #19: the account-wide ceiling uses snapshot equity, never declared capital.
+    accountEquityCents: measuredAccountEquityCents(cockpit.account, STALE_ACCOUNT_MS),
   };
 }
 
@@ -1841,10 +1844,11 @@ export const apertureRouter = router({
       );
       const risk = underwritingRiskFromCockpit(cockpit, aggregateOpenRiskCents);
       const feasibility = calculateTargetFeasibility(objective, risk);
-      const remainingHeadroomCents = Math.max(
+      const equityMeasured = feasibility.aggregateCeilingStatus !== "not_measured";
+      const remainingHeadroomCents = equityMeasured ? Math.max(
         0,
         feasibility.maxOpenRiskCents - aggregateOpenRiskCents,
-      );
+      ) : null;
       return {
         asOf: cockpit.generatedAt,
         account: {
@@ -1876,7 +1880,9 @@ export const apertureRouter = router({
         portfolioRisk: {
           beforeCents: aggregateOpenRiskCents,
           remainingHeadroomCents,
-          bindingConstraint: feasibility.riskBudgetCents <= 0
+          bindingConstraint: !equityMeasured
+            ? "account_equity_not_measured" as const
+            : feasibility.riskBudgetCents <= 0
             ? "portfolio_headroom_exhausted"
             : feasibility.riskBudgetCents < objective.maxPlannedLossCents
               ? "risk_policy_or_portfolio_headroom"

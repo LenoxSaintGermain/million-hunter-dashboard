@@ -73,7 +73,7 @@ vi.mock("@/lib/trpc", () => {
 
 const now = Date.UTC(2026, 8, 9, 18);
 const objective = { deployableCapitalCents: 2_500_000, targetProfitCents: 600_000, targetPeriod: "week" as const, maxPlannedLossCents: 25_000, holdingPeriods: ["swing" as const], instrumentPreference: "shares" as const };
-const risk = { normalPlayRiskPct: .75, highConvictionRiskPct: 1.25, maxAggregateOpenRiskPct: 3, weeklyLossLimitPct: 4, eventRiskAllocationPct: 1.5, perPlayHeadroomCents: 74_200, aggregateOpenRiskBeforeCents: 0, weeklyLossUsedCents: 0 };
+const risk = { normalPlayRiskPct: .75, highConvictionRiskPct: 1.25, maxAggregateOpenRiskPct: 3, weeklyLossLimitPct: 4, eventRiskAllocationPct: 1.5, perPlayHeadroomCents: 74_200, aggregateOpenRiskBeforeCents: 0, accountEquityCents: 2_500_000, weeklyLossUsedCents: 0 };
 const query = (data: any) => ({ data, error: null, isError: false, isLoading: false, isFetching: false, refetch: vi.fn() });
 function elements(node: React.ReactNode): React.ReactElement<any>[] {
   return React.Children.toArray(node).flatMap(child => React.isValidElement<{ children?: React.ReactNode }>(child) ? [child, ...elements(child.props.children)] : []);

@@ -8,15 +8,22 @@ export function TargetFeasibilityCard({ feasibility, noTrade, remainingHeadroomC
   const hasExplicitTarget = feasibility.targetProfitCents != null && feasibility.targetPeriod != null;
   const targetPeriodMissing = feasibility.targetProfitCents != null && feasibility.targetPeriod == null;
   const hasPlannedLossLimit = (operatorMaxLossCents ?? feasibility.lossLimitCents) > 0;
+  // #19: the account-wide ceiling is a share of account equity; unmeasured equity blocks.
+  const ceilingUnmeasured = feasibility.aggregateCeilingStatus === "not_measured";
+  const ceilingText = ceilingUnmeasured ? "Not measured" : money(feasibility.maxOpenRiskCents);
   const headroomExhausted = noTrade?.reason === "portfolio_headroom_exhausted" || (remainingHeadroomCents != null && remainingHeadroomCents <= 0);
-  const capacityMessage = headroomExhausted
+  const capacityMessage = ceilingUnmeasured
+    ? "Account risk ceiling not measured · blocked"
+    : headroomExhausted
     ? "No remaining risk allowance"
     : !hasPlannedLossLimit
       ? "Planned-loss limit missing"
       : feasibility.riskBudgetCents <= 0
         ? "No proposal capacity remains"
         : null;
-  const riskMessage = headroomExhausted
+  const riskMessage = ceilingUnmeasured
+    ? (feasibility.clarification ?? "Account equity is not measured, so the account-wide risk ceiling is not measured and new planned risk is blocked.")
+    : headroomExhausted
     ? (feasibility.clarification ?? "Your planned-loss limit is configured, but no portfolio risk allowance remains. Available cash does not override that limit.")
     : !hasPlannedLossLimit
       ? "A planned-loss limit is not configured yet. Enter one before underwriting a proposal."
@@ -25,10 +32,10 @@ export function TargetFeasibilityCard({ feasibility, noTrade, remainingHeadroomC
     <div className="grid gap-px sm:grid-cols-3" style={{ background: "var(--sh-border-1)" }}>
       <div className="p-4" style={{ background: "var(--sh-surface)" }}><p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Mission</p><p className="mt-1 font-serif text-2xl">{money(feasibility.capitalBaseCents)}</p><p className="text-xs" style={{ color: "var(--sh-fg-muted)" }}>{hasExplicitTarget ? `${money(feasibility.targetProfitCents)} / ${feasibility.targetPeriod}` : "No profit target requested"}</p></div>
       <div className="p-4" style={{ background: "var(--sh-surface)" }}><p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Target feasibility</p><p className="mt-1 font-serif text-2xl">{feasibility.requiredReturnPct == null ? "Not requested" : `${feasibility.requiredReturnPct}%`}</p><StateMark state={state} label={feasibility.classification} compact /></div>
-      <div className="p-4" style={{ background: "var(--sh-surface)" }}><p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Risk limits</p><p className="mt-1 font-serif text-2xl">{money(feasibility.normalPlayRiskCents)} normal</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{money(feasibility.highConvictionRiskCents)} high-conviction · {money(feasibility.maxOpenRiskCents)} aggregate</p><BasisMark basis="calculated" label="Target excluded from sizing" formula="min(mission, mandate, portfolio, weekly headroom)" /></div>
+      <div className="p-4" style={{ background: "var(--sh-surface)" }}><p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Risk limits</p><p className="mt-1 font-serif text-2xl">{money(feasibility.normalPlayRiskCents)} normal</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{money(feasibility.highConvictionRiskCents)} high-conviction · {ceilingText} aggregate{feasibility.aggregateCeilingStatus ? ` (${feasibility.aggregatePolicyPct ?? ""}% of account equity)` : ""}</p><BasisMark basis="calculated" label="Target excluded from sizing" formula="min(mission, mandate, portfolio, weekly headroom)" /></div>
     </div>
     <div className="border-t p-4" style={{ borderColor: "var(--sh-border-1)" }}>
-      {capacityMessage && <p className="text-xs font-semibold" style={{ color: headroomExhausted || !hasPlannedLossLimit ? "var(--sh-red)" : "var(--sh-text-primary)" }}>{capacityMessage}</p>}
+      {capacityMessage && <p className="text-xs font-semibold" style={{ color: ceilingUnmeasured || headroomExhausted || !hasPlannedLossLimit ? "var(--sh-red)" : "var(--sh-text-primary)" }}>{capacityMessage}</p>}
       <p className="mt-1 text-xs leading-5" style={{ color: headroomExhausted ? "var(--sh-red)" : "var(--sh-fg-muted)" }}>{targetPeriodMissing ? "A profit amount was recorded without a target period, so no return rate or aspiration is shown." : riskMessage}</p>
       
       {headroomExhausted && (
@@ -45,7 +52,7 @@ export function TargetFeasibilityCard({ feasibility, noTrade, remainingHeadroomC
             <div className="rounded p-2.5 border border-amber-500/50" style={{ background: "rgba(245, 158, 11, 0.08)" }}>
               <p className="font-medium text-amber-500">2. Account risk limits</p>
               <p className="mt-0.5 font-semibold text-amber-500">No remaining allowance</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">Portfolio risk limit: {money(feasibility.maxOpenRiskCents)}</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">Portfolio risk limit: {ceilingText}</p>
             </div>
             <div className="rounded p-2.5 border" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
               <p className="font-medium text-muted-foreground">3. Your allocation</p>

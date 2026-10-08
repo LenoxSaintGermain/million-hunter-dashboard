@@ -851,6 +851,8 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     : !paperAccount ? "Select an available paper account in Account & risk."
     : branch === "research" && missionConfigured && authoritativePreview.isError ? riskInspection.failureReason ?? "Refresh the effective risk constraint in Account & risk before underwriting."
     : branch === "research" && missionConfigured && authoritativePreview.isLoading ? "Checking the effective account and portfolio constraint."
+    : branch === "research" && previewFeasibility?.aggregateCeilingStatus === "not_measured"
+    ? "Cannot analyze: account equity is not measured. The account-wide risk ceiling is a share of account equity from a broker snapshot under 4 hours old; sync the paper account first."
     : branch === "research" && portfolioHeadroomExhausted
     ? `Cannot analyze: Risk limit reached (${previewPortfolioRisk?.remainingHeadroomCents != null ? formatCents(previewPortfolioRisk.remainingHeadroomCents) : "$0.00"} headroom remaining).`
     : jobNeedsReconciliation ? "Open the saved underwriting task to view progress or deliberately retry."
@@ -1165,10 +1167,10 @@ export function MissionReviewFeasibility({ branch = "research", feasibility, ent
   return <section aria-label={branch === "research" ? "Your target and risk limit" : "Effective risk for future research"} className="mt-4 rounded-lg border p-3 text-sm" style={{ borderColor: hasTarget && feasibility.classification === "extreme" ? "var(--sh-red)" : "var(--sh-border-1)" }}>
     <h3 className="font-semibold">{branch === "research" ? "Risk allowed for this trade" : "Effective risk for future research"} <span className="mt-1 block font-serif text-2xl tabular-nums">{formatCents(feasibility.riskBudgetCents)}</span></h3>
     <div className="mission-limit-visual" aria-label="Planned-loss boundaries, not portfolio allocation">{visualLimits.map(row => <div key={row.label}><span>{row.label}</span><div aria-hidden="true"><i style={{ width: `${row.cents == null ? 0 : Math.max(0, row.cents) / visualMax * 100}%` }} /></div><strong>{row.cents == null ? "Unknown" : formatCents(row.cents)}</strong></div>)}</div>
-    <p className="mt-2 leading-6"><strong>You entered {formatCents(enteredLossCents)}.</strong> {policyBinds ? `The normal-play policy caps risk at ${normalPolicyPct}% of your ${formatCents(feasibility.capitalBaseCents)} declared capital (${formatCents(policyCents)}).` : remainingHeadroomCents === 0 ? "Existing open risk uses this mission’s aggregate allowance." : "The smallest measured mission, policy, account or portfolio limit controls."}</p>
+    <p className="mt-2 leading-6"><strong>You entered {formatCents(enteredLossCents)}.</strong> {policyBinds ? `The normal-play policy caps risk at ${normalPolicyPct}% of your ${formatCents(feasibility.capitalBaseCents)} declared capital (${formatCents(policyCents)}).` : feasibility.aggregateCeilingStatus === "not_measured" ? "The account-wide ceiling is a share of account equity, and equity is not measured, so new risk is blocked." : remainingHeadroomCents === 0 ? `Existing open risk uses the account-wide allowance (${feasibility.aggregatePolicyPct ?? "a fixed share"}${feasibility.aggregatePolicyPct != null ? "%" : ""} of account equity).` : "The smallest measured mission, policy, account or portfolio limit controls."}</p>
     {(feasibility.riskBudgetCents === 0 || remainingHeadroomCents === 0) && (
       <div className="mt-2.5 rounded border p-2.5 text-xs space-y-2" style={{ borderColor: "var(--sh-border-1)", background: "rgba(245, 158, 11, 0.06)" }}>
-        <p className="font-semibold text-amber-500">Why does this mission show no risk headroom when portfolio cash is available?</p>
+        <p className="font-semibold text-amber-500">{feasibility.aggregateCeilingStatus === "not_measured" ? "Why is new risk blocked? Account equity is not measured." : "Why does this mission show no risk headroom when portfolio cash is available?"}</p>
         <p className="leading-5" style={{ color: "var(--sh-fg-muted)" }}>
           {feasibility.clarification ?? `Broker cash is liquid, but the Mandate Planned-Loss Envelope (${formatCents(feasibility.maxOpenRiskCents)} ceiling) is 100% committed by active positions. Downside risk capacity—not nominal broker cash—is the binding constraint.`}
         </p>
@@ -1229,14 +1231,19 @@ export function MissionRiskInspection({ context, enteredLossCents, policyVersion
   const capitalCents = feasibility?.capitalBaseCents ?? null;
   const normalCents = capitalCents != null && risk ? Math.floor(capitalCents * risk.normalPlayRiskPct / 100) : null;
   const aggregateUsed = risk?.aggregateOpenRiskBeforeCents ?? null;
-  const aggregateRemaining = feasibility && aggregateUsed != null ? Math.max(0, feasibility.maxOpenRiskCents - aggregateUsed) : null;
+  // #19: the account-wide ceiling is a share of account equity; unmeasured equity blocks.
+  const ceilingUnmeasured = feasibility?.aggregateCeilingStatus === "not_measured";
+  const aggregateRemaining = feasibility && aggregateUsed != null && !ceilingUnmeasured ? Math.max(0, feasibility.maxOpenRiskCents - aggregateUsed) : null;
+  const ceilingBasis = feasibility?.aggregateCeilingStatus === "measured" && feasibility.accountEquityCents != null
+    ? `${feasibility.aggregatePolicyPct ?? risk?.maxAggregateOpenRiskPct}% × ${formatCents(feasibility.accountEquityCents)} account equity = ${formatCents(feasibility.maxOpenRiskCents)}; `
+    : "";
   const weeklyUsed = risk?.weeklyLossUsedCents ?? null;
   const weeklyRemaining = feasibility && weeklyUsed != null ? Math.max(0, feasibility.lossLimitCents - weeklyUsed) : null;
   const limits = [
     { label: "Mission planned-loss limit", value: enteredLossCents, basis: "Operator-declared; unchanged by inspection" },
     { label: "Normal-play policy", value: normalCents, basis: normalCents == null ? "Policy calculation unavailable" : `${risk!.normalPlayRiskPct}% × ${formatCents(capitalCents)} = ${formatCents(normalCents)}` },
     { label: "Account per-play ceiling", value: risk?.perPlayHeadroomCents ?? null, basis: "Loaded account mandate and account snapshot" },
-    { label: "Aggregate risk headroom", value: aggregateRemaining, basis: aggregateRemaining == null ? "Open-risk calculation unavailable" : `${formatCents(feasibility!.maxOpenRiskCents)} − ${formatCents(aggregateUsed)} = ${formatCents(aggregateRemaining)} (floor at $0)` },
+    { label: "Aggregate risk headroom", value: aggregateRemaining, basis: ceilingUnmeasured ? "Not measured: account equity is unknown or the broker snapshot is older than 4 hours. New planned risk is blocked; declared capital does not substitute." : aggregateRemaining == null ? "Open-risk calculation unavailable" : `${ceilingBasis}${formatCents(feasibility!.maxOpenRiskCents)} − ${formatCents(aggregateUsed)} = ${formatCents(aggregateRemaining)} (floor at $0)` },
     { label: "Loss-budget headroom", value: weeklyRemaining, basis: weeklyRemaining == null ? "Loss-budget calculation unavailable" : `${formatCents(feasibility!.lossLimitCents)} − ${formatCents(weeklyUsed)} = ${formatCents(weeklyRemaining)} (floor at $0). Uses the server's recorded loss-budget usage; not verified weekly realized P&L.` },
   ];
   const binding = feasibility ? limits.filter(line => line.value === feasibility.riskBudgetCents).map(line => line.label) : [];

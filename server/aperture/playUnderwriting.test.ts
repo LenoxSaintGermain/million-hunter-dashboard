@@ -30,7 +30,7 @@ const risk = {
   eventRiskAllocationPct: 1.5,
   perPlayHeadroomCents: 1_000_000,
   aggregateOpenRiskBeforeCents: 0,
-  weeklyLossUsedCents: 0,
+  accountEquityCents: 2_500_000, weeklyLossUsedCents: 0,
 };
 
 describe("target feasibility", () => {
@@ -72,7 +72,7 @@ describe("target feasibility", () => {
     }), {
       ...risk,
       aggregateOpenRiskBeforeCents: 10_000,
-      weeklyLossUsedCents: 5_000,
+      accountEquityCents: 5_000_000, weeklyLossUsedCents: 5_000,
     });
     expect(result.maxOpenRiskCents).toBe(60_000);
     expect(result.lossLimitCents).toBe(50_000);
