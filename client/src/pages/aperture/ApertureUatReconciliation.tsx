@@ -85,7 +85,7 @@ export default function ApertureUatReconciliation() {
 
             <Card className="account-sheet">
               <CardHeader className="pb-3">
-                <p className="account-annotation">Positions / Σ books vs shared account</p>
+                <p className="account-annotation">Positions / all books vs shared account</p>
                 <CardTitle className="account-title">By symbol</CardTitle>
               </CardHeader>
               <CardContent>
