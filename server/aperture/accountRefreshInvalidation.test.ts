@@ -32,6 +32,7 @@ vi.mock("@/lib/trpc", () => {
         upsertActivePlay: mutation, removeActivePlay: mutation,
         sync: { useMutation: (options: unknown) => { boundary.sync = options; return { mutate: boundary.mutate, isPending: false }; } },
       },
+      practiceBook: { reset: mutation },
       cockpit: query("cockpit"),
       cockpitPreference: { get: { useQuery: () => ({ data: null }) }, set: mutation },
     },

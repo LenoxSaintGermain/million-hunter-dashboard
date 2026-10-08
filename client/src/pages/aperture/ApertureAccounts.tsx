@@ -26,6 +26,25 @@ import "@/styles/account-portfolio-editorial.css";
 
 const DISCLAIMER = "Internal research tool — not investment advice. Practice trading only — no real capital.";
 
+/** UAT-E3 copy for book-mode rows (Practice Books). */
+export const PRACTICE_BOOK_COPY = {
+  title: "Your practice book",
+  subtitle: "Alpaca paper fills · shared practice account",
+  source: "Practice book (Alpaca paper fills)",
+  explainer: "Your cash, positions and limits are yours alone. Orders fill in a shared Alpaca paper account, so another tester's open order can briefly block yours.",
+  resetConfirm: "Archive this book and start fresh with $100,000? Your history and scorecard stay in Record.",
+} as const;
+
+export function bookAge(openedAt: number, now = Date.now()): string {
+  const days = Math.max(0, Math.floor((now - openedAt) / 86_400_000));
+  return days === 0 ? "Opened today" : `${days} day${days === 1 ? "" : "s"}`;
+}
+
+function signedMoney(cents: number | null | undefined): string {
+  if (cents == null) return "Not measured yet";
+  return `${cents > 0 ? "+" : cents < 0 ? "−" : ""}${accountMoney(Math.abs(cents))}`;
+}
+
 function fmt(cents: number | null | undefined): string {
   if (cents == null) return "—";
   return `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
@@ -72,6 +91,22 @@ export default function ApertureAccounts() {
   const configureSyncSchedule = trpc.aperture.account.configureSyncSchedule.useMutation({
     onSuccess: ({ enabled }) => { toast.success(enabled ? "Paper-account freshness schedule enabled" : "Paper-account freshness schedule paused"); refetch(); },
     onError: (e) => toast.error(e.message),
+  });
+
+  const resetBook = trpc.aperture.practiceBook.reset.useMutation({
+    onSuccess: async (result, variables) => {
+      const message = result.measured
+        ? "New practice book opened with $100,000. Your earlier trades stay in Record."
+        : "New practice book opened with $100,000. Refresh balances to measure it. Your earlier trades stay in Record.";
+      setSyncFeedback({ accountId: variables.accountId, message, tone: "success" });
+      toast.success("Practice book reset");
+      await invalidateAccountRefreshReads(utils.aperture, variables.accountId);
+    },
+    onError: (e, variables) => {
+      setSyncFeedback({ accountId: variables.accountId, message: e.message, tone: "error" });
+      toast.error(e.message);
+      refetch();
+    },
   });
 
   const importCsv = trpc.aperture.account.importCsv.useMutation({
@@ -206,9 +241,9 @@ export default function ApertureAccounts() {
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <p className="account-annotation">Account #{account.id} / isolated snapshot</p>
+                  <p className="account-annotation">Account #{account.id} / {account.practiceBook ? `practice book · generation ${account.practiceBook.generation}` : "isolated snapshot"}</p>
                   <CardTitle className="account-title flex flex-wrap items-center gap-2 break-words">
-                    {account.label}
+                    {account.practiceBook ? PRACTICE_BOOK_COPY.title : account.label}
                     <Badge variant="outline" className="text-xs">
                       {brokers?.find((broker) => broker.id === account.brokerId)?.label ?? (account.brokerId === "alpaca_paper" ? "Alpaca Paper" : account.brokerId === "manual" ? "Manual import" : "Robinhood context")}
                     </Badge>
@@ -217,7 +252,9 @@ export default function ApertureAccounts() {
                     )}
                   </CardTitle>
                   <p className="text-xs mt-1 break-words" style={{ color: "var(--sh-fg-muted)" }}>
-                    {account.externalAccountId ? `Paper account · ${account.externalAccountId}` : account.brokerId === "manual" ? "Research only · cannot send orders" : "Paper account not linked yet"}
+                    {account.practiceBook
+                      ? `${PRACTICE_BOOK_COPY.subtitle}${account.practiceBook.houseAccount ? ` · ${account.practiceBook.houseAccount}` : ""}`
+                      : account.externalAccountId ? `Paper account · ${account.externalAccountId}` : account.brokerId === "manual" ? "Research only · cannot send orders" : "Paper account not linked yet"}
                     {` · ${accountStamp(account.lastSyncedAt)}`}
                   </p>
                 </div>
@@ -241,13 +278,24 @@ export default function ApertureAccounts() {
             <CardContent className="space-y-3">
               <div className="account-spread">
                 <div className="account-value">
-                  <span className="account-annotation">Recorded account equity</span>
-                  <strong>{accountMoney(account.equityValueCents)}</strong>
+                  <span className="account-annotation">{account.practiceBook ? "Practice book equity" : "Recorded account equity"}</span>
+                  <strong>{accountMoney(account.practiceBook ? account.practiceBook.equityValueCents : account.equityValueCents)}</strong>
                   <p>{accountStamp(account.lastSyncedAt)}</p>
-                  <p>Source: {account.syncSource || (account.brokerId === "manual" ? "Manual record" : "Not recorded")}</p>
+                  <p>Source: {account.practiceBook ? PRACTICE_BOOK_COPY.source : account.syncSource || (account.brokerId === "manual" ? "Manual record" : "Not recorded")}</p>
                   {account.syncError && <p role="alert">Last sync failed: {account.syncError}. These are saved values.</p>}
-                  <dl><div><dt>Cash</dt><dd>{accountMoney(account.cashCents)}</dd></div><div><dt>Broker buying power</dt><dd>{accountMoney(account.buyingPowerCents)}</dd></div></dl>
-                  <small>Buying power may include leverage. It is not cash or permission to deploy.</small>
+                  {account.practiceBook?.status === "frozen" && <p role="alert">Paused for owner review: {account.practiceBook.frozenReason ?? "the shared practice account is being reconciled"}.</p>}
+                  {account.practiceBook ? (
+                    <dl aria-label="Practice book summary">
+                      <div><dt>Starting cash</dt><dd>{accountMoney(account.practiceBook.startingCashCents)}</dd></div>
+                      <div><dt>P&amp;L since start</dt><dd>{signedMoney(account.practiceBook.pnlSinceStartCents)}</dd></div>
+                      <div><dt>Cash</dt><dd>{accountMoney(account.cashCents)}</dd></div>
+                      <div><dt>Book buying power</dt><dd>{accountMoney(account.buyingPowerCents)}</dd></div>
+                      <div><dt>Book age</dt><dd>{bookAge(account.practiceBook.openedAt)}</dd></div>
+                    </dl>
+                  ) : (
+                    <dl><div><dt>Cash</dt><dd>{accountMoney(account.cashCents)}</dd></div><div><dt>Broker buying power</dt><dd>{accountMoney(account.buyingPowerCents)}</dd></div></dl>
+                  )}
+                  <small>{account.practiceBook ? PRACTICE_BOOK_COPY.explainer : "Buying power may include leverage. It is not cash or permission to deploy."}</small>
                 </div>
                 <AccountHoldingsPortrait accountId={account.id} />
               </div>
@@ -300,6 +348,29 @@ export default function ApertureAccounts() {
                       disabled={configureSyncSchedule.isPending || !brokers?.find((b) => b.id === account.brokerId)?.available}
                     >
                       {account.syncScheduleEnabled ? "Pause updates" : "Enable updates"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {account.practiceBook && (
+                <div className="rounded-lg border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>Start a fresh book</p>
+                      <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Archives this book and opens a new one with $100,000. Your history and scorecard stay in Record.</p>
+                      {account.practiceBook.resetBlockedReason && <p id={`reset-blocked-${account.id}`} className="mt-1 text-xs">{account.practiceBook.resetBlockedReason}</p>}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="min-h-11 shrink-0"
+                      aria-label={`Reset practice book for account #${account.id}`}
+                      aria-describedby={account.practiceBook.resetBlockedReason ? `reset-blocked-${account.id}` : undefined}
+                      onClick={() => { if (window.confirm(PRACTICE_BOOK_COPY.resetConfirm)) resetBook.mutate({ accountId: account.id }); }}
+                      disabled={resetBook.isPending || Boolean(account.practiceBook.resetBlockedReason)}
+                    >
+                      {resetBook.isPending && resetBook.variables?.accountId === account.id ? "Resetting…" : "Reset book"}
                     </Button>
                   </div>
                 </div>

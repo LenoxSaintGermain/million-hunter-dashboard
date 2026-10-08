@@ -10,6 +10,7 @@ vi.mock("@/lib/trpc", () => {
   const query = (key: "accounts" | "brokers" | "positions" | "plays") => ({ useQuery: () => ({ refetch: vi.fn(), ...state[key] }) });
   return { trpc: { useUtils: () => ({}), aperture: {
     brokers: query("brokers"), account: { list: query("accounts"), getPositions: query("positions"), listActivePlays: query("plays"), create: mutation, sync: mutation, configureSyncSchedule: mutation, importCsv: mutation, upsertActivePlay: mutation, removeActivePlay: mutation },
+    practiceBook: { reset: mutation },
   } } };
 });
 import ApertureAccounts from "../../client/src/pages/aperture/ApertureAccounts";

@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import {
-  portfolioAccounts, uatBookAdjustments, uatHouseBaselines, uatPracticeBooks,
+  portfolioAccounts, positions, uatBookAdjustments, uatHouseBaselines, uatPracticeBooks,
   type InsertUatBookAdjustment, type UatBookAdjustment, type UatHouseBaseline, type UatPracticeBook,
 } from "../../../drizzle/schema";
 import type { getDb } from "../../db";
@@ -22,7 +22,14 @@ export interface CreatePracticeBookInput {
   scenarioPreset?: string;
   generation?: number;
   houseExternalAccountId?: string | null;
+  /**
+   * Reset (UAT-E3): archive this book in the same transaction, clear the row's
+   * mirrored book numbers, and optionally unbind a previous house account.
+   */
+  resetFrom?: { bookId: number; clearExternalAccountId: boolean };
 }
+
+export class PracticeBookResetConflict extends Error {}
 
 /**
  * Creates a book, records its starting cash as the first (append-only)
@@ -32,6 +39,18 @@ export async function createPracticeBook(db: Db, input: CreatePracticeBookInput)
   const startingCashCents = input.startingCashCents ?? DEFAULT_BOOK_STARTING_CASH_CENTS;
   if (!Number.isSafeInteger(startingCashCents) || startingCashCents <= 0) throw new Error("A practice book needs positive starting cash.");
   return db.transaction(async (tx) => {
+    if (input.resetFrom) {
+      // Old orders keep their practice_book_id; only the book's status changes.
+      const [archived] = await tx.update(uatPracticeBooks).set({ status: "archived", archivedAt: input.now, updatedAt: input.now })
+        .where(and(
+          eq(uatPracticeBooks.id, input.resetFrom.bookId),
+          eq(uatPracticeBooks.userId, input.userId),
+          eq(uatPracticeBooks.portfolioAccountId, input.portfolioAccountId),
+          inArray(uatPracticeBooks.status, ["active", "frozen"]),
+        ));
+      if (Number((archived as any)?.affectedRows ?? 0) !== 1) throw new PracticeBookResetConflict("This practice book was already reset.");
+      await tx.delete(positions).where(eq(positions.accountId, input.portfolioAccountId));
+    }
     const [inserted] = await tx.insert(uatPracticeBooks).values({
       userId: input.userId,
       portfolioAccountId: input.portfolioAccountId,
@@ -51,7 +70,15 @@ export async function createPracticeBook(db: Db, input: CreatePracticeBookInput)
       note: `Book opened with ${(startingCashCents / 100).toFixed(2)} virtual cash (${input.scenarioPreset ?? DEFAULT_BOOK_PRESET}).`,
       createdBy: input.createdBy, createdAt: input.now,
     });
-    await tx.update(portfolioAccounts).set({ practiceBookId: bookId, updatedAt: input.now })
+    await tx.update(portfolioAccounts).set({
+      practiceBookId: bookId,
+      updatedAt: input.now,
+      ...(input.resetFrom ? {
+        cashCents: startingCashCents, buyingPowerCents: startingCashCents, equityValueCents: startingCashCents,
+        optionsBuyingPowerCents: null, lastSyncedAt: null, syncError: null,
+        ...(input.resetFrom.clearExternalAccountId ? { externalAccountId: null } : {}),
+      } : {}),
+    })
       .where(and(eq(portfolioAccounts.id, input.portfolioAccountId), eq(portfolioAccounts.userId, input.userId)));
     return { bookId };
   });
