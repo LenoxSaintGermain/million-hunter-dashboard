@@ -139,8 +139,8 @@ export function GuidedDecisionQueue({
 
   return (
     <div
-      aria-label="Guided Decision Queue"
-      className={`rounded-xl border border-rule bg-surface p-4 sm:p-5 shadow-xs ${className}`}
+      aria-label="Quick Play decision queue"
+      className={`rounded-xl border border-rule bg-[var(--sh-surface-1)] p-4 sm:p-5 shadow-xs ${className}`}
     >
       <div className="flex items-center justify-between pb-3 border-b border-rule">
         <div className="flex items-center gap-2">
@@ -148,7 +148,7 @@ export function GuidedDecisionQueue({
             <Sparkles className="h-3.5 w-3.5" />
           </div>
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Today's Action Queue (Guided)
+            Today's Action Queue (Quick Play)
           </span>
         </div>
 

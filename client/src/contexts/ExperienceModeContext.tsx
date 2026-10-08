@@ -14,6 +14,21 @@ interface ExperienceModeContextType {
 
 const STORAGE_KEY = "sh_aperture_experience_mode";
 
+/**
+ * User-facing mode names (POC v3). The stored values and identifiers stay
+ * "guided" / "pro" so saved preferences keep working: "guided" is shown as
+ * Quick Play and "pro" as Strategist.
+ */
+export const EXPERIENCE_MODE_LABELS: Record<ExperienceMode, string> = {
+  guided: "Quick Play",
+  pro: "Strategist",
+};
+
+export const EXPERIENCE_MODE_DESCRIPTIONS: Record<ExperienceMode, string> = {
+  guided: "Plain steps, one decision at a time",
+  pro: "Full research, limits and order detail",
+};
+
 const ExperienceModeContext = createContext<ExperienceModeContextType | null>(null);
 
 export function ExperienceModeProvider({ children }: { children: ReactNode }) {
@@ -77,9 +92,9 @@ export function ExperienceModeToggle({ className }: { className?: string }) {
   return (
     <div
       role="group"
-      aria-label="Experience Mode Switch"
+      aria-label="Experience mode"
       className={cn(
-        "inline-flex items-center rounded-md border border-rule bg-surface p-0.5 text-xs shadow-sm",
+        "inline-flex items-center rounded-md border border-rule bg-[var(--sh-surface-1)] p-0.5 text-xs shadow-sm",
         className
       )}
     >
@@ -88,6 +103,7 @@ export function ExperienceModeToggle({ className }: { className?: string }) {
         role="radio"
         aria-checked={mode === "guided"}
         onClick={() => setMode("guided")}
+        title={EXPERIENCE_MODE_DESCRIPTIONS.guided}
         className={cn(
           "inline-flex items-center gap-1.5 rounded px-2.5 py-1 font-medium transition-all",
           mode === "guided"
@@ -96,7 +112,7 @@ export function ExperienceModeToggle({ className }: { className?: string }) {
         )}
       >
         <Sparkles className="h-3 w-3 text-amber" />
-        <span>Guided (On-Rails)</span>
+        <span>{EXPERIENCE_MODE_LABELS.guided}</span>
       </button>
 
       <button
@@ -104,6 +120,7 @@ export function ExperienceModeToggle({ className }: { className?: string }) {
         role="radio"
         aria-checked={mode === "pro"}
         onClick={() => setMode("pro")}
+        title={EXPERIENCE_MODE_DESCRIPTIONS.pro}
         className={cn(
           "inline-flex items-center gap-1.5 rounded px-2.5 py-1 font-medium transition-all",
           mode === "pro"
@@ -112,7 +129,7 @@ export function ExperienceModeToggle({ className }: { className?: string }) {
         )}
       >
         <SlidersHorizontal className="h-3 w-3" />
-        <span>Pro Cockpit</span>
+        <span>{EXPERIENCE_MODE_LABELS.pro}</span>
       </button>
     </div>
   );
