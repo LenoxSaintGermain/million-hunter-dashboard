@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import type { ApertureAttentionBriefing, ApertureAttentionItem } from "@shared/apertureAttention";
 import type { TodayExecutionData } from "./TodayExecutionSnapshot";
 import { MicroTooltip } from "./MicroTooltip";
+import { overdueReviewNudge } from "@shared/overdueReviewNudge";
 
 interface GuidedDecisionQueueProps {
   attention: ApertureAttentionBriefing | null;
@@ -70,22 +71,21 @@ export function GuidedDecisionQueue({
   }
 
   // 2. Check for Gate Reviews / 30-Day Checkups
-  const reviewDue = attention?.otherCritical?.find(
-    (item) => item.kind === "review_due" || item.reviewKind === "gate_review"
-  ) ?? (attention?.primary?.kind === "review_due" ? attention.primary : null);
+  // Every overdue checkpoint/outcome review folds into one quiet card whose one
+  // next action is the oldest review.
+  const overdueReviews = overdueReviewNudge([attention?.primary, ...(attention?.otherCritical ?? []), ...(attention?.otherAttention ?? [])]);
 
-  if (reviewDue) {
+  if (overdueReviews) {
     cards.push({
-      id: `gate_review_${reviewDue.key}`,
+      id: `gate_review_${overdueReviews.next.key}`,
       type: "gate_review",
-      title: "30-Day Thesis Checkup Due",
-      badge: "Checkup Needed",
-      badgeTone: "blue",
-      summary: reviewDue.title || "Review whether your investment thesis is still playing out.",
-      detail: reviewDue.reason || "Scheduled checkpoints protect you from drift and unplanned losses.",
-      primaryActionLabel: "Review Checkup",
-      secondaryActionLabel: "Later",
-      href: reviewDue.href,
+      title: overdueReviews.title,
+      badge: "Overdue",
+      badgeTone: "gray",
+      summary: overdueReviews.summary,
+      detail: "A human checkpoint. Nothing checks, orders or exits automatically.",
+      primaryActionLabel: overdueReviews.actionLabel,
+      href: overdueReviews.next.href,
     });
   }
 

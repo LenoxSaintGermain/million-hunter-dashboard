@@ -68,7 +68,9 @@ describe("Today keeps one focal decision and demotes everything else", () => {
     expect($("[data-attention-layout='primary']")).toHaveLength(1);
     // Before: secondary items used the full card layout and competed visually.
     expect($("[data-attention-layout='card']")).toHaveLength(0);
-    expect($("[data-attention-layout='compact']").length).toBeGreaterThanOrEqual(2);
+    expect($("[data-attention-layout='compact']").length).toBeGreaterThanOrEqual(1);
+    // The overdue TLT review folds into the single quiet overdue-review nudge, not a critical row.
+    expect($("[data-attention-layout='compact']").text()).not.toContain("Review TLT");
   });
 
   it("puts critical decisions before routine position status", () => {
