@@ -17,6 +17,8 @@ import { eq } from "drizzle-orm";
 import { httpJson, num } from "../providers/types";
 import { parseOccOptionSymbol } from "../../../shared/paperInstrument";
 import { readOrderExecutions } from "./orderExecutions";
+import { practiceAwareAlpaca } from "./practiceBook";
+import { practiceBooksEnabled } from "../practiceBooks/flags";
 import {
   assertPaperOnly, BrokerUnavailableError, dollarsToCents,
   type BrokerAccount, type BrokerAdapter, type BrokerPosition, type OptionChainItem, type OptionChainQuery, type OptionContractResult, type OptionMarketSnapshotResult, type OrderRequest, type OrderResult,
@@ -579,9 +581,17 @@ export function listBrokers(): BrokerAdapter[] {
   return [manualBroker(0), alpacaPaperBroker, robinhoodMcpBroker, ...(isExactIsolatedUatRuntime() ? [isolatedUatPaperBroker(0)] : [])];
 }
 
-export function brokerFor(brokerId: string, accountId: number): BrokerAdapter {
+/**
+ * `row` is the account when the caller already has it: a row with no practice
+ * book gets the env-key adapter itself, with no extra read. Without a row, the
+ * practice-aware adapter loads it lazily.
+ */
+export function brokerFor(brokerId: string, accountId: number, row?: { practiceBookId?: number | null }): BrokerAdapter {
   switch (brokerId) {
-    case "alpaca_paper": return alpacaPaperBroker;
+    case "alpaca_paper":
+      // UAT Practice Books: tester rows read and trade their own book on the shared house.
+      if (!practiceBooksEnabled() || (row && row.practiceBookId == null)) return alpacaPaperBroker;
+      return practiceAwareAlpaca(accountId, alpacaPaperBroker);
     case "robinhood_mcp": return robinhoodMcpBroker;
     case "uat_paper": return isolatedUatPaperBroker(accountId);
     default: return manualBroker(accountId);

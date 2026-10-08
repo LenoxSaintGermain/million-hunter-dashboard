@@ -24,7 +24,7 @@ export async function syncPaperAccount(db: Db, account: PortfolioAccount, now = 
   }
   // #41: the env-backed key reaches the owner's account; only the owner's rows sync.
   await assertEnvBrokerAccessForUser(db, account.userId, account.brokerId, "paperAccountSync");
-  const broker = brokerFor(account.brokerId, account.id);
+  const broker = brokerFor(account.brokerId, account.id, account);
   if (!broker.available()) throw new Error(broker.unavailableReason() ?? "Alpaca Paper broker is not configured.");
 
   const [accountData, positionData] = await Promise.all([broker.getAccount(), broker.getPositions()]);

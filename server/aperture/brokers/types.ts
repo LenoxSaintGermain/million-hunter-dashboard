@@ -131,6 +131,8 @@ export interface BrokerAdapter {
   getAccount(): Promise<BrokerAccount>;
   getPositions(): Promise<BrokerPosition[]>;
   submitOrder(order: OrderRequest, opts: { isPaper: boolean }): Promise<OrderResult>;
+  /** Optional pre-dispatch refusal (practice books). Called before the order is marked submitted; throws to refuse. */
+  assertCanDispatch?(order: OrderRequest, meta: { orderId: number }): Promise<void>;
   /** Recent orders, newest first. A notional market order is `accepted` before
    *  it is `filled`, so the fill has to be read back rather than assumed. */
   getOrders(opts?: { limit?: number }): Promise<OrderResult[]>;

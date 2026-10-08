@@ -31,6 +31,8 @@ import { brokerFor } from "./brokers/index";
 import { assertEnvBrokerAccessForUser, envBrokerAccessForUser } from "./brokers/envBrokerOwner";
 import type { OrderRequest } from "./brokers/types";
 import { getFacts, freshestPerKey, normSymbol } from "./facts";
+import { clientOrderIdFor } from "./practiceBooks/ledger";
+import { practiceBooksEnabled } from "./practiceBooks/flags";
 import { resolveLiquidityFact } from "./liquidityFactRefresh";
 import { marketSession, startOfEtDay, type SessionState } from "./marketSession";
 import {
@@ -180,7 +182,7 @@ export interface OrderEvaluation {
   orderType: "market" | "limit";
   timeInForce: "day" | "gtc";
   now: number;
-  account: { id: number; isPaper: boolean; brokerId: string; externalAccountId: string | null; equityValueCents: number | null; cashCents: number | null; lastSyncedAt: number | null; label: string; optionsApprovedLevel: number | null; optionsTradingLevel: number | null; optionsBuyingPowerCents: number | null };
+  account: { id: number; isPaper: boolean; brokerId: string; externalAccountId: string | null; equityValueCents: number | null; cashCents: number | null; lastSyncedAt: number | null; label: string; optionsApprovedLevel: number | null; optionsTradingLevel: number | null; optionsBuyingPowerCents: number | null; practiceBookId?: number | null };
   portfolioContextAccount: { id: number; brokerId: string; lastSyncedAt: number | null; label: string };
   instrumentSnapshot: Record<string, unknown> | null;
   /** Exact authoritative binding when the proposal originated in Decision Runway. */
@@ -238,7 +240,7 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
 
   // Manual declarations require operator reconfirmation, not timestamp renewal.
   // Failed provider reads leave the last successful snapshot unchanged.
-  const execBroker = brokerFor(account.brokerId, account.id);
+  const execBroker = brokerFor(account.brokerId, account.id, account);
   if (account.brokerId === "alpaca_paper" && (account.lastSyncedAt == null || now - account.lastSyncedAt > 14 * 60_000) && execBroker.available()) {
     try {
       const alpacaAcct = await execBroker.getAccount();
@@ -339,7 +341,7 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
     action,
   });
 
-  const broker = brokerFor(account.brokerId, account.id);
+  const broker = brokerFor(account.brokerId, account.id, account);
   const [optionContract, optionMarket] = isOptionInstrument(instrumentType) && broker.available()
     ? await Promise.all([
         broker.getOptionContract ? broker.getOptionContract(symbol).catch(() => null) : null,
@@ -538,7 +540,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   if (existingBeforeEvaluation) return { orderId: existingBeforeEvaluation.id, created: false };
 
   const {
-    evaluation, resolvedIntent, session, gatedNotionalCents, symbol, orderType, timeInForce, now, decisionAuthorization, instrumentSnapshot,
+    evaluation, resolvedIntent, session, gatedNotionalCents, symbol, orderType, timeInForce, now, decisionAuthorization, instrumentSnapshot, account,
   } = await evaluateOrder(input, "create_proposal");
 
   const holdingPeriod = isStoredHoldingPeriod(input.holdingPeriod) ? input.holdingPeriod : null;
@@ -584,6 +586,8 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     gatedNotionalCents,
     mandateVersion: evaluation.mandateVersion,
     gateSnapshot: evaluation as unknown as Record<string, unknown>,
+    // UAT Practice Books: the execution row's book, stamped once at creation and never changed.
+    practiceBookId: practiceBooksEnabled() && account.brokerId === "alpaca_paper" ? account.practiceBookId ?? null : null,
     createdAt: now,
     updatedAt: now,
   };
@@ -963,13 +967,14 @@ export async function submitOrder(orderId: number, userId: number, paperConfirma
   const account = rerun.account;
 
   await assertEnvBrokerAccessForUser(db, userId, account.brokerId, "order submit dispatch");
-  const broker = brokerFor(account.brokerId, account.id);
+  const broker = brokerFor(account.brokerId, account.id, account);
   if (!broker.available()) {
     throw new Error(broker.unavailableReason() ?? `broker ${account.brokerId} is not configured`);
   }
 
   const now = rerun.now;
-  const clientOrderId = order.clientOrderId ?? `sh-paper-${order.id}`;
+  // sh-b<book>-<order> for practice-book orders (≤ 25 chars), sh-paper-<order> otherwise.
+  const clientOrderId = order.clientOrderId ?? clientOrderIdFor(order);
   // Mark as submitted at the serialized authorization point, before the broker
   // call. Cash recorded first blocks this transition. Until the broker response
   // persists an external order id (or a rejection), this row is also the durable
@@ -980,9 +985,6 @@ export async function submitOrder(orderId: number, userId: number, paperConfirma
       .where(and(eq(brokerOrders.id, orderId), eq(brokerOrders.userId, userId), eq(brokerOrders.status, "approved")));
     if (!update[0].affectedRows) throw new Error("order changed before submission could be authorized");
   };
-  if (objectiveDiscoveryEnabled()) await withPaperOrderClaimTransaction(db, userId, orderId, authorizeDispatch);
-  else await db.transaction(authorizeDispatch);
-
   const req: OrderRequest = {
     clientOrderId,
     symbol: order.symbol,
@@ -994,6 +996,12 @@ export async function submitOrder(orderId: number, userId: number, paperConfirma
     limitPriceCents: order.limitPriceCents ?? undefined,
     timeInForce: order.timeInForce,
   };
+  // Practice-book guards refuse here, before the order is marked submitted and
+  // before any broker call; the order stays approved.
+  if (broker.assertCanDispatch) await broker.assertCanDispatch(req, { orderId: order.id });
+
+  if (objectiveDiscoveryEnabled()) await withPaperOrderClaimTransaction(db, userId, orderId, authorizeDispatch);
+  else await db.transaction(authorizeDispatch);
 
   let result;
   // A fill poll may finish while this broker response is in flight. Both the
@@ -1032,6 +1040,8 @@ export async function submitOrder(orderId: number, userId: number, paperConfirma
     updatedAt: Date.now(),
   };
   if (newStatus === "filled") updates.filledAt = Date.now();
+  const practiceBookRefusal = (result.raw as { practiceBookRefusal?: unknown } | undefined)?.practiceBookRefusal;
+  if (newStatus === "rejected" && typeof practiceBookRefusal === "string") updates.rejectionReason = practiceBookRefusal;
 
   const recordResponse = async (writer: Pick<typeof db, "update">) => writer.update(brokerOrders).set(updates).where(dispatchResponseScope());
   const [recorded] = objectiveDiscoveryEnabled()
@@ -1088,7 +1098,7 @@ export async function mirrorFills(userId: number): Promise<number> {
     if (!account) continue;
 
     if (!(await envBrokerAccessForUser(db, userId, account.brokerId, "mirrorFills")).allowed) continue;
-    const broker = brokerFor(account.brokerId, account.id);
+    const broker = brokerFor(account.brokerId, account.id, account);
     if (!broker.available()) continue;
 
     try {
