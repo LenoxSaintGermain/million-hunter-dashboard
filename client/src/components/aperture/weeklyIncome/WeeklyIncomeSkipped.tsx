@@ -1,6 +1,6 @@
 /**
  * Weekly Income: ideas skipped by a rule (#85 blackouts, #84 screen filters).
- * Guided mode says why in plain English; Pro mode adds the exact rule and the
+ * Quick Play says why in plain English; Strategist adds the exact rule and the
  * source of any date. Display only.
  */
 import { WI_COPY } from "@shared/weeklyIncome/copy";

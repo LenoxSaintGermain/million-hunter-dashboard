@@ -56,7 +56,7 @@ describe("Weekly Income event windows (#85)", () => {
     expect(earningsRecordFromFact("XYZ", { factKey: "next_earnings_date", valueText: null, basis: "unknown" as any, sourceUrl: null, asOf: null })).toBeNull();
   });
 
-  it("every Guided reason is plain and passes the language rules", () => {
+  it("every Quick Play reason is plain and passes the language rules", () => {
     const cases = [
       evaluateEventWindow({ ...base, earnings: earningsOn("2026-10-19") }),
       evaluateEventWindow({ ...base, earnings: null }),

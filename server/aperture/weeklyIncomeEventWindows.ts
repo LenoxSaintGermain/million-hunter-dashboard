@@ -44,9 +44,9 @@ export type EventExclusionCode = "earnings_in_window" | "earnings_unknown" | "ex
 
 export type EventExclusion = {
   code: EventExclusionCode;
-  /** Pro wording: exact and short. */
+  /** Strategist wording: exact and short. */
   detail: string;
-  /** Guided wording: plain English, one or two sentences. */
+  /** Quick Play wording: plain English, one or two sentences. */
   plain: string;
   source?: { name: string; url?: string | null; recordedBy?: string | null; recordedAt?: number | null } | null;
 };
