@@ -20,6 +20,7 @@ import { ObjectiveMissionFlow } from "./ObjectiveMissionFlow";
 import { MissionAccountRefreshLink } from "./MissionAccountRefreshLink";
 import { MissionReadingBrief } from "./MissionReadingBrief";
 import { canonicalMissionHandoffValues, missionReceiptReadEnabled, type CanonicalMissionHandoff } from "@/lib/canonicalMissionHandoff";
+import { SixPercentNote } from "@/components/aperture/weeklyIncome/WeeklyIncomeGuide";
 
 type Branch = "research" | "conditional" | "cash";
 type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
@@ -1201,7 +1202,7 @@ export function MissionReviewFeasibility({ branch = "research", feasibility, ent
         </div>
       </div>
     )}
-    {hasTarget && <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="font-semibold">{feasibility.requiredReturnPct}% per {feasibility.targetPeriod} required · {feasibility.classification}</p><p className="mt-1 leading-6" style={{ color: "var(--sh-fg-muted)" }}>{formatCents(feasibility.targetProfitCents)} target ÷ {formatCents(feasibility.capitalBaseCents)} declared mission capital. An aspiration, not a forecast; it never increases allowed risk.</p></div>}
+    {hasTarget && <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}><p className="font-semibold">{feasibility.requiredReturnPct}% per {feasibility.targetPeriod} required · {feasibility.classification}</p><p className="mt-1 leading-6" style={{ color: "var(--sh-fg-muted)" }}>{formatCents(feasibility.targetProfitCents)} target ÷ {formatCents(feasibility.capitalBaseCents)} declared mission capital. An aspiration, not a forecast; it never increases allowed risk.</p>{feasibility.targetPeriod === "week" && feasibility.classification !== "conservative" && <SixPercentNote />}</div>}
     {branch !== "research" && feasibility.targetProfitCents != null && feasibility.targetPeriod != null && <p className="mt-2 leading-6">Your profit target is kept for research; it is not evaluated for this decision.</p>}
     {disclosure}
   </section>;

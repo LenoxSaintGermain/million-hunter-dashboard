@@ -48,7 +48,8 @@ export type DisclosureGateResult = {
   effectiveControls: DisclosureControls;
 };
 
-const PROHIBITED_LANGUAGE = /\b(copy\s*congress|follow\s+smart\s+money|insider|conflict|congressional\s+alpha)\b/i;
+/** Exported unchanged (#87) so copy tests use the real pattern instead of a mirrored copy. */
+export const PROHIBITED_LANGUAGE = /\b(copy\s*congress|follow\s+smart\s+money|insider|conflict|congressional\s+alpha)\b/i;
 
 export function compileDisclosureIntent(rawIntent: string): DisclosurePlanV1 {
   if (PROHIBITED_LANGUAGE.test(rawIntent)) {
