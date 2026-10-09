@@ -15,7 +15,7 @@ describe("Weekly Income scorecard view (#86)", () => {
   beforeAll(() => { (globalThis as any).React = React; });
   afterAll(() => { delete (globalThis as any).React; });
 
-  it("Guided: plain headline, sample limit, Main Street labels, clean language", () => {
+  it("Quick Play: plain headline, sample limit, Main Street labels, clean language", () => {
     const $ = load(renderToStaticMarkup(<WeeklyIncomeScorecardView scorecard={card("paper_fill")} isGuided isExample />));
     expect($("[data-wi-scorecard-headline]").text()).toMatch(/^This week your practice account gained/);
     expect($("[data-wi-sample]").text()).toContain("process evidence");

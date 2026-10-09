@@ -1,6 +1,6 @@
 /**
- * Weekly Income scorecard (#86). Guided mode leads with one plain sentence and
- * explains each figure in a line; Pro mode shows every metric with basis and
+ * Weekly Income scorecard (#86). Quick Play leads with one plain sentence and
+ * explains each figure in a line; Strategist shows every metric with basis and
  * asOf. Counterfactual rows are always labelled "Counterfactual, not a fill".
  */
 import type { WeeklyIncomeScorecard } from "@shared/weeklyIncomeScorecard";
@@ -9,7 +9,7 @@ import { ExampleDataBadge, PaperFidelityNote, WiLabel } from "./WeeklyIncomeGuid
 
 const CARD = { borderColor: "var(--rule)", background: "var(--paper)", borderRadius: 0 } as const;
 const GUIDED_KEYS = ["net_kept", "avg_capital_at_risk", "return_on_account", "peak_max_loss_pct", "win_rate", "breakeven_win_rate"];
-/** Main Street labels for Guided mode; Pro keeps the exact metric names. */
+/** Main Street labels for Quick Play; Strategist keeps the exact metric names. */
 const GUIDED_LABELS: Record<string, string> = {
   net_kept: "Kept after closing",
   avg_capital_at_risk: "Most you could lose, on average",

@@ -49,7 +49,7 @@ export type WiMetric = {
   display: string;
   basis: WiBasis;
   asOf: number;
-  /** Plain one-line explanation for Guided mode. */
+  /** Plain one-line explanation for Quick Play. */
   plain: string;
 };
 
