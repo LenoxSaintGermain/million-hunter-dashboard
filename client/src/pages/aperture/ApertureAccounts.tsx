@@ -3,6 +3,7 @@
  * Create and manage portfolio accounts (Alpaca paper, manual entry).
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
  */
+import { useSnapshotAgreement } from "@/lib/useSnapshotAgreement";
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -62,6 +63,8 @@ export default function ApertureAccounts() {
   const [syncFeedback, setSyncFeedback] = useState<{ accountId: number; message: string; tone: "success" | "error" } | null>(null);
 
   const { data: accounts, refetch, isLoading, isError } = trpc.aperture.account.list.useQuery();
+  // A newer stored snapshot here refreshes Today's cached cockpit and desk too (#120).
+  useSnapshotAgreement(accounts);
   const { data: brokers, isError: brokersFailed, refetch: retryBrokers } = trpc.aperture.brokers.useQuery();
 
   const createAccount = trpc.aperture.account.create.useMutation({
