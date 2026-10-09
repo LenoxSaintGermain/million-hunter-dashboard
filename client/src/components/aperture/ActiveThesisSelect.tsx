@@ -2,7 +2,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import "@/styles/capital-active-thesis.css";
 import { trpc } from "@/lib/trpc";
-import { isTestThesisName, resolveActiveThesis, thesisOptions } from "@shared/activeThesis";
+import { isTestThesisName, resolveActiveThesis, showTestThesesLabel, thesisLibraryCounts, thesisOptions } from "@shared/activeThesis";
+import { thesisDisplayLabel } from "@shared/thesisNaming";
 
 /**
  * The one active-thesis selector (POC v3 context strip: "Every step uses this
@@ -23,7 +24,7 @@ export function ActiveThesisSelect({ variant = "strip" }: { variant?: "strip" | 
     onError: (error: any) => toast.error(`Couldn't switch thesis: ${error?.message ?? "try again"}`),
   }) : null;
   const [showTest, setShowTest] = useState(false);
-  const projections: Array<{ id: number; name: string | null; sourceCompilationId?: number | null }> = listQuery.data ?? [];
+  const projections: Array<{ id: number; name: string | null; rawText?: string | null; sourceCompilationId?: number | null }> = listQuery.data ?? [];
   const selection = resolveActiveThesis({
     activeLoaded: activeQuery.data !== undefined && !activeQuery.isLoading,
     active: activeQuery.data?.thesis ?? null,
@@ -45,10 +46,10 @@ export function ActiveThesisSelect({ variant = "strip" }: { variant?: "strip" | 
     }}
   >
     {placeholder && <option value="" disabled>{placeholder}</option>}
-    {visible.map((item) => <option key={item.id} value={String(item.id)}>{item.name ?? `Thesis #${item.id}`}{isTestThesisName(item.name) ? " (test)" : ""}</option>)}
+    {visible.map((item) => <option key={item.id} value={String(item.id)}>{thesisDisplayLabel(item.name, item.rawText, `Thesis #${item.id}`)}{isTestThesisName(item.name) ? " (test)" : ""}</option>)}
   </select>;
   const toggle = (hiddenCount > 0 || showTest) && <button type="button" className="capital-thesis-toggle" aria-pressed={showTest} onClick={() => setShowTest((value) => !value)}>
-    {showTest ? "Hide test theses" : `Show ${hiddenCount} test ${hiddenCount === 1 ? "thesis" : "theses"}`}
+    {showTest ? "Hide test theses" : showTestThesesLabel(thesisLibraryCounts({ projections, canonicalOnly: [], keepId: selection.selectedId }), "selector")}
   </button>;
   if (variant === "inline") return <span className="inline-flex items-center gap-1.5">{select}{toggle}</span>;
   return <div data-active-thesis={selection.state}>

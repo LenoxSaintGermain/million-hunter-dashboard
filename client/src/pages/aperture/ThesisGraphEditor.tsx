@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useExperienceMode } from "@/contexts/ExperienceModeContext";
 import { GuidedThesisWizard } from "@/components/aperture/GuidedThesisWizard";
+import { thesisNameError } from "@shared/thesisNaming";
 
 const PLACEHOLDER = `Example thesis:
 
@@ -103,6 +104,9 @@ export default function ThesisGraphEditor() {
   const handleSave = async () => {
     if (!isNew && (!thesis || thesisError || thesis.sourceCompilationId)) return;
     if (!rawText.trim()) return toast.error("Write your thesis first");
+    // New saves need a recognisable name (#124); existing names are left as they are.
+    const nameError = isNew ? thesisNameError(name) : null;
+    if (nameError) return toast.error(nameError);
     setSaving(true);
     try {
       if (isNew) await createThesis.mutateAsync({ name: name || undefined, rawText });

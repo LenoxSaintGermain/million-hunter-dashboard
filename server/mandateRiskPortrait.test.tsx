@@ -41,7 +41,7 @@ describe("saved mandate risk visuals", () => {
       { id: 2, name: "Second", missionDefaults: { maxPlannedLossCents: 25000, holdingPeriod: "position" } },
       { id: 3, name: "Third", missionDefaults: { maxPlannedLossCents: null, holdingPeriod: "unrecognized" } },
     ]} onReview={onReview} />);
-    expect(html).toContain("3 theses in this library view");
+    expect(html).toContain("3 theses shown");
     expect(html).toContain("1 without a recorded planned-loss limit");
     expect(html).toContain('width="198"');
     expect(html).toContain("Bars show thesis counts, not duration");

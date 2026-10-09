@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import "@/styles/research-library.css";
 import { ThesisRiskComparison } from "@/components/aperture/MandateRiskPortrait";
-import { isTestThesisName } from "@shared/activeThesis";
+import { isTestThesisName, showTestThesesLabel, thesisLibraryCounts } from "@shared/activeThesis";
 
 function formatUpdated(value: number | null | undefined) {
   return value ? new Date(value).toLocaleString() : "Not measured";
@@ -85,7 +85,14 @@ export default function ApertureTheses() {
   // Active comes only from thesis.activeCapital, never a projection's isPrimary flag (#6).
   const isActiveThesis = (t: any) => activeCompilationId != null && t.sourceCompilationId === activeCompilationId;
   // Test/UAT theses stay out of the library unless asked for; the active one is never hidden.
-  const testCount = mergedTheses.filter((t) => isTestThesisName(t.name) && !isActiveThesis(t)).length;
+  // One count source shared with the account-bar selector (#112).
+  const activeProjectionId = mergedTheses.find((t) => !t.isCanonicalOnly && isActiveThesis(t))?.id ?? null;
+  const counts = thesisLibraryCounts({
+    projections: mergedTheses.filter((t) => !t.isCanonicalOnly),
+    canonicalOnly: mergedTheses.filter((t) => t.isCanonicalOnly),
+    keepId: activeProjectionId,
+  });
+  const testCount = counts.testHidden;
   const filteredTheses = useMemo(() => {
     const matching = mergedTheses
       .filter((t) => showTest || !isTestThesisName(t.name) || isActiveThesis(t))
@@ -127,7 +134,7 @@ export default function ApertureTheses() {
           </div>
           <div className="p-3" style={{ background: "var(--sh-surface-2)" }}>
             <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Lifecycle tracking</p>
-            <p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{isLoading || error ? "Not available" : `${theses?.length ?? 0} saved thesis books`}</p>
+            <p className="mt-1 text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{isLoading || error ? "Not available" : `${filteredTheses.length} of ${counts.total} theses shown`}</p>
           </div>
           <div className="p-3" style={{ background: "var(--sh-surface-2)" }}>
             <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-fg-muted)" }}>Execution boundary</p>
@@ -188,11 +195,11 @@ export default function ApertureTheses() {
             aria-pressed={showTest}
             onClick={() => setShowTest((value) => !value)}
           >
-            {showTest ? "Hide test theses" : `Show ${testCount} test ${testCount === 1 ? "thesis" : "theses"}`}
+            {showTest ? "Hide test theses" : showTestThesesLabel(counts, "library")}
           </Button>}
         </div>
 
-        {!error && !isLoading && !!theses?.length && <ThesisRiskComparison theses={filteredTheses} activeCompilationId={activeCompilationId} onReview={id => navigate(`/aperture/thesis/${id}`)} />}
+        {!error && !isLoading && !!theses?.length && <ThesisRiskComparison theses={filteredTheses} totalCount={counts.total} activeCompilationId={activeCompilationId} onReview={id => navigate(`/aperture/thesis/${id}`)} />}
 
         {error ? (
           <Card>

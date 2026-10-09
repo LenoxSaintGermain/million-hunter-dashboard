@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import "@/styles/mandate-risk-portrait.css";
+import { thesisDisplayLabel } from "@shared/thesisNaming";
 
 /** Missing, non-finite and invalid amounts never acquire a zero-width data mark. */
 export function recordedRiskCents(value: unknown): number | null {
@@ -44,14 +45,14 @@ const HORIZONS = [
   ["catalyst_window", "Catalyst"], ["position", "Position"], ["unknown", "Not set"],
 ] as const;
 export type RiskComparisonThesis = {
-  id: number; name?: string | null; sourceCompilationId?: number | null; isPrimary?: boolean;
+  id: number; name?: string | null; rawText?: string | null; sourceCompilationId?: number | null; isPrimary?: boolean;
   missionDefaults?: { maxPlannedLossCents?: number | null; holdingPeriod?: string | null } | null;
 };
 export function thesisHorizonKey(value: unknown): string {
   return HORIZONS.some(([key]) => key !== "unknown" && key === value) ? String(value) : "unknown";
 }
 
-export function ThesisRiskComparison({ theses, activeCompilationId, onReview }: { theses: RiskComparisonThesis[]; activeCompilationId?: number | null; onReview: (id: number) => void }) {
+export function ThesisRiskComparison({ theses, totalCount, activeCompilationId, onReview }: { theses: RiskComparisonThesis[]; totalCount?: number; activeCompilationId?: number | null; onReview: (id: number) => void }) {
   const [horizon, setHorizon] = useState("all");
   const [expanded, setExpanded] = useState(false);
   const maximum = Math.max(0, ...theses.map(t => recordedRiskCents(t.missionDefaults?.maxPlannedLossCents) ?? 0));
@@ -60,7 +61,7 @@ export function ThesisRiskComparison({ theses, activeCompilationId, onReview }: 
   const shown = expanded ? visible : visible.slice(0, 6);
   const unknown = theses.filter(t => recordedRiskCents(t.missionDefaults?.maxPlannedLossCents) == null).length;
   return <section className="mandate-risk-portrait" aria-label="Thesis mandate comparison">
-    <header><span className="mrp-eyebrow">Compare the mandates</span><h2>Different horizons. Different limits.</h2><p className="mrp-caption">{theses.length} theses in this library view · {unknown} without a recorded planned-loss limit</p></header>
+    <header><span className="mrp-eyebrow">Compare the mandates</span><h2>Different horizons. Different limits.</h2><p className="mrp-caption">{totalCount != null && totalCount !== theses.length ? `${theses.length} of ${totalCount}` : theses.length} theses shown · {unknown} without a recorded planned-loss limit</p></header>
     <div className="mrp-horizons" role="group" aria-label="Filter comparison by holding period">
       {counts.map(({ key, label, count }) => <button key={key} type="button" aria-pressed={horizon === key} onClick={() => { setHorizon(horizon === key ? "all" : key); setExpanded(false); }}>
         <span>{label}</span><strong>{count}</strong><span className="mrp-count-track" aria-hidden="true"><span style={{ width: `${theses.length ? count / theses.length * 100 : 0}%` }} /></span>
@@ -74,8 +75,8 @@ export function ThesisRiskComparison({ theses, activeCompilationId, onReview }: 
       // Active comes only from the profile's active Capital thesis (#6).
       const active = activeCompilationId != null && thesis.sourceCompilationId === activeCompilationId;
       return <div key={thesis.id} className="mrp-comparison-row">
-        <button type="button" className="mrp-review" onClick={() => onReview(thesis.id)}><span>{thesis.name || "Untitled Capital thesis"}{active && <small> · active context</small>}</span><span aria-hidden="true">↗</span></button>
-        <div className="mrp-risk-row"><div><span>{HORIZONS.find(([id]) => id === key)?.[1]}</span><strong>{riskMoney(thesis.missionDefaults?.maxPlannedLossCents)}</strong></div><RiskBar value={thesis.missionDefaults?.maxPlannedLossCents} maximum={maximum} label={`${thesis.name || "Untitled Capital thesis"} planned-loss limit`} emphasis={!!active} /></div>
+        <button type="button" className="mrp-review" onClick={() => onReview(thesis.id)}><span>{thesisDisplayLabel(thesis.name, thesis.rawText)}{active && <small> · active context</small>}</span><span aria-hidden="true">↗</span></button>
+        <div className="mrp-risk-row"><div><span>{HORIZONS.find(([id]) => id === key)?.[1]}</span><strong>{riskMoney(thesis.missionDefaults?.maxPlannedLossCents)}</strong></div><RiskBar value={thesis.missionDefaults?.maxPlannedLossCents} maximum={maximum} label={`${thesisDisplayLabel(thesis.name, thesis.rawText)} planned-loss limit`} emphasis={!!active} /></div>
       </div>;
     })}
     {!visible.length && <p className="mrp-caption">No theses in this holding-period category.</p>}
