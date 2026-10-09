@@ -34,7 +34,7 @@ export const WI_COPY = {
   "wi.scorecard.annualized": "{weekReturn} for one week is {simpleAnnual} a year if multiplied by 52, or {compoundAnnual} compounded. That's arithmetic, not a forecast.",
   "wi.scorecard.sample": "{n} closed positions. This is process evidence, not enough to show an edge or an expected return.",
   "wi.paper.fidelity": "Practice fills use the best quoted price without checking size. Dividends and early assignment aren't simulated. Assignment records post the next day.",
-  "wi.halt": "Weekly Income is halted. New ideas are blocked until the owner lifts the halt. Closing positions still works.",
+  "wi.halt": "Weekly Income is research only in this version. The app screens and scores ideas, but it can't place Weekly Income orders yet.",
   "wi.math.sixPercent": "6% a week compounds to about 20.7 times your starting amount in a year. Published weekly put-selling research shows about 0.7% average weekly premium on the S&P 500 before losses.",
 
   // ── Quick Play (Main Street) ──────────────────────────────────────────────

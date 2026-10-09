@@ -157,16 +157,21 @@ export function TodayAttentionBriefing({
   }, [attention, changesOpen, tasksOpen, allMotion, primary?.key, read.canRecordSeen, previewOnly]);
 
   const displayedBaseline = useMemo(() => attention ? displayedAttentionBaseline(attention, observed) : null, [attention, observed]);
-  useEffect(() => {
-    if (previewOnly || !read.canRecordSeen || !displayedBaseline?.snapshot.items.length || inFlight.current || seenError) return;
-    if (displayedBaseline.snapshot.items.every(item => sent.current.get(item.key) === item.fingerprint)) return;
+  // Viewing is not reviewing (#125): the baseline moves only when the operator
+  // presses "Mark reviewed", and then only for the items actually displayed.
+  const [reviewedAt, setReviewedAt] = useState<number | null>(null);
+  const canMarkReviewed = !previewOnly && read.canRecordSeen && !!displayedBaseline?.snapshot.items.length
+    && !displayedBaseline.snapshot.items.every(item => sent.current.get(item.key) === item.fingerprint);
+  const markReviewed = () => {
+    if (!canMarkReviewed || !displayedBaseline || inFlight.current) return;
     inFlight.current = true;
+    setSeenError(false);
     markSeen.mutate(displayedBaseline, {
-      onSuccess: () => { for (const item of displayedBaseline.snapshot.items) sent.current.set(item.key, item.fingerprint); },
+      onSuccess: () => { for (const item of displayedBaseline.snapshot.items) sent.current.set(item.key, item.fingerprint); setReviewedAt(Date.now()); },
       onError: () => setSeenError(true),
       onSettled: () => { inFlight.current = false; setSeenRetry(value => value + 1); },
     });
-  }, [displayedBaseline, markSeen, seenError, seenRetry, read.canRecordSeen, previewOnly]);
+  };
 
   const openTask = (item: ApertureAttentionItem) => {
     if (previewOnly) { onOpen(item.href); return; }
@@ -286,6 +291,11 @@ export function TodayAttentionBriefing({
           : ` — nothing changed since your last review${attention.baseline?.capturedAt ? ` on ${localTime(attention.baseline.capturedAt)}` : ""}. Timestamp-only churn is ignored.`}</span></div>}
 
 
+      {!previewOnly && read.canRecordSeen && <div data-mark-reviewed className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
+        <span>{reviewedAt ? `Marked reviewed at ${localTime(reviewedAt)}. Changes are now compared with this review.` : "Opening this page doesn't count as a review. Mark what you've read as reviewed to reset the comparison."}</span>
+        <Button variant="outline" size="sm" className="min-h-11" disabled={!canMarkReviewed || markSeen.isPending} onClick={markReviewed}>{markSeen.isPending ? "Saving review…" : "Mark reviewed"}</Button>
+      </div>}
+
       {attention.nextCheckpoint && <footer aria-label="Next checkpoint" className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}><div className="flex gap-3"><Clock3 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-signal)" }} /><div><p className="text-sm font-semibold">{attention.nextCheckpoint.title}</p><p className="mt-1 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.nextCheckpoint.detail}{attention.nextCheckpoint.at ? ` · ${localTime(attention.nextCheckpoint.at)}` : ""}</p></div></div>{attention.nextCheckpoint.href && <Button variant="outline" size="sm" className="min-h-11" onClick={() => onOpen(attention.nextCheckpoint!.href!)}>Review checkpoint</Button>}</footer>}
       {dismissedCount > 0 && <details open={showDismissed} onToggle={event => setShowDismissed(event.currentTarget.open)} className="border-t" style={{ borderColor: "var(--sh-border-1)" }}>
         <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Dismissed on this device · {dismissedCount}</summary>
@@ -301,7 +311,7 @@ export function TodayAttentionBriefing({
       <div className="space-y-3 border-t px-4 py-3" style={{ borderColor: "var(--sh-border-1)" }}>
         <p className="text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.monitoringNote}</p>
         <details><summary className="min-h-11 cursor-pointer py-3 text-sm">Status details</summary><p className="pb-2 text-sm leading-5" style={{ color: "var(--sh-fg-muted)" }}>{attention.scopeNote}</p></details>
-        {seenError && <div role="status" className="text-sm">Your displayed-status baseline was not saved. This does not acknowledge or resolve any finding.<Button variant="outline" className="mt-2 min-h-11 sm:ml-2" onClick={() => { setSeenError(false); setSeenRetry(value => value + 1); }}>Retry saving viewed status</Button></div>}
+        {seenError && <div role="status" className="text-sm">Your review was not saved. This does not acknowledge or resolve any finding.<Button variant="outline" className="mt-2 min-h-11 sm:ml-2" onClick={() => { setSeenError(false); markReviewed(); }}>Retry saving review</Button></div>}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Button data-put-capital-to-work className="min-h-11" onClick={() => onOpen("/aperture/deploy")}>Put capital to work<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button>
           {attention.entryState !== "start" && <Button variant="ghost" size="sm" className="min-h-11" onClick={onNewMission}>Review / revise mission</Button>}
