@@ -1,0 +1,18 @@
+/* POC v3 context strip: three limit bars. Square, ink on cream, burnt-orange labels. */
+.capital-limit-bars { display: grid; gap: .55rem; }
+.capital-limit-bar { display: grid; grid-template-columns: 6.2rem 1fr; column-gap: .6rem; row-gap: .15rem; align-items: center; font-size: .72rem; line-height: 1.35; }
+.capital-limit-bar-label { font-family: var(--font-mono, monospace); font-size: .6rem; text-transform: uppercase; letter-spacing: .12em; color: var(--sh-signal); font-weight: 600; }
+.capital-limit-bar-value { color: var(--sh-text-primary); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.capital-limit-track { grid-column: 2; height: 6px; border: 1px solid var(--sh-text-primary); border-radius: 0; background: transparent; position: relative; overflow: hidden; }
+.capital-limit-track[data-kind="ceiling"] { border-style: dashed; border-color: var(--sh-border-1); }
+.capital-limit-fill { position: absolute; inset: 0 auto 0 0; background: var(--sh-text-primary); }
+.capital-limit-bar[data-tone="warning"] .capital-limit-fill { background: var(--sh-signal); }
+.capital-limit-bar[data-tone="critical"] .capital-limit-fill { background: var(--sh-red); }
+.capital-limit-bar[data-tone="unknown"] .capital-limit-track { border-style: dotted; border-color: var(--sh-fg-muted); }
+.capital-limit-note { grid-column: 2; font-size: .66rem; color: var(--sh-fg-muted); }
+.stale-snapshot-prompt { border-top: 2px solid var(--sh-signal); border-bottom: 1px solid var(--sh-border-1); background: color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface)); padding: 1rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1.5rem; }
+.stale-snapshot-prompt h2 { font-family: var(--font-display); font-size: 1.35rem; line-height: 1.2; font-weight: 400; color: var(--sh-text-primary); }
+.stale-snapshot-prompt .kicker { font-family: var(--font-mono, monospace); font-size: .62rem; text-transform: uppercase; letter-spacing: .14em; font-weight: 600; color: var(--sh-signal); }
+.stale-snapshot-prompt p { font-size: .85rem; line-height: 1.5; color: var(--sh-fg-muted); max-width: 42rem; }
+.stale-snapshot-prompt button.stale-snapshot-sync { min-height: 44px; padding: 0 1.1rem; border: 0; border-radius: 0; background: var(--sh-signal); color: #fff; font-family: var(--font-mono, monospace); font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; cursor: pointer; }
+.stale-snapshot-prompt button.stale-snapshot-sync:disabled { opacity: .65; cursor: progress; }

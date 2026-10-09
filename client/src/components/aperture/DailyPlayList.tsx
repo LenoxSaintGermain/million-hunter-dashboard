@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { StaleSnapshotPrompt } from "./StaleSnapshotPrompt";
 import { useLocation } from "wouter";
 import { ArrowRight, ChevronDown, CircleSlash2, Compass, FileSearch, GitCompareArrows, Loader2, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -226,6 +227,7 @@ export function DailyPlayList({ onNewMission, onNewResearch, onOpenRun }: {
   }, [expandedId, onOpenRun, ranked]);
 
   return <section className="capital-story-desk space-y-5">
+    {cockpit && <StaleSnapshotPrompt account={cockpit.account} />}
     <TodayAttentionBriefing
       execution={desk.data}
       executionFailed={!!desk.error}

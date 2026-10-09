@@ -15,6 +15,7 @@ import { PortfolioPortrait } from "./PortfolioPortrait";
 import { useExperienceMode } from "@/contexts/ExperienceModeContext";
 import { MicroTooltip } from "./MicroTooltip";
 import { ConstraintResolverCard } from "./ConstraintResolverCard";
+import { LimitBars } from "./LimitBars";
 
 type HeadroomLine = CockpitHeadroomLine;
 
@@ -318,9 +319,9 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
       <div><span className="capital-context-label">{practiceAccountLabel(data.account.isPaper)}</span><strong>{money(equityCents) ?? "Value unavailable"}</strong><small>Broker snapshot · {staleText}{syncTarget.canSync ? <SyncNowButton onSync={handleRapidSync} syncing={syncing} /> : syncTarget.reason ? ` · ${syncTarget.reason}` : null}</small></div>
       <ActiveThesisSelect />
       <div className="capital-context-limit" style={{ borderColor: severityColor }}>
-        <span className="capital-context-label">Binding Portfolio Limit</span>
-        <p>{summary.binding ? `${bindingSubject} (${summary.binding.usedPct != null ? Math.round(summary.binding.usedPct) + "%" : "measured"})` : "Within limits"}</p>
-        <small>{summary.binding ? `Account holding ceiling (${summary.binding.subject ?? "portfolio"}) · separate from research lens` : summary.accountStale ? "Sync the snapshot before judging capacity" : "Saved limits · not trade clearance"}</small>
+        <span className="capital-context-label">Your limits</span>
+        <LimitBars lines={data.headroom.lines as HeadroomLine[]} />
+        <small>{summary.accountStale ? "Measured from stale account numbers. Sync first." : summary.binding && summary.severity !== "quiet" ? `Tightest holding limit: ${bindingSubject} at ${bindingUtilization.toFixed(0)}%.` : "Saved limits. Checks run again on every order."}</small>
       </div>
     </div>
     <details className="capital-context-controls"><summary>Account controls & evidence <span aria-hidden="true">↗</span></summary>{rail}</details>
