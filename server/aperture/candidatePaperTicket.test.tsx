@@ -8,6 +8,8 @@ vi.mock("@/lib/trpc", () => ({ trpc: {
   useUtils: () => ({ aperture: { invalidate: vi.fn() } }),
   aperture: {
     account: { list: { useQuery: () => ({ data: [{ id: 5, isPaper: true, brokerId: "alpaca_paper", label: "Illustrative paper", equityValueCents: 10_000_000, buyingPowerCents: 10_000_000 }] }) } },
+    // Server headroom for account 5: saved equity $99,577 → single order $4,978.85 (#109).
+    cockpit: { useQuery: () => ({ data: { mandate: { maxOrderNotionalCents: 1_000_000 }, headroom: { equityCents: 9_957_700, lines: [{ key: "single_order", label: "Single order", subject: null, usedCents: null, ceilingCents: 497_885, remainingCents: 497_885, usedPct: null, ceilingPct: 5, basis: "", reason: null }] } } }) },
     desk: { summary: { useQuery: () => ({ data: { attention: { mission: { accountId: 5, researchRunId: 77, title: "Illustrative mission" } } }, isLoading: false }) } },
     order: { create: { useMutation: (opts: unknown) => { trpcCalls.useMutation(opts); return { mutate: trpcCalls.mutate, isPending: false }; } } },
   },
@@ -121,4 +123,17 @@ describe("ticket builder opened from a candidate (#22)", () => {
     expect($.text()).toContain("Stage Paper Order on Desk ($2,500)");
     expect(trpcCalls.mutate).not.toHaveBeenCalled();
   });
+
+  it("shows the server's single-order limit, not a client recomputation, and explains it (#109)", () => {
+    const ticket = paperTicketReadiness({ play: play(), thesis, selectedPlayId: "play-test-1", researchRunId: 77, now });
+    if (ticket.state !== "ready") throw new Error("ticket not ready");
+    const $ = load(renderToStaticMarkup(React.createElement(ManualOrderTicketModal, { open: true, onOpenChange: vi.fn(), initialValues: ticket.prefill })));
+    const text = $.text();
+    expect(text).toContain("Single-Order Limit: $4,978.85");
+    // Live list equity is $100,000; the client must not turn that into $5,000.
+    expect(text).not.toContain("$5,000");
+    expect(text).toContain("5% of your account value, never more than $10,000");
+    expect(text).toContain("of the $4,978.85 limit");
+  });
 });
+
