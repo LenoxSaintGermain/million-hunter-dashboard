@@ -383,7 +383,7 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
       key: "external_paper_account_binding",
       passed: account.brokerId !== "alpaca_paper" || Boolean(account.externalAccountId),
       detail: account.brokerId !== "alpaca_paper" || account.externalAccountId
-        ? `paper destination identity ${(account.practiceBookId != null ? maskAccountNumber(account.externalAccountId) : account.externalAccountId) ?? "not required for this rail"}`
+        ? `paper destination identity ${maskAccountNumber(account.externalAccountId) ?? "not required for this rail"}`
         : "Sync the Alpaca Paper account before proposal review so the exact external destination can be verified",
     },
     {

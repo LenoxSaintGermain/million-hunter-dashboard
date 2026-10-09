@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { maskAccountNumber } from "@shared/accountNumberMask";
 import { AlertTriangle, CheckCircle2, ChevronDown, CircleSlash2, ClipboardCheck, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -546,7 +547,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
         {executionAccounts.length === 1 ? <TicketValue label="Paper destination" value={destinationAccount?.label ?? "Not connected"} /> : <label className="space-y-1.5 text-xs font-medium sm:col-span-2" style={{ color: "var(--sh-text-primary)" }}>Paper destination
           <select className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-3 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} value={destinationAccountId ?? ""} onChange={(event) => setDestinationAccountId(Number(event.target.value) || null)}>
             <option value="">Choose a paper execution account</option>
-            {executionAccounts.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.externalAccountId}</option>)}
+            {executionAccounts.map((item) => <option key={item.id} value={item.id}>{item.label} · {maskAccountNumber(item.externalAccountId)}</option>)}
           </select>
         </label>}
         <TicketValue label="Review" value={holdingPeriodLabel(holdingPeriod)} />

@@ -154,10 +154,7 @@ export async function listHouseBaselines(db: Db): Promise<UatHouseBaseline[]> {
 }
 
 /** Masks an account number to its last four characters (never shown in full outside the owner's raw view). */
-export function maskAccountNumber(value: string | null | undefined): string | null {
-  if (!value) return null;
-  return `••••${value.slice(-4)}`;
-}
+export { maskAccountNumber } from "../../../shared/accountNumberMask";
 
 /**
  * Symbols whose sells are paused on a house (reconciliation, UAT-E4). Freezes and

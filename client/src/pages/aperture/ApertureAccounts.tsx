@@ -3,6 +3,8 @@
  * Create and manage portfolio accounts (Alpaca paper, manual entry).
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
  */
+import { manualHoldingsAge } from "@shared/manualHoldingsAge";
+import { maskAccountNumber } from "@shared/accountNumberMask";
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -274,9 +276,32 @@ export default function ApertureAccounts() {
                   <p className="text-xs mt-1 break-words" style={{ color: "var(--sh-fg-muted)" }}>
                     {account.practiceBook
                       ? `${PRACTICE_BOOK_COPY.subtitle}${account.practiceBook.houseAccount ? ` · ${account.practiceBook.houseAccount}` : ""}`
-                      : account.externalAccountId ? `Paper account · ${account.externalAccountId}` : account.brokerId === "manual" ? "Research only · cannot send orders" : "Paper account not linked yet"}
+                      : account.externalAccountId ? `Paper account · ${maskAccountNumber(account.externalAccountId)}` : account.brokerId === "manual" ? "Research only · cannot send orders" : "Paper account not linked yet"}
                     {` · ${accountStamp(account.lastSyncedAt)}`}
                   </p>
+                  {account.brokerId === "manual" && (() => {
+                    const age = manualHoldingsAge(account.lastSyncedAt, Date.now());
+                    return (
+                      <div data-manual-holdings-age={age.stale ? "stale" : "fresh"} className="mt-2 flex flex-wrap items-center gap-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
+                        {age.stale && <Badge variant="outline" className="rounded-none text-[10px] uppercase tracking-[0.12em]" style={{ borderColor: "var(--sh-signal)", color: "var(--sh-signal)" }}>Stale</Badge>}
+                        <span>{age.text}. Manual holdings never refresh on their own. A ticket that uses this account as portfolio context checks its limits against these saved holdings.</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="min-h-9 rounded-none"
+                          onClick={() => {
+                            const controls = document.getElementById(`account-controls-${account.id}`) as HTMLDetailsElement | null;
+                            if (controls) controls.open = true;
+                            setCsvText("");
+                            setCsvAccountId(account.id);
+                            controls?.scrollIntoView({ block: "start" });
+                          }}
+                        >
+                          <Upload className="h-3.5 w-3.5 mr-1" />Update holdings (CSV)
+                        </Button>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <Button
                   variant="outline"
@@ -319,7 +344,7 @@ export default function ApertureAccounts() {
                 </div>
                 <AccountHoldingsPortrait accountId={account.id} />
               </div>
-              <details className="account-controls">
+              <details id={`account-controls-${account.id}`} className="account-controls">
                 <summary>Account controls · connection, CSV and freshness schedule</summary>
                 <div className="space-y-3 py-3">
               {/* Broker availability */}
