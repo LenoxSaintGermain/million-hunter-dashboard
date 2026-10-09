@@ -38,6 +38,7 @@ export type LegView = {
   impliedVolatility: number | null;
   feed: "opra" | "indicative" | null;
   quoteAgeSeconds: number | null;
+  quoteAt: number | null;
   checks: FilterCheck[];
   pass: boolean;
 };
@@ -135,6 +136,7 @@ export function evaluateLeg(row: ChainRow, role: "short" | "long", ctx: ScreenCo
     impliedVolatility: m?.impliedVolatility ?? null,
     feed: m?.feed ?? null,
     quoteAgeSeconds,
+    quoteAt: m?.quoteAt ?? null,
     checks,
     pass: checks.every((check) => check.pass),
   };
