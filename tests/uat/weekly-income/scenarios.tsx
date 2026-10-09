@@ -34,7 +34,10 @@ function fixtureScreen(regularSession: boolean): WiScreenResult {
   const xyz = screenUnderlying({ symbol: "XYZ", priceCents: 10_000, advUsd: 400_000_000 }, [{ date: "2026-10-16", dte: 4, events: fixEvents, rows: [fixturePut("XYZ", 95, 0.95, 1.05, -0.2), fixturePut("XYZ", 92.5, 0.57, 0.63, -0.12)] }], ctx);
   const abc = screenUnderlying({ symbol: "ABC", priceCents: 4_200, advUsd: 180_000_000 }, [{ date: "2026-10-16", dte: 4, events: fixEvents, rows: [fixturePut("ABC", 40, 0.48, 0.52, -0.24), fixturePut("ABC", 39, 0.29, 0.31, -0.15, 800), fixturePut("ABC", 41, 0.80, 0.84, -0.33)] }], ctx);
   const low = screenUnderlying({ symbol: "LMN", priceCents: 6_000, advUsd: 30_000_000 }, [], ctx);
-  return { asOf: FIX_NOW, session: regularSession ? "regular" : "closed", refusal: null, candidates: rankCandidates([...xyz.candidates, ...abc.candidates], 10), skipped: [...xyz.skipped, ...abc.skipped, ...low.skipped, { symbol: "DEF", plain: "We don't know when DEF next reports results, so we skip it. Surprise moves around a report can be large.", detail: "Earnings source unavailable; next report date unknown.", source: null }] };
+  // SPY: an allowlisted broad-index fund. Fixture strikes and quotes only (Example data), not SPY market data.
+  const spyEvents = { ...fixEvents, nextEarnings: null, allowedBecause: "SPY is a fund that tracks the S&P 500 (about 500 large US companies). Funds don't report earnings, so the earnings rule doesn't apply; the dividend-date rule still does." };
+  const spy = screenUnderlying({ symbol: "SPY", priceCents: 50_000, advUsd: 30_000_000_000 }, [{ date: "2026-10-16", dte: 4, events: spyEvents, rows: [fixturePut("SPY", 490, 1.90, 2.00, -0.18, 9000), fixturePut("SPY", 485, 1.05, 1.11, -0.11, 7000)] }], ctx);
+  return { asOf: FIX_NOW, session: regularSession ? "regular" : "closed", refusal: null, candidates: rankCandidates([...xyz.candidates, ...abc.candidates, ...spy.candidates], 10), skipped: [...xyz.skipped, ...abc.skipped, ...low.skipped, { symbol: "IWM", plain: "We can't confirm IWM's next dividend date, so we skip it this week.", detail: "Next ex-dividend expected around 2026-10-15 (every ~91 days) but not announced yet." }, { symbol: "DEF", plain: "We don't know when DEF next reports results, so we skip it. Surprise moves around a report can be large.", detail: "Earnings source unavailable; next report date unknown.", source: null }] };
 }
 // Example data: hypothetical fixture week (3 take-profits, 1 stop, 1 time exit). Not real fills.
 const WK = Date.parse("2026-10-12T04:00:00Z");
@@ -48,25 +51,25 @@ const fixtureWeek = (basis: WiPositionRecord["basis"], over: Partial<WiWeekInput
 const fixtureHistory = weeklyIncomeHistory([{ weekOf: "2026-10-05", returnOnAccount: 0.0009 }, { weekOf: "2026-10-12", returnOnAccount: -0.003 }, { weekOf: "2026-10-19", returnOnAccount: 0.002 }]).display;
 const refused = (code: "opra_not_entitled" | "options_level", plain: string, detail: string): WiScreenResult => ({ asOf: FIX_NOW, session: "regular", refusal: { code, plain, detail }, candidates: [], skipped: [] });
 
-/** Each scenario is one Guided-mode state. Later PRs append their states here. */
+/** Each scenario is one Quick Play state. Later PRs append their states here. */
 export const SCENARIOS: Record<string, { title: string; render: () => ReactNode }> = {
-  "intro": { title: "What Weekly Income is (Guided intro)", render: () => <WeeklyIncomeIntro /> },
+  "intro": { title: "What Weekly Income is (Quick Play intro)", render: () => <WeeklyIncomeIntro /> },
   "worked-example": { title: "Worked example: put credit spread (Example data)", render: () => ("error" in example ? <p>{example.error}</p> : <WeeklyIncomeSpreadExplainer explainer={example} />) },
   "glossary": { title: "Words used here, in plain English", render: () => <section className="border p-5" style={{ borderColor: "var(--rule)", background: "var(--paper)" }}><WeeklyIncomeGlossary open /></section> },
   "six-percent": { title: "Weekly target note (mission setup)", render: () => <section className="border p-4 text-sm" style={{ borderColor: "var(--rule)", background: "var(--paper)" }}><p className="font-semibold">6% per week required · aggressive</p><p className="mt-1" style={{ color: "var(--sh-fg-muted)" }}>$600 target ÷ $10,000 declared mission capital (Example data). An aspiration, not a forecast; it never increases allowed risk.</p><SixPercentNote /></section> },
   "template-picker": { title: "New Capital thesis: template choice", render: () => <WeeklyIncomeTemplatePicker onUse={() => undefined} /> },
-  "template-guided": { title: "Weekly Income template chosen (Guided)", render: () => <WeeklyIncomeTemplatePanel parameters={weeklyIncomeDefaults()} isGuided onRemove={() => undefined} showExample={false} /> },
-  "template-pro": { title: "Weekly Income template chosen (Pro parameter table)", render: () => <WeeklyIncomeTemplatePanel parameters={weeklyIncomeDefaults()} mandate={FIXTURE_MANDATE} parameterHash="sha256:fixture-not-a-real-hash" isGuided={false} /> },
-  "skipped-guided": { title: "Skipped by a blackout (Guided, Example data)", render: () => <WeeklyIncomeSkipped items={SKIPPED} isGuided /> },
-  "skipped-pro": { title: "Skipped by a blackout (Pro, Example data)", render: () => <WeeklyIncomeSkipped items={SKIPPED} isGuided={false} /> },
-  "week-empty": { title: "No idea met every rule (Guided)", render: () => <WeeklyIncomeSkipped items={[]} isGuided /> },
-  "screen-guided": { title: "This week's research ideas (Guided, Example data)", render: () => <WeeklyIncomeScreenResults result={fixtureScreen(true)} isGuided isExample /> },
-  "screen-pro": { title: "Research screen (Pro, Example data)", render: () => <WeeklyIncomeScreenResults result={fixtureScreen(true)} isGuided={false} isExample /> },
-  "screen-closed": { title: "Market closed preview (Guided, Example data)", render: () => <WeeklyIncomeScreenResults result={{ ...fixtureScreen(false), candidates: fixtureScreen(false).candidates.slice(0, 1) }} isGuided isExample /> },
-  "screen-refused-opra": { title: "Refused: delayed prices only (Guided)", render: () => <WeeklyIncomeScreenResults result={refused("opra_not_entitled", "This account only sees delayed, indicative option prices. Weekly Income needs live OPRA prices, so nothing is shown.", "Option quotes are indicative; OPRA not entitled")} isGuided /> },
+  "template-quick-play": { title: "Weekly Income template chosen (Quick Play)", render: () => <WeeklyIncomeTemplatePanel parameters={weeklyIncomeDefaults()} isGuided onRemove={() => undefined} showExample={false} /> },
+  "template-strategist": { title: "Weekly Income template chosen (Strategist parameter table)", render: () => <WeeklyIncomeTemplatePanel parameters={weeklyIncomeDefaults()} mandate={FIXTURE_MANDATE} parameterHash="sha256:fixture-not-a-real-hash" isGuided={false} /> },
+  "skipped-quick-play": { title: "Skipped by a blackout (Quick Play, Example data)", render: () => <WeeklyIncomeSkipped items={SKIPPED} isGuided /> },
+  "skipped-strategist": { title: "Skipped by a blackout (Strategist, Example data)", render: () => <WeeklyIncomeSkipped items={SKIPPED} isGuided={false} /> },
+  "week-empty": { title: "No idea met every rule (Quick Play)", render: () => <WeeklyIncomeSkipped items={[]} isGuided /> },
+  "screen-quick-play": { title: "This week's research ideas (Quick Play, Example data)", render: () => <WeeklyIncomeScreenResults result={fixtureScreen(true)} isGuided isExample /> },
+  "screen-strategist": { title: "Research screen (Strategist, Example data)", render: () => <WeeklyIncomeScreenResults result={fixtureScreen(true)} isGuided={false} isExample /> },
+  "screen-closed": { title: "Market closed preview (Quick Play, Example data)", render: () => <WeeklyIncomeScreenResults result={{ ...fixtureScreen(false), candidates: fixtureScreen(false).candidates.slice(0, 1) }} isGuided isExample /> },
+  "screen-refused-opra": { title: "Refused: delayed prices only (Quick Play)", render: () => <WeeklyIncomeScreenResults result={refused("opra_not_entitled", "This account only sees delayed, indicative option prices. Weekly Income needs live OPRA prices, so nothing is shown.", "Option quotes are indicative; OPRA not entitled")} isGuided /> },
+  "screen-refused-level": { title: "Refused: options level (Strategist)", render: () => <WeeklyIncomeScreenResults result={refused("options_level", "This account isn't approved for floor-protected option trades (spreads) yet.", "Options level 2 < 3")} isGuided={false} /> },
   "scorecard-guided": { title: "Weekly scorecard (Guided, Example data)", render: () => <WeeklyIncomeScorecardView scorecard={buildWeeklyIncomeScorecard(fixtureWeek("paper_fill"), "paper_fill")} isGuided isExample /> },
   "scorecard-pro": { title: "Weekly scorecard (Pro, Example data)", render: () => <WeeklyIncomeScorecardView scorecard={buildWeeklyIncomeScorecard(fixtureWeek("paper_fill"), "paper_fill")} isGuided={false} isExample history={fixtureHistory} /> },
   "scorecard-counterfactual": { title: "Counterfactual scorecard (Guided, Example data)", render: () => <WeeklyIncomeScorecardView scorecard={buildWeeklyIncomeScorecard(fixtureWeek("counterfactual"), "counterfactual")} isGuided isExample /> },
   "scorecard-not-measured": { title: "Scorecard without measured account value (Guided, Example data)", render: () => <WeeklyIncomeScorecardView scorecard={buildWeeklyIncomeScorecard(fixtureWeek("paper_fill", { mondayEquityCents: null }), "paper_fill")} isGuided isExample /> },
-  "screen-refused-level": { title: "Refused: options level (Pro)", render: () => <WeeklyIncomeScreenResults result={refused("options_level", "This account isn't approved for floor-protected option trades (spreads) yet.", "Options level 2 < 3")} isGuided={false} /> },
 };

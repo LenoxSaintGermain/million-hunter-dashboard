@@ -25,7 +25,7 @@ describe("Weekly Income screen results (#84)", () => {
   beforeAll(() => { (globalThis as any).React = React; });
   afterAll(() => { delete (globalThis as any).React; });
 
-  it("Guided: plain explainer, dollar max loss, what can go wrong, research-only, clean language", () => {
+  it("Quick Play: plain explainer, dollar max loss, what can go wrong, research-only, clean language", () => {
     const $ = load(renderToStaticMarkup(<WeeklyIncomeScreenResults result={result} isGuided isExample />));
     expect($("[data-wi-candidate]")).toHaveLength(1);
     expect($("[data-example-data]").text()).toBe("Example data");
@@ -36,7 +36,7 @@ describe("Weekly Income screen results (#84)", () => {
     expect($("button")).toHaveLength(0);
   });
 
-  it("Pro: exact table, no example badge for measured numbers", () => {
+  it("Strategist: exact table, no example badge for measured numbers", () => {
     const $ = load(renderToStaticMarkup(<WeeklyIncomeScreenResults result={result} isGuided={false} />));
     expect($("[data-wi-pro-table] tbody tr")).toHaveLength(1);
     expect($("[data-example-data]")).toHaveLength(0);
@@ -49,5 +49,16 @@ describe("Weekly Income screen results (#84)", () => {
     expect($("[data-wi-refusal]").text()).toContain("delayed, indicative");
     expect($("[data-wi-candidate]")).toHaveLength(0);
     expect($("[data-wi-refusal]").text()).not.toContain("opra_not_entitled");
+  });
+
+  it("Quick Play shows a plain 'why this is allowed' line for an index fund", () => {
+    const note = "SPY is a fund that tracks the S&P 500 (about 500 large US companies). Funds don't report earnings, so the earnings rule doesn't apply; the dividend-date rule still does.";
+    const withNote: WiScreenResult = { ...result, candidates: result.candidates.map((c) => ({ ...c, allowedBecause: note })) };
+    const quick = load(renderToStaticMarkup(<WeeklyIncomeScreenResults result={withNote} isGuided />));
+    expect(quick("[data-wi-allowed]").text()).toBe(`Why this is allowed · ${note}`);
+    expect(passesWeeklyIncomeLanguage(quick("[data-wi-allowed]").text())).toBe(true);
+    const strategist = load(renderToStaticMarkup(<WeeklyIncomeScreenResults result={withNote} isGuided={false} />));
+    expect(strategist("[data-wi-allowed]").text()).toBe("index fund · earnings rule n/a");
+    expect(load(renderToStaticMarkup(<WeeklyIncomeScreenResults result={result} isGuided />))("[data-wi-allowed]")).toHaveLength(0);
   });
 });

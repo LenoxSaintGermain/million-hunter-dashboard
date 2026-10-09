@@ -11,9 +11,10 @@ import { getDb } from "../db";
 import { portfolioAccounts, thesisCompilations } from "../../drizzle/schema";
 import { brokerFor } from "./brokers/index";
 import { alpacaDataProvider } from "./providers/marketData";
-import { benzingaProvider } from "./providers/paid";
 import { isMarketHoliday, marketSession } from "./marketSession";
-import { evaluateEventWindow, earningsRecordFromFact } from "./weeklyIncomeEventWindows";
+import { evaluateEventWindow, exDividendRecordsFromCorporateActions } from "./weeklyIncomeEventWindows";
+import { benzingaConfigured, fetchCashDividends, fetchUpcomingEarnings } from "./weeklyIncomeEventData";
+import { earningsExemptIndexEtf } from "../../shared/weeklyIncome/indexEtfs";
 import { rankCandidates, screenUnderlying, weeklyExpirationsInRange, type ScreenExpiration, type ScreenSkip, type SpreadCandidate } from "./weeklyIncomeScreen";
 import { readStoredWeeklyIncomeTemplate } from "../../shared/strategyTemplates/weeklyIncome";
 
@@ -41,6 +42,7 @@ export function screenAccountGate(account: { isPaper: boolean; optionsTradingLev
   return null;
 }
 
+const addDaysIso = (date: string, days: number) => new Date(Date.parse(`${date}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 const etDate = (ms: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(ms));
 const dayLabel = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 
@@ -89,21 +91,29 @@ export const weeklyIncomeRouter = router({
       const skipped: ScreenSkip[] = [];
       let sawOpra = false;
       let sawIndicativeOnly = false;
-      const benzingaOn = Boolean(process.env.BENZINGA_API_KEY);
+      const benzingaOn = benzingaConfigured();
 
       for (const symbol of input.symbols) {
         const facts = await (alpacaDataProvider.fetchSecurityFacts?.(symbol, { now, timeoutMs: 10_000 }) ?? Promise.resolve([])).catch(() => []);
         const priceFact = facts.find((f) => f.factKey === "last_price" && f.basis === "verified");
         const advFact = facts.find((f) => f.factKey === "adv_usd_30d" && f.basis === "verified");
         const priceCents = priceFact?.valueNum != null ? Math.round(priceFact.valueNum * 100) : null;
-        const earningsFacts = benzingaOn ? await (benzingaProvider.fetchSecurityFacts?.(symbol, { now, timeoutMs: 10_000 }) ?? Promise.resolve([])).catch(() => []) : [];
-        const earning = earningsRecordFromFact(symbol, earningsFacts.find((f) => f.factKey === "next_earnings_date"));
+        // Allowlisted broad-index ETFs: no earnings lookup; ex-dividend dates from Alpaca instead.
+        const indexEtf = earningsExemptIndexEtf(symbol);
+        const earnings = indexEtf || !benzingaOn ? null : await fetchUpcomingEarnings(symbol, entryDateEt).catch(() => null);
+        const dividends = indexEtf ? await fetchCashDividends(symbol, addDaysIso(entryDateEt, -400), addDaysIso(entryDateEt, 60)).catch(() => null) : null;
         const exps: ScreenExpiration[] = [];
         for (const exp of expirations) {
           const events = evaluateEventWindow({
             symbol, structure: "P1", entryDateEt, expirationDateEt: exp.date,
-            // Unknown earnings are excluded (fail closed); ex-dividend does not affect P1.
-            earnings: benzingaOn ? (earning ? [earning] : []) : null, exDividends: [],
+            // Unknown earnings exclude single stocks (fail closed). Index ETFs skip the
+            // earnings rule but must have a known ex-dividend picture for the window.
+            earnings,
+            ...(() => {
+              if (!indexEtf) return { exDividends: [] };
+              const exDiv = exDividendRecordsFromCorporateActions(symbol, dividends, { entryDateEt, expirationDateEt: exp.date });
+              return { exDividends: exDiv.records, exDividendUnknownDetail: exDiv.unknownDetail };
+            })(),
             earningsWindowSessionsAfter: p.earnings_window_sessions_after, exDividendBlackoutCalls: p.ex_dividend_blackout_calls,
           });
           const rows = events.eligible && priceCents != null

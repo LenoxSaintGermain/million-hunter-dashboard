@@ -2,7 +2,7 @@
  * Weekly Income (#82, #87) copy library. Display text only: nothing here
  * changes a gate, a limit, or stored state.
  *
- * Voice follows docs/CAPITAL_APERTURE_LANGUAGE_LIBRARY.md. Guided mode speaks
+ * Voice follows docs/CAPITAL_APERTURE_LANGUAGE_LIBRARY.md. Quick Play speaks
  * Main Street English: every trading term is either avoided or explained in one
  * plain line where it first appears. No string may promise or imply a return.
  */
@@ -37,7 +37,7 @@ export const WI_COPY = {
   "wi.halt": "Weekly Income is halted. New ideas are blocked until the owner lifts the halt. Closing positions still works.",
   "wi.math.sixPercent": "6% a week compounds to about 20.7 times your starting amount in a year. Published weekly put-selling research shows about 0.7% average weekly premium on the S&P 500 before losses.",
 
-  // ── Guided mode (Main Street) ──────────────────────────────────────────────
+  // ── Quick Play (Main Street) ──────────────────────────────────────────────
   "wi.guided.eyebrow": "Weekly Income · practice money",
   "wi.guided.headline": "Get paid up front for a promise about a stock's price, with a floor on what you can lose.",
   "wi.guided.howItWorks": "You get paid up front to agree to buy a stock you like at a lower price. You also buy a cheaper agreement a little lower down. That second agreement is the floor: it fixes the most you can lose before you start.",
@@ -69,7 +69,7 @@ export const WI_COPY = {
 export type WiCopyKey = keyof typeof WI_COPY;
 
 /**
- * Plain-English one-liners for every trading term Guided mode shows. The rule:
+ * Plain-English one-liners for every trading term Quick Play shows. The rule:
  * no jargon without a one-line plain explanation next to it.
  */
 export const WI_GLOSSARY = [

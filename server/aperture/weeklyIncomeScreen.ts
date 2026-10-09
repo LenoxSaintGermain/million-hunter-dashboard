@@ -62,6 +62,8 @@ export type SpreadCandidate = {
   /** False outside the regular session: prices are from the last session. */
   entryEligible: boolean;
   previewReason: string | null;
+  /** Quick Play note when a rule was lifted for this underlying (broad-index ETF earnings exemption). */
+  allowedBecause: string | null;
   guided: GuidedSpreadExplainer | null;
 };
 
@@ -216,6 +218,7 @@ export function screenUnderlying(underlying: ScreenUnderlying, expirations: Scre
         sizing, structureChecks,
         entryEligible: ctx.regularSession,
         previewReason: ctx.regularSession ? null : "Market closed: these prices are from the last session, so nothing is eligible to enter.",
+        allowedBecause: exp.events.allowedBecause ?? null,
         guided: "error" in guided ? null : guided,
       });
     }

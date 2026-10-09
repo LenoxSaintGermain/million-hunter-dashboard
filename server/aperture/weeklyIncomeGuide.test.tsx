@@ -6,8 +6,8 @@ import { SixPercentNote, WeeklyIncomeIntro, WeeklyIncomeSpreadExplainer } from "
 import { WI_EXAMPLE_SPREAD, buildGuidedSpreadExplainer } from "../../shared/weeklyIncome/guided";
 import { passesWeeklyIncomeLanguage } from "../../shared/weeklyIncome/copy";
 
-/** #87 / #82: Guided mode explains the play in plain words, in dollars, with the downside stated. */
-describe("Weekly Income Guided explainer", () => {
+/** #87 / #82: Quick Play explains the play in plain words, in dollars, with the downside stated. */
+describe("Weekly Income Quick Play explainer", () => {
   beforeAll(() => { (globalThis as any).React = React; });
   afterAll(() => { delete (globalThis as any).React; });
   const explainer = buildGuidedSpreadExplainer(WI_EXAMPLE_SPREAD);
