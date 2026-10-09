@@ -37,7 +37,11 @@ describe("Capital reading desk production and public UAT contract", () => {
     expect(source).toContain("Needs a verified limit");
     expect(source).not.toContain('"0% committed"');
     expect(source).not.toContain("Live Screen Active");
-    expect(source).toContain("Saved research filter");
+    // The queue filter reads the recorded catalyst date only. Thesis-name word
+    // matches were removed and must not come back as a "saved filter".
+    expect(source).not.toContain("Saved research filter");
+    expect(source).not.toMatch(/thesisName\?\.toLowerCase\(\)\.includes/);
+    expect(source).toContain("Recorded catalyst date only");
   });
   it("explicitly disables preview persistence and inline provider-backed reviews", () => {
     const source = readFileSync("client/src/components/aperture/TodayAttentionBriefing.tsx", "utf8");

@@ -74,7 +74,17 @@ describe("Guided decision queue", () => {
     expect(html).not.toContain("NVDA");
   });
 
-  it("shows the all-clear only when nothing needs a decision", () => {
-    expect(render(attention([]))).toContain("All Clear");
+  it("shows the all-clear only when nothing needs a decision and the account check is verified", () => {
+    const verified = { verified: true, reason: "Your practice account synced 5m ago and every measured limit has room." };
+    const html = renderToStaticMarkup(React.createElement(GuidedDecisionQueue, { attention: attention([]), onOpen: () => {}, accountCheck: verified }));
+    expect(html).toContain("All clear");
+    expect(html).toContain("every measured limit has room");
+  });
+
+  it("an empty queue without a verified account check is not an all-clear", () => {
+    const html = render(attention([]));
+    expect(html).not.toMatch(/all clear/i);
+    expect(html).toContain("Nothing needs a decision right now");
+    expect(html).toContain("isn&#x27;t an all-clear");
   });
 });

@@ -75,10 +75,10 @@ export function researchHref(search: string, inspect: number | null) {
 }
 
 const filterLabels: Record<string, string> = {
-  catalyst_14d: "🔥 Near-term Catalyst (<14d)",
-  high_iv: "⚡ High IV / Asymmetric",
-  macro_hedge: "🛡️ Correlated Macro Hedge",
+  catalyst_14d: "Catalyst date within 14 days",
 };
+/** Old Today links matched words in thesis names, not recorded data. They no longer filter. */
+const RETIRED_FILTERS = new Set(["high_iv", "macro_hedge"]);
 
 export default function ApertureRuns() {
   const [, navigate] = useLocation();
@@ -98,23 +98,12 @@ export default function ApertureRuns() {
   const inspected = journeys.find((journey) => journey.rootId === inspectId) ?? null;
 
   const filteredJourneys = useMemo(() => {
-    if (!filter) return journeys;
-    return journeys.filter((journey) => {
-      if (filter === "catalyst_14d") {
-        return journey.runs.some((r) => {
-          const deadline = r.catalystDeadlineAt;
-          const days = deadline ? Math.ceil((deadline - Date.now()) / 86400000) : null;
-          return (days != null && days <= 14 && days >= 0) || r.holdingPeriod === "intraday" || r.holdingPeriod === "catalyst_window";
-        });
-      }
-      if (filter === "high_iv") {
-        return journey.runs.some((r) => r.holdingPeriod === "intraday" || journey.thesisName.toLowerCase().includes("iv") || journey.thesisName.toLowerCase().includes("vol"));
-      }
-      if (filter === "macro_hedge") {
-        return journey.runs.some((r) => journey.thesisName.toLowerCase().includes("macro") || journey.thesisName.toLowerCase().includes("hedge"));
-      }
-      return true;
-    });
+    if (filter !== "catalyst_14d") return journeys;
+    return journeys.filter((journey) => journey.runs.some((r) => {
+      const deadline = r.catalystDeadlineAt;
+      const days = deadline != null ? Math.ceil((deadline - Date.now()) / 86400000) : null;
+      return days != null && days <= 14 && days >= 0;
+    }));
   }, [journeys, filter]);
 
   const visibleJourneys = filteredJourneys.filter(j => (state === "all" || state === j.state) && j.thesisName.toLowerCase().includes(query.trim().toLowerCase()));
@@ -131,9 +120,11 @@ export default function ApertureRuns() {
     {filter && (
       <div className="flex items-center justify-between rounded-xl border px-4 py-2.5 text-xs" style={{ borderColor: "var(--sh-signal)", background: "var(--sh-surface-2)" }}>
         <div className="flex items-center gap-2">
-          <span className="font-semibold" style={{ color: "var(--sh-signal)" }}>Active Screen:</span>
-          <span className="font-medium" style={{ color: "var(--sh-text-primary)" }}>{filterLabels[filter] ?? filter}</span>
-          <span style={{ color: "var(--sh-fg-muted)" }}>({filteredJourneys.length} matching journey{filteredJourneys.length === 1 ? "" : "s"})</span>
+          {filterLabels[filter] ? <>
+            <span className="font-semibold" style={{ color: "var(--sh-signal)" }}>Filter:</span>
+            <span className="font-medium" style={{ color: "var(--sh-text-primary)" }}>{filterLabels[filter]}</span>
+            <span style={{ color: "var(--sh-fg-muted)" }}>({filteredJourneys.length} matching journey{filteredJourneys.length === 1 ? "" : "s"})</span>
+          </> : <span style={{ color: "var(--sh-text-primary)" }}>{RETIRED_FILTERS.has(filter) ? "This filter is no longer offered: it matched words in thesis names, not recorded data. Showing all research." : "Unknown filter. Showing all research."}</span>}
         </div>
         <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={clearScreen}>
           <X className="mr-1 h-3.5 w-3.5" /> Clear filter

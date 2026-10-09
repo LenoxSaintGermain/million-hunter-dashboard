@@ -6,6 +6,7 @@ import type { ApertureAttentionBriefing, ApertureAttentionItem } from "@shared/a
 import type { TodayExecutionData } from "./TodayExecutionSnapshot";
 import { MicroTooltip } from "./MicroTooltip";
 import { overdueReviewNudge } from "@shared/overdueReviewNudge";
+import type { GuidedAccountCheck } from "@shared/guidedAllClear";
 
 interface GuidedDecisionQueueProps {
   attention: ApertureAttentionBriefing | null;
@@ -20,11 +21,16 @@ interface GuidedDecisionQueueProps {
    * Omitted = fall back to attention.primary.
    */
   leadKey?: string | null;
+  /**
+   * Whether the practice account is synced and inside every measured limit.
+   * Without it (or when unverified) the queue never says "All clear".
+   */
+  accountCheck?: GuidedAccountCheck | null;
 }
 
 interface DecisionCardItem {
   id: string;
-  type: "order_ready" | "order_blocked" | "gate_review" | "quote_stale" | "safe_all_clear";
+  type: "order_ready" | "order_blocked" | "gate_review" | "quote_stale" | "safe_all_clear" | "account_unverified";
   title: string;
   badge: string;
   badgeTone: "green" | "amber" | "blue" | "gray";
@@ -43,6 +49,7 @@ export function GuidedDecisionQueue({
   onRefresh,
   className = "",
   leadKey,
+  accountCheck,
 }: GuidedDecisionQueueProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -98,7 +105,8 @@ export function GuidedDecisionQueue({
     });
   }
 
-  // 3. Check for Stale Quotes / Monitoring
+  // 3. Out-of-date saved status. The button only re-reads saved records; it
+  // never fetches new market prices, so the copy must not say it does.
   const staleItem = attention?.otherAttention?.find(
     (item) => item.stateLabel?.toLowerCase().includes("stale")
   );
@@ -107,30 +115,41 @@ export function GuidedDecisionQueue({
     cards.push({
       id: `stale_${staleItem.key}`,
       type: "quote_stale",
-      title: "Update Market Quotes",
-      badge: "Refresh Check",
+      title: "Some saved status is out of date",
+      badge: "Out of date",
       badgeTone: "amber",
-      summary: "Market quotes need refreshing to calculate accurate position values and risk ceilings.",
-      detail: "One click syncs the latest paper prices with zero delay.",
-      primaryActionLabel: "Refresh Now",
+      summary: staleItem.reason || "Some of what's shown here is older than it should be. Check it again before you decide.",
+      detail: "Reloading re-reads what's already saved. It doesn't fetch new market prices. For fresh account numbers, use Sync now on the account bar.",
+      primaryActionLabel: "Reload saved status",
       onPrimary: onRefresh,
     });
   }
 
-  // 4. Default Safe State only when nothing critical needs a decision. A critical
-  // primary decision card shown elsewhere on the page is not an all-clear.
+  // 4. Nothing needs a decision. It is only an all-clear when the account is
+  // synced recently and every measured limit has room; otherwise say what is
+  // unknown. A critical primary card shown elsewhere is never an all-clear.
   if (cards.length === 0 && !attention?.primary?.critical && !(attention?.otherCritical?.length)) {
-    cards.push({
+    const verified = accountCheck?.verified === true;
+    cards.push(verified ? {
       id: "all_clear",
       type: "safe_all_clear",
-      title: "Guardrails Active · All Clear",
-      badge: "Safe Zone",
+      title: "All clear: nothing needs you right now",
+      badge: "All clear",
       badgeTone: "green",
-      summary: "All active positions and paper balances are within their safety boundaries.",
-      detail: "No thesis violations, unsubmitted tickets, or overdue checkups today.",
-      primaryActionLabel: "Explore New Idea",
-      secondaryActionLabel: "View Portfolio",
+      summary: accountCheck!.reason,
+      detail: "Nothing checks, orders or exits automatically. You decide every step.",
+      primaryActionLabel: "Explore a new idea",
       href: "/aperture/theses",
+    } : {
+      id: "unverified_quiet",
+      type: "account_unverified",
+      title: "Nothing needs a decision right now",
+      badge: "Check account",
+      badgeTone: "gray",
+      summary: accountCheck?.reason ?? "We couldn't confirm your account is synced and inside its limits.",
+      detail: "An empty list isn't an all-clear until your account is synced and your limits are measured.",
+      primaryActionLabel: "Open Portfolio",
+      href: "/aperture/accounts",
     });
   }
 
