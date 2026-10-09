@@ -6,6 +6,7 @@ import { buildProposalReadiness } from "@shared/proposalReadiness";
 import { plainPreflightBlocking } from "@shared/orderSubmitReadiness";
 import { PlayAndReturn } from "./PlayAndReturn";
 import { dollarsToCents } from "@shared/proposalTicketFields";
+import { sharePlanSummary, ticketTimeDefaults } from "@shared/proposalTicketDefaults";
 import { buildOccOptionSymbol, isOptionInstrument, nextStandardMonthlyOptionExpiration, paperInstrumentLabel, type PaperInstrumentType } from "@shared/paperInstrument";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -83,8 +84,9 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
   const [reason, setReason] = useState(`Paper-only proposal based on recorded human review of ${candidate?.symbol ?? "this"} research evidence.`);
   const [invalidationCondition, setInvalidationCondition] = useState(run?.invalidationRule ?? "Do not proceed, or exit the paper position, if the thesis evidence no longer supports the decision.");
   const [holdingPeriod, setHoldingPeriod] = useState<HoldingPeriod>(() => safeHoldingPeriod(run?.holdingPeriod));
-  const [deadline, setDeadline] = useState(() => toLocalDateTimeInputValue(run?.catalystDeadlineAt ?? Date.now() + 7 * 86_400_000));
-  const [timeStop, setTimeStop] = useState(() => toLocalDateTimeInputValue(run?.catalystDeadlineAt ?? Date.now() + 6 * 3_600_000));
+  const [timeDefaults] = useState(() => ticketTimeDefaults(run?.catalystDeadlineAt, Date.now()));
+  const [deadline, setDeadline] = useState(() => timeDefaults.deadlineAt == null ? "" : toLocalDateTimeInputValue(timeDefaults.deadlineAt));
+  const [timeStop, setTimeStop] = useState(() => timeDefaults.timeStopAt == null ? "" : toLocalDateTimeInputValue(timeDefaults.timeStopAt));
   const [noTradeText, setNoTradeText] = useState("");
   const [paperAcknowledgement, setPaperAcknowledgement] = useState("");
   const [preflightInput, setPreflightInput] = useState<{ ticket: any; fingerprint: string } | null>(null);
@@ -418,12 +420,14 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
     if (readiness.action === "confirm_paper") return acknowledgementRef.current?.focus();
     submitProposal();
   };
-  const modeledEntryCents = isOption ? constructedPlay?.entry?.priceCents : entryPriceCents ?? constructedPlay?.entry?.priceCents;
-  const modeledStopCents = isOption ? constructedPlay?.stop?.priceCents : stopPriceCents ?? constructedPlay?.stop?.priceCents;
-  const modeledTargets = isOption ? [] : (constructedPlay?.targets ?? []).map((target: any) => ({ label: `${target.rMultiple}R`, priceCents: target.priceCents }));
-  const modeledQuantity = isOption ? (Number.isInteger(optionQty) && optionQty > 0 ? `${optionQty} contract${optionQty === 1 ? "" : "s"}` : "—") : constructedPlay?.qty == null ? "—" : `${constructedPlay.qty.toLocaleString()} shares`;
-  const modeledLoss = isOption ? optionMaxLossCents : constructedPlay?.plannedLossCents;
-  const modeledCapital = isOption ? optionMaxLossCents : constructedPlay?.notionalCents;
+  const sharePlan = sharePlanSummary({ recipe: constructedPlay, recipeReady: recipeCanPrepare, formEntryCents: entryPriceCents ?? null, formStopCents: stopPriceCents ?? null });
+  const modeledEntryCents = isOption ? constructedPlay?.entry?.priceCents : sharePlan.entryCents ?? undefined;
+  const modeledStopCents = isOption ? constructedPlay?.stop?.priceCents : sharePlan.stopCents ?? undefined;
+  const modeledTargets = isOption ? [] : sharePlan.targets;
+  const modeledQuantity = isOption ? (Number.isInteger(optionQty) && optionQty > 0 ? `${optionQty} contract${optionQty === 1 ? "" : "s"}` : "—") : sharePlan.qty == null ? "—" : `${sharePlan.qty.toLocaleString()} shares`;
+  const modeledLoss = isOption ? optionMaxLossCents : sharePlan.plannedLossCents;
+  const modeledCapital = isOption ? optionMaxLossCents : sharePlan.notionalCents;
+  const referenceLevels = isOption ? null : sharePlan.reference;
   const projectedBuyingPowerCents = account?.buyingPowerCents != null
     ? Math.max(0, account.buyingPowerCents - (currentPreflightData?.gatedNotionalCents ?? modeledCapital ?? 0))
     : null;
@@ -480,7 +484,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
           <div className="rounded-lg p-2" style={{ background: "var(--sh-surface-2)" }}>
             <span className="text-[10px] font-medium uppercase tracking-[0.08em]" style={{ color: "var(--sh-fg-muted)" }}>Order Notional</span>
             <p className="mt-0.5 font-mono text-sm font-bold tabular-nums" style={{ color: "var(--sh-text-primary)" }}>
-              {money(currentPreflightData?.gatedNotionalCents ?? modeledCapital ?? 0)}
+              {money(currentPreflightData?.gatedNotionalCents ?? modeledCapital ?? null)}
             </p>
           </div>
           <div className="rounded-lg p-2" style={{ background: "var(--sh-surface-2)" }}>
@@ -498,7 +502,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
           <div className="rounded-lg p-2" style={{ background: "var(--sh-surface-2)" }}>
             <span className="text-[10px] font-medium uppercase tracking-[0.08em]" style={{ color: "var(--sh-fg-muted)" }}>Max Ticket Loss</span>
             <p className="mt-0.5 font-mono text-sm font-bold tabular-nums" style={{ color: "var(--sh-red)" }}>
-              {money(isOption ? (optionMaxLossCents ?? 0) : (modeledLoss ?? 0))}
+              {money(isOption ? (optionMaxLossCents ?? null) : (modeledLoss ?? null))}
             </p>
           </div>
         </div>
@@ -516,7 +520,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
           target: modeledTargets[0]?.priceCents == null ? "Target not measured" : (modeledTargets[0].priceCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }),
         }}
         terms={{
-          quantity: isOption ? (Number.isInteger(optionQty) && optionQty > 0 ? optionQty : null) : constructedPlay?.qty ?? null,
+          quantity: isOption ? (Number.isInteger(optionQty) && optionQty > 0 ? optionQty : null) : sharePlan.qty,
           entryCents: modeledEntryCents ?? null,
           stopCents: modeledStopCents ?? null,
           multiplier: isOption ? 100 : 1,
@@ -532,6 +536,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
           <TicketValue label={isOption ? "Maximum premium loss" : "Planned loss at modeled stop"} value={money(modeledLoss)} />
           <TicketValue label={isOption ? "Premium at risk" : "Capital"} value={money(modeledCapital)} />
         </div>
+        {referenceLevels && <p data-reference-levels className="border-l-2 pl-2 text-xs leading-5" style={{ borderColor: "var(--sh-signal)", color: "var(--sh-fg-muted)" }}><span className="font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--sh-signal)" }}>Reference levels, not ready · </span>The model's entry trigger{referenceLevels.entryCents != null ? ` (${exactMoney(referenceLevels.entryCents)})` : ""} has not been reached{referenceLevels.stopCents != null ? `, with a stop near ${exactMoney(referenceLevels.stopCents)}` : ""}. These are not filled in and are not your plan. Enter your own prices below, or refresh the market checks.</p>}
         {!isOption && <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Stop execution can differ from the modeled price; actual loss can be greater.</p>}
         {isOption && <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 6%, var(--sh-surface))" }}><span><strong style={{ color: "var(--sh-text-primary)" }}>Live option quote required.</strong> <span style={{ color: "var(--sh-fg-muted)" }}>Choose the exact contract and limit below; no quote is inferred.</span></span><span className="shrink-0 font-mono tabular-nums" style={{ color: "var(--sh-text-primary)" }}>{suggestedRange}</span></div>}
       </section>
@@ -599,7 +604,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
         {!isOption && isIntraday && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label className="text-xs font-medium">Maximum planned loss<input value={riskBudgetDollars} onChange={(event) => setRiskBudgetDollars(event.target.value)} type="number" min="0.01" step="0.01" inputMode="decimal" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label><label className="text-xs font-medium">Entry<input value={entryDollars} onChange={(event) => setEntryDollars(event.target.value)} type="number" min="0.01" step="0.01" inputMode="decimal" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label><label className="text-xs font-medium">Stop<input value={stopDollars} onChange={(event) => setStopDollars(event.target.value)} type="number" min="0.01" step="0.01" inputMode="decimal" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label><label className="text-xs font-medium">Slippage / share<input value={slippageDollars} onChange={(event) => setSlippageDollars(event.target.value)} type="number" min="0" step="0.01" inputMode="decimal" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label></div>}
         {!isOption && isIntraday && <p className="rounded-md px-3 py-2 text-xs leading-5" style={{ background: "var(--sh-surface)", color: "var(--sh-fg-muted)" }}>{intradaySizing ? <>Derived: <strong style={{ color: "var(--sh-text-primary)" }}>{intradaySizing.qty.toLocaleString()} shares</strong> · {money(intradaySizing.notionalCents)} · planned loss {money(intradaySizing.plannedRiskCents)}.</> : "The recipe needs measured entry, stop, slippage, and loss budget before it can derive quantity."}</p>}
         {isOption && <label className="block text-xs font-medium">Premium slippage allowance / share<input value={optionSlippageDollars} onChange={(event) => setOptionSlippageDollars(event.target.value)} type="number" min="0" step="0.01" inputMode="decimal" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>}
-        <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-medium">Catalyst deadline<input value={deadline} onChange={(event) => setDeadline(event.target.value)} type="datetime-local" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>{isIntraday && <label className="text-xs font-medium">Human close-review time<input value={timeStop} onChange={(event) => setTimeStop(event.target.value)} type="datetime-local" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>}</div>
+        {timeDefaults.catalystPassed && <p data-catalyst-passed className="text-xs leading-5" style={{ color: "var(--sh-signal)" }}>This run's catalyst date has passed, so the dates below start blank. Pick a new catalyst date that is still ahead.</p>}<div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-medium">Catalyst deadline<input value={deadline} onChange={(event) => setDeadline(event.target.value)} type="datetime-local" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>{isIntraday && <label className="text-xs font-medium">Human close-review time<input value={timeStop} onChange={(event) => setTimeStop(event.target.value)} type="datetime-local" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>}</div>
         <label className="block text-xs font-medium">Why you’re considering this trade<textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label><div className="-mt-2 flex flex-wrap gap-1"><button type="button" onClick={() => setReason(`Paper-only proposal based on the recorded human review of ${candidate.symbol} research evidence.`)} className="min-h-11 rounded-full border px-3 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Use reviewed research case</button><button type="button" onClick={() => setReason(`Modelled ${candidate.playSide === "short" ? "short" : "long"} paper exposure to test the stated catalyst while the reviewed invalidation remains false.`)} className="min-h-11 rounded-full border px-3 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Use catalyst test</button></div><label className="block text-xs font-medium">Reject or exit if<textarea value={invalidationCondition} onChange={(event) => setInvalidationCondition(event.target.value)} rows={2} className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label><div className="-mt-2 flex flex-wrap gap-1"><button type="button" onClick={() => setInvalidationCondition("Invalidate if the stated catalyst does not occur by the deadline, or its disclosed result contradicts the thesis.")} className="min-h-11 rounded-full border px-3 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Use catalyst failure</button>{isIntraday && <button type="button" onClick={() => setInvalidationCondition("Do not take, or exit, if price cannot hold the verified trigger level or the stated risk budget fails.")} className="min-h-11 rounded-full border px-3 py-1 text-[11px]" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>Use trigger failure</button>}</div>{isIntraday && <label className="block text-xs font-medium">No-trade conditions<input value={noTradeText} onChange={(event) => setNoTradeText(event.target.value)} placeholder="One condition per line" className="mt-1 min-h-11 w-full rounded-md border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--sh-border-1)" }} /></label>}
       </div></details>
 
