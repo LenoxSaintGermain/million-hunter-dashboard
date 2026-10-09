@@ -13,7 +13,7 @@ vi.mock("../gates", async (original) => ({ ...await original<typeof import("../g
 import { apertureRuns, brokerOrders, portfolioAccounts, positions, uatBookAdjustments, uatHouseBaselines, uatPracticeBooks, users } from "../../../drizzle/schema";
 import { measuredAccountEquityCents } from "../../../shared/playUnderwriting";
 import { PROHIBITED_LANGUAGE } from "../../../shared/disclosure";
-import { bookAge, PRACTICE_BOOK_COPY } from "../../../client/src/pages/aperture/ApertureAccounts";
+import { bookAge, canDisconnectAccount, PRACTICE_BOOK_COPY } from "../../../client/src/pages/aperture/ApertureAccounts";
 import { appRouter } from "../../routers";
 import { alpacaPaperBroker, brokerFor } from "../brokers/index";
 import { PRACTICE_ACCOUNT_OVERLAP } from "../brokers/practiceBook";
@@ -195,6 +195,17 @@ describe("practiceBook.reset (UAT-E3)", () => {
     expect(syncedRow(rowA.id)).toMatchObject({ externalAccountId: "PA-HOUSE-0002", equityValueCents: 10_000_000 });
   });
 
+  it("treats a row still bound to an old account as a house change even when the book was never stamped (#107)", async () => {
+    h.mem!.seed(users, { id: A.id, openId: A.openId, role: "capital_operator" });
+    const [row] = h.mem!.seed(portfolioAccounts, { userId: A.id, label: "Alpaca Paper", brokerId: "alpaca_paper", isPaper: true, externalAccountId: "PA-OLD-HOUSE", createdAt: NOW, updatedAt: NOW });
+    await createPracticeBook(h.mem!.db, { userId: A.id, portfolioAccountId: row.id, createdBy: A.id, now: NOW });
+    resetHouseSnapshotCache();
+    const result = await caller(A).aperture.practiceBook.reset({ accountId: row.id });
+    expect(syncedRow(row.id)).toMatchObject({ practiceBookId: result.bookId, externalAccountId: null });
+    await caller(A).aperture.account.sync({ id: row.id });
+    expect(syncedRow(row.id)).toMatchObject({ externalAccountId: HOUSE_ID, equityValueCents: 10_000_000 });
+  });
+
   it("is refused for another user's account, a row without a book, and while books are off", async () => {
     const { rowA } = await twoBooks();
     await expect(caller(B).aperture.practiceBook.reset({ accountId: rowA.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -221,4 +232,28 @@ describe("practice book card copy", () => {
     expect(block).toContain("var(--sh-surface-2)");
     expect(block).not.toMatch(/#[0-9a-f]{3,6}\b|oklch\(|rgb\(/i);
   });
+
+  it("offers Disconnect only on a tester's own old raw Alpaca row, with plain copy (#107)", () => {
+    expect(canDisconnectAccount({ brokerId: "alpaca_paper", practiceBook: null, disconnectable: true })).toBe(true);
+    expect(canDisconnectAccount({ brokerId: "alpaca_paper", practiceBook: null })).toBe(false);
+    expect(canDisconnectAccount({ brokerId: "alpaca_paper", practiceBook: { generation: 1 }, disconnectable: true })).toBe(false);
+    expect(PRACTICE_BOOK_COPY.disconnectConfirm).toContain("Nothing is sold or cancelled at Alpaca");
+    expect(PRACTICE_BOOK_COPY.disconnectConfirm).toContain("just stops being used");
+    for (const text of [PRACTICE_BOOK_COPY.disconnectTitle, PRACTICE_BOOK_COPY.disconnectExplainer, PRACTICE_BOOK_COPY.disconnectConfirm]) expect(text).not.toMatch(PROHIBITED_LANGUAGE);
+  });
+
+  it("disconnect removes only the caller's own row; another tester's and the owner's rows stay (#107)", async () => {
+    h.mem!.seed(users, { id: OWNER.id, openId: OWNER.openId, role: "admin" }, { id: A.id, openId: A.openId, role: "capital_operator" }, { id: B.id, openId: B.openId, role: "capital_operator" });
+    const [owner, oldA] = h.mem!.seed(portfolioAccounts,
+      { userId: OWNER.id, label: "raw", brokerId: "alpaca_paper", isPaper: true, externalAccountId: HOUSE_ID, createdAt: NOW, updatedAt: NOW },
+      { userId: A.id, label: "old", brokerId: "alpaca_paper", isPaper: true, externalAccountId: "PA-OLD-HOUSE", createdAt: NOW, updatedAt: NOW });
+    expect((await caller(A).aperture.account.list()).find((r) => r.id === oldA.id)).toMatchObject({ disconnectable: true });
+    expect((await caller(OWNER).aperture.account.list()).find((r) => r.id === owner.id)).toMatchObject({ disconnectable: false });
+    await expect(caller(B).aperture.account.disconnect({ id: oldA.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(caller(A).aperture.account.disconnect({ id: owner.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(caller(A).aperture.account.disconnect({ id: oldA.id })).resolves.toEqual({ disconnected: true, id: oldA.id });
+    expect(h.mem!.rows(portfolioAccounts).map((r) => r.id)).toEqual([owner.id]);
+    expect(broker.submitOrder).not.toHaveBeenCalled();
+  });
 });
+

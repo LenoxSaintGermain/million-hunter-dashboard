@@ -162,7 +162,7 @@ export function DecisionRunway({ onNewResearch, onOpenResearchRun, receiptTarget
     : immutableReceipt
     ? (accounts ?? []).find((item) => item.id === immutableReceipt.accountId) ?? null
     : selectedAccountId !== undefined ? (accounts ?? []).find((item) => item.id === selectedAccountId && item.isPaper) ?? null
-    : (accounts ?? []).find((item) => item.isPaper && item.brokerId === "alpaca_paper") ?? (accounts ?? []).find((item) => item.isPaper) ?? null, [accounts, immutableReceipt, selectedAccountId, preservedStrategyDraft]);
+    : (accounts ?? []).find((item) => item.isPaper && item.brokerId === "alpaca_paper" && item.practiceBook != null) ?? (accounts ?? []).find((item) => item.isPaper && item.brokerId === "alpaca_paper") ?? (accounts ?? []).find((item) => item.isPaper) ?? null, [accounts, immutableReceipt, selectedAccountId, preservedStrategyDraft]);
   const cockpit = trpc.aperture.cockpit.useQuery(paperAccount ? { accountId: paperAccount.id } : undefined, { enabled: Boolean(paperAccount) });
 
   const [capital, setCapital] = useState("");

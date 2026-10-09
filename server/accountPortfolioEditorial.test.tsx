@@ -84,7 +84,8 @@ describe("account editorial evidence", () => {
       "utf8"
     );
     // create, sync, schedule, CSV import, and the UAT-E3 practice-book reset.
-    expect(page.match(/window\.confirm/g)).toHaveLength(5);
+    // Six: the five mutations plus Disconnect for an old Alpaca row (#107).
+    expect(page.match(/window\.confirm/g)).toHaveLength(6);
     expect(page).toContain("csvAccountId !== accountId");
     expect(page).toContain(
       "invalidateAccountRefreshReads(utils.aperture, variables.accountId)"
