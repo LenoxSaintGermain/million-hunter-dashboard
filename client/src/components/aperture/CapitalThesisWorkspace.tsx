@@ -11,6 +11,7 @@ import type { ThesisSaveReceipt } from "@shared/thesisSaveReceipt";
 import { normalizeResearchSymbols } from "@shared/capitalThesisStructure";
 import { WEEKLY_INCOME_TEMPLATE_ID, WEEKLY_INCOME_THESIS_PREFILL, readStoredWeeklyIncomeTemplate, weeklyIncomeDefaults } from "@shared/strategyTemplates/weeklyIncome";
 import { WeeklyIncomeTemplatePanel, WeeklyIncomeTemplatePicker } from "./weeklyIncome/WeeklyIncomeTemplatePanel";
+import { WeeklyIncomeScreenPanel } from "./weeklyIncome/WeeklyIncomeCandidates";
 
 type Purpose = "capital" | "acquisition" | "property";
 type HoldingPeriod = "intraday" | "overnight" | "swing" | "catalyst_window" | "position";
@@ -249,6 +250,7 @@ export function CapitalThesisWorkspace() {
           </section>
 
           {selectedTemplate && !editing && <WeeklyIncomeTemplatePanel parameters={selectedTemplate.parameters} mandate={selectedTemplate.mandateCeilings} parameterHash={selectedTemplate.parameterHash} />}
+          {selectedTemplate && !editing && <WeeklyIncomeScreenPanel compilationId={selected.id} defaultSymbols={Array.isArray((selected.compiledFilters as any)?.researchSymbols) ? (selected.compiledFilters as any).researchSymbols : []} />}
           <section className="rounded-lg border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-paper)" }}><div className="flex items-center justify-between gap-3"><div><p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>Contextual Thesis Library</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>Owner-scoped Capital alternatives. Ranking is descriptive, never approval.</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-3">{visibleAlternatives.map((thesis: any) => <button key={thesis.id} type="button" onClick={() => { setSelectedId(thesis.id); setEditing(false); }} className="min-h-16 rounded border p-3 text-left text-xs" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }}><span className="block font-semibold">{thesis.name ?? "Untitled thesis"}</span><span className="mt-1 block" style={{ color: "var(--sh-fg-muted)" }}>{thesis.status ?? "review"} · v{thesis.id}</span></button>)}</div>{alternatives.length > 3 && <button type="button" onClick={() => setShowMore((current) => !current)} className="mt-3 inline-flex min-h-10 items-center gap-1 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}><ChevronDown className="h-3.5 w-3.5" /> {showMore ? "Show less" : `Show ${alternatives.length - 3} more`}</button>}</section>
 
           {missionError && <p role="alert" className="rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--sh-red)", color: "var(--sh-red)" }}>{missionError}</p>}

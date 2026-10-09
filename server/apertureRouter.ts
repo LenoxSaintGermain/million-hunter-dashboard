@@ -26,6 +26,7 @@ import { monitoringReviewRouter } from "./aperture/monitoringReviewReceipt";
 import { playOutcomeRouter } from "./aperture/playOutcomeReview";
 import { strategyDiscoveryRouter } from "./aperture/strategyDiscoveryRouter";
 import { uatRouter } from "./aperture/practiceBooks/uatRouter";
+import { weeklyIncomeRouter } from "./aperture/weeklyIncomeRouter";
 import { practiceBookRouter, practiceBookSummary, presentAccountRow } from "./aperture/practiceBooks/bookRouter";
 import { usesPracticeBooks } from "./aperture/practiceBooks/flags";
 import { createPracticeBook } from "./aperture/practiceBooks/repository";
@@ -1104,6 +1105,8 @@ export const apertureRouter = router({
   /** UAT Practice Books: owner-only controls. */
   uat: uatRouter,
   practiceBook: practiceBookRouter,
+  /** #84 Weekly Income research screen: read-only. */
+  weeklyIncome: weeklyIncomeRouter,
 
   // ── Thesis management ──────────────────────────────────────────────────────
 

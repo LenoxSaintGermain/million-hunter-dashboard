@@ -89,6 +89,11 @@ export interface OptionMarketSnapshotResult {
   lastTradeAt: number | null;
   dailyVolume: number;
   impliedVolatility: number;
+  /** Snapshot greeks (#84). Null means "Not measured"; a contract without delta is never eligible for Weekly Income. */
+  delta?: number | null;
+  gamma?: number | null;
+  theta?: number | null;
+  vega?: number | null;
   feed: "opra" | "indicative";
   asOf: number;
 }
