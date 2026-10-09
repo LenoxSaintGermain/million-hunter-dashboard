@@ -1,5 +1,5 @@
 /**
- * Builds the Guided-mode explanation for one put credit spread from numbers
+ * Builds the Quick Play explanation for one put credit spread from numbers
  * already computed elsewhere. Display only; it never decides eligibility.
  */
 import { formatStrike, formatUsdCents, putCreditSpreadRisk, type PutCreditSpreadInput } from "./spreadMath";
@@ -29,9 +29,9 @@ export type GuidedSpreadExplainer = {
   breakeven: string;
   whatCanGoWrong: string;
   gapRisk: string;
-  /** Guided wording, in total dollars. */
+  /** Quick Play wording, in total dollars. */
   plan: string;
-  /** §14 wi.mgmt.plan wording, per-share prices, for Pro surfaces. */
+  /** §14 wi.mgmt.plan wording, per-share prices, for Strategist surfaces. */
   proPlan: string;
   rows: Array<{ label: string; value: string; plain: string }>;
 };
