@@ -3,7 +3,6 @@
  * Create and manage portfolio accounts (Alpaca paper, manual entry).
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
  */
-import { useSnapshotAgreement } from "@/lib/useSnapshotAgreement";
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -20,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
+import { useSnapshotAgreement } from "@/lib/useSnapshotAgreement";
 import { AccountContextPanel } from "@/components/aperture/AccountContextPanel";
 import { parsePortfolioCsv } from "@shared/portfolioCsv";
 import { AccountHoldingsPortrait, accountMoney, accountStamp } from "@/components/aperture/AccountHoldingsPortrait";
