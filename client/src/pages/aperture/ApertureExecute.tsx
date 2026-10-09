@@ -9,6 +9,7 @@
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
  * Practice trading only. No live capital.
  */
+import { maskAccountNumber } from "@shared/accountNumberMask";
 import { useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import { useRoute, useLocation, useSearch } from "wouter";
@@ -401,7 +402,7 @@ function OrderQueue({ runId, focusCandidateId, requestedOrderId, ticketBuilderAc
               <div className="sm:col-span-2 rounded-md p-3" style={{ background: "var(--sh-surface-2)" }}>
                 <span className="block text-xs text-muted-foreground">Destination broker account</span>
                 <strong>{confirmation.order.destinationAccount?.label ?? "Unavailable"}</strong>
-                <span className="block break-all text-xs text-muted-foreground">{confirmation.order.destinationAccount?.brokerId ?? "unknown broker"} · account {confirmation.order.destinationAccount?.externalAccountId ?? "not bound"}</span>
+                <span className="block break-all text-xs text-muted-foreground">{confirmation.order.destinationAccount?.brokerId ?? "unknown broker"} · account {maskAccountNumber(confirmation.order.destinationAccount?.externalAccountId) ?? "not bound"}</span>
                 <span className="block text-xs text-muted-foreground">Portfolio context: {confirmation.order.portfolioContextAccount?.label ?? "Unavailable"}</span>
               </div>
             </div>
