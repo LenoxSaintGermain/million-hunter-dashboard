@@ -71,7 +71,8 @@ export function ThesisRiskComparison({ theses, activeCompilationId, onReview }: 
     <div className="mrp-comparison-heading"><span>Planned-loss limit / play</span><span>{maximum > 0 ? `$0 — ${riskMoney(maximum)}` : "No positive limit recorded"}</span></div>
     {shown.map(thesis => {
       const key = thesisHorizonKey(thesis.missionDefaults?.holdingPeriod);
-      const active = (activeCompilationId != null && thesis.sourceCompilationId === activeCompilationId) || thesis.isPrimary;
+      // Active comes only from the profile's active Capital thesis (#6).
+      const active = activeCompilationId != null && thesis.sourceCompilationId === activeCompilationId;
       return <div key={thesis.id} className="mrp-comparison-row">
         <button type="button" className="mrp-review" onClick={() => onReview(thesis.id)}><span>{thesis.name || "Untitled Capital thesis"}{active && <small> · active context</small>}</span><span aria-hidden="true">↗</span></button>
         <div className="mrp-risk-row"><div><span>{HORIZONS.find(([id]) => id === key)?.[1]}</span><strong>{riskMoney(thesis.missionDefaults?.maxPlannedLossCents)}</strong></div><RiskBar value={thesis.missionDefaults?.maxPlannedLossCents} maximum={maximum} label={`${thesis.name || "Untitled Capital thesis"} planned-loss limit`} emphasis={!!active} /></div>

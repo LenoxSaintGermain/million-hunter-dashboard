@@ -78,7 +78,10 @@ describe("the cockpit rail fits its own cells", () => {
     // but that cell carries a state mark, a subject, a meter, a ratio, a help
     // control and a Detail button — 330px of content. The 31px it could not fit
     // overflowed the whole rail section, on Today, Mission and Research alike.
-    expect(source).toContain("xl:grid-cols-[1fr_1fr_1fr_1.15fr]");
+    // The read-only active-thesis cell was removed (the thesis selector in
+    // the ticker replaces it), leaving three cells; the constraint keeps its
+    // larger share.
+    expect(source).toContain("xl:grid-cols-[1fr_1fr_1.15fr]");
     expect(source).not.toContain("xl:grid-cols-4");
   });
 

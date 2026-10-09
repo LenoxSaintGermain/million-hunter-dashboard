@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ActiveThesisSelect } from "./ActiveThesisSelect";
 import { ChevronDown, Clock3, Info, Landmark, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -108,50 +109,6 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
   }) : null;
 
   const [syncing, setSyncing] = useState(false);
-  const activeThesisQuery = (trpc as any).thesis?.activeCapital?.useQuery
-    ? (trpc as any).thesis.activeCapital.useQuery()
-    : { data: null };
-  const thesesListQuery = (trpc as any).aperture?.thesis?.list?.useQuery
-    ? (trpc as any).aperture.thesis.list.useQuery()
-    : { data: [] };
-  const activateThesis = (trpc as any).aperture?.thesis?.activate?.useMutation
-    ? (trpc as any).aperture.thesis.activate.useMutation({
-        onSuccess: async (data: any) => {
-          if (utils) {
-            await Promise.all([
-              utils.aperture?.invalidate?.(),
-              utils.thesis?.invalidate?.(),
-            ]);
-          }
-          toast.success(`Active focus switched to "${data?.name ?? "selected thesis"}"`);
-        },
-        onError: (err: any) => {
-          let message = err?.message ?? "An error occurred";
-          try {
-            const parsed = JSON.parse(message);
-            if (Array.isArray(parsed) && parsed[0]?.message) {
-              message = parsed.map((p: any) => p.message).join(", ");
-            }
-          } catch {
-            // Not JSON
-          }
-          toast.error(`Failed to switch thesis: ${message}`);
-        },
-      })
-    : null;
-
-  const currentActiveThesisId = useMemo(() => {
-    if (!thesesListQuery.data || thesesListQuery.data.length === 0) return "";
-    if (activeThesisQuery.data?.thesis?.id) {
-      const match = thesesListQuery.data.find(
-        (t: any) => t.sourceCompilationId === activeThesisQuery.data.thesis.id
-      );
-      if (match) return String(match.id);
-    }
-    const primary = thesesListQuery.data.find((t: any) => t.isPrimary || t.status === "active");
-    return String(primary ? primary.id : thesesListQuery.data[0]?.id ?? "");
-  }, [activeThesisQuery.data, thesesListQuery.data]);
-
   const handleRapidSync = async () => {
     // Sync the account whose age is shown; never fall back to a guessed id.
     const targetId = syncTarget.accountId;
@@ -239,38 +196,12 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
               {syncing ? "Syncing…" : "Sync now"}
             </button> : syncTarget.reason && <span>· {syncTarget.reason}</span>}
           </div>
-          {/* Rapid Inline Thesis Switcher */}
-          {thesesListQuery.data && thesesListQuery.data.length > 0 && (
-            <>
-              <div className="h-3.5 w-px" style={{ background: "var(--sh-border-1)" }} />
-              <div className="flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
-                <span className="text-[10px] uppercase font-bold tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Thesis:</span>
-                <select
-                  aria-label="Active Capital Thesis"
-                  className="bg-transparent font-semibold cursor-pointer text-[11px] focus:outline-none"
-                  style={{ color: "var(--sh-text-primary)", maxWidth: 170 }}
-                  value={currentActiveThesisId}
-                  onChange={(e) => {
-                    const selectedId = Number(e.target.value);
-                    if (!selectedId) return;
-                    const candidate = thesesListQuery.data?.find((t: any) => t.id === selectedId);
-                    if (candidate && activateThesis?.mutate) {
-                      activateThesis.mutate({
-                        id: candidate.id,
-                        compilationId: candidate.sourceCompilationId ?? candidate.id,
-                      });
-                    }
-                  }}
-                >
-                  {thesesListQuery.data.map((t: any) => (
-                    <option key={t.id} value={t.id} style={{ background: "var(--sh-surface)", color: "var(--sh-text-primary)" }}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
+          {/* The one active-thesis selector, same control as the context strip */}
+          <div className="h-3.5 w-px" style={{ background: "var(--sh-border-1)" }} />
+          <div className="flex items-center gap-1.5 border px-2 py-0.5 text-[11px] font-medium" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
+            <span className="text-[10px] uppercase font-bold tracking-wider" style={{ color: "var(--sh-fg-muted)" }}>Thesis:</span>
+            <ActiveThesisSelect variant="inline" />
+          </div>
         </div>
 
         {/* Live Capital & Risk Metrics Glance */}
@@ -304,12 +235,7 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
 
       {/* Grid Row */}
       <div className="grid min-h-11 gap-px" style={{ background: "var(--sh-border-1)" }}>
-        <div className="grid gap-px sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1.15fr]" style={{ background: "var(--sh-border-1)" }}>
-          <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: "var(--sh-surface)" }}>
-            <StateMark state={data.activeThesis ? "rule_qualified" : "unknown"} label="Active thesis" compact />
-            <span className="truncate text-xs font-semibold" title={data.activeThesis?.name ?? "No active thesis"} style={{ color: "var(--sh-text-primary)" }}>{data.activeThesis ? data.activeThesis.name : "Not assigned"}</span>
-            <RailHelp label="Explain active thesis">This is the canonical thesis selected for new missions. It is separate from holdings and account limits.</RailHelp>
-          </div>
+        <div className="grid gap-px sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1.15fr]" style={{ background: "var(--sh-border-1)" }}>
           <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: "var(--sh-surface)" }}>
             <StateMark state={data.session.session === "unknown" ? "unknown" : "researchable"} label={data.session.session.replaceAll("_", " ")} compact />
             <span className="truncate text-xs" style={{ color: "var(--sh-text-primary)" }}>· {data.session.nextBoundary?.label.toLowerCase() ?? "boundary —"}{boundaryMs != null ? ` ${duration(boundaryMs)}` : ""}</span>
@@ -390,7 +316,7 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
   if (editorialContext) return <section className="capital-context" aria-label="Account context">
     <div className="capital-context-strip">
       <div><span className="capital-context-label">{practiceAccountLabel(data.account.isPaper)}</span><strong>{money(equityCents) ?? "Value unavailable"}</strong><small>Broker snapshot · {staleText}{syncTarget.canSync ? <SyncNowButton onSync={handleRapidSync} syncing={syncing} /> : syncTarget.reason ? ` · ${syncTarget.reason}` : null}</small></div>
-      <div><span className="capital-context-label">Active Research Lens</span><p>{data.activeThesis?.name ?? "No active thesis"}</p></div>
+      <ActiveThesisSelect />
       <div className="capital-context-limit" style={{ borderColor: severityColor }}>
         <span className="capital-context-label">Binding Portfolio Limit</span>
         <p>{summary.binding ? `${bindingSubject} (${summary.binding.usedPct != null ? Math.round(summary.binding.usedPct) + "%" : "measured"})` : "Within limits"}</p>

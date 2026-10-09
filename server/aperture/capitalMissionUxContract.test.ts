@@ -115,9 +115,13 @@ describe("Capital Mission decision-path UX contract", () => {
   });
 
   it("separates the active thesis from the account portfolio constraint", () => {
-    expect(cockpit).toContain("Active thesis");
+    // The active thesis is shown and switched by its own selector (parity
+    // PR-03), not a read-only cell beside the portfolio constraint.
+    expect(cockpit).toContain('<ActiveThesisSelect variant="inline" />');
+    expect(cockpit).not.toContain('label="Active thesis"');
     expect(cockpit).toContain("Portfolio constraint");
-    expect(cockpit).toContain("data.activeThesis.name");
+    const selector = readFileSync("client/src/components/aperture/ActiveThesisSelect.tsx", "utf8");
+    expect(selector).toContain('aria-label="Active thesis"');
   });
 
   it("keeps the mobile glance compact without hiding mode, freshness, thesis, or the binding constraint", () => {
