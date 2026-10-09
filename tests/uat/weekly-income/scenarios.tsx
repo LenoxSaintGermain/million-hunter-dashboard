@@ -36,18 +36,18 @@ function fixtureScreen(regularSession: boolean): WiScreenResult {
 }
 const refused = (code: "opra_not_entitled" | "options_level", plain: string, detail: string): WiScreenResult => ({ asOf: FIX_NOW, session: "regular", refusal: { code, plain, detail }, candidates: [], skipped: [] });
 
-/** Each scenario is one Guided-mode state. Later PRs append their states here. */
+/** Each scenario is one Quick Play state. Later PRs append their states here. */
 export const SCENARIOS: Record<string, { title: string; render: () => ReactNode }> = {
-  "intro": { title: "What Weekly Income is (Guided intro)", render: () => <WeeklyIncomeIntro /> },
+  "intro": { title: "What Weekly Income is (Quick Play intro)", render: () => <WeeklyIncomeIntro /> },
   "worked-example": { title: "Worked example: put credit spread (Example data)", render: () => ("error" in example ? <p>{example.error}</p> : <WeeklyIncomeSpreadExplainer explainer={example} />) },
   "glossary": { title: "Words used here, in plain English", render: () => <section className="border p-5" style={{ borderColor: "var(--rule)", background: "var(--paper)" }}><WeeklyIncomeGlossary open /></section> },
   "six-percent": { title: "Weekly target note (mission setup)", render: () => <section className="border p-4 text-sm" style={{ borderColor: "var(--rule)", background: "var(--paper)" }}><p className="font-semibold">6% per week required · aggressive</p><p className="mt-1" style={{ color: "var(--sh-fg-muted)" }}>$600 target ÷ $10,000 declared mission capital (Example data). An aspiration, not a forecast; it never increases allowed risk.</p><SixPercentNote /></section> },
   "template-picker": { title: "New Capital thesis: template choice", render: () => <WeeklyIncomeTemplatePicker onUse={() => undefined} /> },
-  "template-guided": { title: "Weekly Income template chosen (Guided)", render: () => <WeeklyIncomeTemplatePanel parameters={weeklyIncomeDefaults()} isGuided onRemove={() => undefined} showExample={false} /> },
-  "template-pro": { title: "Weekly Income template chosen (Pro parameter table)", render: () => <WeeklyIncomeTemplatePanel parameters={weeklyIncomeDefaults()} mandate={FIXTURE_MANDATE} parameterHash="sha256:fixture-not-a-real-hash" isGuided={false} /> },
-  "skipped-guided": { title: "Skipped by a blackout (Guided, Example data)", render: () => <WeeklyIncomeSkipped items={SKIPPED} isGuided /> },
-  "skipped-pro": { title: "Skipped by a blackout (Pro, Example data)", render: () => <WeeklyIncomeSkipped items={SKIPPED} isGuided={false} /> },
-  "week-empty": { title: "No idea met every rule (Guided)", render: () => <WeeklyIncomeSkipped items={[]} isGuided /> },
+  "template-quick-play": { title: "Weekly Income template chosen (Quick Play)", render: () => <WeeklyIncomeTemplatePanel parameters={weeklyIncomeDefaults()} isGuided onRemove={() => undefined} showExample={false} /> },
+  "template-strategist": { title: "Weekly Income template chosen (Strategist parameter table)", render: () => <WeeklyIncomeTemplatePanel parameters={weeklyIncomeDefaults()} mandate={FIXTURE_MANDATE} parameterHash="sha256:fixture-not-a-real-hash" isGuided={false} /> },
+  "skipped-quick-play": { title: "Skipped by a blackout (Quick Play, Example data)", render: () => <WeeklyIncomeSkipped items={SKIPPED} isGuided /> },
+  "skipped-strategist": { title: "Skipped by a blackout (Strategist, Example data)", render: () => <WeeklyIncomeSkipped items={SKIPPED} isGuided={false} /> },
+  "week-empty": { title: "No idea met every rule (Quick Play)", render: () => <WeeklyIncomeSkipped items={[]} isGuided /> },
   "screen-guided": { title: "This week's research ideas (Guided, Example data)", render: () => <WeeklyIncomeScreenResults result={fixtureScreen(true)} isGuided isExample /> },
   "screen-pro": { title: "Research screen (Pro, Example data)", render: () => <WeeklyIncomeScreenResults result={fixtureScreen(true)} isGuided={false} isExample /> },
   "screen-closed": { title: "Market closed preview (Guided, Example data)", render: () => <WeeklyIncomeScreenResults result={{ ...fixtureScreen(false), candidates: fixtureScreen(false).candidates.slice(0, 1) }} isGuided isExample /> },

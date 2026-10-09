@@ -2,7 +2,7 @@
  * Weekly Income (defined-risk premium) strategy template, v0.1 (#83, tracker #82).
  *
  * All 52 tunables from the thesis spec §10: default, range, unit, rationale and
- * a one-line plain explanation for Guided mode. Mandate-linked rows are
+ * a one-line plain explanation for Quick Play. Mandate-linked rows are
  * tighten-only. Locked rows cannot change in v0.1.
  *
  * Parameters describe research rules. They cannot lift the strategy halt,
@@ -261,7 +261,7 @@ const clock = (hhmm: string) => {
 };
 
 /**
- * Guided mode: the rules in plain English, one line per group, computed from
+ * Quick Play: the rules in plain English, one line per group, computed from
  * the actual parameter values (so an edited plan reads correctly).
  */
 export function plainRuleSummary(p: WeeklyIncomeParameters): Array<{ group: WiGroup; text: string }> {

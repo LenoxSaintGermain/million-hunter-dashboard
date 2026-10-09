@@ -34,7 +34,7 @@ describe("Weekly Income copy library (#87)", () => {
     expect(() => wiCopy("wi.play.p1", { symbol: "XYZ" })).toThrow(/Missing copy variable/);
   });
 
-  it("explains every trading term Guided mode shows in one plain line", () => {
+  it("explains every trading term Quick Play shows in one plain line", () => {
     for (const entry of WI_GLOSSARY) {
       expect(entry.plain.length).toBeLessThanOrEqual(170);
       expect(entry.plain.split(/(?<=[.!?])\s+/).length).toBeLessThanOrEqual(2);
@@ -49,7 +49,7 @@ describe("Weekly Income copy library (#87)", () => {
   });
 });
 
-describe("Guided put credit spread explainer", () => {
+describe("Quick Play put credit spread explainer", () => {
   it("renders the thesis's worked example in dollars, labelled as an example", () => {
     const explainer = buildGuidedSpreadExplainer(WI_EXAMPLE_SPREAD);
     if ("error" in explainer) throw new Error(explainer.error);
