@@ -1,6 +1,6 @@
 /**
- * Weekly Income research screen results (#84). Guided mode explains each idea
- * in plain English with the most you could lose in dollars; Pro mode shows the
+ * Weekly Income research screen results (#84). Quick Play explains each idea
+ * in plain English with the most you could lose in dollars; Strategist shows the
  * exact filter values. Research only: nothing here can place a trade.
  */
 import { useMemo, useState } from "react";

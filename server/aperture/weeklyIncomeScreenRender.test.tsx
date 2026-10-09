@@ -25,7 +25,7 @@ describe("Weekly Income screen results (#84)", () => {
   beforeAll(() => { (globalThis as any).React = React; });
   afterAll(() => { delete (globalThis as any).React; });
 
-  it("Guided: plain explainer, dollar max loss, what can go wrong, research-only, clean language", () => {
+  it("Quick Play: plain explainer, dollar max loss, what can go wrong, research-only, clean language", () => {
     const $ = load(renderToStaticMarkup(<WeeklyIncomeScreenResults result={result} isGuided isExample />));
     expect($("[data-wi-candidate]")).toHaveLength(1);
     expect($("[data-example-data]").text()).toBe("Example data");
@@ -36,7 +36,7 @@ describe("Weekly Income screen results (#84)", () => {
     expect($("button")).toHaveLength(0);
   });
 
-  it("Pro: exact table, no example badge for measured numbers", () => {
+  it("Strategist: exact table, no example badge for measured numbers", () => {
     const $ = load(renderToStaticMarkup(<WeeklyIncomeScreenResults result={result} isGuided={false} />));
     expect($("[data-wi-pro-table] tbody tr")).toHaveLength(1);
     expect($("[data-example-data]")).toHaveLength(0);
