@@ -11,6 +11,7 @@
  */
 import { CALENDAR_HORIZON, isMarketHoliday } from "./marketSession";
 import type { Fact } from "./facts";
+import { earningsExemptIndexEtf, indexEtfAllowedNote } from "../../shared/weeklyIncome/indexEtfs";
 
 export type WiStructure = "P1" | "P2" | "P3";
 
@@ -38,6 +39,8 @@ export type EventWindowInput = {
   exDividends: ExDividendRecord[] | null;
   earningsWindowSessionsAfter: number;
   exDividendBlackoutCalls: boolean;
+  /** Why the ex-dividend date is unknown, when `exDividends` is null (Strategist detail). */
+  exDividendUnknownDetail?: string | null;
 };
 
 export type EventExclusionCode = "earnings_in_window" | "earnings_unknown" | "ex_dividend_in_window" | "ex_dividend_unknown" | "calendar_outside_horizon" | "invalid_dates";
@@ -57,6 +60,8 @@ export type EventWindowResult = {
   earningsWindow: { from: string; to: string } | null;
   nextEarnings: EarningsRecord | null;
   exclusions: EventExclusion[];
+  /** Quick Play note when a rule is lifted for this symbol (broad-index ETF earnings exemption). */
+  allowedBecause?: string | null;
 };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -102,13 +107,18 @@ export function evaluateEventWindow(input: EventWindowInput): EventWindowResult 
   }
   const earningsWindow = { from: entryDateEt, to: windowEnd };
 
+  // Broad-index ETFs (explicit allowlist) don't report earnings: the earnings
+  // rule is lifted for them, and the ex-dividend rule applies instead (below).
+  const indexEtf = earningsExemptIndexEtf(symbol);
   // Earnings: the next report on or after entry. Unknown excludes the name.
   const upcoming = (input.earnings ?? [])
     .filter((record) => record.symbol.toUpperCase() === symbol.toUpperCase() && DATE.test(record.date) && record.date >= entryDateEt)
     .sort((a, b) => (a.date === b.date ? (a.source === "operator" ? -1 : 1) : a.date < b.date ? -1 : 1));
   const nextEarnings = upcoming[0] ?? null;
   const sourceOf = (record: EarningsRecord) => ({ name: record.source === "operator" ? "Operator-entered" : "Benzinga", url: record.sourceUrl ?? null, recordedBy: record.recordedBy ?? null, recordedAt: record.recordedAt ?? null });
-  if (!nextEarnings) {
+  if (indexEtf) {
+    // no earnings check for an allowlisted index fund
+  } else if (!nextEarnings) {
     exclusions.push({
       code: "earnings_unknown",
       detail: input.earnings == null ? "Earnings source unavailable; next report date unknown." : "No upcoming earnings date on record.",
@@ -124,8 +134,19 @@ export function evaluateEventWindow(input: EventWindowInput): EventWindowResult 
     });
   }
 
+  // Ex-dividend: allowlisted index funds (any structure), unknown excludes.
+  if (indexEtf) {
+    const exDivs = input.exDividends;
+    const hit = (exDivs ?? []).find((record) => record.symbol.toUpperCase() === symbol.toUpperCase() && record.date >= entryDateEt && record.date <= expirationDateEt);
+    if (exDivs == null) {
+      exclusions.push({ code: "ex_dividend_unknown", detail: input.exDividendUnknownDetail ?? "Ex-dividend source unavailable.", plain: `We can't confirm ${symbol}'s next dividend date, so we skip it this week.` });
+    } else if (hit) {
+      exclusions.push({ code: "ex_dividend_in_window", detail: `Ex-dividend ${hit.date} falls inside ${entryDateEt}..${expirationDateEt}.`, plain: `${symbol} has a dividend cutoff on ${prettyDate(hit.date)}, during this trade. The fund's price drops by the dividend that day, so we skip it.`, source: { name: hit.source, url: hit.sourceUrl ?? null } });
+    }
+  }
+
   // Ex-dividend: covered calls only (P3).
-  if (structure === "P3" && input.exDividendBlackoutCalls) {
+  if (!indexEtf && structure === "P3" && input.exDividendBlackoutCalls) {
     const exDivs = input.exDividends;
     const hit = (exDivs ?? []).find((record) => record.symbol.toUpperCase() === symbol.toUpperCase() && record.date >= entryDateEt && record.date <= expirationDateEt);
     if (exDivs == null) {
@@ -135,7 +156,46 @@ export function evaluateEventWindow(input: EventWindowInput): EventWindowResult 
     }
   }
 
-  return { eligible: exclusions.length === 0, earningsWindow, nextEarnings, exclusions };
+  const eligible = exclusions.length === 0;
+  return { eligible, earningsWindow, nextEarnings: indexEtf ? null : nextEarnings, exclusions, allowedBecause: indexEtf && eligible ? indexEtfAllowedNote(indexEtf) : null };
+}
+
+export type CorporateActionDividend = { symbol: string; ex_date: string; special?: boolean | null };
+
+/**
+ * Adapter: Alpaca corporate-action cash dividends → ex-dividend records for one
+ * trade window, or null (unknown) with a reason. Alpaca says new dividends can
+ * appear late, so "nothing announced" counts as known only when the fund's own
+ * history puts the next expected ex-date clearly outside the window.
+ */
+export function exDividendRecordsFromCorporateActions(
+  symbol: string,
+  dividends: CorporateActionDividend[] | null,
+  window: { entryDateEt: string; expirationDateEt: string },
+): { records: ExDividendRecord[] | null; unknownDetail: string | null } {
+  if (dividends == null) return { records: null, unknownDetail: "Ex-dividend source unavailable (Alpaca corporate actions not readable)." };
+  const upper = symbol.toUpperCase();
+  const regular = dividends
+    .filter((d) => d.symbol?.toUpperCase() === upper && DATE.test(d.ex_date ?? "") && !d.special)
+    .map((d) => d.ex_date)
+    .sort();
+  const unique = Array.from(new Set(regular));
+  const records: ExDividendRecord[] = unique.map((date) => ({ symbol: upper, date, source: "alpaca", sourceUrl: null }));
+  if (unique.some((date) => date >= window.entryDateEt && date <= window.expirationDateEt)) return { records, unknownDetail: null };
+  const history = unique.filter((date) => date < window.entryDateEt);
+  if (history.length < 2) return { records: null, unknownDetail: "Not enough dividend history to know when the next ex-dividend date falls." };
+  const recent = history.slice(-5);
+  const gaps = recent.slice(1).map((date, i) => Math.round((toUtc(date) - toUtc(recent[i])) / DAY_MS)).sort((a, b) => a - b);
+  const cadence = gaps[Math.floor(gaps.length / 2)];
+  // An announced ex-date after the window means the next one is known and outside it.
+  if (unique.some((date) => date > window.expirationDateEt)) return { records, unknownDetail: null };
+  const expected = toUtc(history[history.length - 1]) + cadence * DAY_MS;
+  const tolerance = Math.max(5, Math.round(cadence * 0.1)) * DAY_MS;
+  const from = fromUtc(expected - tolerance);
+  const to = fromUtc(expected + tolerance);
+  if (to < window.entryDateEt) return { records: null, unknownDetail: `Expected ex-dividend around ${fromUtc(expected)} has no record yet; dividend data may be late.` };
+  if (from <= window.expirationDateEt) return { records: null, unknownDetail: `Next ex-dividend expected around ${fromUtc(expected)} (every ~${cadence} days) but not announced yet.` };
+  return { records, unknownDetail: null };
 }
 
 /** Adapter: the existing Benzinga `next_earnings_date` fact as an earnings record. Unknown stays unknown. */
