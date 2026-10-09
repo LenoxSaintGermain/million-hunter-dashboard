@@ -750,7 +750,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
                 {isFocusedHistorical ? "Selected historical finding" : "Selected check"} · {isCheckResolved(focusedCheck) ? "Review recorded" : monitoringFindingPresentation({ check: focusedCheck, instrument: order }).stateLabel}
               </p>
               {isCheckResolved(focusedCheck) && (
-                <Badge variant="outline" className="text-xs border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
+                <Badge variant="outline" className="text-xs border-[var(--sh-emerald)] bg-[var(--sh-emerald-15)] text-[var(--sh-fg-1)]">
                   Review recorded
                 </Badge>
               )}
@@ -764,7 +764,7 @@ export function MonitoringPanel({ runId, candidate, thesisSummary, order, select
             {/* Operational Threat Impact Assessment */}
             <div className="rounded-lg border p-3 text-xs space-y-1.5" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
               <div className="flex items-center gap-1.5 font-bold" style={{ color: "var(--sh-text-primary)" }}>
-                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                <ShieldCheck className="h-4 w-4" style={{ color: "var(--sh-emerald)" }} />
                 <span>Direct Risk Boundary Assessment</span>
               </div>
               <p className="text-xs leading-relaxed" style={{ color: "var(--sh-text-secondary)" }}>

@@ -98,9 +98,9 @@ Invalidation Condition: Premise invalid if catalyst misses or price drops below 
   };
 
   return (
-    <Card className="border border-rule shadow-sm bg-surface overflow-hidden">
+    <Card className="border border-rule shadow-sm bg-[var(--sh-surface-1)] overflow-hidden">
       {/* Wizard Header Progress */}
-      <div className="border-b border-rule bg-surface-2 px-5 py-4">
+      <div className="border-b border-rule bg-[var(--sh-surface-2)] px-5 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <div className="flex items-center gap-2">
@@ -152,7 +152,7 @@ Invalidation Condition: Premise invalid if catalyst misses or price drops below 
                     className={`flex flex-col text-left p-3 rounded-lg border transition-all ${
                       isSelected
                         ? "border-amber bg-amber/10 shadow-xs ring-1 ring-amber"
-                        : "border-rule bg-surface hover:bg-surface-2"
+                        : "border-rule bg-[var(--sh-surface-1)] hover:bg-[var(--sh-surface-2)]"
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -203,7 +203,7 @@ Invalidation Condition: Premise invalid if catalyst misses or price drops below 
                       className={`cursor-pointer rounded-lg border p-3 transition-all ${
                         isSelected
                           ? "border-amber bg-amber/10 shadow-xs ring-1 ring-amber"
-                          : "border-rule bg-surface hover:bg-surface-2"
+                          : "border-rule bg-[var(--sh-surface-1)] hover:bg-[var(--sh-surface-2)]"
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -257,7 +257,7 @@ Invalidation Condition: Premise invalid if catalyst misses or price drops below 
                       className={`flex flex-col text-left p-3.5 rounded-lg border transition-all ${
                         isSelected
                           ? "border-amber bg-amber/10 shadow-xs ring-1 ring-amber"
-                          : "border-rule bg-surface hover:bg-surface-2"
+                          : "border-rule bg-[var(--sh-surface-1)] hover:bg-[var(--sh-surface-2)]"
                       }`}
                     >
                       <span className="font-semibold text-xs text-ink">{preset.label}</span>

@@ -526,7 +526,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                         <button
                           type="button"
                           onClick={() => setShareCount(maxAllowableUnits)}
-                          className="text-[9px] text-emerald-400 hover:underline flex items-center gap-1 font-mono font-medium"
+                          className="text-[9px] text-[var(--sh-signal)] hover:underline flex items-center gap-1 font-mono font-medium"
                           title={`5% Single-Order Ceiling ($${Math.round(singleOrderCeilingCents / 100)}) ÷ $${numLimitPrice.toFixed(2)} = ${maxAllowableUnits} shares`}
                         >
                           <Sparkles className="h-2.5 w-2.5" />
@@ -563,7 +563,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                         <button
                           type="button"
                           onClick={() => setContracts(maxAllowableUnits)}
-                          className="text-[9px] text-emerald-400 hover:underline flex items-center gap-1 font-mono font-medium"
+                          className="text-[9px] text-[var(--sh-signal)] hover:underline flex items-center gap-1 font-mono font-medium"
                           title={`5% Single-Order Ceiling ($${Math.round(singleOrderCeilingCents / 100)}) ÷ $${(costPerUnitCents / 100).toFixed(2)} = ${maxAllowableUnits} contracts`}
                         >
                           <Sparkles className="h-2.5 w-2.5" />
@@ -707,7 +707,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-6 text-[10px] font-mono border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                  className="h-6 text-[10px] font-mono border-[var(--sh-signal)] text-[var(--sh-signal)] hover:bg-[var(--sh-burnt-amber-10)]"
                   disabled
                 >
                   Type confirmation below

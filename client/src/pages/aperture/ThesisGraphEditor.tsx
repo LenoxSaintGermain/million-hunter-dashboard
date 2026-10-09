@@ -122,7 +122,7 @@ export default function ThesisGraphEditor() {
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" onClick={() => navigate("/aperture")}><ArrowLeft className="h-4 w-4" /></Button>
               <div>
-                <p className="eyebrow text-emerald-500 font-semibold text-xs tracking-wider uppercase">Guided Mode · 3-Step Wizard</p>
+                <p className="eyebrow font-semibold text-xs tracking-wider uppercase" style={{ color: "var(--sh-signal)" }}>Quick Play · 3-step wizard</p>
                 <h1 className="font-serif text-2xl font-bold">New Bounded Risk Thesis</h1>
               </div>
             </div>
@@ -267,11 +267,12 @@ export default function ThesisGraphEditor() {
                   {!isNew && thesisId && (
                     <Button
                       disabled={compileAndStage.isPending}
-                      className="font-semibold text-white bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/40 shadow-sm"
+                      className="font-semibold text-white hover:opacity-90"
+                      style={{ background: "var(--sh-signal)" }}
                       onClick={() => compileAndStage.mutate({ thesisId })}
                     >
                       {compileAndStage.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                      ⚡ Compile &amp; Stage Best Fit
+                      Compile &amp; Stage Best Fit
                     </Button>
                   )}
                   {!thesis?.sourceCompilationId && (
