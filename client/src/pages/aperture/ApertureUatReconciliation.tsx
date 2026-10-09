@@ -3,6 +3,7 @@
  * Σ practice books vs the shared Alpaca paper account. Reads only, apart from
  * audited sell pauses and append-only adjustments. Never places an order.
  */
+import { unattributedOrderLabel } from "@shared/unattributedOrderLabel";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -119,7 +120,7 @@ export default function ApertureUatReconciliation() {
                 {data.ordersError && <p role="alert">{data.ordersError}</p>}
                 {data.unattributedOrders && (data.unattributedOrders.length === 0
                   ? <p style={muted}>Every recent order in the shared account carries a practice-book or owner tag.</p>
-                  : <div><p className="font-semibold">Unattributed orders</p><ul className="mt-1 space-y-1">{data.unattributedOrders.map((order) => <li key={order.brokerOrderId} className="text-xs">{order.symbol ?? "?"} · {order.side ?? "?"} {order.qty ?? "?"} · {order.status} · client id {order.clientOrderId ?? "none"} · {order.brokerOrderId}</li>)}</ul></div>)}
+                  : <div><p className="font-semibold">Unattributed orders</p><ul className="mt-1 space-y-1">{data.unattributedOrders.map((order) => <li key={order.brokerOrderId} className="text-xs">{unattributedOrderLabel(order)}</li>)}</ul></div>)}
                 {data.missingAtHouse && data.missingAtHouse.length > 0 && <div><p className="font-semibold">Booked fills not found in the shared account</p><ul className="mt-1 space-y-1">{data.missingAtHouse.map((order) => <li key={order.orderId} className="text-xs">order #{order.orderId} · book #{order.bookId} · {order.symbol} · {order.brokerOrderId ?? "no broker id"}</li>)}</ul></div>}
               </CardContent>
             </Card>

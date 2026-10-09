@@ -33,10 +33,25 @@ export function CapitalDecisionAtlas({ title, caption, lanes, selected, onSelect
   </section>;
 }
 
+/**
+ * Sums the counts that were recorded and says how many runs had none (#113).
+ * One legacy run without a count no longer blanks the lane; "Unknown" (null)
+ * is kept only when no run has a count. A missing count is never read as zero.
+ */
 export function researchAtlasCounts(runs: readonly { universeCount?: number | null; candidateCount?: number | null }[]) {
-  const sum = (key: "universeCount" | "candidateCount") => runs.some(run => atlasCount(run[key]) == null)
-    ? null : runs.reduce((total, run) => total + run[key]!, 0);
-  return { symbols: sum("universeCount"), candidates: sum("candidateCount") };
+  const lane = (key: "universeCount" | "candidateCount") => {
+    const counted = runs.map(run => atlasCount(run[key])).filter((value): value is number => value != null);
+    return { total: runs.length > 0 && counted.length === 0 ? null : counted.reduce((sum, value) => sum + value, 0), missing: runs.length - counted.length };
+  };
+  const symbols = lane("universeCount");
+  const candidates = lane("candidateCount");
+  return { symbols: symbols.total, candidates: candidates.total, symbolsMissing: symbols.missing, candidatesMissing: candidates.missing };
+}
+
+/** "Recorded …; 3 runs not counted, so the total is at least this" */
+export function atlasMissingNote(detail: string, missing: number, total: number | null): string {
+  if (!missing || total == null) return detail;
+  return `${detail} · at least this many · ${missing} run${missing === 1 ? "" : "s"} not counted`;
 }
 
 /** Frozen illustrative props for the zero-API visual preview; never used as a fallback. */

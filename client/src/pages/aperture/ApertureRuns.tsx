@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ArrowRight, Clock3, X } from "lucide-react";
 import "@/styles/research-library.css";
-import { CapitalDecisionAtlas, researchAtlasCounts } from "@/components/aperture/CapitalDecisionAtlas";
+import { atlasMissingNote, CapitalDecisionAtlas, researchAtlasCounts } from "@/components/aperture/CapitalDecisionAtlas";
 import DashboardLayout from "@/components/DashboardLayout";
 import { buildResearchJourneys, type ResearchJourney } from "@shared/runWorkspace";
 import { formatDistanceToNow } from "date-fns";
@@ -157,8 +157,8 @@ export default function ApertureRuns() {
     </div>
     {error && <section className="desk-empty" role="alert"><h2>Research could not be refreshed.</h2><p>{runs ? "Previously loaded journeys remain below; their state may be out of date." : "No research state has been substituted."}</p><Button variant="outline" onClick={() => refetch()}>Retry research read</Button></section>}
     <CapitalDecisionAtlas title="The evidence footprint." caption={`${error ? "Last known records" : "Saved records"} · current filters · independent counts, not a completion rate.`} lanes={[
-      { id: "symbols", label: "Universe entries", count: runs == null ? null : coverage.symbols, detail: "Recorded universe counts across chapters; repeats included" },
-      { id: "candidates", label: "Candidates", count: runs == null ? null : coverage.candidates, detail: "Recorded candidates across chapters; not approvals" },
+      { id: "symbols", label: "Universe entries", count: runs == null ? null : coverage.symbols, detail: atlasMissingNote("Recorded universe counts across chapters; repeats included", coverage.symbolsMissing, coverage.symbols) },
+      { id: "candidates", label: "Candidates", count: runs == null ? null : coverage.candidates, detail: atlasMissingNote("Recorded candidates across chapters; not approvals", coverage.candidatesMissing, coverage.candidates) },
     ]} />
     {!isLoading && filteredJourneys.length > 0 && !visibleJourneys.length && <section className="desk-empty"><h2>No questions match this view.</h2><button className="desk-link" onClick={() => { setState("all"); setQuery(""); }}>Clear search and state</button></section>}
     {!isLoading && visibleJourneys.length > 0 && <section aria-label="Research journeys">
