@@ -114,7 +114,7 @@ it("keeps library error and loading distinct from empty", () => {
 });
 it("keeps canonical handoff and invalidation, without research or order mutations", () => {
   const source = readFileSync(new URL("../client/src/pages/aperture/ApertureTheses.tsx", import.meta.url), "utf8");
-  expect(source).toContain('navigate("/thesis?new=1")');
+  expect(source).toContain('navigate(APERTURE_NEW_THESIS_PATH)');
   expect(source).toContain("utils.aperture.invalidate()");
   expect(source).toContain("utils.thesis.invalidate()");
   expect(source).toContain("activate.mutate({ id: thesis.id })");

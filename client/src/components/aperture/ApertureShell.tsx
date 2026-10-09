@@ -7,7 +7,11 @@ import { OPERATING_INVARIANT } from "@shared/operatingInvariant";
 import { CapitalCockpitRail } from "@/components/aperture/CapitalCockpitRail";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { aperturePathForFixture, readIsolatedUatIdentity } from "@shared/isolatedUatIdentity";
+import { APERTURE_NEW_THESIS_PATH, isApertureNavActive } from "@shared/apertureNavRoutes";
+import { releaseStampLabel } from "@shared/releaseStamp";
 import "@/styles/capital-workspace-edition.css";
+
+const RELEASE_STAMP = releaseStampLabel(import.meta.env.VITE_RELEASE_SHA);
 
 const APERTURE_NAV = [
   { href: "/aperture", label: "Today", icon: LayoutDashboard },
@@ -16,7 +20,7 @@ const APERTURE_NAV = [
   { href: "/aperture/runs", label: "Research", icon: Route },
   { href: "/aperture/accounts", label: "Portfolio", icon: Wallet },
   { href: "/aperture/theses", label: "Theses", icon: BookOpen },
-  { href: "/thesis?new=1", label: "New thesis", icon: BookOpen },
+  { href: APERTURE_NEW_THESIS_PATH, label: "New thesis", icon: BookOpen },
 ] as const;
 
 const TRADER_NAV = [
@@ -67,9 +71,7 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
             <nav data-workspace-menu className="flex min-w-0 gap-5 sm:ml-auto" aria-label="Capital Aperture workspace menu">
               {nav.map((item) => {
                 const Icon = item.icon;
-                const active = item.href === "/aperture"
-                  ? location === "/aperture"
-                  : location.startsWith(item.href);
+                const active = isApertureNavActive(item.href, location);
                 return (
                   <Link key={item.href} aria-current={active ? "page" : undefined} href={aperturePathForFixture(item.href, readIsolatedUatIdentity())}>
                     <span className={cn(
@@ -90,6 +92,20 @@ export default function ApertureShell({ children }: { children: ReactNode }) {
       <main id="aperture-workspace" tabIndex={-1} aria-label="Capital Aperture workspace" className="aperture-editorial scroll-mt-16 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 max-w-[1280px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-5 sm:py-8 lg:py-10">
         <CapitalCockpitRail runId={runId} visualHero={location === "/aperture"} editorialContext={location !== "/aperture"} />
         {children}
+        <footer data-release-stamp className="mt-10 border-t border-rule pt-3 text-[11px] text-muted-foreground">
+          {RELEASE_STAMP.short ? (
+            <button
+              type="button"
+              className="font-mono hover:text-ink focus-visible:outline focus-visible:outline-2"
+              title="Copy the release for a bug report"
+              onClick={() => { void navigator.clipboard?.writeText(RELEASE_STAMP.label); }}
+            >
+              {RELEASE_STAMP.label} · copy for bug reports
+            </button>
+          ) : (
+            <span>{RELEASE_STAMP.label}</span>
+          )}
+        </footer>
       </main>
     </EditorialTopNav>
   );
