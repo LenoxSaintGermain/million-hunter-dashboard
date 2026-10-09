@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ query: {} as any, refetch: vi.fn() }));
 vi.mock("@/lib/trpc", () => ({ trpc: { scan: { getV2State: { useQuery: () => ({ data: null }) }, getV2Report: { useQuery: () => ({ data: [] }) }, getThesisComparison: { useQuery: () => ({ data: null }) }, getStatus: { useQuery: () => ({ ...state.query, refetch: state.refetch }) } } } }));
-import ScanProgress from "../client/src/components/ScanProgress";
+import ScanProgress, { scanStatusQueryOptions } from "../client/src/components/ScanProgress";
 import { load } from "cheerio";
 beforeAll(() => vi.stubGlobal("React", React));
 afterAll(() => vi.unstubAllGlobals());
@@ -58,4 +58,18 @@ it("does not expose persisted database errors in a failed search", () => {
   const html = renderToStaticMarkup(<ScanProgress jobId={3} />);
   expect(html).not.toContain("private-thesis");
   expect(html).toContain("Search could not finish");
+});
+
+it("stops polling and shows one clear state when the search is not found (#106)", () => {
+  const notFound = { data: { code: "NOT_FOUND", httpStatus: 404 } };
+  state.query = { isLoading: true, isError: false, error: notFound };
+  const html = renderToStaticMarkup(<ScanProgress jobId={3840001} />);
+  expect(html).toContain("Search status unavailable");
+  expect(html).not.toContain("Connecting to scan engine");
+  const opts = scanStatusQueryOptions(false);
+  expect(opts.refetchInterval({ state: { error: notFound } })).toBe(false);
+  expect(opts.retry(0, notFound)).toBe(false);
+  expect(opts.refetchInterval({ state: { error: null } })).toBe(1200);
+  expect(opts.retry(0, new Error("network"))).toBe(true);
+  expect(scanStatusQueryOptions(true).refetchInterval({ state: { error: null } })).toBe(false);
 });
