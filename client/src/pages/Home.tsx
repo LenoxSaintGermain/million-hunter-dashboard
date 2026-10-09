@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isCapitalTemplateId } from "@shared/capitalThesisEligibility";
 import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { isTutorialAsset } from "@shared/tutorial";
@@ -410,7 +411,7 @@ export default function Home() {
     return Array.from(seen.values());
   })();
   const linkedAcquisitionSearch = savedTheses?.find((thesis: any) =>
-    thesis.scanJobId && thesis.templateUsed !== "capital_trade" &&
+    thesis.scanJobId && !isCapitalTemplateId(thesis.templateUsed) &&
     !(thesis.templateUsed === "wingate" || thesis.compiledFilters?.yearBuiltMax != null),
   );
   const visibleScanJobId = activeScanJobId ?? linkedAcquisitionSearch?.scanJobId ?? null;

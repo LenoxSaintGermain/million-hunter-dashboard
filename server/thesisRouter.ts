@@ -27,6 +27,8 @@ import { detailsFromCanonicalRecord, normalizeCapitalThesisDetails, buildCapital
 import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
 import { operatorDeclaredProjectionIfReady } from "./aperture/operatorDeclaredProjection";
 import { buildThesisSaveReceipt, DEFAULT_CAPITAL_THESIS_NAME } from "../shared/thesisSaveReceipt";
+import { buildStoredWeeklyIncomeTemplate } from "./aperture/weeklyIncomeParameters";
+import { WEEKLY_INCOME_TEMPLATE_ID } from "../shared/strategyTemplates/weeklyIncome";
 
 const capitalThesisDetailsSchema = z.object({
   belief: z.string().max(1000).optional(),
@@ -468,18 +470,34 @@ export const thesisRouter = router({
 
   /** Create a canonical thesis for a capital/trade workflow without forcing acquisition filters. */
   createCapital: capitalOperatorProcedure
-    .input(z.object({ thesisText: z.string().min(20).max(4000), name: z.string().min(1).max(120).optional(), details: capitalThesisDetailsSchema }))
+    .input(z.object({
+      thesisText: z.string().min(20).max(4000),
+      name: z.string().min(1).max(120).optional(),
+      details: capitalThesisDetailsSchema,
+      /** #83: optional strategy template. Overrides are validated server-side; unknown keys are refused. */
+      strategyTemplate: z.object({ id: z.literal(WEEKLY_INCOME_TEMPLATE_ID), parameters: z.record(z.string(), z.unknown()).optional() }).optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
+      // Validate the template before touching the database, so a refused
+      // parameter never leaves a half-saved thesis behind.
+      const weeklyIncome = input.strategyTemplate ? buildStoredWeeklyIncomeTemplate(input.strategyTemplate.parameters ?? {}) : null;
+      if (weeklyIncome && !weeklyIncome.ok) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: weeklyIncome.errors.join(" ") });
+      }
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       const requestedName = input.name?.trim() || DEFAULT_CAPITAL_THESIS_NAME;
-      const details = normalizeCapitalThesisDetails(input.details);
-      const fields = buildCapitalThesisCompilationFields(details);
+      // A Weekly Income thesis is always a swing, defined-risk options thesis.
+      const details = normalizeCapitalThesisDetails(weeklyIncome ? { ...input.details, holdingPeriod: "swing", instrument: "options" } : input.details);
+      const baseFields = buildCapitalThesisCompilationFields(details);
+      const fields = weeklyIncome?.ok
+        ? { ...baseFields, compiledFilters: { ...baseFields.compiledFilters, strategyTemplate: weeklyIncome.template } }
+        : baseFields;
       const [result] = await db.insert(thesisCompilations).values({
         userId: ctx.user.id,
         thesisText: input.thesisText,
         name: requestedName,
-        templateUsed: "capital_trade",
+        templateUsed: weeklyIncome?.ok ? WEEKLY_INCOME_TEMPLATE_ID : "capital_trade",
         compiledFilters: fields.compiledFilters,
         scoringWeights: [],
         evidenceRequirements: fields.evidenceRequirements,
@@ -508,7 +526,7 @@ export const thesisRouter = router({
           evidenceRequirements: fields.evidenceRequirements,
           autoDisqualifiers: fields.autoDisqualifiers,
         });
-        const declared = operatorProjection?.declared ?? normalizeCapitalThesisDetails(input.details);
+        const declared = operatorProjection?.declared ?? details;
         const graph = operatorProjection?.graph ?? manualThesisProjection(input.thesisText, requestedName, declared);
         const projValues = projectionValues({ id: compilationId, name: requestedName, thesisText: input.thesisText }, graph, true, now);
 

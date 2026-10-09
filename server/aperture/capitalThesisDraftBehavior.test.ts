@@ -1,6 +1,8 @@
 import * as React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CapitalThesisWorkspace, thesisDraftValidation } from "../../client/src/components/aperture/CapitalThesisWorkspace";
+import { WeeklyIncomeTemplatePicker } from "../../client/src/components/aperture/weeklyIncome/WeeklyIncomeTemplatePanel";
+import { WEEKLY_INCOME_THESIS_PREFILL } from "../../shared/strategyTemplates/weeklyIncome";
 
 // A hook-state harness exercises the actual component handlers without a browser,
 // providers, or a database. It does not claim DOM focus/accessibility coverage.
@@ -163,5 +165,18 @@ describe("new thesis defaults and preserved drafts", () => {
     button(tree, "Save without starting a run").props.onClick(); await Promise.resolve();
     expect(fixture.create).not.toHaveBeenCalled();
     expect(text(tree)).toContain("Put company descriptions in Research scope instead");
+  });
+
+  it("Weekly Income template (#83) prefills the editable draft and saves with the template id", async () => {
+    let tree = render();
+    const picker = elements(tree).find((element) => element.type === WeeklyIncomeTemplatePicker)!;
+    expect(picker).toBeTruthy();
+    picker.props.onUse(); tree = render();
+    expect(input(tree, "Thesis statement").props.value).toBe(WEEKLY_INCOME_THESIS_PREFILL.statement);
+    expect(input(tree, "Thesis name").props.value).toBe("Weekly Income · defined-risk premium · v0.1 · paper");
+    expect(elements(tree).some((element) => element.type === WeeklyIncomeTemplatePicker)).toBe(false);
+    button(tree, "Save without starting a run").props.onClick(); await Promise.resolve();
+    expect(fixture.create).toHaveBeenCalledWith(expect.objectContaining({ strategyTemplate: { id: "capital_weekly_income", parameters: {} }, details: expect.objectContaining({ holdingPeriod: "swing", instrument: "options" }) }));
+    expect(fixture.create.mock.calls[0][0].thesisText.length).toBeLessThanOrEqual(4_000);
   });
 });
