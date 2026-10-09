@@ -34,19 +34,31 @@ interface ScanProgressProps {
   className?: string;
 }
 
+/** True when the server says this search does not exist for the signed-in user. */
+export function isScanNotFoundError(error: unknown): boolean {
+  const e = error as { data?: { code?: string; httpStatus?: number } } | null | undefined;
+  return e?.data?.code === "NOT_FOUND" || e?.data?.httpStatus === 404;
+}
+
+export const scanStatusQueryOptions = (done: boolean) => ({
+  // Stop polling once the search is finished or the server says it does not exist.
+  refetchInterval: (query: { state: { error: unknown } }) =>
+    done || isScanNotFoundError(query.state.error) ? false : 1200,
+  refetchIntervalInBackground: true,
+  retry: (failureCount: number, error: unknown) => !isScanNotFoundError(error) && failureCount < 3,
+});
+
 export default function ScanProgress({ jobId, onComplete, onRetry, className }: ScanProgressProps) {
   const [done, setDone] = useState(false);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
   // Poll every 1.2 seconds while running
-  const { data: job, isLoading, isError, refetch } = trpc.scan.getStatus.useQuery(
+  const { data: job, isLoading, isError, error, refetch } = trpc.scan.getStatus.useQuery(
     { jobId },
-    {
-      refetchInterval: done ? false : 1200,
-      refetchIntervalInBackground: true,
-    }
+    scanStatusQueryOptions(done) as any,
   );
+  const notFound = isScanNotFoundError(error);
 
   useEffect(() => { setDone(false); }, [jobId]);
 
@@ -57,6 +69,12 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
     }
   }, [job?.status, done]);
 
+  if (notFound && !job) return (
+    <div role="alert" className={className}>
+      <p>Search status unavailable. This search is not on your account, so there is nothing to follow here. Start a new search from your thesis if you still need one.</p>
+      <Button variant="outline" onClick={() => refetch()}>Reload search status</Button>
+    </div>
+  );
   if (isError && !job) return (
     <div role="alert" className={className}>
       <p>Search status unavailable. The search may still be running; do not start a duplicate.</p>
