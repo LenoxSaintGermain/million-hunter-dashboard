@@ -1,5 +1,5 @@
 /**
- * Weekly Income (#82) Guided-mode building blocks. Presentation only: these
+ * Weekly Income (#82) Quick Play building blocks. Presentation only: these
  * components take numbers computed by shared/weeklyIncome and never fetch,
  * gate or submit anything.
  */
@@ -45,7 +45,7 @@ export function WeeklyIncomeGlossary({ terms, open = false }: { terms?: string[]
 }
 
 /**
- * The Guided explanation of one put credit spread: plain sentence, the most you
+ * The Quick Play explanation of one put credit spread: plain sentence, the most you
  * can lose in dollars, a what-can-go-wrong line, and the exit plan.
  */
 export function WeeklyIncomeSpreadExplainer({ explainer, title }: { explainer: GuidedSpreadExplainer; title?: string }) {
