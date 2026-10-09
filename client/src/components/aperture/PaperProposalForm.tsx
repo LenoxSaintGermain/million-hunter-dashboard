@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, CircleSlash2, ClipboardCheck,
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { buildProposalReadiness } from "@shared/proposalReadiness";
+import { plainPreflightBlocking } from "@shared/orderSubmitReadiness";
 import { PlayAndReturn } from "./PlayAndReturn";
 import { dollarsToCents } from "@shared/proposalTicketFields";
 import { buildOccOptionSymbol, isOptionInstrument, nextStandardMonthlyOptionExpiration, paperInstrumentLabel, type PaperInstrumentType } from "@shared/paperInstrument";
@@ -358,7 +359,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
     ticketReady: isOption ? optionTermsReady : true,
     ticketMissing: optionTicketMissing,
     preflightReady: currentPreflightData?.wouldPass,
-    blocking: currentPreflightData?.blocking,
+    blocking: plainPreflightBlocking(currentPreflightData),
     hardBlocker: hardPreflightResult?.detail,
     hardBlockerKey: hardPreflightResult?.key,
     paperAcknowledged: paperAcknowledgement === "PAPER",
@@ -398,7 +399,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
     </CardContent>
   </Card>;
   const suggestedRange = candidate.suggestedSizeHighCents != null ? `${money(candidate.suggestedSizeLowCents)}–${money(candidate.suggestedSizeHighCents)}` : money(candidate.suggestedSizeLowCents);
-  const preflightGaps = currentPreflightData?.blocking ?? [];
+  const preflightGaps = plainPreflightBlocking(currentPreflightData);
   const takeReadinessAction = () => {
     if (readiness.action === "refresh_recipe") return void refreshRecipe();
     if (readiness.action === "return_to_evidence") return onReturnToBrief();
