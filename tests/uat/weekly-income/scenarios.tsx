@@ -3,6 +3,13 @@ import { SixPercentNote, WeeklyIncomeGlossary, WeeklyIncomeIntro, WeeklyIncomeSp
 import { WI_EXAMPLE_SPREAD, buildGuidedSpreadExplainer } from "../../../shared/weeklyIncome/guided";
 import { WeeklyIncomeTemplatePanel, WeeklyIncomeTemplatePicker } from "../../../client/src/components/aperture/weeklyIncome/WeeklyIncomeTemplatePanel";
 import { weeklyIncomeDefaults } from "../../../shared/strategyTemplates/weeklyIncome";
+import { WeeklyIncomeSkipped } from "../../../client/src/components/aperture/weeklyIncome/WeeklyIncomeSkipped";
+
+// Example data: hypothetical tickers and dates for the blackout states.
+const SKIPPED = [
+  { symbol: "XYZ", plain: "XYZ reports results on Mon, Oct 19, before this trade would end. Prices can jump on results day, so we skip it.", detail: "Earnings 2026-10-19 falls inside 2026-10-12..2026-10-19 (expiration + 1 session).", source: { name: "Operator-entered", url: "https://example.invalid/ir", recordedBy: "fixture" } },
+  { symbol: "ABC", plain: "We don't know when ABC next reports results, so we skip it. Surprise moves around a report can be large.", detail: "No upcoming earnings date on record.", source: null },
+];
 
 const FIXTURE_MANDATE = { version: "v2", maxPlannedRiskPctPerPlay: 0.75, maxAggregateOpenRiskPct: 3, maxDailyPlannedRiskPct: 2, maxCorrelatedPlannedRiskPct: 1.25, maxWeeklyPlannedRiskPct: 4, minAdvUsd30d: 20_000_000 };
 
@@ -17,4 +24,7 @@ export const SCENARIOS: Record<string, { title: string; render: () => ReactNode 
   "template-picker": { title: "New Capital thesis: template choice", render: () => <WeeklyIncomeTemplatePicker onUse={() => undefined} /> },
   "template-quick-play": { title: "Weekly Income template chosen (Quick Play)", render: () => <WeeklyIncomeTemplatePanel parameters={weeklyIncomeDefaults()} isGuided onRemove={() => undefined} showExample={false} /> },
   "template-strategist": { title: "Weekly Income template chosen (Strategist parameter table)", render: () => <WeeklyIncomeTemplatePanel parameters={weeklyIncomeDefaults()} mandate={FIXTURE_MANDATE} parameterHash="sha256:fixture-not-a-real-hash" isGuided={false} /> },
+  "skipped-quick-play": { title: "Skipped by a blackout (Quick Play, Example data)", render: () => <WeeklyIncomeSkipped items={SKIPPED} isGuided /> },
+  "skipped-strategist": { title: "Skipped by a blackout (Strategist, Example data)", render: () => <WeeklyIncomeSkipped items={SKIPPED} isGuided={false} /> },
+  "week-empty": { title: "No idea met every rule (Quick Play)", render: () => <WeeklyIncomeSkipped items={[]} isGuided /> },
 };
