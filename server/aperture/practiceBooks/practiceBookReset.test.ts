@@ -195,6 +195,17 @@ describe("practiceBook.reset (UAT-E3)", () => {
     expect(syncedRow(rowA.id)).toMatchObject({ externalAccountId: "PA-HOUSE-0002", equityValueCents: 10_000_000 });
   });
 
+  it("treats a row still bound to an old account as a house change even when the book was never stamped (#107)", async () => {
+    h.mem!.seed(users, { id: A.id, openId: A.openId, role: "capital_operator" });
+    const [row] = h.mem!.seed(portfolioAccounts, { userId: A.id, label: "Alpaca Paper", brokerId: "alpaca_paper", isPaper: true, externalAccountId: "PA-OLD-HOUSE", createdAt: NOW, updatedAt: NOW });
+    await createPracticeBook(h.mem!.db, { userId: A.id, portfolioAccountId: row.id, createdBy: A.id, now: NOW });
+    resetHouseSnapshotCache();
+    const result = await caller(A).aperture.practiceBook.reset({ accountId: row.id });
+    expect(syncedRow(row.id)).toMatchObject({ practiceBookId: result.bookId, externalAccountId: null });
+    await caller(A).aperture.account.sync({ id: row.id });
+    expect(syncedRow(row.id)).toMatchObject({ externalAccountId: HOUSE_ID, equityValueCents: 10_000_000 });
+  });
+
   it("is refused for another user's account, a row without a book, and while books are off", async () => {
     const { rowA } = await twoBooks();
     await expect(caller(B).aperture.practiceBook.reset({ accountId: rowA.id })).rejects.toMatchObject({ code: "NOT_FOUND" });

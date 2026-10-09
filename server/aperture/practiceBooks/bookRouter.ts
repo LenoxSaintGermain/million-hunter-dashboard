@@ -105,7 +105,12 @@ export const practiceBookRouter = router({
       }
       // A book from a previous house can't trade (E2 refuses it), so its shares
       // and orders can never be closed here; it may be archived as it stands.
-      const houseChanged = Boolean(currentHouse && book.houseExternalAccountId && book.houseExternalAccountId !== currentHouse);
+      // The row's own binding counts too: a never-synced converted book has no
+      // houseExternalAccountId but its row can still hold an old account number.
+      const houseChanged = Boolean(currentHouse && (
+        (book.houseExternalAccountId && book.houseExternalAccountId !== currentHouse) ||
+        (row.externalAccountId && row.externalAccountId !== currentHouse)
+      ));
       if (!houseChanged) {
         const summary = await practiceBookSummary(db, row);
         if (summary?.resetBlockedReason) throw new TRPCError({ code: "PRECONDITION_FAILED", message: summary.resetBlockedReason });

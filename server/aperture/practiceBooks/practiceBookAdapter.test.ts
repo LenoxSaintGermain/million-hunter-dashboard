@@ -304,6 +304,18 @@ describe("routing and book creation", () => {
     expect(syncedRow(rows[0].id).practiceBookId).toBeNull();
   });
 
+  it("a converted tester row bound to an old house binds the current house on its first sync (#107)", async () => {
+    h.mem!.seed(users, { id: OWNER.id, openId: OWNER.openId, role: "admin" });
+    const [row] = h.mem!.seed(portfolioAccounts,
+      { userId: A.id, label: "a", brokerId: "alpaca_paper", isPaper: true, externalAccountId: "PA-OLD-HOUSE", equityValueCents: 1_000_165_000, lastSyncedAt: NOW, createdAt: NOW, updatedAt: NOW });
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    await caller(OWNER).aperture.uat.convertTesterAccounts();
+    expect(syncedRow(row.id)).toMatchObject({ externalAccountId: null, practiceBookId: expect.any(Number) });
+    resetHouseSnapshotCache();
+    await caller(A).aperture.account.sync({ id: row.id });
+    expect(syncedRow(row.id)).toMatchObject({ externalAccountId: HOUSE_ID, equityValueCents: 10_000_000 });
+  });
+
   it("compileAndStageBestFit no longer reads the house through alpacaPaperBroker directly", () => {
     const router = readFileSync(path.resolve(import.meta.dirname, "../../apertureRouter.ts"), "utf8");
     expect(router).not.toMatch(/alpacaPaperBroker\.(getAccount|getPositions|submitOrder)\(/);

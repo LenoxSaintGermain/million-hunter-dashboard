@@ -62,7 +62,9 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
   const { isGuided } = useExperienceMode();
   const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false });
   const accounts = accountQuery.data;
-  const preferredAccountId = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")?.id
+  // Prefer the practice-book row (it binds to the current house) over an older raw Alpaca row.
+  const preferredAccountId = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper" && account.practiceBook != null)?.id
+    ?? accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")?.id
     ?? accounts?.find((account) => account.isPaper)?.id
     ?? accounts?.[0]?.id
     ?? 1;
