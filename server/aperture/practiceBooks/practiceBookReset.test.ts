@@ -234,10 +234,9 @@ describe("practice book card copy", () => {
   });
 
   it("offers Disconnect only on a tester's own old raw Alpaca row, with plain copy (#107)", () => {
-    expect(canDisconnectAccount({ brokerId: "alpaca_paper", practiceBook: null }, false)).toBe(true);
-    expect(canDisconnectAccount({ brokerId: "alpaca_paper", practiceBook: null }, true)).toBe(false);
-    expect(canDisconnectAccount({ brokerId: "alpaca_paper", practiceBook: { generation: 1 } }, false)).toBe(false);
-    expect(canDisconnectAccount({ brokerId: "manual", practiceBook: null }, false)).toBe(false);
+    expect(canDisconnectAccount({ brokerId: "alpaca_paper", practiceBook: null, disconnectable: true })).toBe(true);
+    expect(canDisconnectAccount({ brokerId: "alpaca_paper", practiceBook: null })).toBe(false);
+    expect(canDisconnectAccount({ brokerId: "alpaca_paper", practiceBook: { generation: 1 }, disconnectable: true })).toBe(false);
     expect(PRACTICE_BOOK_COPY.disconnectConfirm).toContain("Nothing is sold or cancelled at Alpaca");
     expect(PRACTICE_BOOK_COPY.disconnectConfirm).toContain("just stops being used");
     for (const text of [PRACTICE_BOOK_COPY.disconnectTitle, PRACTICE_BOOK_COPY.disconnectExplainer, PRACTICE_BOOK_COPY.disconnectConfirm]) expect(text).not.toMatch(PROHIBITED_LANGUAGE);
@@ -248,6 +247,8 @@ describe("practice book card copy", () => {
     const [owner, oldA] = h.mem!.seed(portfolioAccounts,
       { userId: OWNER.id, label: "raw", brokerId: "alpaca_paper", isPaper: true, externalAccountId: HOUSE_ID, createdAt: NOW, updatedAt: NOW },
       { userId: A.id, label: "old", brokerId: "alpaca_paper", isPaper: true, externalAccountId: "PA-OLD-HOUSE", createdAt: NOW, updatedAt: NOW });
+    expect((await caller(A).aperture.account.list()).find((r) => r.id === oldA.id)).toMatchObject({ disconnectable: true });
+    expect((await caller(OWNER).aperture.account.list()).find((r) => r.id === owner.id)).toMatchObject({ disconnectable: false });
     await expect(caller(B).aperture.account.disconnect({ id: oldA.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(caller(A).aperture.account.disconnect({ id: owner.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(caller(A).aperture.account.disconnect({ id: oldA.id })).resolves.toEqual({ disconnected: true, id: oldA.id });

@@ -6,7 +6,6 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { invalidateAccountRefreshReads } from "@/lib/accountRefreshInvalidation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,9 +38,9 @@ export const PRACTICE_BOOK_COPY = {
   disconnectConfirm: "Disconnect this old Alpaca paper account? Nothing is sold or cancelled at Alpaca. This row just stops being used here, and its saved positions are cleared from this app.",
 } as const;
 
-/** Only a tester's own older raw Alpaca paper row gets Disconnect; the owner's row and practice books never do. */
-export function canDisconnectAccount(account: { brokerId: string; practiceBook?: unknown | null }, isOwner: boolean): boolean {
-  return !isOwner && account.brokerId === "alpaca_paper" && account.practiceBook == null;
+/** Only a tester's own older raw Alpaca paper row gets Disconnect (the server decides); the owner's rows and practice books never do. */
+export function canDisconnectAccount(account: { brokerId: string; practiceBook?: unknown | null; disconnectable?: boolean }): boolean {
+  return account.disconnectable === true && account.brokerId === "alpaca_paper" && account.practiceBook == null;
 }
 
 export function bookAge(openedAt: number, now = Date.now()): string {
@@ -70,8 +69,6 @@ export default function ApertureAccounts() {
   const [csvText, setCsvText] = useState("");
   const [syncFeedback, setSyncFeedback] = useState<{ accountId: number; message: string; tone: "success" | "error" } | null>(null);
 
-  const { user } = useAuth();
-  const isOwner = user?.role === "admin";
   const { data: accounts, refetch, isLoading, isError } = trpc.aperture.account.list.useQuery();
   const { data: brokers, isError: brokersFailed, refetch: retryBrokers } = trpc.aperture.brokers.useQuery();
 
@@ -376,7 +373,7 @@ export default function ApertureAccounts() {
                 </div>
               )}
 
-              {canDisconnectAccount(account, isOwner) && (
+              {canDisconnectAccount(account) && (
                 <div className="border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>

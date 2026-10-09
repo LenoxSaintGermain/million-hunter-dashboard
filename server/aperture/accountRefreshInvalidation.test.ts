@@ -30,6 +30,7 @@ vi.mock("@/lib/trpc", () => {
         listActivePlays: { useQuery: () => ({ data: [] }) },
         create: mutation, configureSyncSchedule: mutation, importCsv: mutation,
         upsertActivePlay: mutation, removeActivePlay: mutation,
+        disconnect: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         sync: { useMutation: (options: unknown) => { boundary.sync = options; return { mutate: boundary.mutate, isPending: false }; } },
       },
       practiceBook: { reset: mutation },
