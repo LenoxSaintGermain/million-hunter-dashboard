@@ -62,6 +62,7 @@ import ApertureHome from "./pages/aperture/ApertureHome";
 import ApertureMission from "./pages/aperture/ApertureMission";
 import ApertureDeploy from "./pages/aperture/ApertureDeploy";
 import ThesisGraphEditor from "./pages/aperture/ThesisGraphEditor";
+import ApertureNewThesis from "./pages/aperture/ApertureNewThesis";
 import ApertureTheses from "./pages/aperture/ApertureTheses";
 import ApertureDisclosure from "./pages/aperture/ApertureDisclosure";
 import ExposureMap from "./pages/aperture/ExposureMap";
@@ -284,6 +285,8 @@ function Router() {
         <Route path="/aperture/deploy">{() => <ApertureRoute component={ApertureDeploy} />}</Route>
         <Route path="/aperture/mission">{() => <ApertureRoute component={ApertureMission} />}</Route>
         <Route path="/aperture">{() => <ApertureRoute component={ApertureHome} />}</Route>
+        <Route path="/aperture/theses/new">{() => <ApertureRoute component={ApertureNewThesis} />}</Route>
+        <Route path="/aperture/portfolio">{() => <ApertureRoute component={ApertureAccounts} />}</Route>
         <Route path="/aperture/theses">{() => <ApertureRoute component={ApertureTheses} />}</Route>
         <Route path="/aperture/disclosures">{() => <ApertureRoute component={ApertureDisclosure} />}</Route>
         <Route path="/aperture/thesis/new">{() => <ApertureRoute component={ThesisGraphEditor} />}</Route>

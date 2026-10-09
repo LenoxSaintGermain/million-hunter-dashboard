@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { APERTURE_NEW_THESIS_PATH } from "@shared/apertureNavRoutes";
 import { useLocation } from "wouter";
 import { ArrowLeft, ArrowUpRight, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -115,7 +116,7 @@ export default function ApertureTheses() {
               </p>
             </div>
           </div>
-          <Button onClick={() => navigate("/thesis?new=1")}>
+          <Button onClick={() => navigate(APERTURE_NEW_THESIS_PATH)}>
             <Sparkles className="mr-2 h-4 w-4" />New canonical thesis
           </Button>
         </div>
