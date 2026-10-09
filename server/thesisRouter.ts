@@ -5,6 +5,7 @@
  * Compiles free-text investment theses into executable pipeline configurations
  * using the configured Google provider. Saves compilations to thesis_compilations.
  */
+import { isDescriptiveThesisName, thesisNameError } from "../shared/thesisNaming";
 import { z } from "zod";
 import { GoogleGenAI } from "@google/genai";
 import { strategistInput, strategistApprovalSchema, strategistReceipt } from "../shared/strategistReview";
@@ -480,6 +481,10 @@ export const thesisRouter = router({
     .mutation(async ({ ctx, input }) => {
       // Validate the template before touching the database, so a refused
       // parameter never leaves a half-saved thesis behind.
+      // #124: a supplied name must be recognisable (not "MR"). Existing rows are never renamed.
+      if (input.name?.trim() && !isDescriptiveThesisName(input.name)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: thesisNameError(input.name) ?? "Use a descriptive thesis name." });
+      }
       const weeklyIncome = input.strategyTemplate ? buildStoredWeeklyIncomeTemplate(input.strategyTemplate.parameters ?? {}) : null;
       if (weeklyIncome && !weeklyIncome.ok) {
         throw new TRPCError({ code: "BAD_REQUEST", message: weeklyIncome.errors.join(" ") });

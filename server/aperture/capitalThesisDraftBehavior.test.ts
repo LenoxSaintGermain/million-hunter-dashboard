@@ -69,7 +69,7 @@ describe("new thesis defaults and preserved drafts", () => {
   });
   it("hands the saved source and projection to Mission rather than resuming Today", async () => {
     let tree = render();
-    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); tree = render();
+    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); input(tree, "Thesis name").props.onChange({ target: { value: "Diesel crack spread widening" } }); tree = render();
     button(tree, "Save and use in Capital Mission").props.onClick();
     for (let i = 0; i < 12; i++) await Promise.resolve();
     expect(fixture.navigate).toHaveBeenCalledWith("/aperture/mission?canonicalThesisId=1&capitalThesisId=42&newMission=1");
@@ -77,7 +77,7 @@ describe("new thesis defaults and preserved drafts", () => {
   it("does not hand off an unrelated projection", async () => {
     fixture.project.mockResolvedValue({ sourceCompilationId: 999, apertureThesisId: 42, compilerStatus: "ready", missingFields: [], incompatibilities: [] });
     let tree = render();
-    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); tree = render();
+    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); input(tree, "Thesis name").props.onChange({ target: { value: "Diesel crack spread widening" } }); tree = render();
     button(tree, "Save and use in Capital Mission").props.onClick();
     for (let i = 0; i < 12; i++) await Promise.resolve();
     expect(fixture.navigate).not.toHaveBeenCalled();
@@ -85,7 +85,7 @@ describe("new thesis defaults and preserved drafts", () => {
   it("blocks missing research scope even when provider compilation completed", async () => {
     fixture.project.mockResolvedValue({ sourceCompilationId: 1, apertureThesisId: 42, compilerStatus: "compiled", missingFields: ["Recover the research universe in a new thesis version"], incompatibilities: [] });
     let tree = render();
-    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); tree = render();
+    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); input(tree, "Thesis name").props.onChange({ target: { value: "Diesel crack spread widening" } }); tree = render();
     button(tree, "Save and use in Capital Mission").props.onClick();
     for (let i = 0; i < 12; i++) await Promise.resolve();
     expect(fixture.navigate).not.toHaveBeenCalled();
@@ -129,7 +129,7 @@ describe("new thesis defaults and preserved drafts", () => {
   });
   it("retains the draft after a failed save and shows failure instead of Saved", async () => {
     fixture.create.mockRejectedValue(new Error("Fixture save unavailable"));
-    let tree = render(); input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); tree = render();
+    let tree = render(); input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); input(tree, "Thesis name").props.onChange({ target: { value: "Diesel crack spread widening" } }); tree = render();
     button(tree, "Save without starting a run").props.onClick(); await Promise.resolve(); tree = render();
     expect(input(tree, "Thesis statement").props.value).toBe(saved.thesisText);
     expect(text(tree)).toContain("Save not confirmed: Fixture save unavailable");
@@ -147,10 +147,13 @@ describe("new thesis defaults and preserved drafts", () => {
     expect(thesisDraftValidation("x".repeat(20), "x".repeat(4001), "")).toContain("4,000");
     expect(thesisDraftValidation("x".repeat(20), "x".repeat(20), "n".repeat(121))).toContain("120");
     expect(thesisDraftValidation("x".repeat(20), "x".repeat(4000), "n".repeat(120))).toBeNull();
+    // #124: new saves need a recognisable name.
+    expect(thesisDraftValidation("x".repeat(20), "x".repeat(20), "")).toContain("name");
+    expect(thesisDraftValidation("x".repeat(20), "x".repeat(20), "MR")).toContain("8 characters");
   });
   it("keeps descriptive research scope separate from declared tickers", async () => {
     let tree = render();
-    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } });
+    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); input(tree, "Thesis name").props.onChange({ target: { value: "Diesel crack spread widening" } });
     button(tree, "Add thesis detail").props.onClick(); tree = render();
     const scope = "Liquid U.S.-listed refiners and diesel-sensitive transport businesses; verify mappings first.";
     input(tree, "Research scope (optional)").props.onChange({ target: { value: scope } }); tree = render();
@@ -159,7 +162,7 @@ describe("new thesis defaults and preserved drafts", () => {
   });
   it("asks for correction rather than saving prose as ticker declarations", async () => {
     let tree = render();
-    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } });
+    input(tree, "Thesis statement").props.onChange({ target: { value: saved.thesisText } }); input(tree, "Thesis name").props.onChange({ target: { value: "Diesel crack spread widening" } });
     button(tree, "Add thesis detail").props.onClick(); tree = render();
     input(tree, "Ticker symbols (optional)").props.onChange({ target: { value: "Liquid U.S.-listed refiners and diesel-sensitive transport businesses" } }); tree = render();
     button(tree, "Save without starting a run").props.onClick(); await Promise.resolve();

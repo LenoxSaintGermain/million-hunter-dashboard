@@ -1,3 +1,4 @@
+import { thesisNameError } from "@shared/thesisNaming";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { ArrowLeft, ArrowRight, ChevronDown, FileCheck2, Loader2, Pencil, Save, ShieldCheck } from "lucide-react";
@@ -31,6 +32,8 @@ export function thesisDraftValidation(statement: string, submittedText: string, 
   if (statement.trim().length < 20) return "Write your own thesis statement (at least 20 characters) before saving.";
   if (submittedText.length > 4_000) return "Shorten the statement and thesis detail to 4,000 characters total.";
   if (name.trim().length > 120) return "Shorten the version name to 120 characters.";
+  const nameError = thesisNameError(name);
+  if (nameError) return nameError;
   return null;
 }
 

@@ -43,3 +43,35 @@ export function thesisOptions<T extends ThesisProjection>(projections: readonly 
   const visible = opts.showTest ? [...all] : all.filter((projection) => !isTestThesisName(projection.name) || String(projection.id) === keep);
   return { visible, hiddenCount };
 }
+
+/**
+ * One count source for the thesis library and the account-bar selector (#112).
+ * The library lists Capital projections plus canonical-only theses; the
+ * selector can only switch to Capital projections. Both read their counts
+ * from here, so the numbers agree and any difference is named.
+ */
+export function thesisLibraryCounts(input: {
+  projections: readonly ThesisProjection[] | null | undefined;
+  canonicalOnly: readonly { name: string | null }[] | null | undefined;
+  keepId?: string | number | null;
+}) {
+  const projections = input.projections ?? [];
+  const canonicalOnly = input.canonicalOnly ?? [];
+  const selectableTestHidden = thesisOptions(projections, { showTest: false, keepId: input.keepId }).hiddenCount;
+  const canonicalOnlyTest = canonicalOnly.filter((thesis) => isTestThesisName(thesis.name)).length;
+  return {
+    capital: projections.length,
+    canonicalOnly: canonicalOnly.length,
+    total: projections.length + canonicalOnly.length,
+    selectableTestHidden,
+    canonicalOnlyTest,
+    testHidden: selectableTestHidden + canonicalOnlyTest,
+  };
+}
+
+/** "Show 9 test theses (1 not yet in Capital)": the same number the selector shows, plus what only the library has. */
+export function showTestThesesLabel(counts: { selectableTestHidden: number; canonicalOnlyTest: number }, scope: "library" | "selector"): string {
+  const n = scope === "selector" ? counts.selectableTestHidden : counts.selectableTestHidden + counts.canonicalOnlyTest;
+  const base = `Show ${n} test ${n === 1 ? "thesis" : "theses"}`;
+  return scope === "library" && counts.canonicalOnlyTest > 0 ? `${base} (${counts.canonicalOnlyTest} not yet in Capital)` : base;
+}

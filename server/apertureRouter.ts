@@ -10,6 +10,7 @@
  * such." This is enforced in the client, not here, but it is documented here
  * so the contract is visible in the server code too.
  */
+import { isDescriptiveThesisName, thesisNameError } from "../shared/thesisNaming";
 import { z } from "zod";
 import { eq, ne, and, or, inArray, gte, lt, sql, asc, isNull } from "drizzle-orm";
 import { createHash } from "node:crypto";
@@ -1155,6 +1156,10 @@ export const apertureRouter = router({
         rawText: z.string().min(10).max(8000),
       }))
       .mutation(async ({ ctx, input }) => {
+        // #124: a supplied name must be recognisable (not "MR"). Existing rows are never renamed.
+        if (input.name?.trim() && !isDescriptiveThesisName(input.name)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: thesisNameError(input.name) ?? "Use a descriptive thesis name." });
+        }
         const db = await getDb();
         const now = Date.now();
         const [canonical] = await db!.insert(thesisCompilations).values(canonicalCapitalValues({
