@@ -18,10 +18,14 @@ describe("manual ticket fail-closed guidance", () => {
   it("applies the same blocker to keyboard and button paths, without acknowledgement autofill", () => {
     const source = readFileSync("client/src/components/aperture/ManualOrderTicketModal.tsx", "utf8");
     expect(source).toContain("createOrder.isPending || stagingBlocker");
-    expect(source).toContain("disabled={createOrder.isPending || Boolean(stagingBlocker)}");
+    expect(source).toContain("disabled={createOrder.isPending || Boolean(stagingBlocker) || preflightNotReady}");
+    // #118: the server preflight drives the same checklist as the execute page, and blocks staging until it passes.
+    expect(source).toContain("aperture.order.preflight.useQuery");
+    expect(source).toContain("<GuardrailChecklist evaluation={preflightData?.evaluation}");
+    expect(source).toContain("if (preflightNotReady) {");
     expect(source).not.toContain('setPaperAck("PAPER")');
     expect(source).not.toContain("runsQuery.data?.[0]?.id");
-    expect(source).toContain('side: isOption ? "buy"');
+    expect(readFileSync("shared/manualTicketPayload.ts", "utf8")).toContain('side: (isOption ? "buy"');
     expect(source).not.toContain(": 200_000");
   });
 });

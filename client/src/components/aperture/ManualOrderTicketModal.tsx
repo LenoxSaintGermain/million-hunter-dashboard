@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { buildOccOptionSymbol, nextStandardMonthlyOptionExpiration } from "@shared/paperInstrument";
+import { nextStandardMonthlyOptionExpiration } from "@shared/paperInstrument";
 import { TrendingDown, TrendingUp, Sparkles, Loader2, AlertTriangle } from "lucide-react";
 import type { AttentionMission } from "@shared/apertureAttention";
 import { manualTicketBlocker } from "@shared/manualTicketReadiness";
+import { buildManualTicketPayload } from "@shared/manualTicketPayload";
+import { GuardrailChecklist } from "@/components/aperture/GuardrailChecklist";
 
 export interface ManualOrderTicketModalProps {
   open: boolean;
@@ -261,10 +263,20 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
     },
   });
 
+  const ticketFields = React.useCallback((now: number) => ({
+    accountId: selectedAccount?.id, symbol, expression, direction, shareCount, contracts, limitPrice, strikePrice,
+    spreadUpperStrike, expirationDate, reason, invalidationCondition, holdingPeriod, catalystDays,
+    notionalCents: estimatedNotionalCents, runId: effectiveRunId, candidateId: initialValues?.candidateId, now,
+  }), [selectedAccount?.id, symbol, expression, direction, shareCount, contracts, limitPrice, strikePrice, spreadUpperStrike, expirationDate, reason, invalidationCondition, holdingPeriod, catalystDays, estimatedNotionalCents, effectiveRunId, initialValues?.candidateId]);
+
   const handleSubmit = async () => {
     setStageError(null);
     if (createOrder.isPending || stagingBlocker) {
       if (stagingBlocker) setStageError(stagingBlocker);
+      return;
+    }
+    if (preflightNotReady) {
+      setStageError(preflightChecking ? "Checking paper-order guardrails. Please wait." : "Fix the guardrail checks above before staging this ticket.");
       return;
     }
     if (!selectedAccount) {
@@ -280,57 +292,35 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
       return;
     }
 
-    const cleanSymbol = symbol.trim().toUpperCase();
-    const isOption = expression !== "shares";
-
-    let contractSymbol: string = cleanSymbol;
-    let finalInstrumentType: "shares" | "long_call" | "long_put" = "shares";
-
-    if (isOption) {
-      const optionType = expression === "long_put" || expression === "bear_put_spread" ? "put" : "call";
-      finalInstrumentType = optionType === "put" ? "long_put" : "long_call";
-      const strikeCents = Math.round(numStrike * 100);
-
-      const generatedOcc = buildOccOptionSymbol({
-        underlyingSymbol: cleanSymbol,
-        expirationDate,
-        optionType,
-        strikePriceCents: strikeCents,
-      });
-
-      if (!generatedOcc) {
-        toast.error("Could not construct standard OCC option symbol. Check strike and expiration format.");
-        return;
-      }
-      contractSymbol = generatedOcc;
+    const built = buildManualTicketPayload(ticketFields(Date.now()));
+    if (!built.ok) {
+      toast.error(built.error);
+      return;
     }
-
-    const structuredReason = `[${expression.toUpperCase()} EXPR] ${reason} · Target: $${numUpperStrike || numStrike} · Structure: ${expression.replaceAll("_", " ")}`;
-
-    createOrder.mutate({
-      accountId: selectedAccount.id,
-      symbol: contractSymbol,
-      underlyingSymbol: isOption ? cleanSymbol : undefined,
-      instrumentType: finalInstrumentType,
-      optionExpirationDate: isOption ? expirationDate : undefined,
-      optionStrikePriceCents: isOption ? Math.round(numStrike * 100) : undefined,
-      contractMultiplier: isOption ? 100 : undefined,
-      side: isOption ? "buy" : direction === "long" ? "buy" : "sell",
-      intent: "open",
-      qty: isOption ? contracts : shareCount,
-      notionalCents: !isOption ? estimatedNotionalCents : undefined,
-      orderType: "limit",
-      limitPriceCents: Math.round(numLimitPrice * 100),
-      timeInForce: "day",
-      reason: structuredReason,
-      invalidationCondition: invalidationCondition || "Break of structural support or catalyst expiry",
-      holdingPeriod,
-      catalystDeadlineAt: Date.now() + catalystDays * 86_400_000,
-      paperAcknowledgement: "PAPER",
-      runId: effectiveRunId,
-      candidateId: initialValues?.candidateId,
-    });
+    createOrder.mutate(built.payload);
   };
+
+  // Server guardrail preflight for the ticket being drafted (#118): the same
+  // checklist and readiness meter as /aperture/run/:id/execute. Debounced, and
+  // only the result for the current ticket is shown.
+  // Minute-rounded clock keeps the fingerprint stable while typing.
+  const preflightMinute = Math.floor(Date.now() / 60_000) * 60_000;
+  const preflightBuilt = useMemo(() => buildManualTicketPayload(ticketFields(preflightMinute)), [ticketFields, preflightMinute]);
+  const preflightTicket = preflightBuilt.ok ? preflightBuilt.payload : null;
+  const preflightFingerprint = preflightTicket ? JSON.stringify(preflightTicket) : null;
+  const [preflightInput, setPreflightInput] = useState<{ ticket: any; fingerprint: string } | null>(null);
+  useEffect(() => {
+    if (!open || !preflightTicket || !preflightFingerprint) { setPreflightInput(null); return; }
+    const timer = window.setTimeout(() => setPreflightInput({ ticket: preflightTicket, fingerprint: preflightFingerprint }), 400);
+    return () => window.clearTimeout(timer);
+  }, [open, preflightFingerprint]);
+  const preflightQuery = (trpc as any)?.aperture?.order?.preflight?.useQuery
+    ? (trpc as any).aperture.order.preflight.useQuery(preflightInput?.ticket ?? preflightTicket ?? {}, { enabled: open && preflightInput != null, staleTime: 0, retry: false })
+    : { data: undefined, isFetching: false };
+  const preflightCurrent = preflightInput != null && preflightInput.fingerprint === preflightFingerprint;
+  const preflightData = preflightCurrent ? preflightQuery.data : undefined;
+  const preflightChecking = Boolean(preflightTicket) && (!preflightCurrent || preflightQuery.isFetching);
+  const preflightNotReady = !preflightData?.evaluation || preflightData.wouldPass !== true;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -778,6 +768,8 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
           )}
         </div>
 
+        <GuardrailChecklist evaluation={preflightData?.evaluation} checking={preflightChecking} checkedAt={preflightData?.evaluation?.evaluatedAt ?? null} />
+        {preflightCurrent && (preflightQuery as any).error && <p role="status" className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Guardrail check could not run: {(preflightQuery as any).error.message}. Nothing has been staged.</p>}
         {stagingBlocker && <p role="status" className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{stagingBlocker}</p>}
         <DialogFooter className="flex flex-wrap items-center justify-between gap-2 border-t pt-3" style={{ borderColor: "var(--sh-border-1)" }}>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
@@ -785,7 +777,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
           </Button>
           <Button
             size="sm"
-            disabled={createOrder.isPending || Boolean(stagingBlocker)}
+            disabled={createOrder.isPending || Boolean(stagingBlocker) || preflightNotReady}
             onClick={handleSubmit}
             className="min-h-10 px-4 font-semibold"
           >

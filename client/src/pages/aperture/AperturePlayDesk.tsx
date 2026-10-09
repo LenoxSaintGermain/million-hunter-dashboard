@@ -27,6 +27,7 @@ import { PlayInspectionDrawer, type InspectableOrder } from "@/components/apertu
 import { PositionExitModal, type ExitTarget } from "@/components/aperture/PositionExitModal";
 import { ManualOrderTicketModal } from "@/components/aperture/ManualOrderTicketModal";
 import { snapshotAgeLabel } from "@shared/snapshotAge";
+import { markBasisLabel } from "@shared/markBasisLabel";
 
 const money = (cents?: number | null) => cents == null
   ? "—"
@@ -463,7 +464,7 @@ export default function AperturePlayDesk() {
                   <div>{money(order.plannedRiskCents)}</div>
                   {order.latestMark && (
                     <div className="text-[11px] font-mono" style={{ color: "var(--sh-fg-muted)" }}>
-                      Mark {money(order.latestMark.lastPriceCents)} · Basis {money(order.latestMark.avgCostCents)}
+                      {markBasisLabel({ lastPriceCents: order.latestMark.lastPriceCents, avgCostCents: order.latestMark.avgCostCents, isOption: isOptionInstrument(order.instrumentType), contractMultiplier: (order as any).contractMultiplier })}
                     </div>
                   )}
                   <span className="block text-[11px] leading-4" style={{ color: "var(--sh-fg-muted)" }}>{isOptionInstrument(order.instrumentType) ? "Premium at risk" : "Planned loss at modeled stop"} · {quantities.ordered} ordered · {quantities.filled} filled · {quantities.remaining} remaining{!isOptionInstrument(order.instrumentType) ? " · Stop execution may differ from the modeled price." : ""}<span className="block">Human review: {(() => { const humanReview = deskHumanReview(order, pendingOutcomes); return humanReview ? new Date(humanReview.dueAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : outcomes.error || outcomes.data == null ? "Review status unavailable" : "No checkpoint recorded"; })()}</span></span>
