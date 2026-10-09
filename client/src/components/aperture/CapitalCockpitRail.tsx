@@ -1,5 +1,6 @@
 import { singleOrderLimit } from "@shared/singleOrderLimit";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useSnapshotAgreement } from "@/lib/useSnapshotAgreement";
 import { ActiveThesisSelect } from "./ActiveThesisSelect";
 import { ChevronDown, Clock3, Info, Landmark, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -61,8 +62,10 @@ function ConnectedPortfolioPortrait({ accountId, ...props }: Omit<React.Componen
 
 export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = false, editorialContext = false }: { runId?: number; compactOnly?: boolean; visualHero?: boolean; editorialContext?: boolean }) {
   const { isGuided } = useExperienceMode();
-  const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false });
+  // Polls the stored snapshot (read only) so a scheduled sync reaches Today without a reload (#120).
+  const accountQuery = trpc.aperture.account.list.useQuery(undefined, { retry: false, refetchInterval: 60_000, refetchIntervalInBackground: false });
   const accounts = accountQuery.data;
+  useSnapshotAgreement(accounts);
   // Prefer the practice-book row (it binds to the current house) over an older raw Alpaca row.
   const preferredAccountId = accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper" && account.practiceBook != null)?.id
     ?? accounts?.find((account) => account.isPaper && account.brokerId === "alpaca_paper")?.id

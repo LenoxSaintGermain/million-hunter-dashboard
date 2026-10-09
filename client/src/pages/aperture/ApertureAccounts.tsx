@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
+import { useSnapshotAgreement } from "@/lib/useSnapshotAgreement";
 import { AccountContextPanel } from "@/components/aperture/AccountContextPanel";
 import { parsePortfolioCsv } from "@shared/portfolioCsv";
 import { AccountHoldingsPortrait, accountMoney, accountStamp } from "@/components/aperture/AccountHoldingsPortrait";
@@ -72,6 +73,8 @@ export default function ApertureAccounts() {
   const [syncFeedback, setSyncFeedback] = useState<{ accountId: number; message: string; tone: "success" | "error" } | null>(null);
 
   const { data: accounts, refetch, isLoading, isError } = trpc.aperture.account.list.useQuery();
+  // A newer stored snapshot here refreshes Today's cached cockpit and desk too (#120).
+  useSnapshotAgreement(accounts);
   const { data: brokers, isError: brokersFailed, refetch: retryBrokers } = trpc.aperture.brokers.useQuery();
 
   const createAccount = trpc.aperture.account.create.useMutation({
