@@ -235,12 +235,7 @@ export function CapitalCockpitRail({ runId, compactOnly = false, visualHero = fa
 
       {/* Grid Row */}
       <div className="grid min-h-11 gap-px" style={{ background: "var(--sh-border-1)" }}>
-        <div className="grid gap-px sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1.15fr]" style={{ background: "var(--sh-border-1)" }}>
-          <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: "var(--sh-surface)" }}>
-            <StateMark state={data.activeThesis ? "rule_qualified" : "unknown"} label="Active thesis" compact />
-            <span className="truncate text-xs font-semibold" title={data.activeThesis?.name ?? "No active thesis"} style={{ color: "var(--sh-text-primary)" }}>{data.activeThesis ? data.activeThesis.name : "Not assigned"}</span>
-            <RailHelp label="Explain active thesis">This is the canonical thesis selected for new missions. It is separate from holdings and account limits.</RailHelp>
-          </div>
+        <div className="grid gap-px sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1.15fr]" style={{ background: "var(--sh-border-1)" }}>
           <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ background: "var(--sh-surface)" }}>
             <StateMark state={data.session.session === "unknown" ? "unknown" : "researchable"} label={data.session.session.replaceAll("_", " ")} compact />
             <span className="truncate text-xs" style={{ color: "var(--sh-text-primary)" }}>· {data.session.nextBoundary?.label.toLowerCase() ?? "boundary —"}{boundaryMs != null ? ` ${duration(boundaryMs)}` : ""}</span>

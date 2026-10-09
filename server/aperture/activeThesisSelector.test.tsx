@@ -80,6 +80,9 @@ describe("ActiveThesisSelect", () => {
     expect(rail.match(/<ActiveThesisSelect/g)).toHaveLength(2);
     expect(rail).not.toContain("currentActiveThesisId");
     expect(rail).not.toContain("Active Research Lens");
+    // The selector replaces the read-only "Active thesis" cell in the account bar.
+    expect(rail).not.toContain('label="Active thesis"');
+    expect(rail).not.toContain("Explain active thesis");
     const library = readFileSync("client/src/pages/aperture/ApertureTheses.tsx", "utf8");
     expect(library).not.toMatch(/\|\| thesis\.isPrimary/);
     expect(library).not.toMatch(/\|\| t\.isPrimary/);
