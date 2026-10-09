@@ -9,7 +9,7 @@ import { buildOccOptionSymbol, nextStandardMonthlyOptionExpiration } from "@shar
 import { TrendingDown, TrendingUp, Sparkles, Loader2, AlertTriangle } from "lucide-react";
 import type { AttentionMission } from "@shared/apertureAttention";
 import { manualTicketBlocker } from "@shared/manualTicketReadiness";
-import { singleOrderLimit } from "@shared/singleOrderLimit";
+import { singleNameCheck, singleOrderLimit } from "@shared/singleOrderLimit";
 import type { CockpitHeadroomLine } from "@shared/cockpitRailSummary";
 
 const usdExact = (cents: number) => {
@@ -225,13 +225,25 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
   const autoFitCents = maxAllowableUnits * costPerUnitCents;
   const autoFitLabel = `Auto-Fit: ${maxAllowableUnits} (uses ${usdExact(autoFitCents)} of the ${limit.value} limit)`;
   const orderExceedsCeiling = singleOrderCeilingCents != null && estimatedNotionalCents > singleOrderCeilingCents;
+  // One-company limit: the server's per-name ceiling plus the server's saved holdings (#109).
+  const positionsQuery = trpc.aperture.account.getPositions.useQuery(
+    { accountId: selectedAccount?.id ?? 0 },
+    { enabled: Boolean(selectedAccount), retry: false },
+  );
+  const heldSymbolCents = positionsQuery.data
+    ? positionsQuery.data
+      .filter((p: { symbol: string }) => p.symbol.trim().toUpperCase() === symbol.trim().toUpperCase())
+      .reduce((sum: number, p: { marketValueCents: number | null }) => sum + Math.abs(p.marketValueCents ?? 0), 0)
+    : null;
+  const nameCheck = singleNameCheck(headroom?.lines, symbol, heldSymbolCents, estimatedNotionalCents);
+  const orderExceedsConcentration = positionsQuery.data != null && nameCheck.over;
 
   const buyingPowerCents = selectedAccount?.buyingPowerCents ?? 0;
   const hasBuyingPower = buyingPowerCents >= estimatedNotionalCents;
   const stagingBlocker = manualTicketBlocker({ expression, missionAccountId: activeMission?.accountId,
     accountId: selectedAccount?.id, runId: effectiveRunId, brokerId: selectedAccount?.brokerId,
     equityCents, notionalCents: estimatedNotionalCents, buyingPowerCents,
-    exceedsLimit: orderExceedsCeiling, acknowledgement: paperAck });
+    exceedsLimit: orderExceedsCeiling || orderExceedsConcentration, acknowledgement: paperAck });
 
   const createOrder = trpc.aperture.order.create.useMutation({
     onSuccess: async (res) => {
@@ -666,6 +678,13 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
               </div>
 
               <p className="text-[11px] leading-5" style={{ color: "var(--sh-fg-muted)", fontFamily: "inherit" }}>Single-order limit: {limit.explanation}</p>
+              <p className="text-[11px] leading-5" style={{ color: "var(--sh-fg-muted)", fontFamily: "inherit" }}>{nameCheck.explanation}</p>
+              {orderExceedsConcentration && nameCheck.warning && (
+                <div role="alert" data-single-name-warning className="border p-1.5 text-[11px] flex items-center gap-1.5" style={{ borderColor: "var(--sh-red)", color: "var(--sh-text-primary)", background: "var(--sh-surface)" }}>
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-red)" }} />
+                  <span>{nameCheck.warning}</span>
+                </div>
+              )}
               {orderExceedsCeiling && (
                 <div className="rounded p-1.5 text-[11px] bg-red-950/40 border border-red-900/60 text-red-300 flex items-center gap-1.5">
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-400" />
