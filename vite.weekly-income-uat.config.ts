@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 
-// Weekly Income (#82) zero-API fixture renderer for Guided-mode states.
+// Weekly Income (#82) zero-API fixture renderer for Quick Play states.
 // Never part of the production entry or build. Mirrors vite.today-uat.config.ts.
 export default defineConfig(({ command }) => {
   if (command !== "serve" || process.env.ISOLATED_UAT_MODE !== "true") throw new Error("Weekly Income fixture requires isolated serve mode.");

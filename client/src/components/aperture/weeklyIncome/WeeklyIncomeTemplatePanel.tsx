@@ -1,6 +1,6 @@
 /**
- * Weekly Income template (#83): picker and rules panel. Guided mode reads the
- * rules in plain English; Pro mode sees the full parameter table. Display only;
+ * Weekly Income template (#83): picker and rules panel. Quick Play reads the
+ * rules in plain English; Strategist sees the full parameter table. Display only;
  * the server validates and stores parameters.
  */
 import { WI_COPY } from "@shared/weeklyIncome/copy";
@@ -101,7 +101,7 @@ export function WeeklyIncomeTemplatePanel({ parameters, mandate, parameterHash, 
   /** Defaults to the user's experience mode; fixtures pass it explicitly. */
   isGuided?: boolean;
   onRemove?: () => void;
-  /** Defaults to Guided mode only. */
+  /** Defaults to Quick Play only. */
   showExample?: boolean;
 }) {
   const mode = useExperienceMode();
