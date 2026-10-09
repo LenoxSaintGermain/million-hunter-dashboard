@@ -32,7 +32,6 @@ export function GuardrailChecklist({ evaluation, checking = false, checkedAt }: 
           <X aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--sh-red)" }} />
           <div className="min-w-0 text-xs leading-5">
             <p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}><span className="sr-only">Fails: </span>{row.problem}</p>
-            <p style={{ color: "var(--sh-fg-muted)" }}>{row.detail}</p>
             {row.remedy && <p className="mt-0.5" style={{ color: "var(--sh-text-primary)" }}><span className="font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--sh-signal)" }}>What to do · </span>{row.remedy}</p>}
           </div>
         </li>)}
