@@ -16,3 +16,13 @@ describe("isApertureNavActive", () => {
     expect(isApertureNavActive("/aperture", "/aperture")).toBe(true);
   });
 });
+
+import { readFileSync } from "node:fs";
+describe("retired /aperture/thesis/new editor (#114)", () => {
+  it("redirects to the Capital-shell editor and is no longer linked from the sidebar", () => {
+    const app = readFileSync("client/src/App.tsx", "utf8");
+    expect(app).toContain('<Route path="/aperture/thesis/new">{() => <Redirect to={APERTURE_NEW_THESIS_PATH} replace />}</Route>');
+    expect(app.indexOf('path="/aperture/thesis/new"')).toBeLessThan(app.indexOf('path="/aperture/thesis/:id"'));
+    expect(readFileSync("client/src/components/DashboardLayout.tsx", "utf8")).not.toContain('"/aperture/thesis/new"');
+  });
+});

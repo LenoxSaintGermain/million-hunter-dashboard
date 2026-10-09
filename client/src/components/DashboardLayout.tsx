@@ -63,7 +63,6 @@ const navSections = [
     label: "Capital Aperture",
     items: [
       { href: "/aperture", icon: TrendingUp, label: "Aperture Home", badge: { label: "v0", color: "amber" } },
-      { href: "/aperture/thesis/new", icon: Sparkles, label: "New Thesis", badge: null },
       { href: "/aperture/accounts", icon: Wallet, label: "Accounts", badge: null },
     ],
   },

@@ -1,7 +1,8 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch, useLocation } from "wouter";
+import { Redirect, Route, Switch, useLocation } from "wouter";
+import { APERTURE_NEW_THESIS_PATH } from "@shared/apertureNavRoutes";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -289,7 +290,8 @@ function Router() {
         <Route path="/aperture/portfolio">{() => <ApertureRoute component={ApertureAccounts} />}</Route>
         <Route path="/aperture/theses">{() => <ApertureRoute component={ApertureTheses} />}</Route>
         <Route path="/aperture/disclosures">{() => <ApertureRoute component={ApertureDisclosure} />}</Route>
-        <Route path="/aperture/thesis/new">{() => <ApertureRoute component={ThesisGraphEditor} />}</Route>
+        {/* Retired editor (#114): new theses are written inside the Capital shell. */}
+        <Route path="/aperture/thesis/new">{() => <Redirect to={APERTURE_NEW_THESIS_PATH} replace />}</Route>
         <Route path="/aperture/thesis/:id">{() => <ApertureRoute component={ThesisGraphEditor} />}</Route>
         <Route path="/aperture/runs">{() => <ApertureRoute component={ApertureRuns} />}</Route>
         <Route path="/aperture/research">{() => <ApertureRoute component={ApertureRuns} />}</Route>
