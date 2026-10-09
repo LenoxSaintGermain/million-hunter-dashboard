@@ -126,4 +126,11 @@ describe("Weekly Income screen (#84)", () => {
     expect(rankCandidates([a, richer], 10).map((c) => c.underlying)).toEqual(["ABC", "XYZ"]);
     expect(rankCandidates([a, richer], 1)).toHaveLength(1);
   });
+
+  it("carries the index-fund 'why this is allowed' note onto the candidate", () => {
+    const note = "SPY is a fund that tracks the S&P 500 (about 500 large US companies). Funds don't report earnings, so the earnings rule doesn't apply; the dividend-date rule still does.";
+    const withNote = screenUnderlying(xyz, [exp(goodPair(), { events: { ...eligibleEvents, allowedBecause: note } })], ctx());
+    expect(withNote.candidates[0].allowedBecause).toBe(note);
+    expect(screenUnderlying(xyz, [exp(goodPair())], ctx()).candidates[0].allowedBecause).toBeNull();
+  });
 });

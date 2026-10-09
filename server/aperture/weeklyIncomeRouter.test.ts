@@ -9,7 +9,7 @@ describe("Weekly Income screen endpoint (#84)", () => {
     const procedures = (weeklyIncomeRouter as any)._def.procedures as Record<string, any>;
     expect(Object.keys(procedures)).toEqual(["screen"]);
     for (const procedure of Object.values(procedures)) expect(procedure._def.type).toBe("query");
-    const source = readFileSync(join(__dirname, "weeklyIncomeRouter.ts"), "utf8") + readFileSync(join(__dirname, "weeklyIncomeScreen.ts"), "utf8");
+    const source = readFileSync(join(__dirname, "weeklyIncomeRouter.ts"), "utf8") + readFileSync(join(__dirname, "weeklyIncomeScreen.ts"), "utf8") + readFileSync(join(__dirname, "weeklyIncomeEventData.ts"), "utf8");
     expect(source).not.toMatch(/submitOrder|orderFlow|proposedOrders|insert\(|\.update\(|\.delete\(/);
   });
 

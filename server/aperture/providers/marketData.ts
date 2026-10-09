@@ -132,6 +132,13 @@ function missingAlpacaCredentials(): string[] {
   return missing;
 }
 
+/** Read-only auth headers for Alpaca market-data GETs, or null when credentials are missing. */
+export function alpacaDataHeaders(): Record<string, string> | null {
+  if (missingAlpacaCredentials().length) return null;
+  const credentials = alpacaCredentials();
+  return { "APCA-API-KEY-ID": credentials.key, "APCA-API-SECRET-KEY": credentials.secret };
+}
+
 interface Bar { c: number; v: number; t: number }
 
 /** Average daily DOLLAR volume — shares alone say nothing about tradability. */

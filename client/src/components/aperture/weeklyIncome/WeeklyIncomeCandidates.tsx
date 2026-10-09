@@ -53,6 +53,7 @@ function GuidedCandidate({ candidate, isExample }: { candidate: SpreadCandidate;
           <p className="mt-2 text-sm leading-6" style={{ color: "var(--ink)" }}>{g.summary}</p>
         </>
       ) : <p className="mt-2 text-sm" style={{ color: "var(--ink)" }}>Plain-language summary not available for this idea.</p>}
+      {candidate.allowedBecause && <p data-wi-allowed className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}><span className="font-mono font-semibold uppercase tracking-[0.1em]" style={{ color: "var(--sh-signal)" }}>Why this is allowed · </span>{candidate.allowedBecause}</p>}
       <div data-wi-max-loss className="mt-4 border-l-2 pl-3" style={{ borderColor: "var(--sh-signal)" }}>
         <WiLabel>Most you could lose</WiLabel>
         <p className="font-serif text-3xl" style={{ color: "var(--ink)" }}>{formatUsdCents(totalMaxLoss)}</p>
@@ -93,7 +94,7 @@ function ProTable({ candidates }: { candidates: SpreadCandidate[] }) {
         <tbody>
           {candidates.map((c) => (
             <tr key={`${c.short.symbol}-${c.long.symbol}`} className="border-b" style={{ borderColor: "var(--rule)" }}>
-              <td className="px-2 py-2 font-semibold">{c.underlying}</td>
+              <td className="px-2 py-2 font-semibold">{c.underlying}{c.allowedBecause && <span data-wi-allowed className="block font-normal" style={{ color: "var(--sh-fg-muted)" }}>index fund · earnings rule n/a</span>}</td>
               <td className="px-2 py-2">{c.expiration} · {c.dte}</td>
               <td className="px-2 py-2">{strike(c.short.strikeCents)} / {strike(c.long.strikeCents)}</td>
               <td className="px-2 py-2">{c.short.delta == null ? "Not measured" : Math.abs(c.short.delta).toFixed(2)}</td>
