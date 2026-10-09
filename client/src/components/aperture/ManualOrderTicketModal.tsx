@@ -11,6 +11,13 @@ import type { AttentionMission } from "@shared/apertureAttention";
 import { manualTicketBlocker } from "@shared/manualTicketReadiness";
 import { buildManualTicketPayload } from "@shared/manualTicketPayload";
 import { GuardrailChecklist } from "@/components/aperture/GuardrailChecklist";
+import { singleNameCheck, singleOrderLimit } from "@shared/singleOrderLimit";
+import type { CockpitHeadroomLine } from "@shared/cockpitRailSummary";
+
+const usdExact = (cents: number) => {
+  const whole = Math.round(cents) % 100 === 0;
+  return `$${(Math.round(cents) / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 })}`;
+};
 
 export interface ManualOrderTicketModalProps {
   open: boolean;
@@ -200,21 +207,38 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
     return Math.round(contracts * numLimitPrice * 100 * 100);
   }, [expression, shareCount, contracts, numLimitPrice]);
 
-  // Account Capacity & Sizing Limits
-  const rawEquityCents = selectedAccount?.equityValueCents ?? 0;
-  const equityCents = rawEquityCents > 0 ? rawEquityCents : 0;
-  const singleOrderCeilingCents = Math.min(10_000_00, Math.round(equityCents * 0.05));
-  const singleNameCapCents = Math.round(equityCents * 0.10);
-  const effectiveCeilingCents = Math.min(singleOrderCeilingCents, singleNameCapCents);
+  // Account Capacity & Sizing Limits: the single-order limit is the server's
+  // own headroom line for this account (#109). No client-side mandate math.
+  const cockpitQuery = trpc.aperture.cockpit.useQuery(
+    selectedAccount ? { accountId: selectedAccount.id } : undefined,
+    { enabled: Boolean(selectedAccount), retry: false },
+  );
+  const headroom = cockpitQuery.data?.headroom as { lines?: CockpitHeadroomLine[]; equityCents?: number | null } | undefined;
+  const serverEquityCents = headroom?.equityCents ?? null;
+  const equityCents = serverEquityCents != null && serverEquityCents > 0 ? serverEquityCents : 0;
+  const limit = singleOrderLimit(headroom?.lines, cockpitQuery.data?.mandate?.maxOrderNotionalCents ?? null, serverEquityCents);
+  const singleOrderCeilingCents = limit.ceilingCents;
   const costPerUnitCents = expression === "shares"
     ? Math.round(numLimitPrice * 100)
     : Math.round(numLimitPrice * 100 * 100);
-  const maxAllowableUnits = costPerUnitCents > 0 && effectiveCeilingCents > 0
-    ? Math.floor(effectiveCeilingCents / costPerUnitCents)
+  const maxAllowableUnits = costPerUnitCents > 0 && singleOrderCeilingCents != null && singleOrderCeilingCents > 0
+    ? Math.floor(singleOrderCeilingCents / costPerUnitCents)
     : 0;
-  const orderExceedsCeiling = equityCents > 0 && estimatedNotionalCents > singleOrderCeilingCents;
-  const orderExceedsConcentration = equityCents > 0 && estimatedNotionalCents > singleNameCapCents;
-  const concentrationPct = equityCents > 0 ? Math.round((estimatedNotionalCents / equityCents) * 100) : 0;
+  const autoFitCents = maxAllowableUnits * costPerUnitCents;
+  const autoFitLabel = `Auto-Fit: ${maxAllowableUnits} (uses ${usdExact(autoFitCents)} of the ${limit.value} limit)`;
+  const orderExceedsCeiling = singleOrderCeilingCents != null && estimatedNotionalCents > singleOrderCeilingCents;
+  // One-company limit: the server's per-name ceiling plus the server's saved holdings (#109).
+  const positionsQuery = trpc.aperture.account.getPositions.useQuery(
+    { accountId: selectedAccount?.id ?? 0 },
+    { enabled: Boolean(selectedAccount), retry: false },
+  );
+  const heldSymbolCents = positionsQuery.data
+    ? positionsQuery.data
+      .filter((p: { symbol: string }) => p.symbol.trim().toUpperCase() === symbol.trim().toUpperCase())
+      .reduce((sum: number, p: { marketValueCents: number | null }) => sum + Math.abs(p.marketValueCents ?? 0), 0)
+    : null;
+  const nameCheck = singleNameCheck(headroom?.lines, symbol, heldSymbolCents, estimatedNotionalCents);
+  const orderExceedsConcentration = positionsQuery.data != null && nameCheck.over;
 
   const buyingPowerCents = selectedAccount?.buyingPowerCents ?? 0;
   const hasBuyingPower = buyingPowerCents >= estimatedNotionalCents;
@@ -517,10 +541,10 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                           type="button"
                           onClick={() => setShareCount(maxAllowableUnits)}
                           className="text-[9px] text-[var(--sh-signal)] hover:underline flex items-center gap-1 font-mono font-medium"
-                          title={`5% Single-Order Ceiling ($${Math.round(singleOrderCeilingCents / 100)}) ÷ $${numLimitPrice.toFixed(2)} = ${maxAllowableUnits} shares`}
+                          title={`Single-order limit ${limit.value} ÷ $${numLimitPrice.toFixed(2)} = ${maxAllowableUnits} whole shares`}
                         >
                           <Sparkles className="h-2.5 w-2.5" />
-                          Auto-Fit: {maxAllowableUnits} (max ${Math.round((maxAllowableUnits * costPerUnitCents) / 100)})
+                          {autoFitLabel}
                         </button>
                       )}
                     </div>
@@ -554,10 +578,10 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                           type="button"
                           onClick={() => setContracts(maxAllowableUnits)}
                           className="text-[9px] text-[var(--sh-signal)] hover:underline flex items-center gap-1 font-mono font-medium"
-                          title={`5% Single-Order Ceiling ($${Math.round(singleOrderCeilingCents / 100)}) ÷ $${(costPerUnitCents / 100).toFixed(2)} = ${maxAllowableUnits} contracts`}
+                          title={`Single-order limit ${limit.value} ÷ $${(costPerUnitCents / 100).toFixed(2)} = ${maxAllowableUnits} whole contracts`}
                         >
                           <Sparkles className="h-2.5 w-2.5" />
-                          Auto-Fit: {maxAllowableUnits} (max ${Math.round((maxAllowableUnits * costPerUnitCents) / 100)})
+                          {autoFitLabel}
                         </button>
                       )}
                     </div>
@@ -632,7 +656,7 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                 <div>
                   <span style={{ color: "var(--sh-fg-muted)" }}>Single-Order Limit: </span>
                   <strong style={{ color: orderExceedsCeiling ? "var(--sh-red)" : "var(--sh-emerald)" }}>
-                    ${Math.round(singleOrderCeilingCents / 100).toLocaleString()}
+                    {limit.value}
                   </strong>
                 </div>
                 <div>
@@ -643,28 +667,30 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                 </div>
               </div>
 
+              <p className="text-[11px] leading-5" style={{ color: "var(--sh-fg-muted)", fontFamily: "inherit" }}>Single-order limit: {limit.explanation}</p>
+              <p className="text-[11px] leading-5" style={{ color: "var(--sh-fg-muted)", fontFamily: "inherit" }}>{nameCheck.explanation}</p>
+              {orderExceedsConcentration && nameCheck.warning && (
+                <div role="alert" data-single-name-warning className="border p-1.5 text-[11px] flex items-center gap-1.5" style={{ borderColor: "var(--sh-red)", color: "var(--sh-text-primary)", background: "var(--sh-surface)" }}>
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--sh-red)" }} />
+                  <span>{nameCheck.warning}</span>
+                </div>
+              )}
               {orderExceedsCeiling && (
                 <div className="rounded p-1.5 text-[11px] bg-red-950/40 border border-red-900/60 text-red-300 flex items-center gap-1.5">
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-400" />
-                  <span>Order (${Math.round(estimatedNotionalCents / 100).toLocaleString()}) exceeds the 5% single-order ceiling (${Math.round(singleOrderCeilingCents / 100).toLocaleString()}) for this account.</span>
-                </div>
-              )}
-              {orderExceedsConcentration && (
-                <div className="rounded p-1.5 text-[11px] bg-red-950/40 border border-red-900/60 text-red-300 flex items-center gap-1.5">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-400" />
-                  <span>Order represents {concentrationPct}% of total equity, exceeding the 10% single-name cap (${Math.round(singleNameCapCents / 100).toLocaleString()}).</span>
+                  <span>Order (${Math.round(estimatedNotionalCents / 100).toLocaleString()}) is over this account's single-order limit ({limit.value}).</span>
                 </div>
               )}
 
               {/* Defined-Risk Spread Recommendation */}
-              {expression !== "shares" && costPerUnitCents > effectiveCeilingCents && effectiveCeilingCents > 0 && (
+              {expression !== "shares" && singleOrderCeilingCents != null && costPerUnitCents > singleOrderCeilingCents && singleOrderCeilingCents > 0 && (
                 <div className="rounded p-2 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 border" style={{ borderColor: "var(--sh-signal)", background: "color-mix(in srgb, var(--sh-signal) 12%, var(--sh-surface))" }}>
                   <div className="space-y-0.5">
                     <p className="font-semibold text-[11px] flex items-center gap-1" style={{ color: "var(--sh-signal)" }}>
                       <AlertTriangle className="h-3.5 w-3.5" /> This contract exceeds the recorded limit
                     </p>
                     <p className="text-[10px]" style={{ color: "var(--sh-fg-muted)" }}>
-                      One contract costs ${(costPerUnitCents / 100).toFixed(0)} against a ${(effectiveCeilingCents / 100).toFixed(0)} limit. Choose another verified contract or preserve cash. Multi-leg orders are unavailable here; no spread price is assumed.
+                      One contract costs ${(costPerUnitCents / 100).toFixed(0)} against a {limit.value} limit. Choose another verified contract or preserve cash. Multi-leg orders are unavailable here; no spread price is assumed.
                     </p>
                   </div>
                 </div>

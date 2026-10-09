@@ -3,11 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { load } from "cheerio";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-const trpcCalls = vi.hoisted(() => ({ mutate: vi.fn(), useMutation: vi.fn() }));
+const trpcCalls = vi.hoisted(() => ({ mutate: vi.fn(), useMutation: vi.fn(), positions: [] as Array<{ symbol: string; marketValueCents: number }> }));
 vi.mock("@/lib/trpc", () => ({ trpc: {
   useUtils: () => ({ aperture: { invalidate: vi.fn() } }),
   aperture: {
-    account: { list: { useQuery: () => ({ data: [{ id: 5, isPaper: true, brokerId: "alpaca_paper", label: "Illustrative paper", equityValueCents: 10_000_000, buyingPowerCents: 10_000_000 }] }) } },
+    account: { getPositions: { useQuery: () => ({ data: trpcCalls.positions }) }, list: { useQuery: () => ({ data: [{ id: 5, isPaper: true, brokerId: "alpaca_paper", label: "Illustrative paper", equityValueCents: 10_000_000, buyingPowerCents: 10_000_000 }] }) } },
+    // Server headroom for account 5: saved equity $99,577 → single order $4,978.85 (#109).
+    cockpit: { useQuery: () => ({ data: { mandate: { maxOrderNotionalCents: 1_000_000 }, headroom: { equityCents: 9_957_700, lines: [{ key: "single_order", label: "Single order", subject: null, usedCents: null, ceilingCents: 497_885, remainingCents: 497_885, usedPct: null, ceilingPct: 5, basis: "", reason: null }, { key: "position", label: "Largest single name", subject: null, usedCents: null, ceilingCents: 995_770, remainingCents: null, usedPct: null, ceilingPct: 10, basis: "", reason: null }] } } }) },
     desk: { summary: { useQuery: () => ({ data: { attention: { mission: { accountId: 5, researchRunId: 77, title: "Illustrative mission" } } }, isLoading: false }) } },
     order: { create: { useMutation: (opts: unknown) => { trpcCalls.useMutation(opts); return { mutate: trpcCalls.mutate, isPending: false }; } } },
   },
@@ -121,4 +123,34 @@ describe("ticket builder opened from a candidate (#22)", () => {
     expect($.text()).toContain("Stage Paper Order on Desk ($2,500)");
     expect(trpcCalls.mutate).not.toHaveBeenCalled();
   });
+
+  it("shows the server's single-order limit, not a client recomputation, and explains it (#109)", () => {
+    const ticket = paperTicketReadiness({ play: play(), thesis, selectedPlayId: "play-test-1", researchRunId: 77, now });
+    if (ticket.state !== "ready") throw new Error("ticket not ready");
+    const $ = load(renderToStaticMarkup(React.createElement(ManualOrderTicketModal, { open: true, onOpenChange: vi.fn(), initialValues: ticket.prefill })));
+    const text = $.text();
+    expect(text).toContain("Single-Order Limit: $4,978.85");
+    // Live list equity is $100,000; the client must not turn that into $5,000.
+    expect(text).not.toContain("$5,000");
+    expect(text).toContain("5% of your account value, never more than $10,000");
+    expect(text).toContain("of the $4,978.85 limit");
+  });
+
+  it("warns before staging when the order would put too much in one company, from the server's numbers (#109)", () => {
+    const ticket = paperTicketReadiness({ play: play(), thesis, selectedPlayId: "play-test-1", researchRunId: 77, now });
+    if (ticket.state !== "ready") throw new Error("ticket not ready");
+    const render = () => load(renderToStaticMarkup(React.createElement(ManualOrderTicketModal, { open: true, onOpenChange: vi.fn(), initialValues: ticket.prefill })));
+    trpcCalls.positions = [];
+    let $ = render();
+    expect($("[data-single-name-warning]")).toHaveLength(0);
+    expect($.text()).toContain("One-company limit: 10% of your account value in any one company ($9,957.70).");
+    trpcCalls.positions = [{ symbol: "TEST", marketValueCents: 900_000 }, { symbol: "OTHER", marketValueCents: 900_000 }];
+    $ = render();
+    const warning = $("[data-single-name-warning]").text();
+    expect(warning).toContain("you would hold $11,500 of TEST (you already hold $9,000)");
+    expect(warning).toContain("over the limit of 10% of your account value in any one company ($9,957.70)");
+    expect(warning).not.toMatch(/conflict|insider/i);
+    trpcCalls.positions = [];
+  });
 });
+
