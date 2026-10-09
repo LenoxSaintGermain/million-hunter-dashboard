@@ -38,6 +38,10 @@ export interface UnattributedOrder {
   symbol: string | null;
   side: string | null;
   qty: number | null;
+  /** Dollar amount for notional orders (Alpaca returns qty: null for these). */
+  notional: number | null;
+  filledQty: number | null;
+  filledAvgPrice: number | null;
   status: string;
   submittedAt: number;
   touchesBookedSymbol: boolean;
@@ -134,7 +138,11 @@ export async function reconcileHouse(db: Db, house: HouseSnapshot, options: { no
       return [{
         brokerOrderId: order.brokerOrderId, clientOrderId, symbol,
         side: typeof rawField(order.raw, "side") === "string" ? rawField(order.raw, "side") as string : null,
-        qty: numberOrNull(rawField(order.raw, "qty")), status: order.status, submittedAt: order.submittedAt,
+        qty: numberOrNull(rawField(order.raw, "qty")),
+        notional: numberOrNull(rawField(order.raw, "notional")),
+        filledQty: numberOrNull(rawField(order.raw, "filled_qty")),
+        filledAvgPrice: numberOrNull(rawField(order.raw, "filled_avg_price")),
+        status: order.status, submittedAt: order.submittedAt,
         touchesBookedSymbol: symbol != null && openOrBooked.has(symbol),
       }];
     });

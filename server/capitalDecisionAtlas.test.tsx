@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { load } from "cheerio";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { atlasCount, CapitalDecisionAtlas, capitalDecisionAtlasFixture, researchAtlasCounts } from "../client/src/components/aperture/CapitalDecisionAtlas";
+import { atlasCount, atlasMissingNote, CapitalDecisionAtlas, capitalDecisionAtlasFixture, researchAtlasCounts } from "../client/src/components/aperture/CapitalDecisionAtlas";
 
 beforeAll(() => vi.stubGlobal("React", React));
 afterAll(() => vi.unstubAllGlobals());
@@ -47,11 +47,15 @@ describe("Capital decision atlas", () => {
     expect(atlasCount(0)).toBe(0);
   });
   it("sums chapter records without pretending unique symbols or a funnel", () => {
-    expect(researchAtlasCounts([{ universeCount: 10, candidateCount: 3 }, { universeCount: 10, candidateCount: 2 }])).toEqual({ symbols: 20, candidates: 5 });
-    expect(researchAtlasCounts([{ universeCount: 2, candidateCount: 4 }])).toEqual({ symbols: 2, candidates: 4 });
+    expect(researchAtlasCounts([{ universeCount: 10, candidateCount: 3 }, { universeCount: 10, candidateCount: 2 }])).toMatchObject({ symbols: 20, candidates: 5, symbolsMissing: 0 });
+    expect(researchAtlasCounts([{ universeCount: 2, candidateCount: 4 }])).toMatchObject({ symbols: 2, candidates: 4 });
   });
   it("keeps a partially missing series unknown and the independent series usable", () => {
-    expect(researchAtlasCounts([{ candidateCount: 2 }, { universeCount: 10, candidateCount: 3 }])).toEqual({ symbols: null, candidates: 5 });
-    expect(researchAtlasCounts([])).toEqual({ symbols: 0, candidates: 0 });
+    // #113: one run without a count no longer blanks the lane; the gap is counted instead.
+    expect(researchAtlasCounts([{ candidateCount: 2 }, { universeCount: 10, candidateCount: 3 }])).toEqual({ symbols: 10, candidates: 5, symbolsMissing: 1, candidatesMissing: 0 });
+    expect(researchAtlasCounts([{ candidateCount: 2 }, { candidateCount: 3 }])).toMatchObject({ symbols: null, symbolsMissing: 2 });
+    expect(atlasMissingNote("Recorded", 3, 412)).toBe("Recorded · at least this many · 3 runs not counted");
+    expect(atlasMissingNote("Recorded", 0, 412)).toBe("Recorded");
+    expect(researchAtlasCounts([])).toMatchObject({ symbols: 0, candidates: 0 });
   });
 });
