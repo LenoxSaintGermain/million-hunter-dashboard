@@ -33,7 +33,15 @@ export const PRACTICE_BOOK_COPY = {
   source: "Practice book (Alpaca paper fills)",
   explainer: "Your cash, positions and limits are yours alone. Orders fill in a shared Alpaca paper account, so another tester's open order can briefly block yours.",
   resetConfirm: "Archive this book and start fresh with $100,000? Your history and scorecard stay in Record.",
+  disconnectTitle: "Stop using this old account",
+  disconnectExplainer: "This older Alpaca paper row is not your practice book. Disconnect it so pages stop picking it.",
+  disconnectConfirm: "Disconnect this old Alpaca paper account? Nothing is sold or cancelled at Alpaca. This row just stops being used here, and its saved positions are cleared from this app.",
 } as const;
+
+/** Only a tester's own older raw Alpaca paper row gets Disconnect (the server decides); the owner's rows and practice books never do. */
+export function canDisconnectAccount(account: { brokerId: string; practiceBook?: unknown | null; disconnectable?: boolean }): boolean {
+  return account.disconnectable === true && account.brokerId === "alpaca_paper" && account.practiceBook == null;
+}
 
 export function bookAge(openedAt: number, now = Date.now()): string {
   const days = Math.max(0, Math.floor((now - openedAt) / 86_400_000));
@@ -106,6 +114,18 @@ export default function ApertureAccounts() {
       setSyncFeedback({ accountId: variables.accountId, message: e.message, tone: "error" });
       toast.error(e.message);
       refetch();
+    },
+  });
+
+  const disconnectAccount = trpc.aperture.account.disconnect.useMutation({
+    onSuccess: async (_, variables) => {
+      toast.success("Old account disconnected. Nothing changed at Alpaca.");
+      await invalidateAccountRefreshReads(utils.aperture, variables.id);
+      refetch();
+    },
+    onError: (e, variables) => {
+      setSyncFeedback({ accountId: variables.id, message: e.message, tone: "error" });
+      toast.error(e.message);
     },
   });
 
@@ -348,6 +368,27 @@ export default function ApertureAccounts() {
                       disabled={configureSyncSchedule.isPending || !brokers?.find((b) => b.id === account.brokerId)?.available}
                     >
                       {account.syncScheduleEnabled ? "Pause updates" : "Enable updates"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {canDisconnectAccount(account) && (
+                <div className="border p-3" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>{PRACTICE_BOOK_COPY.disconnectTitle}</p>
+                      <p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{PRACTICE_BOOK_COPY.disconnectExplainer}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="min-h-11 shrink-0 rounded-none"
+                      aria-label={`Disconnect old Alpaca paper account #${account.id}`}
+                      onClick={() => { if (window.confirm(PRACTICE_BOOK_COPY.disconnectConfirm)) disconnectAccount.mutate({ id: account.id }); }}
+                      disabled={disconnectAccount.isPending}
+                    >
+                      {disconnectAccount.isPending && disconnectAccount.variables?.id === account.id ? "Disconnecting…" : "Disconnect"}
                     </Button>
                   </div>
                 </div>

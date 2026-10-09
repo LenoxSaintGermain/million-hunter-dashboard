@@ -1333,6 +1333,8 @@ export const apertureRouter = router({
       return Promise.all(rows.map(async (row) => ({
         ...presentAccountRow(row, ctx.user.openId),
         practiceBook: row.practiceBookId != null ? await practiceBookSummary(db!, row) : null,
+        // A tester's own older raw Alpaca paper row may be disconnected; the owner's rows and books never offer it.
+        disconnectable: usesPracticeBooks(ctx.user.openId) && row.brokerId === "alpaca_paper" && row.practiceBookId == null,
       })));
     }),
 

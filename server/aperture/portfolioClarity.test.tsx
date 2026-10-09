@@ -9,7 +9,7 @@ vi.mock("@/lib/trpc", () => {
   const mutation = { useMutation: () => ({ mutate: state.mutate, isPending: false }) };
   const query = (key: "accounts" | "brokers" | "positions" | "plays") => ({ useQuery: () => ({ refetch: vi.fn(), ...state[key] }) });
   return { trpc: { useUtils: () => ({}), aperture: {
-    brokers: query("brokers"), account: { list: query("accounts"), getPositions: query("positions"), listActivePlays: query("plays"), create: mutation, sync: mutation, configureSyncSchedule: mutation, importCsv: mutation, upsertActivePlay: mutation, removeActivePlay: mutation },
+    brokers: query("brokers"), account: { list: query("accounts"), getPositions: query("positions"), listActivePlays: query("plays"), create: mutation, disconnect: mutation, sync: mutation, configureSyncSchedule: mutation, importCsv: mutation, upsertActivePlay: mutation, removeActivePlay: mutation },
     practiceBook: { reset: mutation },
   } } };
 });

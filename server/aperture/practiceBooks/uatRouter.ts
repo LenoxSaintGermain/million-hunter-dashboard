@@ -84,6 +84,9 @@ export const uatRouter = router({
       await db.delete(positionsTable).where(eq(positionsTable.accountId, row.id));
       await db.update(portfolioAccounts).set({
         cashCents: null, buyingPowerCents: null, equityValueCents: null, optionsBuyingPowerCents: null, lastSyncedAt: null, syncError: null, updatedAt: now,
+        // Unbind the old account number so the first sync binds the current house
+        // through the usual checks, exactly like a book opened by account.create.
+        externalAccountId: null,
       }).where(eq(portfolioAccounts.id, row.id));
       await createPracticeBook(db, { userId: row.userId, portfolioAccountId: row.id, createdBy: ctx.user.id, now });
       converted.push(row.id);
