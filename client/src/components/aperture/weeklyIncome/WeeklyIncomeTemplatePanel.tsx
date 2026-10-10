@@ -9,6 +9,8 @@ import {
   WEEKLY_INCOME_PARAMETERS,
   WEEKLY_INCOME_TEMPLATE_LABEL,
   WI_GROUPS,
+  WI_LEGACY_STRUCTURES_NOTE,
+  isLegacyStructuresDefault,
   formatParamValue,
   plainRuleSummary,
   tightenOnlySource,
@@ -47,7 +49,7 @@ function rangeLabel(def: WiParamDef): string {
     case "time": return `${def.min} – ${def.max} ET`;
     case "enum": return def.options.join(" / ");
     case "boolean": return "on / off";
-    case "structures": return "P1 / P2 / P3 (P2 after owner decision O1)";
+    case "structures": return "P1 only (P2 after owner decision O1; no P3)";
     case "days": return "Mon – Thu";
     case "tiers": return `$${def.min} – $${def.max} each`;
     case "blackout": return "0–15 before / 5–30 after";
@@ -121,6 +123,7 @@ export function WeeklyIncomeTemplatePanel({ parameters, mandate, parameterHash, 
           {onRemove && <button type="button" onClick={onRemove} className={BUTTON} style={{ borderColor: "var(--rule)", color: "var(--ink)", borderRadius: 0 }}>Remove template</button>}
         </div>
         <div className="mt-3">{isGuided ? <WeeklyIncomePlainRules parameters={parameters} /> : <WeeklyIncomeParameterTable parameters={parameters} mandate={mandate} />}</div>
+        {parameterHash && isLegacyStructuresDefault(parameters.structures_enabled) && <p data-wi-legacy-structures className="mt-3 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{WI_LEGACY_STRUCTURES_NOTE}</p>}
         <p className="mt-3 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{WI_COPY["wi.halt"]} {parameterHash ? <span className="font-mono">Parameter set {parameterHash.slice(0, 19)}…</span> : "Defaults shown; the server checks every value when you save."}</p>
       </div>
       {isGuided && (showExample ?? true) && !("error" in example) && <WeeklyIncomeSpreadExplainer explainer={example} title="Worked example: one floor-protected trade" />}

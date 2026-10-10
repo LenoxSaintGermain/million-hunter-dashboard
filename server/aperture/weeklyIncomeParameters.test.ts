@@ -3,7 +3,11 @@ import { CURRENT_MANDATE } from "./mandate";
 import { buildStoredWeeklyIncomeTemplate, hashWeeklyIncomeParameters, mandateCeilings } from "./weeklyIncomeParameters";
 import {
   WEEKLY_INCOME_PARAMETERS,
+  WEEKLY_INCOME_TEMPLATE_ID,
   WEEKLY_INCOME_THESIS_PREFILL,
+  isLegacyStructuresDefault,
+  migrateLegacyStructuresDefault,
+  readStoredWeeklyIncomeTemplate,
   plainRuleSummary,
   tightenOnlySource,
   validateWeeklyIncomeParameters,
@@ -30,7 +34,7 @@ describe("Weekly Income parameters (#83)", () => {
     if (!result.ok) return;
     expect(result.parameters).toEqual(weeklyIncomeDefaults());
     expect(result.parameters).toMatchObject({
-      structures_enabled: ["P1", "P3"], min_avg_dollar_volume: 100_000_000, short_delta_min: 0.15, short_delta_max: 0.3,
+      structures_enabled: ["P1"], min_avg_dollar_volume: 100_000_000, short_delta_min: 0.15, short_delta_max: 0.3,
       dte_min: 4, dte_max: 10, spread_width_tiers: { under50: 1, from50to150: 2.5, above150: 5 },
       min_credit_pct_of_width: 15, max_credit_pct_of_width: 40, entry_days: ["mon", "tue", "wed"], last_entry_time: "15:30",
       max_loss_per_position_pct: 0.75, max_open_loss_pct: 3, max_daily_new_loss_pct: 2, weekly_loss_limit_pct: 2,
@@ -126,3 +130,48 @@ function cross(key: string, value: number): Record<string, unknown> {
   if (key === "short_delta_max" && value <= 0.15) out.short_delta_min = 0.05;
   return out;
 }
+
+describe("structures_enabled default: put credit spreads only (Refs #83)", () => {
+  it("defaults to P1 only and says so in the help text", () => {
+    expect(weeklyIncomeDefaults().structures_enabled).toEqual(["P1"]);
+    const def = WEEKLY_INCOME_PARAMETERS.find((d) => d.key === "structures_enabled")!;
+    expect(def.plain).toMatch(/put credit spreads only/i);
+    expect(def.plain).toMatch(/covered calls and cash-secured puts are off/i);
+  });
+
+  it("stays tighten-only: P3 can't be added, P2 still needs O1", () => {
+    expect(errorsFor({ structures_enabled: ["P1", "P3"] })).toEqual(["structures_enabled cannot include P3 (covered call): the default is put credit spreads only, and a thesis can only narrow it"]);
+    expect(errorsFor({ structures_enabled: ["P3"] })).toHaveLength(1);
+    expect(errorsFor({ structures_enabled: ["P1"] })).toEqual([]);
+    expect(errorsFor({ structures_enabled: [] })).toEqual(["structures_enabled must include at least one structure"]);
+    expect(validateWeeklyIncomeParameters({ structures_enabled: ["P1", "P2"] }, ceilings, { o1Recorded: true }).ok).toBe(true);
+  });
+
+  it("migrates only the exact old default when a saved thesis is re-saved", () => {
+    const saved = { ...weeklyIncomeDefaults(), structures_enabled: ["P1", "P3"] };
+    const frozen = JSON.stringify(saved);
+    const out = migrateLegacyStructuresDefault(saved);
+    expect(out.migrated).toBe(true);
+    expect(out.overrides.structures_enabled).toEqual(["P1"]);
+    expect(JSON.stringify(saved)).toBe(frozen); // stored value not mutated
+    expect(migrateLegacyStructuresDefault({ structures_enabled: ["P3", "P1"] }).migrated).toBe(true);
+    for (const other of [["P1"], ["P3"], ["P1", "P2"], ["P1", "P2", "P3"]]) {
+      expect(migrateLegacyStructuresDefault({ structures_enabled: other }).migrated, other.join(",")).toBe(false);
+    }
+    expect(migrateLegacyStructuresDefault({}).migrated).toBe(false);
+  });
+
+  it("re-saving an old thesis with the old default succeeds as P1 only; other P3 lists are refused, not rewritten", () => {
+    const old = buildStoredWeeklyIncomeTemplate({ ...weeklyIncomeDefaults(), structures_enabled: ["P1", "P3"] });
+    expect(old.ok).toBe(true);
+    if (old.ok) expect(old.template.parameters.structures_enabled).toEqual(["P1"]);
+    const custom = buildStoredWeeklyIncomeTemplate({ structures_enabled: ["P3"] });
+    expect(custom.ok).toBe(false);
+  });
+
+  it("reads stored rows with the old default as-is", () => {
+    const stored = { strategyTemplate: { id: WEEKLY_INCOME_TEMPLATE_ID, parameters: { ...weeklyIncomeDefaults(), structures_enabled: ["P1", "P3"] } } };
+    expect(readStoredWeeklyIncomeTemplate(stored)?.parameters.structures_enabled).toEqual(["P1", "P3"]);
+    expect(isLegacyStructuresDefault(["P1", "P3"])).toBe(true);
+  });
+});

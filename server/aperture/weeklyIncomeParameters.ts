@@ -11,6 +11,7 @@ import {
   WEEKLY_INCOME_TEMPLATE_ID,
   WEEKLY_INCOME_TEMPLATE_VERSION,
   canonicalParameterJson,
+  migrateLegacyStructuresDefault,
   validateWeeklyIncomeParameters,
   type StoredWeeklyIncomeTemplate,
   type WeeklyIncomeParameters,
@@ -38,7 +39,11 @@ export type WeeklyIncomeBuildResult = { ok: true; template: StoredWeeklyIncomeTe
 export function buildStoredWeeklyIncomeTemplate(overrides: unknown, mandate: Mandate = CURRENT_MANDATE): WeeklyIncomeBuildResult {
   // No owner decision store exists yet, so O1 is never recorded: P2 stays off.
   const ceilings = mandateCeilings(mandate);
-  const result = validateWeeklyIncomeParameters(overrides, ceilings, { o1Recorded: false });
+  // A saved thesis re-saved as a new version sends its stored parameters back.
+  // Only the exact old structures default is mapped to the new one; existing
+  // rows are immutable and are not touched.
+  const { overrides: input } = migrateLegacyStructuresDefault(overrides);
+  const result = validateWeeklyIncomeParameters(input, ceilings, { o1Recorded: false });
   if (!result.ok) return result;
   return {
     ok: true,
