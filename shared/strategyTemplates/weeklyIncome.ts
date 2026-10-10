@@ -22,6 +22,35 @@ export type WiMandateKey = "maxPlannedRiskPctPerPlay" | "maxAggregateOpenRiskPct
 export type WiMandateCeilings = Record<WiMandateKey, number> & { version: string };
 
 export type Structure = "P1" | "P2" | "P3";
+const STRUCTURE_NAMES: Record<Structure, string> = { P1: "put credit spread", P2: "cash-secured put", P3: "covered call" };
+
+/**
+ * structures_enabled default before the owner switched it to put credit spreads
+ * only (2026-10-10). Theses saved earlier store this value inside an immutable,
+ * hashed compilation row; those rows are never rewritten.
+ */
+export const WI_LEGACY_STRUCTURES_DEFAULT: readonly Structure[] = ["P1", "P3"];
+
+/** True when a stored structures list is exactly the old default (any order). */
+export function isLegacyStructuresDefault(list: unknown): boolean {
+  if (!Array.isArray(list) || list.length !== WI_LEGACY_STRUCTURES_DEFAULT.length) return false;
+  return [...list].sort().join(",") === [...WI_LEGACY_STRUCTURES_DEFAULT].sort().join(",");
+}
+
+/**
+ * When a saved thesis is re-saved as a new version, its stored parameters come
+ * back as overrides. Only if structures_enabled equals the old default exactly,
+ * map it to the new default; any other value passes through unchanged and is
+ * validated as usual. Returns a copy; the input is never mutated.
+ */
+export function migrateLegacyStructuresDefault<T>(overrides: T): { overrides: T; migrated: boolean } {
+  const o = overrides as Record<string, unknown> | null;
+  if (!o || typeof o !== "object" || !isLegacyStructuresDefault(o.structures_enabled)) return { overrides, migrated: false };
+  return { overrides: { ...o, structures_enabled: ["P1"] } as T, migrated: true };
+}
+
+/** Plain note for a saved thesis that still stores the old default. */
+export const WI_LEGACY_STRUCTURES_NOTE = "Saved under the old default (put credit spreads + covered calls). The screen only looks for put credit spreads, so nothing changes; a new version saves put credit spreads only.";
 export type EntryDay = "mon" | "tue" | "wed" | "thu";
 export type WidthTiers = { under50: number; from50to150: number; above150: number };
 export type MacroBlackout = { beforeMinutes: number; afterMinutes: number };
@@ -40,7 +69,7 @@ export type WiParamDef = NumberDef | BoolDef | EnumDef | TimeDef | StructuresDef
 const V01 = "Deferred to v0.2 (owner decision)";
 
 export const WEEKLY_INCOME_PARAMETERS = [
-  { key: "structures_enabled", group: "Structure", kind: "structures", default: ["P1", "P3"], label: "Structures enabled", unit: "set", rationale: "Start with the defined-risk play", plain: "Which kinds of trade are allowed. Cash-secured puts stay off until the owner decides how their loss is counted." },
+  { key: "structures_enabled", group: "Structure", kind: "structures", default: ["P1"], label: "Structures enabled", unit: "set", rationale: "Put credit spreads only (owner decision)", plain: "Which kinds of trade are allowed. Put credit spreads only: covered calls and cash-secured puts are off by default." },
   { key: "min_avg_dollar_volume", group: "Universe", kind: "number", default: 100_000_000, min: 50_000_000, max: 500_000_000, decimals: 0, label: "Minimum average dollar volume (20-day)", unit: "USD", rationale: "Liquidity", plain: "Only stocks where at least this much money changes hands on an average day.", mandateKey: "minAdvUsd30d" },
   { key: "min_underlying_price", group: "Universe", kind: "number", default: 20, min: 10, max: 100, decimals: 2, label: "Minimum share price", unit: "USD", rationale: "Tick and quality noise", plain: "Skip stocks priced below this." },
   { key: "require_weekly_expirations", group: "Universe", kind: "boolean", default: true, label: "Weekly expirations required", unit: "flag", rationale: "Weekly thesis", plain: "Only stocks that have options expiring every week.", locked: "Fixed for this thesis" },
@@ -202,6 +231,9 @@ export function validateWeeklyIncomeParameters(overrides: unknown, mandate: WiMa
         if (!list.length) errors.push("structures_enabled must include at least one structure");
         if (new Set(list).size !== list.length) errors.push("structures_enabled must not repeat a structure");
         if (list.includes("P2") && !decisions.o1Recorded) errors.push("structures_enabled cannot include P2 (cash-secured put) until owner decision O1 is recorded");
+        // Tighten-only: a thesis may drop structures from the default but not add
+        // new ones. P2 is the one owner-gated exception (O1, checked above).
+        for (const s of list) if (s !== "P2" && !def.default.includes(s)) errors.push(`structures_enabled cannot include ${s}${STRUCTURE_NAMES[s] ? ` (${STRUCTURE_NAMES[s]})` : ""}: the default is put credit spreads only, and a thesis can only narrow it`);
         break;
       }
       case "days": {

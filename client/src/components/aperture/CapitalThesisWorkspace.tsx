@@ -10,7 +10,7 @@ import { isCapitalThesisEligible } from "@shared/capitalThesisEligibility";
 import { canonicalThesisLabel } from "@shared/canonicalThesisLabel";
 import type { ThesisSaveReceipt } from "@shared/thesisSaveReceipt";
 import { normalizeResearchSymbols } from "@shared/capitalThesisStructure";
-import { WEEKLY_INCOME_TEMPLATE_ID, WEEKLY_INCOME_THESIS_PREFILL, readStoredWeeklyIncomeTemplate, weeklyIncomeDefaults } from "@shared/strategyTemplates/weeklyIncome";
+import { WEEKLY_INCOME_TEMPLATE_ID, WEEKLY_INCOME_THESIS_PREFILL, migrateLegacyStructuresDefault, readStoredWeeklyIncomeTemplate, weeklyIncomeDefaults } from "@shared/strategyTemplates/weeklyIncome";
 import { WeeklyIncomeTemplatePanel, WeeklyIncomeTemplatePicker } from "./weeklyIncome/WeeklyIncomeTemplatePanel";
 import { WeeklyIncomeScreenPanel } from "./weeklyIncome/WeeklyIncomeCandidates";
 
@@ -189,7 +189,7 @@ export function CapitalThesisWorkspace() {
   const renderComposer = (versioning = false) => <section className="mt-4 space-y-3 rounded-md border p-4" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface-2)" }}>
     <div><p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-fg-muted)" }}>{versioning ? "New canonical version" : "New canonical thesis"}</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{versioning ? "The active source and every prior mission receipt remain unchanged." : "Save a source first. Starting a mission remains a separate choice."}</p></div>
     {!versioning && !templateId && <WeeklyIncomeTemplatePicker onUse={applyWeeklyIncomeTemplate} />}
-    {templateId && <WeeklyIncomeTemplatePanel parameters={selectedTemplate && versioning ? selectedTemplate.parameters : weeklyIncomeDefaults()} mandate={versioning ? selectedTemplate?.mandateCeilings : null} onRemove={versioning ? undefined : () => setTemplateId(null)} />}
+    {templateId && <WeeklyIncomeTemplatePanel parameters={selectedTemplate && versioning ? migrateLegacyStructuresDefault(selectedTemplate.parameters).overrides : weeklyIncomeDefaults()} mandate={versioning ? selectedTemplate?.mandateCeilings : null} onRemove={versioning ? undefined : () => setTemplateId(null)} />}
     <label className="block text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}>Thesis statement<textarea value={draftText} onChange={(event) => setDraftText(event.target.value)} aria-label="Thesis statement" aria-describedby="thesis-guidance thesis-validation" placeholder={THESIS_GUIDANCE} className="mt-2 min-h-32 w-full resize-y rounded border bg-transparent p-3 text-sm leading-6" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-text-primary)" }} /></label>
     <p id="thesis-guidance" className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>{THESIS_GUIDANCE} Guidance is not saved as your belief.</p>
     <button type="button" onClick={() => setShowDetails((current) => !current)} aria-expanded={showDetails} className="inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--sh-text-primary)" }}><ChevronDown className={showDetails ? "h-3.5 w-3.5 rotate-180" : "h-3.5 w-3.5"} />Add thesis detail</button>
