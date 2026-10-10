@@ -15,6 +15,7 @@ import { z } from "zod";
 import { eq, ne, and, or, inArray, gte, lt, sql, asc, isNull } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { apertureUnderwritingJobs } from "../drizzle/apertureUnderwritingJobSchema";
+import { recordEquitySnapshot } from "./aperture/equitySnapshots";
 import { buildEvidenceFactDraft } from "./aperture/evidenceFactDraft";
 import { selectBestPlays } from "../shared/bestPlaySelection";
 import { claimUnderwritingJob, readUnderwritingJob } from "./aperture/underwritingJobs";
@@ -1476,6 +1477,10 @@ export const apertureRouter = router({
           syncError: null,
           updatedAt: now,
         }).where(eq(portfolioAccounts.id, input.id));
+        await recordEquitySnapshot(db!, {
+          accountId: account.id, userId: account.userId, practiceBookId: account.practiceBookId,
+          equityCents: acctData.equityValueCents, cashCents: acctData.cashCents, source: broker.id, takenAt: now,
+        });
 
         // Replace positions
         await db!.delete(positions).where(eq(positions.accountId, input.id));

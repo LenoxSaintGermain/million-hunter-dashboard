@@ -27,6 +27,7 @@ import {
   apertureDecisionRuns, apertureRuns, brokerOrders, positionSnapshots, portfolioAccounts, positions as positionsTable,
   type BrokerOrder,
 } from "../../drizzle/schema";
+import { recordEquitySnapshot } from "./equitySnapshots";
 import { brokerFor } from "./brokers/index";
 import { assertEnvBrokerAccessForUser, envBrokerAccessForUser } from "./brokers/envBrokerOwner";
 import type { OrderRequest } from "./brokers/types";
@@ -258,6 +259,10 @@ async function evaluateOrder(input: CreateOrderInput, action: PaperDecisionActio
         lastSyncedAt: alpacaAcct.asOf,
         updatedAt: now,
       }).where(eq(portfolioAccounts.id, account.id));
+      await recordEquitySnapshot(db, {
+        accountId: account.id, userId: account.userId, practiceBookId: account.practiceBookId,
+        equityCents: alpacaAcct.equityValueCents, cashCents: alpacaAcct.cashCents, source: execBroker.id, takenAt: alpacaAcct.asOf,
+      });
       account.equityValueCents = alpacaAcct.equityValueCents;
       account.cashCents = alpacaAcct.cashCents;
       account.buyingPowerCents = alpacaAcct.buyingPowerCents;
