@@ -533,21 +533,8 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {expression === "shares" ? (
                 <>
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[10px] font-semibold uppercase" style={{ color: "var(--sh-fg-muted)" }}>Shares Qty</label>
-                      {maxAllowableUnits > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setShareCount(maxAllowableUnits)}
-                          className="text-[9px] text-[var(--sh-signal)] hover:underline flex items-center gap-1 font-mono font-medium"
-                          title={`Single-order limit ${limit.value} ÷ $${numLimitPrice.toFixed(2)} = ${maxAllowableUnits} whole shares`}
-                        >
-                          <Sparkles className="h-2.5 w-2.5" />
-                          {autoFitLabel}
-                        </button>
-                      )}
-                    </div>
+                  <div className="min-w-0">
+                    <label className="text-[10px] font-semibold uppercase block mb-1" style={{ color: "var(--sh-fg-muted)" }}>Shares Qty</label>
                     <input
                       type="number"
                       min="1"
@@ -556,6 +543,17 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                       className="w-full rounded border bg-transparent px-2.5 py-1 text-xs font-mono font-bold"
                       style={{ borderColor: "var(--sh-border-1)" }}
                     />
+                    {maxAllowableUnits > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShareCount(maxAllowableUnits)}
+                        className="mt-1 flex w-full items-start gap-1 text-left text-[10px] leading-4 text-[var(--sh-signal)] hover:underline font-mono font-medium whitespace-normal break-words"
+                        title={`Single-order limit ${limit.value} ÷ $${numLimitPrice.toFixed(2)} = ${maxAllowableUnits} whole shares`}
+                      >
+                        <Sparkles className="mt-0.5 h-2.5 w-2.5 shrink-0" />
+                        {autoFitLabel}
+                      </button>
+                    )}
                   </div>
                   <div>
                     <label className="text-[10px] font-semibold uppercase block mb-1" style={{ color: "var(--sh-fg-muted)" }}>Limit Price ($)</label>
@@ -570,21 +568,8 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                 </>
               ) : (
                 <>
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[10px] font-semibold uppercase" style={{ color: "var(--sh-fg-muted)" }}>Contracts</label>
-                      {maxAllowableUnits > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setContracts(maxAllowableUnits)}
-                          className="text-[9px] text-[var(--sh-signal)] hover:underline flex items-center gap-1 font-mono font-medium"
-                          title={`Single-order limit ${limit.value} ÷ $${(costPerUnitCents / 100).toFixed(2)} = ${maxAllowableUnits} whole contracts`}
-                        >
-                          <Sparkles className="h-2.5 w-2.5" />
-                          {autoFitLabel}
-                        </button>
-                      )}
-                    </div>
+                  <div className="min-w-0">
+                    <label className="text-[10px] font-semibold uppercase block mb-1" style={{ color: "var(--sh-fg-muted)" }}>Contracts</label>
                     <input
                       type="number"
                       min="1"
@@ -593,6 +578,17 @@ export function ManualOrderTicketModal({ open, onOpenChange, activeMission: prop
                       className="w-full rounded border bg-transparent px-2.5 py-1 text-xs font-mono font-bold"
                       style={{ borderColor: "var(--sh-border-1)" }}
                     />
+                    {maxAllowableUnits > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setContracts(maxAllowableUnits)}
+                        className="mt-1 flex w-full items-start gap-1 text-left text-[10px] leading-4 text-[var(--sh-signal)] hover:underline font-mono font-medium whitespace-normal break-words"
+                        title={`Single-order limit ${limit.value} ÷ $${(costPerUnitCents / 100).toFixed(2)} = ${maxAllowableUnits} whole contracts`}
+                      >
+                        <Sparkles className="mt-0.5 h-2.5 w-2.5 shrink-0" />
+                        {autoFitLabel}
+                      </button>
+                    )}
                   </div>
                   <div>
                     <label className="text-[10px] font-semibold uppercase block mb-1" style={{ color: "var(--sh-fg-muted)" }}>Primary Strike ($)</label>
