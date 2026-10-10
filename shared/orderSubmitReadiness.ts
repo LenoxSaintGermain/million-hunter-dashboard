@@ -319,3 +319,15 @@ export function unverifiedReadiness(checkedAt: number, detail = "Final order che
 export function canSendApprovedOrder(readiness: OrderSubmitReadiness | null | undefined): boolean {
   return readiness?.state === "ready";
 }
+
+/**
+ * Blockers the guardrail checklist does not already list (Refs #118 retest).
+ * The checklist names every failed server gate ("N to fix"); repeating those
+ * here made "See 8 supporting gaps" disagree with "7 to fix". Only schema
+ * problems and other non-gate blockers are returned, de-duplicated.
+ */
+export function preflightBlockersOutsideChecklist(preflight: Parameters<typeof plainPreflightBlocking>[0]): string[] {
+  const failedDetails = new Set((preflight?.evaluation?.results ?? []).filter((r) => !r.passed).map((r) => r.detail));
+  const extras = (preflight?.blocking ?? []).filter((line) => !failedDetails.has(line));
+  return plainPreflightBlocking({ blocking: extras, evaluation: preflight?.evaluation, schemaErrors: preflight?.schemaErrors });
+}

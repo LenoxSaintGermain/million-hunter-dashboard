@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, CircleSlash2, ClipboardCheck,
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { buildProposalReadiness } from "@shared/proposalReadiness";
-import { plainPreflightBlocking } from "@shared/orderSubmitReadiness";
+import { plainPreflightBlocking, preflightBlockersOutsideChecklist } from "@shared/orderSubmitReadiness";
 import { PlayAndReturn } from "./PlayAndReturn";
 import { dollarsToCents } from "@shared/proposalTicketFields";
 import { sharePlanSummary, ticketTimeDefaults } from "@shared/proposalTicketDefaults";
@@ -402,7 +402,8 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
     </CardContent>
   </Card>;
   const suggestedRange = candidate.suggestedSizeHighCents != null ? `${money(candidate.suggestedSizeLowCents)}–${money(candidate.suggestedSizeHighCents)}` : money(candidate.suggestedSizeLowCents);
-  const preflightGaps = plainPreflightBlocking(currentPreflightData);
+  // Failed gates are listed in the guardrail checklist; only list what it does not show.
+  const preflightGaps = preflightBlockersOutsideChecklist(currentPreflightData);
   const takeReadinessAction = () => {
     if (readiness.action === "refresh_recipe") return void refreshRecipe();
     if (readiness.action === "return_to_evidence") return onReturnToBrief();
@@ -448,7 +449,7 @@ export function PaperProposalForm({ runId, candidate, account, run, evidenceRevi
       <section className="rounded-lg border p-3" style={{ borderColor: readiness.action === "create_proposal" ? "oklch(0.55 0.15 145)" : "var(--sh-signal)", background: "var(--sh-surface)" }} aria-live="polite">
         <div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: readiness.action === "create_proposal" ? "oklch(0.55 0.15 145)" : "var(--sh-signal)" }} /><div><p className="text-sm font-semibold" style={{ color: "var(--sh-text-primary)" }}>{readiness.title}</p><p className="mt-1 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>{readiness.explanation}</p></div></div>
         {currentPreflightData?.notionalBasis === "derived_from_last_price" && <p className="mt-2 text-xs leading-5" style={{ color: "var(--sh-fg-muted)" }}>Modeled basis: the mandate ceiling uses notional derived from the last recorded price.</p>}
-        {preflightGaps.length > 1 && <details className="mt-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}><summary className="cursor-pointer font-medium">See {preflightGaps.length - 1} supporting gap{preflightGaps.length === 2 ? "" : "s"}</summary><ul className="mt-2 space-y-1 pl-4">{preflightGaps.slice(1).map((gap) => <li key={gap}>{gap}</li>)}</ul></details>}
+        {preflightGaps.length > 0 && <details className="mt-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}><summary className="cursor-pointer font-medium">See {preflightGaps.length} more gap{preflightGaps.length === 1 ? "" : "s"} not in the checklist</summary><ul className="mt-2 space-y-1 pl-4">{preflightGaps.map((gap) => <li key={gap}>{gap}</li>)}</ul></details>}
         {readiness.action === "refresh_recipe" && <div className="mt-3 space-y-2">
           <p className="text-sm" style={{ color: "var(--sh-fg-muted)" }}>Checks run on demand. A waiting trigger is not an order queued for market open.</p>
           <div className="flex flex-wrap gap-2"><Button type="button" className="min-h-11" disabled={constructed.isFetching} onClick={() => void refreshRecipe()}>{constructed.isFetching ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}{constructed.isFetching ? "Refreshing market checks…" : "Refresh market checks"}</Button><Button type="button" variant="outline" className="min-h-11" onClick={onReturnToDecisionBrief}>Compare other plays</Button></div>
