@@ -31,6 +31,8 @@ export function WeeklyIncomeTemplatePicker({ onUse }: { onUse: () => void }) {
         <div className="min-w-0 max-w-2xl">
           <p className="font-serif text-lg leading-snug" style={{ color: "var(--ink)" }}>{WEEKLY_INCOME_TEMPLATE_LABEL}</p>
           <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{WI_COPY["wi.thesis.oneLiner"]} {WI_COPY["wi.thesis.noTarget"]}</p>
+          <p data-wi-research-only className="mt-2 text-[0.68rem] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--sh-signal)" }}>Research only</p>
+          <p className="mt-1 text-sm leading-6" style={{ color: "var(--sh-fg-muted)" }}>{WI_COPY["wi.halt"]}</p>
         </div>
         <button type="button" onClick={onUse} className={BUTTON} style={{ borderColor: "var(--sh-signal)", background: "var(--sh-signal)", color: "var(--paper)", borderRadius: 0 }}>Use this template</button>
       </div>
