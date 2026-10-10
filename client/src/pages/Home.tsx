@@ -6,6 +6,7 @@ import { isTutorialAsset } from "@shared/tutorial";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { prioritizesWingate } from "@shared/wingatePresentation";
 import EditorialTopNav from "@/components/EditorialTopNav";
+import { ReleaseStamp } from "@/components/ReleaseStamp";
 import ScanProgress from "@/components/ScanProgress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -567,6 +568,7 @@ export default function Home() {
             <SignalStream />
           </div>
         </div>
+        <ReleaseStamp className="mt-10" />
       </main>
     </EditorialTopNav>
   );

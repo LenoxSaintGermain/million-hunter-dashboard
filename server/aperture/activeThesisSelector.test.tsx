@@ -61,7 +61,7 @@ describe("ActiveThesisSelect", () => {
     const $ = load(renderToStaticMarkup(<ActiveThesisSelect />));
     expect($("select option[selected]").text()).toBe(NEW.name);
     expect($("select").text()).not.toContain("UAT");
-    expect($.text()).toContain("Show 1 test thesis");
+    expect($.text()).toContain("Show 1 switchable test thesis");
     expect($.text()).toContain("Every step uses this thesis.");
   });
   it("says the active thesis isn't prepared instead of selecting another one", () => {

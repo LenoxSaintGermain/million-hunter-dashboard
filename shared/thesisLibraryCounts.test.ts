@@ -13,7 +13,7 @@ describe("thesisLibraryCounts (#112)", () => {
     const counts = thesisLibraryCounts({ projections, canonicalOnly });
     expect(counts).toMatchObject({ capital: 3, canonicalOnly: 2, total: 5, selectableTestHidden: 2, testHidden: 3 });
     expect(counts.selectableTestHidden).toBe(thesisOptions(projections, { showTest: false }).hiddenCount);
-    expect(showTestThesesLabel(counts, "selector")).toBe("Show 2 test theses");
+    expect(showTestThesesLabel(counts, "selector")).toBe("Show 2 switchable test theses");
     expect(showTestThesesLabel(counts, "library")).toBe("Show 3 test theses (1 not yet in Capital)");
   });
   it("never hides the active thesis from the count", () => {
