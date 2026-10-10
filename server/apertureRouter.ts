@@ -16,6 +16,7 @@ import { eq, ne, and, or, inArray, gte, lt, sql, asc, isNull } from "drizzle-orm
 import { createHash } from "node:crypto";
 import { apertureUnderwritingJobs } from "../drizzle/apertureUnderwritingJobSchema";
 import { recordEquitySnapshot } from "./aperture/equitySnapshots";
+import { performanceRouter } from "./aperture/performanceRouter";
 import { buildEvidenceFactDraft } from "./aperture/evidenceFactDraft";
 import { selectBestPlays } from "../shared/bestPlaySelection";
 import { claimUnderwritingJob, readUnderwritingJob } from "./aperture/underwritingJobs";
@@ -1107,6 +1108,8 @@ export const apertureRouter = router({
   /** UAT Practice Books: owner-only controls. */
   uat: uatRouter,
   practiceBook: practiceBookRouter,
+  /** Account performance: saved syncs and recorded fills, read-only. */
+  performance: performanceRouter,
   /** #84 Weekly Income research screen: read-only. */
   weeklyIncome: weeklyIncomeRouter,
 
