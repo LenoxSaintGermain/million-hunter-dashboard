@@ -157,17 +157,19 @@ export function TodayAttentionBriefing({
   }, [attention, changesOpen, tasksOpen, allMotion, primary?.key, read.canRecordSeen, previewOnly]);
 
   const displayedBaseline = useMemo(() => attention ? displayedAttentionBaseline(attention, observed) : null, [attention, observed]);
-  // Viewing is not reviewing (#125): the baseline moves only when the operator
-  // presses "Mark reviewed", and then only for the items actually displayed.
+  // Viewing is not reviewing (#125): the stored baseline moves only when the
+  // operator presses "Mark reviewed". The button records the whole current
+  // status the operator is looking at; nothing on load or scroll writes it.
   const [reviewedAt, setReviewedAt] = useState<number | null>(null);
-  const canMarkReviewed = !previewOnly && read.canRecordSeen && !!displayedBaseline?.snapshot.items.length
-    && !displayedBaseline.snapshot.items.every(item => sent.current.get(item.key) === item.fingerprint);
+  const changedCount = changedKeys.size;
+  const canMarkReviewed = !previewOnly && read.canRecordSeen && !!attention?.baseline?.items.length && !!attention?.baselineToken;
   const markReviewed = () => {
-    if (!canMarkReviewed || !displayedBaseline || inFlight.current) return;
+    if (!canMarkReviewed || !attention || inFlight.current) return;
     inFlight.current = true;
     setSeenError(false);
-    markSeen.mutate(displayedBaseline, {
-      onSuccess: () => { for (const item of displayedBaseline.snapshot.items) sent.current.set(item.key, item.fingerprint); setReviewedAt(Date.now()); },
+    const reviewed = { snapshot: attention.baseline, token: attention.baselineToken };
+    markSeen.mutate(reviewed, {
+      onSuccess: () => { for (const item of reviewed.snapshot.items) sent.current.set(item.key, item.fingerprint); setReviewedAt(Date.now()); onRetry(); },
       onError: () => setSeenError(true),
       onSettled: () => { inFlight.current = false; setSeenRetry(value => value + 1); },
     });
@@ -284,15 +286,15 @@ export function TodayAttentionBriefing({
 
       {(layout?.otherAttention.length ?? 0) > 0 && <details open={tasksOpen} onToggle={event => setTasksOpen(event.currentTarget.open)} className="border-t" style={{ borderColor: "var(--sh-border-1)" }}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Other pending decisions · {attentionSplit.visible.length}</summary>{tasksOpen && attentionSplit.visible.map(row)}</details>}
 
-      {visibleChanged.length > 0
-        ? <details className="border-t" style={{ borderColor: "var(--sh-border-1)" }} open={changesOpen} onToggle={event => setChangesOpen(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">{attention.changeHeading} · {visibleChanged.length}</summary>{changesOpen && <div className="border-t" style={{ borderColor: "var(--sh-border-1)" }}>{visibleChanged.map(row)}</div>}</details>
-        : <div data-change-baseline className="border-t px-4 py-3 text-sm leading-5" style={{ borderColor: "var(--sh-border-1)" }}><span className="font-semibold">{attention.changeHeading} · 0</span><span style={{ color: "var(--sh-fg-muted)" }}>{attention.changeHeading === "Current status"
+      {changedCount > 0
+        ? <details className="border-t" style={{ borderColor: "var(--sh-border-1)" }} open={changesOpen} onToggle={event => setChangesOpen(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">{attention.changeHeading} · {changedCount}</summary>{changesOpen && <div className="border-t" style={{ borderColor: "var(--sh-border-1)" }}>{visibleChanged.map(row)}{changedCount > visibleChanged.length && <p className="px-4 py-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{changedCount - visibleChanged.length} more marked Changed in the lists above.</p>}</div>}</details>
+        : <div data-change-baseline className="border-t px-4 py-3 text-sm leading-5" style={{ borderColor: "var(--sh-border-1)" }}><span className="font-semibold">{attention.changeHeading} · {changedCount}</span><span style={{ color: "var(--sh-fg-muted)" }}>{attention.changeHeading === "Current status"
           ? " — this is the first recorded baseline, so there is no earlier review to compare against."
-          : ` — nothing changed since your last review${attention.baseline?.capturedAt ? ` on ${localTime(attention.baseline.capturedAt)}` : ""}. Timestamp-only churn is ignored.`}</span></div>}
+          : ` — nothing changed since your last review${attention.lastReviewedAt ? ` on ${localTime(attention.lastReviewedAt)}` : ""}. Timestamp-only churn is ignored.`}</span></div>}
 
 
-      {!previewOnly && read.canRecordSeen && <div data-mark-reviewed className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
-        <span>{reviewedAt ? `Marked reviewed at ${localTime(reviewedAt)}. Changes are now compared with this review.` : "Opening this page doesn't count as a review. Mark what you've read as reviewed to reset the comparison."}</span>
+      {!previewOnly && (changedCount > 0 || (read.canRecordSeen && attention.changeHeading === "Current status")) && <div data-mark-reviewed className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 text-xs leading-5" style={{ borderColor: "var(--sh-border-1)", color: "var(--sh-fg-muted)" }}>
+        <span>{reviewedAt ? `Marked reviewed at ${localTime(reviewedAt)}. Changes are now compared with this review.` : read.canRecordSeen ? "Opening this page doesn't count as a review. Mark what you've read as reviewed to reset the comparison." : "Status is still loading or partly unavailable, so a review can't be recorded yet."}</span>
         <Button variant="outline" size="sm" className="min-h-11" disabled={!canMarkReviewed || markSeen.isPending} onClick={markReviewed}>{markSeen.isPending ? "Saving review…" : "Mark reviewed"}</Button>
       </div>}
 

@@ -28,7 +28,8 @@ describe("Aperture attention persistence contracts", () => {
     expect(briefing).toContain("displayedAttentionBaseline(attention, observed)");
     expect(briefing).toContain("IntersectionObserver");
     expect(briefing).toContain('document.visibilityState !== "visible"');
-    expect(briefing).toContain("markSeen.mutate(displayedBaseline,");
+    // #125: the baseline is written only by the explicit Mark reviewed action.
+    expect(briefing).toContain("markSeen.mutate(reviewed,");
     expect(briefing).not.toContain("invalidate()");
   });
 
