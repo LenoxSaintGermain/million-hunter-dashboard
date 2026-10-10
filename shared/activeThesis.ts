@@ -72,6 +72,8 @@ export function thesisLibraryCounts(input: {
 /** "Show 9 test theses (1 not yet in Capital)": the same number the selector shows, plus what only the library has. */
 export function showTestThesesLabel(counts: { selectableTestHidden: number; canonicalOnlyTest: number }, scope: "library" | "selector"): string {
   const n = scope === "selector" ? counts.selectableTestHidden : counts.selectableTestHidden + counts.canonicalOnlyTest;
-  const base = `Show ${n} test ${n === 1 ? "thesis" : "theses"}`;
+  // The selector can only switch to theses already in Capital, so it says so;
+  // the library adds the ones not yet in Capital and names them.
+  const base = scope === "selector" ? `Show ${n} switchable test ${n === 1 ? "thesis" : "theses"}` : `Show ${n} test ${n === 1 ? "thesis" : "theses"}`;
   return scope === "library" && counts.canonicalOnlyTest > 0 ? `${base} (${counts.canonicalOnlyTest} not yet in Capital)` : base;
 }
