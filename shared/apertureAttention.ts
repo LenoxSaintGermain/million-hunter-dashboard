@@ -193,6 +193,8 @@ export type ApertureAttentionBriefing = {
   quiet: boolean;
   quietMessage: string | null;
   baseline: ApertureAttentionBaseline;
+  /** When the operator last pressed Mark reviewed (the stored baseline), not the time of this read. */
+  lastReviewedAt?: number | null;
   baselineToken: string;
   sourceIssues?: AttentionSourceIssue[];
   mission?: AttentionMission | null;
@@ -789,6 +791,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
     quietMessage: quiet ? `Recorded status as of ${asOf}.` : null,
     baseline,
     baselineToken,
+    lastReviewedAt: prior?.capturedAt ?? null,
     sourceIssues: input.checks.issues ?? [],
     mission: input.mission,
   };
