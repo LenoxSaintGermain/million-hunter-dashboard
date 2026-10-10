@@ -76,6 +76,7 @@ import ApertureUatReconciliation from "./pages/aperture/ApertureUatReconciliatio
 import ApertureMemoLibrary from "./pages/aperture/ApertureMemoLibrary";
 import ApertureRuns from "./pages/aperture/ApertureRuns";
 import ApertureRecord from "./pages/aperture/ApertureRecord";
+import AperturePerformance from "./pages/aperture/AperturePerformance";
 import AperturePlayDesk from "./pages/aperture/AperturePlayDesk";
 import CapitalWalkthrough from "./pages/aperture/CapitalWalkthrough";
 import ApertureUnderwriting from "./pages/aperture/ApertureUnderwriting";
@@ -296,6 +297,7 @@ function Router() {
         <Route path="/aperture/runs">{() => <ApertureRoute component={ApertureRuns} />}</Route>
         <Route path="/aperture/research">{() => <ApertureRoute component={ApertureRuns} />}</Route>
         <Route path="/aperture/plays">{() => <ApertureRoute component={AperturePlayDesk} />}</Route>
+        <Route path="/aperture/performance">{() => <ApertureRoute component={AperturePerformance} />}</Route>
         <Route path="/aperture/record">{() => <ApertureRoute component={ApertureRecord} />}</Route>
         <Route path="/aperture/walkthrough">{() => <ApertureRoute component={CapitalWalkthrough} />}</Route>
         <Route path="/aperture/run/:id">{() => <ApertureRoute component={CandidateBoard} />}</Route>
