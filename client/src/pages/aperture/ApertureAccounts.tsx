@@ -3,7 +3,7 @@
  * Create and manage portfolio accounts (Alpaca paper, manual entry).
  * INTERNAL RESEARCH TOOL — NOT INVESTMENT ADVICE.
  */
-import { manualHoldingsAge } from "@shared/manualHoldingsAge";
+import { manualHoldingsAgeLine, manualHoldingsTimestamp } from "@shared/manualHoldingsAge";
 import { maskAccountNumber } from "@shared/accountNumberMask";
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
@@ -280,11 +280,9 @@ export default function ApertureAccounts() {
                     {account.practiceBook
                       ? `${PRACTICE_BOOK_COPY.subtitle}${account.practiceBook.houseAccount ? ` · ${account.practiceBook.houseAccount}` : ""}`
                       : account.externalAccountId ? `Paper account · ${maskAccountNumber(account.externalAccountId)}` : account.brokerId === "manual" ? "Research only · cannot send orders" : "Paper account not linked yet"}
-                    {` · ${accountStamp(account.lastSyncedAt)}`}
+                    {account.brokerId === "manual" ? null : ` · ${accountStamp(account.lastSyncedAt)}`}
                   </p>
-                  {account.brokerId === "manual" && (() => {
-                    const age = manualHoldingsAge(account.lastSyncedAt, Date.now());
-                    return (
+                  {account.brokerId === "manual" && <ManualHoldingsAge accountId={account.id} lastSyncedAt={account.lastSyncedAt}>{(age) => (
                       <div data-manual-holdings-age={age.stale ? "stale" : "fresh"} className="mt-2 flex flex-wrap items-center gap-2 text-xs" style={{ color: "var(--sh-fg-muted)" }}>
                         {age.stale && <Badge variant="outline" className="rounded-none text-[10px] uppercase tracking-[0.12em]" style={{ borderColor: "var(--sh-signal)", color: "var(--sh-signal)" }}>Stale</Badge>}
                         <span>{age.text}. Manual holdings never refresh on their own. A ticket that uses this account as portfolio context checks its limits against these saved holdings.</span>
@@ -303,8 +301,7 @@ export default function ApertureAccounts() {
                           <Upload className="h-3.5 w-3.5 mr-1" />Update holdings (CSV)
                         </Button>
                       </div>
-                    );
-                  })()}
+                  )}</ManualHoldingsAge>}
                 </div>
                 <Button
                   variant="outline"
@@ -328,7 +325,7 @@ export default function ApertureAccounts() {
                 <div className="account-value">
                   <span className="account-annotation">{account.practiceBook ? "Practice book equity" : "Recorded account equity"}</span>
                   <strong>{accountMoney(account.practiceBook ? account.practiceBook.equityValueCents : account.equityValueCents)}</strong>
-                  <p>{accountStamp(account.lastSyncedAt)}</p>
+                  <p>{account.brokerId === "manual" ? <ManualHoldingsAgeText accountId={account.id} lastSyncedAt={account.lastSyncedAt} /> : accountStamp(account.lastSyncedAt)}</p>
                   <p>Source: {account.practiceBook ? PRACTICE_BOOK_COPY.source : account.syncSource || (account.brokerId === "manual" ? "Manual record" : "Not recorded")}</p>
                   {account.syncError && <p role="alert">Last sync failed: {account.syncError}. These are saved values.</p>}
                   {account.practiceBook?.status === "frozen" && <p role="alert">Paused for owner review: {account.practiceBook.frozenReason ?? "the shared practice account is being reconciled"}.</p>}
@@ -530,4 +527,19 @@ export default function ApertureAccounts() {
       </div>
     </DashboardLayout>
   );
+}
+
+/** Age of manual holdings from their real saved time (#116); reads the same cached positions query the holdings list uses. */
+function useManualHoldingsAge(accountId: number, lastSyncedAt: number | null | undefined) {
+  const positions = trpc.aperture.account.getPositions.useQuery({ accountId }, { retry: false });
+  const holdings = (positions.data ?? undefined) as { priceAsOf?: number | null; updatedAt?: number | null }[] | undefined;
+  return manualHoldingsAgeLine(manualHoldingsTimestamp(lastSyncedAt, holdings), holdings?.length ?? 0, Date.now());
+}
+
+function ManualHoldingsAge({ accountId, lastSyncedAt, children }: { accountId: number; lastSyncedAt: number | null | undefined; children: (age: { text: string; stale: boolean }) => React.ReactNode }) {
+  return <>{children(useManualHoldingsAge(accountId, lastSyncedAt))}</>;
+}
+
+function ManualHoldingsAgeText({ accountId, lastSyncedAt }: { accountId: number; lastSyncedAt: number | null | undefined }) {
+  return <>{useManualHoldingsAge(accountId, lastSyncedAt).text}</>;
 }
