@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { BookOpen, FileText, Landmark, LayoutDashboard, ListTodo, Route, Wallet } from "lucide-react";
+import { BookOpen, FileText, Landmark, LayoutDashboard, LineChart, ListTodo, Route, Wallet } from "lucide-react";
 import EditorialTopNav from "@/components/EditorialTopNav";
 import { cn } from "@/lib/utils";
 import { OPERATING_INVARIANT } from "@shared/operatingInvariant";
@@ -17,6 +17,7 @@ const APERTURE_NAV = [
   { href: "/aperture/mission", label: "Mission", icon: FileText },
   { href: "/aperture/plays", label: "Play Desk", icon: ListTodo },
   { href: "/aperture/runs", label: "Research", icon: Route },
+  { href: "/aperture/performance", label: "Performance", icon: LineChart },
   { href: "/aperture/accounts", label: "Portfolio", icon: Wallet },
   { href: "/aperture/theses", label: "Theses", icon: BookOpen },
   { href: APERTURE_NEW_THESIS_PATH, label: "New thesis", icon: BookOpen },
@@ -27,6 +28,7 @@ const TRADER_NAV = [
   { href: "/aperture/mission", label: "Mission", icon: FileText },
   { href: "/aperture/plays", label: "Play Desk", icon: ListTodo },
   { href: "/aperture/runs", label: "Follow-ups", icon: Route },
+  { href: "/aperture/performance", label: "Performance", icon: LineChart },
   { href: "/aperture/accounts", label: "Portfolio", icon: Wallet },
   { href: "/thesis", label: "Theses", icon: BookOpen },
   { href: "/aperture/record", label: "Record", icon: FileText },
