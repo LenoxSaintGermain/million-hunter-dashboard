@@ -3,6 +3,7 @@ import { portfolioAccounts, positions, type PortfolioAccount } from "../../drizz
 import type { getDb } from "../db";
 import { brokerFor } from "./brokers";
 import { assertEnvBrokerAccessForUser } from "./brokers/envBrokerOwner";
+import { recordEquitySnapshot } from "./equitySnapshots";
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
@@ -40,6 +41,10 @@ export async function syncPaperAccount(db: Db, account: PortfolioAccount, now = 
     syncError: null,
     updatedAt: now,
   }).where(eq(portfolioAccounts.id, account.id));
+  await recordEquitySnapshot(db, {
+    accountId: account.id, userId: account.userId, practiceBookId: account.practiceBookId,
+    equityCents: accountData.equityValueCents, cashCents: accountData.cashCents, source: broker.id, takenAt: now,
+  });
 
   await db.delete(positions).where(eq(positions.accountId, account.id));
   if (positionData.length) {

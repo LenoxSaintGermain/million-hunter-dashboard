@@ -1163,6 +1163,27 @@ export type PortfolioAccount = typeof portfolioAccounts.$inferSelect;
 export type InsertPortfolioAccount = typeof portfolioAccounts.$inferInsert;
 
 /**
+ * Account equity snapshots (0071). One row per saved sync, append-only; the bucket
+ * (5 minutes) makes the scheduled and manual syncs idempotent. The Performance view
+ * draws its chart from these rows only and leaves gaps where none exist.
+ */
+export const accountEquitySnapshots = mysqlTable("account_equity_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  accountId: int("account_id").notNull(),
+  userId: int("user_id").notNull(),
+  practiceBookId: int("practice_book_id"),
+  equityCents: bigint("equity_cents", { mode: "number" }).notNull(),
+  cashCents: bigint("cash_cents", { mode: "number" }),
+  source: varchar("source", { length: 32 }).notNull(),
+  takenAt: bigint("taken_at", { mode: "number" }).notNull(),
+  bucketTs: bigint("bucket_ts", { mode: "number" }).notNull(),
+}, (table) => ({
+  accountBucketIdx: uniqueIndex("equity_snap_account_bucket").on(table.accountId, table.bucketTs),
+  userAccountTimeIdx: index("equity_snap_user_account_time").on(table.userId, table.accountId, table.takenAt),
+}));
+export type AccountEquitySnapshot = typeof accountEquitySnapshots.$inferSelect;
+
+/**
  * UAT Practice Books (0070). A tester's virtual sub-ledger on the one shared
  * "UAT house" Alpaca paper account: own cash, positions and limits, real paper
  * fills. A reset archives the book and starts a new row (generation + 1), so old
