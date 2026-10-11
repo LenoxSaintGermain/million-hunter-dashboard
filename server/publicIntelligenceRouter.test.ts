@@ -1,6 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "./_core/context";
-import { publicIntelligenceRouter } from "./routers/publicIntelligenceRouter";
+const sharedAccess = vi.hoisted(() => ({
+  caller: vi.fn(async (_ownerId: number) => undefined),
+  provider: vi.fn(async (_provider: string) => undefined),
+}));
+vi.mock("./_core/env", () => ({
+  ENV: { secUserAgent: "Synthetic unit test test@example.com" },
+}));
+vi.mock("./evidenceRepository", () => ({
+  evidenceRepository: {
+    reserveSecProviderBudget: vi.fn(async () => undefined),
+    setSecCooldown: vi.fn(async () => undefined),
+    reserveFeedCaller: sharedAccess.caller,
+    reserveFeedProvider: sharedAccess.provider,
+  },
+}));
+import {
+  publicIntelligenceRouter,
+  createPublicIntelligenceRouter,
+} from "./routers/publicIntelligenceRouter";
+import * as feeds from "./publicIntelligence";
 
 let identity = 900000;
 function caller(authenticated = true) {
@@ -27,15 +46,76 @@ const network = vi.fn(async (url: string | URL | Request) => {
 });
 
 beforeEach(() => {
+  sharedAccess.caller.mockReset().mockResolvedValue(undefined);
+  sharedAccess.provider.mockReset().mockResolvedValue(undefined);
   network.mockClear();
   vi.stubGlobal("fetch", network);
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
 describe("Public Intelligence router auth and input boundaries", () => {
+  it("forwards general FeedAccess only to non-SEC adapters and preserves the first SEC argument", async () => {
+    const empty = {
+      status: "empty" as const,
+      data: [],
+      source: "Synthetic test",
+      sourceUrl: "https://example.com",
+      fetchedAt: "2026-01-02T00:00:00Z",
+      attemptedAt: "2026-01-02T00:00:00Z",
+      message: null,
+    };
+    const macro = vi.spyOn(feeds, "getMacroOdds").mockResolvedValue(empty);
+    const trademarks = vi
+      .spyOn(feeds, "searchTrademarks")
+      .mockResolvedValue(empty);
+    const recipients = vi
+      .spyOn(feeds, "searchFederalContractors")
+      .mockResolvedValue(empty);
+    const sec = vi.spyOn(feeds, "searchSecCompanies").mockResolvedValue(empty);
+    const fx = vi
+      .spyOn(feeds, "getForexRates")
+      .mockResolvedValue({
+        ...empty,
+        status: "ok",
+        data: { base: "USD", date: "2026-01-02", rates: { EUR: 0.9 } },
+      });
+    const secAccess = {
+      reserve: vi.fn(async () => undefined),
+      cooldown: vi.fn(async (_until: Date) => undefined),
+    };
+    const feedAccess = {
+      reserve: vi.fn(async (_provider: string) => undefined),
+    };
+    const reserve = vi.fn(async (_ownerId: number) => undefined);
+    const user = createPublicIntelligenceRouter(
+      secAccess,
+      feedAccess,
+      reserve
+    ).createCaller({
+      user: { id: ++identity, role: "user" },
+      req: {},
+      res: {},
+    } as TrpcContext);
+    await user.getMacroOdds({ tagSlug: "economy", limit: 2 });
+    await user.searchTrademarks({ query: "Example", limit: 2 });
+    await user.searchFederalContractors({ query: "Example", limit: 2 });
+    await user.searchSecCompanies({ query: "Example", limit: 2 });
+    await user.getForexRates({ base: "USD", symbols: ["EUR"] });
+    expect(macro).toHaveBeenCalledWith(
+      { tagSlug: "economy", limit: 2 },
+      feedAccess
+    );
+    expect(trademarks).toHaveBeenCalledWith("Example", 2, feedAccess);
+    expect(recipients).toHaveBeenCalledWith("Example", 2, feedAccess);
+    expect(sec).toHaveBeenCalledWith("Example", 2, secAccess);
+    expect(fx).toHaveBeenCalledWith("USD", ["EUR"], feedAccess);
+    expect(reserve).toHaveBeenCalledTimes(5);
+    expect(network).not.toHaveBeenCalled();
+  });
   it("rejects anonymous callers on every procedure before network access", async () => {
     const guest = caller(false);
     const requests = [
@@ -52,6 +132,7 @@ describe("Public Intelligence router auth and input boundaries", () => {
         expect(result.reason.code).toBe("UNAUTHORIZED");
     }
     expect(network).not.toHaveBeenCalled();
+    expect(sharedAccess.caller).not.toHaveBeenCalled();
   });
 
   it("allows authenticated non-admin callers and preserves feed envelopes", async () => {
@@ -172,21 +253,94 @@ describe("Public Intelligence router auth and input boundaries", () => {
     expect(network).not.toHaveBeenCalled();
   });
 
-  it("shares the 30-request quota across procedures, isolates users, and resets after a minute", async () => {
+  it("delegates the 30-request quota across router instances to shared storage", async () => {
     vi.useFakeTimers();
-    const user = caller();
+    // Simulated shared storage; production atomicity belongs to repository tests.
+    const windows = new Map<number, { start: number; count: number }>();
+    const reserve = vi.fn(async (ownerId: number) => {
+      let window = windows.get(ownerId);
+      if (!window || Date.now() - window.start >= 60_000) {
+        window = { start: Date.now(), count: 0 };
+        windows.set(ownerId, window);
+      }
+      if (++window.count > 30) throw { code: "RATE_LIMITED" };
+    });
+    const context = {
+      user: { id: ++identity, role: "user" },
+      req: {},
+      res: {},
+    } as TrpcContext;
+    const user = createPublicIntelligenceRouter(
+      undefined,
+      undefined,
+      reserve
+    ).createCaller(context);
+    const secondInstance = createPublicIntelligenceRouter(
+      undefined,
+      undefined,
+      reserve
+    ).createCaller(context);
     for (let index = 0; index < 30; index++)
       await user.getBrandFaviconUrl({ domain: "example.com" });
-    await expect(user.getMacroOdds({})).rejects.toMatchObject({
+    await expect(secondInstance.getMacroOdds({})).rejects.toMatchObject({
       code: "TOO_MANY_REQUESTS",
     });
     await expect(
-      caller().getBrandFaviconUrl({ domain: "example.com" })
+      createPublicIntelligenceRouter(undefined, undefined, reserve)
+        .createCaller({
+          ...context,
+          user: { ...context.user!, id: ++identity },
+        })
+        .getBrandFaviconUrl({ domain: "example.com" })
     ).resolves.toHaveProperty("url");
     vi.advanceTimersByTime(60_000);
     await expect(
       user.getBrandFaviconUrl({ domain: "example.com" })
     ).resolves.toHaveProperty("url");
     expect(network).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "RATE_LIMITED",
+    "DATABASE_UNAVAILABLE",
+    "BUDGET_STATE_INVALID",
+    "UNEXPECTED",
+  ])("fails closed and sanitizes caller reservation failure %s", async code => {
+    sharedAccess.caller.mockRejectedValueOnce(
+      Object.assign(new Error("SECRET database connection and SQL"), { code })
+    );
+    const result = await caller()
+      .getMacroOdds({ tagSlug: "reservation-failure" })
+      .catch(error => error);
+    expect(result.code).toBe(
+      code === "RATE_LIMITED" ? "TOO_MANY_REQUESTS" : "INTERNAL_SERVER_ERROR"
+    );
+    expect(result.message).not.toContain("SECRET");
+    expect(network).not.toHaveBeenCalled();
+  });
+
+  it("awaits shared reservation before proceeding and uses authenticated owner ID", async () => {
+    let release!: () => void;
+    sharedAccess.caller.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          release = resolve;
+        })
+    );
+    const user = caller();
+    const ownerId = identity;
+    let done = false;
+    const pending = user
+      .getBrandFaviconUrl({ domain: "example.com" })
+      .then(result => {
+        done = true;
+        return result;
+      });
+    await vi.waitFor(() =>
+      expect(sharedAccess.caller).toHaveBeenCalledWith(ownerId)
+    );
+    expect(done).toBe(false);
+    release();
+    await expect(pending).resolves.toHaveProperty("url");
   });
 });

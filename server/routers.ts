@@ -54,6 +54,7 @@ import { researchRouter } from "./routers/research";
 import { apertureRouter } from "./apertureRouter";
 import { dealDocumentRouter } from "./dealDocumentRouter";
 import { publicIntelligenceRouter } from "./routers/publicIntelligenceRouter";
+import { publicEvidenceRouter } from "./routers/publicEvidenceRouter";
 import { PUBLIC_OPPORTUNITIES } from "../shared/publicOpportunities";
 import * as privateWorkspace from "./privateDealWorkspace";
 
@@ -63,6 +64,7 @@ export const appRouter = router({
   aperture: apertureRouter,
   dealDocument: dealDocumentRouter,
   publicIntelligence: publicIntelligenceRouter,
+  publicEvidence: publicEvidenceRouter,
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),

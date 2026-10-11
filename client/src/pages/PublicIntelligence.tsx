@@ -1,6 +1,9 @@
-import React, { useState, type ReactNode } from "react";
+import React, { useRef, useState, type ReactNode } from "react";
 import { trpc } from "@/lib/trpc";
 import EditorialTopNav from "@/components/EditorialTopNav";
+import SecEvidencePanel, {
+  createCaptureRequests,
+} from "@/components/SecEvidencePanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -282,7 +285,14 @@ const searchLabels: Record<SearchKind, string> = {
   sec: "Search SEC companies by ticker or name",
 };
 
-function SearchFeed({ kind }: { kind: SearchKind }) {
+function SearchFeed({
+  kind,
+  captureRequests,
+}: {
+  kind: SearchKind;
+  captureRequests: ReturnType<typeof createCaptureRequests>;
+}) {
+  const [issuer, setIssuer] = useState<SecCompanyMatch | null>(null);
   const [input, setInput] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [validation, setValidation] = useState("");
@@ -470,6 +480,15 @@ function SearchFeed({ kind }: { kind: SearchKind }) {
                           SEC filings
                         </SourceLink>
                       </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="min-h-11 h-auto whitespace-normal text-xs"
+                        aria-pressed={issuer?.cik === record.cik}
+                        onClick={() => setIssuer(record)}
+                      >
+                        View saved evidence for {record.ticker || record.title}
+                      </Button>
                     </article>
                   ))}
                 </div>
@@ -477,6 +496,14 @@ function SearchFeed({ kind }: { kind: SearchKind }) {
             </FeedView>
           )}
         </>
+      )}
+      {kind === "sec" && issuer && (
+        <SecEvidencePanel
+          key={issuer.cik}
+          cik={issuer.cik}
+          name={issuer.title}
+          captureRequests={captureRequests}
+        />
       )}
     </div>
   );
@@ -539,6 +566,7 @@ const tabs = [
 ] as const;
 
 export default function PublicIntelligence() {
+  const captureRequests = useRef(createCaptureRequests());
   const [activeTab, setActiveTab] = useState("macro_odds");
   return (
     <EditorialTopNav>
@@ -581,7 +609,7 @@ export default function PublicIntelligence() {
           </TabsContent>
           {(["trademarks", "contractors", "sec"] as const).map(kind => (
             <TabsContent key={kind} value={kind}>
-              {activeTab === kind && <SearchFeed kind={kind} />}
+              {activeTab === kind && <SearchFeed kind={kind} captureRequests={captureRequests.current} />}
             </TabsContent>
           ))}
           <TabsContent value="forex">

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { ENV } from "./_core/env";
+import { evidenceRepository } from "./evidenceRepository";
 import type { FeedResult, MacroOddEvent, TrademarkRecord, FederalContractor, SecCompanyMatch, FxRatesResult } from "../shared/publicIntelligence";
 export type { FeedResult, MacroOddMarket, MacroOddEvent, TrademarkRecord, FederalContractor, SecCompanyMatch, FxRatesResult } from "../shared/publicIntelligence";
 
@@ -25,8 +27,12 @@ const TIMEOUT_MS = 8000;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const RETRY_MS = 30_000;
 
+export type FeedProvider = "polymarket" | "markbase" | "usaspending" | "frankfurter";
+export interface FeedAccess { reserve(provider: FeedProvider): Promise<void> }
+const defaultFeedAccess: FeedAccess = { reserve: provider => evidenceRepository.reserveFeedProvider(provider) };
+
 /** Deadline includes headers AND streamed body, including non-cooperative transports. */
-async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
+async function fetchJson(url: string, init?: RequestInit, onRateLimit?: (until: Date) => Promise<void>): Promise<unknown> {
   const controller = new AbortController();
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -41,6 +47,13 @@ async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
     return await Promise.race([deadline, (async () => {
       const res = await fetch(url, { ...init, redirect: "error", signal: controller.signal,
         headers: { "User-Agent": USER_AGENT, Accept: "application/json", ...init?.headers } });
+      if (res.status === 429 && onRateLimit) {
+        const value = res.headers.get("retry-after");
+        const parsed = value && /^\d+$/.test(value) ? Date.now() + Number(value) * 1000 : Date.parse(value ?? "");
+        const until = Math.min(8.64e15, Math.max(Date.now() + 60_000, Number.isFinite(parsed) ? parsed : 0));
+        void res.body?.cancel().catch(() => {});
+        await onRateLimit(new Date(until));
+      }
       if (!res.ok) { void res.body?.cancel().catch(() => {}); throw new FeedError("Provider returned HTTP " + res.status + "."); }
       if (controller.signal.aborted) { void res.body?.cancel().catch(() => {}); throw new FeedError("Provider request timed out."); }
       if (Number(res.headers.get("content-length")) > MAX_BODY_BYTES) {
@@ -70,15 +83,15 @@ async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
   }
 }
 
-/** Bounded per-process caches and provider budgets. Multi-instance deployments
- * should also enforce a shared edge quota. No cache-bypass parameter is exposed. */
-function createFeed<T>(source: string, ttlMs: number, maxStaleMs: number) {
+/** Bounded local caches/coalescing plus durable non-SEC provider reservations.
+ * SEC reserves its separate shared budget in its loader. No cache bypass. */
+function createFeed<T>(source: string, ttlMs: number, maxStaleMs: number, provider?: FeedProvider) {
   type Entry = { result?: FeedResult<T>; good?: FeedResult<T>; expires: number; pending?: Promise<FeedResult<T>> };
   const cache = new Map<string, Entry>();
   let windowStart = 0;
   let requests = 0;
   let inFlight = 0;
-  return async (key: string, sourceUrl: string, load: () => Promise<T>): Promise<FeedResult<T>> => {
+  return async (key: string, sourceUrl: string, load: () => Promise<T>, access: FeedAccess = defaultFeedAccess): Promise<FeedResult<T>> => {
     const now = Date.now();
     let entry = cache.get(key);
     if (entry?.pending) return structuredClone(await entry.pending);
@@ -107,6 +120,10 @@ function createFeed<T>(source: string, ttlMs: number, maxStaleMs: number) {
     inFlight++;
     current.pending = (async () => {
       try {
+        if (provider) {
+          try { await access.reserve(provider); }
+          catch { throw new FeedError("Provider shared budget or storage is unavailable; no provider request made."); }
+        }
         const data = await load();
         const result: FeedResult<T> = { status: Array.isArray(data) && !data.length ? "empty" : "ok", data, source, sourceUrl,
           fetchedAt: new Date().toISOString(), attemptedAt, message: null };
@@ -126,16 +143,16 @@ function createFeed<T>(source: string, ttlMs: number, maxStaleMs: number) {
   };
 }
 
-const macroFeed = createFeed<MacroOddEvent[]>("Polymarket Gamma", 60_000, 60 * 60_000);
-const trademarkFeed = createFeed<TrademarkRecord[]>("Markbase", 5 * 60_000, 24 * 60 * 60_000);
-const federalFeed = createFeed<FederalContractor[]>("USAspending.gov", 5 * 60_000, 24 * 60 * 60_000);
+const macroFeed = createFeed<MacroOddEvent[]>("Polymarket Gamma", 60_000, 60 * 60_000, "polymarket");
+const trademarkFeed = createFeed<TrademarkRecord[]>("Markbase", 5 * 60_000, 24 * 60 * 60_000, "markbase");
+const federalFeed = createFeed<FederalContractor[]>("USAspending.gov", 5 * 60_000, 24 * 60 * 60_000, "usaspending");
 const secFeed = createFeed<SecCompanyMatch[]>("SEC EDGAR", 24 * 60 * 60_000, 7 * 24 * 60 * 60_000);
-const forexFeed = createFeed<FxRatesResult>("Frankfurter / ECB reference rates", 60 * 60_000, 24 * 60 * 60_000);
+const forexFeed = createFeed<FxRatesResult>("Frankfurter / ECB reference rates", 60 * 60_000, 24 * 60 * 60_000, "frankfurter");
 const marketSchema = z.object({ id, question: text, slug, outcomes: labels.nullish(), outcomePrices: prices.nullish(), volume: finiteNumeric.nullish(), endDate: optionalText,
   active: z.boolean().nullish(), closed: z.boolean().nullish() });
 const eventSchema = z.object({ id, title: text, slug, markets: z.array(marketSchema).max(100) });
 
-export async function getMacroOdds(options?: { tagSlug?: string; limit?: number }): Promise<FeedResult<MacroOddEvent[]>> {
+export async function getMacroOdds(options?: { tagSlug?: string; limit?: number }, access?: FeedAccess): Promise<FeedResult<MacroOddEvent[]>> {
   const { tagSlug, limit } = macroInput.parse(options ?? {});
   const url = "https://gamma-api.polymarket.com/events?limit=" + limit + "&closed=false&active=true&tag_slug=" + encodeURIComponent(tagSlug);
   return macroFeed(url, url, async () => z.array(eventSchema).max(100).parse(await fetchJson(url)).slice(0, limit).map(ev => ({
@@ -153,14 +170,14 @@ export async function getMacroOdds(options?: { tagSlug?: string; limit?: number 
         active: m.active ?? null, closed: m.closed ?? null,
         url: "https://polymarket.com/event/" + ev.slug };
     }),
-  })).filter(ev => ev.markets.length > 0));
+  })).filter(ev => ev.markets.length > 0), access);
 }
 
 // Exact inspected raw Markbase fields; do not use _formatted HTML or infer
 // legal status from an unverified code table.
 const trademarkSchema = z.object({ serial_number: z.string().regex(/^\d{8}$/), word_mark: text,
   status_code: z.string().max(32).nullish(), owner_name: optionalText, goods_services: optionalText, filing_date: optionalText });
-export async function searchTrademarks(query: string, limit = 5): Promise<FeedResult<TrademarkRecord[]>> {
+export async function searchTrademarks(query: string, limit = 5, access?: FeedAccess): Promise<FeedResult<TrademarkRecord[]>> {
   const input = searchInput.parse({ query, limit });
   const url = "https://markbase.co/api/search?q=" + encodeURIComponent(input.query) + "&limit=" + input.limit;
   return trademarkFeed(url, url, async () => {
@@ -168,10 +185,10 @@ export async function searchTrademarks(query: string, limit = 5): Promise<FeedRe
     return data.hits.slice(0, input.limit).map(hit => ({ serialNumber: hit.serial_number, wordMark: hit.word_mark,
       statusCode: hit.status_code ?? null, statusLabel: null, ownerName: hit.owner_name ?? null,
       goodsServices: hit.goods_services ?? null, filingDate: hit.filing_date ?? null }));
-  });
+  }, access);
 }
 
-export async function searchFederalContractors(query: string, limit = 5): Promise<FeedResult<FederalContractor[]>> {
+export async function searchFederalContractors(query: string, limit = 5, access?: FeedAccess): Promise<FeedResult<FederalContractor[]>> {
   const input = searchInput.parse({ query, limit });
   const url = "https://api.usaspending.gov/api/v2/autocomplete/recipient/";
   return federalFeed(JSON.stringify(input), "https://www.usaspending.gov/search", async () => {
@@ -180,15 +197,25 @@ export async function searchFederalContractors(query: string, limit = 5): Promis
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ search_text: input.query, limit: input.limit }),
     }));
     return data.results.slice(0, input.limit).map(r => ({ recipientName: r.recipient_name, uei: r.uei ?? null, duns: r.duns ?? null, recipientLevel: r.recipient_level ?? null }));
-  });
+  }, access);
 }
 
-export async function searchSecCompanies(query: string, limit = 5): Promise<FeedResult<SecCompanyMatch[]>> {
+export interface SecIndexAccess {
+  reserve: () => Promise<void>;
+  cooldown: (until: Date) => Promise<void>;
+}
+export async function searchSecCompanies(query: string, limit = 5, access: SecIndexAccess = {
+  reserve: () => evidenceRepository.reserveSecProviderBudget(),
+  cooldown: until => evidenceRepository.setSecCooldown(until),
+}): Promise<FeedResult<SecCompanyMatch[]>> {
   const input = searchInput.parse({ query, limit });
   const url = "https://www.sec.gov/files/company_tickers.json";
   // All queries share one index. Refresh failures preserve stale disclosure.
   const result = await secFeed("index", url, async () => {
-    const rows = z.record(z.string().regex(/^\d+$/), z.object({ cik_str: z.number().int().positive().max(9999999999), ticker: text, title: text })).parse(await fetchJson(url));
+    if (!ENV.secUserAgent || !/[^\s@]+@[^\s@]+\.[^\s@]+/.test(ENV.secUserAgent)) throw new FeedError("SEC identification is not configured.");
+    try { await access.reserve(); }
+    catch { throw new FeedError("SEC shared budget or storage is unavailable; no provider request made."); }
+    const rows = z.record(z.string().regex(/^\d+$/), z.object({ cik_str: z.number().int().positive().max(9999999999), ticker: text, title: text })).parse(await fetchJson(url, { headers: { "User-Agent": ENV.secUserAgent } }, access.cooldown));
     if (Object.keys(rows).length > 30_000) throw new FeedError("SEC index exceeds the row limit.");
     return Object.values(rows).map(r => ({ cik: String(r.cik_str).padStart(10, "0"), ticker: r.ticker, title: r.title }));
   });
@@ -198,7 +225,7 @@ export async function searchSecCompanies(query: string, limit = 5): Promise<Feed
   return { ...result, data, status: result.status === "stale" ? "stale" : data.length ? "ok" : "empty" };
 }
 
-export async function getForexRates(base = "USD", symbols?: string[]): Promise<FeedResult<FxRatesResult>> {
+export async function getForexRates(base = "USD", symbols?: string[], access?: FeedAccess): Promise<FeedResult<FxRatesResult>> {
   const input = forexInput.parse({ base, symbols });
   const targets = Array.from(new Set(input.symbols)).sort();
   // Canonical endpoint inspected 2026-10-11; .app redirects here with HTTP 301.
@@ -209,7 +236,7 @@ export async function getForexRates(base = "USD", symbols?: string[]): Promise<F
     if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== data.date || date.getTime() > Date.now()) throw new FeedError("Provider returned an invalid rate date.");
     if (data.base !== input.base || Object.keys(data.rates).length !== targets.length || targets.some(s => data.rates[s] === undefined)) throw new FeedError("Provider currencies do not match the request.");
     return data;
-  });
+  }, access);
 }
 
 export function getBrandFaviconUrl(domainOrHost: string): string {

@@ -1,4 +1,6 @@
 export const ENV = {
+  secEvidenceEnabled: process.env.SEC_EVIDENCE_ENABLED === "true",
+  secUserAgent: process.env.SEC_USER_AGENT?.trim() ?? "",
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
   databaseUrl: process.env.DATABASE_URL ?? "",

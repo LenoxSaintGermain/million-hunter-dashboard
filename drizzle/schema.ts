@@ -2171,3 +2171,4 @@ export { apertureMissionDrafts, apertureMissionDraftRevisions } from "./aperture
 export { apertureCapitalEvents, apertureCapitalClaims } from "./apertureCapitalLedgerSchema";
 export { apertureExecutionEvidence } from "./apertureExecutionEvidenceSchema";
 export { capitalStackTemplates, capitalStacks, capitalStackLayers } from "./legacyCapitalStackSchema";
+export { publicEvidenceReceipts, publicEvidenceBudgets, publicEvidenceCaptureClaims } from "./publicEvidenceSchema";

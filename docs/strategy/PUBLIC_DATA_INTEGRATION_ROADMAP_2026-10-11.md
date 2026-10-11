@@ -1,12 +1,12 @@
 # Public data: verified inventory and integration roadmap
 
 Date: 2026-10-11. Team: Third Signal Lab. Project: Third Signal Lab Agency.
-Primary surface/label: Research OS. Status: planned integrations; existing lookup layer verified locally.
+Primary surface/label: Research OS. Status: SEC receipts implemented and locally verified; production release gated. Remaining integrations planned.
 Linear is unavailable (UNAUTHORIZED). Work packages below are ready to sync, not created issues.
 
 ## Decision
 
-Build sourced diligence evidence, not a directory of API widgets. The authenticated lookup layer is implemented in `23c1993`; durable deal evidence and agent enrichment are not. Public demos remain frozen, explicitly illustrative and zero-API. Nothing in this roadmap grants trade, outreach, credit, legal, or investment approval.
+Build sourced diligence evidence, not a directory of API widgets. The authenticated lookup layer is implemented in `23c1993`. The first durable evidence slice now captures owner-scoped SEC issuer snapshots; automatic deal binding and agent enrichment are not implemented. See [SEC verification and release gate](../qa/SEC_EVIDENCE_RECEIPTS_2026-10-11.md). Public demos remain frozen, explicitly illustrative and zero-API. Nothing in this roadmap grants trade, outreach, credit, legal, or investment approval.
 
 The supplied Gemini plan is a candidate inventory, not an access or licensing guarantee. HTTP success alone is insufficient: validate content type, schema, timestamps, entity identity and permitted use. Unknown data stays unknown. No account registrations, subscriptions or credentials were created during this audit.
 
@@ -19,11 +19,11 @@ See [repair and UAT record](../qa/PUBLIC_INTELLIGENCE_FEEDS_2026-10-11.md) for p
 | Polymarket Gamma | Event/outcome lookups and probability bars | Independent forecasts, agent evidence receipts |
 | Markbase | Trademark-name lookup and raw status | Legal clearance, validated entity ownership |
 | USAspending | Recipient autocomplete | Awards, verified UEI matching, contract revenue |
-| SEC | Ticker/CIK index | Filing ingestion or analysis |
+| SEC | Ticker/CIK index, explicit owner-scoped submissions receipts, immutable history and exact form-count chart | Filing-content analysis, historical archive ingestion, automatic deal matching or engine enrichment |
 | Frankfurter | Dated reference FX | Executable prices or historical valuation service |
 | favicon.im | Decorative URL helper | Authoritative business identity |
 
-All are authenticated, read-only product lookups. Their current caches and quotas are process-local. Production deployment and signed-in deployed-route UAT remain separate release gates.
+All lookups are authenticated. SEC capture is an explicit persistence action, disabled by default. SEC index/submissions now share a database-backed quota and provider cooldown. The other lookup providers have shared application-enforced provider budgets (60/minute) and a shared caller budget (30/minute across all lookups); caches remain local. These are application limits, not claims about official provider allowances. Production deployment and signed-in deployed-route UAT remain separate release gates.
 
 ## Candidate audit
 
@@ -50,7 +50,7 @@ The blanket descriptions “unlimited,” “no-auth,” “real-time,” “cre
 
 ## Implementation sequence and acceptance gates
 
-Each row is one concrete work package. Status is **planned**, not shipped. Complete the dependency gates before expanding UI claims.
+Each row is one concrete work package. PD-01's SEC registry/budget slice, PD-02's issuer receipt slice, PD-03 submissions ingestion and PD-07's SEC review UI are implemented locally, not production-shipped. The broader provider registry, deal binding, retention administration, engine consumption and frozen SEC demo remain open. Complete the dependency gates before expanding UI claims.
 
 | ID / priority | Change | Acceptance / dependency |
 | --- | --- | --- |
@@ -79,4 +79,4 @@ Before claiming production readiness: verify deployed revision/traffic, authenti
 
 ## Ship-log boundary
 
-Baseline test repairs and this roadmap are the current change. Five lookup feeds were pushed in `23c1993`; no new candidate integration or production deployment is claimed by this document. Validation results are recorded in the linked QA report. Linear synchronization awaits reauthentication.
+Five lookup feeds were pushed in `23c1993`; baseline repairs and the initial roadmap followed in `48717d2`. SEC receipts and shared feed budgets are the current implementation. Validation and exact release status are recorded in the linked SEC QA report; implementation is not a production-deployment claim. Linear synchronization awaits reauthentication.
