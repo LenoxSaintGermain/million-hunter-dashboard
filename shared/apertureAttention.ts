@@ -707,7 +707,7 @@ export function deriveApertureAttention(input: ApertureAttentionInput, prior: Ap
       title: attentionReviewTitle(review.title),
       reason: review.reviewBasis?.trim()
         ? `Check now: ${review.reviewBasis.trim()}`
-        : "Scheduled checkpoint protects you from drift and unplanned losses. Inspect the saved decision before reassessing.",
+        : "Review is due, but its condition is not recorded. Inspect the saved decision before reassessing.",
       consequence: "This is a human checkpoint, not proof that an automatic check or exit occurred.",
       actionLabel: review.kind === "gate_review" ? "Complete Checkup" : "Review Recorded Outcome",
       href: review.kind === "play_outcome" ? outcomeReviewHref(review.href) : review.href,

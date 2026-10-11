@@ -1,7 +1,7 @@
 # Public Intelligence — repair and verification
 
 Date: 2026-10-11. Surface: authenticated `/public-intelligence`.
-Primary label: Data integrity. Change: harden Gemini's public-feed prototype.
+Primary label: Research OS. Change: harden Gemini's public-feed prototype.
 Tracking: Linear issue creation failed with UNAUTHORIZED; this record is ready to sync.
 
 ## Scope and truth boundary
@@ -86,10 +86,26 @@ DATABASE_URL= NODE_ENV=development pnpm exec tsx scripts/public-intelligence-uat
 
 ## Remaining product/release gates
 
-- Public-data discovery is not yet versioned deal evidence or automatic agent enrichment. Additional named APIs in the supplied roadmap remain unimplemented/unverified.
+- Public-data discovery is not yet versioned deal evidence or automatic agent enrichment. Additional named APIs were access/documentation-audited in the [integration roadmap](../strategy/PUBLIC_DATA_INTEGRATION_ROADMAP_2026-10-11.md); they remain unimplemented, with provider-specific credentials/licensing/verification gates.
 - Quotas and caches are process-local; multi-instance deployments need a shared edge quota. No distributed quota is claimed.
 - Production Cloud Run/Firebase deployment and signed-in deployed-route UAT are separate from this local live-provider verification; no deployment performed here.
-- Full repository test suite still has the eight baseline failures above.
+- The eight historical baseline failures above are resolved in the follow-up below. Skipped tests and production UAT are not claimed as passed.
 - Linear requires reauthentication.
 
-Ship log: branch `main`; scoped commit to be recorded in Git. Pre-existing local commit `4098c70` was already ahead of `origin/main` before this change. Unrelated strategy files are excluded.
+Ship log: branch `main`; feed repair pushed as `23c199300d2adbb1b84f0e8db8b8caef9363c674`. Pre-existing local commit `4098c70` was already ahead of `origin/main` before that change. Unrelated strategy files remain excluded. No production deployment claimed.
+
+## Follow-up: baseline failures and roadmap reconciled
+
+2026-10-11, after the feed repair. The historical failed run above is retained rather than rewritten as successful.
+
+- Reproduced all eight failures locally: 44 passed / 8 failed across the four affected files.
+- Research-library tests now include the actual `thesis.list` query in their mock.
+- Capital-thesis storage mock records compilation and projection separately and asserts both inserts; no assertion removed to hide the overwrite.
+- MicroTooltip imports the React runtime needed by the rendering tests.
+- Missing review conditions now say the condition is not recorded. Removed the unsupported claim that a checkpoint protects against losses; added undefined, null, empty and whitespace regression cases.
+- Focused affected tests: 56/56 passed. Feed regressions: 135/135 passed.
+- Full `DATABASE_URL= pnpm test:unit`: **3,700 passed, 18 skipped, zero failures**; 348 passed files / 4 skipped, 32.13 seconds, started 18:35:11 America/New_York. Skips remain skips, not verification.
+- Follow-up `DATABASE_URL= pnpm check`, `DATABASE_URL= pnpm build` and `git diff --check` passed. Build retains the bundle-size warning; it is not a test failure and is not silently marked resolved.
+- The [API roadmap](../strategy/PUBLIC_DATA_INTEGRATION_ROADMAP_2026-10-11.md) now records each named candidate, official references, access observations, commercial-use gates, dependencies and acceptance criteria. HTTP 200 HTML from Census is recorded as a missing-key response, not working data. Optional API integrations are not misrepresented as implemented.
+
+No production DB, broker actions, credential creation, provider subscriptions or deployment were performed by this follow-up. Linear remains unavailable pending reauthentication.

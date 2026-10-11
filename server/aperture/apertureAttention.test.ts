@@ -39,6 +39,15 @@ describe("Capital Aperture attention briefing", () => {
     expect(deriveApertureAttention(base({ pendingReviews: [{ ...review, reviewBasis: "" }] }), null).primary?.reason)
       .toBe("Review is due, but its condition is not recorded. Inspect the saved decision before reassessing.");
   });
+  it.each([undefined, null, "", " \t\n"])("discloses an absent review condition (%s) without promising protection", (reviewBasis) => {
+    const review = { id: 12, kind: "gate_review" as const, dueAt: now - 1, updatedAt: now,
+      title: "Portfolio-gap deployment", href: "/aperture/decision/12/revision/4", reviewBasis };
+    const item = deriveApertureAttention(base({ pendingReviews: [review] }), null).primary;
+    expect(item?.reason).toBe("Review is due, but its condition is not recorded. Inspect the saved decision before reassessing.");
+    expect(item?.reason).not.toMatch(/protect|prevent.*loss/i);
+    expect(item?.consequence).toContain("not proof");
+    expect(item?.href).toBe(review.href);
+  });
   const savedMission = { decisionRunId: 42, revisionId: 7, state: "complete" as const, title: "MRVL", updatedAt: now - 8_000 };
 
   it("keeps an accepted objective visible without advertising unsupported analysis or inventing a thesis", () => {

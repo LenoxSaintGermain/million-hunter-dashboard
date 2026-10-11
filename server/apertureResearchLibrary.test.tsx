@@ -18,7 +18,10 @@ vi.mock("../client/src/components/DashboardLayout", () => ({ default: ({ childre
 vi.mock("../client/src/components/aperture/ResearchJourneyDrawer", () => ({ ResearchJourneyDrawer: ({ journey }: any) => journey ? <aside data-inspected={journey.rootId}/> : null }));
 vi.mock("../client/src/lib/trpc", () => ({ trpc: {
   useUtils: () => ({ aperture: { invalidate: vi.fn() }, thesis: { invalidate: vi.fn() } }),
-  thesis: { activeCapital: { useQuery: () => ({ data: { thesis: { id: 4, name: "Illustrative focus" } }, error: fixture.contextError }) } },
+  thesis: {
+    list: { useQuery: () => ({ data: [] }) },
+    activeCapital: { useQuery: () => ({ data: { thesis: { id: 4, name: "Illustrative focus" } }, error: fixture.contextError }) },
+  },
   aperture: {
     run: { list: { useQuery: () => ({ data: fixture.runs, isLoading: fixture.loading, error: fixture.error, refetch: vi.fn() }) } },
     runway: { pending: { useQuery: () => ({ data: [] }) } },
