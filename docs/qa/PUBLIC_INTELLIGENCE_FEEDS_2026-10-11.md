@@ -109,3 +109,7 @@ Ship log: branch `main`; feed repair pushed as `23c199300d2adbb1b84f0e8db8b8caef
 - The [API roadmap](../strategy/PUBLIC_DATA_INTEGRATION_ROADMAP_2026-10-11.md) now records each named candidate, official references, access observations, commercial-use gates, dependencies and acceptance criteria. HTTP 200 HTML from Census is recorded as a missing-key response, not working data. Optional API integrations are not misrepresented as implemented.
 
 No production DB, broker actions, credential creation, provider subscriptions or deployment were performed by this follow-up. Linear remains unavailable pending reauthentication.
+
+## Subsequent SEC receipt release
+
+The later `484fe40` release supersedes the process-local quota and undeployed status above: all five lookup feeds now use shared database budgets, and SEC has owner-scoped immutable issuer receipts. [Complete migration, test, build, deployment and signed-in browser verification](SEC_EVIDENCE_RECEIPTS_2026-10-11.md). Earlier failed/skipped runs are retained here as historical evidence, not silently rewritten. Automatic deal matching, filing-content analysis and engine consumption remain roadmap work.

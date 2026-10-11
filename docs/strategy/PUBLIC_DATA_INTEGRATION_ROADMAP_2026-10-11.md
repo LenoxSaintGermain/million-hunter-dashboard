@@ -1,7 +1,7 @@
 # Public data: verified inventory and integration roadmap
 
 Date: 2026-10-11. Team: Third Signal Lab. Project: Third Signal Lab Agency.
-Primary surface/label: Research OS. Status: SEC receipts implemented and locally verified; production release gated. Remaining integrations planned.
+Primary surface/label: Research OS. Status: SEC issuer receipts and shared feed quotas released as `484fe40`; remaining integrations planned.
 Linear is unavailable (UNAUTHORIZED). Work packages below are ready to sync, not created issues.
 
 ## Decision
@@ -50,7 +50,7 @@ The blanket descriptions “unlimited,” “no-auth,” “real-time,” “cre
 
 ## Implementation sequence and acceptance gates
 
-Each row is one concrete work package. PD-01's SEC registry/budget slice, PD-02's issuer receipt slice, PD-03 submissions ingestion and PD-07's SEC review UI are implemented locally, not production-shipped. The broader provider registry, deal binding, retention administration, engine consumption and frozen SEC demo remain open. Complete the dependency gates before expanding UI claims.
+Each row is one concrete work package. PD-01's SEC registry/shared-budget slice, PD-02's issuer receipt slice, PD-03 submissions ingestion and PD-07's SEC review UI are production-shipped in `484fe40`, with signed-in capture verification. The broader provider registry, deal binding, retention administration, engine consumption and frozen SEC demo remain open. Complete the dependency gates before expanding UI claims.
 
 | ID / priority | Change | Acceptance / dependency |
 | --- | --- | --- |

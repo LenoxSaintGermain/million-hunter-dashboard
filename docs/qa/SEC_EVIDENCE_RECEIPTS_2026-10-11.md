@@ -27,7 +27,7 @@ SEC primary references: [API documentation](https://www.sec.gov/search-filings/e
 
 ## Verification record
 
-All commands explicitly disconnected the production `.env` database. Isolated MariaDB 11.4 at loopback 13372, database `signal_evidence_uat`; illustrative local identity. No production data mutation or broker action.
+All local tests and harnesses explicitly disconnected the production `.env` database. Isolated MariaDB 11.4 at loopback 13372, database `signal_evidence_uat`; illustrative local identity. Production metadata/migration and release actions are separately recorded below. No broker action.
 
 - Live adapter probe: Apple CIK 0000320193, 1,001 filings, retrieved 2026-10-11T22:47:31.061Z. Original accession/form/report-date links retained.
 - Isolated migration/read-back found a real JSON-text decoding defect; fixed before continuing. Verified owner isolation, concurrent idempotency, single-winner claims, distinct revision retention, null failure timestamps, shared quota, monotonic cooldown, rollback and empty reapply.
@@ -55,7 +55,16 @@ The storage check refuses existing feature tables; do not clear a populated UAT 
 
 ## Release status
 
-Not deployed. Production service read-back currently reports 100% traffic to `capital-aperture-00167-xst`, created 2026-10-10, image associated with `uat-097b227`. Revision numbering alone does not establish a rollback. Reconcile the actual release baseline, schema and Firebase route before promotion. Successful local build is not a deployment receipt.
+Initial baseline: 100% traffic to `capital-aperture-00167-xst`, created 2026-10-10, image `uat-097b227`. Revision numbering alone did not establish a rollback; browser release and Git baseline were reconciled before promotion.
+
+Release candidate `484fe40ec0a30ca7214d3272e1035f87086362b8` pushed to `origin/main`. Frozen source hash `30be68f4862c9088ddfeae38518a7a36c83eb02426b589694f85e4bd944b2164`; no unrelated strategy files or environment secrets included.
+
+- Guarded production 0072 apply: all three tables absent beforehand, created additively, full metadata verification compatible afterward. No existing deal/Capital rows changed by the migration.
+- Cloud Build `282f7480-96fb-4987-b429-3238521b4ec2`: SUCCESS, 2026-10-11T23:28:13Z.
+- Image digest `sha256:394911821212253164b45145fc51664afe1ce0f752a8f32b3683109973370a47`.
+- Revision `capital-aperture-sec-484fe40` first deployed at 0% traffic. Exact-SHA bundle, health, legacy anonymous-denial smoke checks and new anonymous receipt read/capture denials all passed.
+- Promoted to 100%; service traffic read-back confirmed. Firebase-hosted exact-SHA release smoke also passed. Signed-in live-provider/receipt UAT follows below.
+- Rollback preserves receipt tables: route traffic back to `capital-aperture-00167-xst`; do not run the destructive down migration against populated evidence.
 
 ### Final local verification
 
@@ -68,5 +77,14 @@ Not deployed. Production service read-back currently reports 100% traffic to `ca
 - Mobile override 354×767 (actual document width 350): scroll width equals client width; no horizontal overflow. Keyboard toggles remaining-form disclosure. Screenshot `/tmp/sec-evidence-mobile-uat.jpg`.
 - Production initially appeared blank but finished loading; verified signed-in admin `treble.design@gmail.com` and release `097b227`. No rollback inferred from revision numbering.
 - Independent code review cleared final concurrency/admission/shared-budget findings. Production migration, candidate smoke and authenticated deployed-route verification remain separate gates.
+
+### Production verification
+
+- Signed-in browser account: `treble.design@gmail.com` (admin). Production served exact release `484fe40`; 27 release smoke assertions passed, plus four new receipt/feed anonymous-access denials.
+- SEC AAPL index search succeeded from Cloud Run. Explicit confirmation/capture saved real receipt `44cf7c8d-cee3-4125-af54-ce975a3e749c` at 2026-10-11 19:32:33 America/New_York: 1,001 Apple filings; source CIK 0000320193; payload hash matches the earlier real local capture. No injected test failure or synthetic success entered production.
+- Reloaded the production page, searched the issuer again and read back the same receipt ID and original retrieval time. No second capture needed. Browser error log empty. [Production screenshot](screenshots/sec-evidence-production-2026-10-11.jpg).
+- Other production tabs succeeded: Polymarket macro, Markbase Tesla, USAspending Boeing, and Frankfurter USD reference rates dated 2026-10-09. Source codes and unknown identifiers remained uninterpreted/unknown; no legal or contractor-status claim added.
+- Local frozen `/walkthrough/capital-desk` opened with zero API requests under the final harness counter. Demo remained illustrative, unauthenticated and independent of the new live adapters.
+- Linear synchronization still requires reauthentication. Existing bundle-size warning and 18 skipped tests remain disclosed; they are not counted as passed.
 
 No completion claim for the entire API roadmap. PD-06 engine consumption, automatic deal linking and new SEC demo fixtures remain future work.
