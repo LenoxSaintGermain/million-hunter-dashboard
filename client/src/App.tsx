@@ -52,6 +52,7 @@ import CapitalDeskPreview from "./pages/aperture/CapitalDeskPreview";
 import Pricing from "./pages/Pricing";
 import Wingate from "./pages/Wingate";
 import AssetDossier from "./pages/AssetDossier";
+import PublicIntelligence from "./pages/PublicIntelligence";
 import AssetShare from "./pages/AssetShare";
 import VerificationQueue from "./pages/VerificationQueue";
 import ThesisStudio from "./pages/ThesisStudio";
@@ -264,6 +265,7 @@ function Router() {
         <Route path="/insurance-prospector">{() => <ProtectedRoute component={InsuranceProspector} />}</Route>
         <Route path="/stack">{() => <ProtectedRoute component={CapitalStack} />}</Route>
         <Route path="/ripple">{() => <ProtectedRoute component={RippleEffect} />}</Route>
+        <Route path="/public-intelligence">{() => <ProtectedRoute component={PublicIntelligence} />}</Route>
         <Route path="/admin">{() => <ProtectedRoute component={AdminPanel} />}</Route>
         <Route path="/operator-registry">{() => <ProtectedRoute component={OperatorRegistry} />}</Route>
         <Route path="/profile">{() => <ProtectedRoute component={OperatorIdentity} />}</Route>

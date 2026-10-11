@@ -54,6 +54,7 @@ import {
   ArrowRight,
   MapPin,
   Tag,
+  Globe,
 } from "lucide-react";
 
 /* ── Nav items ─────────────────────────────────────────────────────────────── */
@@ -86,6 +87,7 @@ const ACT_NAV = [
 ];
 
 const MORE_NAV = [
+  { label: "Public Intelligence", href: "/public-intelligence", icon: Globe, badge: "Open Data" },
   { label: "Freedom Map", href: "/freedom-map", icon: Map },
   { label: "Strategy Blender", href: "/strategy-blender", icon: Layers },
   { label: "Insurance Prospector", href: "/insurance-prospector", icon: Shield },

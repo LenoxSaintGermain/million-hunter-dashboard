@@ -53,6 +53,7 @@ import { rolePermissionsRouter } from "./rolePermissionsRouter";
 import { researchRouter } from "./routers/research";
 import { apertureRouter } from "./apertureRouter";
 import { dealDocumentRouter } from "./dealDocumentRouter";
+import { publicIntelligenceRouter } from "./routers/publicIntelligenceRouter";
 import { PUBLIC_OPPORTUNITIES } from "../shared/publicOpportunities";
 import * as privateWorkspace from "./privateDealWorkspace";
 
@@ -61,6 +62,7 @@ export const appRouter = router({
   agent: agentRouter,
   aperture: apertureRouter,
   dealDocument: dealDocumentRouter,
+  publicIntelligence: publicIntelligenceRouter,
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
