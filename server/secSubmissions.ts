@@ -47,7 +47,7 @@ const realDate = z
       date.toISOString().slice(0, 10) === value
     );
   }, "Invalid calendar date");
-const safeDocument = z
+export const safeSecPrimaryDocument = z
   .string()
   .min(1)
   .max(512)
@@ -67,7 +67,7 @@ const rowSchema = z.object({
     .regex(/^[A-Za-z0-9][A-Za-z0-9 /._-]*$/),
   filingDate: realDate,
   reportDate: z.union([realDate, z.literal(""), z.null()]),
-  primaryDocument: safeDocument,
+  primaryDocument: safeSecPrimaryDocument,
 });
 const requiredColumns = [
   "accessionNumber",

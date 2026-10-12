@@ -2172,3 +2172,4 @@ export { apertureCapitalEvents, apertureCapitalClaims } from "./apertureCapitalL
 export { apertureExecutionEvidence } from "./apertureExecutionEvidenceSchema";
 export { capitalStackTemplates, capitalStacks, capitalStackLayers } from "./legacyCapitalStackSchema";
 export { publicEvidenceReceipts, publicEvidenceBudgets, publicEvidenceCaptureClaims } from "./publicEvidenceSchema";
+export { dealEvidenceAttachments, dealEvidenceAnalysisRequests, dealEvidenceAnalysisResults } from "./dealEvidenceSchema";

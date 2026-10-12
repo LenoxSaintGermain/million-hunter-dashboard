@@ -4,6 +4,7 @@ import { AcquisitionSourceBrief } from "@/components/AcquisitionSourceBrief";
 import { AlignmentPortrait } from "@/components/AlignmentPortrait";
 import { DealCashBridge } from "@/components/DealCashBridge";
 import { DealDocumentReviewDesk } from "@/components/DealDocumentReviewDesk";
+import DealEvidenceDesk from "@/components/DealEvidenceDesk";
 import LOIGeneration from "./LOIGeneration";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -289,6 +290,7 @@ export default function DealDetail() {
               <h2 className="deal-chapter-title">What stands behind the numbers?</h2>
               <AcquisitionSourceBrief listingUrl={deal.listingUrl} description={deal.description} isSynthetic={deal.isSynthetic} />
               <dl className="deal-record-facts"><div><dt>Employees · recorded</dt><dd>{(deal as any).employeeCount ?? "Not disclosed"}</dd></div><div><dt>Operating years · recorded</dt><dd>{(deal as any).yearsInOperation ?? "Not disclosed"}</dd></div></dl>
+              {workPane === "research" && <DealEvidenceDesk dealId={dealId} demo={Boolean(deal.isSynthetic)} />}
               <DealDossierModule dealId={dealId} />
             </section>
           </TabsContent>

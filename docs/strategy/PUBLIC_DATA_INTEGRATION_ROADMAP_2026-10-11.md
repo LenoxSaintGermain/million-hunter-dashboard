@@ -77,6 +77,10 @@ For each implementation: red regression test → isolated-DB tests → opt-in re
 
 Before claiming production readiness: verify deployed revision/traffic, authenticated route/account, source provenance and errors in the actual browser. A successful build or pushed commit is not a deployment receipt. Keys/licenses and inaccessible providers are explicit blockers for those integrations, not reasons to fabricate data or silently substitute another feed.
 
+## PD-06 local implementation checkpoint
+
+The first deal-analysis slice now binds owner-confirmed, same-legal-entity SEC receipt versions into immutable Red Team and IC runs. Exact input hashes, citation facts, model IDs, failures and version comparisons are retained. Actual provider success and isolated browser tests are recorded in [PD-06 verification](../qa/PD06_EVIDENCE_ANALYSIS_2026-10-11.md). This is local implementation, not a production release. Production remains the SEC receipt release above until migration and deployed UAT gates pass. Research-brief binding, award evidence, filing-content interpretation and uploads remain open.
+
 ## Ship-log boundary
 
 Five lookup feeds were pushed in `23c1993`; baseline repairs and the initial roadmap followed in `48717d2`. SEC receipts and shared feed budgets are the current implementation. Validation and exact release status are recorded in the linked SEC QA report; implementation is not a production-deployment claim. Linear synchronization awaits reauthentication.

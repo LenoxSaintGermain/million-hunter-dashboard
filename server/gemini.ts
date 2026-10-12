@@ -21,8 +21,11 @@ import { modelAcquisitionFinancing } from "../shared/acquisitionFinancing";
 import { poeJSON, POE_MODELS } from "./poe";
 import { GEMINI_STRONG, GEMINI_FAST, GEMINI_BALANCED, GEMINI_LITE } from "../shared/models";
 import type { Deal } from "../drizzle/schema";
+import type { DealEvidenceSnapshot, EvidenceRedTeamOutput } from "../shared/dealEvidence";
+import { evidenceEnginePrompt, EvidenceOutputError, validateEvidenceOutput } from "./dealEvidenceEngine";
 
-const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+// Delay credential use until a provider is actually invoked (including isolated tests).
+const genai = { get models() { return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! }).models; } };
 
 // ─── Gemini model IDs (single source of truth: shared/models.ts) ─────────────────
 const GEMINI_PRO    = GEMINI_STRONG;    // deep reasoning
@@ -184,7 +187,9 @@ Return ONLY valid JSON.`;
 }
 
 // ─── Red Team Analysis (Gemini 3.1 Pro — direct) ─────────────────────────────
-export async function runRedTeamAnalysis(deal: Deal): Promise<RedTeamResult> {
+export function runRedTeamAnalysis(deal: Deal, evidence: { snapshot: DealEvidenceSnapshot; model: string }): Promise<EvidenceRedTeamOutput>;
+export function runRedTeamAnalysis(deal: Deal): Promise<RedTeamResult>;
+export async function runRedTeamAnalysis(deal: Deal, evidence?: { snapshot: DealEvidenceSnapshot; model: string }): Promise<RedTeamResult | EvidenceRedTeamOutput> {
   const prompt = `You are a ruthless Devil's Advocate for a private equity firm. Your ONLY job is to find reasons NOT to buy this business. Be specific, data-driven, and brutal.
 
 Business: ${deal.name}
@@ -208,19 +213,28 @@ Return JSON with:
 Return ONLY valid JSON.`;
 
   try {
+    if (evidence && evidence.model !== GEMINI_PRO) throw new Error("Unapproved Red Team evidence model");
+    const boundedPrompt = evidence ? `${evidenceEnginePrompt(evidence.snapshot)}
+Act as the existing acquisition Red Team: evaluate customer concentration, key-person dependency, disruption, regulatory exposure, market saturation, operational complexity and deal structure as hypotheses. Return ONLY JSON: {killProbability: number 0..1, redFlags: string[] (max 6), summary: string, citations: [{citationId, quote}]}. Do not substitute default scores on missing evidence.` : prompt;
     const response = await genai.models.generateContent({
       model: GEMINI_PRO,
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: { responseMimeType: "application/json" },
+      contents: [{ role: "user", parts: [{ text: boundedPrompt }] }],
+      config: { responseMimeType: "application/json", ...(evidence ? { abortSignal: AbortSignal.timeout(60000), maxOutputTokens: 4096 } : {}) },
     });
     const text = response.text ?? "{}";
-    const parsed = looseJsonParse(text);
+    if (evidence && text.length > 24000) throw new EvidenceOutputError("Oversized evidence output");
+    let parsed: unknown;
+    try { parsed = looseJsonParse(text); }
+    catch (error) { if (evidence) throw new EvidenceOutputError("Invalid evidence output JSON"); throw error; }
+    if (evidence) return validateEvidenceOutput("red_team", parsed, evidence.snapshot, [evidence.model]) as EvidenceRedTeamOutput;
+    const legacy = parsed as Partial<RedTeamResult>;
     return {
-      killProbability: Math.min(1, Math.max(0, parsed.killProbability ?? 0.3)),
-      redFlags: Array.isArray(parsed.redFlags) ? parsed.redFlags.slice(0, 6) : [],
-      summary: parsed.summary ?? "Red team analysis completed.",
+      killProbability: Math.min(1, Math.max(0, legacy.killProbability ?? 0.3)),
+      redFlags: Array.isArray(legacy.redFlags) ? legacy.redFlags.slice(0, 6) : [],
+      summary: legacy.summary ?? "Red team analysis completed.",
     };
-  } catch {
+  } catch (error) {
+    if (evidence) throw error;
     return { killProbability: 0.3, redFlags: ["Analysis unavailable"], summary: "Red team analysis failed." };
   }
 }

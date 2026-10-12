@@ -90,6 +90,7 @@ export interface PoeChatParams {
   userPrompt: string;
   maxTokens?: number;
   temperature?: number;
+  signal?: AbortSignal;
 }
 
 /**
@@ -111,7 +112,7 @@ export async function poeChat(params: PoeChatParams): Promise<string> {
     messages,
     max_tokens: maxTokens,
     temperature,
-  });
+  }, params.signal ? { signal: params.signal, maxRetries: 0 } : undefined);
 
   const content = response.choices[0]?.message?.content;
   if (!content) {
@@ -127,7 +128,7 @@ export async function poeChat(params: PoeChatParams): Promise<string> {
  * Wraps poeChat with JSON extraction — parses the first JSON block in the response.
  */
 export async function poeJSON<T = Record<string, unknown>>(
-  params: PoeChatParams & { schema?: string }
+  params: PoeChatParams & { schema?: string; preserveObject?: boolean }
 ): Promise<T> {
   const schemaHint = params.schema
     ? `\n\nRespond ONLY with valid JSON matching this schema:\n${params.schema}`
@@ -142,6 +143,16 @@ export async function poeJSON<T = Record<string, unknown>>(
   // Extract JSON from markdown code blocks if present.
   // Handles both objects {...} and arrays [...]
   const codeBlockMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  // Evidence reviewers return structured objects containing citations arrays.
+  // Keep legacy array-unwrapping behavior opt-out rather than changing callers.
+  if (params.preserveObject) {
+    if (raw.length > 24000) throw Object.assign(new Error("Poe returned oversized JSON."), { code: "INVALID_JSON" });
+    try {
+      const parsed = JSON.parse(codeBlockMatch ? codeBlockMatch[1].trim() : raw.trim());
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Object required");
+      return parsed as T;
+    } catch { throw Object.assign(new Error("Poe returned invalid JSON."), { code: "INVALID_JSON" }); }
+  }
   let jsonStr: string;
   if (codeBlockMatch) {
     jsonStr = codeBlockMatch[1].trim();

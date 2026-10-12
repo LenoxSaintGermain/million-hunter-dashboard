@@ -39,6 +39,8 @@ import {
   toValidRoutableModelId,
 } from "../../shared/models";
 import { poeJSON } from "../poe";
+import type { DealEvidenceSnapshot, EvidenceRedTeamOutput } from "../../shared/dealEvidence";
+import { evidenceEnginePrompt, EvidenceOutputError, EvidencePanelError, evidenceFailureCategory } from "../dealEvidenceEngine";
 
 // ─── Model Tiers ─────────────────────────────────────────────────────────────
 // Gemini — called directly via Google Generative AI API.
@@ -65,7 +67,7 @@ export interface TrajectoryStep {
 }
 
 export interface ConsensusResult {
-  scores: { model: string; score: number; rationale: string }[];
+  scores: { model: string; score: number; rationale: string; citations?: EvidenceRedTeamOutput["citations"] }[];
   consensusScore: number;
   divergenceScore: number;
   divergenceFlag: boolean;
@@ -226,12 +228,12 @@ export async function getConsensusModelIds(): Promise<[string, string, string]> 
   }
 }
 
-type ConsensusModelOutput = { score?: number; rationale?: string };
+type ConsensusModelOutput = { score?: number; rationale?: string; citations?: EvidenceRedTeamOutput["citations"] };
 
 function validateConsensusOutput(
   modelId: string,
   output: ConsensusModelOutput,
-): { score: number; rationale: string } {
+): { score: number; rationale: string; citations?: EvidenceRedTeamOutput["citations"] } {
   if (
     typeof output.score !== "number"
     || !Number.isFinite(output.score)
@@ -242,50 +244,59 @@ function validateConsensusOutput(
   ) {
     throw new Error(`Consensus model returned an invalid decision record: ${modelId}`);
   }
-  return { score: output.score, rationale: output.rationale.trim() };
+  return { score: output.score, rationale: output.rationale.trim(), ...(output.citations === undefined ? {} : { citations: output.citations }) };
 }
 
 /** Invoke one consensus reviewer through its declared provider route. */
 async function callConsensusModel(
   modelId: string,
   prompt: string,
+  evidenceMode = false,
 ): Promise<ConsensusModelOutput> {
   const definition = getModelById(modelId);
   if (!definition) throw new Error(`Consensus model is not in the validated catalog: ${modelId}`);
 
   if (definition.provider === "poe") {
+    if (evidenceMode && !process.env.Poe_api_key) throw Object.assign(new Error("Provider credentials unavailable"), { code: "CREDENTIALS_UNAVAILABLE" });
     const output = await poeJSON<ConsensusModelOutput>({
       model: modelId,
       userPrompt: prompt,
-      maxTokens: 512,
+      maxTokens: evidenceMode ? 2048 : 512,
+      ...(evidenceMode ? { preserveObject: true } : {}),
       temperature: 0.1,
-      schema: '{"score":"number from 0 to 1","rationale":"2-3 sentence string"}',
+      ...(evidenceMode ? { signal: AbortSignal.timeout(60000) } : {}),
+      schema: evidenceMode ? '{"score":"number from 0 to 1","rationale":"2-3 sentence hypothesis","citations":[{"citationId":"provided ID","quote":"exact provided fact"}]}' : '{"score":"number from 0 to 1","rationale":"2-3 sentence string"}',
     });
-    return validateConsensusOutput(modelId, output);
+    try { return validateConsensusOutput(modelId, output); }
+    catch (error) { if (evidenceMode) throw new EvidenceOutputError("Invalid reviewer output"); throw error; }
   }
 
   if (definition.provider === "google") {
+    if (evidenceMode && !process.env.GEMINI_API_KEY) throw Object.assign(new Error("Provider credentials unavailable"), { code: "CREDENTIALS_UNAVAILABLE" });
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        ...(evidenceMode ? { signal: AbortSignal.timeout(60000) } : {}),
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json" },
+          generationConfig: { responseMimeType: "application/json", ...(evidenceMode ? { maxOutputTokens: 2048 } : {}) },
         }),
       },
     );
-    if (!response.ok) throw new Error(`Gemini consensus call failed (${response.status})`);
+    if (!response.ok) throw Object.assign(new Error(`Gemini consensus call failed (${response.status})`), { status: response.status });
     const payload: any = await response.json();
     const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-    return validateConsensusOutput(modelId, JSON.parse(text) as ConsensusModelOutput);
+    if (evidenceMode && text.length > 16000) throw new EvidenceOutputError("Oversized consensus output");
+    try { return validateConsensusOutput(modelId, JSON.parse(text) as ConsensusModelOutput); }
+    catch (error) { if (evidenceMode) throw new EvidenceOutputError("Invalid reviewer output"); throw error; }
   }
 
   throw new Error(`Provider ${definition.provider} is not supported for consensus scoring`);
 }
 
-export async function runConsensusScoring(deal: Deal): Promise<ConsensusResult> {
+export async function runConsensusScoring(deal: Deal, evidence?: { snapshot: DealEvidenceSnapshot; models: [string, string, string] }): Promise<ConsensusResult> {
   const dealContext = `
 Business: ${deal.name}
 Industry: ${deal.industry ?? "Unknown"}
@@ -297,7 +308,8 @@ Employees: ${deal.employees ?? "N/A"}
 Description: ${deal.description ?? "No description"}
   `.trim();
 
-  const scoringPrompt = (modelLabel: string) => `You are a seasoned M&A analyst (${modelLabel}). Score this business acquisition opportunity.
+  const scoringPrompt = (modelLabel: string) => evidence ? `${evidenceEnginePrompt(evidence.snapshot)}
+You are an IC acquisition reviewer (${modelLabel}). Return ONLY JSON with score: number 0..1, rationale: a bounded hypothesis explaining uncertainty, citations: [{citationId, quote}] using exact facts only. No automatic approval or financial verification.` : `You are a seasoned M&A analyst (${modelLabel}). Score this business acquisition opportunity.
 
 ${dealContext}
 
@@ -308,19 +320,27 @@ Return JSON with:
 Return ONLY valid JSON.`;
 
   // Load configured model IDs (dynamic — reads from DB, falls back to defaults)
-  const [modelId1, modelId2, modelId3] = await getConsensusModelIds();
+  const [modelId1, modelId2, modelId3] = evidence?.models ?? await getConsensusModelIds();
 
   // Run three provider-diverse reviewers in parallel (MiroFish fan-out pattern).
   const [result1, result2, result3] = await Promise.allSettled([
-    callConsensusModel(modelId1, scoringPrompt(modelId1)),
-    callConsensusModel(modelId2, scoringPrompt(modelId2)),
-    callConsensusModel(modelId3, scoringPrompt(modelId3)),
+    callConsensusModel(modelId1, scoringPrompt(modelId1), !!evidence),
+    callConsensusModel(modelId2, scoringPrompt(modelId2), !!evidence),
+    callConsensusModel(modelId3, scoringPrompt(modelId3), !!evidence),
   ]);
 
   const unavailable = [result1, result2, result3]
     .map((result, index) => ({ result, model: [modelId1, modelId2, modelId3][index] }))
     .filter((entry) => entry.result.status === "rejected");
   if (unavailable.length > 0) {
+    if (evidence) {
+      const failures = unavailable.map(entry => {
+        const reason = entry.result.status === "rejected" ? entry.result.reason : null;
+        const status = reason?.status ?? reason?.statusCode;
+        return { model: entry.model, category: evidenceFailureCategory(reason), httpStatus: Number.isInteger(status) && status >= 100 && status <= 599 ? status as number : null };
+      });
+      throw new EvidencePanelError(failures);
+    }
     const names = unavailable.map((entry) => entry.model).join(", ");
     throw new Error(`Consensus panel unavailable; no score was recorded (${names})`);
   }
