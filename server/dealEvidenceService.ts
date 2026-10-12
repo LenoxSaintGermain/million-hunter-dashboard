@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { attachDealEvidenceInput, dealEvidenceId, dealEvidenceScope, dealEvidenceSnapshotSchema, getDealEvidenceRunInput, runDealEvidenceInput, SEC_ANALYSIS_LIMITATION, DEAL_EVIDENCE_PROMPT_VERSION, type DealEvidenceSnapshot } from "../shared/dealEvidence";
+import { attachDealEvidenceInput, dealEvidenceId, dealEvidenceScope, dealEvidenceSnapshotSchema, getDealEvidenceRunInput, runDealEvidenceInput, SEC_ANALYSIS_LIMITATION, DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION, type DealEvidenceSnapshot } from "../shared/dealEvidence";
 import { createDealEvidenceRepository, type DealEvidenceRepository, type DealEvidenceRun } from "./dealEvidenceRepository";
 import { createEvidenceRepository, type EvidenceReceipt } from "./evidenceRepository";
 import { evidencePayloadHash } from "./evidenceService";
@@ -47,7 +47,7 @@ export function createDealEvidenceService(deps: {
   }
   async function snapshot(ownerId: number, deal: Awaited<ReturnType<typeof authorizedDeal>>, attachmentIds: string[]): Promise<DealEvidenceSnapshot> {
     const result: DealEvidenceSnapshot = {
-      schemaVersion: 1, promptVersion: DEAL_EVIDENCE_PROMPT_VERSION, limitation: SEC_ANALYSIS_LIMITATION,
+      schemaVersion: 1, promptVersion: DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION, limitation: SEC_ANALYSIS_LIMITATION,
       deal: { id: deal.id, name: deal.name, description: deal.description?.slice(0, 8000) ?? null, industry: deal.industry,
         location: deal.location, revenue: deal.revenue, cashFlow: deal.cashFlow, askingPrice: deal.askingPrice,
         multiple: deal.multiple, employees: deal.employees, yearEstablished: deal.yearEstablished },

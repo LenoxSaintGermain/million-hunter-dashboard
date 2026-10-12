@@ -5,8 +5,8 @@ vi.mock("@google/genai", () => ({ GoogleGenAI: class { models = { generateConten
 vi.mock("./poe", () => ({ poeJSON: mocks.poeJSON, POE_MODELS: {} }));
 import { runRedTeamAnalysis } from "./gemini";
 import { runConsensusScoring } from "./agents/index";
-import { evidenceEnginePrompt, validateEvidenceOutput, evidenceFailureCategory } from "./dealEvidenceEngine";
-import { DEAL_EVIDENCE_PROMPT_VERSION, SEC_ANALYSIS_LIMITATION, type DealEvidenceSnapshot } from "../shared/dealEvidence";
+import { evidenceEnginePrompt, validateEvidenceOutput, evidenceFailureCategory, evidenceValidationIssues } from "./dealEvidenceEngine";
+import { DEAL_EVIDENCE_PROMPT_VERSION, DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION, SEC_ANALYSIS_LIMITATION, type DealEvidenceSnapshot } from "../shared/dealEvidence";
 import { GEMINI_STRONG, DEFAULT_CONSENSUS_MODELS } from "../shared/models";
 import type { Deal } from "../drizzle/schema";
 
@@ -24,6 +24,71 @@ function fixture() {
 beforeEach(() => { vi.clearAllMocks(); vi.stubEnv("GEMINI_API_KEY", "synthetic-unit-test-key"); vi.stubEnv("Poe_api_key", "synthetic-unit-test-key"); });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe("existing engines with bounded PD06 evidence context", () => {
+  it("reports schema field paths without invalid values, messages or unknown keys", () => {
+    const f = fixture(); f.snapshot.promptVersion = DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION;
+    try {
+      validateEvidenceOutput("red_team", { outputVersion: 2, killProbability: 0.5, redFlags: [], summary: "Hypothesis only", citations: f.citations,
+        insights: [{ id: "I1", kind: "hypothesis", interpretation: "Unknown", rationale: "Unknown", uncertainty: "Unknown", criterion: "financial_verification", action: "secret-provider-value", citations: f.citations, "secret-provider-key": "secret-provider-value" }] }, f.snapshot, [GEMINI_STRONG]);
+      expect.fail("Invalid action must fail");
+    } catch (error) {
+      const issues = evidenceValidationIssues(error);
+      expect(issues).toContainEqual({ path: "insights.0.action", code: "invalid_value" });
+      expect(JSON.stringify(issues)).not.toContain("secret-provider");
+    }
+  });
+  it("classifies truncated Red Team JSON without leaking the response", async () => {
+    const f = fixture(); mocks.generate.mockResolvedValueOnce({ text: '{"secret-value":', candidates: [{ finishReason: "MAX_TOKENS" }] });
+    await expect(runRedTeamAnalysis(f.deal, { snapshot: f.snapshot, model: GEMINI_STRONG })).rejects.toMatchObject({ validationIssues: [{ path: "$", code: "OUTPUT_TRUNCATED" }] });
+  });
+  it("classifies truncated Google IC JSON separately from schema/citation rejection", async () => {
+    const f = fixture(); mocks.poeJSON.mockResolvedValue({ score: 0.5, rationale: "Hypothesis", citations: f.citations });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: '{"secret-value":' }] } }] }), { status: 200 })));
+    try {
+      await runConsensusScoring(f.deal, { snapshot: f.snapshot, models: [...DEFAULT_CONSENSUS_MODELS] });
+      expect.fail("Expected truncated panel failure");
+    } catch (error: any) {
+      expect(error.failures[0].validationIssues).toEqual([{ path: "$", code: "OUTPUT_TRUNCATED" }]);
+      expect(JSON.stringify(error)).not.toContain("secret-value");
+    }
+  });
+  it.each(["red_team", "ic"] as const)("retains validated v2 findings through the actual %s adapter", async mode => {
+    const f = fixture(); f.snapshot.promptVersion = DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION;
+    const insights = [{ id: "I1", kind: "hypothesis", interpretation: "Financial verification remains unresolved.", rationale: "Only submissions metadata is present.", uncertainty: "Financial statements have not been verified.", criterion: "financial_verification", action: "inspect_documents", citations: f.citations }];
+    const models = mode === "red_team" ? [GEMINI_STRONG] : [...DEFAULT_CONSENSUS_MODELS];
+    mocks.generate.mockResolvedValue({ text: JSON.stringify({ outputVersion: 2, insights, killProbability: 0.5, redFlags: [], summary: "Hypothesis only.", citations: f.citations }) });
+    const reviewer = { score: 0.5, rationale: "Unverified hypothesis.", citations: f.citations, insights };
+    mocks.poeJSON.mockResolvedValue(reviewer);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(reviewer) }] } }] }), { status: 200 })));
+    const raw = mode === "red_team" ? await runRedTeamAnalysis(f.deal, { snapshot: f.snapshot, model: GEMINI_STRONG }) : await runConsensusScoring(f.deal, { snapshot: f.snapshot, models: models as [string, string, string] });
+    const output = validateEvidenceOutput(mode, raw, f.snapshot, models);
+    expect(output.outputVersion).toBe(2);
+    for (const record of "scores" in output ? output.scores : [output]) expect(record.insights).toEqual(insights);
+    expect(evidenceEnginePrompt(f.snapshot)).toContain("Finding contract v2");
+    expect(evidenceEnginePrompt(f.snapshot)).toContain("UNTRUSTED DATA");
+    expect(evidenceEnginePrompt(f.snapshot)).toContain("exactly one concise, prioritized insight");
+    if (mode === "red_team") {
+      const config = mocks.generate.mock.calls[0][0].config;
+      expect(config.maxOutputTokens).toBe(8192);
+      expect(config.responseJsonSchema.required).toContain("outputVersion");
+      expect(config.responseJsonSchema.properties.citations.items.required).toEqual(["citationId", "quote"]);
+    }
+    else {
+      for (const call of mocks.poeJSON.mock.calls) {
+        expect(call[0].maxTokens).toBe(8192);
+        const schema = JSON.parse(call[0].schema);
+        expect(schema.properties.insights.type).toBe("array");
+        expect(schema.required).toContain("score");
+        expect(schema.properties.citations.items.additionalProperties).toBe(false);
+      }
+      const googleCall = (globalThis.fetch as any).mock.calls[0];
+      expect(JSON.parse(googleCall[1].body).generationConfig.maxOutputTokens).toBe(8192);
+      expect(JSON.parse(googleCall[1].body).generationConfig.responseJsonSchema.required).toEqual(["score", "rationale", "citations", "insights"]);
+    }
+  });
+  it("rejects uncited v1 output for a fresh v2 prompt instead of synthesizing findings", () => {
+    const f = fixture(); f.snapshot.promptVersion = DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION;
+    expect(() => validateEvidenceOutput("red_team", { killProbability: 0.5, redFlags: ["Legacy flag"], summary: "Legacy", citations: f.citations }, f.snapshot, [GEMINI_STRONG])).toThrow("could not be verified");
+  });
   it("passes exact untrusted snapshot and resolved model to the existing Red Team provider route", async () => {
     const f = fixture(); const output = { killProbability: 0.5, redFlags: [], summary: "Hypothesis only.", citations: f.citations };
     mocks.generate.mockResolvedValueOnce({ text: JSON.stringify(output) });

@@ -5,6 +5,7 @@ import { AlignmentPortrait } from "@/components/AlignmentPortrait";
 import { DealCashBridge } from "@/components/DealCashBridge";
 import { DealDocumentReviewDesk } from "@/components/DealDocumentReviewDesk";
 import DealEvidenceDesk from "@/components/DealEvidenceDesk";
+import { projectDealEvidenceRun, type ProjectedDealEvidenceInsight } from "@shared/dealEvidenceProjection";
 import LOIGeneration from "./LOIGeneration";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -75,6 +76,7 @@ export default function DealDetail() {
   const dealId = Number(params.id);
   const [workPane, setWorkPane] = React.useState("research");
   const [readerFocus, setReaderFocus] = React.useState("report");
+  const [evidenceQuestion, setEvidenceQuestion] = React.useState<{ target: string; action: ProjectedDealEvidenceInsight["action"] } | null>(null);
   const selectWork = (value: string) => {
     setWorkPane(value);
     setReaderFocus("report");
@@ -86,6 +88,28 @@ export default function DealDetail() {
   };
 
   const { data, isLoading, refetch } = trpc.deals.getById.useQuery({ id: dealId });
+  const evidenceRuns = trpc.dealEvidence.runs.useQuery({ dealId }, {
+    enabled: Boolean(data?.deal && !data.deal.isSynthetic),
+    retry: false, refetchOnWindowFocus: false,
+  });
+  // The rail and chapters use the same latest saved attempts, never an older
+  // success substituted for a failed/pending attempt. History is inspection only.
+  const latestEvidenceRisk = evidenceRuns.data?.find(run => run.mode === "red_team");
+  const latestEvidenceIC = evidenceRuns.data?.find(run => run.mode === "ic");
+  const questionRun = evidenceRuns.data?.find(run => run.id === evidenceQuestion?.action.runId);
+  const questionFinding = !evidenceRuns.isError && questionRun
+    ? projectDealEvidenceRun(questionRun, new Date()).insights.find(finding => finding.key === evidenceQuestion?.action.insightKey)
+    : null;
+  const followEvidence = (target: "documents" | "capital" | "research", action?: ProjectedDealEvidenceInsight["action"]) => {
+    setEvidenceQuestion(action ? { target, action } : null);
+    selectWork(target);
+  };
+  const evidenceLoading = !data?.deal?.isSynthetic && evidenceRuns.isLoading;
+  const evidenceStateLabel = (run: typeof latestEvidenceRisk) => evidenceRuns.isError
+    ? "Evidence status unavailable" : evidenceLoading ? "Loading evidence status" : run
+    ? run.status === "complete" ? "Evidence review saved"
+      : run.status === "failed" ? "Latest evidence review failed" : "Evidence review pending"
+    : null;
   const analyzeSignals = trpc.signals.analyze.useMutation({
     onSuccess: () => { toast.success("Third Signal analysis complete"); refetch(); },
     onError: (e) => toast.error(`Analysis failed: ${e.message}`),
@@ -233,15 +257,19 @@ export default function DealDetail() {
         <aside className="deal-senior-rail" aria-label="The Senior">
           <header><span className="hunter-eyebrow">Your margin partner</span><h2>The Senior.</h2><p>Read the evidence.<br />Question the assumptions.</p></header>
           <p className="deal-rail-disclosure">Reading guide · saved outputs, not a new agent verdict. Opening a section does not run an analysis.</p>
-          <div aria-label="Next decision" className="deal-margin-note"><h3>{signal?.redTeamSummary ? "Read the recorded risks." : "The cash needs a second look."}</h3><p>{signal?.redTeamSummary ? "Review the saved analysis and its evidence; it is not approval." : "Risk analysis has not been run; risk is still unknown."}</p></div>
+          <div aria-label="Next decision" className="deal-margin-note">
+            <h3>{evidenceRuns.isError ? "Evidence status needs checking." : evidenceLoading ? "Checking the saved evidence." : latestEvidenceRisk ? evidenceStateLabel(latestEvidenceRisk) : signal?.redTeamSummary ? "Read the recorded risks." : "The cash needs a second look."}</h3>
+            <p>{evidenceRuns.isError ? "The saved evidence review could not be loaded. Historical analysis is not a substitute." : evidenceLoading ? "The latest attempt has not loaded yet. No conclusion is available." : latestEvidenceRisk ? "Open the challenge for its implication and next step. The saved review is not approval." : signal?.redTeamSummary ? "Review the saved analysis and its evidence; it is not approval." : "Risk analysis has not been run; risk is still unknown."}</p>
+            <button className="scan-rescore min-h-11" onClick={() => selectWork("signals")}>Review the challenge →</button>
+          </div>
           {typeof signal?.redTeamSummary === "string" && <div className="deal-margin-note"><span className="hunter-eyebrow">Red Team / historical output</span><p>Its inputs have not been verified against this deal record. Reconcile the figures before relying on the conclusion.</p><button className="scan-rescore" onClick={() => selectWork("signals")}>Inspect the saved challenge ↗</button></div>}
           <TabsList aria-label="Senior reading desk" className="deal-rail-nav">
             {[
               ["research", "Follow the sources", "Listing & research dossier"],
               ["documents", "Deal Document Desk", "Upload & reconcile verified filings"],
-              ["signals", "Challenge the cash", signal ? "Recorded specialist analysis" : "Analysis not yet run"],
+              ["signals", "Challenge the cash", evidenceStateLabel(latestEvidenceRisk) ?? (signal ? "Historical specialist analysis" : "Analysis not yet run")],
               ["capital", "Test the financing", "Assumptions & capital structure"],
-              ["consensus", "Hear the committee", consensusData ? "Saved panel view" : "Panel has not reported"],
+              ["consensus", "Hear the committee", evidenceStateLabel(latestEvidenceIC) ?? (consensusData ? "Historical panel view" : "Panel has not reported")],
               ["memo", "Build the argument", memo ? "Read the investment memo" : "Memo not yet commissioned"],
             ].map(([value, title, note], index) => <TabsTrigger key={value} value={value}><span>{String(index + 1).padStart(2, "0")}</span><div>{title}<small>{note}</small></div><ArrowRight size={16}/></TabsTrigger>)}
             <details className="deal-desk-drawer"><summary>Specialists & next moves</summary>
@@ -285,12 +313,20 @@ export default function DealDetail() {
             </section>
           )}
           <div id="deal-workspace" className="deal-chapter" tabIndex={-1}><span className="hunter-eyebrow">The reading desk / {workPane === "research" ? "Sources" : workPane}</span></div>
+          {evidenceQuestion?.target === workPane && questionFinding && <aside aria-label="Evidence question to resolve" className="my-4 border-l-2 border-[var(--sh-signal)] pl-4">
+            <p className="hunter-eyebrow">Question carried from the evidence review</p>
+            <p className="mt-2 text-sm break-words">{questionFinding.interpretation}</p>
+            <button type="button" className="mt-2 min-h-11 text-sm underline underline-offset-4" onClick={() => selectWork(questionRun?.mode === "ic" ? "consensus" : "signals")}>Return to the finding & its basis →</button>
+          </aside>}
           <TabsContent value="research">
             <section id="deal-research" aria-label="Opportunity research" className="scroll-mt-24">
               <h2 className="deal-chapter-title">What stands behind the numbers?</h2>
               <AcquisitionSourceBrief listingUrl={deal.listingUrl} description={deal.description} isSynthetic={deal.isSynthetic} />
               <dl className="deal-record-facts"><div><dt>Employees · recorded</dt><dd>{(deal as any).employeeCount ?? "Not disclosed"}</dd></div><div><dt>Operating years · recorded</dt><dd>{(deal as any).yearsInOperation ?? "Not disclosed"}</dd></div></dl>
-              {workPane === "research" && <DealEvidenceDesk dealId={dealId} demo={Boolean(deal.isSynthetic)} />}
+              <div className="border-y border-rule py-4">
+                <p className="text-sm">Evidence belongs with the decision it informs. Inspect the exact receipt from a challenge or committee review.</p>
+                <button className="scan-rescore min-h-11" onClick={() => selectWork("signals")}>Review the evidence-backed challenge →</button>
+              </div>
               <DealDossierModule dealId={dealId} />
             </section>
           </TabsContent>
@@ -302,6 +338,10 @@ export default function DealDetail() {
 
         {/* Third Signal Tab */}
         <TabsContent value="signals" className="mt-4 space-y-4">
+          {workPane === "signals" && <DealEvidenceDesk dealId={dealId} demo={Boolean(deal.isSynthetic)} mode="red_team" onNavigate={followEvidence} />}
+          <details className="border-t border-rule">
+            <summary className="min-h-11 cursor-pointer py-3 text-sm">Historical specialist analysis · separate inputs</summary>
+            <p className="text-xs text-muted-foreground mb-4">These older outputs are not the evidence-backed review above. Running this legacy analysis does not consume the selected SEC receipts.</p>
           {!signal ? (
             <Card className="bg-card border-border">
               <CardContent className="flex flex-col items-center justify-center py-16 text-center">
@@ -465,6 +505,7 @@ export default function DealDetail() {
             </div>
             </div>
           )}
+          </details>
         </TabsContent>
 
         {/* Investment Memo Tab */}
@@ -574,6 +615,10 @@ export default function DealDetail() {
 
         {/* Consensus Score Tab (MiroFish) */}
         <TabsContent value="consensus" className="mt-4">
+          {workPane === "consensus" && <DealEvidenceDesk dealId={dealId} demo={Boolean(deal.isSynthetic)} mode="ic" onNavigate={followEvidence} />}
+          <details className="border-t border-rule mt-4">
+            <summary className="min-h-11 cursor-pointer py-3 text-sm">Historical committee · separate inputs</summary>
+            <p className="text-xs text-muted-foreground mb-4">This panel is retained for history. It does not use the selected SEC receipt versions and is not the current evidence-backed review.</p>
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
@@ -582,7 +627,7 @@ export default function DealDetail() {
                   IC Agent Consensus
                 </CardTitle>
                 <CardDescription className="text-xs mt-1">
-                  Three independent agents score in parallel. High divergence = genuine uncertainty = do not advance.
+                  Saved model opinions on earlier inputs. Agreement is not verification; disagreement needs human review.
                 </CardDescription>
               </div>
               <Button
@@ -631,7 +676,7 @@ export default function DealDetail() {
                   {!consensusData.divergenceFlag && (
                     <div className="flex items-center gap-3 p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
                       <CheckCircle2 className="w-4 h-4 text-[var(--sage)] shrink-0" />
-                      <p className="text-xs text-[var(--sage)] font-medium">All three agents in agreement — consensus score is reliable</p>
+                      <p className="text-xs text-[var(--sage)] font-medium">No disagreement flag in this saved panel — not a reliability or approval claim</p>
                     </div>
                   )}
 
@@ -718,6 +763,7 @@ export default function DealDetail() {
               )}
             </CardContent>
           </Card>
+          </details>
         </TabsContent>
 
         {/* Seller Simulation Tab (MiroFish) */}

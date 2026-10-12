@@ -1,4 +1,5 @@
 import React from "react";
+import { useEvidenceExpiry } from "./DealEvidenceExpiry";
 import type { EvidenceReceipt } from "../../../server/evidenceRepository";
 
 const muted = "text-xs text-[var(--sh-text-secondary)]";
@@ -12,12 +13,16 @@ function dateLabel(value: Date | string | null) {
 export function DealEvidenceReceiptSummary({
   receipt,
   attached = false,
-  now = Date.now(),
+  now: fixedNow,
 }: {
   receipt: EvidenceReceipt;
   attached?: boolean;
   now?: number;
 }) {
+  const clockNow = useEvidenceExpiry(
+    fixedNow === undefined ? [receipt.expiresAt] : []
+  );
+  const now = fixedNow ?? clockNow;
   const observed = receipt.status === "ok" || receipt.status === "empty";
   const filings = observed ? receipt.payload.filings : [];
   const forms = new Set(filings.map(filing => filing.form));

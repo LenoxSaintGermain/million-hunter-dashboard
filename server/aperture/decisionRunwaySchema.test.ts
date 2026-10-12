@@ -35,11 +35,13 @@ describe("Decision Runway authoritative schema", () => {
     expect(orderFlow).toContain("lockCurrentDecisionRevision");
     expect(orderFlow).toContain("decisionAuthorization?.maxPlannedLossCents");
     expect(orderFlow).toContain("resolveEffectiveRiskCeilingPct");
-    expect(router).toContain('eq(brokerOrders.status, "submitted")');
-    expect(router).toContain("isNull(brokerOrders.brokerOrderId)");
+    const revisionWriter = readFileSync("server/aperture/decisionRevisionWriter.ts", "utf8");
+    expect(router).toContain("appendDecisionRevision(db!");
+    expect(revisionWriter).toContain('eq(brokerOrders.status, "submitted")');
+    expect(revisionWriter).toContain("isNull(brokerOrders.brokerOrderId)");
     expect(orderFlow).toContain("getOrderByClientOrderId(order.clientOrderId)");
     expect(orderFlow).toContain("reconcile any unresolved dispatch; do not resubmit it");
-    expect(router).toContain("A paper order dispatch is still resolving for this Decision Run");
+    expect(revisionWriter).toContain("A paper order dispatch is still resolving for this Decision Run");
     expect(router).toContain("Arbitrary run attachment is retired");
     expect(router).toContain("Decision history is immutable");
   });

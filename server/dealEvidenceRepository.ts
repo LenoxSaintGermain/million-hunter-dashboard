@@ -155,7 +155,12 @@ export function createDealEvidenceRepository(getDbFn: typeof getDb = getDb) {
     },
     async listRuns(ownerId: number, dealId: number) {
       scope(ownerId, dealId); const db = await database();
-      const rows = await db.select().from(requests).where(and(eq(requests.ownerId, ownerId), eq(requests.dealId, dealId))).orderBy(desc(requests.startedAt), desc(requests.id)).limit(20);
+      // Bound history per mode, not globally: a busy Red Team history must not
+      // hide the latest IC attempt (including pending/failed), or vice versa.
+      const histories = await Promise.all((["red_team", "ic"] as const).map(mode =>
+        db.select().from(requests).where(and(eq(requests.ownerId, ownerId), eq(requests.dealId, dealId), eq(requests.mode, mode)))
+          .orderBy(desc(requests.startedAt), desc(requests.id)).limit(20)));
+      const rows = histories.flat().sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime() || b.id.localeCompare(a.id));
       return Promise.all(rows.map(row => hydrate(normalizeRequest(row))));
     },
   };

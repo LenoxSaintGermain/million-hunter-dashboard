@@ -11,7 +11,8 @@ import { createDealEvidenceRepository } from "../server/dealEvidenceRepository";
 import { createDealEvidenceService } from "../server/dealEvidenceService";
 import { createEvidenceRepository } from "../server/evidenceRepository";
 import { evidencePayloadHash } from "../server/evidenceService";
-import { DEAL_EVIDENCE_PROMPT_VERSION } from "../shared/dealEvidence";
+import { DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION, type EvidenceAnalysisOutput, type EvidenceFinding } from "../shared/dealEvidence";
+import { projectDealEvidenceRun } from "../shared/dealEvidenceProjection";
 import type { SecSubmissionsResult } from "../shared/secEvidence";
 import { inspectPd06Schema, readMetadata } from "./pd06-evidence-schema.mjs";
 
@@ -26,11 +27,16 @@ const quoteId = (snapshot: { citations: { id: string; fact: string }[] }) => [{ 
 let engineCalls = 0;
 const service = createDealEvidenceService({ repository: repo, evidence,
   resolveModels: async mode => mode === "ic" ? ["synthetic-a", "synthetic-b", "synthetic-c"] : ["synthetic-a"],
-  engine: async (mode, snapshot, models) => {
+  engine: async (mode, snapshot, models): Promise<EvidenceAnalysisOutput> => {
     engineCalls++;
     const citations = quoteId(snapshot);
-    return mode === "red_team" ? { killProbability: 0.5, redFlags: [], summary: "Synthetic storage fixture, not a decision.", citations }
-      : { scores: models.map(model => ({ model, score: 0.5, rationale: "Synthetic storage fixture.", citations })),
+    const insights: EvidenceFinding[] = [{ id: "I1", kind: "hypothesis",
+      interpretation: "Synthetic fixture: financial diligence remains unresolved.",
+      rationale: "The cited submissions metadata does not verify financial condition.",
+      uncertainty: "Controlled storage fixture; no documents were reviewed and no live model ran.",
+      criterion: "financial_verification", action: "inspect_documents", citations }];
+    return mode === "red_team" ? { outputVersion: 2, insights, killProbability: 0.5, redFlags: [], summary: "Synthetic storage fixture, not a decision.", citations }
+      : { outputVersion: 2, scores: models.map(model => ({ model, score: 0.5, rationale: "Synthetic storage fixture.", citations, insights })),
         consensusScore: 0.5, divergenceScore: 0, divergenceFlag: false, summary: "Synthetic IC fixture." };
   },
 });
@@ -75,8 +81,15 @@ try {
   const input = { dealId, requestId: randomUUID(), attachmentIds: [attachment.id] };
   const first = await service.runRedTeam(owner, input);
   assert.equal(first.status, "complete");
-  assert.equal(first.inputSnapshot.promptVersion, DEAL_EVIDENCE_PROMPT_VERSION);
+  assert.equal(first.inputSnapshot.promptVersion, DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION);
+  assert.equal(first.output?.outputVersion, 2);
   assert.deepEqual(await other.getRun(owner, dealId, first.id), first);
+  const firstProjection = projectDealEvidenceRun((await other.getRun(owner, dealId, first.id))!, new Date());
+  assert.equal(firstProjection.state, "ready");
+  assert.equal(firstProjection.insights.length, 1);
+  assert.equal(firstProjection.insights[0].action.type, "inspect_documents");
+  assert.equal(firstProjection.insights[0].citations[0].receiptId, receipt.id);
+  assert.equal(firstProjection.insights[0].citations[0].quote, first.inputSnapshot.citations[0].fact);
   assert.equal((await service.runRedTeam(owner, input)).id, first.id);
   assert.equal(engineCalls, 1);
   assert.equal(await other.getRun(foreign, dealId, first.id), null);
@@ -97,6 +110,12 @@ try {
   const ic = await service.runIC(owner, { ...input, requestId: randomUUID() });
   assert.equal(ic.status, "complete"); assert.equal(ic.models.length, 3);
   assert.deepEqual(await other.getRun(owner, dealId, ic.id), ic);
+  assert.equal(ic.inputSnapshot.promptVersion, DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION);
+  const icProjection = projectDealEvidenceRun((await other.getRun(owner, dealId, ic.id))!, new Date());
+  assert.equal(icProjection.state, "ready");
+  assert.deepEqual(icProjection.insights.map(insight => insight.model), ic.models);
+  assert.equal(icProjection.insights.length, 3);
+  assert.ok(icProjection.insights.every(insight => insight.citations[0].quote === ic.inputSnapshot.citations[0].fact));
   const failingService = createDealEvidenceService({ repository: repo, evidence, resolveModels: async () => ["synthetic-a"],
     engine: async () => { throw new Error("Synthetic offline provider"); } });
   const failure = await failingService.runRedTeam(owner, { ...input, requestId: randomUUID() });
@@ -112,6 +131,6 @@ try {
   const current = new Map((after as { id: string }[]).map(row => [row.id, JSON.stringify(row)]));
   for (const [id, value] of preserved) assert.equal(current.get(id), value, "Pre-existing SEC receipt changed");
   console.log(JSON.stringify({ ok: true, owner, dealId, synthetic: true, engineCalls,
-    checks: "SQL deal/receipt/attachment/run isolation, concurrent claims, replay/conflict, RT+IC JSON readback, prompt version, persisted failures, immutable completion/history, prior SEC receipts unchanged",
+    checks: "SQL deal/receipt/attachment/run isolation, concurrent claims, replay/conflict, RT+IC v2 finding JSON readback and projection, prompt version, persisted failures, immutable completion/history, prior SEC receipts unchanged",
     cleanup: "None; synthetic fixtures retained. No provider calls or budget resets." }));
 } finally { await pool.end(); }

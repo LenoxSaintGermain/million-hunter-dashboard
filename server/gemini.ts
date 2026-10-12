@@ -21,8 +21,8 @@ import { modelAcquisitionFinancing } from "../shared/acquisitionFinancing";
 import { poeJSON, POE_MODELS } from "./poe";
 import { GEMINI_STRONG, GEMINI_FAST, GEMINI_BALANCED, GEMINI_LITE } from "../shared/models";
 import type { Deal } from "../drizzle/schema";
-import type { DealEvidenceSnapshot, EvidenceRedTeamOutput } from "../shared/dealEvidence";
-import { evidenceEnginePrompt, EvidenceOutputError, validateEvidenceOutput } from "./dealEvidenceEngine";
+import { DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION, type DealEvidenceSnapshot, type EvidenceRedTeamOutput } from "../shared/dealEvidence";
+import { evidenceEnginePrompt, evidenceProviderJsonSchema, EvidenceOutputError, validateEvidenceOutput } from "./dealEvidenceEngine";
 
 // Delay credential use until a provider is actually invoked (including isolated tests).
 const genai = { get models() { return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! }).models; } };
@@ -215,17 +215,18 @@ Return ONLY valid JSON.`;
   try {
     if (evidence && evidence.model !== GEMINI_PRO) throw new Error("Unapproved Red Team evidence model");
     const boundedPrompt = evidence ? `${evidenceEnginePrompt(evidence.snapshot)}
-Act as the existing acquisition Red Team: evaluate customer concentration, key-person dependency, disruption, regulatory exposure, market saturation, operational complexity and deal structure as hypotheses. Return ONLY JSON: {killProbability: number 0..1, redFlags: string[] (max 6), summary: string, citations: [{citationId, quote}]}. Do not substitute default scores on missing evidence.` : prompt;
+Act as the existing acquisition Red Team: evaluate customer concentration, key-person dependency, disruption, regulatory exposure, market saturation, operational complexity and deal structure as hypotheses. Return ONLY JSON: {killProbability: number 0..1, redFlags: string[] (max 6), summary: string, citations: [{citationId, quote}]}, plus outputVersion and insights when the versioned finding contract above requires them. Do not substitute default scores on missing evidence.` : prompt;
     const response = await genai.models.generateContent({
       model: GEMINI_PRO,
       contents: [{ role: "user", parts: [{ text: boundedPrompt }] }],
-      config: { responseMimeType: "application/json", ...(evidence ? { abortSignal: AbortSignal.timeout(60000), maxOutputTokens: 4096 } : {}) },
+      config: { responseMimeType: "application/json", ...(evidence ? { abortSignal: AbortSignal.timeout(60000), maxOutputTokens: evidence.snapshot.promptVersion === DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION ? 8192 : 4096,
+        ...(evidence.snapshot.promptVersion === DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION ? { responseJsonSchema: evidenceProviderJsonSchema("red_team") } : {}) } : {}) },
     });
     const text = response.text ?? "{}";
     if (evidence && text.length > 24000) throw new EvidenceOutputError("Oversized evidence output");
     let parsed: unknown;
     try { parsed = looseJsonParse(text); }
-    catch (error) { if (evidence) throw new EvidenceOutputError("Invalid evidence output JSON"); throw error; }
+    catch (error) { if (evidence) throw new EvidenceOutputError("Invalid evidence output JSON", [{ path: "$", code: response.candidates?.[0]?.finishReason === "MAX_TOKENS" ? "OUTPUT_TRUNCATED" : "INVALID_JSON" }]); throw error; }
     if (evidence) return validateEvidenceOutput("red_team", parsed, evidence.snapshot, [evidence.model]) as EvidenceRedTeamOutput;
     const legacy = parsed as Partial<RedTeamResult>;
     return {

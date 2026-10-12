@@ -39,8 +39,8 @@ import {
   toValidRoutableModelId,
 } from "../../shared/models";
 import { poeJSON } from "../poe";
-import type { DealEvidenceSnapshot, EvidenceRedTeamOutput } from "../../shared/dealEvidence";
-import { evidenceEnginePrompt, EvidenceOutputError, EvidencePanelError, evidenceFailureCategory } from "../dealEvidenceEngine";
+import { DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION, type DealEvidenceSnapshot, type EvidenceRedTeamOutput } from "../../shared/dealEvidence";
+import { evidenceEnginePrompt, evidenceProviderJsonSchema, EvidenceOutputError, EvidencePanelError, evidenceFailureCategory, evidenceValidationIssues } from "../dealEvidenceEngine";
 
 // ─── Model Tiers ─────────────────────────────────────────────────────────────
 // Gemini — called directly via Google Generative AI API.
@@ -67,7 +67,8 @@ export interface TrajectoryStep {
 }
 
 export interface ConsensusResult {
-  scores: { model: string; score: number; rationale: string; citations?: EvidenceRedTeamOutput["citations"] }[];
+  outputVersion?: 2;
+  scores: { model: string; score: number; rationale: string; citations?: EvidenceRedTeamOutput["citations"]; insights?: EvidenceRedTeamOutput["insights"] }[];
   consensusScore: number;
   divergenceScore: number;
   divergenceFlag: boolean;
@@ -228,12 +229,12 @@ export async function getConsensusModelIds(): Promise<[string, string, string]> 
   }
 }
 
-type ConsensusModelOutput = { score?: number; rationale?: string; citations?: EvidenceRedTeamOutput["citations"] };
+type ConsensusModelOutput = { score?: number; rationale?: string; citations?: EvidenceRedTeamOutput["citations"]; insights?: EvidenceRedTeamOutput["insights"] };
 
 function validateConsensusOutput(
   modelId: string,
   output: ConsensusModelOutput,
-): { score: number; rationale: string; citations?: EvidenceRedTeamOutput["citations"] } {
+): { score: number; rationale: string; citations?: EvidenceRedTeamOutput["citations"]; insights?: EvidenceRedTeamOutput["insights"] } {
   if (
     typeof output.score !== "number"
     || !Number.isFinite(output.score)
@@ -244,7 +245,7 @@ function validateConsensusOutput(
   ) {
     throw new Error(`Consensus model returned an invalid decision record: ${modelId}`);
   }
-  return { score: output.score, rationale: output.rationale.trim(), ...(output.citations === undefined ? {} : { citations: output.citations }) };
+  return { score: output.score, rationale: output.rationale.trim(), ...(output.citations === undefined ? {} : { citations: output.citations }), ...(output.insights === undefined ? {} : { insights: output.insights }) };
 }
 
 /** Invoke one consensus reviewer through its declared provider route. */
@@ -252,6 +253,7 @@ async function callConsensusModel(
   modelId: string,
   prompt: string,
   evidenceMode = false,
+  findingMode = false,
 ): Promise<ConsensusModelOutput> {
   const definition = getModelById(modelId);
   if (!definition) throw new Error(`Consensus model is not in the validated catalog: ${modelId}`);
@@ -261,11 +263,13 @@ async function callConsensusModel(
     const output = await poeJSON<ConsensusModelOutput>({
       model: modelId,
       userPrompt: prompt,
-      maxTokens: evidenceMode ? 2048 : 512,
+      maxTokens: findingMode ? 8192 : evidenceMode ? 2048 : 512,
       ...(evidenceMode ? { preserveObject: true } : {}),
       temperature: 0.1,
       ...(evidenceMode ? { signal: AbortSignal.timeout(60000) } : {}),
-      schema: evidenceMode ? '{"score":"number from 0 to 1","rationale":"2-3 sentence hypothesis","citations":[{"citationId":"provided ID","quote":"exact provided fact"}]}' : '{"score":"number from 0 to 1","rationale":"2-3 sentence string"}',
+      schema: findingMode ? JSON.stringify(evidenceProviderJsonSchema("ic")) : evidenceMode ? JSON.stringify({ score: "number from 0 to 1", rationale: "short hypothesis",
+        citations: [{ citationId: "provided ID", quote: "exact full provided fact" }] })
+        : '{"score":"number from 0 to 1","rationale":"2-3 sentence string"}',
     });
     try { return validateConsensusOutput(modelId, output); }
     catch (error) { if (evidenceMode) throw new EvidenceOutputError("Invalid reviewer output"); throw error; }
@@ -281,7 +285,8 @@ async function callConsensusModel(
         ...(evidenceMode ? { signal: AbortSignal.timeout(60000) } : {}),
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json", ...(evidenceMode ? { maxOutputTokens: 2048 } : {}) },
+          generationConfig: { responseMimeType: "application/json", ...(evidenceMode ? { maxOutputTokens: findingMode ? 8192 : 2048 } : {}),
+            ...(findingMode ? { responseJsonSchema: evidenceProviderJsonSchema("ic") } : {}) },
         }),
       },
     );
@@ -289,8 +294,11 @@ async function callConsensusModel(
     const payload: any = await response.json();
     const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
     if (evidenceMode && text.length > 16000) throw new EvidenceOutputError("Oversized consensus output");
-    try { return validateConsensusOutput(modelId, JSON.parse(text) as ConsensusModelOutput); }
-    catch (error) { if (evidenceMode) throw new EvidenceOutputError("Invalid reviewer output"); throw error; }
+    let parsed: ConsensusModelOutput;
+    try { parsed = JSON.parse(text) as ConsensusModelOutput; }
+    catch (error) { if (evidenceMode) throw new EvidenceOutputError("Invalid reviewer output", [{ path: "$", code: payload?.candidates?.[0]?.finishReason === "MAX_TOKENS" ? "OUTPUT_TRUNCATED" : "INVALID_JSON" }]); throw error; }
+    try { return validateConsensusOutput(modelId, parsed); }
+    catch (error) { if (evidenceMode) throw new EvidenceOutputError("Invalid reviewer output", [{ path: "score|rationale", code: "INVALID_REVIEWER_FIELDS" }]); throw error; }
   }
 
   throw new Error(`Provider ${definition.provider} is not supported for consensus scoring`);
@@ -309,7 +317,7 @@ Description: ${deal.description ?? "No description"}
   `.trim();
 
   const scoringPrompt = (modelLabel: string) => evidence ? `${evidenceEnginePrompt(evidence.snapshot)}
-You are an IC acquisition reviewer (${modelLabel}). Return ONLY JSON with score: number 0..1, rationale: a bounded hypothesis explaining uncertainty, citations: [{citationId, quote}] using exact facts only. No automatic approval or financial verification.` : `You are a seasoned M&A analyst (${modelLabel}). Score this business acquisition opportunity.
+You are an IC acquisition reviewer (${modelLabel}). Return ONLY JSON with score: number 0..1, rationale: a bounded hypothesis explaining uncertainty, citations: [{citationId, quote}] using exact facts only, plus insights when the versioned finding contract above requires them. No automatic approval or financial verification.` : `You are a seasoned M&A analyst (${modelLabel}). Score this business acquisition opportunity.
 
 ${dealContext}
 
@@ -324,9 +332,9 @@ Return ONLY valid JSON.`;
 
   // Run three provider-diverse reviewers in parallel (MiroFish fan-out pattern).
   const [result1, result2, result3] = await Promise.allSettled([
-    callConsensusModel(modelId1, scoringPrompt(modelId1), !!evidence),
-    callConsensusModel(modelId2, scoringPrompt(modelId2), !!evidence),
-    callConsensusModel(modelId3, scoringPrompt(modelId3), !!evidence),
+    callConsensusModel(modelId1, scoringPrompt(modelId1), !!evidence, evidence?.snapshot.promptVersion === DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION),
+    callConsensusModel(modelId2, scoringPrompt(modelId2), !!evidence, evidence?.snapshot.promptVersion === DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION),
+    callConsensusModel(modelId3, scoringPrompt(modelId3), !!evidence, evidence?.snapshot.promptVersion === DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION),
   ]);
 
   const unavailable = [result1, result2, result3]
@@ -337,7 +345,8 @@ Return ONLY valid JSON.`;
       const failures = unavailable.map(entry => {
         const reason = entry.result.status === "rejected" ? entry.result.reason : null;
         const status = reason?.status ?? reason?.statusCode;
-        return { model: entry.model, category: evidenceFailureCategory(reason), httpStatus: Number.isInteger(status) && status >= 100 && status <= 599 ? status as number : null };
+        return { model: entry.model, category: evidenceFailureCategory(reason), httpStatus: Number.isInteger(status) && status >= 100 && status <= 599 ? status as number : null,
+          ...(reason instanceof EvidenceOutputError ? { validationIssues: evidenceValidationIssues(reason) } : {}) };
       });
       throw new EvidencePanelError(failures);
     }
@@ -368,7 +377,8 @@ Return ONLY valid JSON.`;
     ? `⚠️ Models disagree (divergence: ${divergenceScore.toFixed(3)}). Consensus score: ${consensusScore.toFixed(3)}. Manual review recommended.`
     : `Models agree. Consensus score: ${consensusScore.toFixed(3)} (divergence: ${divergenceScore.toFixed(3)}).`;
 
-  return { scores, consensusScore, divergenceScore, divergenceFlag, summary };
+  return { scores, consensusScore, divergenceScore, divergenceFlag, summary,
+    ...(evidence?.snapshot.promptVersion === DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION ? { outputVersion: 2 as const } : {}) };
 }
 
 // ─── Seller Simulation (MiroFish persona pattern) ────────────────────────────

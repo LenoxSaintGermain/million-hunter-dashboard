@@ -10,6 +10,7 @@ import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, CircleAlert, Clipbo
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { CapitalBrief } from "@/components/aperture/CapitalBrief";
+import { CapitalEvidenceInsight } from "@/components/aperture/CapitalEvidenceInsight";
 import { ResearchLedger } from "@/components/aperture/ResearchLedger";
 import { DecisionFocusCard } from "@/components/aperture/DecisionFocusCard";
 import { PlayRecipeCard } from "@/components/aperture/PlayRecipeCard";
@@ -565,6 +566,7 @@ export default function CandidateBoard() {
           <ResearchLedger macroFacts={macroFacts} onRefresh={() => refreshMacro.mutate()} refreshing={refreshMacro.isPending} />
         ) : (
           <section className="space-y-4">
+            <CapitalEvidenceInsight scope={data.decisionAuthority && focusCandidate ? { decisionRunId: data.decisionAuthority.decisionRunId, revisionId: data.decisionAuthority.revisionId, candidateId: focusCandidate.id } : null} />
             <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--sh-border-1)", background: "var(--sh-surface)" }}>
               <div><p className="text-sm font-medium" style={{ color: "var(--sh-text-primary)" }}>Review the few questions that could change this decision</p><p className="mt-1 text-xs" style={{ color: "var(--sh-fg-muted)" }}>{focusCandidate ? (paperStageDeclined ? "Evidence declined for this revision. No ticket can be created." : unreviewedChecks.length ? `${unreviewedChecks.length} unanswered question${unreviewedChecks.length === 1 ? "" : "s"} for ${focusCandidate.symbol}.` : `All required evidence answers are recorded for ${focusCandidate.symbol}. Market and risk checks still apply in the ticket.`) : "Select a candidate to see its required checks."}</p></div>
               <div className="flex flex-wrap gap-2">

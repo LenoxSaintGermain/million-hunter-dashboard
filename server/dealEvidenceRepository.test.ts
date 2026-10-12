@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import { getTableColumns } from "drizzle-orm";
 import { dealEvidenceAttachments as attachments, dealEvidenceAnalysisRequests as requests, dealEvidenceAnalysisResults as results } from "../drizzle/dealEvidenceSchema";
 import { createDealEvidenceRepository, type DealEvidenceRequest } from "./dealEvidenceRepository";
-import { DEAL_EVIDENCE_PROMPT_VERSION, SEC_ANALYSIS_LIMITATION, type DealEvidenceSnapshot } from "../shared/dealEvidence";
+import { DEAL_EVIDENCE_PROMPT_VERSION, DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION, SEC_ANALYSIS_LIMITATION, type DealEvidenceSnapshot } from "../shared/dealEvidence";
 import { GEMINI_STRONG } from "../shared/models";
 
 function harness() {
@@ -40,6 +40,58 @@ function fixture() {
 const duplicate = () => Object.assign(new Error("duplicate"), { code: "ER_DUP_ENTRY", errno: 1062 });
 
 describe("PD06 real SQL generation with isolated fake driver", () => {
+  it.each(["red_team", "ic"] as const)("retains the other mode after more than 20 %s runs, including failed/pending latest", async crowdedMode => {
+    const f = fixture();
+    const quietMode = crowdedMode === "red_team" ? "ic" : "red_team";
+    const quiet = { ...f.request, mode: quietMode, startedAt: new Date("2026-10-01T00:00:00Z") };
+    const crowded = Array.from({ length: 25 }, (_, index) => ({ ...f.request, id: randomUUID(), mode: crowdedMode, startedAt: new Date(Date.UTC(2026, 9, 2, 0, index)) }));
+    const foreign = { ...quiet, id: randomUUID(), ownerId: 99, startedAt: new Date("2026-11-01T00:00:00Z") };
+    const otherDeal = { ...foreign, id: randomUUID(), ownerId: 7, dealId: 99 };
+    const records = [quiet, ...crowded, foreign, otherDeal];
+    for (const status of ["pending", "failed"] as const) {
+      const query = vi.fn(async (options: { sql: string }, params: unknown[]) => {
+        if (options.sql.includes("from `deal_evidence_analysis_requests`")) {
+          const [ownerId, dealId] = params;
+          const mode = params.find(value => value === "ic" || value === "red_team");
+          const selected = records.filter(record => record.ownerId === ownerId && record.dealId === dealId && (!mode || record.mode === mode))
+            .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime() || b.id.localeCompare(a.id)).slice(0, Number(params.at(-1)));
+          return [selected.map(record => row(requests, record)), []];
+        }
+        if (status === "failed" && params[2] === quiet.id) return [[row(results, { ...f.result, id: quiet.id, status: "failed", output: null, failureCode: "PROVIDER_UNAVAILABLE", message: "Synthetic failure." })], []];
+        return [[], []];
+      });
+      const repo = createDealEvidenceRepository(async () => drizzle({ query } as any));
+      const listed = await repo.listRuns(7, 8);
+      expect(listed).toHaveLength(21);
+      expect(listed.find(run => run.id === quiet.id)?.status).toBe(status);
+      expect(listed.filter(run => run.mode === crowdedMode)).toHaveLength(20);
+      expect(listed.map(run => run.id)).toEqual([...crowded].reverse().slice(0, 20).map(run => run.id).concat(quiet.id));
+      expect(listed.every(run => run.ownerId === 7 && run.dealId === 8)).toBe(true);
+    }
+  });
+  it.each([false, true])("validates durable v2 finding-level JSON, corrupt=%s", async corrupt => {
+    const h = harness(); const f = fixture(); f.snapshot.promptVersion = DEAL_EVIDENCE_FINDINGS_PROMPT_VERSION;
+    const output = { ...f.result.output, outputVersion: 2, insights: [{ id: "I1", kind: "hypothesis", interpretation: "Financial verification unresolved.", rationale: "Metadata only.", uncertainty: "Documents not verified.", criterion: "financial_verification", action: "inspect_documents", citations: [{ citationId: "E1", quote: corrupt ? "Invented fact" : f.snapshot.citations[0].fact }] }] };
+    h.responses.push([row(requests, { ...f.request, inputSnapshot: JSON.stringify(f.snapshot) })], [row(results, { ...f.result, output: JSON.stringify(output) })]);
+    const pending = h.repo.getRun(7, 8, f.request.id);
+    if (corrupt) await expect(pending).rejects.toThrow();
+    else expect((await pending)?.output).toEqual(output);
+  });
+  it("merges both bounded histories with deterministic ID ordering for tied timestamps", async () => {
+    const h = harness(); const f = fixture();
+    const records = Array.from({ length: 40 }, (_, index) => ({ ...f.request,
+      id: `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      mode: index < 20 ? "red_team" as const : "ic" as const }));
+    h.responses.push(records.slice(0, 20).reverse().map(record => row(requests, record)), records.slice(20).reverse().map(record => row(requests, record)));
+    const listed = await h.repo.listRuns(7, 8);
+    expect(listed).toHaveLength(40);
+    expect(listed.map(run => run.id)).toEqual(records.map(record => record.id).reverse());
+    expect(new Set(listed.map(run => run.id)).size).toBe(40);
+  });
+  it("does not return a partial history when one mode query fails", async () => {
+    const h = harness(); h.responses.push([], new Error("isolated query failure"));
+    await expect(h.repo.listRuns(7, 8)).rejects.toThrow();
+  });
   it("fails closed with no DB", async () => {
     const repo = createDealEvidenceRepository(async () => null);
     for (const pending of [repo.getDeal(7, 8), repo.listAttachments(7, 8), repo.listRuns(7, 8), repo.findRequest(7, randomUUID()), repo.getRun(7, 8, randomUUID())]) await expect(pending).rejects.toMatchObject({ code: "DATABASE_UNAVAILABLE" });
@@ -50,8 +102,14 @@ describe("PD06 real SQL generation with isolated fake driver", () => {
     expect(h.calls[0].sql).toContain("owner_user_id"); expect(h.calls[0].sql).toContain("isArchived");
     await h.repo.listAttachments(7, 8); expect(h.calls[1].params).toEqual([7, 8, 100]);
     expect(h.calls[1].sql).toMatch(/order by .*created_at.*desc.*id.*desc/);
-    await h.repo.listRuns(7, 8); expect(h.calls[2].params).toEqual([7, 8, 20]);
-    const id = randomUUID(); await h.repo.getRun(7, 8, id); expect(h.calls[3].params).toEqual([7, 8, id, 1]);
+    await h.repo.listRuns(7, 8);
+    expect(h.calls[2].params).toEqual([7, 8, "red_team", 20]);
+    expect(h.calls[3].params).toEqual([7, 8, "ic", 20]);
+    for (const call of h.calls.slice(2, 4)) {
+      expect(call.sql).toMatch(/order by .*started_at.*desc.*id.*desc/);
+      expect(call.sql).not.toContain("status");
+    }
+    const id = randomUUID(); await h.repo.getRun(7, 8, id); expect(h.calls[4].params).toEqual([7, 8, id, 1]);
   });
   it("decodes MariaDB JSON and verifies citations on saved readback", async () => {
     const h = harness(); const f = fixture();

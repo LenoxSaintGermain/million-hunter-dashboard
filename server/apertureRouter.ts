@@ -30,6 +30,7 @@ import { playOutcomeRouter } from "./aperture/playOutcomeReview";
 import { strategyDiscoveryRouter } from "./aperture/strategyDiscoveryRouter";
 import { uatRouter } from "./aperture/practiceBooks/uatRouter";
 import { weeklyIncomeRouter } from "./aperture/weeklyIncomeRouter";
+import { capitalEvidenceRouter } from "./aperture/capitalEvidenceRouter";
 import { practiceBookRouter, practiceBookSummary, presentAccountRow } from "./aperture/practiceBooks/bookRouter";
 import { usesPracticeBooks } from "./aperture/practiceBooks/flags";
 import { createPracticeBook } from "./aperture/practiceBooks/repository";
@@ -136,6 +137,7 @@ import {
   rankMissionLibrary,
 } from "./aperture/decisionRunway";
 import { immutableReceiptBindingIssue, hasThesisDecisionBinding, revisionJsonForInsert } from "./aperture/decisionReceiptBinding";
+import { appendDecisionRevision } from "./aperture/decisionRevisionWriter";
 import { resolveCapitalMissionDefaults } from "../shared/capitalMissionDefaults";
 import { evaluateThesisResearchReadiness } from "./aperture/thesisResearchReadiness";
 import { detailsFromCanonicalRecord } from "../shared/capitalThesisStructure";
@@ -1102,6 +1104,7 @@ async function constructPlayForUser(ctx: { user: { id: number; openId?: string }
 }
 
 export const apertureRouter = router({
+  capitalEvidence: capitalEvidenceRouter,
   playOutcome: playOutcomeRouter,
   quickPlay: createQuickPlayRouter({ construct: constructPlayForUser, evidenceBlock: evidenceReviewBlock }),
   strategy: strategyDiscoveryRouter,
@@ -2496,78 +2499,15 @@ export const apertureRouter = router({
           )).limit(1);
           if (!head?.currentRevisionId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The Decision Run binding changed. Open the current mission before recording a new outcome." });
           const expectedRevisionId = head.currentRevisionId;
-          const appended = await db!.transaction(async (tx) => {
-            const [lockedHead] = await tx.select().from(apertureDecisionRuns).where(and(
-              eq(apertureDecisionRuns.id, head.id),
-              eq(apertureDecisionRuns.currentRevisionId, expectedRevisionId),
-              eq(apertureDecisionRuns.lockVersion, head.lockVersion),
-            )).for("update").limit(1);
-            if (!lockedHead?.currentRevisionId) throw new TRPCError({ code: "CONFLICT", message: "The Decision Run changed while this revision was being recorded." });
-            const [inFlightDispatch] = await tx.select({ id: brokerOrders.id }).from(brokerOrders).where(and(
-              eq(brokerOrders.userId, ctx.user.id),
-              eq(brokerOrders.decisionRunId, lockedHead.id),
-              eq(brokerOrders.status, "submitted"),
-              isNull(brokerOrders.brokerOrderId),
-            )).for("update").limit(1);
-            if (inFlightDispatch) {
-              throw new TRPCError({
-                code: "PRECONDITION_FAILED",
-                message: "A paper order dispatch is still resolving for this Decision Run. Record a new disposition after the broker response is persisted.",
-              });
-            }
-            const [current] = await tx.select().from(apertureDecisionRevisions).where(and(
-              eq(apertureDecisionRevisions.id, lockedHead.currentRevisionId),
-              eq(apertureDecisionRevisions.decisionRunId, lockedHead.id),
-            )).limit(1);
-            if (!current) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The current Decision Run revision is unavailable." });
-            const [revisionResult] = await tx.insert(apertureDecisionRevisions).values({
-              decisionRunId: lockedHead.id,
-              version: current.version + 1,
-              previousRevisionId: current.id,
-              ...revisionValues,
-            });
-            const revisionId = Number((revisionResult as any).insertId);
-            const update = await tx.update(apertureDecisionRuns).set({
-              currentRevisionId: revisionId,
-              lifecycle: input.branch === "cash" ? "cash" : input.branch === "conditional" ? "conditional" : head.lifecycle,
-              lockVersion: lockedHead.lockVersion + 1,
-              updatedAt: now,
-            }).where(and(
-              eq(apertureDecisionRuns.id, lockedHead.id),
-              eq(apertureDecisionRuns.currentRevisionId, current.id),
-              eq(apertureDecisionRuns.lockVersion, lockedHead.lockVersion),
-            ));
-            if (!update[0].affectedRows) throw new TRPCError({ code: "CONFLICT", message: "The Decision Run changed while this revision was being recorded." });
-            await tx.update(aperturePendingOutcomes).set({
-              status: "cancelled",
-              updatedAt: now,
-            }).where(and(
-              eq(aperturePendingOutcomes.userId, ctx.user.id),
-              eq(aperturePendingOutcomes.decisionRunId, lockedHead.id),
-              eq(aperturePendingOutcomes.revisionId, current.id),
-              inArray(aperturePendingOutcomes.status, ["pending", "due"]),
-            ));
-            const pendingOutcome = decisionReceiptPendingOutcome({
-              branch: input.branch,
-              reviewAt: input.reviewAt ?? null,
-              reopenCondition: input.reopenCondition ?? null,
-              namedGateKey: input.namedGateKey ?? null,
-            });
-            if (pendingOutcome) {
-              await tx.insert(aperturePendingOutcomes).values({
-                userId: ctx.user.id,
-                decisionRunId: lockedHead.id,
-                revisionId,
-                kind: pendingOutcome.kind,
-                status: "pending",
-                dueAt: pendingOutcome.dueAt,
-                gateKey: pendingOutcome.gateKey,
-                reviewBasis: pendingOutcome.reviewBasis,
-                createdAt: now,
-                updatedAt: now,
-              });
-            }
-            return { decisionRunId: lockedHead.id, revisionId };
+          const appended = await appendDecisionRevision(db!, {
+            ownerId: ctx.user.id, decisionRunId: head.id,
+            expectedRevisionId, expectedLockVersion: head.lockVersion, now,
+            build: async (_tx, lockedHead) => ({
+              values: revisionValues,
+              lifecycle: input.branch === "cash" ? "cash" : input.branch === "conditional" ? "conditional" : lockedHead.lifecycle,
+              pending: { branch: input.branch, reviewAt: input.reviewAt ?? null,
+                reopenCondition: input.reopenCondition ?? null, namedGateKey: input.namedGateKey ?? null },
+            }),
           });
           return { ...appended, created: false, branch: input.branch, maxPlannedLossCents };
         }
