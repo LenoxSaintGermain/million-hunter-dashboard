@@ -49,6 +49,11 @@ export class DealDocumentStorageService {
     await fs.mkdir(dirPath, { recursive: true });
   }
 
+  uploadAvailability() {
+    const available = process.env.NODE_ENV !== "production" || !!(this.s3Client && this.s3Bucket);
+    return { available, message: available ? null : "Document uploads are unavailable until private durable storage is configured. Existing dossier records remain readable." };
+  }
+
   getStoragePath(ownerUserId: number, dossierId: string, documentId: string, contentHash: string): string {
     const safeOwner = String(ownerUserId).replace(/[^0-9]/g, "");
     const safeDossier = dossierId.replace(/[^a-zA-Z0-9-]/g, "");
@@ -75,6 +80,9 @@ export class DealDocumentStorageService {
     retentionPolicy?: RetentionPolicy;
   }): Promise<StoredDocumentStorageResult> {
     const { ownerUserId, dossierId, documentId, buffer, mimeType } = params;
+    if (process.env.NODE_ENV === "production" && (!this.s3Client || !this.s3Bucket)) {
+      throw new Error("durable_storage_required: Document upload is unavailable until private durable storage is configured. No file was saved.");
+    }
     const retentionPolicy = params.retentionPolicy ?? "permanent";
 
     if (buffer.length > MAX_FILE_SIZE) {

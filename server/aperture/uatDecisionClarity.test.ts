@@ -68,6 +68,13 @@ describe("Today briefing header does not stack repeated account chrome above the
     expect($("h1").attr("id")).toBe("today-briefing-title");
     expect($.text()).toContain("Alpaca Paper — AI Thesis");
   });
+
+  it("stacks tour and refresh controls below the heading on narrow screens", () => {
+    const $ = load(today());
+    const row = $("[aria-labelledby='today-briefing-title'] > header > div");
+    expect(row.hasClass("flex-col")).toBe(true);
+    expect(row.hasClass("sm:flex-row")).toBe(true);
+  });
 });
 
 describe("A blocking constraint reconciles its utilization number with its blocked state", () => {

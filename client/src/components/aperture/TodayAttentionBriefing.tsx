@@ -212,7 +212,7 @@ export function TodayAttentionBriefing({
 
   return <section ref={root} aria-labelledby="today-briefing-title" aria-busy={read.busy} data-read-state={read.state} data-mobile-focus={mobileFocus} className="capital-briefing" >
     <header className="border-b p-4" style={{ borderColor: "var(--sh-border-1)" }}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div className="min-w-0"><p className="capital-edition-kicker">The decision desk / Today</p><h1 id="today-briefing-title" className="font-serif text-2xl leading-tight sm:text-3xl">What needs your judgment.</h1><p className="mt-1 text-xs leading-5"><span className="font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--sh-signal)" }}>Today · {modeLabel}</span><span style={{ color: "var(--sh-fg-muted)" }}> · {accountLabel}</span></p></div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowTour(true)} className="min-h-11 gap-1.5 text-xs font-medium border-[var(--sh-signal)] text-[var(--sh-signal)] hover:bg-[var(--sh-burnt-amber-10)]">

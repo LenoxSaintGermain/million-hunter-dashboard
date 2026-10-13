@@ -60,16 +60,19 @@ export function DealDocumentReviewDesk({ dealId, initialDossierId }: Props) {
   const [allowOcr, setAllowOcr] = useState<boolean>(true);
 
   // Queries
-  const { data: dossiers, refetch: refetchDossiers } = trpc.dealDocument.listDossiers.useQuery();
+  const utils = trpc.useUtils();
+  const { data: uploadAvailability, error: availabilityError } = trpc.dealDocument.uploadAvailability.useQuery();
+  const { data: allDossiers, error: dossiersError, refetch: refetchDossiers } = trpc.dealDocument.listDossiers.useQuery();
+  const dossiers = allDossiers?.filter(d => dealId == null || d.dealId === dealId);
   const activeDossierId = selectedDossierId ?? (dossiers && dossiers.length > 0 ? dossiers[0].id : null);
 
-  const { data: dossierData, isLoading: isLoadingDossier, refetch: refetchActiveDossier } =
+  const { data: dossierData, error: dossierError, isLoading: isLoadingDossier, refetch: refetchActiveDossier } =
     trpc.dealDocument.getDossier.useQuery(
       { dossierId: activeDossierId! },
       { enabled: !!activeDossierId }
     );
 
-  const dossier = dossierData?.dossier;
+  const dossier = !dossierError && (dealId == null || dossierData?.dossier.dealId === dealId) ? dossierData?.dossier : undefined;
   const snapshot = dossierData?.snapshot;
 
   // Mutations
@@ -175,14 +178,13 @@ export function DealDocumentReviewDesk({ dealId, initialDossierId }: Props) {
 
   const handleDownload = async (docId: string, filename: string) => {
     try {
-      const response = await fetch(`/api/trpc/dealDocument.downloadDocument?input=${encodeURIComponent(JSON.stringify({ dossierId: activeDossierId, documentId: docId }))}`);
-      const json = await response.json();
-      if (json?.result?.data) {
+      if (!activeDossierId) throw new Error("No dossier selected");
+      const data = await utils.dealDocument.downloadDocument.fetch({ dossierId: activeDossierId, documentId: docId });
+      if (!data?.mimeType || !data.base64Content) throw new Error("Document response unavailable");
         const link = document.createElement("a");
-        link.href = `data:${json.result.data.mimeType};base64,${json.result.data.base64Content}`;
+        link.href = `data:${data.mimeType};base64,${data.base64Content}`;
         link.download = filename;
         link.click();
-      }
     } catch {
       toast.error("Download failed");
     }
@@ -190,6 +192,8 @@ export function DealDocumentReviewDesk({ dealId, initialDossierId }: Props) {
 
   return (
     <div className="v2-edition space-y-8">
+      {dossiersError && <div role="alert"><p>Dossiers could not be loaded. No empty workspace is confirmed.</p><button className="min-h-11 underline" onClick={() => void refetchDossiers()}>Reload dossiers</button></div>}
+      {dossierError && <div role="alert"><p>This dossier could not be loaded. No facts or evaluation are confirmed.</p><button className="min-h-11 underline" onClick={() => void refetchActiveDossier()}>Reload dossier</button></div>}
       {/* 1. Header & Dossier Selector */}
       <div className="border-b border-rule pb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -201,7 +205,7 @@ export function DealDocumentReviewDesk({ dealId, initialDossierId }: Props) {
             {dossier ? dossier.name : "Select or Create Deal Dossier"}
           </h2>
           {dossier && (
-            <div className="flex items-center gap-4 mt-2 text-xs font-mono text-[var(--sh-fg-3)]">
+            <div className="flex flex-wrap items-center gap-4 mt-2 text-xs font-mono text-[var(--sh-fg-3)]">
               <span>Revision {dossier.currentRevision}</span>
               <span>·</span>
               <span>Period: {dossier.reportingPeriod}</span>
@@ -213,12 +217,13 @@ export function DealDocumentReviewDesk({ dealId, initialDossierId }: Props) {
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap min-w-0 max-w-full items-center gap-3">
           {dossiers && dossiers.length > 0 && (
             <select
+              aria-label="Deal dossier"
               value={activeDossierId ?? ""}
               onChange={(e) => setSelectedDossierId(e.target.value)}
-              className="border border-rule bg-paper px-3 py-1.5 text-xs font-mono text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="max-w-full min-w-0 border border-rule bg-paper px-3 py-1.5 text-xs font-mono text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-amber-500"
             >
               {dossiers.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -331,25 +336,20 @@ export function DealDocumentReviewDesk({ dealId, initialDossierId }: Props) {
               </div>
 
               {/* Upload Dropzone */}
-              <div
+              {(!uploadAvailability?.available || availabilityError) && <p role="status" className="mb-3 text-sm text-[var(--sh-fg-3)]">{availabilityError ? "Upload availability could not be checked. Reload before choosing a file." : uploadAvailability?.message ?? "Checking upload availability…"}</p>}
+              <button type="button" disabled={isUploading || !uploadAvailability?.available || !!availabilityError}
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-rule hover:border-amber-500 p-6 text-center cursor-pointer transition-colors bg-[var(--sh-surface-1)]/40"
+                className="w-full min-h-11 border-2 border-dashed border-rule hover:border-amber-500 p-6 text-center cursor-pointer transition-colors bg-[var(--sh-surface-1)]/40"
               >
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  accept=".pdf,.txt"
-                  className="hidden"
-                />
                 <UploadCloud className="w-8 h-8 text-neutral-400 mx-auto mb-2" />
                 <p className="text-xs font-mono text-[var(--ink)] font-semibold">
-                  {isUploading ? "Parsing & Indexing File..." : "Click or Drop PDF / TXT here"}
+                  {isUploading ? "Parsing & Indexing File..." : "Choose PDF or TXT"}
                 </p>
                 <p className="text-[10px] font-mono text-[var(--sh-fg-3)] mt-1">
-                  Bounded: $\le 25$MB · $\le 100$ pages · digital or scanned (Gemini OCR)
+                  Up to 25 MB · 100 pages · scanned PDFs require Vision OCR
                 </p>
-              </div>
+              </button>
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.txt" className="hidden" />
 
               {uploadError && (
                 <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-600 text-xs font-mono flex items-start gap-2">
@@ -580,7 +580,7 @@ export function DealDocumentReviewDesk({ dealId, initialDossierId }: Props) {
                       }
                       className="bg-paper border border-rule hover:border-amber-500 text-xs font-mono px-3 py-2 transition-colors"
                     >
-                      Attach Standard Mandate
+                      Use example mandate
                     </button>
                   )}
 
@@ -604,6 +604,7 @@ export function DealDocumentReviewDesk({ dealId, initialDossierId }: Props) {
                 </div>
               </div>
 
+              <p className="text-xs text-[var(--sh-fg-3)]">The example mandate is illustrative, not your approved acquisition criteria. Review its assumptions before relying on any evaluation.</p>
               {/* Evaluation Receipt Display */}
               {dossier.evaluationReceipt ? (
                 <div className="border-t border-rule pt-6 space-y-6">

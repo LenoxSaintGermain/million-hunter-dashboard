@@ -72,6 +72,7 @@ export default function ScanProgress({ jobId, onComplete, onRetry, className }: 
   if (notFound && !job) return (
     <div role="alert" className={className}>
       <p>Search status unavailable. This search is not on your account, so there is nothing to follow here. Start a new search from your thesis if you still need one.</p>
+      <a className="inline-flex min-h-11 items-center mr-3 underline" href="/thesis?scope=acquisition">Review acquisition thesis →</a>
       <Button variant="outline" onClick={() => refetch()}>Reload search status</Button>
     </div>
   );

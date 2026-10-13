@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { dealDocumentService } from "./dealDocumentService";
+import { dealDocumentStorage } from "./dealDocumentStorage";
 import { acquisitionMandateSchema } from "../shared/acquisitionV2";
 
 export const dealDocumentRouter = router({
+  uploadAvailability: protectedProcedure.query(() => dealDocumentStorage.uploadAvailability()),
   createDossier: protectedProcedure
     .input(z.object({
       name: z.string().trim().min(1).max(256),

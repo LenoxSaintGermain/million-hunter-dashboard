@@ -64,6 +64,7 @@ it("stops polling and shows one clear state when the search is not found (#106)"
   const notFound = { data: { code: "NOT_FOUND", httpStatus: 404 } };
   state.query = { isLoading: true, isError: false, error: notFound };
   const html = renderToStaticMarkup(<ScanProgress jobId={3840001} />);
+  expect(html).toContain('href="/thesis?scope=acquisition"');
   expect(html).toContain("Search status unavailable");
   expect(html).not.toContain("Connecting to scan engine");
   const opts = scanStatusQueryOptions(false);
