@@ -36,3 +36,31 @@ After-hours UAT found that production had no document bucket and could save orig
 Fresh-instance cloud readback; anonymous denial; canary and both production origins; logged-in document intake/download/reload; mobile UI fix; screenshot capture. Broader Capital evidence-binding UAT is still distinct from durable-file storage acceptance.
 
 Linear requires reauthentication; this is the ready-to-sync ship log.
+
+## Build record
+
+- Runtime source: `eb5aaf0d3f9fb1312cc7b88a4d1fc5380ecce26f` (includes prior UAT fixes `e1ff241`).
+- Cloud Build: `07297daf-47cc-420f-8305-69e3bdf6e996`.
+- Tracked-source manifest SHA-256: `3b5e7c58425d83637740b78ffd19f90be857a6d9a34cb0e66e8c82699722e7ff`.
+- No environment files, unrelated strategy drafts or repository history uploaded in the build context.
+- Whole-project typecheck/build passed. Five isolated fresh bundled server starts served HTTP on their first accepted socket.
+- Rollback traffic target, if required: `capital-aperture-startup-81b85b6-r3`. Do not represent rollback as document support: old code cannot read new native-GCS originals. Preserve bucket and database records if traffic rolls back.
+
+## Cloud acceptance in progress
+
+- Build succeeded; image digest `sha256:b4e5b56a6723a62679578a4915fea2b640234a8c5878b0133fde2b60c465e5f6`.
+- Canary `capital-aperture-documents-eb5aaf0-canary`: all 28 release checks passed, including exact source SHA and unauthenticated access denial. No production traffic promoted by this check.
+- Synthetic storage write execution `capital-document-storage-uat-ql8hc` passed under the runtime identity, with no database configuration and zero orders. SHA-256 `e4d6b26fbac42b9d8d1fed7fa799fac0f60036cd5499527ef637c5f5d8780003`.
+- Anonymous request to the exact synthetic original returned HTTP 403.
+- A separate read execution and production/browser acceptance are pending; these are not implied by the successful write execution.
+
+## Production verification update — 23:42 UTC
+
+- Separate read execution `capital-document-storage-uat-pp2nt` succeeded; identical SHA-256, no database, zero orders. Native cloud persistence across containers passed.
+- Production now serves `capital-aperture-startup-eb5aaf0-d2` at 100% traffic. Both public origins passed all 28 release checks for exact runtime `eb5aaf0`.
+- Fresh revision d1: marker `capital-aperture-startup-eb5aaf0-d1-1791934710863`; both URLs HTTP 200 without retry (2109/2026ms). Request logs matched d1; new instance at 23:38:21 UTC and HTTP startup success at 23:38:32 UTC.
+- Fresh revision d2: marker `capital-aperture-startup-eb5aaf0-d2-1791934791551`; both URLs HTTP 200 without retry (221/127ms). Logs matched d2; new instance at 23:39:21 UTC and HTTP startup success at 23:39:31 UTC. These requests occurred after startup completed, so d2 proves another successful fresh-instance startup and route check, not an un-warmed request.
+- Signed-in existing dossier loaded under the deployed UI; upload availability enabled, plain limits and explicitly illustrative mandate labels visible.
+- Browser file upload remains blocked: after user replied about file-URL permission, the extension again explicitly refused `setFiles`. No file was uploaded through the browser. User asked to enable the permission in the signed-in Chrome profile or choose the synthetic file manually. Do not mark browser upload/extraction/download passed.
+- Production Today at 390 × 844: document scroll width 386, viewport 390; overflow remediation passed. Saved account remains explicitly stale, not refreshed. Screenshot: `today-mobile-production-eb5aaf0.png` in the after-hours UAT evidence directory. Viewport reset.
+- No trading actions, account refreshes, or thesis changes performed. Stakeholder UAT remains HOLD pending browser document acceptance and the remaining matrix in the after-hours report.

@@ -2,7 +2,7 @@
 
 Team: Third Signal Lab · Project: Third Signal Lab Agency · Surface: Research OS / Capital Aperture.
 
-**Status: HOLD for stakeholder acceptance.** This is a partial production UAT plus local remediation record, not a release approval. Production observed release: `81b85b6`. Fixes below are local and have not been deployed by this run. Linear authentication was unavailable; this report is ready to sync.
+**Status: HOLD for stakeholder acceptance.** Initial observations below describe `81b85b6`; remediation was subsequently deployed as `eb5aaf0` on revision `capital-aperture-startup-eb5aaf0-d2`. See `DOCUMENT_STORAGE_RELEASE_2026-10-13.md` for exact cloud, two-origin and mobile evidence. Private storage passes separate-container hash readback; Today production mobile overflow is fixed. Browser file permission still blocks upload/extraction/download acceptance. Broader uncovered flows remain open. Linear authentication was unavailable; this report is ready to sync.
 
 ## Boundaries
 
