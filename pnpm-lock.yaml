@@ -25,6 +25,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.693.0
         version: 3.1016.0
+      '@google-cloud/storage':
+        specifier: ^7.22.0
+        version: 7.22.0(encoding@0.1.13)
       '@google/adk':
         specifier: ^0.6.0
         version: 0.6.0(efb39b6693895eeee7de5b1c746213e9)

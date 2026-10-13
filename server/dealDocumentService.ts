@@ -143,6 +143,7 @@ export class DealDocumentService {
       retentionPolicy: storageRes.retentionPolicy,
       purgeAfter: storageRes.purgeAfter,
       storageBackend: storageRes.storageBackend,
+      bucket: storageRes.bucket,
       ocrApplied: parseRes.ocrApplied,
       ocrModel: parseRes.ocrModel,
       uploadedAt: now,
@@ -361,6 +362,7 @@ export class DealDocumentService {
     }
 
     // Delete physical file
+    dealDocumentStorage.assertStoredLocation(targetDoc);
     await dealDocumentStorage.deleteDocument(userId, dossier.id, targetDoc.id, targetDoc.contentHash);
 
     // Invalidation: deleting a document clears confirmations, review, and evaluation
@@ -393,6 +395,8 @@ export class DealDocumentService {
       });
     }
 
+    dealDocumentStorage.assertStoredLocation(targetDoc);
+    if (targetDoc.purgeAfter && Date.parse(targetDoc.purgeAfter) <= Date.now()) throw new Error("document_retention_expired: The original file retention window has ended; extracted evidence remains in the dossier record.");
     const buffer = await dealDocumentStorage.readDocument(
       userId,
       dossier.id,
@@ -411,7 +415,8 @@ export class DealDocumentService {
 
   async deleteDossier(userId: number, dossierId: string) {
     const dossier = await dealDocumentRepository.getDossier(userId, dossierId);
-    await dealDocumentStorage.deleteDossierStorage(userId, dossier.id);
+    for (const doc of dossier.documents) dealDocumentStorage.assertStoredLocation(doc);
+    for (const doc of dossier.documents) await dealDocumentStorage.deleteDocument(userId, dossier.id, doc.id, doc.contentHash);
     return dealDocumentRepository.deleteDossier(userId, dossier.id);
   }
 }

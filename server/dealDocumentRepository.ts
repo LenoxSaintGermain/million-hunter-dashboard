@@ -18,10 +18,15 @@ const documentPagesKey = (dossierId: string, documentId: string, version: number
 // In-memory test store fallback when DATABASE_URL is unset
 const memoryStore = new Map<string, string>();
 
+function requireDevelopmentMemory() {
+  if (process.env.NODE_ENV === "production") throw new Error("database_unavailable: Document records cannot be read or saved. No in-memory substitute was used.");
+}
+
 export class DealDocumentRepository {
   private async getRaw(key: string): Promise<string | null> {
     const db = await getDb();
     if (!db) {
+      requireDevelopmentMemory();
       return memoryStore.get(key) ?? null;
     }
     const [row] = await db
@@ -35,6 +40,7 @@ export class DealDocumentRepository {
   private async setRaw(key: string, content: string): Promise<void> {
     const db = await getDb();
     if (!db) {
+      requireDevelopmentMemory();
       memoryStore.set(key, content);
       return;
     }
@@ -66,6 +72,7 @@ export class DealDocumentRepository {
   private async deleteRaw(key: string): Promise<void> {
     const db = await getDb();
     if (!db) {
+      requireDevelopmentMemory();
       memoryStore.delete(key);
       return;
     }
@@ -153,6 +160,7 @@ export class DealDocumentRepository {
   async listDossiers(ownerUserId: number): Promise<DealDossier[]> {
     const db = await getDb();
     if (!db) {
+      requireDevelopmentMemory();
       const prefix = `deal-document:user:${ownerUserId}:dossier:`;
       const dossiers: DealDossier[] = [];
       for (const [k, v] of Array.from(memoryStore.entries())) {

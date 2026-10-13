@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { Storage, type Bucket } from "@google-cloud/storage";
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
@@ -20,7 +21,7 @@ export interface StoredDocumentStorageResult {
   retentionPolicy: RetentionPolicy;
   createdAt: string;
   purgeAfter?: string;
-  storageBackend: "local_fs" | "cloud_s3";
+  storageBackend: "local_fs" | "cloud_s3" | "cloud_gcs";
   bucket?: string;
 }
 
@@ -32,10 +33,18 @@ export class DealDocumentStorageService {
   private baseDir: string;
   private s3Client: S3Client | null = null;
   private s3Bucket: string | null = null;
+  private gcsBucket: Bucket | null = null;
+  private gcsBucketName: string | null = null;
 
-  constructor(options?: { customBaseDir?: string; s3Bucket?: string; s3Client?: S3Client }) {
+  constructor(options?: { customBaseDir?: string; s3Bucket?: string; s3Client?: S3Client; gcsBucket?: Bucket; gcsBucketName?: string }) {
     this.baseDir = options?.customBaseDir ? path.resolve(options.customBaseDir) : storageBaseDir;
     const bucket = options?.s3Bucket ?? process.env.DEAL_DOCUMENT_S3_BUCKET ?? process.env.DEAL_DOCUMENT_STORAGE_BUCKET;
+    const gcs = options?.gcsBucketName ?? process.env.DEAL_DOCUMENT_GCS_BUCKET;
+    if (gcs && bucket) throw new Error("ambiguous_document_storage: Configure only one cloud backend");
+    if (gcs) {
+      this.gcsBucketName = gcs;
+      this.gcsBucket = options?.gcsBucket ?? new Storage().bucket(gcs);
+    }
     if (bucket) {
       this.s3Bucket = bucket;
       this.s3Client = options?.s3Client ?? new S3Client({
@@ -50,8 +59,15 @@ export class DealDocumentStorageService {
   }
 
   uploadAvailability() {
-    const available = process.env.NODE_ENV !== "production" || !!(this.s3Client && this.s3Bucket);
+    const available = process.env.NODE_ENV !== "production" || !!(this.s3Client && this.s3Bucket) || !!this.gcsBucket;
     return { available, message: available ? null : "Document uploads are unavailable until private durable storage is configured. Existing dossier records remain readable." };
+  }
+
+  assertStoredLocation(meta: {storageBackend?: string; bucket?: string}) {
+    const backend = this.gcsBucket ? "cloud_gcs" : this.s3Client ? "cloud_s3" : "local_fs";
+    if ((meta.storageBackend ?? "local_fs") !== backend || (meta.bucket && meta.bucket !== (this.gcsBucketName ?? this.s3Bucket))) {
+      throw new Error("document_storage_location_unavailable: This original belongs to a different storage backend; no substitute was returned.");
+    }
   }
 
   getStoragePath(ownerUserId: number, dossierId: string, documentId: string, contentHash: string): string {
@@ -80,7 +96,7 @@ export class DealDocumentStorageService {
     retentionPolicy?: RetentionPolicy;
   }): Promise<StoredDocumentStorageResult> {
     const { ownerUserId, dossierId, documentId, buffer, mimeType } = params;
-    if (process.env.NODE_ENV === "production" && (!this.s3Client || !this.s3Bucket)) {
+    if (!this.uploadAvailability().available) {
       throw new Error("durable_storage_required: Document upload is unavailable until private durable storage is configured. No file was saved.");
     }
     const retentionPolicy = params.retentionPolicy ?? "permanent";
@@ -99,7 +115,23 @@ export class DealDocumentStorageService {
       ? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
       : undefined;
 
-    // Cloud S3 / GCS storage path
+    if (this.gcsBucket && this.gcsBucketName) {
+      const storageKey = this.getS3StorageKey(ownerUserId, dossierId, documentId, contentHash);
+      await this.gcsBucket.file(storageKey).save(buffer, {
+        resumable: false,
+        validation: "crc32c",
+        preconditionOpts: { ifGenerationMatch: 0 },
+        metadata: {
+          contentType: mimeType,
+          cacheControl: "private, no-store",
+          ...(purgeAfter ? { customTime: purgeAfter } : {}),
+          metadata: { owneruserid: String(ownerUserId), dossierid: dossierId, documentid: documentId, contenthash: contentHash, retentionpolicy: retentionPolicy, createdat: now, ...(purgeAfter ? { purgeafter: purgeAfter } : {}) },
+        },
+      });
+      return {storageKey, contentHash, byteSize: buffer.length, retentionPolicy, createdAt: now, purgeAfter, storageBackend: "cloud_gcs", bucket: this.gcsBucketName};
+    }
+
+    // S3-compatible storage path
     if (this.s3Client && this.s3Bucket) {
       const s3Key = this.getS3StorageKey(ownerUserId, dossierId, documentId, contentHash);
       await this.s3Client.send(new PutObjectCommand({
@@ -153,6 +185,16 @@ export class DealDocumentStorageService {
   }
 
   async readDocument(ownerUserId: number, dossierId: string, documentId: string, contentHash: string): Promise<Buffer> {
+    if (this.gcsBucket) {
+      try {
+        const [buffer] = await this.gcsBucket.file(this.getS3StorageKey(ownerUserId, dossierId, documentId, contentHash)).download({validation:"crc32c"});
+        if (crypto.createHash("sha256").update(buffer).digest("hex") !== contentHash) throw new Error("document_integrity_compromised: Hash mismatch on storage read");
+        return buffer;
+      } catch (err) {
+        if ((err as {code?: number}).code === 404) throw new Error("document_not_found: The requested document file does not exist");
+        throw err;
+      }
+    }
     if (this.s3Client && this.s3Bucket) {
       const s3Key = this.getS3StorageKey(ownerUserId, dossierId, documentId, contentHash);
       try {
@@ -200,6 +242,11 @@ export class DealDocumentStorageService {
   }
 
   async getMetadata(ownerUserId: number, dossierId: string, documentId: string, contentHash: string): Promise<StoredDocumentStorageResult | null> {
+    if (this.gcsBucket) {
+      const storageKey = this.getS3StorageKey(ownerUserId, dossierId, documentId, contentHash);
+      const [meta] = await this.gcsBucket.file(storageKey).getMetadata();
+      return {storageKey, contentHash, byteSize: Number(meta.size), retentionPolicy: meta.metadata?.retentionpolicy === "90_day" ? "90_day" : "permanent", createdAt: String(meta.metadata?.createdat ?? meta.timeCreated), purgeAfter: meta.metadata?.purgeafter ? String(meta.metadata.purgeafter) : undefined, storageBackend:"cloud_gcs", bucket:this.gcsBucketName!};
+    }
     const targetPath = this.getStoragePath(ownerUserId, dossierId, documentId, contentHash);
     const metaPath = targetPath.replace(/\.bin$/, ".meta.json");
     try {
@@ -211,6 +258,10 @@ export class DealDocumentStorageService {
   }
 
   async deleteDocument(ownerUserId: number, dossierId: string, documentId: string, contentHash: string): Promise<boolean> {
+    if (this.gcsBucket) {
+      await this.gcsBucket.file(this.getS3StorageKey(ownerUserId, dossierId, documentId, contentHash)).delete({ignoreNotFound:true});
+      return true;
+    }
     if (this.s3Client && this.s3Bucket) {
       const s3Key = this.getS3StorageKey(ownerUserId, dossierId, documentId, contentHash);
       try {
@@ -219,8 +270,8 @@ export class DealDocumentStorageService {
           Key: s3Key,
         }));
         return true;
-      } catch {
-        return false;
+      } catch (error) {
+        throw error;
       }
     }
 
@@ -239,6 +290,7 @@ export class DealDocumentStorageService {
   }
 
   async deleteDossierStorage(ownerUserId: number, dossierId: string): Promise<void> {
+    if (this.gcsBucket || this.s3Client) throw new Error("cloud_dossier_delete_requires_explicit_documents: Delete each authorized document first");
     const safeOwner = String(ownerUserId).replace(/[^0-9]/g, "");
     const safeDossier = dossierId.replace(/[^a-zA-Z0-9-]/g, "");
     const dossierDir = path.join(this.baseDir, safeOwner, safeDossier);

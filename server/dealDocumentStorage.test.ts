@@ -15,7 +15,7 @@ describe("Deal Document Production Engine & Storage Pipeline", () => {
 
   beforeEach(async () => {
     await fs.rm(testStorageDir, { recursive: true, force: true });
-    storage = new DealDocumentStorageService(testStorageDir);
+    storage = new DealDocumentStorageService({customBaseDir:testStorageDir});
     repo = new DealDocumentRepository();
     repo._clearMemoryStore();
     service = new DealDocumentService();
