@@ -5,6 +5,7 @@ const base = new URL(baseArgument);
 if (base.protocol !== 'https:' || base.username || base.password || base.pathname !== '/' || base.search || base.hash || !(
   base.hostname === 'third-signal-capital-aperture.web.app' ||
   base.hostname === 'capital-aperture-oxiyp4dcpq-uc.a.run.app' ||
+  base.hostname === 'capital-aperture-325422432428.us-central1.run.app' ||
   /^[a-z0-9-]+---capital-aperture-oxiyp4dcpq-uc\.a\.run\.app$/.test(base.hostname)
 )) throw new Error('Use the verified Capital Aperture production or tagged origin');
 
@@ -18,6 +19,10 @@ function check(label, passed) {
   if (!passed) throw new Error(`Release check failed: ${label}`);
 }
 try {
+  const ready = await read('/readyz');
+  check('Real HTTP readiness endpoint responds without caching', ready.response.status === 200 &&
+    (ready.response.headers.get('content-type') ?? '').includes('application/json') &&
+    (ready.response.headers.get('cache-control') ?? '').includes('no-store') && JSON.parse(ready.body)?.ready === true);
   const page = await read('/aperture');
   check('App shell is available', page.response.status === 200 && (page.response.headers.get('content-type') ?? '').includes('text/html'));
   const asset = page.body.match(/src="(\/assets\/[^"\s]+\.js)"/)?.[1];

@@ -14,6 +14,7 @@ import { handleOneTimeGlp1Research } from "../aperture/oneTimeGlp1ResearchSchedu
 import { handlePaperAccountSync } from "../aperture/paperAccountSyncScheduled";
 import { logSharedAlpacaKeyMode } from "../aperture/brokers/envBrokerOwner";
 import { logPracticeBooksMode } from "../aperture/practiceBooks/flags";
+import { resolveServerPort, listenHttp } from "./serverStartup";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -42,11 +43,17 @@ async function startServer() {
   // Resolve the port BEFORE setting up Vite so the HMR server binding
   // knows which port it will listen on. If resolved after setupVite,
   // Vite falls back to its default standalone port (5173).
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
+  const preferredPort = Number(process.env.PORT ?? "3000");
+  const port = await resolveServerPort({ PORT: process.env.PORT, NODE_ENV: process.env.NODE_ENV }, findAvailablePort);
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
+
+  // This route exists only on the real HTTP listener, after setup completes.
+  // Readiness means HTTP is serving; it does not claim DB/provider health.
+  app.get("/readyz", (_req, res) => {
+    res.set("Cache-Control", "no-store").status(200).json({ ready: true });
+  });
 
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
@@ -75,9 +82,9 @@ async function startServer() {
     serveStatic(app);
   }
 
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-  });
+  await listenHttp(server, port);
+  console.log(`HTTP ready on 0.0.0.0:${port}`);
+  startSentinelArchiveCron();
 
   // Scheduled sourcing. Arming the timer is inert — every schedule is disabled
   // by default, so nothing spends tokens until a human turns one on.
@@ -89,7 +96,10 @@ async function startServer() {
   }
 }
 
-startServer().catch(console.error);
+startServer().catch(error => {
+  console.error("[startup] HTTP server failed to start", error instanceof Error ? error.message : "Unknown error");
+  process.exit(1);
+});
 
 // ─── Sentinel Auto-Archive Cron ──────────────────────────────────────────────
 // Runs every hour to mark expired macro signals as archived.
@@ -111,4 +121,3 @@ function startSentinelArchiveCron() {
   // Then every hour
   setInterval(runArchive, 60 * 60 * 1000);
 }
-startSentinelArchiveCron();
