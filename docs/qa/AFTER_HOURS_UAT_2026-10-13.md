@@ -2,6 +2,10 @@
 
 Team: Third Signal Lab · Project: Third Signal Lab Agency · Surface: Research OS / Capital Aperture.
 
+## October 14 follow-up
+
+The historical observations below are retained. Upload permission is no longer the current blocker: the synthetic TXT was uploaded, persisted and downloaded byte-for-byte. Expanded SDE extraction, undisclosed-value confirmation safety and mobile proposal clipping are fixed and production-retested on `capital-aperture-document-mobile-322c30b`. See `DOCUMENT_EXTRACTION_RELEASE_2026-10-14.md` for exact builds, both-origin checks, test caveats and screenshots. Stakeholder HOLD remains for the uncovered flows; confirmation/evaluation and OCR are not certified.
+
 **Status: HOLD for stakeholder acceptance.** Initial observations below describe `81b85b6`; remediation was subsequently deployed as `eb5aaf0` on revision `capital-aperture-startup-eb5aaf0-d2`. See `DOCUMENT_STORAGE_RELEASE_2026-10-13.md` for exact cloud, two-origin and mobile evidence. Private storage passes separate-container hash readback; Today production mobile overflow is fixed. Browser file permission still blocks upload/extraction/download acceptance. Broader uncovered flows remain open. Linear authentication was unavailable; this report is ready to sync.
 
 ## Boundaries
