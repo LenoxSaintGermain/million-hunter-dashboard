@@ -509,11 +509,11 @@ export function DealDocumentReviewDesk({ dealId, initialDossierId }: Props) {
                               {proposals.map((p) => (
                                 <div
                                   key={p.id}
-                                  className="flex items-center justify-between p-3 border border-rule hover:border-amber-500/60 bg-[var(--sh-surface-1)]/30 text-xs transition-colors"
+                                  className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between p-3 border border-rule hover:border-amber-500/60 bg-[var(--sh-surface-1)]/30 text-xs transition-colors"
                                 >
-                                  <div className="space-y-1 pr-4">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono font-semibold text-[var(--ink)]">
+                                  <div className="min-w-0 flex-1 space-y-1 sm:pr-4">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="shrink-0 whitespace-nowrap font-mono font-semibold text-[var(--ink)]">
                                         {formatUSD(p.value)}
                                       </span>
                                       <span className="text-[10px] font-mono px-1.5 py-0.5 bg-neutral-100 text-neutral-600 border border-neutral-200">
@@ -540,7 +540,7 @@ export function DealDocumentReviewDesk({ dealId, initialDossierId }: Props) {
                                         span: p.provenance.span,
                                       });
                                     }}
-                                    className="flex-shrink-0 bg-paper border border-rule hover:border-amber-500 text-xs font-mono px-3 py-1.5 transition-colors"
+                                    className="min-h-11 flex-shrink-0 bg-paper border border-rule hover:border-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-mono px-3 py-1.5 transition-colors"
                                   >
                                     Confirm Fact
                                   </button>

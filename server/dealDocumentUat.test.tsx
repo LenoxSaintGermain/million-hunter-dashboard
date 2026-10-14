@@ -22,6 +22,17 @@ it("does not offer confirmation of missing or failed extraction as a financial f
   expect($.text()).toContain("Extraction needs review");
 });
 afterEach(() => vi.unstubAllEnvs());
+it("gives document amounts and actions separate mobile rows with wrapping provenance", () => {
+  state.list = {data: [{id:"uat",name:"UAT",dealId:1}]};
+  state.detail = {data: {dossier:{id:"uat",name:"UAT",dealId:1,currentRevision:2,documents:[],confirmedFacts:{},currency:"USD",reportingPeriod:"FY2025"}, snapshot:{fields:[],proposals:[{id:"value",field:"sde",state:"value",value:702537,provenance:{page:1,documentVersion:1,extractionVersion:"test",span:"SDE: $702,537"}}]}}};
+  const $ = load(renderToStaticMarkup(<DealDocumentReviewDesk dealId={1} />));
+  const action = $('button').filter((_, el) => $(el).text().includes("Confirm Fact"));
+  expect(action.parent().hasClass("flex-col")).toBe(true);
+  expect(action.parent().hasClass("sm:flex-row")).toBe(true);
+  expect(action.hasClass("min-h-11")).toBe(true);
+  expect(action.parent().find(".flex-wrap").length).toBe(1);
+  expect(action.parent().find(".whitespace-nowrap").text()).toBe("$702,537");
+});
 it("rejects production uploads before touching temporary filesystem when durable storage is absent", async () => {
   vi.stubEnv("NODE_ENV", "production");
   vi.stubEnv("DEAL_DOCUMENT_S3_BUCKET", ""); vi.stubEnv("DEAL_DOCUMENT_STORAGE_BUCKET", "");
