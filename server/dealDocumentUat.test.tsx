@@ -14,6 +14,13 @@ vi.mock("@/lib/trpc", () => ({ trpc: {
   ]),
 } }));
 import { DealDocumentReviewDesk } from "../client/src/components/DealDocumentReviewDesk";
+it("does not offer confirmation of missing or failed extraction as a financial fact", () => {
+  state.list = {data: [{id:"uat",name:"UAT",dealId:1}]};
+  state.detail = {data: {dossier:{id:"uat",name:"UAT",dealId:1,currentRevision:2,documents:[],confirmedFacts:{},currency:"USD",reportingPeriod:"FY2025"}, snapshot:{fields:[],proposals:[{id:"missing",field:"sde",state:"extraction_failed",value:null,provenance:{page:1,documentVersion:1,extractionVersion:"test",span:""}}]}}};
+  const $ = load(renderToStaticMarkup(<DealDocumentReviewDesk dealId={1} />));
+  expect($('button:not(:disabled)').filter((_, el) => $(el).text().includes("Confirm Fact")).length).toBe(0);
+  expect($.text()).toContain("Extraction needs review");
+});
 afterEach(() => vi.unstubAllEnvs());
 it("rejects production uploads before touching temporary filesystem when durable storage is absent", async () => {
   vi.stubEnv("NODE_ENV", "production");

@@ -23,6 +23,11 @@ function ready() {
 }
 
 describe("document foundation (illustrative, deterministic, zero API)", () => {
+  it("extracts the expanded SDE label from the production UAT text fixture", () => {
+    const proposals = proposeDealDocument(document("Seller's Discretionary Earnings (SDE): $702,537\nEBITDA is not disclosed. Do not infer EBITDA from SDE."));
+    expect(proposals.find(p => p.field === "sde")).toMatchObject({ state: "value", value: 702537 });
+    expect(proposals.find(p => p.field === "ebitda")).toMatchObject({ state: "not_disclosed", value: null });
+  });
   it.each([false, true])("selects the oldest capture instant across ISO offsets (reverse insertion: %s)", reverse => {
     const oldest = "2026-09-30T10:00:00+02:00"; // 08:00Z
     const newer = "2026-09-30T09:00:00-04:00"; // 13:00Z, lexically first

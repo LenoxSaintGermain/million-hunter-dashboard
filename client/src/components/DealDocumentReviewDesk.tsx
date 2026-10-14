@@ -456,7 +456,7 @@ export function DealDocumentReviewDesk({ dealId, initialDossierId }: Props) {
                               </span>
                             ) : proposals.length > 0 ? (
                               <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200">
-                                <AlertTriangle className="w-3 h-3" /> Proposals Extracted
+                                <AlertTriangle className="w-3 h-3" /> {proposals.some(p => p.state === "value" && p.value !== null) ? "Proposals Extracted" : proposals.every(p => p.state === "not_disclosed") ? "Not disclosed" : "Extraction needs review"}
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 bg-neutral-100 text-neutral-500 border border-neutral-200">
@@ -524,20 +524,22 @@ export function DealDocumentReviewDesk({ dealId, initialDossierId }: Props) {
                                       </span>
                                     </div>
                                     <blockquote className="italic text-[var(--sh-fg-2)] text-[11px] border-l border-rule pl-2">
-                                      "{p.provenance.span}"
+                                      {p.provenance.span ? `"${p.provenance.span}"` : "No usable source span extracted. Review the original document."}
                                     </blockquote>
                                   </div>
 
                                   <button
-                                    onClick={() =>
+                                    disabled={p.state !== "value" || p.value === null || !p.provenance.span.trim()}
+                                    onClick={() => {
+                                      if (p.state !== "value" || p.value === null || !p.provenance.span.trim()) return;
                                       setConfirmingProposal({
                                         proposalId: p.id,
                                         field,
-                                        value: p.value ?? 0,
+                                        value: p.value,
                                         page: p.provenance.page,
                                         span: p.provenance.span,
-                                      })
-                                    }
+                                      });
+                                    }}
                                     className="flex-shrink-0 bg-paper border border-rule hover:border-amber-500 text-xs font-mono px-3 py-1.5 transition-colors"
                                   >
                                     Confirm Fact

@@ -74,7 +74,7 @@ export type MoneyField = { value: number | null; state: FieldState; span: string
 const labels = {
   ask: "Asking Price|Asking|Selling Price",
   revenue: "Gross Revenue|Annual Revenue|Revenue|Gross Sales",
-  sde: "Cash Flow(?:\\s*\\(SDE\\))?|Seller(?:’|'|s)* Discretionary Earnings|SDE",
+  sde: "Cash Flow(?:\\s*\\(SDE\\))?|Seller(?:’|'|s)* Discretionary Earnings(?:\\s*\\(SDE\\))?|SDE",
   ebitda: "EBITDA",
   inventory: "Inventory",
   ffe: "FF&E|Furniture,? Fixtures (?:and|&) Equipment|Equipment",
@@ -132,7 +132,7 @@ export type ListingEvidence = {
 
 function moneyField(text: string, key: MoneyKey, source: Source): MoneyField {
   // Label-anchored and bounded; never borrow a value from the next field.
-  const pattern = new RegExp(`(?:^|[\\s;])((?:${labels[key]})\\s*:?\\s*(?:(?:about|roughly|approximately|approx\\.?|≈|~)\\s*)?(?:\\$\\s*[\\d,.]+(?:\\s*[MK]\\b)?(?:\\s*(?:million|thousand)\\b)?\\+?|on request|upon request|sign in to view|not disclosed|N/A))`, "gi");
+  const pattern = new RegExp(`(?:^|[\\s;])((?:${labels[key]})\\s*:?\\s*(?:(?:about|roughly|approximately|approx\\.?|≈|~)\\s*)?(?:\\$\\s*[\\d,.]+(?:\\s*[MK]\\b)?(?:\\s*(?:million|thousand)\\b)?\\+?|on request|upon request|sign in to view|(?:is\\s+)?not disclosed|N/A))`, "gi");
   const matches = Array.from(text.matchAll(pattern)).filter(match => {
     // Aliases are field labels, not replacement costs or prose about equipment.
     if (!/^(?:Selling Price|Gross Sales|Equipment)\b/i.test(match[1])) return true;

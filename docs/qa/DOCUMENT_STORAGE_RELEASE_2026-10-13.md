@@ -64,3 +64,15 @@ Linear requires reauthentication; this is the ready-to-sync ship log.
 - Browser file upload remains blocked: after user replied about file-URL permission, the extension again explicitly refused `setFiles`. No file was uploaded through the browser. User asked to enable the permission in the signed-in Chrome profile or choose the synthetic file manually. Do not mark browser upload/extraction/download passed.
 - Production Today at 390 × 844: document scroll width 386, viewport 390; overflow remediation passed. Saved account remains explicitly stale, not refreshed. Screenshot: `today-mobile-production-eb5aaf0.png` in the after-hours UAT evidence directory. Viewport reset.
 - No trading actions, account refreshes, or thesis changes performed. Stakeholder UAT remains HOLD pending browser document acceptance and the remaining matrix in the after-hours report.
+
+## Browser upload follow-up — October 13, evening ET
+
+- User enabled file access; browser reconnected. Synthetic TXT upload succeeded with OCR off and 90-day original retention. Revision 2 and one document persisted after reload. Original SHA-256: `8f43bd3a881498100300d5a44cf135d658c97338e1058f05d3c0a01781e589d8`.
+- Asking price, revenue, inventory and FF&E matched the fixture. Expanded SDE label failed extraction; EBITDA explicit nondisclosure was rendered as an empty proposal. UI offered confirmation of empty proposals. No facts were confirmed and no gate evaluation run.
+- New failing regression reproduced SDE extraction failure. Local parser fix supports parenthesized SDE and explicit “is not disclosed”; 81 engine/acquisition tests passed. Separate UI regression reproduced enabled confirmation for a null extraction; local fix labels unusable extraction, disables confirmation and removes null-to-zero substitution. These follow-up fixes are not yet deployed.
+- Download click produced no observable download event within 15 seconds. Browser downloads-page inspection was blocked by browser policy; no workaround attempted. User asked to supply the downloaded synthetic file for hash verification. Download acceptance remains unverified.
+- Screenshot: `document-upload-production-gap.png` in the existing evidence directory. Stakeholder HOLD remains.
+
+### Download integrity verified
+
+User identified the saved download at `docs/strategy/uat-document-2026-10-13.txt`. Read-only filesystem verification found 466 bytes and SHA-256 `8f43bd3a881498100300d5a44cf135d658c97338e1058f05d3c0a01781e589d8`, identical to `/tmp/uat-document-2026-10-13.txt`. Byte-for-byte `cmp` also passed. Browser download integrity acceptance is now passed; the earlier event timeout was not proof of download failure. The downloaded file is left in the user's chosen location, not staged. Extraction/UI follow-up fixes remain local; stakeholder HOLD is unchanged.
